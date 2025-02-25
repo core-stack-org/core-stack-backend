@@ -1,0 +1,10 @@
+from django.urls import path
+from . import api
+
+urlpatterns = [
+    path("get_states/", api.get_states, name="get_states"),
+    path("get_districts/<int:state_id>/", api.get_districts, name="get_districts"),
+    path("get_blocks/<int:district_id>/", api.get_blocks, name="get_blocks"),
+    path("activate_entities/", api.activate_entities, name="activate_entities"),
+    path("proposed_blocks/", api.proposed_blocks, name="proposed_blocks"),
+]

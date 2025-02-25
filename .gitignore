@@ -1,0 +1,34 @@
+data/
+app_controller/migrations
+app_controller/migrations/__pycache__/
+computing/migrations
+computing/lulc/__pycache__
+computing/mws/__pycache__
+computing/crop_grid/__pycache__
+gee_computing/migrations
+plans/migrations
+geoadmin/migrations
+dpr/migrations
+dpr/__pycache__
+venv/
+.env
+*.pyc
+.idea/
+.DS_Store
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+static/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+env.bak/
+venv.bak/

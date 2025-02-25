@@ -1,0 +1,20 @@
+[
+    {
+      "state": "Uttar Pradesh",
+      "district": "Bara_banki",
+      "block": "Fatehpur",
+      "update_required": 1
+    },
+    {
+      "state": "Telangana",
+      "district": "Medak",
+      "block": "Tupran",
+      "update_required": 1
+    },
+    {
+        "state": "Jharkhand",
+        "district": "Dumka",
+        "block": "Masalia",
+        "update_required": 1
+    }
+  ]
