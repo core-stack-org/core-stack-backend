@@ -459,23 +459,17 @@ def create_excel_for_terrain(data, output_file, writer):
     features = data['features']
     
     for feature in features:
-        properties = feature['properties']
-        hill_slope = properties['hill_slope']
-        plain_area = properties['plain_area']
-        ridge_area = properties['ridge_area']
-        slopy_area = properties['slopy_area']
-        valley_area = properties['valley_are']
-        
+        properties = feature['properties']        
         row = {
             'UID': properties['uid'],  
             'area_in_hac': properties['area_in_ha'],
             'terrainCluster_ID': properties['terrainClu'],
             'Terrain_Description': terrain_description.get(properties['terrainClu']),
-            '% of area hill_slope': hill_slope*100,
-            '% of area plain_area': plain_area*100,
-            '% of area ridge_area': ridge_area*100,
-            '% of area slopy_area': slopy_area*100,
-            '% of area valley_area': valley_area*100,
+            '% of area hill_slope': properties['hill_slope'],
+            '% of area plain_area': properties['plain_area'],
+            '% of area ridge_area': properties['ridge_area'],
+            '% of area slopy_area': properties['slopy_area'],
+            '% of area valley_area': properties['valley_are'],
         }
         
         df_data.append(row)
