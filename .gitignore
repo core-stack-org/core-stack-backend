@@ -1,14 +1,8 @@
 data/
-app_controller/migrations
 app_controller/migrations/__pycache__/
-computing/migrations
 computing/lulc/__pycache__
 computing/mws/__pycache__
 computing/crop_grid/__pycache__
-gee_computing/migrations
-plans/migrations
-geoadmin/migrations
-dpr/migrations
 dpr/__pycache__
 venv/
 .env

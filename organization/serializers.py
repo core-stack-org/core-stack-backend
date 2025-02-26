@@ -19,4 +19,6 @@ class PydanticModelSerializer(serializers.ModelSerializer):
 class OrganizationSerializer(PydanticModelSerializer):
     class Meta:
         model = Organization
-        fields = '__all__'
+        fields = ['id', 'name', 'description', 'created_at', 'created_by', 'updated_at','updated_by']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+        
