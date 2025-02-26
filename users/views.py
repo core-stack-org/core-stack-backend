@@ -12,6 +12,8 @@ from .serializers import (
 )
 from projects.models import Project
 from projects.serializers import ProjectSerializer
+from organization.models import Organization
+from organization.serializers import OrganizationSerializer
 
 
 class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
@@ -23,14 +25,14 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
     @action(detail=False, methods=['get'])
     def available_organizations(self, request):
         """Get list of organizations that users can register for."""
-        from organization.models import Organization
-        from organization.serializers import OrganizationSerializer
         
         # Get all organizations
         organizations = Organization.objects.all()
-        serializer = OrganizationSerializer(organizations, many=True)
         
-        return Response(serializer.data)
+        # Return only the names of the organizations
+        organization_names = [org.name for org in organizations]
+        
+        return Response(organization_names)
     
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

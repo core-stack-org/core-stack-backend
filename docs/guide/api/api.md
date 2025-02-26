@@ -4,6 +4,29 @@ This document provides a comprehensive overview of the Core Stack Backend API en
 
 ## Authentication Endpoints
 
+### Authentication Flow
+The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentication flow works:
+
+1. **Registration/Login**: 
+   - When a user registers or logs in, they receive both an access token and a refresh token.
+
+2. **Using Access Tokens**:
+   - The access token must be included in the Authorization header for all authenticated API requests:
+   ```
+   Authorization: Bearer <your_access_token>
+   ```
+   - Access tokens are valid for 2 days.
+
+3. **Token Refresh**:
+   - When an access token expires, use the refresh token to obtain a new one.
+   - Send a POST request to the token refresh endpoint with the refresh token.
+   - You'll receive a new access token (and potentially a new refresh token).
+   - Refresh tokens are valid for 14 days.
+
+4. **Logout**:
+   - When logging out, send the refresh token to the logout endpoint to invalidate it.
+   - This prevents the refresh token from being used to obtain new access tokens.
+
 ### User Registration
 - **URL**: `/api/v1/auth/register/`
 - **Method**: POST
@@ -46,6 +69,23 @@ This document provides a comprehensive overview of the Core Stack Backend API en
   ```
 - **Response**: Returns access token, refresh token, and user details
 - **Notes**: The access token must be included in the Authorization header for subsequent API calls
+
+### Token Refresh
+- **URL**: `/api/v1/auth/token/refresh/`
+- **Method**: POST
+- **Description**: Obtain a new access token using a valid refresh token
+- **Request Body**:
+  ```json
+  {
+    "refresh": "your-refresh-token"
+  }
+  ```
+- **Response**: Returns a new access token and, if configured, a new refresh token
+- **Notes**: 
+  - Use this endpoint when your access token expires but your refresh token is still valid
+  - With the current configuration, refresh tokens are valid for 14 days while access tokens are valid for 2 days
+  - The system is configured with token rotation, meaning you'll receive a new refresh token with each refresh
+  - The old refresh token is automatically blacklisted after use
 
 ### User Logout
 - **URL**: `/api/v1/auth/logout/`
@@ -464,7 +504,14 @@ These endpoints are maintained for backward compatibility:
      -d '{"username": "newuser", "password": "securepassword"}'
    ```
 
-3. Use the access token for authenticated requests:
+3. Refresh your access token when it expires:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/auth/token/refresh/ \
+     -H "Content-Type: application/json" \
+     -d '{"refresh": "your-refresh-token"}'
+   ```
+
+4. Use the access token for authenticated requests:
    ```bash
    curl -X GET http://api.example.com/api/v1/projects/ \
      -H "Authorization: Bearer {access_token}"
@@ -548,6 +595,7 @@ These endpoints are maintained for backward compatibility:
    - Organization level
    - Project level
    - Feature-specific permissions
-3. **Token Expiration**: Access tokens expire after a short period (typically 15 minutes)
-4. **Token Refresh**: Refresh tokens can be used to obtain new access tokens
-5. **Token Blacklisting**: Refresh tokens are blacklisted on logout
+3. **Token Expiration**: Access tokens expire after 2 days
+4. **Token Refresh**: Refresh tokens (valid for 14 days) can be used to obtain new access tokens
+5. **Token Blacklisting**: Refresh tokens are blacklisted on logout or when used for refresh
+6. **Token Rotation**: When refreshing a token, a new refresh token is issued and the old one is blacklisted
