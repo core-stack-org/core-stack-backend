@@ -29,10 +29,10 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
         # Get all organizations
         organizations = Organization.objects.all()
         
-        # Return only the names of the organizations
-        organization_names = [org.name for org in organizations]
+        # Return organization name and ID
+        organization_data = [{"id": str(org.id), "name": org.name} for org in organizations]
         
-        return Response(organization_names)
+        return Response(organization_data)
     
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
