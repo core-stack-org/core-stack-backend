@@ -258,7 +258,9 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
   {
     "name": "Project Name",
     "description": "Project Description",
-    "organization": "organization-id"
+    "organization": "organization-id",
+    "created_by": "user-id",
+    "updated_by": "user-id"
   }
   ```
 - **Authentication**: Required
@@ -295,7 +297,7 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Permissions**: User must have access to the project
 
 ### Enable Project App
-- **URL**: `/api/v1/projects/{project_id}/apps/`
+- **URL**: `/api/v1/projects/{project_id}/enable_app/`
 - **Method**: POST
 - **Description**: Enable an app for a project
 - **Request Body**:

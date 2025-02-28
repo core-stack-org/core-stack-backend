@@ -28,14 +28,14 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         """
         Returns the permission objects that should be applied to the request.
         """
-        if self.action in ["create", "list", "delete"]:   
-            permission_classes = [IsSuperAdmin] # only superadmins can create or list organizations
+        if self.action in ["create", "delete"]:   
+            permission_classes = [IsSuperAdmin] # only superadmins can create or delete organizations
 
-        elif self.action in ["retrieve", "update", "partial_update"]:
-            permission_classes = [permissions.IsAuthenticated()] # only authenticated users can retrieve, update, or partial_update an organization
+        elif self.action in ["retrieve", "update", "partial_update", "list"]:
+            permission_classes = [permissions.IsAuthenticated] # only authenticated users can retrieve, update, or partial_update an organization
 
         else:
-            permission_classes = [permissions.IsAuthenticated()]
+            permission_classes = [permissions.IsAuthenticated]
 
         return [permission() for permission in permission_classes]
 
