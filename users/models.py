@@ -15,6 +15,7 @@ class User(AbstractUser):
         related_name='users'
     )
     contact_number = models.CharField(max_length=20, blank=True, null=True)
+    odk_username = models.CharField(max_length=255, blank=True, null=True)
     is_superadmin = models.BooleanField(default=False)
 
     # Override the ManyToMany fields from AbstractUser with custom related_name

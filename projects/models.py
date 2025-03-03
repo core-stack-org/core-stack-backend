@@ -38,3 +38,25 @@ class ProjectApp(models.Model):
         
     def __str__(self):
         return f"{self.project.name} - {self.get_app_type_display()}"
+
+
+class PlantationProfile(models.Model):
+    """
+    Profile model specifically for projects with app_type='plantation'.
+    """
+    profile_id = models.AutoField(primary_key=True)
+    project_app = models.ForeignKey(ProjectApp, on_delete=models.CASCADE, 
+                                   limit_choices_to={'app_type': AppType.PLANTATION},
+                                   related_name='plantation_profiles')
+    config = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Plantation Profile {self.profile_id} for Project {self.project_app.project.name}"
+    
+    def save(self, *args, **kwargs):
+        """Override save to ensure this model is only used with plantation app types"""
+        if self.project_app.app_type != AppType.PLANTATION:
+            raise ValueError("PlantationProfile can only be associated with plantation app types")
+        super().save(*args, **kwargs)

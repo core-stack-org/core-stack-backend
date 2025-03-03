@@ -52,7 +52,7 @@ Superadmins are application-level administrators who can manage organizations an
 
 **To create additional superadmins:**
 
-Only existing superadmins can create new superadmins through the API:
+Only existing **superadmins** can create new superadmins through the API:
 
 ```http
 PUT/PATCH /api/v1/users/{user_id}/
