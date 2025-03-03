@@ -6,7 +6,7 @@ from nrm_app.settings import (
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_SERVICE_ACCOUNT_KEY_NRM_WORK_PATH,
+    GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -24,13 +24,13 @@ from utilities.geoserver_utils import Geoserver
 
 def ee_initialize(project=None):
     try:
-        if project == "nrm_work":
-            service_account = "nrm-work@nrm-work.iam.gserviceaccount.com"
+        if project == "helper":
+            service_account = "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
             credentials = ee.ServiceAccountCredentials(
-                service_account, GEE_SERVICE_ACCOUNT_KEY_NRM_WORK_PATH
+                service_account, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH
             )
         else:
-            service_account = "nrm-water@df-project-iit.iam.gserviceaccount.com"
+            service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
             credentials = ee.ServiceAccountCredentials(
                 service_account, GEE_SERVICE_ACCOUNT_KEY_PATH
             )

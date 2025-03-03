@@ -36,8 +36,8 @@ ODK_URL_crop = (
     "https://odk.gramvaani.org/v1/projects/9/forms/crop_form_V1.0.0.svc/Submissions"
 )
 
-GEE_ASSET_PATH = "projects/df-project-iit/assets/core-stack/"
+GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
 GCS_BUCKET_NAME = "core-stack"
 
-GEE_PATH_NRM_WORK = "projects/nrm-work/assets/core-stack/"
+GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"

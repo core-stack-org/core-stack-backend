@@ -3,7 +3,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from computing.utils import create_chunk, merge_chunks
-from utilities.constants import GEE_PATH_NRM_WORK
+from utilities.constants import GEE_HELPER_PATH
 from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
@@ -17,10 +17,10 @@ from utilities.gee_utils import (
 
 def run_off(state, district, block, start_date, end_date, is_annual):
     description = (
-        ("Runoff_annual_" if is_annual else "Runoff_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+            ("Runoff_annual_" if is_annual else "Runoff_fortnight_")
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
     )
 
     asset_id = get_gee_asset_path(state, district, block) + description
@@ -40,13 +40,13 @@ def run_off(state, district, block, start_date, end_date, is_annual):
         chunk_size = 30
         rois, descs = create_chunk(roi, description, chunk_size)
 
-        ee_initialize("nrm_work")
-        create_gee_directory(state, district, block, GEE_PATH_NRM_WORK)
+        ee_initialize("helper")
+        create_gee_directory(state, district, block, GEE_HELPER_PATH)
 
         tasks = []
         for i in range(len(rois)):
             chunk_asset_id = (
-                get_gee_asset_path(state, district, block, GEE_PATH_NRM_WORK) + descs[i]
+                    get_gee_asset_path(state, district, block, GEE_HELPER_PATH) + descs[i]
             )
             if not is_gee_asset_exists(chunk_asset_id):
                 task_id = generate_run_off(
@@ -64,7 +64,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
 
         for desc in descs:
             make_asset_public(
-                get_gee_asset_path(state, district, block, GEE_PATH_NRM_WORK) + desc
+                get_gee_asset_path(state, district, block, GEE_HELPER_PATH) + desc
             )
 
         runoff_task_id = merge_chunks(
@@ -354,6 +354,7 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
         stats2 = total.reduceRegions(reducer=ee.Reducer.sum(), collection=roi, scale=30)
 
         statsl = ee.List(stats2.toList(size))
+
         # l = ee.List([])
 
         def res(m):
