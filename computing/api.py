@@ -15,8 +15,6 @@ from .utils import (
 from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
-from .lulc.lulc_v2 import generate_lulc_layer_v2
-from .lulc.temporal_correction import lulc_temporal_correction
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb1 import generate_swb_layer
@@ -217,42 +215,6 @@ def generate_well_depth(request):
         )
     except Exception as e:
         print("Exception in generate_well_depth api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-def generate_lulc_v2(request):
-    print("Inside generate_lulc_v2")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        generate_lulc_layer_v2.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
-        )
-        return Response({"Success": "LULC task initiated"}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in generate_lulc_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-def generate_lulc_v3(request):
-    print("Inside generate_lulc_v3")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        lulc_temporal_correction.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
-        )
-        return Response({"Success": "LULC task initiated"}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in generate_lulc_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

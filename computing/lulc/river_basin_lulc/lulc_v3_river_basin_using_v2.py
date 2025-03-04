@@ -21,13 +21,13 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
     ee_initialize("aman")
     print("Inside lulc_river_basin")
 
-    objectid = 5
+    objectid = 12
     roi_boundary = ee.FeatureCollection(
         "projects/ee-ankit-mcs/assets/CGWB_basin"
     ).filter(ee.Filter.eq("objectid", objectid))
 
     filename_prefix = (
-        str(objectid) + "_" + roi_boundary.first().get("ba_name").getInfo()
+            str(objectid) + "_" + roi_boundary.first().get("ba_name").getInfo()
     )
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
@@ -57,8 +57,8 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
             # get_gee_asset_path(state_name, district_name, block_name)
-            "projects/ee-amanverma/assets/lulc_v3/"
-            + final_output_filename
+                "projects/ee-amanverma/assets/lulc_v3/"
+                + final_output_filename
         )
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
@@ -227,7 +227,7 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         )
 
     def process_conditions(
-        before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
+            before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
     ):
 
         cond1 = (
@@ -466,7 +466,7 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
 
 
 def sync_lulc_to_gcs(
-    final_output_filename_array_new, final_output_assetid_array_new, scale
+        final_output_filename_array_new, final_output_assetid_array_new, scale
 ):
     task_ids = []
     for i in range(0, len(final_output_assetid_array_new)):
@@ -495,12 +495,12 @@ def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_
             suff = workspace.replace("LULC", "")
             style = workspace.lower() + "_style"
             layer_name = (
-                "LULC_"
-                + s_year
-                + "_"
-                + e_year
-                + "_"
-                + valid_gee_text(block_name.lower())
-                + suff
+                    "LULC_"
+                    + s_year
+                    + "_"
+                    + e_year
+                    + "_"
+                    + valid_gee_text(block_name.lower())
+                    + suff
             )
             sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style)
