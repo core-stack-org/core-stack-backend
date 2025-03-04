@@ -6,6 +6,7 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
+from .misc.restoration_opportunity import generate_layers
 from .misc.stream_order import generate_stream_order_vector
 from .utils import (
     Geoserver,
@@ -624,4 +625,22 @@ def stream_order_vector(request):
         )
     except Exception as e:
         print("Exception in stream_order_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["POST"])
+def restoration_opportunity(request):
+    print("Inside restoration_opportunity api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        generate_layers.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": "restoration_opportunity task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in restoration_opportunity api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
