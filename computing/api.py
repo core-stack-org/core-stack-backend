@@ -41,6 +41,7 @@ from .drought.drought_causality import drought_causality
 from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
+from .plantation.site_suitability import site_suitability
 
 
 @api_view(["POST"])
@@ -627,6 +628,7 @@ def stream_order_vector(request):
         print("Exception in stream_order_vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 @api_view(["POST"])
 def restoration_opportunity(request):
     print("Inside restoration_opportunity api")
@@ -643,4 +645,25 @@ def restoration_opportunity(request):
         )
     except Exception as e:
         print("Exception in restoration_opportunity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def plantation_site_suitability(request):
+    print("Inside plantation_site_suitability API")
+    try:
+        organization = request.data.get("organization").lower()
+        project = request.data.get("project").lower()
+        state = request.data.get("state").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        site_suitability.apply_async(
+            args=[organization, project, state, start_year, end_year], queue="nrm"
+        )
+        return Response(
+            {"Success": "Plantation_site_suitability initiated"},
+            status=status.HTTP_201_CREATED,
+        )
+    except Exception as e:
+        print("Exception in Plantation_site_suitability api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
