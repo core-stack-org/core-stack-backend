@@ -16,17 +16,48 @@ logger = setup_logger(__name__)
 
 
 def get_pss(roi, org, project, state, asset_name):
-    # Initialize base image
+    """
+    Generate Plantation Site Suitability (PSS) raster.
+
+    Comprehensive multi-layer analysis that combines:
+    1. Climate
+    2. Soil
+    3. Socioeconomic
+    4. Ecological
+    5. Topographical factors
+
+    Args:
+        roi: Region of Interest (Feature Collection)
+        org: Organization name
+        project: Project name
+        state: Geographic state
+        asset_name: Name for the output asset
+
+    Returns:
+        Asset ID of the generated suitability raster
+    """
+    # Initialize base image with a constant value of 1
     all_layers = ee.Image(1)
+
+    # Prepare asset description and path
     description = asset_name + "_raster"
     asset_id = (
         get_gee_dir_path([org, project], asset_path=GEE_PATH_PLANTATION) + description
     )
 
+    # Remove existing asset if it exists to prevent conflicts
     if is_gee_asset_exists(asset_id):
         ee.data.deleteAsset(asset_id)
 
-    # Climate Layer
+    # Define analysis layers and their processing functions
+    # Each subsequent section follows a similar pattern:
+    # 1. Define variables
+    # 2. Set weights
+    # 3. Create sub-layers
+    # 4. Combine layers with weighted expression
+    # 5. Add to all_layers
+
+    ############### Climate Layer ################
     climate_variables = [
         "annualPrecipitation",
         "meanAnnualTemperature",
@@ -34,20 +65,24 @@ def get_pss(roi, org, project, state, asset_name):
         "referenceEvapoTranspiration",
     ]
 
+    # Default weights (TODO: Consider dynamic weight configuration)
     climate_variable_weights = {
         "annualPrecipitation": 0.25,
         "meanAnnualTemperature": 0.25,
         "aridityIndex": 0.25,
         "referenceEvapoTranspiration": 0.25,
-    }  # TODO Use from DB default config
+    }
 
+    # Get customized weights from external configuration
     climate_variable_weights = get_weights(climate_variable_weights)
     # Validate climate weights
     # if abs(sum(climate_weights.values()) - 1.0) > 1e-6:
     #     raise ValueError("Climate weights must sum to 1")
 
+    # Create climate sub-layers by classifying each variable
     climate_sub_layers = create_classification(climate_variables, roi, state)
 
+    # Prepare weighted expression for climate layer
     climate_expr_vars = {
         "annualPrecip": climate_sub_layers.select(["annualPrecipitation"]),
         "meanAnnualTemp": climate_sub_layers.select(["meanAnnualTemperature"]),
@@ -62,12 +97,13 @@ def get_pss(roi, org, project, state, asset_name):
         "w4": ee.Number(climate_variable_weights["referenceEvapoTranspiration"]),
     }
 
+    # Combine climate variables with weighted expression
     climate_layer = climate_sub_layers.expression(
         "w1 * annualPrecip + w2 * meanAnnualTemp + w3 * aridityIndex + w4 * refEvapoTransp",
         {**climate_expr_vars, **climate_expr_weights},
     ).rename("Climate")
 
-    logger.info("------------Climate layer---------------")
+    logger.info("------------Climate layer done---------------")
 
     all_layers = all_layers.addBands(climate_layer)
 
@@ -90,13 +126,13 @@ def get_pss(roi, org, project, state, asset_name):
         "AWC",
     ]
 
-    # Soil Nutrient Weights
+    # Default Soil Nutrient Weights (TODO: Consider dynamic weight configuration)
     topsoil_nutrient_weights = {
         "tnTopsoilPH": 0.25,
         "tnTopsoilCEC": 0.25,
         "tnTopsoilOC": 0.25,
         "tnTopsoilTexture": 0.25,
-    }  # TODO Use from DB default config
+    }
 
     topsoil_nutrient_weights = get_weights(topsoil_nutrient_weights)
 
@@ -295,7 +331,7 @@ def get_pss(roi, org, project, state, asset_name):
         "Topography": 0.30,
         "Ecology": 0.10,
         "Socioeconomic": 0.15,
-    }  # TODO Use from DB default config
+    }  # TODO: Consider dynamic weight configuration from database
 
     final_weights = get_weights(final_weights)
 
@@ -303,6 +339,7 @@ def get_pss(roi, org, project, state, asset_name):
     # if abs(sum(final_weights.values()) - 1.0) > 1e-6:
     #     raise ValueError("Final weights must sum to 1")
 
+    # Prepare final layer variables and weights
     final_expr_vars = {
         layer: all_layers.select([layer]) for layer in final_weights.keys()
     }
@@ -311,17 +348,19 @@ def get_pss(roi, org, project, state, asset_name):
         f"w{i+1}": ee.Number(weight) for i, weight in enumerate(final_weights.values())
     }
 
+    # Combine all layers with weighted expression
     final_layer = all_layers.expression(
         "w1 * Climate + w2 * Soil + w3 * Topography + w4 * Ecology + w5 * Socioeconomic",
         {**final_expr_vars, **final_expr_weights},
     ).rename("Final")
 
-    # Final plantation score
+    # Pixels with score <= 0.5 are considered unsuitable
     # This rounding is specific to a binary score output
     # Round off Plantation Score to 0 or 1 on each pixel and mask
     final_plantation_score = ee.Image(1).where(final_layer.lte(0.5), 0)
 
-    # LULC mask
+    # Apply LULC (Land Use/Land Cover) mask to filter suitable areas
+    # Considers specific LULC classes as potentially suitable
     # Classes to be masked for (in Dynamic World) - 1 (Trees), 2 (Grass), 4 (Crops), 5 (Shrub & Scrub), 7 (Bare ground)
     lulc = (
         ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
@@ -339,11 +378,13 @@ def get_pss(roi, org, project, state, asset_name):
     # 7	#a59b8f	bare
     # 8	#b39fe1	snow_and_ice
 
+    # LULC classes to consider: Trees, Grass, Crops, Shrub & Scrub, Bare ground
     valid_lulc_values = [1, 2, 4, 5, 7]
     lulc_mask = lulc.eq(valid_lulc_values[0])
     for value in valid_lulc_values[1:]:
         lulc_mask = lulc_mask.Or(lulc.eq(value))
 
+    # Final score with LULC masking and clipping to ROI
     final_plantation_score = (
         final_plantation_score.updateMask(lulc_mask)
         .clip(roi.geometry())
@@ -352,7 +393,8 @@ def get_pss(roi, org, project, state, asset_name):
 
     logger.info("---------------final_plantation_score--------------")
     all_layers = all_layers.addBands(final_plantation_score)
-    logger.info("Final Plantation Score")
+
+    # Harmonize band types to ensure consistency
     all_layers = harmonize_band_types(all_layers, "Float")
 
     # Export to GEE asset
@@ -380,10 +422,25 @@ def get_pss(roi, org, project, state, asset_name):
         raise
 
 
+# Helper functions for dataset retrieval and classification
 def get_dataset(variable, state):
     """
-    Get preprocessed dataset for a specific variable
+    Retrieve and preprocess geospatial dataset for a specific variable.
+
+    Args:
+        variable (str): The type of geospatial data to retrieve.
+        state (str): The state for which data is being retrieved.
+
+    Returns:
+        ee.Image: Processed geospatial dataset for the specified variable.
+
+    Supports different processing for various variables like:
+    - Slope and Aspect calculation
+    - LULC and NDVI retrieval
+    - Distance transformations for roads, drainage, settlements
     """
+
+    # List of supported variables with special processing requirements
     diff_variables = [
         "distToRoad",
         "distToDrainage",
@@ -393,70 +450,85 @@ def get_dataset(variable, state):
         "NDVI",
         "LULC",
     ]
-    if variable in diff_variables:
-        if variable == "slope":
-            dataset = ee.Image(dataset_paths[variable])
-            return ee.Terrain.slope(dataset)
-        elif variable == "aspect":
-            dataset = ee.Image(dataset_paths[variable])
-            return ee.Terrain.aspect(dataset)
-        elif variable == "LULC":
-            return (
-                ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
-                .filterDate("2022-07-01", "2023-06-30")  # TODO Use IndiaSAT
-                .median()
-                .select("label")
-            )
-        elif variable == "NDVI":
-            return (
-                ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
-                .filterDate("2022-07-01", "2023-06-30")  # TODO Check
-                .select("NDVI")
-                .reduce(ee.Reducer.mean())
-            )
-        elif variable == "distToRoad":
-            dataset_collection = ee.FeatureCollection(
-                "projects/df-project-iit/assets/datasets/Road_DRRP/"
-                + valid_gee_text(state)
-            )
-            dataset = dataset_collection.reduceToImage(
-                properties=["STATE_ID"], reducer=ee.Reducer.first()
-            )
-            return (
-                dataset.fastDistanceTransform()
-                .sqrt()
-                .multiply(ee.Image.pixelArea().sqrt())
-            )
-        elif variable == "distToDrainage":
-            dataset = ee.Image(dataset_paths[variable])
-            strahler3to7 = (
-                dataset.select(["b1"]).lte(7).And(dataset.select(["b1"]).gt(2))
-            )
-            return (
-                strahler3to7.fastDistanceTransform()
-                .sqrt()
-                .multiply(ee.Image.pixelArea().sqrt())
-            )
-        elif variable == "distToSettlements":
-            LULC = (
-                ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
-                .filterDate("2022-07-01", "2023-06-30")
-                .median()
-                .select("label")
-            )
-            return (
-                LULC.eq(6)
-                .fastDistanceTransform()
-                .sqrt()
-                .multiply(ee.Image.pixelArea().sqrt())
-            )
-    else:
+
+    if variable not in diff_variables:
         return ee.Image(dataset_paths[variable])
+
+    # Terrain-related variables (slope and aspect)
+    if variable in ["slope", "aspect"]:
+        dataset = ee.Image(dataset_paths[variable])
+        return (
+            ee.Terrain.slope(dataset)
+            if variable == "slope"
+            else ee.Terrain.aspect(dataset)
+        )
+
+    # Land Use and Land Cover (LULC)
+    if variable == "LULC":
+        return (
+            ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+            .filterDate(
+                "2022-07-01", "2023-06-30"
+            )  # TODO: Update with IndiaSAT data when available
+            .median()
+            .select("label")
+        )
+    # Normalized Difference Vegetation Index (NDVI)
+    if variable == "NDVI":
+        return (
+            ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
+            .filterDate("2022-07-01", "2023-06-30")  # TODO: Verify date range
+            .select("NDVI")
+            .reduce(ee.Reducer.mean())
+        )
+    # Distance to Roads
+    if variable == "distToRoad":
+        dataset_collection = ee.FeatureCollection(
+            f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
+        )
+        dataset = dataset_collection.reduceToImage(
+            properties=["STATE_ID"], reducer=ee.Reducer.first()
+        )
+        return (
+            dataset.fastDistanceTransform().sqrt().multiply(ee.Image.pixelArea().sqrt())
+        )
+
+    # Distance to Drainage
+    if variable == "distToDrainage":
+        dataset = ee.Image(dataset_paths[variable])
+        # Filter streams with Strahler order between 3 and 7
+        strahler3to7 = dataset.select(["b1"]).lte(7).And(dataset.select(["b1"]).gt(2))
+        return (
+            strahler3to7.fastDistanceTransform()
+            .sqrt()
+            .multiply(ee.Image.pixelArea().sqrt())
+        )
+
+    # Distance to Settlements
+    if variable == "distToSettlements":
+        LULC = (
+            ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+            .filterDate("2022-07-01", "2023-06-30")
+            .median()
+            .select("label")
+        )
+        return (
+            LULC.eq(6)  # Assuming class 6 represents settlements
+            .fastDistanceTransform()
+            .sqrt()
+            .multiply(ee.Image.pixelArea().sqrt())
+        )
 
 
 def get_weights(weight_dict):
     """
-    Get customized weights for variables
+    Retrieve customized weights from external configuration.
+
+    Args:
+        weight_dict: Dictionary of default weights
+
+    Returns:
+        Dictionary with weights from external configuration
     """
     new_dict = {}
     for key in weight_dict:
@@ -467,6 +539,20 @@ def get_weights(weight_dict):
 
 
 def create_classification(variable_list, roi, state):
+    """
+    Create classification layers for multiple variables.
+
+    Converts continuous datasets into categorical layers
+    based on predefined intervals and thresholds.
+
+    Args:
+        variable_list: List of variables to classify
+        roi: Region of Interest
+        state: Geographic state
+
+    Returns:
+        Multi-band image with classified layers
+    """
     sub_layer = ee.Image(1)
 
     def classify_variable(variable):
