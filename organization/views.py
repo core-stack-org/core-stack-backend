@@ -47,7 +47,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         Check if the user is allowed to access the organization.
         """
         user = self.request.user
-        return user.is_superadmin or user == organization.created_by 
+        return user.is_superadmin or user == organization.created_by or user.organization == organization
 
     def retrieve(self, request, *args, **kwargs):
         """
