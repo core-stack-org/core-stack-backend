@@ -17,7 +17,7 @@ import shutil
 from utilities.constants import (
     ADMIN_BOUNDARY_OUTPUT_DIR,
     SHAPEFILE_DIR,
-    GEE_PATH_NRM_WORK,
+    GEE_HELPER_PATH,
 )
 import ee
 import json
@@ -177,8 +177,8 @@ def merge_chunks(aoi, state, district, block, description, chunk_size):
         end = start + chunk_size
         block_name_for_parts = description + "_" + str(start) + "-" + str(end)
         src_asset_id = (
-            get_gee_asset_path(state, district, block, GEE_PATH_NRM_WORK)
-            + block_name_for_parts
+                get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
+                + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
