@@ -153,6 +153,8 @@ PIP_PACKAGES=(
     "pymannkendall"
     "pydantic"
     "fastapi"
+    "djangorestframework-simplejwt"
+    "drf-nested-routers"
 )
 
 for package in "${PIP_PACKAGES[@]}"; do

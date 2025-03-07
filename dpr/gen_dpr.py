@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import tempfile
 import threading
 from collections import defaultdict
 from datetime import date, datetime
@@ -1765,18 +1766,20 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
     folium.LayerControl().add_to(fol_map)
 
-    map_filename = f"marked_works_{uid}.html"
-    fol_map.save(map_filename)
+    # Create a temporary directory for saving files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
+        fol_map.save(map_filename)
 
-    img_data = fol_map._to_png(5)
-    img = Image.open(BytesIO(img_data))
-    img_filename = f"marked_works_{uid}.png"
-    img.save(img_filename)
+        img_data = fol_map._to_png(5)
+        img = Image.open(BytesIO(img_data))
+        img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
+        img.save(img_filename)
 
-    doc.add_picture(img_filename, width=Inches(6))
-
-    os.remove(map_filename)
-    os.remove(img_filename)
+        doc.add_picture(img_filename, width=Inches(6))
+        
+        # No need to manually remove files as they'll be cleaned up automatically
+        # when the tempfile.TemporaryDirectory context exits
 
 
 def show_all_mws(doc, plan, mws):
@@ -1908,20 +1911,20 @@ def show_all_mws(doc, plan, mws):
     fol_map.get_root().html.add_child(folium.Element(legend_html))
     folium.LayerControl().add_to(fol_map)
 
-    # Save map and convert to image
-    map_filename = "all_mws_map.html"
-    fol_map.save(map_filename)
+    # Create a temporary directory for saving files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Save map and convert to image
+        map_filename = os.path.join(temp_dir, "all_mws_map.html")
+        fol_map.save(map_filename)
 
-    img_data = fol_map._to_png(5)
-    img = Image.open(BytesIO(img_data))
-    img_filename = "all_mws_map.png"
-    img.save(img_filename)
+        img_data = fol_map._to_png(5)
+        img = Image.open(BytesIO(img_data))
+        img_filename = os.path.join(temp_dir, "all_mws_map.png")
+        img.save(img_filename)
 
-    # Add heading and map to document
-    doc.add_heading("Overview Map of All MWS", level=1)
-    doc.add_picture(img_filename, width=Inches(6))
-    doc.add_page_break()
-
-    # Clean up temporary files
-    os.remove(map_filename)
-    os.remove(img_filename)
+        # Add heading and map to document
+        doc.add_heading("Overview Map of All MWS", level=1)
+        doc.add_picture(img_filename, width=Inches(6))
+        doc.add_page_break()
+        
+        
