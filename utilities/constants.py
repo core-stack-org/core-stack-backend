@@ -38,6 +38,6 @@ ODK_URL_crop = (
 
 GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
-GCS_BUCKET_NAME = "core-stack"
+GCS_BUCKET_NAME = "core_stack"
 
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
