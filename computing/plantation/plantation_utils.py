@@ -111,27 +111,28 @@ saytrees_intervals = {
 }
 
 
-def combine_kmls(input_dir):
+def combine_kmls(kml_files_obj):
     # Enable KML driver
     fiona.drvsupport.supported_drivers["KML"] = "rw"
 
-    # Get all KML files in directory
-    kml_files = list(Path(input_dir).glob("*.kml"))
-
-    if not kml_files:
-        raise ValueError(f"No KML files found in {input_dir}")
+    # # Get all KML files in directory
+    # kml_files = list(Path(input_dir).glob("*.kml"))
+    #
+    # if not kml_files:
+    #     raise ValueError(f"No KML files found in {input_dir}")
 
     # Read and combine all KML files
     gdfs = []
-    for kml_file in kml_files:
+    print(kml_files_obj)
+    for kml_file in kml_files_obj:
         try:
-            gdf = gpd.read_file(kml_file, driver="KML")
+            gdf = gpd.read_file(kml_file.file, driver="KML")
             # Convert geometries to 2D
             gdf["geometry"] = gdf["geometry"].apply(convert_to_2d)
-            kml_hash = create_hash_using_geometry(gdf["geometry"])
+            # kml_hash = create_hash_using_geometry(gdf["geometry"])
             # Add filename as source column
             gdf["source"] = kml_file.name
-            gdf["uid"] = kml_hash
+            gdf["uid"] = kml_file.kml_hash
             gdfs.append(gdf)
         except Exception as e:
             print(f"Error reading {kml_file}: {e}")

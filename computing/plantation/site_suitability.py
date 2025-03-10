@@ -18,22 +18,30 @@ from .plantation_utils import combine_kmls
 from utilities.logger import setup_logger
 from ..utils import sync_fc_to_geoserver
 import geopandas as gpd
+from projects.models import ProjectApp
+from plantations.models import KMLFile
 
 logger = setup_logger(__name__)
 
 
 @app.task(bind=True)
-def site_suitability(self, organization, project, state, start_year, end_year):
+def site_suitability(
+    self, project_app_id, state, start_year, end_year
+):  # self, organization, project, state, start_year, end_year):
     """
     Main task for site suitability analysis using Google Earth Engine.
 
     Args:
-        organization: Name of the organization conducting the analysis
-        project: Name of the specific project
+        project_app_id: Id of the specific project_app
         state: Geographic state for the analysis
         start_year: Beginning of the temporal analysis range
         end_year: End of the temporal analysis range
     """
+    project_app = ProjectApp.objects.get(id=project_app_id)
+    organization = project_app.project.organization.name
+    project = project_app.project.name
+
+    kml_files_obj = KMLFile.objects.filter(project_app=project_app)
 
     # Initialize Earth Engine connection for the project
     ee_initialize(project="nrm_work")
@@ -50,9 +58,9 @@ def site_suitability(self, organization, project, state, start_year, end_year):
 
     # Check if the asset already exists and handle accordingly
     if is_gee_asset_exists(asset_id):
-        merge_new_kmls(asset_id, description, project)
+        merge_new_kmls(asset_id, description, project, kml_files_obj)
     else:
-        generate_project_roi(asset_id, description, project)
+        generate_project_roi(asset_id, description, project, kml_files_obj)
 
     # Load the region of interest (ROI) feature collection
     roi = ee.FeatureCollection(asset_id)
@@ -66,7 +74,7 @@ def site_suitability(self, organization, project, state, start_year, end_year):
     sync_suitability_to_geoserver(vector_asset_id, organization, project)
 
 
-def merge_new_kmls(asset_id, description, project):
+def merge_new_kmls(asset_id, description, project, kml_files_obj):
     """
     Merge new KML files into an existing Google Earth Engine asset.
 
@@ -74,12 +82,10 @@ def merge_new_kmls(asset_id, description, project):
         asset_id: Existing asset identifier
         description: Project description
         project: Project name
+        kml_files_obj: Queryset of KML_Files model
     """
-    # TODO: Hardcoded path needs to be replaced with a dynamic method
-    path = "/home/aman/Downloads/Farmer List and KML/Farmer List and KML/1st phase KML FILE Mandal wise Infosys Donors/Vajrakaruru/Venkatampalli Infosys"
-
     # Combine KML files into a GeoDataFrame
-    gdf = combine_kmls(path)
+    gdf = combine_kmls(kml_files_obj)
 
     # Load existing ROI from Earth Engine
     roi = ee.FeatureCollection(asset_id)
@@ -111,7 +117,7 @@ def merge_new_kmls(asset_id, description, project):
             logger.exception("Exception in exporting asset: %s", e)
 
 
-def generate_project_roi(asset_id, description, project):
+def generate_project_roi(asset_id, description, project, kml_files_obj):
     """
     Generate a new region of interest (ROI) for a project.
 
@@ -119,12 +125,10 @@ def generate_project_roi(asset_id, description, project):
         asset_id: Unique identifier for the asset
         description: Project description
         project: Project name
+        kml_files_obj: Queryset of KML_Files model
     """
-    # TODO: Hardcoded path needs to be replaced with a dynamic method
-    path = "/home/aman/Downloads/Farmer List and KML/Farmer List and KML/1st phase KML FILE Mandal wise Infosys Donors/Vajrakaruru/VPP Thanda infosys"
-
     # Combine KML files into a feature collection
-    gdf = combine_kmls(path)
+    gdf = combine_kmls(kml_files_obj)
     fc = gdf_to_ee_fc(gdf)
 
     try:
