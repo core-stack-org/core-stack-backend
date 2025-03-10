@@ -6,6 +6,7 @@ from django.db import IntegrityError
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
 from projects.models import Project, ProjectApp, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
 from .models import KMLFile
@@ -17,6 +18,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
     """ViewSet for KML file operations"""
     serializer_class = KMLFileSerializer
     permission_classes = [permissions.IsAuthenticated, HasProjectPermission]
+    parser_classes = [MultiPartParser, FormParser, FileUploadParser]
     # For the HasProjectPermission to work correctly
     app_type = AppType.PLANTATION
     

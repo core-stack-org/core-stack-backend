@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+
+  <Placemark>
+
+    <name>An extruded placemark</name>
+
+    <Point>
+			<extrude>1</extrude>
+			<altitudeMode>relativeToGround</altitudeMode>
+			<coordinates>8.542952335953721,47.36685263064198,200</coordinates>
+    </Point>
+
+  </Placemark>
+
+</kml>
