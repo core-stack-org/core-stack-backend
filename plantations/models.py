@@ -2,7 +2,6 @@
 import os
 import hashlib
 from django.db import models
-from django.conf import settings
 from projects.models import ProjectApp
 from users.models import User
 from utilities.constants import SITE_DATA_PATH
@@ -17,10 +16,12 @@ def kml_file_path(instance, filename):
     org_name = instance.project_app.project.organization.name
     app_type = instance.project_app.app_type
     project_name = instance.project_app.project.name
+
     # Create directory if it doesn't exist
     directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
     full_path = os.path.join(SITE_DATA_PATH, directory)
     os.makedirs(full_path, exist_ok=True)
+
     return f"{full_path}/{filename}"
 
 

@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
 from computing.plantation.site_suitability import site_suitability
 from projects.models import Project, ProjectApp, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
+from utilities.gee_utils import valid_gee_text
 from .models import KMLFile
 from .serializers import KMLFileSerializer, KMLFileDetailSerializer
 from .utils.kml_converter import convert_kml_to_geojson, merge_geojson_files
@@ -108,7 +109,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
 
             # Prepare data for serializer
             data = {
-                "name": request.data.get("name", uploaded_file.name),
+                "name": request.data.get("name", valid_gee_text(uploaded_file.name)),
                 "file": uploaded_file,
                 "project_app": project_app.id,
             }
@@ -146,10 +147,6 @@ class KMLFileViewSet(viewsets.ModelViewSet):
         # if created_files:
         #     self.update_project_geojson(project)
 
-        # site_suitability(project_app, "telangana", 2017, 2023)
-        site_suitability.apply_async(
-            args=[project_app.id, "telangana", 2017, 2023], queue="nrm"
-        )
         # Prepare response
         response_data = {"files_created": len(created_files), "files": created_files}
 
@@ -159,6 +156,10 @@ class KMLFileViewSet(viewsets.ModelViewSet):
         # Return 201 if at least one file was created, otherwise 400
         status_code = (
             status.HTTP_201_CREATED if created_files else status.HTTP_400_BAD_REQUEST
+        )
+
+        site_suitability.apply_async(
+            args=[project_app.id, "telangana", 2017, 2023], queue="nrm"
         )
 
         return Response(response_data, status=status_code)

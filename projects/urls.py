@@ -6,13 +6,13 @@ from .views import ProjectViewSet, ProjectAppViewSet
 
 # Main router for projects
 router = DefaultRouter()
-router.register(r'projects', ProjectViewSet, basename='project')
+router.register(r"projects", ProjectViewSet, basename="project")
 
 # Nested router for project apps
-projects_router = routers.NestedSimpleRouter(router, r'projects', lookup='project')
-projects_router.register(r'apps', ProjectAppViewSet, basename='project-app')
+projects_router = routers.NestedSimpleRouter(router, r"projects", lookup="project")
+projects_router.register(r"apps", ProjectAppViewSet, basename="project-app")
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('', include(projects_router.urls)),
+    path("", include(router.urls)),
+    path("", include(projects_router.urls)),
 ]

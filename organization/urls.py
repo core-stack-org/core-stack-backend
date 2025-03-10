@@ -4,8 +4,8 @@ from .views import OrganizationViewSet
 
 # Create a router for organization endpoints
 router = DefaultRouter()
-router.register(r'organizations', OrganizationViewSet)
+router.register(r"organizations", OrganizationViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]

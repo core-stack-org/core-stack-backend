@@ -19,6 +19,8 @@ DRAINAGE_LINES_OUTPUT = "data/drainage_lines/output"
 DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
 
 LITHOLOGY_PATH = "data/lithology/"
+SITE_DATA_PATH = "data/site_data"
+
 
 # MARK: ODK URLs
 # subject to change
