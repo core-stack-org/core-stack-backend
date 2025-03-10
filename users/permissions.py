@@ -51,18 +51,26 @@ class HasProjectPermission(permissions.BasePermission):
         if request.user.is_superadmin or request.user.is_superuser:
             return True
         
-        # Check method-specific permissions
         project_id = view.kwargs.get('project_pk')
-        if project_id:
-            method = request.method
-            permission_codename = self._get_permission_codename(method, view)
+        if not project_id:
+            return False
             
-            return request.user.has_project_permission(
-                project_id=project_id,
-                codename=permission_codename
-            )
+        # Organization Admins have full access to projects in their organization
+        if request.user.groups.filter(name__in=['Organization Admin', 'Org Admin', 'Administrator']).exists():
+            try:
+                project = Project.objects.get(id=project_id)
+                return project.organization == request.user.organization
+            except Project.DoesNotExist:
+                return False
+                
+        # Check method-specific permissions for regular users with assigned roles
+        method = request.method
+        permission_codename = self._get_permission_codename(method, view)
         
-        return False
+        return request.user.has_project_permission(
+            project_id=project_id,
+            codename=permission_codename
+        )
     
     def has_object_permission(self, request, view, obj):
         # Super admins have full access
@@ -76,16 +84,21 @@ class HasProjectPermission(permissions.BasePermission):
         elif hasattr(obj, 'project_app') and hasattr(obj.project_app, 'project'):
             project = obj.project_app.project
         
-        if project:
-            method = request.method
-            permission_codename = self._get_permission_codename(method, view)
+        if not project:
+            return False
             
-            return request.user.has_project_permission(
-                project=project,
-                codename=permission_codename
-            )
+        # Organization Admins have full access to projects in their organization
+        if request.user.groups.filter(name__in=['Organization Admin', 'Org Admin', 'Administrator']).exists():
+            return project.organization == request.user.organization
+            
+        # Check method-specific permissions for regular users with assigned roles
+        method = request.method
+        permission_codename = self._get_permission_codename(method, view)
         
-        return False
+        return request.user.has_project_permission(
+            project=project,
+            codename=permission_codename
+        )
     
     def _get_permission_codename(self, method, view):
         """Map HTTP methods to permission codenames."""

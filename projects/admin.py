@@ -8,14 +8,14 @@ class ProjectAppInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'organization', 'created_at', 'updated_at')
+    list_display = ('name', 'organization', 'created_at', 'updated_at', "created_by", "updated_by")
     list_filter = ('organization', 'created_at')
     search_fields = ('name', 'description', 'organization__name')
     inlines = [ProjectAppInline]
     
     fieldsets = (
         (None, {
-            'fields': ('name', 'organization', 'description', 'geojson_path')
+            'fields': ('name', 'organization', 'description', 'geojson_path', "created_by", "updated_by")
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),

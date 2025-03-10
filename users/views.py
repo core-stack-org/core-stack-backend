@@ -95,7 +95,7 @@ class IsSuperAdminOrOrgAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and (
             request.user.is_superadmin or 
-            request.user.groups.filter(name='Organization Admin').exists()
+            request.user.groups.filter(name__in=['Organization Admin', 'Org Admin', 'Administrator']).exists()
         )
 
 
