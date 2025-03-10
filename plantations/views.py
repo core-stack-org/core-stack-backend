@@ -42,7 +42,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
         return KMLFileSerializer
     
     def create(self, request, *args, **kwargs):
-        """Create a new KML file"""
+        """Create new KML files - supports both single and multiple file uploads"""
         project_id = self.kwargs.get('project_pk')
         if not project_id:
             return Response(
@@ -64,75 +64,96 @@ class KMLFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Get uploaded file
-        uploaded_file = request.FILES.get('file')
-        if not uploaded_file:
+        # Check if we have files in the request
+        files = []
+        
+        # Handle single file upload case
+        if 'file' in request.FILES:
+            files.append(request.FILES['file'])
+        
+        # Handle multiple files upload case
+        if 'files[]' in request.FILES:
+            files.extend(request.FILES.getlist('files[]'))
+        
+        if not files:
             return Response(
-                {"detail": "No file was uploaded."},
+                {"detail": "No files were uploaded."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validate file extension
-        if not uploaded_file.name.lower().endswith('.kml'):
-            return Response(
-                {"detail": "Only KML files are allowed."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Process each file
+        created_files = []
+        errors = []
         
-        # Calculate file hash to check for duplicates
-        uploaded_file.seek(0)
-        file_hash = hashlib.sha256()
-        for chunk in uploaded_file.chunks():
-            file_hash.update(chunk)
-        kml_hash = file_hash.hexdigest()
+        for uploaded_file in files:
+            # Validate file extension
+            if not uploaded_file.name.lower().endswith('.kml'):
+                errors.append(f"File '{uploaded_file.name}' is not a KML file. Only KML files are allowed.")
+                continue
+            
+            # Calculate file hash to check for duplicates
+            uploaded_file.seek(0)
+            file_hash = hashlib.sha256()
+            for chunk in uploaded_file.chunks():
+                file_hash.update(chunk)
+            kml_hash = file_hash.hexdigest()
+            
+            # Check if file with same hash already exists
+            if KMLFile.objects.filter(kml_hash=kml_hash).exists():
+                errors.append(f"File '{uploaded_file.name}' has already been uploaded.")
+                continue
+            
+            # Prepare data for serializer
+            data = {
+                'name': request.data.get('name', uploaded_file.name),
+                'file': uploaded_file,
+                'project_app': project_app.id
+            }
+            
+            serializer = self.get_serializer(data=data)
+            
+            try:
+                if serializer.is_valid():
+                    # Save KML file
+                    kml_file = serializer.save(
+                        project_app=project_app,
+                        uploaded_by=request.user,
+                        kml_hash=kml_hash
+                    )
+                    
+                    # Convert KML to GeoJSON
+                    file_path = kml_file.file.path
+                    geojson_data = convert_kml_to_geojson(file_path)
+                    
+                    if geojson_data:
+                        # Update GeoJSON data in the model
+                        kml_file.geojson_data = geojson_data
+                        kml_file.save(update_fields=['geojson_data'])
+                    
+                    created_files.append(serializer.data)
+                else:
+                    errors.append(f"Error validating file '{uploaded_file.name}': {serializer.errors}")
+            except IntegrityError as e:
+                errors.append(f"Error saving file '{uploaded_file.name}': {str(e)}")
+                continue
         
-        # Check if file with same hash already exists
-        if KMLFile.objects.filter(kml_hash=kml_hash).exists():
-            return Response(
-                {"detail": "This KML file has already been uploaded."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Update the merged GeoJSON file for the project if any files were created
+        if created_files:
+            self.update_project_geojson(project)
         
-        # Prepare data for serializer
-        data = {
-            'name': request.data.get('name', uploaded_file.name),
-            'file': uploaded_file,
-            'project_app': project_app.id
+        # Prepare response
+        response_data = {
+            "files_created": len(created_files),
+            "files": created_files
         }
         
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
+        if errors:
+            response_data["errors"] = errors
         
-        try:
-            # Save KML file
-            kml_file = serializer.save(
-                project_app=project_app,
-                uploaded_by=request.user,
-                kml_hash=kml_hash
-            )
-            
-            # Convert KML to GeoJSON
-            file_path = kml_file.file.path
-            geojson_data = convert_kml_to_geojson(file_path)
-            
-            if geojson_data:
-                # Update GeoJSON data in the model
-                kml_file.geojson_data = geojson_data
-                kml_file.save(update_fields=['geojson_data'])
-                
-                # Update the merged GeoJSON file for the project
-                self.update_project_geojson(project)
-            
-            return Response(
-                serializer.data,
-                status=status.HTTP_201_CREATED
-            )
-            
-        except IntegrityError:
-            return Response(
-                {"detail": "Error saving KML file."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Return 201 if at least one file was created, otherwise 400
+        status_code = status.HTTP_201_CREATED if created_files else status.HTTP_400_BAD_REQUEST
+        
+        return Response(response_data, status=status_code)
     
     def perform_destroy(self, instance):
         """Override destroy to update project GeoJSON after deletion"""
