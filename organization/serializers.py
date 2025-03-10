@@ -2,10 +2,12 @@ from rest_framework import serializers
 from .models import Organization
 from .schemas import OrganizationCreate, OrganizationRead
 
+
 class PydanticModelSerializer(serializers.ModelSerializer):
     """
     A custom ModelSerializer that uses Pydantic for validation
     """
+
     def to_representation(self, instance):
         # Convert model instance to Pydantic model
         pydantic_model = OrganizationRead.from_orm(instance)
@@ -16,9 +18,17 @@ class PydanticModelSerializer(serializers.ModelSerializer):
         validated_data = OrganizationCreate(**data)
         return validated_data.model_dump()
 
+
 class OrganizationSerializer(PydanticModelSerializer):
     class Meta:
         model = Organization
-        fields = ['id', 'name', 'description', 'created_at', 'created_by', 'updated_at','updated_by']
-        read_only_fields = ['id', 'created_at', 'updated_at']
-        
+        fields = [
+            "id",
+            "name",
+            "description",
+            "created_at",
+            "created_by",
+            "updated_at",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]

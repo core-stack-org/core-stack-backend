@@ -27,20 +27,40 @@ class PlanAppSerializer(serializers.ModelSerializer):
     """
     Serializer for watershed plans with basic information
     """
+
     created_by_name = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Plan
         fields = [
-            'id', 'plan', 'project_app', 'organization', 
-            'state', 'district', 'block', 'village', 'gram_panchayat',
-            'created_by', 'created_by_name', 'created_at', 'updated_at'
+            "id",
+            "plan",
+            "project_app",
+            "organization",
+            "state",
+            "district",
+            "block",
+            "village",
+            "gram_panchayat",
+            "created_by",
+            "created_by_name",
+            "created_at",
+            "updated_at",
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at', 'organization']
-    
+        read_only_fields = [
+            "id",
+            "created_by",
+            "created_at",
+            "updated_at",
+            "organization",
+        ]
+
     def get_created_by_name(self, obj):
         if obj.created_by:
-            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+            return (
+                f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+                or obj.created_by.username
+            )
         return None
 
 
@@ -48,17 +68,23 @@ class PlanCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating watershed plans
     """
+
     class Meta:
         model = Plan
-        fields = [
-            'name', 'state', 'district', 'block', 'village', 'gram_panchayat'
-        ]
-    
+        fields = ["name", "state", "district", "block", "village", "gram_panchayat"]
+
     def validate(self, data):
         """
         Additional validation to ensure required fields are present
         """
-        required_fields = ['name', 'state', 'district', 'block', 'village', 'gram_panchayat']
+        required_fields = [
+            "name",
+            "state",
+            "district",
+            "block",
+            "village",
+            "gram_panchayat",
+        ]
         for field in required_fields:
             if field not in data or not data[field]:
                 raise serializers.ValidationError(f"{field} is required")
@@ -71,5 +97,5 @@ class PlanCreateSerializer(serializers.ModelSerializer):
 
         if not data["block"].active_status:
             raise serializers.ValidationError("The block is not active.")
-            
+
         return data
