@@ -27,11 +27,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-kcm_)r8!+hl5q!5d$r8spl#5+fjy5qmj#bukx3hq*puq3t8_3n"
+SECRET_KEY = env("SECRET_KEY")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env("DEBUG")
 
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
@@ -174,7 +174,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
-ASSET_DIR = "/home/ubuntu/prod_dir/nrm-app/assets/"
+ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
