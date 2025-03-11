@@ -14,22 +14,20 @@ import os
 from pathlib import Path
 import environ
 from datetime import timedelta
+from corsheaders.defaults import default_headers
 
 env = environ.Env()
 
 environ.Env.read_env()
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-kcm_)r8!+hl5q!5d$r8spl#5+fjy5qmj#bukx3hq*puq3t8_3n"
-
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -49,7 +47,9 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "d71e-116-206-157-32.ngrok-free.app"
+    "d71e-116-206-157-32.ngrok-free.app",
+    "9681-106-222-136-28.ngrok-free.app",
+    "7e22-2401-4900-1cd6-4e74-970e-d91e-cf6-137a.ngrok-free.app",
 ]
 
 # Application definition
@@ -60,17 +60,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     "computing",
     "dpr",
     "geoadmin",
     "stats_generator",
-    
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
     "drf_yasg",
-
+    "rest_framework_simplejwt.token_blacklist",
     # project apps
     "users",
     "organization",
@@ -87,49 +85,60 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.222.27:8000",
     "http://192.168.222.23:3000",
     "http://192.168.20.236:3000",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://9681-106-222-136-28.ngrok-free.app",
+    "https://7e22-2401-4900-1cd6-4e74-970e-d91e-cf6-137a.ngrok-free.app",
 ]
 
-CORS_ALLOW_HEADERS = [
+# CORS_ALLOW_HEADERS = [
+#     "ngrok-skip-browser-warning",
+#     "content-type",
+# ]
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
     "content-type",
 ]
 
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+]
+
 # REST Framework settings
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
 # JWT settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=14),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
-
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
-
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-
-    'JTI_CLAIM': 'jti',
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": False,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "JTI_CLAIM": "jti",
 }
 
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -162,7 +171,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "nrm_app.wsgi.application"
 
-
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
@@ -179,7 +187,6 @@ DATABASES = {
         },
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -199,7 +206,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
@@ -210,7 +216,6 @@ TIME_ZONE = "Asia/Kolkata"
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -245,7 +250,6 @@ OD_DATA_URL_plan = {
     },
 }
 
-
 # EMAIL Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtpout.secureserver.net"
@@ -264,4 +268,5 @@ EARTH_DATA_USER = env("EARTH_DATA_USER")
 EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
+
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")

@@ -75,7 +75,12 @@ class KMLFileViewSet(viewsets.ModelViewSet):
 
         # Handle multiple files upload case
         if "files[]" in request.FILES:
-            files.extend(request.FILES.getlist("files[]"))
+            print("Found multiple files with 'files[]'")
+            file_list = request.FILES.getlist("files[]")
+            print(f"Number of files in 'files[]': {len(file_list)}")
+            for f in file_list:
+                print(f"  - {f.name}")
+            files.extend(file_list)
 
         if not files:
             return Response(
@@ -144,7 +149,10 @@ class KMLFileViewSet(viewsets.ModelViewSet):
                 continue
 
         # # Update the merged GeoJSON file for the project if any files were created
-        # if created_files:
+        if created_files:
+            site_suitability.apply_async(
+                args=[project_app.id, "telangana", 2017, 2023], queue="nrm"
+            )
         #     self.update_project_geojson(project)
 
         # Prepare response
@@ -156,10 +164,6 @@ class KMLFileViewSet(viewsets.ModelViewSet):
         # Return 201 if at least one file was created, otherwise 400
         status_code = (
             status.HTTP_201_CREATED if created_files else status.HTTP_400_BAD_REQUEST
-        )
-
-        site_suitability.apply_async(
-            args=[project_app.id, "telangana", 2017, 2023], queue="nrm"
         )
 
         return Response(response_data, status=status_code)
