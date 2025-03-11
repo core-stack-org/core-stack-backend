@@ -101,7 +101,7 @@ def fetch_odk_data_sync(ODK_URL):
 
 def sync_settlement():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_settlement)
-    print("ODK data", odk_resp_list[:1])
+    print("ODK data settlement", odk_resp_list[:1])
     settlement = ODK_settlement()  # settlement obj for the db model
 
     for record in odk_resp_list:
@@ -141,9 +141,9 @@ def sync_settlement():
         settlement.latitude, settlement.longitude = extract_coordinates(record)
         settlement.block_name = record.get("block_name", "")
         settlement.number_of_households = record.get("number_households", "") or 0
-        settlement.largest_caste = record.get("CASTE_1", "") or "0"
-        settlement.smallest_caste = record.get("CASTE_2", "") or "0"
-        settlement.settlement_status = record.get("Settlement_status", "") or "0"
+        settlement.largest_caste = record.get("select_one_type", "") or "None"
+        settlement.smallest_caste = record.get("caste_group_single", "") or "None"
+        settlement.settlement_status = record.get("caste_group_mixed", "") or "None"
         settlement.plan_id = record.get("plan_id", "") or "0"
         settlement.plan_name = record.get("plan_name", "") or "0"
         settlement.uuid = record.get("__id", "") or "0"
@@ -162,10 +162,6 @@ def sync_settlement():
         settlement.nrega_past_work = mgnrega_info.get("q1", "") or "0"
         settlement.nrega_raise_demand = mgnrega_info.get("select_one_Y_N", "") or "0"
         settlement.nrega_demand = mgnrega_info.get("select_one_demands", "") or "0"
-
-        # new additions goes here
-        
-        #
         settlement.nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
         settlement.nrega_community = (
             mgnrega_info.get("select_one_contributions", "") or "0"
@@ -176,7 +172,7 @@ def sync_settlement():
 
 def sync_well():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_well)
-    print("ODK data", odk_resp_list[:1])
+    print("ODK data well", odk_resp_list[:1])
     well = ODK_well()  # well object
 
     for record in odk_resp_list:
@@ -204,10 +200,16 @@ def sync_well():
         well.owner = record.get("select_one_owns", "") or "0"
         well.households_benefitted = record.get("households_benefited", "") or 0
         well.caste_uses = record.get("select_multiple_caste_use", "") or "0"
+
+        well_usage = record.get("Well_usage", {})
+        well_condition = record.get("Well_condition", {})
         well.is_functional = (
-            record.get("select_one_Functional_Non_functional", "") or "0"
+            well_usage.get("select_one_Functional_Non_functional", "")
+            or "No Data Provided"
         )
-        well.need_maintenance = record.get("select_one_maintenance", "") or "0"
+        well.need_maintenance = (
+            well_condition.get("select_one_maintenance", "") or "No Data Provided"
+        )
         well.plan_id = record.get("plan_id", "") or "0"
         well.plan_name = record.get("plan_name", "") or "0"
         well.status_re = (
@@ -236,6 +238,7 @@ def sync_well():
 
 def sync_waterbody():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_waterbody)
+    print("ODK data waterbody", odk_resp_list[:1])
     waterbody = ODK_waterbody()
 
     for record in odk_resp_list:
@@ -268,41 +271,11 @@ def sync_waterbody():
         waterbody.caste_who_uses = record.get("select_multiple_caste_use", "") or "0"
         waterbody.household_benefitted = record.get("households_benefited", "") or 0
         waterbody.water_structure_type = (
-            record.get("select_one_irrigation_structure", "") or "0"
+            record.get("select_one_water_structure", "") or "0"
         )
         waterbody.water_structure_other = (
-            record.get("select_one_irrigation_structure_other", "") or "0"
+            record.get("select_one_water_structure_other", "") or "0"
         )
-
-        # Handle the dynamic water structure dimensions
-        water_structure_type = waterbody.water_structure_type.lower().replace("_", " ")
-        water_structure_dimension = {}
-        for key, value in record.items():
-            if isinstance(value, dict):
-                structure_type = key.lower().replace("_", " ")
-                if structure_type == water_structure_type:
-                    water_structure_dimension[structure_type] = {
-                        "length": next(
-                            (v for k, v in value.items() if k.startswith("Length")),
-                            None,
-                        ),
-                        "breadth": next(
-                            (v for k, v in value.items() if k.startswith("Breadth")),
-                            None,
-                        ),
-                        "width": next(
-                            (v for k, v in value.items() if k.startswith("Width")), None
-                        ),
-                        "depth": next(
-                            (v for k, v in value.items() if k.startswith("Depth")), None
-                        ),
-                        "height": next(
-                            (v for k, v in value.items() if k.startswith("Height")),
-                            None,
-                        ),
-                    }
-                    break
-        waterbody.water_structure_dimension = water_structure_dimension
 
         waterbody.identified_by = record.get("select_one_identified", "") or "0"
         waterbody.need_maintenance = record.get("select_one_maintenance") or "0"
@@ -429,6 +402,7 @@ def sync_agri():
 
 def sync_livelihood():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_livelihood)
+    print("ODK data livelihood", odk_resp_list[:1])
     livelihood = ODK_livelihood()
 
     for record in odk_resp_list:
@@ -489,6 +463,7 @@ def sync_livelihood():
 
 def sync_cropping_pattern():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_crop)
+    print("ODK data cropping pattern", odk_resp_list[:1])
     cropping_pattern = ODK_crop()
 
     for record in odk_resp_list:

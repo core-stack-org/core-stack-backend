@@ -17,7 +17,9 @@ from nrm_app.settings import (
 )
 
 import folium
-
+from selenium import webdriver
+from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.firefox.options import Options
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -48,7 +50,10 @@ from .models import (
 )
 from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
 from utilities.logger import setup_logger
+import environ
 
+env = environ.Env()
+environ.Env.read_env()  # reading .env file
 
 logger = setup_logger(__name__)
 
@@ -64,7 +69,7 @@ def create_dpr_document(plan):
     doc = initialize_document()
     logger.info("Generating DPR for plan ID: %s", plan.plan_id)
     logger.info("Syncing ODK database")
-    
+
     sync_db_odk()
     logger.info("Database sync complete")
     logger.info("Details of the plan")
@@ -196,13 +201,13 @@ def initialize_document():
     doc = Document()
     heading = doc.add_heading("Detailed Project Report", 0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    doc.add_paragraph(date.today().strftime("%B %d, %Y")).alignment = (
-        WD_PARAGRAPH_ALIGNMENT.CENTER
-    )
+    doc.add_paragraph(
+        date.today().strftime("%B %d, %Y")
+    ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     return doc
 
 
-# MARK: Section A
+# MARK: - Section A
 def add_section_a(doc, plan):
     """
     Brief about team details.
@@ -238,7 +243,7 @@ def create_team_details_table(doc, plan):
                 run.font.bold = True
 
 
-# MARK: Section B
+# MARK: - Section B
 def add_section_b(doc, plan, total_settlements, mws_fortnight):
     """
     Briefs about the village
@@ -314,7 +319,7 @@ def create_village_brief_table(
         row_cells[1].text = value
 
 
-# MARK: Section C
+# MARK: - Section C
 def add_section_c(doc, plan):
     """
     Adds information on Settlement, Vulnerability, NREGA from the settlement's form
@@ -338,9 +343,9 @@ def create_socio_eco_table(doc, plan):
     headers_socio = [
         "Name of the Settlement",
         "Total Number of Households",
-        "Largest Caste Group",
-        "Smallest Caste Group",
-        "Economic condition in comparison to other settlements",
+        "Settlement Caste Type",
+        "Single Caste Group",
+        "Mixed Caste Group",
         "Total marginal farmers (<2 acres)",
     ]
 
@@ -382,72 +387,19 @@ def create_socio_eco_table(doc, plan):
         row_cells = table_nrega.add_row().cells
         row_cells[0].text = settlement_nrega.settlement_name
         row_cells[1].text = (
-            "aware: " + str(settlement_nrega.nrega_job_aware)
+            "aware: "
+            + str(settlement_nrega.nrega_job_aware)
             + "\n"
-            + "applied: " + str(settlement_nrega.nrega_job_applied)
+            + "applied: "
+            + str(settlement_nrega.nrega_job_applied)
             + "\n"
-            + "having: " + str(settlement_nrega.nrega_job_card)
+            + "having: "
+            + str(settlement_nrega.nrega_job_card)
         )
         row_cells[2].text = str(settlement_nrega.nrega_work_days)
         row_cells[3].text = format_text(settlement_nrega.nrega_past_work)
         row_cells[4].text = settlement_nrega.nrega_demand
         row_cells[5].text = format_text(settlement_nrega.nrega_issues)
-
-
-# def create_livelihood_table(doc, plan):
-#     doc.add_heading("Crop Info", level=4)
-#     crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id)
-
-#     headers_cropping_pattern = [
-#         "Name of the Settlement",
-#         "Irrigation Source",
-#         "Cropping Pattern (Kharif)",
-#         "Cropping Pattern (Rabi)",
-#         "Cropping Pattern (Zaid)",
-#         "Agriculture Productivity",
-#         "Land Classification",
-#     ]
-
-#     table_cropping_pattern = doc.add_table(rows=1, cols=len(headers_cropping_pattern))
-#     table_cropping_pattern.style = "Table Grid"
-#     hdr_cells = table_cropping_pattern.rows[0].cells
-#     for i, header in enumerate(headers_cropping_pattern):
-#         hdr_cells[i].paragraphs[0].add_run(header).bold = True
-
-#     for crops in crops_in_plan:
-#         row_cells = table_cropping_pattern.add_row().cells
-#         row_cells[0].text = crops.beneficiary_settlement
-#         row_cells[1].text = crops.irrigation_source
-#         row_cells[2].text = crops.cropping_patterns_kharif
-#         row_cells[3].text = crops.cropping_patterns_rabi
-#         row_cells[4].text = crops.cropping_patterns_zaid
-#         row_cells[5].text = crops.agri_productivity
-#         row_cells[6].text = crops.land_classification
-
-#     doc.add_heading("Livestock Info", level=4)
-#     livelihood_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
-#     headers_livelihood = [
-#         "Name of the Settlement",
-#         "Goats",
-#         "Sheep",
-#         "Cattle",
-#         "Piggery",
-#         "Poultry",
-#     ]
-#     table_livelihood = doc.add_table(rows=1, cols=len(headers_livelihood))
-#     table_livelihood.style = "Table Grid"
-#     hdr_cells = table_livelihood.rows[0].cells
-#     for i, header in enumerate(headers_livelihood):
-#         hdr_cells[i].paragraphs[0].add_run(header).bold = True
-
-#     for livelihood in livelihood_in_plan:
-#         row_cells = table_livelihood.add_row().cells
-#         row_cells[0].text = livelihood.settlement_name
-#         row_cells[1].text = str(livelihood.livestock_census.get("Goats", "")) or "None"
-#         row_cells[2].text = str(livelihood.livestock_census.get("Sheep", "")) or "None"
-#         row_cells[3].text = str(livelihood.livestock_census.get("Cattle", "")) or "None"
-#         row_cells[4].text = str(livelihood.livestock_census.get("Piggery", "")) or "None"
-#         row_cells[5].text = str(livelihood.livestock_census.get("Poultry", "")) or "None"
 
 
 def create_livelihood_table(doc, plan):
@@ -515,7 +467,27 @@ def create_livelihood_table(doc, plan):
             value = livestock_data.get(livestock_type, "")
             row_cells[i].text = format_livestock_value(value)
 
-# MARK: Section D
+    doc.add_heading("Plantation Info", level=4)
+    plantation_in_plan = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
+    headers_plantation = [
+        "Name of the Settlement",
+        "Plantation",
+        "Area",
+    ]
+    table_plantation = doc.add_table(rows=1, cols=len(headers_plantation))
+    table_plantation.style = "Table Grid"
+    hdr_cells = table_plantation.rows[0].cells
+    for i, header in enumerate(headers_plantation):
+        hdr_cells[i].paragraphs[0].add_run(header).bold = True
+
+    for plantation in plantation_in_plan:
+        row_cells = table_plantation.add_row().cells
+        row_cells[0].text = plantation.beneficiary_settlement
+        row_cells[1].text = plantation.data_livelihood.get("Plantation", "No Data")
+        row_cells[2].text = plantation.data_livelihood.get("Plantation_crop", "No Data")
+
+
+# MARK: - Section D
 def add_section_d(doc, plan, settlement_mws_ids, mws_gdf):
     doc.add_heading(
         "Section D: Information of all Micro Watersheds intersecting the village",
@@ -571,24 +543,35 @@ def populate_land_use(doc, plan, mws_id, mws_gdf):
     logger.info("2. Cropping Intensity Layer")
 
     try:
-        ci_layer_name = str(plan.district.district_name).lower().replace(" ", "_") + "_" + str(plan.block.block_name).lower().replace(" ", "_") + "_" + "intensity"
+        ci_layer_name = (
+            str(plan.district.district_name).lower().replace(" ", "_")
+            + "_"
+            + str(plan.block.block_name).lower().replace(" ", "_")
+            + "_"
+            + "intensity"
+        )
         logger.debug("Attempting to fetch layer: %s", ci_layer_name)
-        
+
         cropping_intensity_layer = get_vector_layer_geoserver(
             geoserver_url=GEOSERVER_URL,
             workspace="cropping_intensity",
             layer_name=ci_layer_name,
         )
-        
+
         if not cropping_intensity_layer or "features" not in cropping_intensity_layer:
-            logger.error("Failed to fetch cropping intensity layer or layer has no features")
+            logger.error(
+                "Failed to fetch cropping intensity layer or layer has no features"
+            )
             return
-            
-        logger.debug("Successfully fetched cropping intensity layer with %d features", len(cropping_intensity_layer["features"]))
-        
+
+        logger.debug(
+            "Successfully fetched cropping intensity layer with %d features",
+            len(cropping_intensity_layer["features"]),
+        )
+
         ci_gdf = gpd.GeoDataFrame.from_features(cropping_intensity_layer["features"])
         joined_gdf = gpd.sjoin(mws_gdf, ci_gdf, how="left", predicate="intersects")
-        
+
     except Exception as e:
         logger.exception("Error processing cropping intensity layer: %s", str(e))
         return
@@ -848,33 +831,7 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         for (settlement, waterbody_type) in waterbody_count
     ]
 
-    # Add a table for waterbody information
     doc.add_heading(f"Waterbody Information for MWS: {mws_id}", level=2)
-    # headers_waterbody_info = [
-    #     "Name of Beneficiary Settlement",
-    #     "Type of Water Structure",
-    #     "Total Number of Household Benefitted",
-    # ]
-    # table_waterbody_info = doc.add_table(
-    #     rows=len(waterbody_info) + 1, cols=len(headers_waterbody_info)
-    # )
-    # table_waterbody_info.style = "Table Grid"
-
-    # # Populate the header row
-    # hdr_cells = table_waterbody_info.rows[0].cells
-    # for i, header in enumerate(headers_waterbody_info):
-    #     hdr_cells[i].paragraphs[0].add_run(header).bold = True
-
-    # # Populate the table with waterbody information
-    # for i, (settlement, waterbody_type, num_waterbodies, num_households) in enumerate(
-    #     waterbody_info, start=1
-    # ):
-    #     row_cells = table_waterbody_info.rows[i].cells
-    #     row_cells[0].text = settlement
-    #     row_cells[1].text = waterbody_type
-    #     row_cells[2].text = str(num_households)
-
-    # doc.add_heading("Water Structure Info", level=3)
     headers_waterstructure = [
         "Name of the Beneficiary Settlement",
         "Who manages?",
@@ -882,7 +839,6 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         "Which Caste uses the water strucutre?",
         "Households Benefitted",
         "Type of Water Structure",
-        "Water Structure Dimensions",
         "Identified By",
         "Need Maintenance",
         "Latitude",
@@ -909,11 +865,10 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
             row_cells[5].text = "Other: " + water_st.water_structure_other
         else:
             row_cells[5].text = water_st.water_structure_type
-        row_cells[6].text = water_st.water_structure_dimension
-        row_cells[7].text = water_st.identified_by
-        row_cells[8].text = water_st.need_maintenance
-        row_cells[9].text = str(water_st.latitude)
-        row_cells[10].text = str(water_st.longitude)
+        row_cells[6].text = water_st.identified_by
+        row_cells[7].text = water_st.need_maintenance
+        row_cells[8].text = str(water_st.latitude)
+        row_cells[9].text = str(water_st.longitude)
 
 
 def populate_water_budgeting(doc, plan, mws_id, mws_gdf):
@@ -1001,33 +956,6 @@ def fill_yearly_table(doc, yearly_data):
     create_and_add_graph(doc, yearly_data)
 
 
-# def create_and_add_graph(doc, yearly_data):
-#     years = sorted(yearly_data.keys())
-#     precipitation = [yearly_data[year]['Precipitation'] for year in years]
-#     runoff = [yearly_data[year]['RunOff'] for year in years]
-#     et = [yearly_data[year]['ET'] for year in years]
-#     g = [yearly_data[year]['G'] for year in years]
-
-#     sns.set_style("darkgrid")
-#     plt.figure(figsize=(6, 4))
-#     sns.lineplot(x=years, y=precipitation, color="blue", label="Precipitation")
-#     sns.lineplot(x=years, y=runoff, color="pink", label="Run-off")
-#     sns.lineplot(x=years, y=et, color="green", label="ET")
-#     plt.fill_between(years, g, color="brown", alpha=0.3, label="Change in Groundwater")
-
-#     plt.xlabel("Year", fontsize=12)
-#     plt.ylabel("Values", fontsize=12)
-#     plt.title("Yearly Water Budget", fontsize=14)
-#     plt.legend(fontsize=10, loc="upper right")
-#     sns.despine(left=True, bottom=True)
-#     plt.tight_layout()
-
-
-#     image_stream = BytesIO()
-#     plt.savefig(image_stream, format="png", dpi=300)
-#     plt.close()
-#     image_stream.seek(0)
-#     doc.add_picture(image_stream)
 def create_and_add_graph(doc, yearly_data):
     years = sorted(yearly_data.keys())
     precipitation = [yearly_data[year]["Precipitation"] for year in years]
@@ -1078,6 +1006,7 @@ def create_and_add_graph(doc, yearly_data):
     doc.add_paragraph()
 
 
+# MARK: - Section E
 def add_section_e(doc, plan):
     doc.add_heading(
         "Section E: Remote sensing data- Total Area under Surface Water Structures",
@@ -1212,122 +1141,17 @@ def create_surface_wb_table(doc, plan):
             row.cells[i].text = str(cell_data)
 
 
+# MARK: - Section F
 def add_section_f(doc, plan, mws):
     doc.add_heading("Section F: Proposed New NRM works on basis through Gram Sabha")
     para = doc.add_paragraph()
     para.add_run(
-        "This section outlines the details of proposed new NRM works based on community inputs put up to the Gram Sabha.\n\n\n\n XXX"
+        "This section outlines the details of proposed new NRM works based on community inputs put up to the Gram Sabha.\n\n\n\n"
     )
 
     create_nrm_works_table(doc, plan, mws)
 
 
-# def create_nrm_works_table(doc, plan, mws):
-#     recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id)
-#     irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id)
-#     settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
-#     well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id)
-#     waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
-
-#     mws_uids = list(set([feature["properties"]["uid"] for feature in mws["features"]]))
-
-#     for uid in mws_uids:
-#         mws_filtered = {
-#             "type": "FeatureCollection",
-#             "features": [
-#                 feature
-#                 for feature in mws["features"]
-#                 if feature["properties"]["uid"] == uid
-#             ],
-#         }
-
-#         polygon_coords = mws_filtered["features"][0]["geometry"]["coordinates"][0]
-#         polygon = shape({"type": "Polygon", "coordinates": polygon_coords})
-
-#         recharge_works = [
-#             structure
-#             for structure in recharge_st_in_plan
-#             if shape(
-#                 {
-#                     "type": "Point",
-#                     "coordinates": [structure.longitude, structure.latitude],
-#                 }
-#             ).within(polygon)
-#         ]
-
-#         irrigation_works = [
-#             work
-#             for work in irrigation_works_in_plan
-#             if shape(
-#                 {"type": "Point", "coordinates": [work.longitude, work.latitude]}
-#             ).within(polygon)
-#         ]
-
-#         settlement_resources = [settlement for settlement in settlement_resources_in_plan if shape({"type": "Point", "coordinates": [settlement.longitude, settlement.latitude]}).within(polygon)]
-#         well_resources = [well for well in well_resources_in_plan if shape({"type": "Point", "coordinates": [well.longitude, well.latitude]}).within(polygon)]
-#         waterbody_resources = [waterbody for waterbody in waterbody_resources_in_plan if shape({"type": "Point", "coordinates": [waterbody.longitude, waterbody.latitude]}).within(polygon)]
-
-#         if len(recharge_works) == 0 and len(irrigation_works) == 0 and len(settlement_resources) == 0 and len(well_resources) == 0 and len(waterbody_resources) == 0:
-#             continue  # Skip MWS polygons with no associated works
-
-#         doc.add_heading(f"MWS UID: {uid}", level=2)
-
-#         headers = [
-#             "S.No",
-#             "Work Category : Irrigation work or Recharge Structure",
-#             "Name of Beneficiary",
-#             "Type of work",
-#             "Work ID",
-#             "Latitude",
-#             "Longitude",
-#             "Work Dimensions",
-#         ]
-#         table = doc.add_table(
-#             rows=1 + len(recharge_works) + len(irrigation_works), cols=len(headers)
-#         )
-#         table.style = "Table Grid"
-
-#         for i, header in enumerate(headers):
-#             table.cell(0, i).text = header
-#             table.cell(0, i).paragraphs[0].runs[0].font.bold = True
-
-#         # Add rows for recharge structures
-#         for i, structure in enumerate(recharge_works, start=1):
-#             row_cells = table.rows[i].cells
-#             row_cells[0].text = str(i)  # S.No
-#             row_cells[1].text = "Recharge Structure"  # Work Category
-#             # Name of Beneficiary
-#             row_cells[2].text = structure.beneficiary_settlement
-#             row_cells[3].text = structure.work_type  # Type of work
-#             row_cells[4].text = structure.recharge_structure_id  # Work ID
-#             row_cells[5].text = str(structure.latitude)  # Latitude
-#             row_cells[6].text = str(structure.longitude)  # Longitude
-#             row_cells[7].text = format_work_dimensions(
-#                 structure.work_dimensions, structure.work_type.lower()
-#             )  # Work Dimension
-
-#         # Add rows for irrigation works
-#         offset = len(recharge_works) + 1
-#         for i, work in enumerate(irrigation_works, start=offset):
-#             row_cells = table.rows[i].cells
-#             row_cells[0].text = str(i)  # S.No
-#             row_cells[1].text = "Irrigation Work"  # Work Category
-#             # Name of Beneficiary
-#             row_cells[2].text = work.beneficiary_settlement
-#             row_cells[3].text = work.work_type  # Type of work
-#             row_cells[4].text = work.irrigation_work_id  # Work ID
-#             row_cells[5].text = str(work.latitude)  # Latitude
-#             row_cells[6].text = str(work.longitude)  # Longitude
-#             row_cells[7].text = format_work_dimensions(
-#                 work.work_dimensions, work.work_type.lower()
-#             )  # Work Dimension
-
-
-#         # show marked resources and proposed works
-#         show_marked_works(doc, plan, uid, mws_filtered, polygon)
-#         doc.add_page_break()
-#     show_all_mws(doc, plan, mws)
-#     # show_all_marked_works(doc, plan, mws)
 def create_nrm_works_table(doc, plan, mws):
     recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id)
     irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id)
@@ -1368,7 +1192,9 @@ def create_nrm_works_table(doc, plan, mws):
     for well in well_resources_in_plan:
         coords = [well.longitude, well.latitude]
         mws_uid = find_closest_mws(coords, mws_polygons)
-        logger.info(f"Well at ({well.latitude}, {well.longitude}) assigned to MWS {mws_uid}")
+        logger.info(
+            f"Well at ({well.latitude}, {well.longitude}) assigned to MWS {mws_uid}"
+        )
         if mws_uid not in resource_mws_assignments:
             resource_mws_assignments[mws_uid] = {
                 "settlement": [],
@@ -1449,9 +1275,9 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
                 row_cells[1].text = "Recharge Structure"  # Work Category
-                row_cells[2].text = (
-                    structure.beneficiary_settlement
-                )  # Name of Beneficiary
+                row_cells[
+                    2
+                ].text = structure.beneficiary_settlement  # Name of Beneficiary
                 row_cells[3].text = structure.work_type  # Type of work
                 row_cells[4].text = structure.recharge_structure_id  # Work ID
                 row_cells[5].text = str(structure.latitude)  # Latitude
@@ -1467,7 +1293,21 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells[0].text = str(i)  # S.No
                 row_cells[1].text = "Irrigation Work"  # Work Category
                 row_cells[2].text = work.beneficiary_settlement  # Name of Beneficiary
-                row_cells[3].text = work.work_type  # Type of work
+
+                if (
+                    work.work_type.lower() == "other"
+                    and work.data_agri
+                    and "TYPE_OF_WORK_ID_other" in work.data_agri
+                ):
+                    custom_work_type = work.data_agri.get("TYPE_OF_WORK_ID_other")
+                    row_cells[3].text = (
+                        str(custom_work_type)
+                        if custom_work_type is not None
+                        else "Other (unspecified)"
+                    )
+                else:
+                    row_cells[3].text = work.work_type
+
                 row_cells[4].text = work.irrigation_work_id  # Work ID
                 row_cells[5].text = str(work.latitude)  # Latitude
                 row_cells[6].text = str(work.longitude)  # Longitude
@@ -1496,132 +1336,6 @@ def format_work_dimensions(work_dimensions, work_type):
     return dimensions_str.rstrip(", ")
 
 
-# def show_marked_works(doc, plan, uid, mws_filtered, polygon):
-#     print(f"Showing marked works for MWS: {uid}")
-
-#     layers = {
-#         'settlement': {
-#             'workspace': 'resources',
-#             'layer_name': f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-#             'icon_url': 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-#             'label_key': 'Settleme_1',
-#             'legend_name': 'Settlement (Resource)'
-#         },
-#         'well': {
-#             'workspace': 'resources',
-#             'layer_name': f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-#             'icon_url': 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-#             'label_key': 'well_id',
-#             'legend_name': 'Well (Resource)'
-#         },
-#         'waterbody': {
-#             'workspace': 'resources',
-#             'layer_name': f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-#             'icon_url': 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
-#             'label_key': 'wbs_type',
-#             'legend_name': 'Water Structure (Resource)'
-#         },
-#         'recharge': {
-#             'workspace': 'works',
-#             'layer_name': f"plan_gw_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-#             'icon_url': 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-#             'label_key': 'work_type',
-#             'legend_name': 'Recharge Structure (Proposed Work)'
-#         },
-#         'irrigation': {
-#             'workspace': 'works',
-#             'layer_name': f"plan_agri_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-#             'icon_url': 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-#             'label_key': 'work_type',
-#             'legend_name': 'Irrigation Work (Proposed Work)'
-#         }
-#     }
-
-#     features = {}
-#     for key, layer_info in layers.items():
-#         try:
-#             layer = get_vector_layer_geoserver(
-#                 geoserver_url=GEOSERVER_URL,
-#                 workspace=layer_info['workspace'],
-#                 layer_name=layer_info['layer_name']
-#             )
-#             features[key] = [
-#                 feature for feature in layer["features"]
-#                 if shape(feature["geometry"]).within(polygon)
-#             ] if layer is not None else []
-#         except Exception as e:
-#             print(f"Error retrieving {key} layer: {str(e)}")
-#             features[key] = []
-
-#     if all(len(feature_list) == 0 for feature_list in features.values()):
-#         print(f"No features found for MWS: {uid}")
-#         return
-
-#     centroid = polygon.centroid
-#     map_center = [centroid.y, centroid.x]
-#     fol_map = folium.Map(location=map_center, zoom_start=14)
-
-#     folium.GeoJson(
-#         mws_filtered,
-#         name="MWS boundary",
-#         style_function=lambda feature: {
-#             "fillColor": "blue",
-#             "color": "black",
-#             "weight": 2,
-#             "fillOpacity": 0.3,
-#         },
-#     ).add_to(fol_map)
-
-#     legend_html = """
-#     <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; height: 180px;
-#     border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
-#     ">&nbsp;<b>Legend:</b><br>
-#     """
-
-#     for key, feature_list in features.items():
-#         if len(feature_list) > 0:
-#             feature_group = folium.FeatureGroup(name=layers[key]['legend_name'])
-#             for feature in feature_list:
-#                 icon = folium.features.CustomIcon(
-#                     layers[key]['icon_url'],
-#                     icon_size=(25, 41)
-#                 )
-#                 label_text = feature['properties'].get(layers[key]['label_key'], 'N/A')
-#                 folium.Marker(
-#                     location=[
-#                         feature["geometry"]["coordinates"][1],
-#                         feature["geometry"]["coordinates"][0],
-#                     ],
-#                     icon=icon,
-#                     popup=label_text
-#                 ).add_to(feature_group)
-#             feature_group.add_to(fol_map)
-
-#             # Add to legend
-#             legend_html += f"""
-#             <img src="{layers[key]['icon_url']}" alt="{layers[key]['legend_name']}" width="15" height="25">
-#             {layers[key]['legend_name']}<br>
-#             """
-
-#     legend_html += "</div>"
-#     fol_map.get_root().html.add_child(folium.Element(legend_html))
-
-#     folium.LayerControl().add_to(fol_map)
-
-#     map_filename = f"marked_works_{uid}.html"
-#     fol_map.save(map_filename)
-#     print(f"Map saved as {map_filename}")
-
-#     img_data = fol_map._to_png(5)
-#     img = Image.open(BytesIO(img_data))
-#     img_filename = f"marked_works_{uid}.png"
-#     img.save(img_filename)
-
-#     doc.add_picture(img_filename, width=Inches(6))
-
-
-#     os.remove(map_filename)
-#     os.remove(img_filename)
 def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     logger.info(f"\nDEBUG: Starting show_marked_works for MWS: {uid}")
     logger.info(f"DEBUG: Polygon bounds: {polygon.bounds}")
@@ -1708,8 +1422,8 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
             feature_group.add_to(fol_map)
             legend_html += f"""
-            <img src="{layers[key]['icon_url']}" alt="{layers[key]['legend_name']}" width="15" height="25">
-            {layers[key]['legend_name']}<br>
+            <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
+            {layers[key]["legend_name"]}<br>
             """
 
     # Now process works layers
@@ -1737,7 +1451,9 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
                             feature["geometry"]["coordinates"][1],
                             feature["geometry"]["coordinates"][0],
                         ]
-                        logger.info(f"DEBUG: Adding {key} marker at coordinates: {coords}")
+                        logger.info(
+                            f"DEBUG: Adding {key} marker at coordinates: {coords}"
+                        )
                         folium.Marker(
                             location=coords,
                             icon=icon,
@@ -1747,8 +1463,8 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
                         ).add_to(feature_group)
                     feature_group.add_to(fol_map)
                     legend_html += f"""
-                    <img src="{layers[key]['icon_url']}" alt="{layers[key]['legend_name']}" width="15" height="25">
-                    {layers[key]['legend_name']}<br>
+                    <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
+                    {layers[key]["legend_name"]}<br>
                     """
 
         except Exception as e:
@@ -1771,15 +1487,19 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
         map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
         fol_map.save(map_filename)
 
-        img_data = fol_map._to_png(5)
+        if env("DEBUG") == "False":
+            logger.info("Using custom selenium driver")
+            driver = create_firefox_driver(
+                geckodriver_path="/usr/local/bin/geckodriver"
+            )
+            img_data = fol_map._to_png(delay=5, driver=driver)
+        else:
+            img_data = fol_map._to_png(5)
         img = Image.open(BytesIO(img_data))
         img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
         img.save(img_filename)
 
         doc.add_picture(img_filename, width=Inches(6))
-        
-        # No need to manually remove files as they'll be cleaned up automatically
-        # when the tempfile.TemporaryDirectory context exits
 
 
 def show_all_mws(doc, plan, mws):
@@ -1897,8 +1617,8 @@ def show_all_mws(doc, plan, mws):
 
             # Add to legend
             legend_html += f"""
-            <img src="{layers[key]['icon_url']}" alt="{layers[key]['legend_name']}" width="15" height="25">
-            {layers[key]['legend_name']}<br>
+            <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
+            {layers[key]["legend_name"]}<br>
             """
 
     # Add MWS boundary to legend
@@ -1917,7 +1637,14 @@ def show_all_mws(doc, plan, mws):
         map_filename = os.path.join(temp_dir, "all_mws_map.html")
         fol_map.save(map_filename)
 
-        img_data = fol_map._to_png(5)
+        if env("DEBUG") == "False":
+            logger.info("Using custom selenium driver")
+            driver = create_firefox_driver(
+                geckodriver_path="/usr/local/bin/geckodriver"
+            )
+            img_data = fol_map._to_png(delay=5, driver=driver)
+        else:
+            img_data = fol_map._to_png(5)
         img = Image.open(BytesIO(img_data))
         img_filename = os.path.join(temp_dir, "all_mws_map.png")
         img.save(img_filename)
@@ -1926,5 +1653,14 @@ def show_all_mws(doc, plan, mws):
         doc.add_heading("Overview Map of All MWS", level=1)
         doc.add_picture(img_filename, width=Inches(6))
         doc.add_page_break()
-        
-        
+
+
+def create_firefox_driver(geckodriver_path="/usr/local/bin/geckodriver"):
+    options = webdriver.firefox.options.Options()
+    options.add_argument("--headless")
+
+    service = Service(executable_path=geckodriver_path)
+
+    driver = webdriver.Firefox(service=service, options=options)
+
+    return driver

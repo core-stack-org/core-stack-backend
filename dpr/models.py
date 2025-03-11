@@ -32,11 +32,10 @@ class ODK_settlement(models.Model):
     nrega_issues = models.TextField()
     nrega_community = models.TextField()
     data_settlement = models.JSONField(default=dict, null=True, blank=True)
-    
-    
+
     def __str__(self) -> str:
         return self.settlement_name
-    
+
 
 class ODK_well(models.Model):
     well_id = models.CharField(max_length=255, primary_key=True)
@@ -45,7 +44,7 @@ class ODK_well(models.Model):
     beneficiary_settlement = models.TextField()
     block_name = models.TextField()
     owner = models.TextField()
-    households_benefitted = models.IntegerField()   
+    households_benefitted = models.IntegerField()
     caste_uses = models.TextField()
     is_functional = models.TextField()
     need_maintenance = models.TextField()
@@ -57,10 +56,10 @@ class ODK_well(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_well = models.JSONField(default=dict, null=True, blank=True)
-    
+
     def __str__(self) -> str:
         return self.well_id
-    
+
 
 class ODK_waterbody(models.Model):
     waterbody_id = models.CharField(max_length=255, primary_key=True)
@@ -87,12 +86,11 @@ class ODK_waterbody(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_waterbody = models.JSONField(default=dict, null=True, blank=True)
-    
-    
+
     def __str__(self) -> str:
         return self.waterbody_id
-    
-    
+
+
 class ODK_groundwater(models.Model):
     recharge_structure_id = models.CharField(max_length=255, primary_key=True)
     uuid = models.TextField()
@@ -109,17 +107,16 @@ class ODK_groundwater(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_groundwater = models.JSONField(default=dict, null=True, blank=True)
-    
 
     def __str__(self) -> str:
         return self.recharge_structure_id
-    
+
     def update_work_dimensions(self, work_type, work_details):
         work_dimensions = self.work_dimensions.copy()
         work_dimensions[work_type] = work_details
         self.work_dimensions = work_dimensions
         self.save()
-    
+
 
 class ODK_agri(models.Model):
     irrigation_work_id = models.CharField(max_length=255, primary_key=True)
@@ -137,16 +134,16 @@ class ODK_agri(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_agri = models.JSONField(default=dict, null=True, blank=True)
-    
+
     def __str__(self) -> str:
         return self.irrigation_work_id
-    
+
     def update_work_dimensions(self, work_type, work_details):
         work_dimensions = self.work_dimensions.copy()
         work_dimensions[work_type] = work_details
         self.work_dimensions = work_dimensions
         self.save()
-        
+
 
 class ODK_crop(models.Model):
     crop_grid_id = models.CharField(max_length=255, primary_key=True)
@@ -164,10 +161,10 @@ class ODK_crop(models.Model):
     status_re = models.TextField()
     system = models.JSONField()
     data_crop = models.JSONField(default=dict, null=True, blank=True)
-    
+
     def __str__(self) -> str:
         return self.crop_grid_id
-    
+
 
 class ODK_livelihood(models.Model):
     livelihood_id = models.AutoField(primary_key=True)
@@ -187,12 +184,12 @@ class ODK_livelihood(models.Model):
     system = models.JSONField()
     gps_point = models.JSONField()
     data_livelihood = models.JSONField(default=dict, null=True, blank=True)
-    
+
     def __str__(self) -> str:
         return self.livelihood_id
-    
-    
-# Maintenance forms and data .. 
+
+
+# Maintenance forms and data ..
 # class GW_maintenance(models.Model):
 #     pass
 
