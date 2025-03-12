@@ -6,7 +6,7 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
-from .misc.restoration_opportunity import generate_layers
+from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order_vector
 from .utils import (
     Geoserver,
@@ -499,7 +499,7 @@ def mws_drought_causality(request):
         )
         return Response(
             {"Success": "Drought Causality task initiated"},
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in Drought Causality api :: ", e)
@@ -526,7 +526,7 @@ def tree_health_raster(request):
         )
         return Response(
             {"Success": "tree_health task initiated"},
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in change_detection api :: ", e)
@@ -598,7 +598,7 @@ def restoration_opportunity(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        generate_layers.apply_async(
+        generate_restoration_opportunity.apply_async(
             args=[state, district, block], queue="nrm"
         )
         return Response(
@@ -614,17 +614,16 @@ def restoration_opportunity(request):
 def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
     try:
-        organization = request.data.get("organization").lower()
-        project = request.data.get("project").lower()
+        project_id = request.data.get("project_id")
         state = request.data.get("state").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         site_suitability.apply_async(
-            args=[organization, project, state, start_year, end_year], queue="nrm"
+            args=[project_id, state, start_year, end_year], queue="nrm"
         )
         return Response(
-            {"Success": "Plantation_site_suitability initiated"},
-            status=status.HTTP_201_CREATED,
+            {"Success": "Plantation_site_suitability task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in Plantation_site_suitability api :: ", e)

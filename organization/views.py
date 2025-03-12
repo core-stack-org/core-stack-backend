@@ -67,7 +67,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if not self.check_organization_permissions(instance):
             return Response(
                 {"message": "You don't have permission to access this organization."},
-                status=status.HTTP_403_BAD_REQUEST,
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = self.get_serializer(instance)
@@ -83,7 +83,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if not self.check_organization_permissions(instance):
             return Response(
                 {"message": "You don't have permission to access this organization."},
-                status=status.HTTP_403_BAD_REQUEST,
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         partial = kwargs.pop("partial", False)

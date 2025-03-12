@@ -47,9 +47,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "d71e-116-206-157-32.ngrok-free.app",
-    "9681-106-222-136-28.ngrok-free.app",
-    "7e22-2401-4900-1cd6-4e74-970e-d91e-cf6-137a.ngrok-free.app",
+    ".ngrok-free.app",
 ]
 
 # Application definition
@@ -87,9 +85,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.20.236:3000",
     "http://localhost:3000",
     "http://localhost:3001",
-    "https://9681-106-222-136-28.ngrok-free.app",
-    "https://7e22-2401-4900-1cd6-4e74-970e-d91e-cf6-137a.ngrok-free.app",
-]
+]  # TODO Remove extras
 
 # CORS_ALLOW_HEADERS = [
 #     "ngrok-skip-browser-warning",

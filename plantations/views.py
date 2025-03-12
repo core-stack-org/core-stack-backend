@@ -7,8 +7,6 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
-
-from computing.plantation.site_suitability import site_suitability
 from projects.models import Project, ProjectApp, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
 from utilities.gee_utils import valid_gee_text
@@ -149,10 +147,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
                 continue
 
         # # Update the merged GeoJSON file for the project if any files were created
-        if created_files:
-            site_suitability.apply_async(
-                args=[project_app.id, "telangana", 2017, 2023], queue="nrm"
-            )
+        # if created_files:
         #     self.update_project_geojson(project)
 
         # Prepare response

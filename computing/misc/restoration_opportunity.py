@@ -10,7 +10,7 @@ from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def generate_layers(self, state, district, block):
+def generate_restoration_opportunity(self, state, district, block):
     ee_initialize()
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
