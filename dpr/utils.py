@@ -101,7 +101,7 @@ def fetch_odk_data_sync(ODK_URL):
 
 def sync_settlement():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_settlement)
-    print("ODK data settlement", odk_resp_list[:1])
+    # print("ODK data settlement", odk_resp_list[:1])
     settlement = ODK_settlement()  # settlement obj for the db model
 
     for record in odk_resp_list:
@@ -159,7 +159,7 @@ def sync_settlement():
         settlement.nrega_job_card = mgnrega_info.get("NREGA_have_job_card", "") or 0
         settlement.nrega_without_job_card = mgnrega_info.get("total_household", "") or 0
         settlement.nrega_work_days = mgnrega_info.get("NREGA_work_days", "") or 0
-        settlement.nrega_past_work = mgnrega_info.get("q1", "") or "0"
+        settlement.nrega_past_work = mgnrega_info.get("work_demands", "") or "0"
         settlement.nrega_raise_demand = mgnrega_info.get("select_one_Y_N", "") or "0"
         settlement.nrega_demand = mgnrega_info.get("select_one_demands", "") or "0"
         settlement.nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
@@ -172,7 +172,7 @@ def sync_settlement():
 
 def sync_well():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_well)
-    print("ODK data well", odk_resp_list[:1])
+    # print("ODK data well", odk_resp_list[:1])
     well = ODK_well()  # well object
 
     for record in odk_resp_list:
@@ -238,7 +238,7 @@ def sync_well():
 
 def sync_waterbody():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_waterbody)
-    print("ODK data waterbody", odk_resp_list[:1])
+    # print("ODK data waterbody", odk_resp_list[:1])
     waterbody = ODK_waterbody()
 
     for record in odk_resp_list:
