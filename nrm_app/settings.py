@@ -58,16 +58,18 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # core apps
     "computing",
     "dpr",
     "geoadmin",
     "stats_generator",
+    # rest framework for APIs
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
-    "rest_framework_simplejwt.token_blacklist",
-    # project apps
+    # project applications
     "users",
     "organization",
     "projects",
