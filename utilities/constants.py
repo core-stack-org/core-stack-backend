@@ -29,15 +29,18 @@ ODK_URL_well = (
 ODK_URL_waterbody = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Waterbodies_Form_V1.0.3.svc/Submissions"
 
 ODK_URL_gw = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_propose_new_recharge_structure_V1.0.0.svc/Submissions"
-ODK_URL_swb = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions"
 ODK_URL_agri = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_Agri_Screen_V1.0.0.svc/Submissions"
 ODK_URL_livelihood = "https://odk.gramvaani.org/v1/projects/9/forms/NRM%20Livelihood%20Form.svc/Submissions"
 ODK_URL_crop = (
     "https://odk.gramvaani.org/v1/projects/9/forms/crop_form_V1.0.0.svc/Submissions"
 )
 
+# Mainetenance forms
+ODK_URL_WATERBODY_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1.svc/Submissions"
+ODK_URL_RS_WATERBODY_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/PM_Remote_Sensed_Surface_Water_structure_V1.0.0.svc/Submissions"
+ODK_URL_GW_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions"
+ODK_URL_AGRI_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1.svc/Submissions"
+
 GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
-
 GCS_BUCKET_NAME = "core-stack"
-
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"

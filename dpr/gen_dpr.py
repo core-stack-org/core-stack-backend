@@ -1336,6 +1336,42 @@ def format_work_dimensions(work_dimensions, work_type):
     return dimensions_str.rstrip(", ")
 
 
+# MARK: - Section G
+# TODO: Add for Fisheries and Livestock
+def add_section_g(doc, plan, mws):
+    doc.add_heading("Section G: Propose New Livelihood Works", level=1)
+
+    plantation_in_plan = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
+    headers_plantation = [
+        "Livelihood Works",
+        "Name of Beneficiary Settlement",
+        "Name of Beneficiary",
+        "Beneficiary Father's Name",
+        "Type of Work Demand",
+        "Area",
+        "Latitude",
+        "Longitude",
+    ]
+    table_plantation = doc.add_table(rows=1, cols=len(headers_plantation))
+    table_plantation.style = "Table Grid"
+    hdr_cells = table_plantation.rows[0].cells
+    for i, header in enumerate(headers_plantation):
+        hdr_cells[i].paragraphs[0].add_run(header).bold = True
+
+    for plantation in plantation_in_plan:
+        row_cells = table_plantation.add_row().cells
+        row_cells[0].text = "Plantations"
+        row_cells[1].text = plantation.beneficiary_settlement
+        row_cells[2].text = plantation.data_livelihood.get(
+            "beneficiary_name", "No Data"
+        )
+        row_cells[3].text = "No Data"
+        row_cells[4].text = plantation.data_livelihood.get("Plantation", "No Data")
+        row_cells[5].text = plantation.data_livelihood.get("Plantation_crop", "No Data")
+        row_cells[6].text = plantation.latitude
+        row_cells[7].text = plantation.longitude
+
+
 def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     logger.info(f"\nDEBUG: Starting show_marked_works for MWS: {uid}")
     logger.info(f"DEBUG: Polygon bounds: {polygon.bounds}")
@@ -1664,3 +1700,6 @@ def create_firefox_driver(geckodriver_path="/usr/local/bin/geckodriver"):
     driver = webdriver.Firefox(service=service, options=options)
 
     return driver
+
+
+# MARK: - Section H

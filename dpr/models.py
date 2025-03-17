@@ -189,18 +189,53 @@ class ODK_livelihood(models.Model):
         return self.livelihood_id
 
 
-# Maintenance forms and data ..
-# class GW_maintenance(models.Model):
-#     pass
+class GW_maintenance(models.Model):
+    gw_maintenance_id = models.AutoField(primary_key=True)
+    uuid = models.CharField(max_length=255)
+    plan_id = models.TextField()
+    plan_name = models.TextField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    status_re = models.TextField()
+    work_id = models.CharField(max_length=255)
+    corresponding_work_id = models.CharField(max_length=255)
+    data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
 
 
-# class SWB_RS_maintenance(models.Model):
-#     pass
+class SWB_RS_maintenance(models.Model):
+    swb_rs_maintenance_id = models.AutoField(primary_key=True)
+    uuid = models.CharField(max_length=255)
+    plan_id = models.TextField()
+    plan_name = models.TextField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    status_re = models.TextField()
+    work_id = models.CharField(max_length=255)
+    corresponding_work_id = models.CharField(max_length=255)
+    data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
 
 
-# class SWB_maintenance(models.Model):
-#     pass
+class SWB_maintenance(models.Model):
+    swb_maintenance_id = models.AutoField(primary_key=True)
+    uuid = models.CharField(max_length=255)
+    plan_id = models.TextField()
+    plan_name = models.TextField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    status_re = models.TextField()
+    work_id = models.CharField(max_length=255)
+    corresponding_work_id = models.CharField(max_length=255)
+    data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
 
 
-# class Agri_maintenance(models.Model):
-#     pass
+class Agri_maintenance(models.Model):
+    agri_maintenance_id = models.AutoField(primary_key=True)
+    uuid = models.CharField(max_length=255)
+    plan_id = models.TextField()
+    plan_name = models.TextField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    status_re = models.TextField()
+    work_id = models.CharField(max_length=255)
+    corresponding_work_id = models.CharField(max_length=255)
+    data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)

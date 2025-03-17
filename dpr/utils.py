@@ -16,6 +16,10 @@ from utilities.constants import (
     ODK_URL_settlement,
     ODK_URL_waterbody,
     ODK_URL_well,
+    ODK_URL_AGRI_MAINTENANCE,
+    ODK_URL_GW_MAINTENANCE,
+    ODK_URL_RS_WATERBODY_MAINTENANCE,
+    ODK_URL_WATERBODY_MAINTENANCE,
 )
 
 from .models import (
@@ -26,6 +30,10 @@ from .models import (
     ODK_settlement,
     ODK_waterbody,
     ODK_well,
+    Agri_maintenance,
+    GW_maintenance,
+    SWB_maintenance,
+    SWB_RS_maintenance,
 )
 
 warnings.filterwarnings("ignore")
@@ -82,6 +90,8 @@ def sync_db_odk():
     print("sync cropping patterns")
     sync_cropping_pattern()
 
+    print("sync maintenance data")
+
 
 def fetch_odk_data_sync(ODK_URL):
     """Fetch ODK data from the given ODK URL."""
@@ -90,10 +100,7 @@ def fetch_odk_data_sync(ODK_URL):
         response.raise_for_status()
         response_dict = json.loads(response.content)
         response_list = response_dict["value"]
-        # print("response list: ", response_list[0:2])
-
         return response_list
-        # return response.json()  # Returns the ODK data
     except requests.exceptions.RequestException as e:
         print(f"Failed to fetch ODK data from the given URL: {e}")
         return None
@@ -512,6 +519,162 @@ def sync_cropping_pattern():
         cropping_pattern.system = record.get("__system", {})
         cropping_pattern.data_crop = record
         cropping_pattern.save()
+
+
+def sync_agri_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_AGRI_MAINTENANCE)
+    print("ODK data agri maintenance", odk_resp_list[:1])
+    agri_maintenance = Agri_maintenance()
+
+    for record in odk_resp_list:
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        agri_maintenance.uuid = record.get("__id", "") or "0"
+        agri_maintenance.work_id = record.get("work_id", "") or "0"
+        agri_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        agri_maintenance.plan_id = record.get("plan_id", "") or "0"
+        agri_maintenance.plan_name = record.get("plan_name", "") or "0"
+        agri_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapsappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            agri_maintenance.latitude = round(coordinates[1], 2)
+            agri_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            agri_maintenance.latitude = 0.0
+            agri_maintenance.longitude = 0.0
+        agri_maintenance.data_agri_maintenance = record
+        agri_maintenance.save()
+
+
+def sync_gw_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_GW_MAINTENANCE)
+    print("ODK data gw maintenance", odk_resp_list[:1])
+    gw_maintenance = GW_maintenance()
+
+    for record in odk_resp_list:
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        gw_maintenance.uuid = record.get("__id", "") or "0"
+        gw_maintenance.work_id = record.get("work_id", "") or "0"
+        gw_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        gw_maintenance.plan_id = record.get("plan_id", "") or "0"
+        gw_maintenance.plan_name = record.get("plan_name", "") or "0"
+        gw_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapsappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            gw_maintenance.latitude = round(coordinates[1], 2)
+            gw_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            gw_maintenance.latitude = 0.0
+            gw_maintenance.longitude = 0.0
+        gw_maintenance.data_gw_maintenance = record
+        gw_maintenance.save()
+
+
+def sync_swb_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_WATERBODY_MAINTENANCE)
+    print("ODK data swb maintenance", odk_resp_list[:1])
+    swb_maintenance = SWB_maintenance()
+
+    for record in odk_resp_list:
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        swb_maintenance.uuid = record.get("__id", "") or "0"
+        swb_maintenance.work_id = record.get("work_id", "") or "0"
+        swb_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        swb_maintenance.plan_id = record.get("plan_id", "") or "0"
+        swb_maintenance.plan_name = record.get("plan_name", "") or "0"
+        swb_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            swb_maintenance.latitude = round(coordinates[1], 2)
+            swb_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            swb_maintenance.latitude = 0.0
+            swb_maintenance.longitude = 0.0
+        swb_maintenance.data_swb_maintenance = record
+        swb_maintenance.save()
+
+
+def sync_swb_rs_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_RS_WATERBODY_MAINTENANCE)
+    print("ODK data waterbody rs maintenance", odk_resp_list[:1])
+    swb_rs_maintenance = SWB_RS_maintenance()
+
+    for record in odk_resp_list:
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        swb_rs_maintenance.uuid = record.get("__id", "") or "0"
+        swb_rs_maintenance.work_id = record.get("work_id", "") or "0"
+        swb_rs_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        swb_rs_maintenance.plan_id = record.get("plan_id", "") or "0"
+        swb_rs_maintenance.plan_name = record.get("plan_name", "") or "0"
+        swb_rs_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            swb_rs_maintenance.latitude = round(coordinates[1], 2)
+            swb_rs_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            swb_rs_maintenance.latitude = 0.0
+            swb_rs_maintenance.longitude = 0.0
+        swb_rs_maintenance.data_swb_rs_maintenance = record
+        swb_rs_maintenance.save()
 
 
 def validate_email(emailid):
