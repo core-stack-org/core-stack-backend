@@ -91,6 +91,10 @@ def sync_db_odk():
     sync_cropping_pattern()
 
     print("sync maintenance data")
+    sync_agri_maintenance()
+    sync_gw_maintenance()
+    sync_swb_maintenance()
+    sync_swb_rs_maintenance()
 
 
 def fetch_odk_data_sync(ODK_URL):
@@ -491,25 +495,54 @@ def sync_cropping_pattern():
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
-        cropping_pattern.uuid = record.get("__id", "") or "0"
+        cropping_pattern.uuid = record.get("__id", "") or "None"
         cropping_pattern.beneficiary_settlement = (
-            record.get("beneficiary_settlement", "") or "0"
+            record.get("beneficiary_settlement", "") or "None"
         )
-        cropping_pattern.irrigation_source = record.get("select_one_widgets", "") or "0"
+        cropping_pattern.irrigation_source = (
+            record.get("select_multiple_widgets", "") or "None"
+        )
         cropping_pattern.land_classification = (
-            record.get("select_one_classified", "") or "0"
+            record.get("select_one_classified", "") or "None"
         )
-        cropping_pattern.cropping_patterns_kharif = (
-            record.get("select_multiple_cropping_kharif_other", "") or "0"
-        )
-        cropping_pattern.cropping_patterns_rabi = (
-            record.get("select_multiple_cropping_Rabi_other", "") or "0"
-        )
-        cropping_pattern.cropping_patterns_zaid = (
-            record.get("select_multiple_cropping_Zaid_other", "") or "0"
-        )
+
+        # For Kharif season, check if 'other' is selected and use the _other field if it is
+        kharif_crops = record.get("select_multiple_cropping_kharif", "")
+        if kharif_crops and "other" in kharif_crops.lower():
+            kharif_other = record.get("select_multiple_cropping_kharif_other", "")
+            if kharif_other:
+                cropping_pattern.cropping_patterns_kharif = (
+                    kharif_crops + ": " + kharif_other
+                )
+            else:
+                cropping_pattern.cropping_patterns_kharif = kharif_crops
+        else:
+            cropping_pattern.cropping_patterns_kharif = kharif_crops or "None"
+
+        # For Rabi season, check if 'other' is selected and use the _other field if it is
+        rabi_crops = record.get("select_multiple_cropping_Rabi", "")
+        if rabi_crops and "other" in rabi_crops.lower():
+            rabi_other = record.get("select_multiple_cropping_Rabi_other", "")
+            if rabi_other:
+                cropping_pattern.cropping_patterns_rabi = rabi_crops + ": " + rabi_other
+            else:
+                cropping_pattern.cropping_patterns_rabi = rabi_crops
+        else:
+            cropping_pattern.cropping_patterns_rabi = rabi_crops or "None"
+
+        # For Zaid season, check if 'other' is selected and use the _other field if it is
+        zaid_crops = record.get("select_multiple_cropping_Zaid", "")
+        if zaid_crops and "other" in zaid_crops.lower():
+            zaid_other = record.get("select_multiple_cropping_Zaid_other", "")
+            if zaid_other:
+                cropping_pattern.cropping_patterns_zaid = zaid_crops + ": " + zaid_other
+            else:
+                cropping_pattern.cropping_patterns_zaid = zaid_crops
+        else:
+            cropping_pattern.cropping_patterns_zaid = zaid_crops or "None"
+
         cropping_pattern.agri_productivity = (
-            record.get("select_one_productivity", "") or "0"
+            record.get("select_one_productivity", "") or "None"
         )
         cropping_pattern.plan_id = record.get("plan_id", "") or "0"
         cropping_pattern.plan_name = record.get("plan_name", "") or "0"
@@ -523,10 +556,12 @@ def sync_cropping_pattern():
 
 def sync_agri_maintenance():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_AGRI_MAINTENANCE)
-    print("ODK data agri maintenance", odk_resp_list[:1])
-    agri_maintenance = Agri_maintenance()
+    print(f"ODK data agri maintenance: {len(odk_resp_list)} records found")
+
+    Agri_maintenance.objects.all().delete()
 
     for record in odk_resp_list:
+        agri_maintenance = Agri_maintenance()
         submission_date = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -562,10 +597,12 @@ def sync_agri_maintenance():
 
 def sync_gw_maintenance():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_GW_MAINTENANCE)
-    print("ODK data gw maintenance", odk_resp_list[:1])
-    gw_maintenance = GW_maintenance()
+    print(f"ODK data gw maintenance: {len(odk_resp_list)} records found")
+
+    GW_maintenance.objects.all().delete()
 
     for record in odk_resp_list:
+        gw_maintenance = GW_maintenance()
         submission_date = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -597,14 +634,17 @@ def sync_gw_maintenance():
             gw_maintenance.longitude = 0.0
         gw_maintenance.data_gw_maintenance = record
         gw_maintenance.save()
+    print(f"Synced {GW_maintenance.objects.count()} GW_maintenance records")
 
 
 def sync_swb_maintenance():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_WATERBODY_MAINTENANCE)
-    print("ODK data swb maintenance", odk_resp_list[:1])
-    swb_maintenance = SWB_maintenance()
+    print(f"ODK data swb maintenance: {len(odk_resp_list)} records found")
+
+    SWB_maintenance.objects.all().delete()
 
     for record in odk_resp_list:
+        swb_maintenance = SWB_maintenance()
         submission_date = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -623,7 +663,7 @@ def sync_swb_maintenance():
         try:
             coordinates = (
                 record.get("GPS_point", {})
-                .get("point_mapappearance", {})
+                .get("point_mapsappearance", {})
                 .get("coordinates", [])
             )
         except AttributeError:
@@ -636,14 +676,17 @@ def sync_swb_maintenance():
             swb_maintenance.longitude = 0.0
         swb_maintenance.data_swb_maintenance = record
         swb_maintenance.save()
+    print(f"Synced {SWB_maintenance.objects.count()} SWB_maintenance records")
 
 
 def sync_swb_rs_maintenance():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_RS_WATERBODY_MAINTENANCE)
-    print("ODK data waterbody rs maintenance", odk_resp_list[:1])
-    swb_rs_maintenance = SWB_RS_maintenance()
+    print(f"ODK data swb rs maintenance: {len(odk_resp_list)} records found")
+
+    SWB_RS_maintenance.objects.all().delete()
 
     for record in odk_resp_list:
+        swb_rs_maintenance = SWB_RS_maintenance()
         submission_date = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -662,7 +705,7 @@ def sync_swb_rs_maintenance():
         try:
             coordinates = (
                 record.get("GPS_point", {})
-                .get("point_mapappearance", {})
+                .get("point_mapsappearance", {})
                 .get("coordinates", [])
             )
         except AttributeError:

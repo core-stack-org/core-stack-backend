@@ -21,7 +21,6 @@ DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
 LITHOLOGY_PATH = "data/lithology/"
 
 # MARK: ODK URLs
-# subject to change
 ODK_URL_settlement = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Settlements_form%20_V1.0.1.svc/Submissions"
 ODK_URL_well = (
     "https://odk.gramvaani.org/v1/projects/9/forms/Add_well_form_V1.0.1.svc/Submissions"
@@ -29,6 +28,7 @@ ODK_URL_well = (
 ODK_URL_waterbody = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Waterbodies_Form_V1.0.3.svc/Submissions"
 
 ODK_URL_gw = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_propose_new_recharge_structure_V1.0.0.svc/Submissions"
+ODK_URL_swb = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions"
 ODK_URL_agri = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_Agri_Screen_V1.0.0.svc/Submissions"
 ODK_URL_livelihood = "https://odk.gramvaani.org/v1/projects/9/forms/NRM%20Livelihood%20Form.svc/Submissions"
 ODK_URL_crop = (

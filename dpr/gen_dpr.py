@@ -47,6 +47,10 @@ from .models import (
     ODK_well,
     ODK_crop,
     ODK_livelihood,
+    GW_maintenance,
+    SWB_maintenance,
+    SWB_RS_maintenance,
+    Agri_maintenance,
 )
 from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
 from utilities.logger import setup_logger
@@ -102,6 +106,10 @@ def create_dpr_document(plan):
     add_section_e(doc, plan)
 
     add_section_f(doc, plan, mws_fortnight)
+
+    add_section_g(doc, plan, mws_fortnight)
+
+    add_section_h(doc, plan, mws_fortnight)
 
     # MARK: local save /tmp/dpr/
     # operations on the document
@@ -368,7 +376,7 @@ def create_socio_eco_table(doc, plan):
 
     headers_nrega = [
         "Settlement's Name",
-        "Households - aware \n- applied \n- having NREGA job cards",
+        "Households - applied \n- having NREGA job cards",
         "NREGA work days in previous year",
         "Previous NRM demands made in the settlement",
         "Were demands raised by you, and were you involved in the new NRM planning?",
@@ -387,10 +395,7 @@ def create_socio_eco_table(doc, plan):
         row_cells = table_nrega.add_row().cells
         row_cells[0].text = settlement_nrega.settlement_name
         row_cells[1].text = (
-            "aware: "
-            + str(settlement_nrega.nrega_job_aware)
-            + "\n"
-            + "applied: "
+            "applied: "
             + str(settlement_nrega.nrega_job_applied)
             + "\n"
             + "having: "
@@ -409,11 +414,12 @@ def create_livelihood_table(doc, plan):
     headers_cropping_pattern = [
         "Name of the Settlement",
         "Irrigation Source",
+        "Land Classification",
+        "Type of Grid (Uncropped/Barren)",
         "Cropping Pattern (Kharif)",
         "Cropping Pattern (Rabi)",
         "Cropping Pattern (Zaid)",
-        "Agriculture Productivity",
-        "Land Classification",
+        "Cropping Intensity",
     ]
     table_cropping_pattern = doc.add_table(rows=1, cols=len(headers_cropping_pattern))
     table_cropping_pattern.style = "Table Grid"
@@ -425,11 +431,12 @@ def create_livelihood_table(doc, plan):
         row_cells = table_cropping_pattern.add_row().cells
         row_cells[0].text = crops.beneficiary_settlement
         row_cells[1].text = crops.irrigation_source
-        row_cells[2].text = crops.cropping_patterns_kharif
-        row_cells[3].text = crops.cropping_patterns_rabi
-        row_cells[4].text = crops.cropping_patterns_zaid
-        row_cells[5].text = crops.agri_productivity
-        row_cells[6].text = crops.land_classification
+        row_cells[2].text = crops.land_classification
+        row_cells[3].text = crops.data_crop.get("Uncropped_barren_land") or "None"
+        row_cells[4].text = format_text(crops.cropping_patterns_kharif)
+        row_cells[5].text = format_text(crops.cropping_patterns_rabi)
+        row_cells[6].text = format_text(crops.cropping_patterns_zaid)
+        row_cells[7].text = crops.agri_productivity
 
     # Livestock Info section with modified value handling
     doc.add_heading("Livestock Info", level=4)
@@ -466,25 +473,6 @@ def create_livelihood_table(doc, plan):
         for i, livestock_type in enumerate(livestock_types, start=1):
             value = livestock_data.get(livestock_type, "")
             row_cells[i].text = format_livestock_value(value)
-
-    doc.add_heading("Plantation Info", level=4)
-    plantation_in_plan = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
-    headers_plantation = [
-        "Name of the Settlement",
-        "Plantation",
-        "Area",
-    ]
-    table_plantation = doc.add_table(rows=1, cols=len(headers_plantation))
-    table_plantation.style = "Table Grid"
-    hdr_cells = table_plantation.rows[0].cells
-    for i, header in enumerate(headers_plantation):
-        hdr_cells[i].paragraphs[0].add_run(header).bold = True
-
-    for plantation in plantation_in_plan:
-        row_cells = table_plantation.add_row().cells
-        row_cells[0].text = plantation.beneficiary_settlement
-        row_cells[1].text = plantation.data_livelihood.get("Plantation", "No Data")
-        row_cells[2].text = plantation.data_livelihood.get("Plantation_crop", "No Data")
 
 
 # MARK: - Section D
@@ -1368,8 +1356,8 @@ def add_section_g(doc, plan, mws):
         row_cells[3].text = "No Data"
         row_cells[4].text = plantation.data_livelihood.get("Plantation", "No Data")
         row_cells[5].text = plantation.data_livelihood.get("Plantation_crop", "No Data")
-        row_cells[6].text = plantation.latitude
-        row_cells[7].text = plantation.longitude
+        row_cells[6].text = str(plantation.latitude)
+        row_cells[7].text = str(plantation.longitude)
 
 
 def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
@@ -1703,3 +1691,179 @@ def create_firefox_driver(geckodriver_path="/usr/local/bin/geckodriver"):
 
 
 # MARK: - Section H
+def add_section_h(doc, plan, mws):
+    doc.add_heading(
+        "Section H: Proposed Maintenance Works on existing Assets on basis through Gram Sabha",
+        level=1,
+    )
+    para = doc.add_paragraph()
+    para.add_run(
+        "This section presents information on proposed maintenance works for existing assets based on inputs from the Gram Sabha. For each maintenance work, include details such as the beneficiary settlement, work ID, type of work, latitude, and longitude."
+    )
+    para.add_run("\n\n")
+
+    asset_types = [
+        "Water Recharge Structures",
+        "Irrigation Structures",
+        "Surface Water Structures",
+        "Remote Sensed Surface Water Structures",
+    ]
+
+    doc.add_heading("Maintenance Works by Asset Type", level=2)
+
+    table = doc.add_table(rows=len(asset_types) + 1, cols=1)
+    table.style = "Table Grid"
+
+    header_cells = table.rows[0].cells
+    header_cells[0].text = "Asset Type"
+    header_cells[0].paragraphs[0].runs[0].bold = True
+
+    for i, asset_type in enumerate(asset_types):
+        row_cells = table.rows[i].cells
+        row_cells[0].text = asset_type
+
+        doc.add_heading(f"Maintenance Works for {asset_type}", level=3)
+
+        if asset_type == "Water Recharge Structures":
+            maintenance_gw_table(doc, plan, mws)
+        elif asset_type == "Irrigation Structures":
+            maintenance_agri_table(doc, plan, mws)
+        elif asset_type == "Surface Water Structures":
+            maintenance_waterstructures_table(doc, plan, mws)
+        elif asset_type == "Remote Sensed Surface Water Structures":
+            maintenance_rs_waterstructures_table(doc, plan, mws)
+
+        doc.add_page_break()
+
+
+def maintenance_gw_table(doc, plan, mws):
+    headers = [
+        "Name of the Beneficiary Settlement",
+        "Beneficiary Name",
+        "Work ID",
+        "Corresponding Work ID",
+        "Previous Maintenance Activity",
+        "Latitude",
+        "Longitude",
+    ]
+
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    header_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
+        header_cells[i].text = header
+        header_cells[i].paragraphs[0].runs[0].bold = True
+
+    # Add data rows
+    for maintenance in GW_maintenance.objects.filter(plan_id=plan.plan_id):
+        row_cells = table.add_row().cells
+        row_cells[0].text = maintenance.data_gw_maintenance.get(
+            "beneficiary_settlement"
+        )
+        row_cells[1].text = maintenance.data_gw_maintenance.get("Beneficiary_Name")
+        row_cells[2].text = maintenance.work_id
+        row_cells[3].text = maintenance.corresponding_work_id
+        row_cells[4].text = maintenance.data_gw_maintenance.get("select_one_activities")
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
+
+
+def maintenance_agri_table(doc, plan, mws):
+    headers = [
+        "Name of the Beneficiary Settlement",
+        "Beneficiary Name",
+        "Work ID",
+        "Corresponding Work ID",
+        "Type of Irrigation Structure",
+        "Previous Maintenance Activity",
+        "Latitude",
+        "Longitude",
+    ]
+
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    header_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
+        header_cells[i].text = header
+        header_cells[i].paragraphs[0].runs[0].bold = True
+
+    # Add data rows
+    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.plan_id):
+        row_cells = table.add_row().cells
+        row_cells[0].text = maintenance.data_agri_maintenance.get(
+            "beneficiary_settlement"
+        )
+        row_cells[1].text = maintenance.data_agri_maintenance.get("Beneficiary_Name")
+        row_cells[2].text = maintenance.work_id
+        row_cells[3].text = maintenance.corresponding_work_id
+        row_cells[4].text = maintenance.data_agri_maintenance.get(
+            "select_one_irrigation_structure"
+        )
+        row_cells[5].text = maintenance.data_agri_maintenance.get(
+            "select_one_activities"
+        )
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
+
+
+def maintenance_waterstructures_table(doc, plan, mws):
+    headers = [
+        "Name of the Beneficiary Settlement",
+        "Beneficiary Name",
+        "Work ID",
+        "Corresponding Work ID",
+        "Type of Work",
+        "Latitude",
+        "Longitude",
+    ]
+
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    header_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
+        header_cells[i].text = header
+        header_cells[i].paragraphs[0].runs[0].bold = True
+
+    # Add data rows
+    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.plan_id):
+        row_cells = table.add_row().cells
+        row_cells[0].text = maintenance.data_swb_maintenance.get(
+            "beneficiary_settlement"
+        )
+        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name")
+        row_cells[2].text = maintenance.work_id
+        row_cells[3].text = maintenance.corresponding_work_id
+        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
+
+
+def maintenance_rs_waterstructures_table(doc, plan, mws):
+    headers = [
+        "Name of the Beneficiary Settlement",
+        "Beneficiary Name",
+        "Work ID",
+        "Corresponding Work ID",
+        "Type of Work",
+        "Latitude",
+        "Longitude",
+    ]
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    header_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
+        header_cells[i].text = header
+        header_cells[i].paragraphs[0].runs[0].bold = True
+
+    # Add data rows
+    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.plan_id):
+        row_cells = table.add_row().cells
+        row_cells[0].text = maintenance.data_swb_rs_maintenance.get(
+            "beneficiary_settlement"
+        )
+        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name")
+        row_cells[2].text = maintenance.work_id
+        row_cells[3].text = maintenance.corresponding_work_id
+        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK")
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
