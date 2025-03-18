@@ -7,6 +7,9 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     check_task_status,
     valid_gee_text,
+    get_gee_asset_path,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
 )
 from .plantation_utils import dataset_paths, saytrees_weights, saytrees_intervals
 from utilities.logger import setup_logger
@@ -399,12 +402,13 @@ def get_pss(roi, org, project, state, asset_name):
 
     # Export to GEE asset
     try:
+        scale = 30
         export_params = {
             "image": all_layers.clip(roi.geometry()),
             "description": description,
             "assetId": asset_id,
             "pyramidingPolicy": {"predicted_label": "mode"},
-            "scale": 30,
+            "scale": scale,
             "maxPixels": 1e13,
             "crs": "EPSG:4326",
             "region": roi.geometry(),
@@ -415,6 +419,14 @@ def get_pss(roi, org, project, state, asset_name):
 
         logger.info(f"Export task started with ID: {export_task.status()['id']}")
         check_task_status([export_task.status()["id"]])
+
+        layer_name = (
+            valid_gee_text(org.lower())
+            + "_"
+            + valid_gee_text(project.lower())
+            + "_suitability_raster"
+        )
+        sync_to_gcs_geoserver(asset_id, layer_name, scale)
         return asset_id
 
     except Exception as e:
@@ -595,3 +607,17 @@ def create_classification(variable_list, roi, state):
         classify_variable(variable)
 
     return sub_layer
+
+
+def sync_to_gcs_geoserver(asset_id, layer_name, scale):
+    image = ee.Image(asset_id)
+    task_id = sync_raster_to_gcs(image, scale, layer_name)
+    task_id_list = check_task_status([task_id])
+    print("task_id sync to gcs ", task_id_list)
+
+    sync_raster_gcs_to_geoserver(
+        "plantation",
+        layer_name,
+        layer_name,
+        None,
+    )

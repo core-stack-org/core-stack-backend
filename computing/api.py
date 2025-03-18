@@ -614,12 +614,12 @@ def restoration_opportunity(request):
 def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
     try:
-        project_id = request.data.get("project_id")
+        project_app_id = request.data.get("project_app_id")
         state = request.data.get("state").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         site_suitability.apply_async(
-            args=[project_id, state, start_year, end_year], queue="nrm"
+            args=[project_app_id, state, start_year, end_year], queue="nrm"
         )
         return Response(
             {"Success": "Plantation_site_suitability task initiated"},

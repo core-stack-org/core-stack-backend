@@ -95,9 +95,7 @@ def get_lulc_data(suitability_vector, start_year, end_year):
         lulc_by_year = years.map(process_year)
 
         # Set LULC data as an encoded JSON string in the feature's properties
-        return feature.set(
-            "LULC", ee.String.encodeJSON(lulc_by_year)
-        )  # TODO: Consider refactoring to create separate columns for each year's LULC data
+        return feature.set("LULC", ee.String.encodeJSON(lulc_by_year))
 
     # Apply LULC data retrieval to each feature in the suitability vector
     return suitability_vector.map(get_lulc)

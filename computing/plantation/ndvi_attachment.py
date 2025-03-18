@@ -67,34 +67,64 @@ def get_ndvi_data(suitability_vector, start_year, end_year):
                 reducer=ee.Reducer.mean(), geometry=feature.geometry(), scale=10
             ).get("NDVI")
 
+            # Get the date and extract the year
+            date = image.date()
+            date_str = date.format("YYYY-MM-dd")
+            # Extract year as number for proper filtering
+            year_num = date.get("year")
+
             # Handle potential missing NDVI values
-            temp_dict = ee.Dictionary(
-                {
-                    "NDVI": ee.Algorithms.If(
-                        ee.Algorithms.IsEqual(mean_ndvi, None), -9999, mean_ndvi
-                    ),
-                    "date": image.date().format("YYYY-MM-dd"),
-                }
+            ndvi_value = ee.Algorithms.If(
+                ee.Algorithms.IsEqual(mean_ndvi, None), -9999, mean_ndvi
             )
 
-            return ee.Feature(None, temp_dict)
+            return ee.Feature(
+                None,
+                {
+                    "date": date_str,
+                    "ndvi": ndvi_value,
+                    "year": year_num,  # Store year as number for filtering
+                },
+            )
 
         # Extract NDVI for all images intersecting the feature
         ndvi_series = ndvi_collection.map(extract_ndvi)
 
-        # Aggregate NDVI values and dates
-        ndvi_list = ndvi_series.aggregate_array("NDVI")
-        date_list = ndvi_series.aggregate_array("date")
+        # Initialize the feature to be returned (will add year properties to it)
+        result_feature = feature
 
-        # Convert lists to JSON-encoded strings for storage
-        # TODO: Consider refactoring to use key-value pairs instead of separate lists
-        ndvi_values_str = ee.String.encodeJSON(ndvi_list)
-        ndvi_dates_str = ee.String.encodeJSON(date_list)
+        # Process each year and add it as a separate property
+        for year in range(start_year, end_year + 1):
+            # Define field name for this year
+            field_name = f"NDVI_{year}"
 
-        # Add NDVI data as feature properties
-        return feature.set(
-            {"NDVI_values": ndvi_values_str, "NDVI_dates": ndvi_dates_str}
-        )
+            # Filter features for the current year
+            year_features = ndvi_series.filter(ee.Filter.eq("year", year))
+
+            # Get the size of the collection after filtering
+            count = year_features.size()
+
+            # Convert to list for processing
+            year_ndvi_list = ee.Algorithms.If(
+                ee.Algorithms.IsEqual(count, 0),
+                ee.List([]),  # Empty list if no features
+                year_features.toList(count).map(
+                    lambda feature: ee.List(
+                        [
+                            ee.Feature(feature).get("date"),
+                            ee.Feature(feature).get("ndvi"),
+                        ]
+                    )
+                ),
+            )
+
+            # Encode as JSON string
+            year_ndvi_json = ee.String.encodeJSON(year_ndvi_list)
+
+            # Add as property to the result feature
+            result_feature = result_feature.set(field_name, year_ndvi_json)
+
+        return result_feature
 
     # Apply NDVI data retrieval to each feature in the suitability vector
     return suitability_vector.map(get_ndvi)

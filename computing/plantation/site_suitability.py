@@ -44,7 +44,7 @@ def site_suitability(
     kml_files_obj = KMLFile.objects.filter(project_app=project_app)
 
     # Initialize Earth Engine connection for the project
-    ee_initialize(project="nrm_work")
+    ee_initialize()
 
     # Create a project-specific directory in Google Earth Engine
     create_gee_dir([organization, project], gee_project_path=GEE_PATH_PLANTATION)
@@ -163,14 +163,14 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     # Create a unique asset name for the suitability analysis
     asset_name = "site_suitability_" + project
 
-    # Generate Plantation Site Suitability raster
-    pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
-
     # Prepare asset description and path
     description = asset_name + "_vector"
     asset_id = (
         get_gee_dir_path([org, project], asset_path=GEE_PATH_PLANTATION) + description
     )
+
+    # Generate Plantation Site Suitability raster
+    pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
 
     # Remove existing asset if it exists
     if is_gee_asset_exists(asset_id):
@@ -224,32 +224,14 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     # Add NDVI data for the specified time range
     suitability_vector = get_ndvi_data(suitability_vector, start_year, end_year)
     logger.info("NDVI calculation completed")
-
     # Add Land Use/Land Cover data
     suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
     logger.info("LULC calculation completed")
 
-    # Select and prepare final output properties
-    final_annotated = suitability_vector.select(
-        [
-            "Name",
-            "uid",
-            "source",
-            "patch_score",
-            "patch_conf",
-            "patch_suitability",
-            # "GTscore",
-            # "comments",
-            "LULC",
-            "NDVI_values",
-            "NDVI_dates",
-        ]
-    )
-
     try:
         # Export annotated feature collection to Earth Engine
         task = ee.batch.Export.table.toAsset(
-            collection=final_annotated,
+            collection=suitability_vector,
             description=description,
             assetId=asset_id,
         )
