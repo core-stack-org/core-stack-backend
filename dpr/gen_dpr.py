@@ -351,9 +351,8 @@ def create_socio_eco_table(doc, plan):
     headers_socio = [
         "Name of the Settlement",
         "Total Number of Households",
-        "Settlement Caste Type",
-        "Single Caste Group",
-        "Mixed Caste Group",
+        "Settlement Type",
+        "Caste Group",
         "Total marginal farmers (<2 acres)",
     ]
 
@@ -370,9 +369,16 @@ def create_socio_eco_table(doc, plan):
         row_cells[0].text = item.settlement_name
         row_cells[1].text = str(item.number_of_households)
         row_cells[2].text = item.largest_caste
-        row_cells[3].text = item.smallest_caste
-        row_cells[4].text = item.settlement_status
-        row_cells[5].text = str(item.farmer_family.get("marginal_farmers", "")) or "na"
+
+        # Determine the caste group based on settlement type
+        if item.largest_caste.lower() == "single caste group":
+            row_cells[3].text = item.smallest_caste
+        elif item.largest_caste.lower() == "mixed caste group":
+            row_cells[3].text = item.settlement_status
+        else:
+            row_cells[3].text = "NA"
+
+        row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
     headers_nrega = [
         "Settlement's Name",
