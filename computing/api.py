@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -61,14 +62,20 @@ def generate_admin_boundary(request):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def generate_nrega_layer(request):
     print("Inside generate_nrega_layer API.")
     try:
+        # check for the user permission
+        user = request.user  
+        if not user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         clip_nrega_district_block.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK

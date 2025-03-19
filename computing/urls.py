@@ -1,7 +1,13 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import GeneratedLayerInfoViewSet
 from . import api
 
+router = DefaultRouter()
+router.register(r'generated-layers', GeneratedLayerInfoViewSet)
+
 urlpatterns = [
+    path('', include(router.urls)),
     path("create_workspace/", api.create_workspace, name="create_workspace"),
     path(
         "generate_block_layer/",

@@ -10,23 +10,29 @@ from utilities.constants import (
     NREGA_ASSETS_INPUT_DIR,
     NREGA_ASSETS_OUTPUT_DIR,
 )
+from computing.views import create_generated_layer
+from geoadmin.models import State, District, Block
 from unidecode import unidecode
 
 
 @app.task(bind=True)
-def clip_nrega_district_block(self, state_name, district_name, block_name):
+def clip_nrega_district_block(self, state_name, district_name, block_name, user):
     print("inside clip")
     formatted_state_name = state_name.title()
     if " " in formatted_state_name:
         formatted_state_name = formatted_state_name.replace(" ", "_")
     if " " in district_name:
         district_name = district_name.replace(" ", "_")
+    if " " in block_name:
+        block_name = block_name.replace(" ", "_")
     district_shape_file_metadata_df = pd.read_csv(
         os.path.join(
             NREGA_ASSETS_INPUT_DIR,
             f"{formatted_state_name.upper()}/{district_name.upper()}.csv",
         )
     )
+
+
     district_shape_file_metadata_df["Geometry"] = [
         f"{Point(xy)}"
         for xy in zip(
@@ -78,5 +84,32 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
     )
 
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
+
+    '''
+        Creating entry in db for the generated layer
+    '''
+    state = State.objects.get(state_name=state_name)
+    district = District.objects.get(district_name=district_name, state_id=state.state_census_code)
+    block = Block.objects.get(block_name=block_name, district_id=district.id)
+
+    nrega_layer_data = {
+        'layer_name': f"{district_name}_{block_name}",
+        'layer_type': 'vector',
+        'state': state,
+        'district': district,
+        'block': block,
+        'gee_path': '',
+        'workspace': 'nrega_assets',
+        'algorithm': 'bhuvan_nrega_data',
+        'version': '1',
+        'style_name': '',
+    }
+
+    try:
+        new_layer = create_generated_layer(nrega_layer_data, user)
+        print(f"✅ Entry created for NREGA layer: {new_layer.layer_name}")
+    except Exception as e:
+        print(f"Exception while creating entry in layer table: {str(e)}")
+
 
     return push_shape_to_geoserver(path, workspace="nrega_assets")
