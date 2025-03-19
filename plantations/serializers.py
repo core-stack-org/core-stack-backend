@@ -1,7 +1,7 @@
 # plantations/serializers.py
 from rest_framework import serializers
 from .models import KMLFile
-from projects.models import ProjectApp, AppType
+from projects.models import Project, AppType
 
 
 class KMLFileSerializer(serializers.ModelSerializer):

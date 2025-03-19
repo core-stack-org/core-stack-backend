@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from .models import Plan
 from geoadmin.models import State, District, Block
-from projects.models import ProjectApp, AppType
+from projects.models import Project, AppType
 
 
 class PlanSerializer(serializers.ModelSerializer):
@@ -35,7 +35,7 @@ class PlanAppSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "plan",
-            "project_app",
+            "project",
             "organization",
             "state",
             "district",
@@ -46,6 +46,11 @@ class PlanAppSerializer(serializers.ModelSerializer):
             "created_by_name",
             "created_at",
             "updated_at",
+            "enabled",
+            "is_completed",
+            "is_dpr_generated",
+            "is_dpr_reviewed",
+            "is_dpr_approved",
         ]
         read_only_fields = [
             "id",

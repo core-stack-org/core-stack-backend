@@ -1,22 +1,14 @@
 # projects/serializers.py
 from rest_framework import serializers
-from .models import Project, ProjectApp, AppType
-
-
-class ProjectAppSerializer(serializers.ModelSerializer):
-    app_type_display = serializers.CharField(
-        source="get_app_type_display", read_only=True
-    )
-
-    class Meta:
-        model = ProjectApp
-        fields = ["id", "app_type", "app_type_display", "enabled"]
-        read_only_fields = ["id"]
+from .models import Project, AppType
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     organization_name = serializers.CharField(
         source="organization.name", read_only=True
+    )
+    app_type_display = serializers.CharField(
+        source="get_app_type_display", read_only=True
     )
 
     class Meta:
@@ -28,6 +20,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             "organization_name",
             "description",
             "geojson_path",
+            "state",
+            "app_type",
+            "app_type_display",
+            "enabled",
             "created_at",
             "created_by",
             "updated_at",
@@ -40,7 +36,9 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     organization_name = serializers.CharField(
         source="organization.name", read_only=True
     )
-    apps = ProjectAppSerializer(many=True, read_only=True)
+    app_type_display = serializers.CharField(
+        source="get_app_type_display", read_only=True
+    )
 
     class Meta:
         model = Project
@@ -51,11 +49,14 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             "organization_name",
             "description",
             "geojson_path",
+            "state",
+            "app_type",
+            "app_type_display",
+            "enabled",
             "created_at",
             "created_by",
             "updated_at",
             "updated_by",
-            "apps",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -63,9 +64,3 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
 class AppTypeSerializer(serializers.Serializer):
     app_type = serializers.ChoiceField(choices=AppType.choices)
     enabled = serializers.BooleanField(default=True)
-
-
-class ProjectAppUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectApp
-        fields = ["app_type", "enabled"]

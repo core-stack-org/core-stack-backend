@@ -5,13 +5,13 @@ from .models import KMLFile
 
 @admin.register(KMLFile)
 class KMLFileAdmin(admin.ModelAdmin):
-    list_display = ("name", "project_app", "uploaded_by", "created_at")
-    list_filter = ("project_app__project", "created_at")
-    search_fields = ("name", "project_app__project__name")
+    list_display = ("name", "project", "uploaded_by", "created_at")
+    list_filter = ("project", "created_at")
+    search_fields = ("name", "project__name")
     readonly_fields = ("kml_hash", "created_at")
 
     fieldsets = (
-        (None, {"fields": ("name", "project_app", "file", "uploaded_by")}),
+        (None, {"fields": ("name", "project", "file", "uploaded_by")}),
         (
             "Technical Details",
             {
