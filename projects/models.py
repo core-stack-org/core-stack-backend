@@ -1,3 +1,4 @@
+from email.policy import default
 import uuid
 from django.db import models
 from organization.models import Organization
@@ -18,7 +19,7 @@ class Project(models.Model):
     )
     description = models.TextField(blank=True, null=True)
     geojson_path = models.CharField(max_length=512, blank=True, null=True)
-    state = models.ForeignKey(State, on_delete=models.CASCADE)
+    state = models.ForeignKey(State, on_delete=models.CASCADE, null=True)
     app_type = models.CharField(max_length=255, choices=AppType.choices)
     enabled = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -49,7 +50,11 @@ class PlantationProfile(models.Model):
         limit_choices_to={"app_type": AppType.PLANTATION},
         related_name="plantation_profiles",
     )
-    config = models.JSONField()
+    config_variables = models.JSONField(null=True, default=None)
+    config_weight = models.JSONField(null=True, default=None)
+    config_user_input = models.JSONField(
+        null=True, default=None
+    )  # comes from the frontend
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 

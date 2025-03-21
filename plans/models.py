@@ -27,9 +27,10 @@ class PlanApp(models.Model):
         on_delete=models.CASCADE,
         related_name="plans",
         limit_choices_to={"enabled": True},
+        null=True,
     )
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
-    facilitator_name = models.CharField(max_length=512)
+    facilitator_name = models.CharField(max_length=512, null=True, blank=True)
     state = models.ForeignKey(State, on_delete=models.CASCADE)
     district = models.ForeignKey(District, on_delete=models.CASCADE)
     block = models.ForeignKey(Block, on_delete=models.CASCADE)

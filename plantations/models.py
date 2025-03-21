@@ -32,6 +32,7 @@ class KMLFile(models.Model):
         on_delete=models.CASCADE,
         related_name="kml_files",
         limit_choices_to={"app_type": AppType.PLANTATION, "enabled": True},
+        null=True,
     )
     name = models.CharField(max_length=255)
     file = models.FileField(upload_to=kml_file_path)

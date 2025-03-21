@@ -18,7 +18,7 @@ class PlanAppAdmin(admin.ModelAdmin):
         "organization",
         "state",
         "district",
-        "project_app__project",
+        "project",
         "created_at",
     )
     search_fields = (
@@ -33,7 +33,7 @@ class PlanAppAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     fieldsets = (
-        (None, {"fields": ("plan", "project_app", "organization")}),
+        (None, {"fields": ("plan", "project", "organization")}),
         (
             "Location Information",
             {

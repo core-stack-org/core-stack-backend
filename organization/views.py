@@ -14,7 +14,9 @@ class IsSuperAdmin(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.is_superuser
+        return request.user.is_authenticated and (
+            request.user.is_superuser or request.user.is_superadmin
+        )
 
 
 class OrganizationViewSet(viewsets.ModelViewSet):
@@ -32,7 +34,8 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         """
         if self.action in ["create", "delete"]:
             permission_classes = [
-                IsSuperAdmin
+                permissions.IsAuthenticated,
+                IsSuperAdmin,
             ]  # only superadmins can create or delete organizations
 
         elif self.action in ["retrieve", "update", "partial_update", "list"]:
