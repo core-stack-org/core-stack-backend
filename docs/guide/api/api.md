@@ -258,6 +258,7 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
   {
     "name": "Project Name",
     "description": "Project Description",
+    "state": "state-id",
     "app_type": "plantation",
     "enabled": true,
     "created_by": "user-id",
