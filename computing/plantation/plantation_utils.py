@@ -4,23 +4,17 @@ from shapely.geometry import Polygon, Point, MultiPolygon, MultiPoint
 import geopandas as gpd
 import pandas as pd
 import fiona
-from pathlib import Path
 
 dataset_paths = {
     "AWC": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",  # (Pan India)
-    # "LULC": "projects/ee-indiasat/assets/LULC_Version2_Outputs_NewHierarchy/Anantapur_2019-07-01_2020-06-30_LULCmap_30m",
-    # "NDVI": "",
     "annualPrecipitation": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",  # (Global)
     "aridityIndex": "projects/ee-plantationsitescores/assets/India-AridityIndex",  # (Pan India)
     "aspect": "USGS/SRTMGL1_003",
     "distToDrainage": "projects/ee-plantationsitescores/assets/so_thinned2",  # (Pan India)
-    # "distToRoad": "projects/ee-mtpictd/assets/shiva/Road_DRRP3_TN",  # (Only available for AP and TN)
-    # "distToSettlements": "projects/ee-indiasat/assets/LULC_Version2_Outputs_NewHierarchy/Anantapur_2019-07-01_2020-06-30_LULCmap_30m",
     "drainage": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",  # (Pan India)
     "elevation": "USGS/SRTMGL1_003",
     "meanAnnualTemperature": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",  # (Global)
     "referenceEvapoTranspiration": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",  # (Global)
-    # "roi": "projects/ee-mtpictd/assets/shiva/ATREE/Plantations_TN",  # (TN only, are this converted from KMLs?)
     "slope": "USGS/SRTMGL1_003",
     "subsoilBD": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",  # (Pan India)
     "subsoilCEC": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",  # (Pan India)
@@ -35,14 +29,14 @@ dataset_paths = {
 }
 
 saytrees_weights = {
-    "AWC": 0.20000000298023224,
     "Climate": 0.10000000149011612,
     "Ecology": 0.3499999940395355,
-    "LULC": 0.5,
-    "NDVI": 0.5,
     "Socioeconomic": 0,
     "Soil": 0.3499999940395355,
     "Topography": 0.20000000298023224,
+    "AWC": 0.20000000298023224,
+    "LULC": 0.5,
+    "NDVI": 0.5,
     "annualPrecipitation": 0.3499999940395355,
     "aridityIndex": 0.15000000596046448,
     "aspect": 0.20000000298023224,
