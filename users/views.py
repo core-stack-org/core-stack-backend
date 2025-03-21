@@ -123,8 +123,8 @@ class UserViewSet(viewsets.ModelViewSet):
         """Set custom permissions based on action."""
         if self.action in ["list", "create"]:
             permission_classes = [IsSuperAdminOrOrgAdmin]
-        elif self.action in ["retrieve", "update", "partial_update"]:
-            # Users can view/edit their own profile
+        elif self.action in ["retrieve", "update", "partial_update", "my_projects"]:
+            # Users can view/edit their own profile and see their projects
             permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [IsSuperAdminOrOrgAdmin]
@@ -139,7 +139,12 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.all()
 
         # Organization admins can see users in their organization
-        if user.organization and user.groups.filter(name="Organization Admin").exists():
+        if (
+            user.organization
+            and user.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            ).exists()
+        ):
             return User.objects.filter(organization=user.organization)
 
         # Regular users can only see themselves
@@ -329,6 +334,37 @@ class UserViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=False, methods=["get"])
+    def my_projects(self, request):
+        """Get all projects the current user is assigned to with their roles."""
+        user = request.user
+        user_project_groups = UserProjectGroup.objects.filter(user=user).select_related(
+            "project", "group"
+        )
+
+        projects_data = []
+        for upg in user_project_groups:
+            projects_data.append(
+                {
+                    "project": {
+                        "id": upg.project.id,
+                        "name": upg.project.name,
+                        "description": upg.project.description,
+                        "app_type": upg.project.app_type,
+                        "enabled": upg.project.enabled,
+                        "organization": str(upg.project.organization.id)
+                        if upg.project.organization
+                        else None,
+                        "organization_name": upg.project.organization.name
+                        if upg.project.organization
+                        else None,
+                    },
+                    "role": {"id": upg.group.id, "name": upg.group.name},
+                }
+            )
+
+        return Response(projects_data)
+
 
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     """API endpoint for group management (read-only)."""
@@ -365,14 +401,40 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
 
         # Add project_id to request data
         mutable_data = request.data.copy()
-        mutable_data["project"] = project_id
+        mutable_data["project_id"] = project_id
+
+        # Handle both user/user_id and group/group_id field names
+        user_id = mutable_data.get("user_id") or mutable_data.get("user")
+        group_id = mutable_data.get("group_id") or mutable_data.get("group")
+
+        if not user_id:
+            return Response(
+                {"detail": "User ID is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not group_id:
+            return Response(
+                {"detail": "Group ID is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Ensure the data has the fields the serializer expects
+        mutable_data["user_id"] = user_id
+        mutable_data["group_id"] = group_id
 
         serializer = self.get_serializer(data=mutable_data)
         serializer.is_valid(raise_exception=True)
 
         # Verify the user belongs to the same organization as the project
         project = Project.objects.get(id=project_id)
-        user = User.objects.get(id=mutable_data.get("user"))
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": f"User with ID {user_id} does not exist."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if user.organization != project.organization:
             return Response(
@@ -386,7 +448,7 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
         ).first()
         if existing:
             # Update existing role
-            existing.group_id = mutable_data.get("group")
+            existing.group_id = group_id
             existing.save()
             return Response(
                 UserProjectGroupSerializer(existing).data, status=status.HTTP_200_OK

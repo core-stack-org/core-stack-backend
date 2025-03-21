@@ -194,6 +194,33 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Authentication**: Required
 - **Permissions**: Super admin only
 
+### Get My Projects
+- **URL**: `/api/v1/users/my_projects/`
+- **Method**: GET
+- **Description**: Get all projects the current user is assigned to with their roles
+- **Authentication**: Required
+- **Response Body**:
+  ```json
+  [
+    {
+      "project": {
+        "id": 1,
+        "name": "Project Name",
+        "description": "Project Description",
+        "app_type": "plantation",
+        "enabled": true,
+        "organization": "organization-uuid",
+        "organization_name": "Organization Name"
+      },
+      "role": {
+        "id": 2,
+        "name": "Project Manager"
+      }
+    }
+  ]
+  ```
+- **Notes**: This endpoint allows users to see all projects they have been assigned to along with their role in each project
+
 ## Organization Endpoints
 
 ### List Organizations

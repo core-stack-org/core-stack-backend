@@ -14,7 +14,6 @@ class CustomUserAdmin(UserAdmin):
         "last_name",
         "organization",
         "is_superadmin",
-        "is_staff",
     )
     list_filter = ("is_superadmin", "is_staff", "is_active", "organization")
     search_fields = ("username", "email", "first_name", "last_name")
