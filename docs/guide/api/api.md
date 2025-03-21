@@ -258,13 +258,18 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
   {
     "name": "Project Name",
     "description": "Project Description",
-    "organization": "organization-id",
+    "app_type": "plantation",
+    "enabled": true,
     "created_by": "user-id",
     "updated_by": "user-id"
   }
   ```
 - **Authentication**: Required
 - **Permissions**: Super admin or organization admin
+- **Notes**: 
+  - The organization is automatically set to the user's organization
+  - Valid app_type values include 'plantation', 'watershed', etc. (as defined in AppType choices)
+  - The enabled field defaults to true if not specified
 
 ### Get Project Details
 - **URL**: `/api/v1/projects/{project_id}/`
@@ -287,48 +292,24 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Authentication**: Required
 - **Permissions**: Super admin or organization admin
 
-## Project App Endpoints
+## Project App Type Management
 
-### List Project Apps
-- **URL**: `/api/v1/projects/{project_id}/apps/`
-- **Method**: GET
-- **Description**: List apps enabled for a project
-- **Authentication**: Required
-- **Permissions**: User must have access to the project
-
-### Enable Project App
-- **URL**: `/api/v1/projects/{project_id}/enable_app/`
-- **Method**: POST
-- **Description**: Enable an app for a project
+### Update Project App Type
+- **URL**: `/api/v1/projects/{project_id}/update_app_type/`
+- **Method**: PATCH
+- **Description**: Update a project's app type and enabled status
 - **Request Body**:
   ```json
   {
-    "app_type": "plantation"
-  }
-  ```
-- **Authentication**: Required
-- **Permissions**: Super admin, organization admin, or project manager
-- **Notes**: Valid app types include 'plantation' and 'watershed'
-
-### Update Project App
-- **URL**: `/api/v1/projects/{project_id}/apps/{app_id}/`
-- **Method**: PUT/PATCH
-- **Description**: Update app settings
-- **Request Body**:
-  ```json
-  {
+    "app_type": "plantation",
     "enabled": true
   }
   ```
 - **Authentication**: Required
 - **Permissions**: Super admin, organization admin, or project manager
-
-### Delete Project App
-- **URL**: `/api/v1/projects/{project_id}/apps/{app_id}/`
-- **Method**: DELETE
-- **Description**: Disable an app for a project
-- **Authentication**: Required
-- **Permissions**: Super admin, organization admin, or project manager
+- **Notes**: 
+  - Valid app types include 'plantation', 'watershed', etc. (as defined in AppType choices)
+  - The enabled field controls whether the app functionality is active for the project
 
 ## Project User Management Endpoints
 
