@@ -1,11 +1,6 @@
 # projects/admin.py
 from django.contrib import admin
-from .models import Project, ProjectApp
-
-
-class ProjectAppInline(admin.TabularInline):
-    model = ProjectApp
-    extra = 1
+from .models import Project, PlantationProfile
 
 
 @admin.register(Project)
@@ -13,14 +8,15 @@ class ProjectAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "organization",
+        "app_type",
+        "enabled",
         "created_at",
         "updated_at",
         "created_by",
         "updated_by",
     )
-    list_filter = ("organization", "created_at")
+    list_filter = ("organization", "app_type", "enabled", "created_at")
     search_fields = ("name", "description", "organization__name")
-    inlines = [ProjectAppInline]
 
     fieldsets = (
         (
@@ -31,6 +27,9 @@ class ProjectAdmin(admin.ModelAdmin):
                     "organization",
                     "description",
                     "geojson_path",
+                    "state",
+                    "app_type",
+                    "enabled",
                     "created_by",
                     "updated_by",
                 )
@@ -47,8 +46,4 @@ class ProjectAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
 
-@admin.register(ProjectApp)
-class ProjectAppAdmin(admin.ModelAdmin):
-    list_display = ("project", "app_type", "enabled")
-    list_filter = ("app_type", "enabled", "project__organization")
-    search_fields = ("project__name",)
+admin.site.register(PlantationProfile)

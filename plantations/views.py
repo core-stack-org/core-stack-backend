@@ -7,7 +7,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
-from projects.models import Project, ProjectApp, AppType
+from projects.models import Project, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
 from utilities.gee_utils import valid_gee_text
 from .models import KMLFile
@@ -28,13 +28,13 @@ class KMLFileViewSet(viewsets.ModelViewSet):
         """Filter KML files by project"""
         project_id = self.kwargs.get("project_pk")
         if project_id:
-            # Get the plantation app for this project
+            # Get the plantation project
             try:
-                project_app = ProjectApp.objects.get(
-                    project_id=project_id, app_type=AppType.PLANTATION, enabled=True
+                project = Project.objects.get(
+                    id=project_id, app_type=AppType.PLANTATION, enabled=True
                 )
-                return KMLFile.objects.filter(project_app=project_app)
-            except ProjectApp.DoesNotExist:
+                return KMLFile.objects.filter(project=project)
+            except Project.DoesNotExist:
                 return KMLFile.objects.none()
         return KMLFile.objects.none()
 
@@ -52,15 +52,14 @@ class KMLFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get project and check if plantation app is enabled
-        project = get_object_or_404(Project, id=project_id)
+        # Get project and check if it's a plantation project and enabled
         try:
-            project_app = ProjectApp.objects.get(
-                project=project, app_type=AppType.PLANTATION, enabled=True
+            project = Project.objects.get(
+                id=project_id, app_type=AppType.PLANTATION, enabled=True
             )
-        except ProjectApp.DoesNotExist:
+        except Project.DoesNotExist:
             return Response(
-                {"detail": "Plantation app is not enabled for this project."},
+                {"detail": "Plantation project not found or not enabled."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -114,7 +113,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
             data = {
                 "name": request.data.get("name", valid_gee_text(uploaded_file.name)),
                 "file": uploaded_file,
-                "project_app": project_app.id,
+                "project": project.id,
             }
 
             serializer = self.get_serializer(data=data)
@@ -123,7 +122,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
                 if serializer.is_valid():
                     # Save KML file
                     kml_file = serializer.save(
-                        project_app=project_app,
+                        project=project,
                         uploaded_by=request.user,
                         kml_hash=kml_hash,
                     )
@@ -165,22 +164,22 @@ class KMLFileViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         """Override destroy to update project GeoJSON after deletion"""
-        project = instance.project_app.project
+        project = instance.project
         super().perform_destroy(instance)
         self.update_project_geojson(project)
 
     def update_project_geojson(self, project):
         """Update the merged GeoJSON file for a project"""
         try:
-            # Get all KML files for this project's plantation app
-            project_app = ProjectApp.objects.get(
-                project=project, app_type=AppType.PLANTATION, enabled=True
-            )
-
-            kml_files = KMLFile.objects.filter(project_app=project_app)
+            # Get all KML files for this project
+            kml_files = KMLFile.objects.filter(project=project)
 
             # Collect GeoJSON data
-            geojson_list = [kml.geojson_data for kml in kml_files if kml.geojson_data]
+            geojson_list = [
+                kml.geojson_data
+                for kml in kml_files
+                if hasattr(kml, "geojson_data") and kml.geojson_data
+            ]
 
             if geojson_list:
                 # Create directory if it doesn't exist
@@ -200,9 +199,6 @@ class KMLFileViewSet(viewsets.ModelViewSet):
                 # No KML files, clear the geojson_path
                 project.geojson_path = None
                 project.save(update_fields=["geojson_path"])
-
-            return False
-
         except Exception as e:
             print(f"Error updating project GeoJSON: {str(e)}")
             return False

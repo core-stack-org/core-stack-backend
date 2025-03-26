@@ -1,6 +1,6 @@
 from django.db import models
 from geoadmin.models import State, District, Block
-from projects.models import ProjectApp
+from projects.models import Project, AppType
 from organization.models import Organization
 from users.models import User
 
@@ -22,10 +22,15 @@ class Plan(models.Model):
 class PlanApp(models.Model):
     id = models.AutoField(primary_key=True)
     plan = models.CharField(max_length=255)
-    project_app = models.ForeignKey(
-        ProjectApp, on_delete=models.CASCADE, related_name="plans"
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="plans",
+        limit_choices_to={"enabled": True},
+        null=True,
     )
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    facilitator_name = models.CharField(max_length=512, null=True, blank=True)
     state = models.ForeignKey(State, on_delete=models.CASCADE)
     district = models.ForeignKey(District, on_delete=models.CASCADE)
     block = models.ForeignKey(Block, on_delete=models.CASCADE)
@@ -39,6 +44,11 @@ class PlanApp(models.Model):
     updated_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="updated_plans"
     )
+    enabled = models.BooleanField(default=True)
+    is_completed = models.BooleanField(default=False)
+    is_dpr_generated = models.BooleanField(default=False)
+    is_dpr_reviewed = models.BooleanField(default=False)
+    is_dpr_approved = models.BooleanField(default=False)
 
     def __str__(self):
         return str(self.plan)

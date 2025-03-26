@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
 from .models import User, UserProjectGroup
+from projects.models import Project
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -129,7 +130,10 @@ class UserProjectGroupSerializer(serializers.ModelSerializer):
         source="group", queryset=Group.objects.all()
     )
     group_name = serializers.CharField(source="group.name", read_only=True)
+    project_id = serializers.PrimaryKeyRelatedField(
+        source="project", queryset=Project.objects.all(), required=False
+    )
 
     class Meta:
         model = UserProjectGroup
-        fields = ["id", "user_id", "username", "group_id", "group_name"]
+        fields = ["id", "user_id", "username", "group_id", "group_name", "project_id"]

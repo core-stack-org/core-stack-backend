@@ -18,7 +18,7 @@ from .plantation_utils import combine_kmls
 from utilities.logger import setup_logger
 from ..utils import sync_fc_to_geoserver
 import geopandas as gpd
-from projects.models import ProjectApp
+from projects.models import Project, AppType
 from plantations.models import KMLFile
 
 logger = setup_logger(__name__)
@@ -26,62 +26,64 @@ logger = setup_logger(__name__)
 
 @app.task(bind=True)
 def site_suitability(
-    self, project_app_id, state, start_year, end_year
+    self, project_id, state, start_year, end_year
 ):  # self, organization, project, state, start_year, end_year):
     """
     Main task for site suitability analysis using Google Earth Engine.
 
     Args:
-        project_app_id: Id of the specific project_app
+        project_id: Id of the specific project
         state: Geographic state for the analysis
         start_year: Beginning of the temporal analysis range
         end_year: End of the temporal analysis range
     """
-    project_app = ProjectApp.objects.get(id=project_app_id)
-    organization = project_app.project.organization.name
-    project = project_app.project.name
+    project = Project.objects.get(
+        id=project_id, app_type=AppType.PLANTATION, enabled=True
+    )
+    organization = project.organization.name
+    project_name = project.name
 
-    kml_files_obj = KMLFile.objects.filter(project_app=project_app)
+    kml_files_obj = KMLFile.objects.filter(project=project)
 
     # Initialize Earth Engine connection for the project
     ee_initialize()
 
     # Create a project-specific directory in Google Earth Engine
-    create_gee_dir([organization, project], gee_project_path=GEE_PATH_PLANTATION)
+    create_gee_dir([organization, project_name], gee_project_path=GEE_PATH_PLANTATION)
 
     # Construct a unique description and asset ID for the project
-    description = organization + "_" + project
+    description = organization + "_" + project_name
     asset_id = (
-        get_gee_dir_path([organization, project], asset_path=GEE_PATH_PLANTATION)
+        get_gee_dir_path([organization, project_name], asset_path=GEE_PATH_PLANTATION)
         + description
     )
 
     # Check if the asset already exists and handle accordingly
     if is_gee_asset_exists(asset_id):
-        merge_new_kmls(asset_id, description, project, kml_files_obj)
+        merge_new_kmls(asset_id, description, project_name, kml_files_obj)
     else:
-        generate_project_roi(asset_id, description, project, kml_files_obj)
+        generate_project_roi(asset_id, description, project_name, kml_files_obj)
 
     # Load the region of interest (ROI) feature collection
     roi = ee.FeatureCollection(asset_id)
 
     # Perform site suitability analysis
     vector_asset_id = check_site_suitability(
-        roi, organization, project, state, start_year, end_year
+        roi, organization, project_name, state, start_year, end_year
     )
 
     # Sync the results to GeoServer for visualization
-    sync_suitability_to_geoserver(vector_asset_id, organization, project)
+    sync_suitability_to_geoserver(vector_asset_id, organization, project_name)
 
 
-def merge_new_kmls(asset_id, description, project, kml_files_obj):
+def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
     """
     Merge new KML files into an existing Google Earth Engine asset.
 
     Args:
         asset_id: Existing asset identifier
         description: Project description
-        project: Project name
+        project_name: Project name
         kml_files_obj: Queryset of KML_Files model
     """
     # Combine KML files into a GeoDataFrame
@@ -112,19 +114,19 @@ def merge_new_kmls(asset_id, description, project, kml_files_obj):
             )
             task.start()
             check_task_status([task.status()["id"]])
-            logger.info("ROI for project: %s exported to GEE", project)
+            logger.info("ROI for project: %s exported to GEE", project_name)
         except Exception as e:
             logger.exception("Exception in exporting asset: %s", e)
 
 
-def generate_project_roi(asset_id, description, project, kml_files_obj):
+def generate_project_roi(asset_id, description, project_name, kml_files_obj):
     """
     Generate a new region of interest (ROI) for a project.
 
     Args:
         asset_id: Unique identifier for the asset
         description: Project description
-        project: Project name
+        project_name: Project name
         kml_files_obj: Queryset of KML_Files model
     """
     # Combine KML files into a feature collection
@@ -139,19 +141,19 @@ def generate_project_roi(asset_id, description, project, kml_files_obj):
         task.start()
 
         check_task_status([task.status()["id"]])
-        logger.info("ROI for project: %s exported to GEE", project)
+        logger.info("ROI for project: %s exported to GEE", project_name)
     except Exception as e:
         logger.exception("Exception in exporting asset: %s", e)
 
 
-def check_site_suitability(roi, org, project, state, start_year, end_year):
+def check_site_suitability(roi, org, project_name, state, start_year, end_year):
     """
     Perform comprehensive site suitability analysis.
 
     Args:
         roi: Region of Interest feature collection
         org: Organization name
-        project: Project name
+        project_name: Project name
         state: Geographic state
         start_year: Analysis start year
         end_year: Analysis end year
@@ -161,16 +163,17 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     """
 
     # Create a unique asset name for the suitability analysis
-    asset_name = "site_suitability_" + project
+    asset_name = "site_suitability_" + project_name
+
+    # Generate Plantation Site Suitability raster
+    pss_rasters_asset = get_pss(roi, org, project_name, state, asset_name)
 
     # Prepare asset description and path
     description = asset_name + "_vector"
     asset_id = (
-        get_gee_dir_path([org, project], asset_path=GEE_PATH_PLANTATION) + description
+        get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
+        + description
     )
-
-    # Generate Plantation Site Suitability raster
-    pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
 
     # Remove existing asset if it exists
     if is_gee_asset_exists(asset_id):
@@ -224,6 +227,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     # Add NDVI data for the specified time range
     suitability_vector = get_ndvi_data(suitability_vector, start_year, end_year)
     logger.info("NDVI calculation completed")
+
     # Add Land Use/Land Cover data
     suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
     logger.info("LULC calculation completed")
@@ -239,20 +243,20 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
 
         logger.info(f"Asset export task started. Asset path: {description}")
         check_task_status([task.status()["id"]])
-        logger.info("Suitability vector for project=%s exported to GEE", project)
+        logger.info("Suitability vector for project=%s exported to GEE", project_name)
         return asset_id
     except Exception as e:
         logger.exception("Exception in exporting suitability vector", e)
 
 
-def sync_suitability_to_geoserver(asset_id, organization, project):
+def sync_suitability_to_geoserver(asset_id, organization, project_name):
     """
     Synchronize suitability analysis results to GeoServer.
 
     Args:
         asset_id: Earth Engine asset ID
         organization: Organization name
-        project: Project name
+        project_name: Project name
     """
 
     try:
@@ -265,7 +269,7 @@ def sync_suitability_to_geoserver(asset_id, organization, project):
             organization,
             valid_gee_text(organization.lower())
             + "_"
-            + valid_gee_text(project.lower())
+            + valid_gee_text(project_name.lower())
             + "_suitability",
             workspace="plantation",
         )
