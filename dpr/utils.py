@@ -288,8 +288,12 @@ def sync_waterbody():
             record.get("select_one_water_structure_other", "") or "0"
         )
 
-        waterbody.identified_by = record.get("select_one_identified", "") or "0"
-        waterbody.need_maintenance = record.get("select_one_maintenance") or "0"
+        waterbody.identified_by = (
+            record.get("select_one_identified", "") or "No Data Provided"
+        )
+        waterbody.need_maintenance = (
+            record.get("select_one_maintenance") or "No Data Provided"
+        )
         waterbody.plan_id = record.get("plan_id", "") or "0"
         waterbody.plan_name = record.get("plan_name", "") or "0"
         try:
@@ -413,10 +417,11 @@ def sync_agri():
 
 def sync_livelihood():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_livelihood)
-    print("ODK data livelihood", odk_resp_list[:1])
-    livelihood = ODK_livelihood()
+
+    ODK_livelihood.objects.all().delete()
 
     for record in odk_resp_list:
+        livelihood = ODK_livelihood()
         submission_date = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -426,9 +431,9 @@ def sync_livelihood():
             Max("submission_time")
         )["submission_time__max"]
 
-        if latest_submission_time and submission_date <= latest_submission_time:
-            print("The DB is already synced with the latest submissions")
-            return
+        # if latest_submission_time and submission_date <= latest_submission_time:
+        #     print("The DB is already synced with the latest submissions")
+        #     return
         livelihood.uuid = record.get("__id", "") or "0"
         livelihood.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),

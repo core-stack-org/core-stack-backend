@@ -52,6 +52,7 @@ from .models import (
     SWB_RS_maintenance,
     Agri_maintenance,
 )
+from dpr.mapping import populate_maintenance_from_waterbody
 from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
 from utilities.logger import setup_logger
 import environ
@@ -705,9 +706,6 @@ def populate_well(doc, plan, mws_id, mws_gdf):
             mws_gdf["uid"], mws_gdf["geometry"]
         ):
             if well_point.within(current_mws_polygon):
-                logger.info(
-                    f"Well at ({well.latitude}, {well.longitude}) belongs to MWS ID: {current_mws_id}"
-                )
                 well_found = True
                 wells_in_mws.append(well)
                 break  # Stop checking other MWS if found in one
@@ -791,9 +789,6 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
             mws_gdf["uid"], mws_gdf["geometry"]
         ):
             if waterbody_point.within(current_mws_polygon):
-                logger.info(
-                    f"Waterbody at ({waterbody.latitude}, {waterbody.longitude}) belongs to MWS ID: {current_mws_id}"
-                )
                 waterbody_found = True
                 waterbody_in_mws.append(waterbody)
                 break  # Stop checking other MWS if found in one
@@ -830,7 +825,7 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         "Name of the Beneficiary Settlement",
         "Who manages?",
         "Who owns the water structure?",
-        "Which Caste uses the water strucutre?",
+        "Which Caste uses the water structure?",
         "Households Benefitted",
         "Type of Water Structure",
         "Identified By",
@@ -1153,11 +1148,8 @@ def create_nrm_works_table(doc, plan, mws):
     well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id)
     waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
 
-    # Get all MWS UIDs
     mws_uids = list(set([feature["properties"]["uid"] for feature in mws["features"]]))
-    logger.info(f"\nDEBUG: All MWS UIDs: {mws_uids}")
 
-    # Create a dictionary to store all polygons by UID
     mws_polygons = {}
     for feature in mws["features"]:
         uid = feature["properties"]["uid"]
@@ -1212,7 +1204,6 @@ def create_nrm_works_table(doc, plan, mws):
         resource_mws_assignments[mws_uid]["waterbody"].append(waterbody)
 
     for uid in mws_uids:
-        logger.info(f"\nProcessing MWS: {uid}")
         polygon = mws_polygons[uid]
         mws_filtered = {
             "type": "FeatureCollection",
@@ -1248,7 +1239,8 @@ def create_nrm_works_table(doc, plan, mws):
             headers = [
                 "S.No",
                 "Work Category : Irrigation work or Recharge Structure",
-                "Name of Beneficiary",
+                "Name of Beneficiary's Settlement",
+                "Beneficiary Name",
                 "Type of work",
                 "Work ID",
                 "Latitude",
@@ -1271,12 +1263,17 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells[1].text = "Recharge Structure"  # Work Category
                 row_cells[
                     2
-                ].text = structure.beneficiary_settlement  # Name of Beneficiary
-                row_cells[3].text = structure.work_type  # Type of work
-                row_cells[4].text = structure.recharge_structure_id  # Work ID
-                row_cells[5].text = str(structure.latitude)  # Latitude
-                row_cells[6].text = str(structure.longitude)  # Longitude
-                row_cells[7].text = format_work_dimensions(
+                ].text = (
+                    structure.beneficiary_settlement
+                )  # Name of Beneficiary's Settlement
+                row_cells[3].text = structure.data_groundwater.get(
+                    "Beneficiary_Name"
+                )  # Beneficiary Name
+                row_cells[4].text = structure.work_type  # Type of work
+                row_cells[5].text = structure.recharge_structure_id  # Work ID
+                row_cells[6].text = str(structure.latitude)  # Latitude
+                row_cells[7].text = str(structure.longitude)  # Longitude
+                row_cells[8].text = format_work_dimensions(
                     structure.work_dimensions, structure.work_type.lower()
                 )  # Work Dimension
 
@@ -1286,7 +1283,12 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
                 row_cells[1].text = "Irrigation Work"  # Work Category
-                row_cells[2].text = work.beneficiary_settlement  # Name of Beneficiary
+                row_cells[
+                    2
+                ].text = work.beneficiary_settlement  # Name of Beneficiary's Settlement
+                row_cells[3].text = work.data_agri.get(
+                    "Beneficiary_Name"
+                )  # Beneficiary Name
 
                 if (
                     work.work_type.lower() == "other"
@@ -1294,18 +1296,18 @@ def create_nrm_works_table(doc, plan, mws):
                     and "TYPE_OF_WORK_ID_other" in work.data_agri
                 ):
                     custom_work_type = work.data_agri.get("TYPE_OF_WORK_ID_other")
-                    row_cells[3].text = (
+                    row_cells[4].text = (
                         str(custom_work_type)
                         if custom_work_type is not None
                         else "Other (unspecified)"
                     )
                 else:
-                    row_cells[3].text = work.work_type
+                    row_cells[4].text = work.work_type
 
-                row_cells[4].text = work.irrigation_work_id  # Work ID
-                row_cells[5].text = str(work.latitude)  # Latitude
-                row_cells[6].text = str(work.longitude)  # Longitude
-                row_cells[7].text = format_work_dimensions(
+                row_cells[5].text = work.irrigation_work_id  # Work ID
+                row_cells[6].text = str(work.latitude)  # Latitude
+                row_cells[7].text = str(work.longitude)  # Longitude
+                row_cells[8].text = format_work_dimensions(
                     work.work_dimensions, work.work_type.lower()
                 )  # Work Dimension
 
@@ -1331,12 +1333,11 @@ def format_work_dimensions(work_dimensions, work_type):
 
 
 # MARK: - Section G
-# TODO: Add for Fisheries and Livestock
 def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Propose New Livelihood Works", level=1)
 
-    plantation_in_plan = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
-    headers_plantation = [
+    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
+    headers = [
         "Livelihood Works",
         "Name of Beneficiary Settlement",
         "Name of Beneficiary",
@@ -1346,24 +1347,93 @@ def add_section_g(doc, plan, mws):
         "Latitude",
         "Longitude",
     ]
-    table_plantation = doc.add_table(rows=1, cols=len(headers_plantation))
-    table_plantation.style = "Table Grid"
-    hdr_cells = table_plantation.rows[0].cells
-    for i, header in enumerate(headers_plantation):
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    hdr_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for plantation in plantation_in_plan:
-        row_cells = table_plantation.add_row().cells
-        row_cells[0].text = "Plantations"
-        row_cells[1].text = plantation.beneficiary_settlement
-        row_cells[2].text = plantation.data_livelihood.get(
-            "beneficiary_name", "No Data"
-        )
-        row_cells[3].text = "No Data"
-        row_cells[4].text = plantation.data_livelihood.get("Plantation", "No Data")
-        row_cells[5].text = plantation.data_livelihood.get("Plantation_crop", "No Data")
-        row_cells[6].text = str(plantation.latitude)
-        row_cells[7].text = str(plantation.longitude)
+    for record in livelihood_records:
+        # Handle Livestock category
+        if record.data_livelihood.get("select_one_demand_promoting_livestock") == "Yes":
+            row_cells = table.add_row().cells
+            row_cells[0].text = "Livestock"
+            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
+            row_cells[3].text = "No Data"  # Father's name not specified
+
+            # Get livestock demand type
+            livestock_demand = record.data_livelihood.get(
+                "select_one_promoting_livestock"
+            )
+            if livestock_demand == "other":
+                livestock_demand = record.data_livelihood.get(
+                    "select_one_promoting_livestock_other", "No Data Provided"
+                )
+            row_cells[4].text = livestock_demand or "No Data Provided"
+
+            row_cells[5].text = "No Data"  # Area not specified for livestock
+            row_cells[6].text = (
+                str(record.latitude) if record.latitude else "No Data Provided"
+            )
+            row_cells[7].text = (
+                str(record.longitude) if record.longitude else "No Data Provided"
+            )
+
+        # Handle Fisheries category
+        if record.data_livelihood.get("select_one_demand_promoting_fisheries") == "Yes":
+            row_cells = table.add_row().cells
+            row_cells[0].text = "Fisheries"
+            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
+            row_cells[3].text = "No Data Provided"  # Father's name not specified
+
+            # Get fisheries demand type
+            fisheries_demand = record.data_livelihood.get(
+                "select_one_promoting_fisheries"
+            )
+            if fisheries_demand == "other":
+                fisheries_demand = record.data_livelihood.get(
+                    "select_one_promoting_fisheries_other", "No Data Provided"
+                )
+            row_cells[4].text = fisheries_demand or "No Data Provided"
+
+            row_cells[5].text = "No Data Provided"  # Area not specified for fisheries
+            row_cells[6].text = (
+                str(record.latitude) if record.latitude else "No Data Provided"
+            )
+            row_cells[7].text = (
+                str(record.longitude) if record.longitude else "No Data Provided"
+            )
+
+        # Handle Plantation category
+        if record.data_livelihood.get("select_one_demand_plantation") == "Yes":
+            row_cells = table.add_row().cells
+            row_cells[0].text = "Plantations"
+            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
+            row_cells[3].text = "No Data Provided"  # Father's name not specified
+
+            # Get plantation type
+            plantation_type = record.data_livelihood.get("Plantation")
+            row_cells[4].text = plantation_type or "No Data Provided"
+
+            # Get plantation area/crop
+            plantation_area = record.data_livelihood.get("Plantation_crop")
+            row_cells[5].text = plantation_area or "No Data Provided"
+
+            row_cells[6].text = (
+                str(record.latitude) if record.latitude else "No Data Provided"
+            )
+            row_cells[7].text = (
+                str(record.longitude) if record.longitude else "No Data Provided"
+            )
 
 
 def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
@@ -1443,7 +1513,6 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
                     layers[key]["icon_url"], icon_size=(25, 41)
                 )
                 coords = [resource.latitude, resource.longitude]
-                logger.info(f"DEBUG: Adding {key} marker at coordinates: {coords}")
                 folium.Marker(
                     location=coords,
                     icon=icon,
@@ -1477,21 +1546,20 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
                         icon = folium.features.CustomIcon(
                             layers[key]["icon_url"], icon_size=(25, 41)
                         )
-                        coords = [
-                            feature["geometry"]["coordinates"][1],
-                            feature["geometry"]["coordinates"][0],
-                        ]
-                        logger.info(
-                            f"DEBUG: Adding {key} marker at coordinates: {coords}"
+                        label_text = feature["properties"].get(
+                            layers[key]["label_key"], "N/A"
                         )
                         folium.Marker(
-                            location=coords,
+                            location=[
+                                feature["geometry"]["coordinates"][1],
+                                feature["geometry"]["coordinates"][0],
+                            ],
                             icon=icon,
-                            popup=feature["properties"].get(
-                                layers[key]["label_key"], "N/A"
-                            ),
+                            popup=label_text,
                         ).add_to(feature_group)
                     feature_group.add_to(fol_map)
+
+                    # Add to legend
                     legend_html += f"""
                     <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
                     {layers[key]["legend_name"]}<br>
@@ -1698,6 +1766,8 @@ def create_firefox_driver(geckodriver_path="/usr/local/bin/geckodriver"):
 
 # MARK: - Section H
 def add_section_h(doc, plan, mws):
+    populate_maintenance_from_waterbody(plan)
+
     doc.add_heading(
         "Section H: Proposed Maintenance Works on existing Assets on basis through Gram Sabha",
         level=1,
@@ -1748,6 +1818,7 @@ def maintenance_gw_table(doc, plan, mws):
         "Beneficiary Name",
         "Work ID",
         "Corresponding Work ID",
+        "Type of Recharge Structure",
         "Previous Maintenance Activity",
         "Latitude",
         "Longitude",
@@ -1769,9 +1840,12 @@ def maintenance_gw_table(doc, plan, mws):
         row_cells[1].text = maintenance.data_gw_maintenance.get("Beneficiary_Name")
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_gw_maintenance.get("select_one_activities")
-        row_cells[5].text = str(maintenance.latitude)
-        row_cells[6].text = str(maintenance.longitude)
+        row_cells[4].text = maintenance.data_gw_maintenance.get(
+            "select_one_water_structure"
+        )
+        row_cells[5].text = maintenance.data_gw_maintenance.get("select_one_activities")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_agri_table(doc, plan, mws):
@@ -1799,7 +1873,10 @@ def maintenance_agri_table(doc, plan, mws):
         row_cells[0].text = maintenance.data_agri_maintenance.get(
             "beneficiary_settlement"
         )
-        row_cells[1].text = maintenance.data_agri_maintenance.get("Beneficiary_Name")
+        row_cells[1].text = (
+            maintenance.data_agri_maintenance.get("Beneficiary_Name")
+            or "No Data Provided"
+        )
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
         row_cells[4].text = maintenance.data_agri_maintenance.get(
