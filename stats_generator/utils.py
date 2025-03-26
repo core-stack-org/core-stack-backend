@@ -121,11 +121,40 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
             elif workspace=='change_detection' and layer_name == f'change_vector_{district}_{block}_Urbanization':
                 create_excel_chan_detection_urbanization(geojson_data, xlsx_file, writer)
+            elif workspace == 'restoration':
+                create_excel_for_restoration(geojson_data, xlsx_file, writer)
 
             results.append({"layer": layer_name, "status": "success"})
 
     return results
 
+
+
+def create_excel_for_restoration(data, xlsx_file, writer):
+    df_data = []
+    features = data['features']
+    
+    for feature in features:  
+        properties = feature['properties']      
+        row = {
+            'UID': properties['uid'],  
+            'area_in_ha': properties['area_in_ha'],  
+            'Wide-scale Restoration': properties['Wide-scale'],
+            'Protection': properties['Protection'],
+            'Mosaic Restoration': properties['Mosaic Res'],
+            'Excluded Areas': properties['Excluded A'],
+        }
+        
+        df_data.append(row)
+    df = pd.DataFrame(df_data) 
+    df = df.sort_values(['UID'])  
+
+    ## for roundoff all numeric value upto 2 decimal
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+    df[numeric_cols] = df[numeric_cols].round(2)  
+
+    df.to_excel(writer, sheet_name='restoration_vector', index=False)
+    print(f"Excel file created for restoration_vector")
 
 
 def create_excel_for_overall_tree_change(data, xlsx_file, writer):
