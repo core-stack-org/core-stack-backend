@@ -1,36 +1,3 @@
-# Input data as a Python dictionary instead of reading from CSV
-form_data = {
-    "annualPrecipitation": "400-600, 600-740, 740-860, 860-1000",
-    "meanAnnualTemperature": "24-26, 26-28",
-    "aridityIndex": "0.20-0.50",
-    "referenceEvapoTranspiration": "2-4, 4-6",
-    "Climate": "20",
-    "topsoilPH": "5.5-6, 6-6.5, 6.5-7, 7-7.5",
-    "subsoilPH": "5.5-6, 6-6.5, 6.5-7, 7-7.5",
-    "topsoilOC": "0.5-0.7, 0.7-1",
-    "subsoilOC": "0.4-0.6, 0.6-0.8, 0.8-1",
-    "topsoilCEC": "10-15, 15-20, 20-25",
-    "subsoilCEC": "10-15, 15-20, 20-25",
-    "topsoilTexture": "Coarse",
-    "subsoilTexture": "Loam, Sandy clay loam",
-    "topsoilBD": "1.1-1.3, 1.3-1.35, 1.35-1.40",
-    "subsoilBD": "1.3-1.35, 1.35-1.4",
-    "drainage": "Well drained",
-    "AWC": "100, 75",
-    "Soil": "20%",
-    "elevation": "0-100, 100-200, 200-500, 500-800",
-    "slope": "0-5, 5-10, 10-15",
-    "aspect": "",
-    "Topography": "20",
-    "NDVI": "0.7-1, 0.5-0.7",
-    "LULC": "Grassland, Cropland, Shrub and scrub, Bare ground",
-    "Ecology": "20",
-    "distToDrainage": "0-5, 5-50, 50-100",
-    "distToSettlements": "0-20, 200-500",
-    "distToRoad": "0-20, 100-200",
-    "Socioeconomic": "20",
-}
-
 # List of environmental variables to be processed
 variables = [
     "annualPrecipitation",
@@ -221,7 +188,7 @@ def clean_percentage(value):
     return float(value)
 
 
-def process_project_profile():
+def process_project_profile(form_data):
     weights = {}
     final_variables = {}
     final_weights = {}
@@ -264,7 +231,6 @@ def process_project_profile():
     # Process each weight (convert from percentage to decimal)
     for category, value in weights.items():
         decimal_value = clean_percentage(value) / 100
-        final_weights[category] = decimal_value
+        final_weights[category] = round(decimal_value, 2)
 
-    print(final_weights)
-    print(final_variables)
+    return final_variables, final_weights

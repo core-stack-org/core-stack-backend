@@ -1,6 +1,6 @@
 # plantations/admin.py
 from django.contrib import admin
-from .models import KMLFile
+from .models import KMLFile, PlantationProfile
 
 
 @admin.register(KMLFile)
@@ -20,3 +20,6 @@ class KMLFileAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+
+admin.site.register(PlantationProfile)

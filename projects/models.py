@@ -36,35 +36,3 @@ class Project(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-
-
-class PlantationProfile(models.Model):
-    """
-    Profile model specifically for projects with app_type='plantation'.
-    """
-
-    profile_id = models.AutoField(primary_key=True)
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.CASCADE,
-        limit_choices_to={"app_type": AppType.PLANTATION},
-        related_name="plantation_profiles",
-    )
-    config_variables = models.JSONField(null=True, default=None)
-    config_weight = models.JSONField(null=True, default=None)
-    config_user_input = models.JSONField(
-        null=True, default=None
-    )  # comes from the frontend
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Plantation Profile {self.profile_id} for Project {self.project.name}"
-
-    def save(self, *args, **kwargs):
-        """Override save to ensure this model is only used with plantation app types"""
-        if self.project.app_type != AppType.PLANTATION:
-            raise ValueError(
-                "PlantationProfile can only be associated with plantation app types"
-            )
-        super().save(*args, **kwargs)

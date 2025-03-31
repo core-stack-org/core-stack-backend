@@ -52,7 +52,7 @@ def site_suitability(
     create_gee_dir([organization, project_name], gee_project_path=GEE_PATH_PLANTATION)
 
     # Construct a unique description and asset ID for the project
-    description = organization + "_" + project_name
+    description = valid_gee_text(organization) + "_" + valid_gee_text(project_name)
     asset_id = (
         get_gee_dir_path([organization, project_name], asset_path=GEE_PATH_PLANTATION)
         + description
@@ -69,7 +69,7 @@ def site_suitability(
 
     # Perform site suitability analysis
     vector_asset_id = check_site_suitability(
-        roi, organization, project_name, state, start_year, end_year
+        roi, organization, project, state, start_year, end_year
     )
 
     # Sync the results to GeoServer for visualization
@@ -146,7 +146,7 @@ def generate_project_roi(asset_id, description, project_name, kml_files_obj):
         logger.exception("Exception in exporting asset: %s", e)
 
 
-def check_site_suitability(roi, org, project_name, state, start_year, end_year):
+def check_site_suitability(roi, org, project, state, start_year, end_year):
     """
     Perform comprehensive site suitability analysis.
 
@@ -163,15 +163,15 @@ def check_site_suitability(roi, org, project_name, state, start_year, end_year):
     """
 
     # Create a unique asset name for the suitability analysis
-    asset_name = "site_suitability_" + project_name
+    asset_name = "site_suitability_" + project.name
 
     # Generate Plantation Site Suitability raster
-    pss_rasters_asset = get_pss(roi, org, project_name, state, asset_name)
+    pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
 
     # Prepare asset description and path
     description = asset_name + "_vector"
     asset_id = (
-        get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
+        get_gee_dir_path([org, project.name], asset_path=GEE_PATH_PLANTATION)
         + description
     )
 
@@ -243,7 +243,7 @@ def check_site_suitability(roi, org, project_name, state, start_year, end_year):
 
         logger.info(f"Asset export task started. Asset path: {description}")
         check_task_status([task.status()["id"]])
-        logger.info("Suitability vector for project=%s exported to GEE", project_name)
+        logger.info("Suitability vector for project=%s exported to GEE", project.name)
         return asset_id
     except Exception as e:
         logger.exception("Exception in exporting suitability vector", e)

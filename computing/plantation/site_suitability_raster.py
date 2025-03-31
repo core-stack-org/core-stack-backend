@@ -1,5 +1,6 @@
 import ee
 
+from plantations.models import PlantationProfile
 from utilities.constants import GEE_PATH_PLANTATION
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -7,11 +8,10 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     check_task_status,
     valid_gee_text,
-    get_gee_asset_path,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
 )
-from .plantation_utils import dataset_paths, saytrees_weights, saytrees_intervals
+from .plantation_utils import dataset_paths
 from utilities.logger import setup_logger
 
 
@@ -32,7 +32,7 @@ def get_pss(roi, org, project, state, asset_name):
     Args:
         roi: Region of Interest (Feature Collection)
         org: Organization name
-        project: Project name
+        project: Project object
         state: Geographic state
         asset_name: Name for the output asset
 
@@ -41,11 +41,24 @@ def get_pss(roi, org, project, state, asset_name):
     """
     # Initialize base image with a constant value of 1
     all_layers = ee.Image(1)
+    project_name = project.name
+
+    default_profile = PlantationProfile.objects.get(profile_id=1)
+    project_weights = default_profile.config_weight
+    project_variables = default_profile.config_variables
+
+    plantation_profile = PlantationProfile.objects.filter(project=project)
+
+    if plantation_profile.exists():
+        plantation_profile = plantation_profile[0]
+        project_weights = {**project_weights, **plantation_profile.config_weight}
+        project_variables = {**project_variables, **plantation_profile.config_variables}
 
     # Prepare asset description and path
     description = asset_name + "_raster"
     asset_id = (
-        get_gee_dir_path([org, project], asset_path=GEE_PATH_PLANTATION) + description
+        get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
+        + description
     )
 
     # Remove existing asset if it exists to prevent conflicts
@@ -68,22 +81,24 @@ def get_pss(roi, org, project, state, asset_name):
         "referenceEvapoTranspiration",
     ]
 
-    # Default weights (TODO: Consider dynamic weight configuration)
-    climate_variable_weights = {
-        "annualPrecipitation": 0.25,
-        "meanAnnualTemperature": 0.25,
-        "aridityIndex": 0.25,
-        "referenceEvapoTranspiration": 0.25,
-    }
-
-    # Get customized weights from external configuration
-    climate_variable_weights = get_weights(climate_variable_weights)
+    # Default weights
+    # climate_variable_weights = {
+    #     "annualPrecipitation": 0.25,
+    #     "meanAnnualTemperature": 0.25,
+    #     "aridityIndex": 0.25,
+    #     "referenceEvapoTranspiration": 0.25,
+    # }
+    #
+    # # Get customized weights from external configuration
+    # climate_variable_weights = get_weights(climate_variable_weights)
     # Validate climate weights
     # if abs(sum(climate_weights.values()) - 1.0) > 1e-6:
     #     raise ValueError("Climate weights must sum to 1")
 
     # Create climate sub-layers by classifying each variable
-    climate_sub_layers = create_classification(climate_variables, roi, state)
+    climate_sub_layers = create_classification(
+        project_variables, climate_variables, roi, state
+    )
 
     # Prepare weighted expression for climate layer
     climate_expr_vars = {
@@ -94,10 +109,10 @@ def get_pss(roi, org, project, state, asset_name):
     }
 
     climate_expr_weights = {
-        "w1": ee.Number(climate_variable_weights["annualPrecipitation"]),
-        "w2": ee.Number(climate_variable_weights["meanAnnualTemperature"]),
-        "w3": ee.Number(climate_variable_weights["aridityIndex"]),
-        "w4": ee.Number(climate_variable_weights["referenceEvapoTranspiration"]),
+        "w1": ee.Number(project_weights["annualPrecipitation"]),
+        "w2": ee.Number(project_weights["meanAnnualTemperature"]),
+        "w3": ee.Number(project_weights["aridityIndex"]),
+        "w4": ee.Number(project_weights["referenceEvapoTranspiration"]),
     }
 
     # Combine climate variables with weighted expression
@@ -129,58 +144,60 @@ def get_pss(roi, org, project, state, asset_name):
         "AWC",
     ]
 
-    # Default Soil Nutrient Weights (TODO: Consider dynamic weight configuration)
-    topsoil_nutrient_weights = {
-        "tnTopsoilPH": 0.25,
-        "tnTopsoilCEC": 0.25,
-        "tnTopsoilOC": 0.25,
-        "tnTopsoilTexture": 0.25,
-    }
+    # # Default Soil Nutrient Weights
+    # topsoil_nutrient_weights = {
+    #     "tnTopsoilPH": 0.25,
+    #     "tnTopsoilCEC": 0.25,
+    #     "tnTopsoilOC": 0.25,
+    #     "tnTopsoilTexture": 0.25,
+    # }
+    #
+    # topsoil_nutrient_weights = get_weights(topsoil_nutrient_weights)
+    #
+    # subsoil_nutrient_weights = {
+    #     "snSubsoilPH": 0.25,
+    #     "snSubsoilCEC": 0.25,
+    #     "snSubsoilOC": 0.25,
+    #     "snSubsoilTexture": 0.25,
+    # }
+    #
+    # subsoil_nutrient_weights = get_weights(subsoil_nutrient_weights)
+    #
+    # rooting_condition_weights = {
+    #     "rcTopsoilPH": 0.25,
+    #     "rcSubsoilPH": 0.25,
+    #     "rcTopsoilBD": 0.25,
+    #     "rcSubsoilBD": 0.25,
+    # }
+    #
+    # rooting_condition_weights = get_weights(rooting_condition_weights)
+    #
+    # soil_variable_weights = {
+    #     "topsoilNutrient": 0.20,
+    #     "subsoilNutrient": 0.20,
+    #     "rootingCondition": 0.20,
+    #     "drainage": 0.20,
+    #     "AWC": 0.20,
+    # }
+    #
+    # soil_variable_weights = get_weights(soil_variable_weights)
 
-    topsoil_nutrient_weights = get_weights(topsoil_nutrient_weights)
-
-    subsoil_nutrient_weights = {
-        "snSubsoilPH": 0.25,
-        "snSubsoilCEC": 0.25,
-        "snSubsoilOC": 0.25,
-        "snSubsoilTexture": 0.25,
-    }  # TODO Use from DB default config
-
-    subsoil_nutrient_weights = get_weights(subsoil_nutrient_weights)
-
-    rooting_condition_weights = {
-        "rcTopsoilPH": 0.25,
-        "rcSubsoilPH": 0.25,
-        "rcTopsoilBD": 0.25,
-        "rcSubsoilBD": 0.25,
-    }  # TODO Use from DB default config
-
-    rooting_condition_weights = get_weights(rooting_condition_weights)
-
-    soil_variable_weights = {
-        "topsoilNutrient": 0.20,
-        "subsoilNutrient": 0.20,
-        "rootingCondition": 0.20,
-        "drainage": 0.20,
-        "AWC": 0.20,
-    }  # TODO Use from DB default config
-
-    soil_variable_weights = get_weights(soil_variable_weights)
-
-    soil_sub_layers = create_classification(soil_variables, roi, state)
+    soil_sub_layers = create_classification(
+        project_variables, soil_variables, roi, state
+    )
 
     # Topsoil Nutrient Layer
     topsoil_nutrient_layer = soil_sub_layers.expression(
         "w1 * topsoilPH + w2 * topsoilOC + w3 * topsoilCEC + w4 * topsoilTexture",
         {
             "topsoilPH": soil_sub_layers.select(["topsoilPH"]),
-            "w1": ee.Number(topsoil_nutrient_weights["tnTopsoilPH"]),
+            "w1": ee.Number(project_weights["tnTopsoilPH"]),
             "topsoilOC": soil_sub_layers.select(["topsoilOC"]),
-            "w2": ee.Number(topsoil_nutrient_weights["tnTopsoilOC"]),
+            "w2": ee.Number(project_weights["tnTopsoilOC"]),
             "topsoilCEC": soil_sub_layers.select(["topsoilCEC"]),
-            "w3": ee.Number(topsoil_nutrient_weights["tnTopsoilCEC"]),
+            "w3": ee.Number(project_weights["tnTopsoilCEC"]),
             "topsoilTexture": soil_sub_layers.select(["topsoilTexture"]),
-            "w4": ee.Number(topsoil_nutrient_weights["tnTopsoilTexture"]),
+            "w4": ee.Number(project_weights["tnTopsoilTexture"]),
         },
     )
     topsoil_nutrient_layer = topsoil_nutrient_layer.rename("topsoilNutrient")
@@ -192,13 +209,13 @@ def get_pss(roi, org, project, state, asset_name):
         "w1 * subsoilPH + w2 * subsoilOC + w3 * subsoilCEC + w4 * subsoilTexture",
         {
             "subsoilPH": soil_sub_layers.select(["subsoilPH"]),
-            "w1": ee.Number(subsoil_nutrient_weights["snSubsoilPH"]),
+            "w1": ee.Number(project_weights["snSubsoilPH"]),
             "subsoilOC": soil_sub_layers.select(["subsoilOC"]),
-            "w2": ee.Number(subsoil_nutrient_weights["snSubsoilOC"]),
+            "w2": ee.Number(project_weights["snSubsoilOC"]),
             "subsoilCEC": soil_sub_layers.select(["subsoilCEC"]),
-            "w3": ee.Number(subsoil_nutrient_weights["snSubsoilCEC"]),
+            "w3": ee.Number(project_weights["snSubsoilCEC"]),
             "subsoilTexture": soil_sub_layers.select(["subsoilTexture"]),
-            "w4": ee.Number(subsoil_nutrient_weights["snSubsoilTexture"]),
+            "w4": ee.Number(project_weights["snSubsoilTexture"]),
         },
     )
     subsoil_nutrient_layer = subsoil_nutrient_layer.rename("subsoilNutrient")
@@ -209,13 +226,13 @@ def get_pss(roi, org, project, state, asset_name):
         "w1 * topsoilPH + w2 * topsoilBD + w3 * subsoilPH + w4 * subsoilBD",
         {
             "topsoilPH": soil_sub_layers.select(["topsoilPH"]),
-            "w1": ee.Number(rooting_condition_weights["rcTopsoilPH"]),
+            "w1": ee.Number(project_weights["rcTopsoilPH"]),
             "topsoilBD": soil_sub_layers.select(["topsoilBD"]),
-            "w2": ee.Number(rooting_condition_weights["rcTopsoilBD"]),
+            "w2": ee.Number(project_weights["rcTopsoilBD"]),
             "subsoilPH": soil_sub_layers.select(["subsoilPH"]),
-            "w3": ee.Number(rooting_condition_weights["rcSubsoilPH"]),
+            "w3": ee.Number(project_weights["rcSubsoilPH"]),
             "subsoilBD": soil_sub_layers.select(["subsoilBD"]),
-            "w4": ee.Number(rooting_condition_weights["rcSubsoilBD"]),
+            "w4": ee.Number(project_weights["rcSubsoilBD"]),
         },
     )
     rooting_condition_layer = rooting_condition_layer.rename("rootingCondition")
@@ -228,15 +245,15 @@ def get_pss(roi, org, project, state, asset_name):
         "w1 * topsoilNutrient + w2 * subsoilNutrient + w3 * rootingCondition + w4 * drainage + w5 * AWC",
         {
             "topsoilNutrient": soil_sub_layers.select(["topsoilNutrient"]),
-            "w1": ee.Number(soil_variable_weights["topsoilNutrient"]),
+            "w1": ee.Number(project_weights["topsoilNutrient"]),
             "subsoilNutrient": soil_sub_layers.select(["subsoilNutrient"]),
-            "w2": ee.Number(soil_variable_weights["subsoilNutrient"]),
+            "w2": ee.Number(project_weights["subsoilNutrient"]),
             "rootingCondition": soil_sub_layers.select(["rootingCondition"]),
-            "w3": ee.Number(soil_variable_weights["rootingCondition"]),
+            "w3": ee.Number(project_weights["rootingCondition"]),
             "drainage": soil_sub_layers.select(["drainage"]),
-            "w4": ee.Number(soil_variable_weights["drainage"]),
+            "w4": ee.Number(project_weights["drainage"]),
             "AWC": soil_sub_layers.select(["AWC"]),
-            "w5": ee.Number(soil_variable_weights["AWC"]),
+            "w5": ee.Number(project_weights["AWC"]),
         },
     )
     soil_layer = soil_layer.rename("Soil")
@@ -246,27 +263,27 @@ def get_pss(roi, org, project, state, asset_name):
     ######################## Socioeconomic Layer  ############################
     socioeconomic_variables = ["distToRoad", "distToDrainage", "distToSettlements"]
 
-    socioeconomic_variable_weights = {
-        "distToRoad": 0.33,
-        "distToDrainage": 0.33,
-        "distToSettlements": 0.34,
-    }  # TODO Use from DB default config
-
-    socioeconomic_variable_weights = get_weights(socioeconomic_variable_weights)
+    # socioeconomic_variable_weights = {
+    #     "distToRoad": 0.33,
+    #     "distToDrainage": 0.33,
+    #     "distToSettlements": 0.34,
+    # }
+    #
+    # socioeconomic_variable_weights = get_weights(socioeconomic_variable_weights)
 
     socioeconomic_sub_layers = create_classification(
-        socioeconomic_variables, roi, state
+        project_variables, socioeconomic_variables, roi, state
     )
 
     socioeconomic_layer = socioeconomic_sub_layers.expression(
         "w1 * distToRoad + w2 * distToDrainage + w3 * distToSettlements",
         {
             "distToRoad": socioeconomic_sub_layers.select(["distToRoad"]),
-            "w1": ee.Number(socioeconomic_variable_weights["distToRoad"]),
+            "w1": ee.Number(project_weights["distToRoad"]),
             "distToDrainage": socioeconomic_sub_layers.select(["distToDrainage"]),
-            "w2": ee.Number(socioeconomic_variable_weights["distToDrainage"]),
+            "w2": ee.Number(project_weights["distToDrainage"]),
             "distToSettlements": socioeconomic_sub_layers.select(["distToSettlements"]),
-            "w3": ee.Number(socioeconomic_variable_weights["distToSettlements"]),
+            "w3": ee.Number(project_weights["distToSettlements"]),
         },
     )
 
@@ -277,22 +294,24 @@ def get_pss(roi, org, project, state, asset_name):
     ##################### Ecology Layer  ############################
     ecology_variables = ["NDVI", "LULC"]
 
-    ecology_variable_weights = {
-        "NDVI": 0.5,
-        "LULC": 0.5,
-    }  # TODO Use from DB default config
+    # ecology_variable_weights = {
+    #     "NDVI": 0.5,
+    #     "LULC": 0.5,
+    # }
+    #
+    # ecology_variable_weights = get_weights(ecology_variable_weights)
 
-    ecology_variable_weights = get_weights(ecology_variable_weights)
-
-    ecology_sub_layers = create_classification(ecology_variables, roi, state)
+    ecology_sub_layers = create_classification(
+        project_variables, ecology_variables, roi, state
+    )
 
     ecology_layer = ecology_sub_layers.expression(
         "w1 * NDVI + w2 * LULC",
         {
             "NDVI": ecology_sub_layers.select(["NDVI"]),
-            "w1": ee.Number(ecology_variable_weights["NDVI"]),
+            "w1": ee.Number(project_weights["NDVI"]),
             "LULC": ecology_sub_layers.select(["LULC"]),
-            "w2": ee.Number(ecology_variable_weights["LULC"]),
+            "w2": ee.Number(project_weights["LULC"]),
         },
     )
 
@@ -302,25 +321,27 @@ def get_pss(roi, org, project, state, asset_name):
     ########## Topography Layer ###########################
     topography_variables = ["elevation", "slope", "aspect"]
 
-    topography_variable_weights = {
-        "elevation": 0.4,
-        "slope": 0.4,
-        "aspect": 0.2,
-    }  # TODO Use from DB default config
+    # topography_variable_weights = {
+    #     "elevation": 0.4,
+    #     "slope": 0.4,
+    #     "aspect": 0.2,
+    # }
+    #
+    # topography_variable_weights = get_weights(topography_variable_weights)
 
-    topography_variable_weights = get_weights(topography_variable_weights)
-
-    topography_sub_layers = create_classification(topography_variables, roi, state)
+    topography_sub_layers = create_classification(
+        project_variables, topography_variables, roi, state
+    )
 
     topography_layer = topography_sub_layers.expression(
         "w1 * elevation + w2 * slope + w3 * aspect",
         {
             "elevation": topography_sub_layers.select(["elevation"]),
-            "w1": ee.Number(topography_variable_weights["elevation"]),
+            "w1": ee.Number(project_weights["elevation"]),
             "slope": topography_sub_layers.select(["slope"]),
-            "w2": ee.Number(topography_variable_weights["slope"]),
+            "w2": ee.Number(project_weights["slope"]),
             "aspect": topography_sub_layers.select(["aspect"]),
-            "w3": ee.Number(topography_variable_weights["aspect"]),
+            "w3": ee.Number(project_weights["aspect"]),
         },
     )
 
@@ -328,34 +349,37 @@ def get_pss(roi, org, project, state, asset_name):
     all_layers = all_layers.addBands(topography_layer)
 
     ############### Final layer calculation  ######################
-    final_weights = {
-        "Climate": 0.25,
-        "Soil": 0.20,
-        "Topography": 0.30,
-        "Ecology": 0.10,
-        "Socioeconomic": 0.15,
-    }  # TODO: Consider dynamic weight configuration from database
-
-    final_weights = get_weights(final_weights)
+    # final_weights = {
+    #     "Climate": 0.25,
+    #     "Soil": 0.20,
+    #     "Topography": 0.30,
+    #     "Ecology": 0.10,
+    #     "Socioeconomic": 0.15,
+    # }
+    #
+    # final_weights = get_weights(final_weights)
 
     # # Validate final weights
     # if abs(sum(final_weights.values()) - 1.0) > 1e-6:
     #     raise ValueError("Final weights must sum to 1")
 
-    # Prepare final layer variables and weights
-    final_expr_vars = {
-        layer: all_layers.select([layer]) for layer in final_weights.keys()
-    }
-
-    final_expr_weights = {
-        f"w{i+1}": ee.Number(weight) for i, weight in enumerate(final_weights.values())
-    }
-
-    # Combine all layers with weighted expression
     final_layer = all_layers.expression(
         "w1 * Climate + w2 * Soil + w3 * Topography + w4 * Ecology + w5 * Socioeconomic",
-        {**final_expr_vars, **final_expr_weights},
-    ).rename("Final")
+        {
+            "Climate": all_layers.select(["Climate"]),
+            "w1": ee.Number(project_weights["Climate"]),
+            "Soil": all_layers.select(["Soil"]),
+            "w2": ee.Number(project_weights["Soil"]),
+            "Topography": all_layers.select(["Topography"]),
+            "w3": ee.Number(project_weights["Topography"]),
+            "Ecology": all_layers.select(["Ecology"]),
+            "w4": ee.Number(project_weights["Ecology"]),
+            "Socioeconomic": all_layers.select(["Socioeconomic"]),
+            "w5": ee.Number(project_weights["Socioeconomic"]),
+        },
+    )
+
+    final_layer = final_layer.rename("Final")
 
     # Pixels with score <= 0.5 are considered unsuitable
     # This rounding is specific to a binary score output
@@ -423,7 +447,7 @@ def get_pss(roi, org, project, state, asset_name):
         layer_name = (
             valid_gee_text(org.lower())
             + "_"
-            + valid_gee_text(project.lower())
+            + valid_gee_text(project_name.lower())
             + "_suitability_raster"
         )
         sync_to_gcs_geoserver(asset_id, layer_name, scale)
@@ -532,25 +556,25 @@ def get_dataset(variable, state):
         )
 
 
-def get_weights(weight_dict):
-    """
-    Retrieve customized weights from external configuration.
+# def get_weights(weight_dict):
+#     """
+#     Retrieve customized weights from external configuration.
+#
+#     Args:
+#         weight_dict: Dictionary of default weights
+#
+#     Returns:
+#         Dictionary with weights from external configuration
+#     """
+#     new_dict = {}
+#     for key in weight_dict:
+#         weight = saytrees_weights[key]
+#         new_dict[key] = round(weight, 2)
+#
+#     return new_dict
 
-    Args:
-        weight_dict: Dictionary of default weights
 
-    Returns:
-        Dictionary with weights from external configuration
-    """
-    new_dict = {}
-    for key in weight_dict:
-        weight = saytrees_weights[key]
-        new_dict[key] = round(weight, 2)
-
-    return new_dict
-
-
-def create_classification(variable_list, roi, state):
+def create_classification(project_intervals, variable_list, roi, state):
     """
     Create classification layers for multiple variables.
 
@@ -558,6 +582,7 @@ def create_classification(variable_list, roi, state):
     based on predefined intervals and thresholds.
 
     Args:
+        project_intervals: User-defined intervals
         variable_list: List of variables to classify
         roi: Region of Interest
         state: Geographic state
@@ -569,8 +594,8 @@ def create_classification(variable_list, roi, state):
 
     def classify_variable(variable):
         nonlocal sub_layer
-        labels = saytrees_intervals[variable]["labels"].split(",")
-        thresholds = saytrees_intervals[variable]["thresholds"].split(",")
+        labels = project_intervals[variable]["labels"].split(",")
+        thresholds = project_intervals[variable]["thresholds"].split(",")
         dataset = get_dataset(variable, state).clip(roi.geometry())
 
         classification = ee.Image(1)

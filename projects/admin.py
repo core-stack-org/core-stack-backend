@@ -1,6 +1,6 @@
 # projects/admin.py
 from django.contrib import admin
-from .models import Project, PlantationProfile
+from .models import Project
 
 
 @admin.register(Project)
@@ -44,6 +44,3 @@ class ProjectAdmin(admin.ModelAdmin):
         ),
     )
     readonly_fields = ("created_at", "updated_at")
-
-
-admin.site.register(PlantationProfile)
