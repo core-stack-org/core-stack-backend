@@ -175,6 +175,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 ASSET_DIR = "/home/ubuntu/prod_dir/nrm-app/assets/"
+EXCEL_PATH = "/home/ubuntu/cfpt/core-stack-backend/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
