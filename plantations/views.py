@@ -220,7 +220,7 @@ class PlantationProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter KML files by project"""
         project_id = self.kwargs.get("project_pk")
-        default_profile = PlantationProfile.objects.get(profile_id=1)
+        default_profile = PlantationProfile.objects.filter(profile_id=1)
         if project_id:
             # Get the plantation project
             try:
