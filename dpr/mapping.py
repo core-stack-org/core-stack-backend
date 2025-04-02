@@ -124,7 +124,7 @@ def populate_maintenance_from_waterbody(plan):
                 GW_maintenance.objects.create(
                     uuid=waterbody.uuid,
                     plan_id=plan.plan_id,
-                    plan_name=plan.plan_name,
+                    plan_name=plan.plan,
                     latitude=waterbody.latitude,
                     longitude=waterbody.longitude,
                     status_re=waterbody.status_re,

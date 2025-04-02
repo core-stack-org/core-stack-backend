@@ -364,7 +364,9 @@ def sync_groundwater():
                     work_type=work_type, work_details=record[work_type]
                 )
         recharge_st.data_groundwater = record
-        recharge_st.save()
+        if recharge_st.status_re.lower() != "rejected":
+            print("SAVING RECHARGE STRUCTURE")
+            recharge_st.save()
 
 
 def sync_agri():

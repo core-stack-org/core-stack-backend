@@ -18,8 +18,8 @@ from nrm_app.settings import (
 
 import folium
 from selenium import webdriver
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -1286,8 +1286,8 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells[
                     2
                 ].text = work.beneficiary_settlement  # Name of Beneficiary's Settlement
-                row_cells[3].text = work.data_agri.get(
-                    "Beneficiary_Name"
+                row_cells[3].text = (
+                    work.data_agri.get("Beneficiary_Name") or "No Data"
                 )  # Beneficiary Name
 
                 if (
@@ -1587,8 +1587,8 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
         if env("DEBUG") == "False":
             logger.info("Using custom selenium driver")
-            driver = create_firefox_driver(
-                geckodriver_path="/usr/local/bin/geckodriver"
+            driver = create_chrome_driver(
+                chromedriver_path="/usr/local/bin/chromedriver"
             )
             img_data = fol_map._to_png(delay=5, driver=driver)
         else:
@@ -1737,8 +1737,8 @@ def show_all_mws(doc, plan, mws):
 
         if env("DEBUG") == "False":
             logger.info("Using custom selenium driver")
-            driver = create_firefox_driver(
-                geckodriver_path="/usr/local/bin/geckodriver"
+            driver = create_chrome_driver(
+                chromedriver_path="/usr/local/bin/chromedriver"
             )
             img_data = fol_map._to_png(delay=5, driver=driver)
         else:
@@ -1753,13 +1753,19 @@ def show_all_mws(doc, plan, mws):
         doc.add_page_break()
 
 
-def create_firefox_driver(geckodriver_path="/usr/local/bin/geckodriver"):
-    options = webdriver.firefox.options.Options()
+def create_chrome_driver(chromedriver_path="/usr/local/bin/chromedriver"):
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.chrome.options import Options
+
+    options = Options()
     options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-    service = Service(executable_path=geckodriver_path)
+    service = Service(executable_path=chromedriver_path)
 
-    driver = webdriver.Firefox(service=service, options=options)
+    driver = webdriver.Chrome(service=service, options=options)
 
     return driver
 
@@ -1837,13 +1843,18 @@ def maintenance_gw_table(doc, plan, mws):
         row_cells[0].text = maintenance.data_gw_maintenance.get(
             "beneficiary_settlement"
         )
-        row_cells[1].text = maintenance.data_gw_maintenance.get("Beneficiary_Name")
+        row_cells[1].text = (
+            maintenance.data_gw_maintenance.get("Beneficiary_Name") or "No Data"
+        )
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_gw_maintenance.get(
-            "select_one_water_structure"
+        row_cells[4].text = (
+            maintenance.data_gw_maintenance.get("select_one_water_structure")
+            or "No Data"
         )
-        row_cells[5].text = maintenance.data_gw_maintenance.get("select_one_activities")
+        row_cells[5].text = (
+            maintenance.data_gw_maintenance.get("select_one_activities") or "No Data"
+        )
         row_cells[6].text = str(maintenance.latitude)
         row_cells[7].text = str(maintenance.longitude)
 
