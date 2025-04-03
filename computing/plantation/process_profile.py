@@ -27,10 +27,18 @@ variables = [
 ]
 
 # Define categorical variables (those that use class mappings instead of ranges)
-categorical_variables = ["topsoilTexture", "subsoilTexture", "drainage", "AWC", "LULC"]
+categorical_variables = [
+    "topsoilTexture",
+    "subsoilTexture",
+    "drainage",
+    "aspect",
+    "AWC",
+    "LULC",
+]
 
 # Define weight categories that appear in the form data
 weight_categories = ["Climate", "Soil", "Topography", "Ecology", "Socioeconomic"]
+
 
 # Define classification dictionaries for categorical variables
 topsoilTextureClasses = {"Fine": 1, "Medium": 2, "Coarse": 3}
@@ -69,11 +77,23 @@ lulcClasses = {
     "Snow and ice": 8,
 }
 
+aspect = {
+    "North": ["0 - 22.5", "337.5 - 360"],
+    "Northeast": "22.5 - 67.5",
+    "East": "67.5 - 112.5",
+    "Southeast": "112.5 - 157.5",
+    "South": "157.5 - 202.5",
+    "Southwest": "202.5 - 247.5",
+    "West": "247.5 - 292.5",
+    "Northwest": "292.5 - 337.5",
+}
+
 # Map variable names to their corresponding class dictionaries
 class_mappings = {
     "topsoilTexture": topsoilTextureClasses,
     "subsoilTexture": subsoilTextureClasses,
     "drainage": drainageClasses,
+    "aspect": aspect,
     "AWC": awcClasses,
     "LULC": lulcClasses,
 }
@@ -169,14 +189,47 @@ def generate_labels_and_classes(input_string, variable):
         print(f"Unknown variable: {variable}")
         return None
 
-    # Create string of all class values
-    classes = ",".join(map(str, classDict.values()))
+    # For aspect, we need to handle the special case differently
+    if variable == "aspect":
+        # Flatten the list for North aspect if needed
+        # Create a flattened list of all range values
+        all_values = []
+        for value in classDict.values():
+            if isinstance(value, list):
+                all_values.extend(value)  # Add all ranges from the list
+            else:
+                all_values.append(value)  # Add single range
 
-    # Create binary labels: 1 for ideal classes, 0 for others
-    ideal_classes = input_string.split(", ")
-    labels = ",".join(
-        ["1" if key in ideal_classes else "0" for key in classDict.keys()]
-    )
+        # Join all ranges with commas
+        classes = ",".join(all_values)
+
+        # Create binary labels - need to handle North direction specially
+        ideal_classes = input_string.split(", ")
+        labels = []
+
+        for key in classDict.keys():
+            if key in ideal_classes:
+                # If this is North, add two "1" values (one for each range)
+                if key == "North":
+                    labels.extend(["1", "1"])
+                else:
+                    labels.append("1")
+            else:
+                # If this is North, add two "0" values (one for each range)
+                if key == "North":
+                    labels.extend(["0", "0"])
+                else:
+                    labels.append("0")
+
+        labels = ",".join(labels)
+    else:
+        classes = ",".join(map(str, classDict.values()))
+
+        # Create binary labels: 1 for ideal classes, 0 for others
+        ideal_classes = input_string.split(", ")
+        labels = ",".join(
+            ["1" if key in ideal_classes else "0" for key in classDict.keys()]
+        )
 
     return classes, labels
 

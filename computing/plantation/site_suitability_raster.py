@@ -504,7 +504,7 @@ def get_dataset(variable, state):
         return (
             ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
             .filterDate(
-                "2022-07-01", "2023-06-30"
+                "2023-07-01", "2024-06-30"
             )  # TODO: Update with IndiaSAT data when available
             .median()
             .select("label")
@@ -513,7 +513,7 @@ def get_dataset(variable, state):
     if variable == "NDVI":
         return (
             ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
-            .filterDate("2022-07-01", "2023-06-30")  # TODO: Verify date range
+            .filterDate("2023-07-01", "2024-06-30")  # TODO: Verify date range
             .select("NDVI")
             .reduce(ee.Reducer.mean())
         )
