@@ -379,9 +379,10 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 ### Remove User from Project
 - **URL**: `/api/v1/projects/{project_id}/users/{user_project_id}/`
 - **Method**: DELETE
-- **Description**: Remove a user from a project
+- **Description**: Remove a user from a project (removes their role/group assignment)
 - **Authentication**: Required
 - **Permissions**: Super admin, organization admin, or project manager
+- **Notes**: The `user_project_id` is the ID of the user-project assignment record, not the user ID. To find this ID, first list all users for the project using the List Project Users endpoint.
 
 ## Plantation App Endpoints
 
@@ -610,3 +611,60 @@ These endpoints are maintained for backward compatibility:
 4. **Token Refresh**: Refresh tokens (valid for 14 days) can be used to obtain new access tokens
 5. **Token Blacklisting**: Refresh tokens are blacklisted on logout or when used for refresh
 6. **Token Rotation**: When refreshing a token, a new refresh token is issued and the old one is blacklisted
+
+## Permission Structure
+
+Below are ASCII diagrams showing the permission hierarchy and capabilities for different user roles in the system:
+
+```
++----------------+     +----------------+     +----------------+
+|   Superadmin   |     |    Org Admin   |     | Project Manager|
++----------------+     +----------------+     +----------------+
+| - Access all   |     | - Access org   |     | - Access       |
+|   organizations|     |   projects     |     |   assigned     |
+| - Access all   |     | - Create/edit  |     |   projects     |
+|   projects     |     |   projects     |     | - Manage       |
+| - Create/edit  |     | - Manage users |     |   project      |
+|   organizations|     |   in org       |     |   users        |
+| - Manage all   |     | - Assign users |     | - Create/edit  |
+|   users        |     |   to projects  |     |   project data |
+| - Assign any   |     | - Cannot access|     | - Cannot       |
+|   role         |     |   other orgs   |     |   create       |
++----------------+     +----------------+     |   projects     |
+                                              +----------------+
+                                                      |
+                                                      v
+                                              +----------------+
+                                              |    App User    |
+                                              +----------------+
+                                              | - View assigned|
+                                              |   projects     |
+                                              | - Enter data   |
+                                              |   based on     |
+                                              |   permissions  |
+                                              | - Cannot       |
+                                              |   manage users |
+                                              | - Cannot       |
+                                              |   create/edit  |
+                                              |   projects     |
+                                              +----------------+
+```
+
+### Permission Comparison Table
+
+| Capability                    | Superadmin | Org Admin | Project Manager | App User |
+|-------------------------------|------------|-----------|----------------|----------|
+| Access all organizations      | ✓          | ✗         | ✗              | ✗        |
+| Access organization projects  | ✓          | ✓         | ✗              | ✗        |
+| Access assigned projects      | ✓          | ✓         | ✓              | ✓        |
+| Create organizations          | ✓          | ✗         | ✗              | ✗        |
+| Create projects               | ✓          | ✓         | ✗              | ✗        |
+| Edit project details          | ✓          | ✓         | ✓              | ✗        |
+| Manage all users              | ✓          | ✗         | ✗              | ✗        |
+| Manage org users              | ✓          | ✓         | ✗              | ✗        |
+| Manage project users          | ✓          | ✓         | ✓              | ✗        |
+| Upload project data           | ✓          | ✓         | ✓              | ✓        |
+| Delete project data           | ✓          | ✓         | ✓              | ✗        |
+| Assign superadmin role        | ✓          | ✗         | ✗              | ✗        |
+| Assign org admin role         | ✓          | ✗         | ✗              | ✗        |
+| Assign project roles          | ✓          | ✓         | ✓              | ✗        |

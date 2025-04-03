@@ -12,7 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
         source="organization.name", read_only=True
     )
     groups = serializers.SerializerMethodField()
-    project_roles = serializers.SerializerMethodField()
+    project_details = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -27,7 +27,7 @@ class UserSerializer(serializers.ModelSerializer):
             "organization_name",
             "is_active",
             "groups",
-            "project_roles",
+            "project_details",
             "is_superadmin",
         ]
         read_only_fields = ["id", "is_active"]
@@ -36,19 +36,17 @@ class UserSerializer(serializers.ModelSerializer):
         """Get simplified groups list."""
         return [{"id": group.id, "name": group.name} for group in obj.groups.all()]
 
-    def get_project_roles(self, obj):
+    def get_project_details(self, obj):
         """Get project-specific roles for the user."""
-        project_roles = UserProjectGroup.objects.filter(user=obj).select_related(
+        project_details = UserProjectGroup.objects.filter(user=obj).select_related(
             "project", "group"
         )
         return [
             {
                 "project_id": role.project.id,
                 "project_name": role.project.name,
-                "group_id": role.group.id,
-                "group_name": role.group.name,
             }
-            for role in project_roles
+            for role in project_details
         ]
 
 
