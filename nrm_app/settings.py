@@ -49,6 +49,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "0.0.0.0",
     "8582-119-252-199-91.ngrok-free.app",
+    "d968-2001-df4-e000-3fc4-2208-ec32-d521-47fd.ngrok-free.app",
 ]
 
 # Application definition
@@ -105,7 +106,7 @@ ROOT_URLCONF = "nrm_app.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR, "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -203,6 +204,8 @@ OD_DATA_URL_plan = {
     },
 }
 
+# Report requirements
+OVERPASS_URL = env("OVERPASS_URL")
 
 # EMAIL Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
