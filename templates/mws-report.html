@@ -61,14 +61,8 @@
         .chart-container {
             position: relative;
             height: 300px;
-            width: 100%;
-            margin: 20px 0;
-        }
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
+            width: 70vw;
+            margin: 20px 0 10px 0;
         }
         .legend {
             display: flex;
@@ -94,12 +88,6 @@
             text-align: center;
             color: #7f8c8d;
         }
-        @media (max-width: 768px) {
-            .data-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -113,78 +101,53 @@
             background-color: #f2f2f2;
         }
 
-        /* Print-specific styles */
-        @media print {
-            body {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-            }
-
-            .container {
-                width: 100%;
-                max-width: none;
-                padding: 0;
-            }
-
-            header {
-                background-color: #2c3e50 !important;
-                color: white !important;
-                padding: 15px 0;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            .section {
-                page-break-inside: avoid;
-                margin-bottom: 30px;
-            }
-
-            h2 {
-                page-break-after: avoid;
-            }
-
-            .map {
-                height: 350px !important;
-                width: 100% !important;
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-
-            .chart-container {
-                height: 250px;
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-
-            .data-value {
-                color: #2c3e50 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            footer {
-                margin-top: 20px;
-            }
-
-            /* Ensure page breaks don't occur in the middle of important content */
-            p, .legend, ul, ol {
-                page-break-inside: avoid;
-            }
-
-            /* Force background colors and images to print */
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                color-adjust: exact !important;
-            }
-
-            /* Ensure charts render properly */
-            canvas {
-                height: auto !important;
-                max-width: 100% !important;
-            }
+       /* Print-specific styles */
+       @media print {
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          padding: 0;
         }
+        #map {
+          width: 100vw;
+          height: 100vh;
+        }
+
+        .container {
+            width: 100vw;
+            max-width: none;
+            padding: 0;
+        }
+
+        header {
+            background-color: #2c3e50 !important;
+            color: white !important;
+            padding: 15px 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .chart-container {
+            height: 250px !important;
+            width: 80vw !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .legend-color {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            background-clip: content-box !important;
+        }
+
+        /* Ensure charts render properly */
+        canvas {
+            height: auto !important;
+            max-width: auto !important;
+        }
+      }
+      
     </style>
 </head>
 <body>
@@ -268,11 +231,13 @@
         <section class="section">
             <h4>Terrain Comparison for Block and MWS</h4>
             <p>{{terrain_comp}}</p>
+
+            <p>The chart illustrates the distribution of different terrain types across the total block. It highlights the percentage of each terrain type to the total block while also showcasing the specific percentage of a single MWS to the overall percentage.</p>
+
             <div class="chart-container">
                 <canvas id="barChart"></canvas>
             </div>
-
-            <p>The chart illustrates the distribution of different terrain types across the total block. It highlights the percentage of each terrain type to the total block while also showcasing the specific percentage of a single MWS to the overall percentage.</p>
+            <br/>
 
         </section>
 
@@ -404,13 +369,14 @@
         <section class="section">
             <h4>Drought Analysis</h4>
             <p>{{drought_desc}}</p>
-            <div class="chart-container">
-                <canvas id="Chart-drought"></canvas>
-            </div>
 
             <p>The occurrence of dry spell is defined across four consecutive weeks with each week of these
                 four weeks incurring a rainfall deviation of less than 50%. Prolonged dry spells can lead to
                 significant reduction in crop sown area.</p>
+
+            <div class="chart-container">
+                <canvas id="Chart-drought"></canvas>
+            </div>
         </section>
 
         <section class="section">
@@ -713,22 +679,22 @@
                     const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
 
                     TerrainMap.getView().setCenter(mapcenter);
-                    TerrainMap.getView().setZoom(14);
+                    TerrainMap.getView().setZoom(13);
 
                     DegradMap.getView().setCenter(mapcenter);
-                    DegradMap.getView().setZoom(14);
+                    DegradMap.getView().setZoom(13);
 
                     lulcMap.getView().setCenter(mapcenter);
-                    lulcMap.getView().setZoom(14);
+                    lulcMap.getView().setZoom(13);
 
                     ComparisonMap1.getView().setCenter(mapcenter);
-                    ComparisonMap1.getView().setZoom(14);
+                    ComparisonMap1.getView().setZoom(13);
 
                     ComparisonMap2.getView().setCenter(mapcenter);
-                    ComparisonMap2.getView().setZoom(14);
+                    ComparisonMap2.getView().setZoom(13);
 
                     ComparisonMap3.getView().setCenter(mapcenter);
-                    ComparisonMap3.getView().setZoom(14);
+                    ComparisonMap3.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
