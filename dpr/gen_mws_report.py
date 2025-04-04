@@ -12,8 +12,16 @@ from scipy.spatial.distance import jensenshannon
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import OVERPASS_URL
 from utilities.logger import setup_logger
+import environ
+
+env = environ.Env()
+# reading .env file
+environ.Env.read_env()
 
 logger = setup_logger(__name__)
+
+# TODO: fix the path issue <> shiv and ksheetiz
+DATA_DIR_TEMP = env("EXCEL_DIR")
 
 
 # MARK: HELPER FUNCTIONS
@@ -757,7 +765,7 @@ def get_osm_data(district, block, uid):
 def get_terrain_data(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -874,7 +882,7 @@ def get_terrain_data(state, district, block, uid):
 
         # ? For the LULCxSlope and LULCxPlain comparisons
         slope_df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -886,7 +894,7 @@ def get_terrain_data(state, district, block, uid):
             sheet_name="terrain_lulc_slope",
         )
         plain_df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1019,7 +1027,7 @@ def get_terrain_data(state, district, block, uid):
 def get_change_detection_data(state, district, block, uid):
     try:
         df_degrad = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1031,7 +1039,7 @@ def get_change_detection_data(state, district, block, uid):
             sheet_name="change_detection_degradation",
         )
         df_defo = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1043,7 +1051,7 @@ def get_change_detection_data(state, district, block, uid):
             sheet_name="change_detection_deforestation",
         )
         df_urban = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1105,7 +1113,7 @@ def get_change_detection_data(state, district, block, uid):
 def get_cropping_intensity(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1117,7 +1125,7 @@ def get_cropping_intensity(state, district, block, uid):
             sheet_name="croppingIntensity_annual",
         )
         df_drought = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1225,7 +1233,7 @@ def get_cropping_intensity(state, district, block, uid):
 def get_double_cropping_area(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1315,7 +1323,7 @@ def get_double_cropping_area(state, district, block, uid):
 def get_surface_Water_bodies_data(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1327,7 +1335,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             sheet_name="surfaceWaterBodies_annual",
         )
         df_area = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1339,7 +1347,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             sheet_name="terrain",
         )
         df_drought = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1616,7 +1624,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 def get_water_balance_data(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1628,7 +1636,7 @@ def get_water_balance_data(state, district, block, uid):
             sheet_name="hydrological_annual",
         )
         df_drought = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -1861,7 +1869,7 @@ def get_water_balance_data(state, district, block, uid):
             pd.to_numeric, errors="coerce"
         )
         filtered_df_precip = (
-            df.loc[df["UID"] == uid, selected_columns_g].values[0].tolist()
+            df.loc[df["UID"] == uid, selected_columns_precip].values[0].tolist()
         )
 
         selected_columns_runoff = [
@@ -1910,7 +1918,7 @@ def get_water_balance_data(state, district, block, uid):
 def get_drought_data(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -2026,7 +2034,7 @@ def get_drought_data(state, district, block, uid):
 def get_village_data(state, district, block, uid):
     try:
         df = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -2038,7 +2046,7 @@ def get_village_data(state, district, block, uid):
             sheet_name="mws_intersect_villages",
         )
         df_village = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -2050,7 +2058,7 @@ def get_village_data(state, district, block, uid):
             sheet_name="nrega_assets_village",
         )
         df_socio = pd.read_excel(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()

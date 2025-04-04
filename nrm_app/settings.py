@@ -48,6 +48,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
+    "e697-2001-df4-e000-3fc4-e2e1-373c-2498-b87c.ngrok-free.app",
 ]
 
 # Application definition

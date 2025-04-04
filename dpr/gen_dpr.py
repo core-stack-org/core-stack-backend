@@ -17,12 +17,8 @@ from nrm_app.settings import (
 )
 
 import folium
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 import geopandas as gpd
 import matplotlib.pyplot as plt
-import pandas as pd
 import seaborn as sns
 from django.core.mail import EmailMessage
 from django.core.mail.backends.smtp import EmailBackend
@@ -1584,15 +1580,7 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     with tempfile.TemporaryDirectory() as temp_dir:
         map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
         fol_map.save(map_filename)
-
-        if env("DEBUG") == "False":
-            logger.info("Using custom selenium driver")
-            driver = create_chrome_driver(
-                chromedriver_path="/usr/local/bin/chromedriver"
-            )
-            img_data = fol_map._to_png(delay=5, driver=driver)
-        else:
-            img_data = fol_map._to_png(5)
+        img_data = fol_map._to_png(5)
         img = Image.open(BytesIO(img_data))
         img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
         img.save(img_filename)
@@ -1735,14 +1723,7 @@ def show_all_mws(doc, plan, mws):
         map_filename = os.path.join(temp_dir, "all_mws_map.html")
         fol_map.save(map_filename)
 
-        if env("DEBUG") == "False":
-            logger.info("Using custom selenium driver")
-            driver = create_chrome_driver(
-                chromedriver_path="/usr/local/bin/chromedriver"
-            )
-            img_data = fol_map._to_png(delay=5, driver=driver)
-        else:
-            img_data = fol_map._to_png(5)
+        img_data = fol_map._to_png(5)
         img = Image.open(BytesIO(img_data))
         img_filename = os.path.join(temp_dir, "all_mws_map.png")
         img.save(img_filename)
@@ -1751,23 +1732,6 @@ def show_all_mws(doc, plan, mws):
         doc.add_heading("Overview Map of All MWS", level=1)
         doc.add_picture(img_filename, width=Inches(6))
         doc.add_page_break()
-
-
-def create_chrome_driver(chromedriver_path="/usr/local/bin/chromedriver"):
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.chrome.options import Options
-
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-
-    service = Service(executable_path=chromedriver_path)
-
-    driver = webdriver.Chrome(service=service, options=options)
-
-    return driver
 
 
 # MARK: - Section H
