@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MWS Analysis Report</title>
+
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.4.0/ol.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.4.0/dist/ol.js"></script>
+
+    <!-- OpenLayers-ext JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.js"></script>
+
+    <!-- OpenLayers-ext CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+        .map-group{
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+        .map {
+            height: 400px;
+            width: 100%;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            margin: 20px 0;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 2px;
+        }
+        footer {
+            margin-top: 40px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+        @media (max-width: 768px) {
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+
+        /* Print-specific styles */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            .container {
+                width: 100%;
+                max-width: none;
+                padding: 0;
+            }
+
+            header {
+                background-color: #2c3e50 !important;
+                color: white !important;
+                padding: 15px 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .section {
+                page-break-inside: avoid;
+                margin-bottom: 30px;
+            }
+
+            h2 {
+                page-break-after: avoid;
+            }
+
+            .map {
+                height: 350px !important;
+                width: 100% !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .chart-container {
+                height: 250px;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .data-value {
+                color: #2c3e50 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            footer {
+                margin-top: 20px;
+            }
+
+            /* Ensure page breaks don't occur in the middle of important content */
+            p, .legend, ul, ol {
+                page-break-inside: avoid;
+            }
+
+            /* Force background colors and images to print */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            /* Ensure charts render properly */
+            canvas {
+                height: auto !important;
+                max-width: 100% !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Micro-Watershed Data Analysis Report</h1>
+            <p>Spatial and Temporal Analysis of Key Metrics</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <section class="section">
+            <h2>Overview of block characteristics</h2>
+            <p>{{block_osm}}</p>
+        </section>
+
+        <section class="section">
+            <h2>Landscape Overview</h2>
+            <p>{{mws_osm}}</p>
+
+            <div id="mainMap" class="map"></div>
+        </section>
+
+        <section class="section">
+            <h3>Terrain Comparison</h3>
+            <p>{{terrain_mws}}</p>
+
+            <div class="map-group">
+                <div id="terrainMap" class="map"></div>
+                <div id="compMap1" class="map"></div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #313695;"></div>
+                    <span>V-shape river valleys, Deep narrow canyons</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4575b4;"></div>
+                    <span>Lateral midslope incised drainages, Local valleys in plains</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a50026;"></div>
+                    <span>Upland incised drainages, Stream headwaters</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                    <span>U-shape valleys</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #fffc00;"></div>
+                    <span>Broad Flat Areas</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #feb24c;"></div>
+                    <span>Broad open slopes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f46d43;"></div>
+                    <span>Mesa tops</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #d73027;"></div>
+                    <span>Upper Slopes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #91bfdb;"></div>
+                    <span>Local ridge/hilltops within broad valleys</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #800000;"></div>
+                    <span>Lateral midslope drainage divides, Local ridges in plains</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4d0000;"></div>
+                    <span>Mountain tops, high ridges</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h4>Terrain Comparison for Block and MWS</h4>
+            <p>{{terrain_comp}}</p>
+            <div class="chart-container">
+                <canvas id="barChart"></canvas>
+            </div>
+
+            <p>The chart illustrates the distribution of different terrain types across the total block. It highlights the percentage of each terrain type to the total block while also showcasing the specific percentage of a single MWS to the overall percentage.</p>
+
+        </section>
+
+        <section class="section">
+            <h4>Land use on slopes and plains</h4>
+            <p>{{terrain_land_use}}</p>
+
+            <div class="chart-container">
+                <canvas id="barChart-terrain-lulc"></canvas>
+            </div>
+
+        </section>
+
+        {% if land_degrad %}
+            <section class="section">
+                <h4>Degradation of land</h4>
+                <p>{{land_degrad}}</p>
+
+                <div class="map-group">
+                    <div id="degradLandMap" class="map"></div>
+                    <div id="compMap3" class="map"></div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #eee05d;"></div>
+                        <span>Farm - Farm</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff0000;"></div>
+                        <span>Farm - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                        <span>Farm - Barren</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                        <span>Farm - Scrub Land</span>
+                    </div>
+                </div>
+            </section>
+        {% endif %}
+
+        {% if tree_degrad %}
+            <section class="section">
+                <h4>Reduction in tree cover</h4>
+                <p>{{tree_degrad}}</p>
+            </section>
+        {% endif %}
+
+        {% if urbanization %}
+            <section class="section">
+                <h4>Urbanization</h4>
+                <p>{{urbanization}}</p>
+            </section>
+        {% endif %}
+
+        <section class="section">
+            <h4>Average percentage of double cropped area</h4>
+            <p>{{double_crop_des}}</p>
+            
+            <div class="map-group">
+                <div id="lulcMap" class="map"></div>
+                <div id="compMap2" class="map"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #A9A9A9;"></div>
+                    <span>Barren Lands</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #c6e46d;"></div>
+                    <span>Single Kharif</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eee05d;"></div>
+                    <span>Single Non-Kharif</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f9b249;"></div>
+                    <span>Double Cropping</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #fb5139;"></div>
+                    <span>Triple Cropping</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <span>Shrubs and Scrubs</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h4>Surface water bodies</h4>
+            <p>{{swb_desc}}</p>
+
+            <p id="swb_desc">
+            </p>
+            {% if not trend_desc %}
+                <p>No surface water body descriptions available.</p>
+            {% endif %}
+
+            <div class="chart-container">
+                <canvas id="barChart-swb"></canvas>
+            </div>
+
+            <p>{{swb_season_desc}}</p>
+        </section>
+
+        <section class="section">
+            <h4>Water Balance</h4>
+            <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominently through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
+
+            <p id="wb_desc">
+            </p>
+            <div class="chart-container">
+                <canvas id="lineChart-water"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineChart-evp"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineChart-gw"></canvas>
+            </div>
+        </section>
+
+        <section class="section">
+            <h4>Drought Analysis</h4>
+            <p>{{drought_desc}}</p>
+            <div class="chart-container">
+                <canvas id="Chart-drought"></canvas>
+            </div>
+
+            <p>The occurrence of dry spell is defined across four consecutive weeks with each week of these
+                four weeks incurring a rainfall deviation of less than 50%. Prolonged dry spells can lead to
+                significant reduction in crop sown area.</p>
+        </section>
+
+        <section class="section">
+            <h2>Village Profile</h2>
+            <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
+            <ul id="village-names"></ul>
+
+            <h4>MGNREGA works</h4>
+            <p>MGNREGA works of soil and water conservation, such as trench cum bunds, irrigation structures like farm ponds, and plantation works, are essential to enhance agricultural productivity and build climate resilience against droughts. In this micro-watershed, the allocation has seen the following uptake</p>
+
+            <table id="village-table">
+                <thead>
+                    <tr>
+                        <th>Village Name</th>
+                        <th>Total Population</th>
+                        <th>Total SC % Population</th>
+                        <th>Total ST % Population</th>
+                        <th>Soil and Water Conservation</th>
+                        <th>Land Restoration</th>
+                        <th>Plantation</th>
+                        <th>Irrigation on Farm</th>
+                        <th>Irrigation Site Livelihoods</th>
+                        <th>Off-farm Livelihoods</th>
+                        <th>Community Assets</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+        </section>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Report generated on <span id="report-date"></span> | CoREStack Team</p>
+        </div>
+    </footer>
+
+    <script>
+
+        const baseLayer = new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                maxZoom: 30,
+                transition: 500,
+            }),
+            preload: 4,
+        });
+
+        const view = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        });
+
+        const mainMap = new ol.Map({
+            target: 'mainMap',
+            layers: [baseLayer],
+            view: view
+        });
+
+        const wmsLayer = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                    'STYLES' : 'Terrain_Style_11_Classes'
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'terrain_raster'
+        })
+
+        const degradRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'degrad_raster'
+        })
+
+        const lulcRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "LULC_level_3:LULC_22_23_{{block}}_level_3",
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'lulc_raster'
+        })
+
+        const TerrainMap = new ol.Map({
+            target: 'terrainMap',
+            layers: [wmsLayer],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const ComparisonMap1 = new ol.Map({
+            target: 'compMap1',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const ComparisonMap2 = new ol.Map({
+            target: 'compMap2',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const ComparisonMap3 = new ol.Map({
+            target: 'compMap3',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+
+        const lulcMap = new ol.Map({
+            target: 'lulcMap',
+            layers: [lulcRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const DegradMap = new ol.Map({
+            target: 'degradLandMap',
+            layers: [degradRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                let strokeColor = 'skyblue'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.4)'; // Default fill color with 0.4 opacity
+
+                if (uid === '{{mws_id}}') {
+                    strokeColor = 'yellow';
+                    fillColor = 'rgba(255, 255, 0, 0.4)';
+                }
+
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+            mainMap.addLayer(vectorLayer);
+
+            const arr = vectorSource.getExtent();
+            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+            mainMap.getView().setCenter(mapcenter);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
+        // Fetch GeoJSON data and extract a feature by UID
+        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1) => {
+            await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+                .then(response => response.json())
+                .then(data => {
+                    const features = new ol.format.GeoJSON().readFeatures(data);
+
+                    const feature = features.find(f => f.get('uid') === uid);
+                    
+                    const vectorSource = new ol.source.Vector({
+                        features: [feature],
+                    });
+
+                    if (feature) {
+                        var crop = new ol.filter.Crop({
+                            feature : feature,
+                            wrapX: true,
+                            inner: false
+                        })
+                        wmsLayer1.addFilter(crop);
+                        degradRaster1.addFilter(crop);
+                        lulcRaster1.addFilter(crop);
+                    }
+
+                    const styleFunctionComp = feature => {
+                        strokeColor = 'yellow';
+                        fillColor = 'rgba(255, 255, 0, 0.1)';
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({
+                                color: strokeColor,
+                                width: 2,
+                            }),
+                            fill: new ol.style.Fill({
+                                color: fillColor,
+                            }),
+                        });
+                    };
+
+                    const vectorLayerComp = new ol.layer.Vector({
+                        source: vectorSource,
+                        style: styleFunctionComp,
+                    });        
+
+                    ComparisonMap1.addLayer(vectorLayerComp)
+                    ComparisonMap2.addLayer(vectorLayerComp)
+                    ComparisonMap3.addLayer(vectorLayerComp)
+
+                    const arr = vectorSource.getExtent();
+                    const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+
+                    TerrainMap.getView().setCenter(mapcenter);
+                    TerrainMap.getView().setZoom(14);
+
+                    DegradMap.getView().setCenter(mapcenter);
+                    DegradMap.getView().setZoom(14);
+
+                    lulcMap.getView().setCenter(mapcenter);
+                    lulcMap.getView().setZoom(14);
+
+                    ComparisonMap1.getView().setCenter(mapcenter);
+                    ComparisonMap1.getView().setZoom(14);
+
+                    ComparisonMap2.getView().setCenter(mapcenter);
+                    ComparisonMap2.getView().setZoom(14);
+
+                    ComparisonMap3.getView().setCenter(mapcenter);
+                    ComparisonMap3.getView().setZoom(14);
+                })
+                .catch(error => console.error('Error fetching GeoJSON:', error));
+        };
+
+        // Extract Feature
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster);
+
+        // Terrain Bar Chart
+        const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
+        const blockTerrain = JSON.parse('{{block_areas|safe}}')
+        const barChart = new Chart(document.getElementById('barChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Plain Area', 'Ridge Area', 'Slopy Area', 'Valley Area', 'Hill Slopes'],
+                datasets: [{
+                    label: '% Block Terrain Area',
+                    data: blockTerrain,
+                    backgroundColor: '#3498db'
+                }, {
+                    label: '% MWS Terrain Area',
+                    data: mwsTerrain,
+                    backgroundColor: '#2ecc71'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title : {
+                            display: true,
+                            text: 'Percent'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            }
+        });
+
+        const mwsTerrain_slope = JSON.parse('{{terrain_mws_slope|safe}}')
+        const blockTerrain_slope = JSON.parse('{{terrain_block_slope|safe}}')
+
+        const mwsTerrain_plain = JSON.parse('{{terrain_mws_plain|safe}}')
+        const blockTerrain_plain = JSON.parse('{{terrain_block_plain|safe}}')
+
+        const finalMwsStat = [mwsTerrain_slope[0] + mwsTerrain_plain[0], mwsTerrain_slope[1] + mwsTerrain_plain[1], mwsTerrain_slope[2], mwsTerrain_plain[2]]
+        const finalBlockStat = [blockTerrain_slope[0] + blockTerrain_plain[0], blockTerrain_slope[1] + blockTerrain_plain[1], blockTerrain_slope[0], blockTerrain_plain[0]]
+
+        const barChart_lulc = new Chart(document.getElementById('barChart-terrain-lulc'), {
+            type: 'bar',
+            data: {
+                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                datasets: [{
+                    label: '% Block Terrain Area',
+                    data: finalBlockStat,
+                    backgroundColor: '#3498db'
+                }, {
+                    label: '% MWS Terrain Area',
+                    data: finalMwsStat,
+                    backgroundColor: '#2ecc71'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title : {
+                            display: true,
+                            text: 'Percent'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            }
+        });
+
+        // Waterbody Graphs
+        const kharifData = JSON.parse('{{kharif_data|safe}}')
+        const rabiData = JSON.parse('{{rabi_data|safe}}')
+        const zaidData = JSON.parse('{{zaid_data|safe}}')
+
+        const barChart_swb = new Chart(document.getElementById('barChart-swb'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                datasets: [
+                {
+                    label: 'Kharif',
+                    data: kharifData,
+                    backgroundColor: '#0000FF',
+
+                },
+                {
+                    label: 'Kharif-Rabi',
+                    data: rabiData,
+                    backgroundColor: '#6495ED'
+
+                },
+                {
+                    label: 'Kharif-Rabi-Zaid',
+                    data: zaidData,
+                    backgroundColor: '#ADD8E6'
+
+                },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x : {
+                        stacked : true,
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    },
+                    y: {
+                        stacked : true,
+                        title : {
+                            display: true,
+                            text: 'Hectare'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Surface water availability during Kharif, Rabi, and Zaid (2017-2022)',
+                },
+            }
+        });
+
+        // SWB descriptions
+        const swbDescArr = JSON.parse('{{ trend_desc|safe }}')
+
+        const swbDescParagraph = document.getElementById('swb_desc')
+
+        swbDescParagraph.innerHTML = '';
+
+        swbDescArr.forEach(function(desc, idx) {
+            const textNode = document.createTextNode(desc)
+
+            swbDescParagraph.appendChild(textNode)
+
+            if (idx < swbDescArr.length - 1) {
+                const lineBreak = document.createElement('br');
+                swbDescParagraph.appendChild(lineBreak);
+
+                // Optional: add some spacing between items
+                swbDescParagraph.appendChild(document.createElement('br'));
+            }
+        })
+
+        // WaterBalance Graphs and descriptions
+        const waterBalanceDesc = JSON.parse('{{ wb_desc|safe }}')
+
+        const wbDescParagraph = document.getElementById('wb_desc')
+
+        wbDescParagraph.innerHTML = '';
+
+        waterBalanceDesc.forEach(function(desc, idx) {
+            const textNode = document.createTextNode(desc)
+
+            wbDescParagraph.appendChild(textNode)
+
+            if (idx < waterBalanceDesc.length - 1) {
+                const lineBreak = document.createElement('br');
+                wbDescParagraph.appendChild(lineBreak);
+
+                // Optional: add some spacing between items
+                wbDescParagraph.appendChild(document.createElement('br'));
+            }
+        })
+
+        const precipData = JSON.parse('{{precip_data|safe}}')
+        const runoffData = JSON.parse('{{runoff_data|safe}}')
+        const etData = JSON.parse('{{et_data|safe}}')
+        const dgData = JSON.parse('{{dg_data|safe}}')
+
+        const lineChart = new Chart(document.getElementById('lineChart-water'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                datasets: [{
+                    label: 'Precipitation',
+                    data: precipData,
+                    backgroundColor: '#413ea0',
+                    tension: 0.3,
+                    fill: false
+                }, {
+                    label: 'Runoff',
+                    data: runoffData,
+                    type: 'line',
+                    fill: true,
+                    borderColor: '#FF6EF4',
+                    backgroundColor: 'rgba(	255, 110, 244, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 5,
+                    tension: 0.3, // Adds curve to the line
+                    order: 1 // Lower order means it's drawn last (in front)
+                }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title : {
+                            display: true,
+                            text: 'Value'
+                        }
+                    },
+                    x : {
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            }
+        });
+
+        const areaChartEvp = new Chart(document.getElementById('lineChart-evp'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                datasets: [{
+                    label: 'Evapotranspiration',
+                    data: etData,
+                    type: 'line',
+                    fill: true,
+                    borderColor: '#90ee90',
+                    backgroundColor: 'rgba(	144, 238, 144, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 5,
+                    tension: 0.3, // Adds curve to the line
+                    order: 1 // Lower order means it's drawn last (in front)
+                }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title : {
+                            display: true,
+                            text: 'Evapotranspiration'
+                        }
+                    },
+                    x : {
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            }
+        });
+
+        const areaChartGW = new Chart(document.getElementById('lineChart-gw'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                datasets: [{
+                    label: 'Groundwater',
+                    data: dgData,
+                    type: 'line',
+                    fill: true,
+                    borderColor: '#a5682a',
+                    backgroundColor: 'rgba(	165, 104, 42, 0.2)',
+                    borderWidth: 2,
+                    pointRadius: 5,
+                    tension: 0.3, // Adds curve to the line
+                    order: 1 // Lower order means it's drawn last (in front)
+                }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title : {
+                            display: true,
+                            text: 'Groundwater'
+                        }
+                    },
+                    x : {
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            }
+        });
+
+        // Drought Graphs
+        const droughtData = JSON.parse('{{drought_weeks|safe}}')
+
+        const droughtChart = new Chart(document.getElementById('Chart-drought'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                datasets: [{
+                    label: 'Drought Index(in Weeks)',
+                    data: droughtData,
+                    type: 'line',
+                    fill: false,
+                    borderColor: '#e67300',
+                    borderWidth: 2,
+                    pointRadius: 5,
+                    order: 1 // Lower order means it's drawn last (in front)
+                }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title : {
+                            display: true,
+                            text: 'Drought Index(in Weeks)'
+                        }
+                    },
+                    x : {
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            }
+        });
+
+        //Village Profile section
+        const villageNames = JSON.parse('{{ villages_name|safe }}')
+        var ulElement = document.getElementById("village-names");
+
+        const swc_works = JSON.parse('{{ swc_works|safe }}')
+        const lr_works = JSON.parse('{{ lr_works|safe }}')
+        const plantation_work = JSON.parse('{{ plantation_work|safe }}')
+        const iof_works = JSON.parse('{{ iof_works|safe }}')
+        const ofl_works = JSON.parse('{{ ofl_works|safe }}')
+        const ca_works = JSON.parse('{{ ca_works|safe }}')
+        const ofw_works = JSON.parse('{{ ofw_works|safe }}')
+
+        const sc_pop = JSON.parse('{{ villages_sc|safe }}')
+        const st_pop = JSON.parse('{{ villages_st|safe }}')
+        const tot_pop = JSON.parse('{{ villages_pop|safe }}')
+
+        // Iterate and append villages as list items
+        villageNames.forEach(function(village) {
+            var li = document.createElement("li");
+            li.textContent = village;
+            ulElement.appendChild(li);
+        });
+
+        var tableBody = document.querySelector("#village-table tbody");
+
+        villageNames.map((item, idx) => {
+            var row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td>${item}</td>
+                <td>${tot_pop[idx]}</td>
+                <td>${sc_pop[idx]}</td>
+                <td>${st_pop[idx]}</td>
+                <td>${swc_works[idx]}</td>
+                <td>${lr_works[idx]}</td>
+                <td>${plantation_work[idx]}</td>
+                <td>${iof_works[idx]}</td>
+                <td>${ofw_works[idx]}</td>
+                <td>${ofl_works[idx]}</td>
+                <td>${ca_works[idx]}</td>
+            `;
+
+            tableBody.appendChild(row);
+        })
+
+        //Setting the Date Time of Report being saved or printed
+        const currentDate = new Date();
+
+        // Format the date as "Month Day, Year" (e.g., "March 3, 2025")
+        const formattedDate = currentDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Insert the formatted date into the span
+        document.getElementById("report-date").textContent = formattedDate;
+
+        // Add print-specific preparation
+        window.addEventListener('beforeprint', function() {
+            // Force render maps to their current view
+
+            // Force render all charts
+            barChart.render();
+            lineChart.render();
+            pieChart.render();
+        });
+
+        // Handle post-print adjustments
+        window.addEventListener('afterprint', function() {
+            // Re-render maps with proper size
+            setTimeout(function() {
+                mainMap.updateSize();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
