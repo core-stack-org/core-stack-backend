@@ -42,5 +42,7 @@ ODK_URL_GW_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form
 ODK_URL_AGRI_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1.svc/Submissions"
 
 GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
-GCS_BUCKET_NAME = "core-stack"
+
+GCS_BUCKET_NAME = "core_stack"
+
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
