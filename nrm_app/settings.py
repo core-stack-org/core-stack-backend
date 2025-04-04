@@ -172,9 +172,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
+
+# PATHS
 STATIC_URL = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
-ASSET_DIR = "/home/ubuntu/prod_dir/nrm-app/assets/"
 EXCEL_PATH = "/home/ubuntu/cfpt/core-stack-backend/"
 
 # Default primary key field type
