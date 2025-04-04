@@ -27,11 +27,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-kcm_)r8!+hl5q!5d$r8spl#5+fjy5qmj#bukx3hq*puq3t8_3n"
+SECRET_KEY = env("SECRET_KEY")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env("DEBUG")
 
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
@@ -48,7 +48,6 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "8582-119-252-199-91.ngrok-free.app",
 ]
 
 # Application definition
@@ -105,7 +104,7 @@ ROOT_URLCONF = "nrm_app.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR, "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -174,7 +173,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
-ASSET_DIR = "/home/ubuntu/prod_dir/nrm-app/assets/"
+ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -203,6 +202,8 @@ OD_DATA_URL_plan = {
     },
 }
 
+# Report requirements
+OVERPASS_URL = env("OVERPASS_URL")
 
 # EMAIL Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

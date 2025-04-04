@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oops! Connection Error</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f3e8ff;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="text-center p-8 bg-white rounded-lg shadow-lg max-w-md w-full">
+        <img src="https://i.ibb.co/spK18DR6/error.png" alt="Connection Error Illustration" class="mx-auto mb-6 w-full max-h-64 object-contain">
+        
+        <h1 class="text-3xl font-bold mb-4" style="color: #8B5CF6;">Connection Error</h1>
+        <p class="text-gray-600 mb-6">We're having trouble connecting to our servers. This could be due to:</p>
+        <ul class="text-left text-gray-600 mb-6 list-disc list-inside">
+            <li>Temporary server maintenance</li>
+            <li>Network connectivity issues</li>
+            <li>Unexpected system error</li>
+        </ul>
+        <div class="flex justify-center space-x-4">
+            <button onclick="window.location.reload()" class="hover:bg-opacity-90 text-white font-bold py-2 px-4 rounded" style="background-color: #8B5CF6;">
+                Try Again
+            </button>
+            <button onclick="window.history.back()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded">
+                Go Back
+            </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-6">If the problem persists, please contact support.</p>
+    </div>
+</body>
+</html>

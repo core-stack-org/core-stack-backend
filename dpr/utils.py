@@ -16,6 +16,10 @@ from utilities.constants import (
     ODK_URL_settlement,
     ODK_URL_waterbody,
     ODK_URL_well,
+    ODK_URL_AGRI_MAINTENANCE,
+    ODK_URL_GW_MAINTENANCE,
+    ODK_URL_RS_WATERBODY_MAINTENANCE,
+    ODK_URL_WATERBODY_MAINTENANCE,
 )
 
 from .models import (
@@ -26,6 +30,10 @@ from .models import (
     ODK_settlement,
     ODK_waterbody,
     ODK_well,
+    Agri_maintenance,
+    GW_maintenance,
+    SWB_maintenance,
+    SWB_RS_maintenance,
 )
 
 warnings.filterwarnings("ignore")
@@ -82,6 +90,12 @@ def sync_db_odk():
     print("sync cropping patterns")
     sync_cropping_pattern()
 
+    print("sync maintenance data")
+    sync_agri_maintenance()
+    sync_gw_maintenance()
+    sync_swb_maintenance()
+    sync_swb_rs_maintenance()
+
 
 def fetch_odk_data_sync(ODK_URL):
     """Fetch ODK data from the given ODK URL."""
@@ -90,10 +104,7 @@ def fetch_odk_data_sync(ODK_URL):
         response.raise_for_status()
         response_dict = json.loads(response.content)
         response_list = response_dict["value"]
-        # print("response list: ", response_list[0:2])
-
         return response_list
-        # return response.json()  # Returns the ODK data
     except requests.exceptions.RequestException as e:
         print(f"Failed to fetch ODK data from the given URL: {e}")
         return None
@@ -101,7 +112,7 @@ def fetch_odk_data_sync(ODK_URL):
 
 def sync_settlement():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_settlement)
-    print("ODK data", odk_resp_list[:1])
+    # print("ODK data settlement", odk_resp_list[:1])
     settlement = ODK_settlement()  # settlement obj for the db model
 
     for record in odk_resp_list:
@@ -141,9 +152,9 @@ def sync_settlement():
         settlement.latitude, settlement.longitude = extract_coordinates(record)
         settlement.block_name = record.get("block_name", "")
         settlement.number_of_households = record.get("number_households", "") or 0
-        settlement.largest_caste = record.get("CASTE_1", "") or "0"
-        settlement.smallest_caste = record.get("CASTE_2", "") or "0"
-        settlement.settlement_status = record.get("Settlement_status", "") or "0"
+        settlement.largest_caste = record.get("select_one_type", "") or "None"
+        settlement.smallest_caste = record.get("caste_group_single", "") or "None"
+        settlement.settlement_status = record.get("caste_group_mixed", "") or "None"
         settlement.plan_id = record.get("plan_id", "") or "0"
         settlement.plan_name = record.get("plan_name", "") or "0"
         settlement.uuid = record.get("__id", "") or "0"
@@ -159,13 +170,9 @@ def sync_settlement():
         settlement.nrega_job_card = mgnrega_info.get("NREGA_have_job_card", "") or 0
         settlement.nrega_without_job_card = mgnrega_info.get("total_household", "") or 0
         settlement.nrega_work_days = mgnrega_info.get("NREGA_work_days", "") or 0
-        settlement.nrega_past_work = mgnrega_info.get("q1", "") or "0"
+        settlement.nrega_past_work = mgnrega_info.get("work_demands", "") or "0"
         settlement.nrega_raise_demand = mgnrega_info.get("select_one_Y_N", "") or "0"
         settlement.nrega_demand = mgnrega_info.get("select_one_demands", "") or "0"
-
-        # new additions goes here
-        
-        #
         settlement.nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
         settlement.nrega_community = (
             mgnrega_info.get("select_one_contributions", "") or "0"
@@ -176,7 +183,7 @@ def sync_settlement():
 
 def sync_well():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_well)
-    print("ODK data", odk_resp_list[:1])
+    # print("ODK data well", odk_resp_list[:1])
     well = ODK_well()  # well object
 
     for record in odk_resp_list:
@@ -204,10 +211,16 @@ def sync_well():
         well.owner = record.get("select_one_owns", "") or "0"
         well.households_benefitted = record.get("households_benefited", "") or 0
         well.caste_uses = record.get("select_multiple_caste_use", "") or "0"
+
+        well_usage = record.get("Well_usage", {})
+        well_condition = record.get("Well_condition", {})
         well.is_functional = (
-            record.get("select_one_Functional_Non_functional", "") or "0"
+            well_usage.get("select_one_Functional_Non_functional", "")
+            or "No Data Provided"
         )
-        well.need_maintenance = record.get("select_one_maintenance", "") or "0"
+        well.need_maintenance = (
+            well_condition.get("select_one_maintenance", "") or "No Data Provided"
+        )
         well.plan_id = record.get("plan_id", "") or "0"
         well.plan_name = record.get("plan_name", "") or "0"
         well.status_re = (
@@ -236,6 +249,7 @@ def sync_well():
 
 def sync_waterbody():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_waterbody)
+    # print("ODK data waterbody", odk_resp_list[:1])
     waterbody = ODK_waterbody()
 
     for record in odk_resp_list:
@@ -268,44 +282,18 @@ def sync_waterbody():
         waterbody.caste_who_uses = record.get("select_multiple_caste_use", "") or "0"
         waterbody.household_benefitted = record.get("households_benefited", "") or 0
         waterbody.water_structure_type = (
-            record.get("select_one_irrigation_structure", "") or "0"
+            record.get("select_one_water_structure", "") or "0"
         )
         waterbody.water_structure_other = (
-            record.get("select_one_irrigation_structure_other", "") or "0"
+            record.get("select_one_water_structure_other", "") or "0"
         )
 
-        # Handle the dynamic water structure dimensions
-        water_structure_type = waterbody.water_structure_type.lower().replace("_", " ")
-        water_structure_dimension = {}
-        for key, value in record.items():
-            if isinstance(value, dict):
-                structure_type = key.lower().replace("_", " ")
-                if structure_type == water_structure_type:
-                    water_structure_dimension[structure_type] = {
-                        "length": next(
-                            (v for k, v in value.items() if k.startswith("Length")),
-                            None,
-                        ),
-                        "breadth": next(
-                            (v for k, v in value.items() if k.startswith("Breadth")),
-                            None,
-                        ),
-                        "width": next(
-                            (v for k, v in value.items() if k.startswith("Width")), None
-                        ),
-                        "depth": next(
-                            (v for k, v in value.items() if k.startswith("Depth")), None
-                        ),
-                        "height": next(
-                            (v for k, v in value.items() if k.startswith("Height")),
-                            None,
-                        ),
-                    }
-                    break
-        waterbody.water_structure_dimension = water_structure_dimension
-
-        waterbody.identified_by = record.get("select_one_identified", "") or "0"
-        waterbody.need_maintenance = record.get("select_one_maintenance") or "0"
+        waterbody.identified_by = (
+            record.get("select_one_identified", "") or "No Data Provided"
+        )
+        waterbody.need_maintenance = (
+            record.get("select_one_maintenance") or "No Data Provided"
+        )
         waterbody.plan_id = record.get("plan_id", "") or "0"
         waterbody.plan_name = record.get("plan_name", "") or "0"
         try:
@@ -376,7 +364,9 @@ def sync_groundwater():
                     work_type=work_type, work_details=record[work_type]
                 )
         recharge_st.data_groundwater = record
-        recharge_st.save()
+        if recharge_st.status_re.lower() != "rejected":
+            print("SAVING RECHARGE STRUCTURE")
+            recharge_st.save()
 
 
 def sync_agri():
@@ -429,9 +419,11 @@ def sync_agri():
 
 def sync_livelihood():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_livelihood)
-    livelihood = ODK_livelihood()
+
+    ODK_livelihood.objects.all().delete()
 
     for record in odk_resp_list:
+        livelihood = ODK_livelihood()
         submission_date = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -441,9 +433,9 @@ def sync_livelihood():
             Max("submission_time")
         )["submission_time__max"]
 
-        if latest_submission_time and submission_date <= latest_submission_time:
-            print("The DB is already synced with the latest submissions")
-            return
+        # if latest_submission_time and submission_date <= latest_submission_time:
+        #     print("The DB is already synced with the latest submissions")
+        #     return
         livelihood.uuid = record.get("__id", "") or "0"
         livelihood.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
@@ -489,6 +481,7 @@ def sync_livelihood():
 
 def sync_cropping_pattern():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_crop)
+    print("ODK data cropping pattern", odk_resp_list[:1])
     cropping_pattern = ODK_crop()
 
     for record in odk_resp_list:
@@ -509,25 +502,54 @@ def sync_cropping_pattern():
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
-        cropping_pattern.uuid = record.get("__id", "") or "0"
+        cropping_pattern.uuid = record.get("__id", "") or "None"
         cropping_pattern.beneficiary_settlement = (
-            record.get("beneficiary_settlement", "") or "0"
+            record.get("beneficiary_settlement", "") or "None"
         )
-        cropping_pattern.irrigation_source = record.get("select_one_widgets", "") or "0"
+        cropping_pattern.irrigation_source = (
+            record.get("select_multiple_widgets", "") or "None"
+        )
         cropping_pattern.land_classification = (
-            record.get("select_one_classified", "") or "0"
+            record.get("select_one_classified", "") or "None"
         )
-        cropping_pattern.cropping_patterns_kharif = (
-            record.get("select_multiple_cropping_kharif_other", "") or "0"
-        )
-        cropping_pattern.cropping_patterns_rabi = (
-            record.get("select_multiple_cropping_Rabi_other", "") or "0"
-        )
-        cropping_pattern.cropping_patterns_zaid = (
-            record.get("select_multiple_cropping_Zaid_other", "") or "0"
-        )
+
+        # For Kharif season, check if 'other' is selected and use the _other field if it is
+        kharif_crops = record.get("select_multiple_cropping_kharif", "")
+        if kharif_crops and "other" in kharif_crops.lower():
+            kharif_other = record.get("select_multiple_cropping_kharif_other", "")
+            if kharif_other:
+                cropping_pattern.cropping_patterns_kharif = (
+                    kharif_crops + ": " + kharif_other
+                )
+            else:
+                cropping_pattern.cropping_patterns_kharif = kharif_crops
+        else:
+            cropping_pattern.cropping_patterns_kharif = kharif_crops or "None"
+
+        # For Rabi season, check if 'other' is selected and use the _other field if it is
+        rabi_crops = record.get("select_multiple_cropping_Rabi", "")
+        if rabi_crops and "other" in rabi_crops.lower():
+            rabi_other = record.get("select_multiple_cropping_Rabi_other", "")
+            if rabi_other:
+                cropping_pattern.cropping_patterns_rabi = rabi_crops + ": " + rabi_other
+            else:
+                cropping_pattern.cropping_patterns_rabi = rabi_crops
+        else:
+            cropping_pattern.cropping_patterns_rabi = rabi_crops or "None"
+
+        # For Zaid season, check if 'other' is selected and use the _other field if it is
+        zaid_crops = record.get("select_multiple_cropping_Zaid", "")
+        if zaid_crops and "other" in zaid_crops.lower():
+            zaid_other = record.get("select_multiple_cropping_Zaid_other", "")
+            if zaid_other:
+                cropping_pattern.cropping_patterns_zaid = zaid_crops + ": " + zaid_other
+            else:
+                cropping_pattern.cropping_patterns_zaid = zaid_crops
+        else:
+            cropping_pattern.cropping_patterns_zaid = zaid_crops or "None"
+
         cropping_pattern.agri_productivity = (
-            record.get("select_one_productivity", "") or "0"
+            record.get("select_one_productivity", "") or "None"
         )
         cropping_pattern.plan_id = record.get("plan_id", "") or "0"
         cropping_pattern.plan_name = record.get("plan_name", "") or "0"
@@ -537,6 +559,172 @@ def sync_cropping_pattern():
         cropping_pattern.system = record.get("__system", {})
         cropping_pattern.data_crop = record
         cropping_pattern.save()
+
+
+def sync_agri_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_AGRI_MAINTENANCE)
+    print(f"ODK data agri maintenance: {len(odk_resp_list)} records found")
+
+    Agri_maintenance.objects.all().delete()
+
+    for record in odk_resp_list:
+        agri_maintenance = Agri_maintenance()
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        agri_maintenance.uuid = record.get("__id", "") or "0"
+        agri_maintenance.work_id = record.get("work_id", "") or "0"
+        agri_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        agri_maintenance.plan_id = record.get("plan_id", "") or "0"
+        agri_maintenance.plan_name = record.get("plan_name", "") or "0"
+        agri_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapsappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            agri_maintenance.latitude = round(coordinates[1], 2)
+            agri_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            agri_maintenance.latitude = 0.0
+            agri_maintenance.longitude = 0.0
+        agri_maintenance.data_agri_maintenance = record
+        agri_maintenance.save()
+
+
+def sync_gw_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_GW_MAINTENANCE)
+    print(f"ODK data gw maintenance: {len(odk_resp_list)} records found")
+
+    GW_maintenance.objects.all().delete()
+
+    for record in odk_resp_list:
+        gw_maintenance = GW_maintenance()
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        gw_maintenance.uuid = record.get("__id", "") or "0"
+        gw_maintenance.work_id = record.get("work_id", "") or "0"
+        gw_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        gw_maintenance.plan_id = record.get("plan_id", "") or "0"
+        gw_maintenance.plan_name = record.get("plan_name", "") or "0"
+        gw_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapsappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            gw_maintenance.latitude = round(coordinates[1], 2)
+            gw_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            gw_maintenance.latitude = 0.0
+            gw_maintenance.longitude = 0.0
+        gw_maintenance.data_gw_maintenance = record
+        gw_maintenance.save()
+    print(f"Synced {GW_maintenance.objects.count()} GW_maintenance records")
+
+
+def sync_swb_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_WATERBODY_MAINTENANCE)
+    print(f"ODK data swb maintenance: {len(odk_resp_list)} records found")
+
+    SWB_maintenance.objects.all().delete()
+
+    for record in odk_resp_list:
+        swb_maintenance = SWB_maintenance()
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        swb_maintenance.uuid = record.get("__id", "") or "0"
+        swb_maintenance.work_id = record.get("work_id", "") or "0"
+        swb_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        swb_maintenance.plan_id = record.get("plan_id", "") or "0"
+        swb_maintenance.plan_name = record.get("plan_name", "") or "0"
+        swb_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapsappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            swb_maintenance.latitude = round(coordinates[1], 2)
+            swb_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            swb_maintenance.latitude = 0.0
+            swb_maintenance.longitude = 0.0
+        swb_maintenance.data_swb_maintenance = record
+        swb_maintenance.save()
+    print(f"Synced {SWB_maintenance.objects.count()} SWB_maintenance records")
+
+
+def sync_swb_rs_maintenance():
+    odk_resp_list = fetch_odk_data_sync(ODK_URL_RS_WATERBODY_MAINTENANCE)
+    print(f"ODK data swb rs maintenance: {len(odk_resp_list)} records found")
+
+    SWB_RS_maintenance.objects.all().delete()
+
+    for record in odk_resp_list:
+        swb_rs_maintenance = SWB_RS_maintenance()
+        submission_date = timezone.datetime.strptime(
+            record.get("__system", {}).get("submissionDate", ""),
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        swb_rs_maintenance.uuid = record.get("__id", "") or "0"
+        swb_rs_maintenance.work_id = record.get("work_id", "") or "0"
+        swb_rs_maintenance.corresponding_work_id = (
+            record.get("corresponding_work_id", "") or "0"
+        )
+        swb_rs_maintenance.plan_id = record.get("plan_id", "") or "0"
+        swb_rs_maintenance.plan_name = record.get("plan_name", "") or "0"
+        swb_rs_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        )
+        try:
+            coordinates = (
+                record.get("GPS_point", {})
+                .get("point_mapsappearance", {})
+                .get("coordinates", [])
+            )
+        except AttributeError:
+            coordinates = []
+        if len(coordinates) >= 2:
+            swb_rs_maintenance.latitude = round(coordinates[1], 2)
+            swb_rs_maintenance.longitude = round(coordinates[0], 2)
+        else:
+            swb_rs_maintenance.latitude = 0.0
+            swb_rs_maintenance.longitude = 0.0
+        swb_rs_maintenance.data_swb_rs_maintenance = record
+        swb_rs_maintenance.save()
 
 
 def validate_email(emailid):

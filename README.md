@@ -1,17 +1,6 @@
-# Installing for NRM Backend
+# CoRE Stack Backend Setup
 
-Branch: staging
-
-1. chmod +x install.sh
-2. ./install.sh
-
-Provide a name of your virutal environment when prompted: 
-> example: nrm
-
-Provide a path to your environment when prompted: 
-> example: /home/user/virtualenvs/nrm
-
-# MySQL setup
+# MySQL DB Setup
 1. sudo apt-get update
 2. sudo apt-get install mysql-server
 
@@ -28,6 +17,17 @@ Provide a path to your environment when prompted:
 3. GRANT ALL PRIVILEGES ON nrm.* TO 'nrm_user'@'localhost';
 4. FLUSH PRIVILEGES;
 
+# Installation of the libraries
+1. chmod +x install.sh
+2. ./install.sh
+
+*Provide a name of your virtual environment when prompted: 
+> example: nrm
+
+*Provide a path to your environment when prompted: 
+> example: /home/user/virtualenvs/nrm
+
+Let the script run and install all the dependencies.
 
 # Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:
@@ -36,8 +36,8 @@ After the successfull installation of all the packages, run the following comman
 
 *Make Migrations*
 1. Make sure the environment is active. Otherwise, run `conda activate nrm`
-2. Run `python manage.py makemigrations`
-3. Run `python manage.py migrate`
+2. Run `python manage.py migrate`
+For any migration related queries, please send an email to contact@core-stack.org
 
 *Run the server*
 1. Make sure the environment is active. Otherwise, run `conda activate nrm`
