@@ -1062,45 +1062,36 @@ def get_change_detection_data(state, district, block, uid):
             + ".xlsx",
             sheet_name="change_detection_urbanization",
         )
-
         parameter_land = f""
         parameter_tree = f""
         parameter_urban = f""
-
         # ? Land Degradation
-        df_degrad["DEGR_Total"] = df_degrad["DEGR_Total"].apply(
+        df_degrad["Total_degradation"] = df_degrad["Total_degradation"].apply(
             pd.to_numeric, errors="coerce"
         )
-        filtered_df = df_degrad.loc[df_degrad["UID"] == uid, "DEGR_Total"]
+        filtered_df = df_degrad.loc[df_degrad["UID"] == uid, "Total_degradation"]
         degradation = filtered_df.iloc[0]
-        avg = df_degrad["DEGR_Total"].mean()
-
+        avg = df_degrad["Total_degradation"].mean()
         if degradation >= 20:
             parameter_land += f"There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2022. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
-
         # ? Tree Reduction
-        df_defo["DEFO_total"] = df_defo["DEFO_total"].apply(
+        df_defo["total_deforestation"] = df_defo["total_deforestation"].apply(
             pd.to_numeric, errors="coerce"
         )
-        filtered_df = df_defo.loc[df_defo["UID"] == uid, "DEFO_total"]
+        filtered_df = df_defo.loc[df_defo["UID"] == uid, "total_deforestation"]
         reduction = filtered_df.iloc[0]
-        avg = df_defo["DEFO_total"].mean()
-
+        avg = df_defo["total_deforestation"].mean()
         if reduction >= 50:
             parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2022, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares on average in the entire block."
-
         # ? Urbanization
-        df_urban["URBA_Total"] = df_urban["URBA_Total"].apply(
+        df_urban["Total_urbanization"] = df_urban["Total_urbanization"].apply(
             pd.to_numeric, errors="coerce"
         )
-        filtered_df = df_urban.loc[df_urban["UID"] == uid, "URBA_Total"]
+        filtered_df = df_urban.loc[df_urban["UID"] == uid, "Total_urbanization"]
         built_up_area = filtered_df.iloc[0]
-
         if built_up_area >= 40:
             parameter_urban += f"There has been a considerate level of urbanization in this micro watershed with about {round(built_up_area, 2)} hectares of land covered with settlements."
-
         return parameter_land, parameter_tree, parameter_urban
-
     except Exception as e:
         logger.info(
             "Not able to access excel for %s district, %s block for degradation",
