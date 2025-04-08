@@ -11,9 +11,12 @@ from .serializers import PlanSerializer
 from .build_layer import build_layer
 from .utils import fetch_odk_data, fetch_bearer_token
 import requests
+from utilities.auth_utils import auth_free
+
 
 # MARK: Get Plans API
 @api_view(["GET"])
+@auth_free
 def get_plans(request):
     """
     Get Plans API
@@ -40,6 +43,7 @@ def get_plans(request):
 
 
 @api_view(["POST"])
+@auth_free
 def add_plan(request):
     if request.method == "POST":
         serializer = PlanSerializer(data=request.data)
@@ -55,6 +59,7 @@ def add_plan(request):
 
 # api's for add settlement, add well, add waterbody | add work [new, maintenance]
 @api_view(["POST"])
+@auth_free
 def add_resources(request):
     layer_name = request.data.get("layer_name").lower()
     resource_type = request.data.get("resource_type").lower()
@@ -97,6 +102,7 @@ def add_resources(request):
 
 
 @api_view(["POST"])
+@auth_free
 def add_works(request):
     """
     work type: plan_gw: recharge st., main_swb: maintenance surface water bodies, plan_agri: irrigation works, livelihood
@@ -146,6 +152,7 @@ def add_works(request):
 # API to sync offline data coming from CC app
 @api_view(["POST"])
 @csrf_exempt
+@auth_free
 def sync_offline_data(request, resource_type=None):
     """
     Sync data to ODK based on resource type (settlement, well, water_structures)

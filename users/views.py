@@ -11,6 +11,7 @@ from .serializers import (
     UserRegistrationSerializer,
     GroupSerializer,
     UserProjectGroupSerializer,
+    PasswordChangeSerializer,
 )
 from projects.models import Project
 from projects.serializers import ProjectSerializer
@@ -216,6 +217,26 @@ class UserViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
 
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"])
+    def change_password(self, request):
+        """Change the user's password."""
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # After password change, invalidate all refresh tokens
+        # This is a security measure to log out the user from all devices
+        RefreshToken.for_user(request.user)
+
+        return Response(
+            {
+                "detail": "Password changed successfully. Please login again with your new password."
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["put"])
     def set_organization(self, request, pk=None):
