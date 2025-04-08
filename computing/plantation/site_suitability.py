@@ -163,7 +163,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     """
 
     # Create a unique asset name for the suitability analysis
-    asset_name = "site_suitability_" + project.name
+    asset_name = "site_suitability_" + valid_gee_text(project.name)
 
     # Generate Plantation Site Suitability raster
     pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
