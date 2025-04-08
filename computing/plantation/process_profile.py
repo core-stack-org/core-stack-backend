@@ -104,18 +104,53 @@ def generate_labels_and_ranges(input_string):
     Function to parse and process numerical range inputs.
     Converts a string of ranges like "10-20, 30-40" into a structured format
     with labels (0 or 1) for each range segment.
+    Also handles inequality expressions like '<50' or '>100'.
 
     Args:
-        input_string: A string containing comma-separated ranges (e.g., "10-20, 30-40")
+        input_string: A string containing comma-separated ranges (e.g., "10-20, 30-40, <50, >100")
 
     Returns:
         Tuple of (keys_string, values_string) where:
         - keys_string: Comma-separated range boundaries
         - values_string: Comma-separated binary values (0 or 1) indicating ideal ranges
     """
-    # Parse input ranges and flatten the start and end points into a sorted list of unique boundaries
-    input_ranges = [tuple(map(float, r.split("-"))) for r in input_string.split(", ")]
-    boundaries = sorted(set([boundary for r in input_ranges for boundary in r]))
+    # Initialize list to store all ranges
+    input_ranges = []
+
+    # Split input into individual range expressions
+    for r in input_string.split(", "):
+        r = r.strip()
+
+        # Handle inequality expressions
+        if r.startswith("<"):
+            # Less than: from negative infinity to the specified value
+            value = float(r[1:])
+            input_ranges.append(("negInf", value))
+        elif r.startswith(">"):
+            # Greater than: from the specified value to positive infinity
+            value = float(r[1:])
+            input_ranges.append((value, "posInf"))
+        elif "-" in r:
+            # Regular range
+            start, end = map(float, r.split("-"))
+            input_ranges.append((start, end))
+        else:
+            # Single value (treat as a point range)
+            try:
+                value = float(r)
+                input_ranges.append((value, value))
+            except ValueError:
+                print(f"Warning: Could not parse range expression: {r}")
+
+    # Extract all boundary values, sorting them numerically
+    boundaries = []
+    for start, end in input_ranges:
+        if start != "negInf":
+            boundaries.append(float(start))
+        if end != "posInf":
+            boundaries.append(float(end))
+
+    boundaries = sorted(set(boundaries))  # Remove duplicates and sort
 
     # Add negative infinity and positive infinity boundaries
     all_boundaries = ["negInf"] + boundaries + ["posInf"]
@@ -131,9 +166,23 @@ def generate_labels_and_ranges(input_string):
 
     # Update the dictionary: mark ranges from input as 1 (ideal)
     for start, end in input_ranges:
-        key = f"{str(start)}-{str(end)}"
-        if key in range_dict:
-            range_dict[key] = 1
+        # For each defined boundary pair in all_ranges
+        for boundary_start, boundary_end in all_ranges:
+            # Check if this boundary pair overlaps with our input range
+
+            # Convert to float for comparison if not "negInf"/"posInf"
+            bs = float(boundary_start) if boundary_start != "negInf" else float("-inf")
+            be = float(boundary_end) if boundary_end != "posInf" else float("inf")
+            rs = float(start) if start != "negInf" else float("-inf")
+            re = float(end) if end != "posInf" else float("inf")
+
+            # If ranges overlap, mark as ideal (1)
+            # A range overlaps if:
+            # 1. The boundary start is within the input range, or
+            # 2. The boundary end is within the input range, or
+            # 3. The input range completely contains the boundary range
+            if (rs <= bs < re) or (rs < be <= re) or (bs <= rs and be >= re):
+                range_dict[f"{boundary_start}-{boundary_end}"] = 1
 
     # Merge consecutive intervals with the same value (to simplify output)
     merged_dict = {}

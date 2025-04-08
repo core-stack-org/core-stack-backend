@@ -7,11 +7,13 @@ from rest_framework.response import Response
 from .models import Block, District, State
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
 from .utils import transform_data, activated_entities
+from utilities.auth_utils import auth_free
 
 
 # state id is the census code while the district id is the id of the district from the DB
 # block id is the id of the block from the DB
 @api_view(["GET"])
+@auth_free
 def get_states(request):
     try:
         states = State.objects.all()
@@ -23,6 +25,7 @@ def get_states(request):
 
 
 @api_view(["GET"])
+@auth_free
 def get_districts(request, state_id):
     try:
         districts = District.objects.filter(state_id=state_id)
@@ -34,6 +37,7 @@ def get_districts(request, state_id):
 
 
 @api_view(["GET"])
+@auth_free
 def get_blocks(request, district_id):
     try:
         blocks = Block.objects.filter(district=district_id)
@@ -45,6 +49,7 @@ def get_blocks(request, district_id):
 
 
 @api_view(["POST"])
+@auth_free
 def activate_entities(request):
     try:
         messages = []
@@ -105,6 +110,7 @@ def activate_entities(request):
 
 
 @api_view(["GET"])
+@auth_free
 def proposed_blocks(request):
     try:
         response_data = activated_entities()
@@ -117,11 +123,12 @@ def proposed_blocks(request):
         )
 
 
+# Keeping it with the auth as superadmin will be able to activate these locations in our case
 @api_view(["PATCH"])
 def activate_location(request):
     """
     Update activation status of a location (state/district/block).
-    
+
     Request body should contain:
     {
         "location_type": "state|district|block",
@@ -133,19 +140,21 @@ def activate_location(request):
         location_type = request.data.get("location_type")
         location_id = request.data.get("location_id")
         active = request.data.get("active")
-        
+
         if not all([location_type, location_id, active is not None]):
             return Response(
                 {
                     "error": "Missing required fields. Please provide location_type, location_id, and active status"
                 },
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            
+
         if location_type not in ["state", "district", "block"]:
             return Response(
-                {"error": "Invalid location_type. Must be one of: state, district, block"},
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "error": "Invalid location_type. Must be one of: state, district, block"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
@@ -158,7 +167,7 @@ def activate_location(request):
             else:  # block
                 location = Block.objects.get(id=location_id)
                 entity_name = "block"
-                
+
             # Only update if status is different
             if location.active_status != active:
                 location.active_status = active
@@ -169,9 +178,9 @@ def activate_location(request):
                         "message": f"{entity_name.title()} '{getattr(location, f'{entity_name}_name')}' has been {status_msg}",
                         "location_type": location_type,
                         "location_id": location_id,
-                        "active": active
+                        "active": active,
                     },
-                    status=status.HTTP_200_OK
+                    status=status.HTTP_200_OK,
                 )
             else:
                 return Response(
@@ -179,20 +188,17 @@ def activate_location(request):
                         "message": f"{entity_name.title()} is already {'active' if active else 'inactive'}",
                         "location_type": location_type,
                         "location_id": location_id,
-                        "active": active
+                        "active": active,
                     },
-                    status=status.HTTP_200_OK
+                    status=status.HTTP_200_OK,
                 )
-                
+
         except (State.DoesNotExist, District.DoesNotExist, Block.DoesNotExist):
             return Response(
                 {"error": f"{location_type.title()} with id {location_id} not found"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
-            
+
     except Exception as e:
         print(f"Exception in activate_location api: {e}")
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

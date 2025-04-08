@@ -11,11 +11,15 @@ from .serializers import (
     UserRegistrationSerializer,
     GroupSerializer,
     UserProjectGroupSerializer,
+    PasswordChangeSerializer,
 )
 from projects.models import Project
 from projects.serializers import ProjectSerializer
 from organization.models import Organization
 from organization.serializers import OrganizationSerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
@@ -214,6 +218,26 @@ class UserViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    @action(detail=False, methods=["post"])
+    def change_password(self, request):
+        """Change the user's password."""
+        serializer = PasswordChangeSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # After password change, invalidate all refresh tokens
+        # This is a security measure to log out the user from all devices
+        RefreshToken.for_user(request.user)
+
+        return Response(
+            {
+                "detail": "Password changed successfully. Please login again with your new password."
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=["put"])
     def set_organization(self, request, pk=None):
         """Assign user to an organization."""
@@ -254,12 +278,28 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         group_id = request.data.get("group_id")
 
-        # Only superadmins can assign users to groups
-        if not request.user.is_superadmin:
+        # Check if the requester is a superadmin or an organization admin
+        is_superadmin = request.user.is_superadmin
+        is_org_admin = request.user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
+
+        if not (is_superadmin or is_org_admin):
             return Response(
                 {"detail": "You do not have permission to assign users to groups."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        # Organization admins can only assign users from their own organization
+        if is_org_admin and not is_superadmin:
+            # Check if the user belongs to the same organization as the requester
+            if user.organization != request.user.organization:
+                return Response(
+                    {
+                        "detail": "You can only assign users from your organization to groups."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         # Get the group
         try:
@@ -450,12 +490,42 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
             # Update existing role
             existing.group_id = group_id
             existing.save()
+
+            # Also update the user's global group
+            try:
+                group = Group.objects.get(id=group_id)
+                # Remove user from all groups they might be in
+                # Uncomment this if you want to remove from all other groups
+                # user.groups.clear()
+                # Add user to the selected group
+                user.groups.add(group)
+            except Group.DoesNotExist:
+                # Log this error but don't fail the request
+                logger.error(
+                    f"Failed to add user {user.id} to global group {group_id}: Group does not exist"
+                )
+
             return Response(
                 UserProjectGroupSerializer(existing).data, status=status.HTTP_200_OK
             )
 
         # Create new role assignment
         self.perform_create(serializer)
+
+        # Also add the user to the global group
+        try:
+            group = Group.objects.get(id=group_id)
+            # Remove user from all groups they might be in
+            # Uncomment this if you want to remove from all other groups
+            # user.groups.clear()
+            # Add user to the selected group
+            user.groups.add(group)
+        except Group.DoesNotExist:
+            # Log this error but don't fail the request
+            logger.error(
+                f"Failed to add user {user.id} to global group {group_id}: Group does not exist"
+            )
+
         headers = self.get_success_headers(serializer.data)
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers

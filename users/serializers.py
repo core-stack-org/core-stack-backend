@@ -12,6 +12,7 @@ class UserSerializer(serializers.ModelSerializer):
         source="organization.name", read_only=True
     )
     groups = serializers.SerializerMethodField()
+    project_details = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -26,6 +27,7 @@ class UserSerializer(serializers.ModelSerializer):
             "organization_name",
             "is_active",
             "groups",
+            "project_details",
             "is_superadmin",
         ]
         read_only_fields = ["id", "is_active"]
@@ -33,6 +35,19 @@ class UserSerializer(serializers.ModelSerializer):
     def get_groups(self, obj):
         """Get simplified groups list."""
         return [{"id": group.id, "name": group.name} for group in obj.groups.all()]
+
+    def get_project_details(self, obj):
+        """Get project-specific roles for the user."""
+        project_details = UserProjectGroup.objects.filter(user=obj).select_related(
+            "project", "group"
+        )
+        return [
+            {
+                "project_id": role.project.id,
+                "project_name": role.project.name,
+            }
+            for role in project_details
+        ]
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -137,3 +152,32 @@ class UserProjectGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProjectGroup
         fields = ["id", "user_id", "username", "group_id", "group_name", "project_id"]
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """Serializer for changing user password."""
+
+    old_password = serializers.CharField(required=True, write_only=True)
+    new_password = serializers.CharField(
+        required=True, write_only=True, validators=[validate_password]
+    )
+    new_password_confirm = serializers.CharField(required=True, write_only=True)
+
+    def validate_old_password(self, value):
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError(
+                {"new_password": "New password fields didn't match."}
+            )
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.context["request"].user
+        user.set_password(self.validated_data["new_password"])
+        user.save()
+        return user
