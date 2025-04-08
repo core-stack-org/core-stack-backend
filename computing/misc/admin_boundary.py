@@ -95,10 +95,7 @@ def clip_block_from_admin_boundary(state, district, block):
     print("census_2011", census_2011)
     cols = list(census_2011.columns)
     if "TEHSIL" in cols:
-        admin_boundary_data = census_2011
-        # admin_boundary_data.rename(
-        #     columns={"STATE": "state_name", "District": "district_name"}, inplace=True
-        # )
+        admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
     else:
         soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
 
