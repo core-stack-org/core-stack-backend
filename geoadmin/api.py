@@ -25,6 +25,7 @@ def get_states(request):
 
 
 @api_view(["GET"])
+@auth_free
 def get_districts(request, state_id):
     try:
         districts = District.objects.filter(state_id=state_id)
@@ -36,6 +37,7 @@ def get_districts(request, state_id):
 
 
 @api_view(["GET"])
+@auth_free
 def get_blocks(request, district_id):
     try:
         blocks = Block.objects.filter(district=district_id)
@@ -47,6 +49,7 @@ def get_blocks(request, district_id):
 
 
 @api_view(["POST"])
+@auth_free
 def activate_entities(request):
     try:
         messages = []
@@ -107,6 +110,7 @@ def activate_entities(request):
 
 
 @api_view(["GET"])
+@auth_free
 def proposed_blocks(request):
     try:
         response_data = activated_entities()
@@ -119,6 +123,7 @@ def proposed_blocks(request):
         )
 
 
+# Keeping it with the auth as superadmin will be able to activate these locations in our case
 @api_view(["PATCH"])
 def activate_location(request):
     """
