@@ -153,7 +153,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     Args:
         roi: Region of Interest feature collection
         org: Organization name
-        project_name: Project name
+        project: Project object
         state: Geographic state
         start_year: Analysis start year
         end_year: Analysis end year
@@ -163,7 +163,8 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     """
 
     # Create a unique asset name for the suitability analysis
-    asset_name = "site_suitability_" + valid_gee_text(project.name)
+    project_name = valid_gee_text(project.name)
+    asset_name = "site_suitability_" + project_name
 
     # Generate Plantation Site Suitability raster
     pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
@@ -171,7 +172,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
     # Prepare asset description and path
     description = asset_name + "_vector"
     asset_id = (
-        get_gee_dir_path([org, project.name], asset_path=GEE_PATH_PLANTATION)
+        get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
         + description
     )
 

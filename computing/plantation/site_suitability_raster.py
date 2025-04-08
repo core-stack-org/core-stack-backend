@@ -41,7 +41,7 @@ def get_pss(roi, org, project, state, asset_name):
     """
     # Initialize base image with a constant value of 1
     all_layers = ee.Image(1)
-    project_name = project.name
+    project_name = valid_gee_text(project.name)
 
     default_profile = PlantationProfile.objects.get(profile_id=1)
     project_weights = default_profile.config_weight
