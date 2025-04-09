@@ -8,6 +8,7 @@ from geoadmin.models import State
 class AppType(models.TextChoices):
     PLANTATION = "plantation", "Plantations"
     WATERSHED = "watershed", "Watershed Planning"
+    WATERBODY_REJ = "waterbody", "Waterbody Rejuvenation"
     # More types as apps are added in future
 
 

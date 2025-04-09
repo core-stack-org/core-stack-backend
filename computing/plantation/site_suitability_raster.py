@@ -11,9 +11,9 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
 )
+from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
 from utilities.logger import setup_logger
-
 
 logger = setup_logger(__name__)
 
@@ -459,14 +459,14 @@ def get_pss(roi, org, project, state, asset_name):
 
 
 # Helper functions for dataset retrieval and classification
-def get_dataset(variable, state):
+def get_dataset(variable, state, roi):
     """
     Retrieve and preprocess geospatial dataset for a specific variable.
 
     Args:
         variable (str): The type of geospatial data to retrieve.
         state (str): The state for which data is being retrieved.
-
+        roi (FeatureCollection): Region of interest
     Returns:
         ee.Image: Processed geospatial dataset for the specified variable.
 
@@ -511,12 +511,17 @@ def get_dataset(variable, state):
         )
     # Normalized Difference Vegetation Index (NDVI)
     if variable == "NDVI":
-        return (
-            ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
-            .filterDate("2023-07-01", "2024-06-30")  # TODO: Verify date range
-            .select("NDVI")
-            .reduce(ee.Reducer.mean())
-        )
+        final_LSMC_NDVI_TS = Get_Padded_NDVI_TS_Image(
+            "2023-07-01", "2024-06-30", roi
+        )  # TODO Remove hard-coded dates
+        ndvi = final_LSMC_NDVI_TS.select("gapfilled_NDVI_lsc").reduce(ee.Reducer.mean())
+        return ndvi
+        # return (
+        #     ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
+        #     .filterDate("2023-07-01", "2024-06-30")
+        #     .select("NDVI")
+        #     .reduce(ee.Reducer.mean())
+        # )
     # Distance to Roads
     if variable == "distToRoad":
         dataset_collection = ee.FeatureCollection(
@@ -596,7 +601,7 @@ def create_classification(project_intervals, variable_list, roi, state):
         nonlocal sub_layer
         labels = project_intervals[variable]["labels"].split(",")
         thresholds = project_intervals[variable]["thresholds"].split(",")
-        dataset = get_dataset(variable, state).clip(roi.geometry())
+        dataset = get_dataset(variable, state, roi).clip(roi.geometry())
 
         classification = ee.Image(1)
         classification = classification.rename(variable)

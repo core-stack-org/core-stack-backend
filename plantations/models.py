@@ -36,7 +36,7 @@ class KMLFile(models.Model):
     )
     name = models.CharField(max_length=255)
     file = models.FileField(upload_to=kml_file_path)
-    kml_hash = models.CharField(max_length=64, unique=True)  # SHA-256 hash of file
+    kml_hash = models.CharField(max_length=64, unique=True)  # md5 hash of file
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -101,6 +101,26 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Authentication**: Required
 - **Notes**: This invalidates the refresh token, preventing it from being used to obtain new access tokens
 
+### Change Password
+- **URL**: `/api/v1/users/change_password/`
+- **Method**: POST
+- **Description**: Change the authenticated user's password
+- **Request Body**:
+  ```json
+  {
+    "old_password": "current-password",
+    "new_password": "new-secure-password",
+    "new_password_confirm": "new-secure-password"
+  }
+  ```
+- **Response**: Success message
+- **Authentication**: Required
+- **Notes**: 
+  - The user must provide their current password correctly
+  - The new password must meet the system's password requirements
+  - After password change, all refresh tokens are invalidated (user will be logged out from all devices)
+  - The user will need to log in again with the new password
+
 ## User Management Endpoints
 
 ### List Users
