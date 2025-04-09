@@ -170,6 +170,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "nrm_app.wsgi.application"
 
+DATA_UPLOAD_MAX_NUMBER_FILES = 1000
+
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
