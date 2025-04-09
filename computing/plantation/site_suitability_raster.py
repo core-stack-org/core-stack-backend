@@ -511,17 +511,17 @@ def get_dataset(variable, state, roi):
         )
     # Normalized Difference Vegetation Index (NDVI)
     if variable == "NDVI":
-        final_LSMC_NDVI_TS = Get_Padded_NDVI_TS_Image(
-            "2023-07-01", "2024-06-30", roi
-        )  # TODO Remove hard-coded dates
-        ndvi = final_LSMC_NDVI_TS.select("gapfilled_NDVI_lsc").reduce(ee.Reducer.mean())
-        return ndvi
-        # return (
-        #     ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
-        #     .filterDate("2023-07-01", "2024-06-30")
-        #     .select("NDVI")
-        #     .reduce(ee.Reducer.mean())
-        # )
+        # final_LSMC_NDVI_TS = Get_Padded_NDVI_TS_Image(
+        #     "2023-07-01", "2024-06-30", roi
+        # )  # TODO Remove hard-coded dates
+        # ndvi = final_LSMC_NDVI_TS.select("gapfilled_NDVI_lsc").reduce(ee.Reducer.mean())
+        # return ndvi
+        return (
+            ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
+            .filterDate("2023-07-01", "2024-06-30")
+            .select("NDVI")
+            .reduce(ee.Reducer.mean())
+        )
     # Distance to Roads
     if variable == "distToRoad":
         dataset_collection = ee.FeatureCollection(
