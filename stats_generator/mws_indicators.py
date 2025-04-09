@@ -51,28 +51,44 @@ def get_generate_filter_mws_data(state, district, block, file_type):
     file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + block
     xlsx_file = file_xl_path + '.xlsx'
     
-    # Read all sheets just once at the beginning
+    # If sheet is need availabe then value become 0
+    sheets = {
+        'hydrological_annual': -1,
+        'terrain': -1,
+        'croppingIntensity_annual': -1,
+        'surfaceWaterBodies_annual': -1,
+        'croppingDrought_kharif': -1,
+        'nrega_annual': -1,
+        'mws_intersect_villages': -1,
+        'change_detection_degradation': -1,
+        'change_detection_afforestation': -1,
+        'change_detection_deforestation': -1,
+        'change_detection_urbanization': -1,
+        'terrain_lulc_slope': -1,
+        'terrain_lulc_plain': -1,
+        'restoration_vector': -1,
+    }
+
     try:
         with pd.ExcelFile(xlsx_file) as xl:
-            # Load all sheets into a dictionary
-            sheets = {
-                'hydrological_annual': xl.parse('hydrological_annual'),
-                'terrain': xl.parse('terrain'),
-                'croppingIntensity_annual': xl.parse('croppingIntensity_annual'),
-                'surfaceWaterBodies_annual': xl.parse('surfaceWaterBodies_annual'),
-                'croppingDrought_kharif': xl.parse('croppingDrought_kharif'),
-                'nrega_annual': xl.parse('nrega_annual'),
-                'mws_intersect_villages': xl.parse('mws_intersect_villages'),
-                'change_detection_degradation': xl.parse('change_detection_degradation'),
-                'change_detection_afforestation': xl.parse('change_detection_afforestation'),
-                'change_detection_deforestation': xl.parse('change_detection_deforestation'),
-                'change_detection_urbanization': xl.parse('change_detection_urbanization'),
-                'terrain_lulc_slope': xl.parse('terrain_lulc_slope'),
-                'terrain_lulc_plain': xl.parse('terrain_lulc_plain')
-            }
+            available_sheets = xl.sheet_names  # Get list of available sheets
+            
+            # Try to parse each sheet if it exists
+            for sheet_name in sheets.keys():
+                if sheet_name in available_sheets:
+                    try:
+                        sheets[sheet_name] = xl.parse(sheet_name)
+                    except Exception as e:
+                        print(f"Error parsing sheet {sheet_name}: {e}")
+                        sheets[sheet_name] = -1
+                else:
+                    print(f"Sheet {sheet_name} not found in Excel file")
+                    sheets[sheet_name] = -1
+                    
     except Exception as e:
         print(f"Error reading Excel file: {e}")
-        return None
+        # Return all sheets as -1 if the file can't be read
+        return {k: -1 for k in sheets.keys()}
 
     results = []
     df_hydrological_annual = sheets['hydrological_annual']
@@ -350,6 +366,15 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         except:
             lulc_plain_category = ''
 
+        
+        ################# Restoration Vector  #########################
+        try:
+            df_restoration_vector_mws_data = sheets['restoration_vector'][sheets['restoration_vector']['UID'] == specific_mws_id]
+            wide_scale_restoration = df_restoration_vector_mws_data.get('Wide-scale Restoration', None).iloc[0]
+            area_protection = df_restoration_vector_mws_data.get('Protection', None).iloc[0]
+        except:
+            wide_scale_restoration = 0
+            area_protection = 0
 
 
         results.append({
@@ -374,11 +399,13 @@ def get_generate_filter_mws_data(state, district, block, file_type):
             'total_nrega_assets': nrega_assets_sum,
             'mws_intersect_villages': mws_intersect_villages,
             'degradation_land_area': round(degradation_land_area,4),
-            'afforestation_land_area': round(afforestation_land_area,4),
-            'deforestation_land_area': round(deforestation_land_area,4),
+            'increase_in_tree_cover': round(afforestation_land_area,4),
+            'decrease_in_tree_cover': round(deforestation_land_area,4),
             'urbanization_land_area': round(urbanization_land_area,4),
             'lulc_slope_category': lulc_slope_category,
-            'lulc_plain_category': lulc_plain_category
+            'lulc_plain_category': lulc_plain_category,
+            'area_wide_scale_restoration': round(wide_scale_restoration,4),
+            'area_protection': round(area_protection,4)
         })
 
     results_df = pd.DataFrame(results)
