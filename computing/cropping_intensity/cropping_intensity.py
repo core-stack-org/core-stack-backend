@@ -10,10 +10,11 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def generate_cropping_intensity(self, state, district, block, start_year, end_year):
+def generate_cropping_intensity(self, state, district, block, start_year, end_year, user):
     ee_initialize()
 
     task_id, asset_id = generate_gee_asset(state, district, block, start_year, end_year)
@@ -23,16 +24,18 @@ def generate_cropping_intensity(self, state, district, block, start_year, end_ye
 
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_intensity",
-        "cropping_intensity",
-    )
+    layer_name = f"{district}_{block}_intensity"
+    res = sync_layer_to_geoserver(state, fc, layer_name,"cropping_intensity")
     print(res)
+
+    # Generated Dataset data to db 
+    gee_path = {"cropping_intensity":asset_id}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='cropping_intensity', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for cropping_intensity")
+    except Exception as e:
+        print(f"Exception while creating entry for cropping_intensity in dataset table: {str(e)}")
 
 
 def generate_gee_asset(state, district, block, start_year, end_year):

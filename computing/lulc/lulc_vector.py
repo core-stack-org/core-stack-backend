@@ -9,10 +9,11 @@ from utilities.gee_utils import (
     get_gee_asset_path,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def vectorise_lulc(self, state, district, block, start_year, end_year):
+def vectorise_lulc(self, state, district, block, start_year, end_year, user):
     ee_initialize()
     fc = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -111,13 +112,14 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
     ).getInfo()
 
     fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
-        "lulc_vector_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-        "lulc_vector",
-    )
+    layer_name = "lulc_vector_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
+    res = sync_layer_to_geoserver(state, fc, layer_name, "lulc_vector")
     print(res)
+
+    # Generated Dataset data to db 
+    gee_path = get_gee_asset_path(state, district, block) + description
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='lulc_vector', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for lulc_vector")
+    except Exception as e:
+        print(f"Exception while creating entry for lulc vector in dataset table: {str(e)}")

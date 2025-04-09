@@ -9,10 +9,11 @@ from utilities.gee_utils import (
     check_task_status,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def tree_health_overall_change_vector(self, state, district, block):
+def tree_health_overall_change_vector(self, state, district, block, user):
     ee_initialize()
     print("Inside process tree_health_overall_change_vector")
     roi = ee.FeatureCollection(
@@ -32,7 +33,7 @@ def tree_health_overall_change_vector(self, state, district, block):
     task_id_list = check_task_status(task_list)
     print("Tree health overall change vector task completed - task_id_list:", task_id_list)
 
-    sync_change_to_geoserver(block, district, state)
+    sync_change_to_geoserver(block, district, state, user)
 
 
 def overall_vector(roi, state, district, block):
@@ -98,7 +99,7 @@ def generate_vector(roi, args, state, district, block):
 
 
 
-def sync_change_to_geoserver(block, district, state):
+def sync_change_to_geoserver(block, district, state, user):
     asset_id = (
         get_gee_asset_path(state, district, block)
         + "tree_health_overall_change_vector_"
@@ -109,10 +110,12 @@ def sync_change_to_geoserver(block, district, state):
 
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(state, fc,
-        "tree_health_overall_change_vector_"
-        +valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-        "tree_overall_ch",
-    )
+    layer_name = "tree_health_overall_change_vector_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    res = sync_layer_to_geoserver(state, fc, layer_name, "tree_overall_ch")
+
+    # Generated Dataset data to db 
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=None, layer_type='vector', workspace='tree_overall_ch', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for tree_overall_change vector")
+    except Exception as e:
+        print(f"Exception while creating entry for tree_overall_change vector in dataset table: {str(e)}")

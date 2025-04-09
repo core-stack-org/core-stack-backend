@@ -16,10 +16,11 @@ from dateutil.relativedelta import relativedelta
 from nrm_app.celery import app
 from .swb2 import calculate_swb2
 from .swb3 import calculate_swb3
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def generate_swb_layer(self, state, district, block, start_year, end_year):
+def generate_swb_layer(self, state, district, block, start_year, end_year, user):
     ee_initialize()
 
     aoi = ee.FeatureCollection(
@@ -58,15 +59,30 @@ def generate_swb_layer(self, state, district, block, start_year, end_year):
         task_id_list = check_task_status([swb3])
         print("SWB task completed - swb3_task_id_list:", task_id_list)
 
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-    )
     fc = ee.FeatureCollection(asset_id)
     res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
     print(res)
+
+     # Generated Dataset data to db 
+    description_swb1 = (
+        "swb1_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    )
+
+    description_swb2 = (
+        "swb2_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    )
+
+    description_swb3 = (
+        "swb3_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    )
+
+    gee_path = {"swb1":get_gee_asset_path(state, district, block) + str(description_swb1), "swb2":get_gee_asset_path(state, district, block) + str(description_swb2), "swb3":get_gee_asset_path(state, district, block) + str(description_swb3)}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='water_bodies', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for water_bodies")
+    except Exception as e:
+        print(f"Exception while creating entry for water_bodies in dataset table: {str(e)}")
 
 
 def calculate_swb1(aoi, state, district, block, start_date, end_date):

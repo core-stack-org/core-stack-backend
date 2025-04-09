@@ -11,10 +11,11 @@ from utilities.gee_utils import (
 import ee
 
 from .terrain_utils import generate_terrain_classified_raster
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def terrain_raster(self, state, district, block):
+def terrain_raster(self, state, district, block, user):
     print("Inside terrain_raster")
     ee_initialize()
     description = (
@@ -67,3 +68,12 @@ def terrain_raster(self, state, district, block):
     print("task_id_list sync to gcs ", task_id_list)
 
     sync_raster_gcs_to_geoserver("terrain", layer_name, layer_name, "terrain_raster")
+
+    # Generated Dataset data to db 
+    gee_path = {"terrain_raster":asset_id}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='raster', workspace='terrain', algorithm=None, version=None, style_name='terrain_raster', misc=None)
+        print("Dataset entry created for terrain raster")
+    except Exception as e:
+        print(f"Exception while creating entry for terrain raster in dataset table: {str(e)}")

@@ -9,10 +9,11 @@ from utilities.gee_utils import (
     check_task_status,
     sync_raster_gcs_to_geoserver,
 )
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
+def tree_health_ccd_raster(self, state, district, block, start_year, end_year, user):
     print("Inside process Tree health ccd raster")
     ee_initialize()
 
@@ -100,5 +101,12 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             print("task_id_list sync to GCS", task_id_list)
 
             sync_raster_gcs_to_geoserver("ccd", layer_name, layer_name, "ccd_style")
+            
+            # Generated Dataset data to db 
+            try:
+                create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=asset_id, layer_type='raster', workspace='ccd', algorithm=None, version=None, style_name='ccd_style', misc=None)
+                print("Dataset entry created for ccd raster")
+            except Exception as e:
+                print(f"Exception while creating entry for ccd raster in dataset table: {str(e)}")
         except Exception as e:
             print(f"Error occurred in running process_ccd task: {e}")

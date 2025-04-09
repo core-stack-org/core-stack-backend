@@ -46,11 +46,12 @@ from .plantation.site_suitability import site_suitability
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
     try:
+        user = request.user
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         generate_tehsil_shape_file_data.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -64,11 +65,12 @@ def generate_admin_boundary(request):
 def generate_nrega_layer(request):
     print("Inside generate_nrega_layer API.")
     try:
+        user = request.user
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         clip_nrega_district_block.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -82,10 +84,11 @@ def generate_nrega_layer(request):
 def generate_drainage_layer(request):
     print("Inside generate_drainage_layer API.")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        clip_drainage_lines.apply_async(args=[state, district, block], queue="nrm")
+        clip_drainage_lines.apply_async(args=[state, district, block, user.id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -182,13 +185,14 @@ def upload_kml(request):
 def generate_mws_layer(request):
     print("Inside generate_mws_layer")
     try:
+        user = request.user
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         mws_layer.apply_async(
-            args=[state, district, block, start_year, end_year, False], queue="nrm"
+            args=[state, district, block, start_year, end_year, False, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -202,13 +206,14 @@ def generate_mws_layer(request):
 def generate_well_depth(request):
     print("Inside generate_well_depth")
     try:
+        user = request.user
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         mws_layer.apply_async(
-            args=[state, district, block, start_year, end_year, True], queue="nrm"
+            args=[state, district, block, start_year, end_year, True, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -240,13 +245,14 @@ def lulc_v3_river_basin(request):
 def lulc_vector(request):
     print("Inside lulc_vector")
     try:
+        user = request.user
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         vectorise_lulc.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "lulc_vector task initiated"},
@@ -275,13 +281,14 @@ def get_gee_layer(request):
 def generate_ci_layer(request):
     print("Inside generate_cropping_intensity_layer")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         generate_cropping_intensity.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Cropping Intensity task initiated"},
@@ -296,13 +303,14 @@ def generate_ci_layer(request):
 def generate_swb(request):
     print("Inside generate_swf")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         generate_swb_layer.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Generate swb task initiated"}, status=status.HTTP_200_OK
@@ -316,13 +324,14 @@ def generate_swb(request):
 def generate_drought_layer(request):
     print("Inside generate_drought_layer")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         calculate_drought.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "generate_drought_layer task initiated"},
@@ -337,11 +346,12 @@ def generate_drought_layer(request):
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         generate_terrain_clusters.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "generate_terrain_descriptor task initiated"},
@@ -356,10 +366,11 @@ def generate_terrain_descriptor(request):
 def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        terrain_raster.apply_async(args=[state, district, block], queue="nrm")
+        terrain_raster.apply_async(args=[state, district, block, user.id], queue="nrm")
         return Response(
             {"Success": "generate_terrain_raster task initiated"},
             status=status.HTTP_200_OK,
@@ -373,13 +384,14 @@ def generate_terrain_raster(request):
 def terrain_lulc_slope_cluster(request):
     print("Inside terrain_lulc_slope_cluster")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         lulc_on_slope_cluster.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "terrain_lulc_slope_cluster task initiated"},
@@ -394,13 +406,14 @@ def terrain_lulc_slope_cluster(request):
 def terrain_lulc_plain_cluster(request):
     print("Inside terrain_lulc_plain_cluster")
     try:
+        user = request.user  
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         lulc_on_plain_cluster.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "terrain_lulc_plain_cluster task initiated"},
@@ -415,10 +428,11 @@ def terrain_lulc_plain_cluster(request):
 def generate_clart(request):
     print("Inside generate_clart")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        generate_clart_layer.apply_async(args=[state, district, block], queue="nrm")
+        generate_clart_layer.apply_async(args=[state, district, block, user.id], queue="nrm")
         return Response(
             {"Success": "generate_clart task initiated"},
             status=status.HTTP_200_OK,
@@ -432,13 +446,14 @@ def generate_clart(request):
 def change_detection(request):
     print("Inside change_detection")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         get_change_detection.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "change_detection task initiated"},
@@ -453,11 +468,12 @@ def change_detection(request):
 def change_detection_vector(request):
     print("Inside change_detection_vector")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         vectorise_change_detection.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "change_detection_vector task initiated"},
@@ -489,13 +505,14 @@ def crop_grid(request):
 def mws_drought_causality(request):
     print("Inside Drought Causality API")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         drought_causality.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Drought Causality task initiated"},
@@ -510,19 +527,20 @@ def mws_drought_causality(request):
 def tree_health_raster(request):
     print("Inside tree_health_change API")
     try:
+        user = request.user
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         tree_health_ccd_raster.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         tree_health_ch_raster.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         tree_health_overall_change_raster.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "tree_health task initiated"},
@@ -537,19 +555,20 @@ def tree_health_raster(request):
 def tree_health_vector(request):
     print("Inside Overall_change_vector")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         tree_health_overall_change_vector.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         tree_health_ch_vector.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         tree_health_ccd_vector.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            args=[state, district, block, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Overall_change_vector task initiated"},
@@ -576,11 +595,12 @@ def gee_task_status(request):
 def stream_order_vector(request):
     print("Inside stream_order_vector api")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         generate_stream_order_vector.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "stream_order_vector task initiated"},
@@ -595,11 +615,12 @@ def stream_order_vector(request):
 def restoration_opportunity(request):
     print("Inside restoration_opportunity api")
     try:
+        user = request.user  
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         generate_restoration_opportunity.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, user.id], queue="nrm"
         )
         return Response(
             {"Success": "restoration_opportunity task initiated"},
@@ -614,12 +635,17 @@ def restoration_opportunity(request):
 def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
     try:
+        # check for the user permission
+        user = request.user  
+        if not user.is_authenticated:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
         project_id = request.data.get("project_id")
         state = request.data.get("state").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         site_suitability.apply_async(
-            args=[project_id, state, start_year, end_year], queue="nrm"
+            args=[project_id, state, start_year, end_year, user.id], queue="nrm"
         )
         return Response(
             {"Success": "Plantation_site_suitability task initiated"},

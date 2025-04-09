@@ -11,10 +11,11 @@ from utilities.constants import (
     NREGA_ASSETS_OUTPUT_DIR,
 )
 from unidecode import unidecode
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def clip_nrega_district_block(self, state_name, district_name, block_name):
+def clip_nrega_district_block(self, state_name, district_name, block_name, user):
     print("inside clip")
     formatted_state_name = state_name.title()
     if " " in formatted_state_name:
@@ -43,21 +44,6 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
     soi = soi[(soi["STATE"].str.lower() == state_name)]
     soi = soi[(soi["District"].str.lower() == district_name)]
     soi = soi[(soi["TEHSIL"].str.lower() == block_name)]
-
-    # geojson_path = os.path.join(
-    # ADMIN_BOUNDARY_INPUT_DIR, "soi_tehsil.geojson",
-    # )
-    # state_bounds = gpd.read_file(geojson_path)
-    # print("state_bounds", state_bounds)
-    #
-    # district_bounds = state_bounds[
-    #     state_bounds["District"].str.lower() == district_name.lower()
-    # ]
-    #
-    # district_bounds = district_bounds[
-    #     district_bounds["TEHSIL"].str.lower() == block_name.lower()
-    # ]
-
     soi = soi.dissolve()
 
     block_bounds = soi.geometry.iloc[0] if not soi.empty else None
@@ -79,4 +65,13 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
 
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
 
-    return push_shape_to_geoserver(path, workspace="nrega_assets")
+    push_shape_to_geoserver(path, workspace="nrega_assets")
+
+    # Generated Dataset data to db 
+    layer_name = f"{district_name}_{block_name}"
+
+    try:
+        return create_dataset_for_generated_layer(state_name, district_name, block_name, layer_name, user, gee_path=None, layer_type='vector', workspace='nrega_assets', algorithm='bhuvan_nrega', version=None, style_name=None, misc=None)
+        print("Dataset entry created for nrega layer")
+    except Exception as e:
+        print(f"Exception while creating entry for nrega in dataset table: {str(e)}")

@@ -13,17 +13,18 @@ from utilities.constants import GEE_ASSET_PATH
 from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def generate_clart_layer(self, state, district, block):
+def generate_clart_layer(self, state, district, block, user):
     ee_initialize()
     drainage_density(state, district, block)
     generate_lithology_layer(state, district)
-    clart_layer(state, district, block)
+    clart_layer(state, district, block, user)
 
 
-def clart_layer(state, district, block):
+def clart_layer(state, district, block, user):
     description = (
         "clart_"
         + valid_gee_text(district.lower())
@@ -231,3 +232,12 @@ def clart_layer(state, district, block):
     print("task_id_list sync to gcs ", task_id_list)
 
     sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
+
+    # Generated Dataset data to db 
+    gee_path = {"clart":final_output_assetid}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='raster', workspace='clart', algorithm=None, version=None, style_name='testClart', misc=None)
+        print("Dataset entry created for clart")
+    except Exception as e:
+        print(f"Exception while creating entry for clart in dataset table: {str(e)}")

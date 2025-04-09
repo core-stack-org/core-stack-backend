@@ -11,10 +11,11 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def lulc_on_plain_cluster(self, state, district, block, start_year, end_year):
+def lulc_on_plain_cluster(self, state, district, block, start_year, end_year, user):
     ee_initialize()
 
     asset_description = (
@@ -89,16 +90,23 @@ def lulc_on_plain_cluster(self, state, district, block, start_year, end_year):
 
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
+    layer_name = (
         valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
-        + "_lulc_plain",
-        "terrain_lulc",
+        + "_lulc_plain"
     )
+    res = sync_layer_to_geoserver(state, fc, layer_name, "terrain_lulc")
     print(res)
+
+    # Generated Dataset data to db 
+    gee_path = {"terrain_lulc_plain":asset_id}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='terrain_lulc', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for terrain_lulc plain")
+    except Exception as e:
+        print(f"Exception while creating entry for terrain_lulc plain in dataset table: {str(e)}")
 
 
 def process_feature_collection(fc, landforms, area_lulc, plain_centroids):

@@ -15,10 +15,11 @@ from .merge_layers import (
     merge_yearly_layers,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def calculate_drought(self, state, district, block, start_year, end_year):
+def calculate_drought(self, state, district, block, start_year, end_year, user):
     ee_initialize()
 
     dst_filename = (
@@ -90,14 +91,20 @@ def calculate_drought(self, state, district, block, start_year, end_year):
     fc = ee.FeatureCollection(asset_id)
     fc = fc.toList(fc.size()).getInfo()
     fc = {"features": fc, "type": "FeatureCollection"}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
+    layer_name = (
         valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
-        + "_drought",
-        "cropping_drought",
+        + "_drought"
     )
-
+    res = sync_layer_to_geoserver(state, fc, layer_name, "cropping_drought")
     print(res)
+
+    # Generated Dataset data to db 
+    gee_path = {"cropping_drought":get_gee_asset_path(state, district, block) + str(dst_filename)}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='cropping_drought', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for cropping_drought")
+    except Exception as e:
+        print(f"Exception while creating entry for cropping_drought in dataset table: {str(e)}")

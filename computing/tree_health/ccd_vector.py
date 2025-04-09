@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     check_task_status,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 def get_column_name(base_name, year):
@@ -27,7 +28,7 @@ def get_mws_features(state, district, block):
 
 
 @app.task(bind=True)
-def tree_health_ccd_vector(self, state, district, block, start_year, end_year):
+def tree_health_ccd_vector(self, state, district, block, start_year, end_year, user):
     ee_initialize()
     
     mws_features = get_mws_features(state, district, block)
@@ -115,19 +116,26 @@ def tree_health_ccd_vector(self, state, district, block, start_year, end_year):
         'features': final_features
     }
 
-    geo_filename = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_tree_health_ccd_vector_{start_year}_{end_year}"
+    layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_tree_health_ccd_vector_{start_year}_{end_year}"
     
     try:
-        sync_res = sync_layer_to_geoserver(state, final_fc, geo_filename, "ccd")
+        sync_res = sync_layer_to_geoserver(state, final_fc, layer_name, "ccd")
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")
         raise
+
+     # Generated Dataset data to db 
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=None, layer_type='vector', workspace='ccd', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for ccd vector")
+    except Exception as e:
+        print(f"Exception while creating entry for ccd vector in dataset table: {str(e)}")
 
     return {
         "status": "Completed",
         "features_processed": len(final_features),
         "year_range": f"{start_year}-{end_year}",
-        "filename": geo_filename
+        "filename": layer_name
     }
 
 

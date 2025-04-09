@@ -10,10 +10,11 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
 )
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def generate_stream_order_vector(self, state, district, block):
+def generate_stream_order_vector(self, state, district, block, user):
     ee_initialize()
     description = (
         "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
@@ -65,16 +66,17 @@ def generate_stream_order_vector(self, state, district, block):
         get_gee_asset_path(state, district, block) + description
     ).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
-        "stream_order_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-        "stream_order",
-    )
+    layer_name = "stream_order_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
+    res = sync_layer_to_geoserver(state, fc, layer_name, "stream_order")
     print(res)
+
+    # Generated Dataset data to db 
+    gee_path = get_gee_asset_path(state, district, block) + description
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='stream_order', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for stream_order vector")
+    except Exception as e:
+        print(f"Exception while creating entry for stream_order vector in dataset table: {str(e)}")
 
 
 def calculate_pixel_area(class_labels, fc, raster):

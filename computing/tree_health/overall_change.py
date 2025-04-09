@@ -12,9 +12,11 @@ from utilities.gee_utils import (
     check_task_status,
     sync_raster_gcs_to_geoserver,
 )
+from computing.views import create_dataset_for_generated_layer
+
 
 @app.task(bind=True)
-def tree_health_overall_change_raster(self, state, district, block):
+def tree_health_overall_change_raster(self, state, district, block, user):
     ee_initialize()
     print("Inside process tree_health_overall_change_raster")
     palette = ['FF0000', 'FFA500', 'FFFFFF', '8AFF8A', '007500', 'DEE64C', 'DEE64C', '000000']
@@ -114,6 +116,13 @@ def tree_health_overall_change_raster(self, state, district, block):
 
         # Sync raster to GeoServer
         sync_raster_gcs_to_geoserver("tree_overall_ch", layer_name, layer_name, "tree_overall_ch_style")
+
+        # Generated Dataset data to db 
+        try:
+            create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=asset_id, layer_type='raster', workspace='tree_overall_ch', algorithm=None, version=None, style_name='tree_overall_ch_style', misc=None)
+            print("Dataset entry created for tree_overall_change raster")
+        except Exception as e:
+            print(f"Exception while creating entry for tree_overall_change raster in dataset table: {str(e)}")
     
     except Exception as e:
         print(f"Error occurred in running process_ch task: {e}")

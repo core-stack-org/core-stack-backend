@@ -16,6 +16,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
 )
+from computing.views import create_dataset_for_generated_layer
 
 
 def calculation_df(year, df, gdf):
@@ -381,7 +382,7 @@ def convert_to_dict(causality_str):
 
 
 @app.task(bind=True)
-def drought_causality(self, state, district, block, start_year, end_year):
+def drought_causality(self, state, district, block, start_year, end_year, user):
     ee_initialize()
     mws_feature_collection = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -492,13 +493,20 @@ def drought_causality(self, state, district, block, start_year, end_year):
         final_features.append(feature)
 
     try:
-        geo_filename = (valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_drought_causality")
+        layer_name = (valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_drought_causality")
         aggregated_feature_collection = {
             'type': 'FeatureCollection',
             'features': final_features
         }
-        sync_res = sync_layer_to_geoserver(state, aggregated_feature_collection, geo_filename, "drought_causality")
+        sync_res = sync_layer_to_geoserver(state, aggregated_feature_collection, layer_name, "drought_causality")
         print(f"Synced aggregated data to GeoServer: {sync_res}")
+
+        # Generated Dataset data to db 
+        try:
+            create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=None, layer_type='vector', workspace='drought_causality', algorithm=None, version=None, style_name=None, misc=None)
+            print("Dataset entry created for drought_causality")
+        except Exception as e:
+            print(f"Exception while creating entry for drought_causality in dataset table: {str(e)}")
     except Exception as e:
         print(f"Error syncing aggregated data to GeoServer: {e}")
 

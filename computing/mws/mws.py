@@ -26,10 +26,11 @@ from shapely.geometry import box
 from pcraster import *
 import os
 import sys
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def mws_layer(self, state, district, block, start_year, end_year, is_annual):
+def mws_layer(self, state, district, block, start_year, end_year, is_annual, user):
     ee_initialize()
 
     sys.setrecursionlimit(6000)
@@ -85,8 +86,34 @@ def mws_layer(self, state, district, block, start_year, end_year, is_annual):
             + valid_gee_text(block.lower())
         )
 
-    calculate_g(state, start_date, end_date, asset_id, layer_name, is_annual)
+        # Generated Dataset data to db 
+        prec_annual = get_gee_asset_path(state, district, block) + "Prec_annual_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        et_annual = get_gee_asset_path(state, district, block) + "ET_annual_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        runoff_annual = get_gee_asset_path(state, district, block) + "Runoff_annual_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        well_depth_annual = get_gee_asset_path(state, district, block) + "well_depth_annual_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        filtered_delta_g_annual = get_gee_asset_path(state, district, block) + "filtered_delta_g_annual_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_uid"
+        gee_path = {"prec_annual":prec_annual, "et_annual":et_annual, "runoff_annual":runoff_annual, "well_depth_annual":well_depth_annual, "filtered_delta_g_annual":filtered_delta_g_annual}
+        try:
+            create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='mws_layers', algorithm=None, version=None, style_name=None, misc=None)
+            print("Dataset entry created for Mws well depth Annual")
+        except Exception as e:
+            print(f"Exception while creating entry for Mws well depth Annual in dataset table: {str(e)}")
+        
 
+    calculate_g(state, start_date, end_date, asset_id, layer_name, is_annual)
+    # Generated Dataset data to db 
+    filter_mws = get_gee_asset_path(state, district, block) + "filtered_mws_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_uid"
+    prec_fortnight = get_gee_asset_path(state, district, block) + "Prec_fortnight_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    et_fortnight = get_gee_asset_path(state, district, block) + "ET_fortnight_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    runoff_fortnight = get_gee_asset_path(state, district, block) + "Runoff_fortnight_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    filtered_delta_g_fortnight = get_gee_asset_path(state, district, block) + "filtered_delta_g_fortnight_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_uid"
+    gee_path = {"filter_mws":filter_mws, "prec_fortnight":prec_fortnight, "et_fortnight":et_fortnight, "runoff_fortnight":runoff_fortnight, "filtered_delta_g_fortnight":filtered_delta_g_fortnight}
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='mws_layers', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for Mws Fortnight")
+    except Exception as e:
+        print(f"Exception while creating entry for Mws Fortnight in dataset table: {str(e)}")
+        
 
 def generate_mws_layer(state, district, block):
     description = (

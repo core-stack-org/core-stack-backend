@@ -10,10 +10,11 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def generate_terrain_clusters(self, state, district, block):
+def generate_terrain_clusters(self, state, district, block, user):
     ee_initialize()
 
     asset_name = (
@@ -28,7 +29,23 @@ def generate_terrain_clusters(self, state, district, block):
     if not is_gee_asset_exists(asset_id):
         compute_on_gee(state, district, block, asset_id, asset_name)
 
-    sync_to_geoserver(state, district, block, asset_id)
+    layer_name = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_cluster"
+    )
+
+    sync_to_geoserver(state, district, block, asset_id, layer_name)
+
+    # Generated Dataset data to db 
+    gee_path = {"terrain_vector":asset_id}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='terrain', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for terrain vector cluster")
+    except Exception as e:
+        print(f"Exception while creating entry for terrain vector cluster in dataset table: {str(e)}")
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
@@ -365,16 +382,13 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
     check_task_status([task.status()["id"]])
 
 
-def sync_to_geoserver(state, district, block, asset_id):
+def sync_to_geoserver(state, district, block, asset_id, layer_name):
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
         state,
         fc,
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_cluster",
+        layer_name,
         "terrain",
     )
     print(res)

@@ -10,6 +10,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
 )
+from computing.views import create_dataset_for_generated_layer
 
 
 def get_column_name(base_name, year):
@@ -32,7 +33,7 @@ def get_column_name(base_name, year):
 
 
 @app.task(bind=True)
-def tree_health_ch_vector(self, state, district, block, start_year, end_year):
+def tree_health_ch_vector(self, state, district, block, start_year, end_year, user):
     """Process canopy height data for multiple years and combine into a single GeoServer layer."""
     ee_initialize()
     # Get the reference MWS features
@@ -137,19 +138,26 @@ def tree_health_ch_vector(self, state, district, block, start_year, end_year):
     }
 
     # Sync to GeoServer with a name that indicates the year range
-    geo_filename = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_tree_health_ch_vector_{start_year}_{end_year}"
+    layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_tree_health_ch_vector_{start_year}_{end_year}"
     
     try:
-        sync_res = sync_layer_to_geoserver(state, final_fc, geo_filename, "canopy_height")
+        sync_res = sync_layer_to_geoserver(state, final_fc, layer_name, "canopy_height")
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")
         raise
+    
+    # Generated Dataset data to db 
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=None, layer_type='vector', workspace='canopy_height', algorithm=None, version=None, style_name=None, misc=None)
+        print("Dataset entry created for canopy_height vector")
+    except Exception as e:
+        print(f"Exception while creating entry for canopy_height vector in dataset table: {str(e)}")
 
     return {
         "status": "Completed",
         "features_processed": len(final_features),
         "year_range": f"{start_year}-{end_year}",
-        "filename": geo_filename
+        "filename": layer_name
     }
 
 

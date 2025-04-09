@@ -19,10 +19,11 @@ from utilities.gee_utils import (
     create_gee_directory,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def generate_tehsil_shape_file_data(self, state, district, block):
+def generate_tehsil_shape_file_data(self, state, district, block, user):
     ee_initialize()
     description = (
         "admin_boundary_"
@@ -45,6 +46,16 @@ def generate_tehsil_shape_file_data(self, state, district, block):
 
     # Generate shape files and sync to geoserver
     sync_admin_boundry_to_geoserver(collection, state_dir, district, block)
+
+    # Generated Dataset data to db 
+    layer_name = f"{district}_{block}"
+    gee_path = {"panchayat_boundaries":get_gee_asset_path(state, district, block) + str(description)}
+
+    try:
+        create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='vector', workspace='panchayat_boundaries', algorithm='soi', version=None, style_name=None, misc=None)
+        print("Dataset entry created for panchayat layer")
+    except Exception as e:
+        print(f"Exception while creating entry for panchayat in dataset table: {str(e)}")
 
 
 def sync_admin_boundry_to_geoserver(collection, state_dir, district, block):
@@ -95,10 +106,7 @@ def clip_block_from_admin_boundary(state, district, block):
     print("census_2011", census_2011)
     cols = list(census_2011.columns)
     if "TEHSIL" in cols:
-        admin_boundary_data = census_2011
-        # admin_boundary_data.rename(
-        #     columns={"STATE": "state_name", "District": "district_name"}, inplace=True
-        # )
+        admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
     else:
         soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
 

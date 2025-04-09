@@ -9,10 +9,11 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def get_change_detection(self, state, district, block, start_year, end_year):
+def get_change_detection(self, state, district, block, start_year, end_year, user):
     # Initialize the Earth Engine
     ee_initialize()
 
@@ -85,7 +86,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)
 
-    sync_to_gcs_geoserver(state, district, block, description, param_list)
+    sync_to_gcs_geoserver(state, district, block, description, param_list, user)
 
 
 def built_up(roi_boundary, l1_asset):
@@ -401,3 +402,13 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list):
             description + "_" + change,
             None,
         )
+
+        # Generated Dataset data to db 
+        layer_name = "change_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_" + change
+        gee_path = {"change_detection_" + change:get_gee_asset_path(state, district, block) + str(description)}
+
+        try:
+            create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=gee_path, layer_type='raster', workspace='change_detection', algorithm=None, version=None, style_name=None, misc=None)
+            print("Dataset entry created for change detection raster")
+        except Exception as e:
+            print(f"Exception while creating entry for change detection raster in dataset table: {str(e)}")

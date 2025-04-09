@@ -9,10 +9,11 @@ from utilities.gee_utils import (
     get_gee_asset_path,
 )
 from nrm_app.celery import app
+from computing.views import create_dataset_for_generated_layer
 
 
 @app.task(bind=True)
-def vectorise_change_detection(self, state, district, block):
+def vectorise_change_detection(self, state, district, block, user):
     ee_initialize()
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -193,15 +194,18 @@ def sync_change_to_geoserver(block, district, state):
         )
         fc = ee.FeatureCollection(asset_id).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
+        layer_name = "change_vector_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_" + param
         res = sync_layer_to_geoserver(
             state,
             fc,
-            "change_vector_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + param,
+            layer_name,
             "change_detection",
         )
         print(res)
+
+        # Generated Dataset data to db 
+        try:
+            create_dataset_for_generated_layer(state, district, block, layer_name, user, gee_path=asset_id, layer_type='vector', workspace='change_detection', algorithm=None, version=None, style_name=None, misc=None)
+            print("Dataset entry created for change detection vector")
+        except Exception as e:
+            print(f"Exception while creating entry for change detection vector in dataset table: {str(e)}")
