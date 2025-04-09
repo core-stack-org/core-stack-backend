@@ -54,7 +54,7 @@ def get_ndvi_data(suitability_vector, start_year, end_year):
             """
             # Calculate mean NDVI for the feature's geometry
             mean_ndvi = image.reduceRegion(
-                reducer=ee.Reducer.mean(), geometry=feature.geometry(), scale=10
+                reducer=ee.Reducer.mean(), geometry=feature.geometry(), scale=30
             ).get("gapfilled_NDVI_lsc")
 
             # Get the date and extract the year
