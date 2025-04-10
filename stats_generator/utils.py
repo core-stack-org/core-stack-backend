@@ -11,6 +11,7 @@ from nrm_app.settings import GEOSERVER_URL
 import pymannkendall as mk
 import numpy as np
 from shapely.geometry import Point, shape
+from shapely.geometry.base import BaseGeometry
 
 
 path_to_add = "/home/ubuntu/cfpt/core-stack-backend/"
@@ -399,11 +400,28 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
 
     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom, mws_geom):
-        if village_geom.intersects(mws_geom):
-            intersection = village_geom.intersection(mws_geom)
-            return intersection.area
-        return 0
+    def calculate_intersection_area(village_geom: BaseGeometry, mws_geom: BaseGeometry) :
+        try:
+            # Check for empty geometries
+            if village_geom.is_empty or mws_geom.is_empty:
+                return 0.0
+                
+            # Fix invalid geometries if needed
+            if not village_geom.is_valid:
+                village_geom = village_geom.buffer(0)
+            if not mws_geom.is_valid:
+                mws_geom = mws_geom.buffer(0)
+            
+            # Calculate intersection
+            if village_geom.intersects(mws_geom):
+                intersection = village_geom.intersection(mws_geom)
+                return intersection.area if not intersection.is_empty else 0.0
+                
+            return 0.0
+            
+        except Exception as e:
+            print(f"Error calculating intersection area: {e}")
+            return 0.0
 
     mws_villages_dict = {}
 
@@ -445,11 +463,28 @@ def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, b
         return
     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom, mws_geom):
-        if village_geom.intersects(mws_geom):
-            intersection = village_geom.intersection(mws_geom)
-            return intersection.area
-        return 0
+    def calculate_intersection_area(village_geom: BaseGeometry, mws_geom: BaseGeometry) :
+        try:
+            # Check for empty geometries
+            if village_geom.is_empty or mws_geom.is_empty:
+                return 0.0
+                
+            # Fix invalid geometries if needed
+            if not village_geom.is_valid:
+                village_geom = village_geom.buffer(0)
+            if not mws_geom.is_valid:
+                mws_geom = mws_geom.buffer(0)
+            
+            # Calculate intersection
+            if village_geom.intersects(mws_geom):
+                intersection = village_geom.intersection(mws_geom)
+                return intersection.area if not intersection.is_empty else 0.0
+                
+            return 0.0
+            
+        except Exception as e:
+            print(f"Error calculating intersection area: {e}")
+            return 0.0
 
     data = []
 
