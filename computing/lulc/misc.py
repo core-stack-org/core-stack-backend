@@ -69,7 +69,9 @@ def remap_values(image):
     return remapped
 
 
-def clip_lulc_from_river_basin(river_basin, roi, scale, start_date, end_date):
+def clip_lulc_from_river_basin(
+    river_basin, roi, scale, start_date, end_date, version="v3"
+):
     # Finding the river basin in which roi lies
     basin = river_basin.filterBounds(roi.geometry())
     basin_size = basin.size().getInfo()
@@ -87,11 +89,19 @@ def clip_lulc_from_river_basin(river_basin, roi, scale, start_date, end_date):
                 + end_date
                 + "_LULCmap_"
                 + str(scale)
-                + "m_v2"
+                + ("m_v2" if version == "v2" else "m")
             )
 
             # Get the image first
-            image = ee.Image("projects/nrm-work/assets/river_basin_lulc/" + lulc_name)
+            image = ee.Image(
+                "projects/ee-corestackdev/assets/datasets/"
+                + (
+                    "LULC_v2_river_basin/"
+                    if version == "v2"
+                    else "LULC_v3_river_basin/"
+                )
+                + lulc_name
+            )
 
             # Ensure the geometry is bounded by getting the intersection
             clip_geometry = roi.geometry().intersection(bs.geometry())
@@ -113,10 +123,12 @@ def clip_lulc_from_river_basin(river_basin, roi, scale, start_date, end_date):
             + end_date
             + "_LULCmap_"
             + str(scale)
-            + "m_v2"
+            + ("m_v2" if version == "v2" else "m")
         )
         # Clipping river basin lulc for a particular geometry
-        lulc = ee.Image("projects/nrm-work/assets/river_basin_lulc/" + lulc_name).clip(
-            roi.geometry()
-        )
+        lulc = ee.Image(
+            "projects/ee-corestackdev/assets/datasets/"
+            + ("LULC_v2_river_basin/" if version == "v2" else "LULC_v3_river_basin/")
+            + lulc_name
+        ).clip(roi.geometry())
     return lulc

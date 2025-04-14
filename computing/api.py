@@ -32,7 +32,7 @@ from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
 from computing.change_detection.change_detection import get_change_detection
-from .lulc.lulc_v3_using_v2_river_basin import lulc_river_basin
+from .lulc.lulc_v3_clip_river_basin import lulc_river_basin
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
@@ -627,6 +627,7 @@ def stream_order_vector(request):
         print("Exception in stream_order_vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 @api_view(["POST"])
 def restoration_opportunity(request):
     print("Inside restoration_opportunity api")
@@ -634,9 +635,7 @@ def restoration_opportunity(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        generate_layers.apply_async(
-            args=[state, district, block], queue="nrm"
-        )
+        generate_layers.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "restoration_opportunity task initiated"},
             status=status.HTTP_200_OK,

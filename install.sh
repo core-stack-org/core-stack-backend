@@ -61,7 +61,7 @@ else
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda/miniconda.sh
     bash ~/miniconda/miniconda.sh -b -u -p ~/miniconda
     rm -rf ~/miniconda/miniconda.sh
-    
+
     # Initialize conda for the detected shell
     shell_type=$(detect_shell)
     if [ "$shell_type" = "zsh" ]; then
@@ -69,10 +69,10 @@ else
     else
         ~/miniconda/bin/conda init bash
     fi
-    
+
     # Disable auto activation of base environment
     ~/miniconda/bin/conda config --set auto_activate_base false
-    
+
     echo "Miniconda installed successfully"
 fi
 
@@ -83,7 +83,7 @@ refresh_shell_config
 print_section "Environment Configuration"
 read -p "Enter the name for your conda environment: " ENV_NAME
 if [ -z "$ENV_NAME" ]; then
-    ENV_NAME="nrm-backend"
+    ENV_NAME="corestack"
     echo "No name provided, using default: $ENV_NAME"
 fi
 
@@ -100,9 +100,6 @@ echo "Created directory: $ENV_PATH"
 # Create and configure virtual environment
 print_section "Creating virtual environment"
 ~/miniconda/bin/conda create --prefix "$ENV_PATH" python=3.10 -y
-
-# Configure conda to show only environment name
-~/miniconda/bin/conda config --set env_prompt '(${name}) '
 
 # Install conda packages
 print_section "Installing conda packages"
@@ -124,7 +121,7 @@ CONDA_PACKAGES=(
     "conda-forge::folium"
     "conda-forge::pcraster"
     "conda-forge::geetools"
-    "conda-forge::sqlite"
+    "conda-forge::sqlite=3.45.3"
     "conda-forge::celery"
     "conda-forge::unidecode"
     "conda-forge::rasterio"
@@ -143,6 +140,21 @@ for package in "${CONDA_PACKAGES[@]}"; do
     conda install -y $package
 done
 
+# Install system dependencies
+print_section "Installing system dependencies"
+echo "Updating package lists and installing required system packages..."
+
+# Check if running on KDE Neon
+if [ -f /etc/os-release ] && grep -q "KDE neon" /etc/os-release; then
+    echo "Detected KDE Neon, using pkcon..."
+    sudo pkcon refresh -y
+    sudo pkcon install -y pkg-config python3-dev default-libmysqlclient-dev build-essential
+else
+    echo "Using apt-get..."
+    sudo apt-get update
+    sudo apt-get install -y pkg-config python3-dev default-libmysqlclient-dev build-essential
+fi
+
 # Install pip packages
 print_section "Installing pip packages"
 PIP_PACKAGES=(
@@ -150,9 +162,11 @@ PIP_PACKAGES=(
     "mysql-connector-python"
     "mysqlclient"
     "python-docx"
-    "pymannkendall"
     "pydantic"
     "fastapi"
+    "pymannkendall"
+    "openpyxl"
+    "scipy"
 )
 
 for package in "${PIP_PACKAGES[@]}"; do

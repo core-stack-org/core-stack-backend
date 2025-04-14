@@ -69,7 +69,12 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         river_basin = ee.FeatureCollection("projects/ee-ankit-mcs/assets/CGWB_basin")
         l1_asset_new.append(
             clip_lulc_from_river_basin(
-                river_basin, roi_boundary, scale, curr_start_date, curr_end_date
+                river_basin,
+                roi_boundary,
+                scale,
+                curr_start_date,
+                curr_end_date,
+                version="v2",
             )
         )
 
