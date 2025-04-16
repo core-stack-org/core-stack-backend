@@ -167,6 +167,8 @@ PIP_PACKAGES=(
     "pymannkendall"
     "openpyxl"
     "scipy"
+    "djangorestframework-simplejwt"
+    "drf-nested-routers"
 )
 
 for package in "${PIP_PACKAGES[@]}"; do

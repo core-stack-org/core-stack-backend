@@ -6,7 +6,7 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
-from .misc.restoration_opportunity import generate_layers
+from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order_vector
 from .utils import (
     Geoserver,
@@ -15,8 +15,6 @@ from .utils import (
 from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
-from .lulc.lulc_v2 import generate_lulc_layer_v2
-from .lulc.temporal_correction import lulc_temporal_correction
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb1 import generate_swb_layer
@@ -41,6 +39,7 @@ from .drought.drought_causality import drought_causality
 from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
+from .plantation.site_suitability import site_suitability
 
 
 @api_view(["POST"])
@@ -216,42 +215,6 @@ def generate_well_depth(request):
         )
     except Exception as e:
         print("Exception in generate_well_depth api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-def generate_lulc_v2(request):
-    print("Inside generate_lulc_v2")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        generate_lulc_layer_v2.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
-        )
-        return Response({"Success": "LULC task initiated"}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in generate_lulc_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-def generate_lulc_v3(request):
-    print("Inside generate_lulc_v3")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        lulc_temporal_correction.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
-        )
-        return Response({"Success": "LULC task initiated"}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in generate_lulc_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -536,7 +499,7 @@ def mws_drought_causality(request):
         )
         return Response(
             {"Success": "Drought Causality task initiated"},
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in Drought Causality api :: ", e)
@@ -563,7 +526,7 @@ def tree_health_raster(request):
         )
         return Response(
             {"Success": "tree_health task initiated"},
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in change_detection api :: ", e)
@@ -635,11 +598,33 @@ def restoration_opportunity(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        generate_layers.apply_async(args=[state, district, block], queue="nrm")
+        generate_restoration_opportunity.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
         return Response(
             {"Success": "restoration_opportunity task initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in restoration_opportunity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def plantation_site_suitability(request):
+    print("Inside plantation_site_suitability API")
+    try:
+        project_id = request.data.get("project_id")
+        state = request.data.get("state").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        site_suitability.apply_async(
+            args=[project_id, state, start_year, end_year], queue="nrm"
+        )
+        return Response(
+            {"Success": "Plantation_site_suitability task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in Plantation_site_suitability api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

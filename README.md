@@ -28,6 +28,17 @@
 > example: /home/user/virtualenvs/nrm
 
 Let the script run and install all the dependencies.
+# Installation of the libraries
+1. chmod +x install.sh
+2. ./install.sh
+
+*Provide a name of your virtual environment when prompted: 
+> example: nrm
+
+*Provide a path to your environment when prompted: 
+> example: /home/user/virtualenvs/nrm
+
+Let the script run and install all the dependencies.
 
 # Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:
@@ -36,6 +47,8 @@ After the successfull installation of all the packages, run the following comman
 
 *Make Migrations*
 1. Make sure the environment is active. Otherwise, run `conda activate nrm`
+2. Run `python manage.py migrate`
+For any migration related queries, please send an email to contact@core-stack.org
 2. Run `python manage.py migrate`
 For any migration related queries, please send an email to contact@core-stack.org
 
@@ -53,3 +66,7 @@ nrm queue is running in this example.
 1. Use .env.example as a template to create .env file inside nrm_app/ directory
 2. Update the environment variables
 3. Add *JSON* files inside the data/ directory
+
+# More
+- [DB Design](https://github.com/core-stack-org/core-stack-backend/wiki/DB-Design) 
+- [API Doc](https://github.com/core-stack-org/core-stack-backend/wiki/Project-API-Doc)

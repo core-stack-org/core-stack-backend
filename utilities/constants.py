@@ -19,6 +19,8 @@ DRAINAGE_LINES_OUTPUT = "data/drainage_lines/output"
 DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
 
 LITHOLOGY_PATH = "data/lithology/"
+SITE_DATA_PATH = "data/site_data"
+
 
 # MARK: ODK URLs
 ODK_URL_settlement = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Settlements_form%20_V1.0.1.svc/Submissions"
@@ -41,8 +43,10 @@ ODK_URL_RS_WATERBODY_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/form
 ODK_URL_GW_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions"
 ODK_URL_AGRI_MAINTENANCE = "https://odk.gramvaani.org/v1/projects/9/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1.svc/Submissions"
 
-GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
-
 GCS_BUCKET_NAME = "core_stack"
 
+GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
+
+GEE_PATH_PLANTATION = "projects/ee-corestackdev/assets/apps/plantation/"
+SITE_DATA_PATH = "data/site_data"

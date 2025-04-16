@@ -11,9 +11,7 @@ urlpatterns = [
     path("delete_layer/", api.delete_layer, name="delete_layer"),
     path("upload_kml/", api.upload_kml, name="upload_kml"),
     path("generate_mws_layer/", api.generate_mws_layer, name="generate_mws_layer"),
-    path("generate_lulc_v2/", api.generate_lulc_v2, name="generate_lulc_v2"),
-    path("generate_lulc_v3/", api.generate_lulc_v3, name="generate_lulc_v3"),
-    path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
+    path("lulc_v3/", api.lulc_v3_river_basin, name="lulc_v3"),
     path("lulc_vector/", api.lulc_vector, name="lulc_vector"),
     path("get_gee_layer/", api.get_gee_layer, name="get_gee_layer"),
     path("generate_ci_layer/", api.generate_ci_layer, name="generate_ci_layer"),
@@ -75,6 +73,11 @@ urlpatterns = [
         name="generate_drainage_density",
     ),
     path("generate_lithology/", api.generate_lithology, name="generate_lithology"),
+    path(
+        "plantation_site_suitability/",
+        api.plantation_site_suitability,
+        name="plantation_site_suitability",
+    ),
     path(
         "restoration_opportunity/",
         api.restoration_opportunity,

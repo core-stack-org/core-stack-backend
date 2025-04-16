@@ -3,13 +3,14 @@ from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
-    get_gee_asset_path, is_gee_asset_exists,
+    get_gee_asset_path,
+    is_gee_asset_exists,
 )
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def generate_layers(self, state, district, block):
+def generate_restoration_opportunity(self, state, district, block):
     ee_initialize()
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -21,10 +22,7 @@ def generate_layers(self, state, district, block):
     )
 
     description = (
-            "restoration_"
-            + valid_gee_text(district)
-            + "_"
-            + valid_gee_text(block)
+        "restoration_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
 
     raster_asset_id = clip_raster(roi, state, district, block, description)
@@ -36,7 +34,9 @@ def generate_layers(self, state, district, block):
         {"value": 3, "label": "Excluded Areas"},
     ]
 
-    return generate_vector(roi, raster_asset_id, args, state, district, block, description + "_vector")
+    return generate_vector(
+        roi, raster_asset_id, args, state, district, block, description + "_vector"
+    )
 
 
 def clip_raster(roi, state, district, block, description):
@@ -44,7 +44,9 @@ def clip_raster(roi, state, district, block, description):
     if is_gee_asset_exists(asset_id):
         return asset_id
 
-    restoration_raster = ee.Image("projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities")
+    restoration_raster = ee.Image(
+        "projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities"
+    )
 
     clipped_raster = restoration_raster.clip(roi.geometry())
 
@@ -73,7 +75,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
             ored_str = "raster.eq(ee.Number(" + str(arg["value"][0]) + "))"
             for i in range(1, len(arg["value"])):
                 ored_str = (
-                        ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
+                    ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
                 )
             print(ored_str)
             mask = eval(ored_str)
@@ -84,7 +86,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         forest_area = pixel_area.updateMask(mask)
 
         fc = forest_area.reduceRegions(
-            collection=fc, reducer=ee.Reducer.sum(), scale=10, crs=raster.projection()
+            collection=fc, reducer=ee.Reducer.sum(), scale=60, crs=raster.projection()
         )
 
         def remove_property(feat, prop):

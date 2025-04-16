@@ -101,10 +101,10 @@ def check_task_status(task_id_list, sleep_time=60):
             for task in tasks:
                 task_id = task["name"].split("/")[-1]
                 if task_id in task_id_list and task["metadata"]["state"] in (
-                    "SUCCEEDED",
-                    "COMPLETED",
-                    "FAILED",
-                    "CANCELLED",
+                        "SUCCEEDED",
+                        "COMPLETED",
+                        "FAILED",
+                        "CANCELLED",
                 ):
                     task_id_list.remove(task_id)
         print("task_id_list after", task_id_list)
@@ -167,11 +167,11 @@ def create_gee_directory(state, district, block, gee_project_path=GEE_ASSET_PATH
     create_gee_folder(folder_path, gee_project_path)
 
     folder_path = (
-        valid_gee_text(state.lower())
-        + "/"
-        + valid_gee_text(district.lower())
-        + "/"
-        + valid_gee_text(block.lower())
+            valid_gee_text(state.lower())
+            + "/"
+            + valid_gee_text(district.lower())
+            + "/"
+            + valid_gee_text(block.lower())
     )
     create_gee_folder(folder_path, gee_project_path)
 
@@ -182,6 +182,21 @@ def get_gee_asset_path(state, district=None, block=None, asset_path=GEE_ASSET_PA
         gee_path += valid_gee_text(district.lower()) + "/"
     if block:
         gee_path += valid_gee_text(block.lower()) + "/"
+    return gee_path
+
+
+def create_gee_dir(folder_list, gee_project_path=GEE_ASSET_PATH):
+    folder_path = ""
+    for folder in folder_list:
+        folder_path += valid_gee_text(folder.lower())
+        create_gee_folder(folder_path, gee_project_path)
+        folder_path = folder_path + "/"
+
+
+def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
+    gee_path = asset_path
+    for folder in folder_list:
+        gee_path += valid_gee_text(folder.lower()) + "/"
     return gee_path
 
 
@@ -309,10 +324,10 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
     blob_name = "nrm_raster/" + gcs_file_name
     blob = bucket.blob(blob_name)
     out_path = (
-        "/".join(local_file_path.split("/")[:-1])
-        + "/"
-        + gcs_file_name.split(".")[0]
-        + "_comp.tif"
+            "/".join(local_file_path.split("/")[:-1])
+            + "/"
+            + gcs_file_name.split(".")[0]
+            + "_comp.tif"
     )
     print(out_path)
     cmd = f"gdal_translate {local_file_path} {out_path} -co TILED=YES -co COPY_SRC_OVERVIEWS=YES -co COMPRESS=LZW"
@@ -378,3 +393,36 @@ def get_geojson_from_gcs(gcs_file_name):
     geojson_data = json.loads(geojson_str)
 
     return geojson_data
+
+
+def harmonize_band_types(image, target_type="Float"):
+    """
+    Harmonize all bands in an image to the same data type.
+
+    Args:
+        image (ee.Image): Input image with mixed band types
+        target_type (str): Target data type ('Float', 'Byte', 'Int' etc.)
+
+    Returns:
+        ee.Image: Image with harmonized band types
+    """
+    # Get list of band names
+    band_names = image.bandNames()
+
+    # Function to cast each band to target type
+    def cast_band(band_name):
+        band = image.select(band_name)
+        if target_type == "Float":
+            return band.toFloat()
+        elif target_type == "Byte":
+            return band.toByte()
+        elif target_type == "Int":
+            return band.toInt()
+        elif target_type == "Double":
+            return band.toDouble()
+        else:
+            raise ValueError(f"Unsupported target type: {target_type}")
+
+    # Cast all bands and combine back into single image
+    harmonized_bands = band_names.map(lambda name: cast_band(ee.String(name)))
+    return ee.ImageCollection(harmonized_bands).toBands().rename(band_names)
