@@ -177,15 +177,15 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 1000
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": DB_NAME,
         "USER": DB_USER,
         "PASSWORD": DB_PASSWORD,
         "HOST": "127.0.0.1",
         "PORT": "",
-        "OPTIONS": {
-            "unix_socket": "/tmp/mysql.sock",
-        },
+        # "OPTIONS": {
+        #     "unix_socket": "/tmp/mysql.sock",
+        # },
     }
 }
 
