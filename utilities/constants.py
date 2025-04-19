@@ -44,4 +44,4 @@ GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
 
 GEE_PATH_PLANTATION = "projects/ee-corestackdev/assets/apps/plantation/"
-SITE_DATA_PATH = "data/site_data"
+GEE_PATH_PLANTATION_HELPER = "projects/ee-corestack-helper/assets/apps/plantation/"

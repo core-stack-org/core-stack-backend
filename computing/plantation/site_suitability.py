@@ -1,6 +1,6 @@
 import ee
 
-from utilities.constants import GEE_PATH_PLANTATION
+from utilities.constants import GEE_PATH_PLANTATION, GEE_PATH_PLANTATION_HELPER
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     valid_gee_text,
+    make_asset_public,
 )
 from nrm_app.celery import app
 from .lulc_attachment import get_lulc_data
@@ -16,7 +17,7 @@ from .ndvi_attachment import get_ndvi_data
 from .site_suitability_raster import get_pss
 from .plantation_utils import combine_kmls
 from utilities.logger import setup_logger
-from ..utils import sync_fc_to_geoserver
+from ..utils import sync_fc_to_geoserver, create_chunk, merge_chunks
 import geopandas as gpd
 from projects.models import Project, AppType
 from plantations.models import KMLFile
@@ -25,9 +26,7 @@ logger = setup_logger(__name__)
 
 
 @app.task(bind=True)
-def site_suitability(
-    self, project_id, state, start_year, end_year
-):  # self, organization, project, state, start_year, end_year):
+def site_suitability(self, project_id, state, start_year, end_year):
     """
     Main task for site suitability analysis using Google Earth Engine.
 
@@ -114,6 +113,7 @@ def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
             )
             task.start()
             check_task_status([task.status()["id"]])
+            make_asset_public(asset_id)
             logger.info("ROI for project: %s exported to GEE", project_name)
         except Exception as e:
             logger.exception("Exception in exporting asset: %s", e)
@@ -141,6 +141,8 @@ def generate_project_roi(asset_id, description, project_name, kml_files_obj):
         task.start()
 
         check_task_status([task.status()["id"]])
+        make_asset_public(asset_id)
+
         logger.info("ROI for project: %s exported to GEE", project_name)
     except Exception as e:
         logger.exception("Exception in exporting asset: %s", e)
@@ -164,10 +166,13 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
 
     # Create a unique asset name for the suitability analysis
     project_name = valid_gee_text(project.name)
+
     asset_name = "site_suitability_" + project_name
 
     # Generate Plantation Site Suitability raster
-    pss_rasters_asset = get_pss(roi, org, project, state, asset_name)
+    pss_rasters_asset, is_default_profile = get_pss(
+        roi, org, project, state, asset_name
+    )
 
     # Prepare asset description and path
     description = asset_name + "_vector"
@@ -184,6 +189,77 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
 
     if pss_rasters is None:
         raise Exception("Failed to calculate PSS rasters")
+
+    if roi.size().getInfo() > 50:
+        chunk_size = 30
+        rois, descs = create_chunk(roi, description, chunk_size)
+
+        ee_initialize("helper")
+        create_gee_dir([org, project_name], gee_project_path=GEE_PATH_PLANTATION_HELPER)
+
+        tasks = []
+        for i in range(len(rois)):
+            chunk_asset_id = (
+                get_gee_dir_path(
+                    [org, project_name], asset_path=GEE_PATH_PLANTATION_HELPER
+                )
+                + descs[i]
+            )
+            if not is_gee_asset_exists(chunk_asset_id):
+                task_id = generate_vector(
+                    rois[i],
+                    start_year,
+                    end_year,
+                    pss_rasters,
+                    is_default_profile,
+                    descs[i],
+                    chunk_asset_id,
+                )
+                if task_id:
+                    tasks.append(task_id)
+
+        check_task_status(tasks, 500)
+
+        for desc in descs:
+            make_asset_public(
+                get_gee_dir_path(
+                    [org, project_name], asset_path=GEE_PATH_PLANTATION_HELPER
+                )
+                + desc
+            )
+
+        merge_task_id = merge_chunks(
+            roi,
+            [org, project_name],
+            description,
+            chunk_size,
+            chunk_asset_path=GEE_PATH_PLANTATION_HELPER,
+            merge_asset_path=GEE_PATH_PLANTATION,
+        )
+        check_task_status([merge_task_id], 120)
+    else:
+        generate_vector(
+            roi,
+            start_year,
+            end_year,
+            pss_rasters,
+            is_default_profile,
+            description,
+            asset_id,
+        )
+
+    return asset_id
+
+
+def generate_vector(
+    roi,
+    start_year,
+    end_year,
+    pss_rasters,
+    is_default_profile,
+    description,
+    asset_id,
+):
 
     def get_max_val(feature):
         """Calculate maximum value and suitability for a feature."""
@@ -204,12 +280,25 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
         patch_average = ee.Algorithms.If(
             ee.Algorithms.IsEqual(patch_average, None), 0, patch_average
         )
+        if is_default_profile:
+            map_string = ee.Dictionary(
+                {
+                    1: "Very Good",
+                    2: "Good",
+                    3: "Moderate",
+                    4: "Marginally Suitable",
+                    5: "Unsuitable",
+                }
+            )
+        else:
+            map_string = ee.Dictionary({0: "Unsuitable", 1: "Suitable"})
 
         # Determine suitability based on threshold
         patch_average = ee.Number(patch_average)
-        patch_val = patch_average.gte(0.5).int()
-        patch_string = ee.Dictionary({0: "Unsuitable", 1: "Suitable"}).get(patch_val)
-        patch_conf = ee.Number(0).eq(patch_val).subtract(patch_average).abs()
+        patch_val = patch_average.round().int()
+
+        patch_string = map_string.get(patch_val)
+        patch_conf = ee.Number(1).subtract(patch_average.subtract(patch_val).abs())
 
         # Add suitability metrics to feature properties
         return feature.set(
@@ -243,9 +332,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
         task.start()
 
         logger.info(f"Asset export task started. Asset path: {description}")
-        check_task_status([task.status()["id"]])
-        logger.info("Suitability vector for project=%s exported to GEE", project.name)
-        return asset_id
+        return task.status()["id"]
     except Exception as e:
         logger.exception("Exception in exporting suitability vector", e)
 

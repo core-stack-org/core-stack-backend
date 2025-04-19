@@ -10,6 +10,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
+    make_asset_public,
 )
 from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
@@ -48,8 +49,9 @@ def get_pss(roi, org, project, state, asset_name):
     project_variables = default_profile.config_variables
 
     plantation_profile = PlantationProfile.objects.filter(project=project)
-
+    is_default_profile = True
     if plantation_profile.exists():
+        is_default_profile = False
         plantation_profile = plantation_profile[0]
         project_weights = {**project_weights, **plantation_profile.config_weight}
         project_variables = {**project_variables, **plantation_profile.config_variables}
@@ -381,10 +383,22 @@ def get_pss(roi, org, project, state, asset_name):
 
     final_layer = final_layer.rename("Final")
 
-    # Pixels with score <= 0.5 are considered unsuitable
     # This rounding is specific to a binary score output
     # Round off Plantation Score to 0 or 1 on each pixel and mask
-    final_plantation_score = ee.Image(1).where(final_layer.lte(0.5), 0)
+    if is_default_profile:
+        # For five suitability classes
+        final_plantation_score = (
+            ee.Image(0)
+            .where(final_layer.lt(1.5), 1)
+            .where(final_layer.gte(1.5).And(final_layer.lt(2.5)), 2)
+            .where(final_layer.gte(2.5).And(final_layer.lt(3.5)), 3)
+            .where(final_layer.gte(3.5).And(final_layer.lt(4.5)), 4)
+            .where(final_layer.gte(4.5), 5)
+            .clip(roi.geometry())
+        )
+    else:
+        # Pixels with score <= 0.5 are considered unsuitable
+        final_plantation_score = ee.Image(1).where(final_layer.lte(0.5), 0)
 
     # Apply LULC (Land Use/Land Cover) mask to filter suitable areas
     # Considers specific LULC classes as potentially suitable
@@ -444,6 +458,8 @@ def get_pss(roi, org, project, state, asset_name):
         logger.info(f"Export task started with ID: {export_task.status()['id']}")
         check_task_status([export_task.status()["id"]])
 
+        make_asset_public(asset_id)
+
         layer_name = (
             valid_gee_text(org.lower())
             + "_"
@@ -451,7 +467,7 @@ def get_pss(roi, org, project, state, asset_name):
             + "_suitability_raster"
         )
         sync_to_gcs_geoserver(asset_id, layer_name, scale)
-        return asset_id
+        return asset_id, is_default_profile
 
     except Exception as e:
         logger.exception(f"Export failed: {str(e)}")
