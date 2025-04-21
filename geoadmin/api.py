@@ -125,6 +125,7 @@ def proposed_blocks(request):
 
 # Keeping it with the auth as superadmin will be able to activate these locations in our case
 @api_view(["PATCH"])
+@auth_free
 def activate_location(request):
     """
     Update activation status of a location (state/district/block).
@@ -172,10 +173,10 @@ def activate_location(request):
             if location.active_status != active:
                 location.active_status = active
                 location.save()
-                status_msg = "activated" if active else "deactivated"
+                message = "Successfully activated a location" if active else "Successfully deactivated a location"
                 return Response(
                     {
-                        "message": f"{entity_name.title()} '{getattr(location, f'{entity_name}_name')}' has been {status_msg}",
+                        "message": message,
                         "location_type": location_type,
                         "location_id": location_id,
                         "active": active,
@@ -183,9 +184,10 @@ def activate_location(request):
                     status=status.HTTP_200_OK,
                 )
             else:
+                message = "Location already active" if active else "Location already inactive"
                 return Response(
                     {
-                        "message": f"{entity_name.title()} is already {'active' if active else 'inactive'}",
+                        "message": message,
                         "location_type": location_type,
                         "location_id": location_id,
                         "active": active,
