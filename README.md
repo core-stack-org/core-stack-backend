@@ -1,59 +1,58 @@
 # CoRE Stack Backend Setup
 
-# MySQL DB Setup
+# DB Setup
+Install PostgreSQL
 1. sudo apt-get update
-2. sudo apt-get install mysql-server
+2. sudo apt-get install postgresql postgresql-contrib
 
-*Start MySQL*
-1. sudo service mysql start
+*Start PostgreSQL*
+1. sudo service postgresql start
+
+*Check PostgreSQL status*
+1. sudo systemctl status postgresql
 
 *Create a new database*
-1. mysql -u root -p or sudo mysql (if no password is setup)
-2. create database nrm;
+1. sudo -u postgres psql
+2. CREATE DATABASE corestack;
 
 *Create a new user*
-1. mysql -u root -p
-2. CREATE USER 'nrm_user'@'localhost' IDENTIFIED BY 'xxxxxx';
-3. GRANT ALL PRIVILEGES ON nrm.* TO 'nrm_user'@'localhost';
-4. FLUSH PRIVILEGES;
+1. sudo -u postgres psql
+2. create user corestack_user with password 'your_password';
+3. GRANT USAGE, CREATE ON SCHEMA public TO corestack_user;
+4. ALTER DATABASE corestack OWNER TO corestack_user;
+5. ALTER USER corestack_user WITH SUPERUSER; (Optional, only if you want superuser rights)
 
 # Installation of the libraries
+If you want to install directly from a conda snap of environment.yml
+> conda env create -f environment.yml
+
+If you want to install using the install.sh script
 1. chmod +x install.sh
 2. ./install.sh
 
 *Provide a name of your virtual environment when prompted: 
-> example: nrm
+> example: corestack
 
 *Provide a path to your environment when prompted: 
-> example: /home/user/virtualenvs/nrm
-
-Let the script run and install all the dependencies.
-# Installation of the libraries
-1. chmod +x install.sh
-2. ./install.sh
-
-*Provide a name of your virtual environment when prompted: 
-> example: nrm
-
-*Provide a path to your environment when prompted: 
-> example: /home/user/virtualenvs/nrm
+> default: /home/user/miniconda/envs/corestack
+> example: /home/user/virtualenvs/corestack
 
 Let the script run and install all the dependencies.
 
 # Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:
-1. conda activate nrm (or whatever is the name of your virtual environment)
+1. conda activate corestack (or whatever is the name of your virtual environment)
 2. python manage.py runserver 
 
 *Make Migrations*
-1. Make sure the environment is active. Otherwise, run `conda activate nrm`
+1. Make sure the environment is active. Otherwise, run `conda activate corestack`
 2. Run `python manage.py migrate`
 For any migration related queries, please send an email to contact@core-stack.org
 2. Run `python manage.py migrate`
 For any migration related queries, please send an email to contact@core-stack.org
 
 *Run the server*
-1. Make sure the environment is active. Otherwise, run `conda activate nrm`
+1. Make sure the environment is active. Otherwise, run `conda activate corestack`
 2. Run `python manage.py runserver`
 > Tip: To make local hits to your server, use `python manage.py runserver 0.0.0.0:8080`
 
