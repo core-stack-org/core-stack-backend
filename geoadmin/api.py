@@ -123,7 +123,6 @@ def proposed_blocks(request):
         )
 
 
-# Keeping it with the auth as superadmin will be able to activate these locations in our case
 @api_view(["PATCH"])
 @auth_free
 def activate_location(request):

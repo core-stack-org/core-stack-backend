@@ -3,7 +3,6 @@ import uuid
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.utils.translation import gettext_lazy as _
 from organization.models import Organization
-from projects.models import Project
 
 
 class User(AbstractUser):
@@ -88,7 +87,7 @@ class UserProjectGroup(models.Model):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="project_groups"
     )
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE)
     group = models.ForeignKey(
         Group, on_delete=models.CASCADE
     )  # using Django's Group model
