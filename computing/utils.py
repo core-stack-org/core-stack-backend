@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     valid_gee_text,
     get_gee_asset_path,
+    get_gee_dir_path,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -18,10 +19,12 @@ from utilities.constants import (
     ADMIN_BOUNDARY_OUTPUT_DIR,
     SHAPEFILE_DIR,
     GEE_HELPER_PATH,
+    GEE_ASSET_PATH,
 )
 import ee
 import json
 from shapely.geometry import shape
+from shapely.validation import explain_validity
 import zipfile
 
 
@@ -146,6 +149,8 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
         # Set CRS (Earth Engine uses EPSG:4326 by default)
         gdf.crs = "EPSG:4326"
 
+        gdf = fix_invalid_geometry_in_gdf(gdf)
+
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
 
@@ -193,7 +198,14 @@ def create_chunk(aoi, description, chunk_size):
     return rois, descs
 
 
-def merge_chunks(aoi, state, district, block, description, chunk_size):
+def merge_chunks(
+    aoi,
+    folder_list,
+    description,
+    chunk_size,
+    chunk_asset_path=GEE_HELPER_PATH,
+    merge_asset_path=GEE_ASSET_PATH,
+):
     print("Merge Chunk task initiated")
     ee_initialize()
     size = aoi.size().getInfo()
@@ -204,15 +216,14 @@ def merge_chunks(aoi, state, district, block, description, chunk_size):
         end = start + chunk_size
         block_name_for_parts = description + "_" + str(start) + "-" + str(end)
         src_asset_id = (
-            get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
-            + block_name_for_parts
+            get_gee_dir_path(folder_list, chunk_asset_path) + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
 
     asset = ee.FeatureCollection(assets).flatten()
 
-    asset_id = get_gee_asset_path(state, district, block) + description
+    asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
     try:
         # Export an ee.FeatureCollection as an Earth Engine asset.
         task = ee.batch.Export.table.toAsset(
@@ -228,3 +239,14 @@ def merge_chunks(aoi, state, district, block, description, chunk_size):
         return task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running merge task: {e}")
+
+
+def fix_invalid_geometry_in_gdf(gdf):
+    invalid = gdf[~gdf.is_valid]
+    if not invalid.empty:
+        print("Invalid geometries found:")
+        for idx, geom in invalid.geometry.items():
+            print(f"Index {idx}: {explain_validity(geom)}")
+            gdf.loc[idx, "geometry"] = gdf.loc[idx, "geometry"].buffer(0)
+
+    return gdf

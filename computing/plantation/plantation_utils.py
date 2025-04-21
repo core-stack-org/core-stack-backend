@@ -6,26 +6,26 @@ import pandas as pd
 import fiona
 
 dataset_paths = {
-    "AWC": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",  # (Pan India)
-    "annualPrecipitation": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",  # (Global)
-    "aridityIndex": "projects/ee-plantationsitescores/assets/India-AridityIndex",  # (Pan India)
-    "aspect": "USGS/SRTMGL1_003",
-    "distToDrainage": "projects/ee-plantationsitescores/assets/so_thinned2",  # (Pan India)
-    "drainage": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",  # (Pan India)
+    "AWC": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",
+    "annualPrecipitation": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",
+    "meanAnnualTemperature": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",
+    "aridityIndex": "projects/ee-plantationsitescores/assets/India-AridityIndex",
+    "referenceEvapoTranspiration": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
+    "topsoilPH": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
+    "topsoilOC": "projects/ee-plantationsitescores/assets/Raster-T_OC",
+    "topsoilCEC": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
+    "topsoilTexture": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
+    "subsoilPH": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
+    "subsoilOC": "projects/ee-plantationsitescores/assets/Raster-S_OC",
+    "subsoilCEC": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
+    "subsoilTexture": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",
+    "topsoilBD": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
+    "subsoilBD": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
+    "drainage": "projects/ee-plantationsitescores/assets/Raster-Drainage",
     "elevation": "USGS/SRTMGL1_003",
-    "meanAnnualTemperature": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",  # (Global)
-    "referenceEvapoTranspiration": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",  # (Global)
     "slope": "USGS/SRTMGL1_003",
-    "subsoilBD": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",  # (Pan India)
-    "subsoilCEC": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",  # (Pan India)
-    "subsoilOC": "projects/ee-plantationsitescores/assets/Raster-S_OC",  # (Pan India)
-    "subsoilPH": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",  # (Pan India)
-    "subsoilTexture": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",  # (Pan India)
-    "topsoilBD": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",  # (Pan India)
-    "topsoilCEC": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",  # (Pan India)
-    "topsoilOC": "projects/ee-plantationsitescores/assets/Raster-T_OC",  # (Pan India)
-    "topsoilPH": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",  # (Pan India)
-    "topsoilTexture": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",  # (Pan India)
+    "aspect": "USGS/SRTMGL1_003",
+    "distToDrainage": "projects/ee-plantationsitescores/assets/so_thinned2",
 }
 
 
