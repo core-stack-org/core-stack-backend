@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .utils import *
 import logging
+from utilities.auth_utils import auth_free
 
 logging.basicConfig(
     level=logging.INFO,
@@ -10,6 +11,7 @@ logging.basicConfig(
 )
 
 @api_view(["GET"])
+@auth_free
 def generate_excel_file_layer(request):
     try:
         state = request.query_params.get("state", "").lower().strip()
@@ -44,6 +46,7 @@ def generate_excel_file_layer(request):
 
 
 @api_view(["GET"])
+@auth_free
 def generate_kyl_data_excel(request):
     try:
         print("Inside generate_kyl_data_excel API.")
@@ -78,6 +81,7 @@ def generate_kyl_data_excel(request):
 
 
 @api_view(["GET"])
+@auth_free
 def generate_kyl_village_data(request):
     try:
         print("Inside generate_filter_data_village API.")
