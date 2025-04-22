@@ -207,6 +207,7 @@ def generate_mws_report(request):
         return render(request, "error-page.html", {})
 
 
+
 @api_view(["POST"])
 @auth_free
 def generate_multi_report(request):
