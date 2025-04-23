@@ -1375,19 +1375,15 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 
                 percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
 
-                formatted_years = format_years(drought_years)
-
                 if result.trend == "increasing":
-                    parameter_swb_2 += f"During the monsoon, on average we observe that the area under surface water during drought years (XXX and YYY) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
+                    parameter_swb_2 += f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
                     
                 
                 elif result.trend == "decreasing":
-                    parameter_swb_2 += f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years (XXX and YYY), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
+                    parameter_swb_2 += f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
                 
                 else:
-                    parameter_swb_2 += f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years (XXX, YYY), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
-
-                parameter_swb_2 = parameter_swb_2.replace("XXX and YYY",formatted_years)
+                    parameter_swb_2 += f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
 
             #? Non-Drought Years SWB
             if len(non_drought_year):
