@@ -35,7 +35,7 @@ def mws_layer(self, state, district, block, start_year, end_year, is_annual):
     sys.setrecursionlimit(6000)
 
     generate_mws_layer(state, district, block)
-
+    end_year = end_year + 1
     task_list = []
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
