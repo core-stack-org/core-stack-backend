@@ -224,6 +224,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+EXCEL_PATH = env("EXCEL_PATH")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
