@@ -2,12 +2,14 @@ import ee
 from computing.utils import (
     sync_layer_to_geoserver,
 )
+from utilities.constants import GEE_HELPER_PATH
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    make_asset_public,
 )
 from .generate_layers import generate_drought_layers
 from .merge_layers import (
@@ -49,19 +51,21 @@ def calculate_drought(self, state, district, block, start_year, end_year):
         # then the next joining script join the chunks
         current_year = start_year
         merged_tasks = []
-
+        yearly_assets = []
         while current_year <= end_year:
             print("current_year", current_year)
-            if not is_gee_asset_exists(
-                get_gee_asset_path(state, district, block)
+            yearly_drought = (
+                get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
                 + "drought_"
                 + valid_gee_text(district.lower())
                 + "_"
                 + valid_gee_text(block.lower())
                 + "_"
                 + str(current_year)
-            ):
-                task_ids = generate_drought_layers(
+            )
+            yearly_assets.append(yearly_drought)
+            if not is_gee_asset_exists(yearly_drought):
+                generate_drought_layers(
                     aoi,
                     state,
                     district,
@@ -71,8 +75,7 @@ def calculate_drought(self, state, district, block, start_year, end_year):
                     end_year,
                     chunk_size_,
                 )
-                task_id_list = check_task_status(task_ids)
-                print("All chunks' asset generated, task id: ", task_id_list)
+
                 task_id = merge_drought_layers_chunks(
                     aoi, state, district, block, current_year, chunk_size_
                 )
@@ -83,9 +86,10 @@ def calculate_drought(self, state, district, block, start_year, end_year):
         merged_task_ids = check_task_status(merged_tasks)
         print("All years' asset generated, task id: ", merged_task_ids)
 
-        task_id = merge_yearly_layers(state, district, block, start_year, end_year)
-        if task_id:
-            check_task_status([task_id])
+        for asset in yearly_assets:
+            make_asset_public(asset)
+
+        merge_yearly_layers(state, district, block, start_year, end_year)
 
     fc = ee.FeatureCollection(asset_id)
     fc = fc.toList(fc.size()).getInfo()

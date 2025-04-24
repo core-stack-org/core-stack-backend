@@ -1,5 +1,15 @@
 import ee
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_HELPER_PATH
+from utilities.gee_utils import (
+    valid_gee_text,
+    get_gee_asset_path,
+    is_gee_asset_exists,
+    ee_initialize,
+    check_task_status,
+    make_asset_public,
+    create_gee_directory,
+)
 
 
 def get_day_of_year(date):
@@ -78,9 +88,14 @@ def generate_drought_layers(
     chunk_size,
 ):
     task_ids = []
+    asset_ids = []
 
     size = aoi.size().getInfo()
+    print("size=", size)
     parts = size // chunk_size
+    print("parts=", parts)
+    ee_initialize("helper")
+    create_gee_directory(state, district_name, block_name, GEE_HELPER_PATH)
     for part in range(parts + 1):
         start = part * chunk_size
         end = start + chunk_size
@@ -107,10 +122,15 @@ def generate_drought_layers(
                 end_year,
                 start_year,
                 task_ids,
+                asset_ids,
             )
 
     print("Done iterating")
-    return task_ids
+    task_id_list = check_task_status(task_ids)
+    print("All chunks' asset generated, task id: ", task_id_list)
+    for asset_id in asset_ids:
+        make_asset_public(asset_id)
+    print("All chunks' asset made public.")
 
 
 def drought_chunk(
@@ -123,9 +143,11 @@ def drought_chunk(
     end_year,
     start_year,
     task_ids,
+    asset_ids,
 ):
     asset_id = (
-        get_gee_asset_path(state, district_name, block_name) + block_name_for_parts
+        get_gee_asset_path(state, district_name, block_name, GEE_HELPER_PATH)
+        + block_name_for_parts
     )
 
     if is_gee_asset_exists(asset_id):
@@ -1479,5 +1501,6 @@ def drought_chunk(
         task.start()
         print("Successfully started the generate drought chunk task", task.status())
         task_ids.append(task.status()["id"])
+        asset_ids.append(asset_id)
     except Exception as e:
         print(f"Error occurred in running generate drought chunk task: {e}")
