@@ -79,17 +79,19 @@ INSTALLED_APPS = [
     "plans",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
+    "https://nrm.core-stack.org",
+    "https://nrm.gramvaanidev.org"
     "http://127.0.0.1:8000",
     "http://192.168.222.27:8000",
     "http://192.168.222.23:3000",
     "http://192.168.20.236:3000",
     "http://localhost:3000",
     "http://localhost:3001",
-]  # TODO Remove extras
+]  # TODO Add extra URLs if required
 
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
