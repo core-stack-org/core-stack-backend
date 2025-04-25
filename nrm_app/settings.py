@@ -91,10 +91,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
 ]  # TODO Remove extras
 
-# CORS_ALLOW_HEADERS = [
-#     "ngrok-skip-browser-warning",
-#     "content-type",
-# ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
@@ -107,6 +103,7 @@ CORS_ALLOW_METHODS = [
     "PUT",
     "PATCH",
     "DELETE",
+    "OPTIONS",
 ]
 
 # REST Framework settings
