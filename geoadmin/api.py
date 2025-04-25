@@ -135,6 +135,10 @@ def activate_location(request):
         "location_id": str,
         "active": bool
     }
+    
+    Hierarchical validation rules:
+    - Districts can only be activated if their State is active
+    - Blocks can only be activated if both their State and District are active
     """
     try:
         location_type = request.data.get("location_type")
@@ -160,15 +164,37 @@ def activate_location(request):
         try:
             if location_type == "state":
                 location = State.objects.get(state_census_code=location_id)
-                entity_name = "state"
             elif location_type == "district":
                 location = District.objects.get(id=location_id)
-                entity_name = "district"
-            else:  # block
+                
+                if active and not location.state.active_status:
+                    return Response(
+                        {"error": "State not active yet, please activate."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:  
                 location = Block.objects.get(id=location_id)
-                entity_name = "block"
+                
+                if active:
+                    state_active = location.district.state.active_status
+                    district_active = location.district.active_status
+                    
+                    if not state_active and not district_active:
+                        return Response(
+                            {"error": "State and District not active yet, please activate them first."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    elif not district_active:
+                        return Response(
+                            {"error": "District not active yet, please activate."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                    elif not state_active:
+                        return Response(
+                            {"error": "State not active yet, please activate."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
-            # Only update if status is different
             if location.active_status != active:
                 location.active_status = active
                 location.save()
