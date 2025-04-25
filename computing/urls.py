@@ -1,6 +1,6 @@
 from django.urls import path
 from . import api
-
+from .views import layer_status
 urlpatterns = [
     path("create_workspace/", api.create_workspace, name="create_workspace"),
     path(
@@ -80,4 +80,5 @@ urlpatterns = [
         api.restoration_opportunity,
         name="restoration_opportunity",
     ),
+    path("layer-status/", layer_status, name="layer-status"),
 ]
