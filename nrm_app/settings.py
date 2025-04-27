@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import re
 from pathlib import Path
 import environ
 from datetime import timedelta
@@ -43,6 +44,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
+
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
@@ -95,17 +97,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1",
-    
-    "http://192.168.29.210",
-    "http://192.168.29.193",
 
-    "http://192.168.222.27:8000",
-    "http://192.168.222.23:3000",
-    "http://192.168.20.236:3000",
     "http://localhost:3000",
     "http://localhost:3001",
-]  # TODO Add extra URLs if required
+]
 
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
@@ -113,13 +110,17 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 ]
 
 CORS_ALLOW_METHODS = [
+    "DELETE",
     "GET",
+    "OPTIONS",
+    "PATCH",
     "POST",
     "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
 
 # REST Framework settings
 REST_FRAMEWORK = {
