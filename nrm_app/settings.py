@@ -93,6 +93,12 @@ CORS_ALLOWED_ORIGINS = [
     "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
 
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1",
+    
+    "http://192.168.29.210",
+    "http://192.168.29.193",
+
     "http://192.168.222.27:8000",
     "http://192.168.222.23:3000",
     "http://192.168.20.236:3000",
