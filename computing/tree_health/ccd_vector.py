@@ -95,7 +95,7 @@ def tree_health_ccd_vector(self, state, district, block, start_year, end_year):
             avg_density = total_density / (end_year - start_year + 1)
             
             data['properties']['avg_den'] = avg_density
-            data['properties']['area_in_ha'] = area_in_ha
+            data['properties']['area_in_ha'] = data['area_in_ha']
             data['properties']['uid'] = uid
             
             final_feature = {

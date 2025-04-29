@@ -64,10 +64,12 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         'change_detection_afforestation': -1,
         'change_detection_deforestation': -1,
         'change_detection_urbanization': -1,
+        'change_detection_cropintensity': -1,
         'terrain_lulc_slope': -1,
         'terrain_lulc_plain': -1,
         'restoration_vector': -1,
         'aquifer_vector': -1,
+        'soge_vector': -1,
     }
 
     try:
@@ -321,8 +323,10 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         ############  Change Detection Degradation  ###################
         try:
             df_change_degr_detection_mws_data = sheets['change_detection_degradation'][sheets['change_detection_degradation']['UID'] == specific_mws_id]
-            degradation_column = ['Farm-Barren', 'Farm-Built_Up', 'Farm-Scrub_Land']
-            degradation_land_area = df_change_degr_detection_mws_data.get('Total_degradation', None).iloc[0]
+            degr_sum = df_change_degr_detection_mws_data[['Farm-Barren', 'Farm-Scrub_Land']].sum(axis=1).iloc[0]
+            df_change_crp_detection_mws_data = sheets['change_detection_cropintensity'][sheets['change_detection_cropintensity']['UID'] == specific_mws_id]
+            crp_sum = df_change_crp_detection_mws_data[['Double-Single', 'Triple-Double', 'Triple-Single']].sum(axis=1).iloc[0]
+            degradation_land_area = degr_sum + crp_sum
         except:
             degradation_land_area = 0
 
@@ -386,6 +390,14 @@ def get_generate_filter_mws_data(state, district, block, file_type):
             aquifer_class = ''
 
 
+        ################# SOGE Vector  #########################
+        try:
+            df_soge_vector_mws_data = sheets['soge_vector'][sheets['soge_vector']['UID'] == specific_mws_id]
+            soge_class = df_soge_vector_mws_data.get('class_name', None).iloc[0]
+        except:
+            soge_class = ''
+
+
         results.append({
             'mws_id': specific_mws_id,
             'terrainCluster_ID': terrainCluster_ID,
@@ -415,7 +427,8 @@ def get_generate_filter_mws_data(state, district, block, file_type):
             'lulc_plain_category': lulc_plain_category,
             'area_wide_scale_restoration': round(wide_scale_restoration,4),
             'area_protection': round(area_protection,4),
-            'aquifer_class': aquifer_class
+            'aquifer_class': aquifer_class,
+            'soge_class': soge_class
 
         })
 
@@ -460,3 +473,4 @@ def download_KYL_filter_data(state, district, block, file_type):
         return file_path
     else:
         return None
+
