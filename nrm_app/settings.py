@@ -54,7 +54,8 @@ ALLOWED_HOSTS = [
     "74f2-2001-df4-e000-3fc4-bb09-a94e-b440-7621.ngrok-free.app"
 ]
 
-# Application definition
+# MARK: Django Apps
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -81,32 +82,39 @@ INSTALLED_APPS = [
     "plans",
 ]
 
-# CORS_ALLOW_ALL_ORIGINS = True
+# MARK: CORS Settings
 
-CORS_ALLOWED_ORIGINS = [
-    "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
-    "https://nrm.core-stack.org",
-    "https://nrm.gramvaanidev.org",
-    "https://dashboard.core-stack.org",
-    "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
-    "https://uat.dashboard.core-stack.org/",
-    "https://www.explorer.core-stack.org/",
-    "https://www.explorer.core-stack.org/landscape_explorer",
-    "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
+        "https://nrm.core-stack.org",
+        "https://nrm.gramvaanidev.org",
+        "https://dashboard.core-stack.org",
+        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
+        "https://uat.dashboard.core-stack.org/",
+        "https://www.explorer.core-stack.org/",
+        "https://www.explorer.core-stack.org/landscape_explorer",
+        "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
 
-    "http://127.0.0.1:8000",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1",
 
-    "http://localhost:3000",
-    "http://localhost:3001",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"
 ]
-
-CORS_ALLOWED_ORIGIN_REGEXES = [r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
-    "content-type",
+    "content-disposition",  # Important for file uploads in form data
 ]
 
 CORS_ALLOW_METHODS = [
@@ -122,7 +130,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
 
-# REST Framework settings
+# MARK: REST Framework
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -130,7 +139,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
-# JWT settings
+# MARK: JWT settings
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
@@ -166,6 +175,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nrm_app.urls"
 
+# MARK: Templates
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -186,7 +196,7 @@ WSGI_APPLICATION = "nrm_app.wsgi.application"
 
 DATA_UPLOAD_MAX_NUMBER_FILES = 1000
 
-# Database
+# MARK: Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
@@ -197,9 +207,6 @@ DATABASES = {
         "PASSWORD": DB_PASSWORD,
         "HOST": "127.0.0.1",
         "PORT": "",
-        # "OPTIONS": {
-        #     "unix_socket": "/tmp/mysql.sock",
-        # },
     }
 }
 
@@ -237,6 +244,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+
 EXCEL_PATH = env("EXCEL_PATH")
 
 # Default primary key field type
@@ -244,7 +252,7 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ODK settings
+# MARK: ODK settings
 # https://odk.gramvaani.org/#/projects/9/forms/Add_Settlements_form%20_V1.0.1
 OD_DATA_URL_hemlet = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Hamlet_form%20_V1.0.1.svc/Submissions"
 OD_DATA_URL_well = (
@@ -265,10 +273,11 @@ OD_DATA_URL_plan = {
         "gps_point": "GPS_point_recharge_structure",
     },
 }
-# Report requirements
+
+# MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
 
-# EMAIL Settings
+# MARK: Email Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtpout.secureserver.net"
 EMAIL_PORT = 465
