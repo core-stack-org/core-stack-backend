@@ -86,11 +86,10 @@ CORS_ALLOWED_ORIGINS = [
     "https://nrm.core-stack.org",
     "https://nrm.gramvaanidev.org",
     "https://dashboard.core-stack.org",
-    "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
-    "https://uat.dashboard.core-stack.org/",
-    "https://www.explorer.core-stack.org/",
-    "https://www.explorer.core-stack.org/landscape_explorer",
-    "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
+    "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
+    "https://uat.dashboard.core-stack.org",
+    "https://www.explorer.core-stack.org",
+    "https://development.d2s4eeyazvtd2g.amplifyapp.com",
 
     "http://127.0.0.1:8000",
     "http://127.0.0.1:3000",
@@ -104,6 +103,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.20.236:3000",
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:5173"
 ]  # TODO Add extra URLs if required
 
 
@@ -236,7 +236,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
-EXCEL_PATH = env("EXCEL_PATH")
+EXCEL_PATH = env("EXCEL_DIR")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
