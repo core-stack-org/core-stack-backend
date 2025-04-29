@@ -92,11 +92,11 @@ else:
         "https://nrm.core-stack.org",
         "https://nrm.gramvaanidev.org",
         "https://dashboard.core-stack.org",
-        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
-        "https://uat.dashboard.core-stack.org/",
-        "https://www.explorer.core-stack.org/",
+        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
+        "https://uat.dashboard.core-stack.org",
+        "https://www.explorer.core-stack.org",
         "https://www.explorer.core-stack.org/landscape_explorer",
-        "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
+        "https://development.d2s4eeyazvtd2g.amplifyapp.com",
 
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
@@ -105,6 +105,7 @@ else:
         "http://localhost:3000",
         "http://localhost:3001",
     ]
+
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
