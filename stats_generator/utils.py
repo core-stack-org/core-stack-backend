@@ -85,7 +85,7 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_for_nrega_assets(geojson_data, mws_geojson_datas, xlsx_file, writer, start_year, end_year)
                 fetch_village_asset_count(state, district, block, writer, xlsx_file, start_year, end_year)
                 create_excel_mws_inters_villages(mws_geojson_datas, xlsx_file, writer, district, block)
-                create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
+                # create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
 
             elif workspace == 'cropping_intensity':
                 create_excel_crop_inten(geojson_data, xlsx_file, writer, start_year, end_year)
@@ -121,10 +121,38 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_for_restoration(geojson_data, xlsx_file, writer)
             elif workspace == 'aquifer':
                 create_excel_for_aquifer(geojson_data, xlsx_file, writer)
+            elif workspace == 'soge':
+                create_excel_for_soge(geojson_data, xlsx_file, writer)
 
             results.append({"layer": layer_name, "status": "success"})
 
     return results
+
+
+def create_excel_for_soge(data, xlsx_file, writer):
+    df_data = []
+    features = data['features']
+    
+    for feature in features:  
+        properties = feature['properties']      
+        row = {
+            'UID': properties['uid'],  
+            'area_in_ha': properties['area_in_ha'],  
+            'soge_dev_%': properties['sgw_dev_pe'],
+            'class_code': properties['code'],
+            'class_name': properties['class']
+        }
+        
+        df_data.append(row)
+    df = pd.DataFrame(df_data) 
+    df = df.sort_values(['UID'])  
+
+    ## for roundoff all numeric value upto 2 decimal
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+    df[numeric_cols] = df[numeric_cols].round(2)  
+
+    df.to_excel(writer, sheet_name='soge_vector', index=False)
+    print(f"Excel file created for soge_vector")
 
 
 def create_excel_for_aquifer(data, xlsx_file, writer):
@@ -179,16 +207,19 @@ def create_excel_for_aquifer(data, xlsx_file, writer):
             if aquifer in principal_aquifers:
                 aquifer_percentages[f'principle_aq_{aquifer}_%'] += row['%_area_aquifer']
         
-        # Determine aquifer class based on Alluvium percentage
-        alluvium_pct = aquifer_percentages['principle_aq_Alluvium_%']
-        print("uid-------------", uid)
-        print("alluvium_pct----------", alluvium_pct)
-        if alluvium_pct >= 99.99:
-            aquifer_class = 'Alluvium'
-        elif alluvium_pct == 0:
-            aquifer_class = 'Hard Rock'
-        else:
-            aquifer_class = 'Multiple'
+        # Find the dominant aquifer (the one with the highest percentage)
+        max_aquifer = None
+        max_percentage = 0
+        
+        for aquifer in principal_aquifers:
+            percentage = aquifer_percentages[f'principle_aq_{aquifer}_%']
+            if percentage > max_percentage:
+                max_percentage = percentage
+                max_aquifer = aquifer
+        
+        # Set aquifer_class based on the dominant aquifer
+        # If the dominant aquifer is Alluvium, class is Alluvium, otherwise Hard Rock
+        aquifer_class = 'Alluvium' if max_aquifer == 'Alluvium' else 'Hard Rock'
         
         # Combine all data for this UID
         combined_row = {
@@ -342,6 +373,7 @@ def create_excel_for_drought_causality(data, xlsx_file, writer, start_year, end_
         
         row = {
             'UID': properties['uid'],
+            'area_in_ha': properties['area_in_ha'],
         }
 
         for year in range(start_year, end_year):
@@ -405,7 +437,7 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
             'Single-Double': properties.get('si_do', None),
             'Single-Triple': properties.get('si_tr', None),
             'Triple-Double': properties.get('tr_do', None),
-            'riple-Single': properties.get('tr_si', None),
+            'Triple-Single': properties.get('tr_si', None),
             'No_Change': properties.get('same', None),
             'Total_Change_crop_intensity': properties.get('total_chan', None),
         })
@@ -571,81 +603,81 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
     print("Excel created for mws_intersect_villages")
 
 
-def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, block):
-    print("Inside create_excel_village_inters_mwss")
-    admin_layer_name = district + '_' + block
-    admin_file_url = get_url('panchayat_boundaries', admin_layer_name)
+# def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, block):
+#     print("Inside create_excel_village_inters_mwss")
+#     admin_layer_name = district + '_' + block
+#     admin_file_url = get_url('panchayat_boundaries', admin_layer_name)
 
-    response = requests.get(admin_file_url)
-    if response.status_code != 200:
-        print(f"Error fetching data: {response.status_code}")
-        return
-    village_geojson = response.json()
+#     response = requests.get(admin_file_url)
+#     if response.status_code != 200:
+#         print(f"Error fetching data: {response.status_code}")
+#         return
+#     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom: BaseGeometry, mws_geom: BaseGeometry) :
-        try:
-            # Check for empty geometries
-            if village_geom.is_empty or mws_geom.is_empty:
-                return 0.0
+#     def calculate_intersection_area(village_geom: BaseGeometry, mws_geom: BaseGeometry) :
+#         try:
+#             # Check for empty geometries
+#             if village_geom.is_empty or mws_geom.is_empty:
+#                 return 0.0
                 
-            # Fix invalid geometries if needed
-            if not village_geom.is_valid:
-                village_geom = village_geom.buffer(0)
-            if not mws_geom.is_valid:
-                mws_geom = mws_geom.buffer(0)
+#             # Fix invalid geometries if needed
+#             if not village_geom.is_valid:
+#                 village_geom = village_geom.buffer(0)
+#             if not mws_geom.is_valid:
+#                 mws_geom = mws_geom.buffer(0)
             
-            # Calculate intersection
-            if village_geom.intersects(mws_geom):
-                intersection = village_geom.intersection(mws_geom)
-                return intersection.area if not intersection.is_empty else 0.0
+#             # Calculate intersection
+#             if village_geom.intersects(mws_geom):
+#                 intersection = village_geom.intersection(mws_geom)
+#                 return intersection.area if not intersection.is_empty else 0.0
                 
-            return 0.0
+#             return 0.0
             
-        except Exception as e:
-            print(f"Error calculating intersection area: {e}")
-            return 0.0
+#         except Exception as e:
+#             print(f"Error calculating intersection area: {e}")
+#             return 0.0
 
 
-    data = []
+#     data = []
 
-    processed_villages = set()
+#     processed_villages = set()
 
-    for village_feature in village_geojson['features']:
-        village_id = village_feature['properties']['vill_ID']
-        village_name = village_feature['properties']['vill_name']
+#     for village_feature in village_geojson['features']:
+#         village_id = village_feature['properties']['vill_ID']
+#         village_name = village_feature['properties']['vill_name']
         
-        village_key = (village_id, village_name)
+#         village_key = (village_id, village_name)
         
-        if village_key in processed_villages:
-            continue
-        processed_villages.add(village_key)
+#         if village_key in processed_villages:
+#             continue
+#         processed_villages.add(village_key)
         
-        village_geom = shape(village_feature['geometry'])
+#         village_geom = shape(village_feature['geometry'])
         
-        mws_uids = []
-        intersection_areas = []
+#         mws_uids = []
+#         intersection_areas = []
         
-        for mws_feature in mws_geojson['features']:
-            mws_geom = shape(mws_feature['geometry'])
-            area_intersected = calculate_intersection_area(village_geom, mws_geom)
-            if area_intersected > 0:
-                mws_uids.append(mws_feature['properties']['uid'])
-                intersection_areas.append(area_intersected)
+#         for mws_feature in mws_geojson['features']:
+#             mws_geom = shape(mws_feature['geometry'])
+#             area_intersected = calculate_intersection_area(village_geom, mws_geom)
+#             if area_intersected > 0:
+#                 mws_uids.append(mws_feature['properties']['uid'])
+#                 intersection_areas.append(area_intersected)
         
-        data.append({
-            'Village ID': village_id,
-            'Village Name': village_name,
-            'MWS UIDs': mws_uids,
-        })
+#         data.append({
+#             'Village ID': village_id,
+#             'Village Name': village_name,
+#             'MWS UIDs': mws_uids,
+#         })
 
-    df = pd.DataFrame(data)
+#     df = pd.DataFrame(data)
 
-     ## for roundoff all numeric value upto 2 decimal
-    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    df[numeric_cols] = df[numeric_cols].round(2) 
+#      ## for roundoff all numeric value upto 2 decimal
+#     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+#     df[numeric_cols] = df[numeric_cols].round(2) 
 
-    df.to_excel(writer, sheet_name='village_intersect_mwss', index=False)
-    print("Excel created for village_intersect_mwss")
+#     df.to_excel(writer, sheet_name='village_intersect_mwss', index=False)
+#     print("Excel created for village_intersect_mwss")
 
 
 def create_excel_for_terrain(data, output_file, writer):
@@ -1068,13 +1100,24 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
 
         # Loop through each year in the range
         for year in range(start_year, end_year + 1):
-            # Construct keys dynamically
-            cropping_key = f'cropping_{year - start_year + 1}'
-            single_c_key = f'single_c_{year - start_year + 1}'
-            single_k_key = f'single_k_{year - start_year + 1}'
-            single_n_key = f'single_n_{year - start_year + 1}'
-            doubly_c_key = f'doubly_c_{year - start_year + 1}'
-            triply_c_key = f'triply_c_{year - start_year + 1}'
+            year_offset = year - start_year
+            
+            # Handle special case for 2017 (first year)
+            if year == start_year:
+                cropping_key = 'cropping_i'
+                single_c_key = 'single_cro'
+                single_k_key = 'single_kha'
+                single_n_key = 'single_non'
+                doubly_c_key = 'doubly_cro'
+                triply_c_key = 'triply_cro'
+            else:
+                # For subsequent years
+                cropping_key = f'cropping_{year_offset}'
+                single_c_key = f'single_c_{year_offset}'
+                single_k_key = f'single_k_{year_offset}'
+                single_n_key = f'single_n_{year_offset}'
+                doubly_c_key = f'doubly_c_{year_offset}'
+                triply_c_key = f'triply_c_{year_offset}'
 
             # Add cropping intensity and area data for each year
             row[f'cropping_intensity_{year}-{year + 1}'] = properties.get(cropping_key, 0)
@@ -1093,7 +1136,7 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
     df = pd.DataFrame(df_data)
     df = df.sort_values(['UID'])
 
-     ## for roundoff all numeric value upto 2 decimal
+    ## for roundoff all numeric value upto 2 decimal
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
     df[numeric_cols] = df[numeric_cols].round(2) 
 

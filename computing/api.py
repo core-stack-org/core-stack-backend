@@ -40,6 +40,8 @@ from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
 from .plantation.site_suitability import site_suitability
+from .misc.aquifer_vector import generate_aquifer_vector
+from .misc.soge_vector import generate_soge_vector
 
 
 @api_view(["POST"])
@@ -628,3 +630,42 @@ def plantation_site_suitability(request):
     except Exception as e:
         print("Exception in Plantation_site_suitability api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def aquifer_vector(request):
+    print("Inside Aquifer vector layer api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        generate_aquifer_vector.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": "aquifer vector task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in aquifer vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def soge_vector(request):
+    print("Inside soge vector layer api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        generate_soge_vector.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": "SOGE vector task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in SOGE vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

@@ -95,11 +95,9 @@ def tree_health_ch_vector(self, state, district, block, start_year, end_year):
             print(f"Error processing year {year}: {str(e)}")
             continue
 
-    # Create the final combined feature collection
     final_features = []
     
     for uid, data in uid_data.items():
-        # Calculate statistics for each height class
         total_short = sum(
             data['properties'].get(get_column_name('Short_Trees', year), 0)
             for year in range(start_year, end_year + 1)
@@ -117,7 +115,7 @@ def tree_health_ch_vector(self, state, district, block, start_year, end_year):
         data['properties']['avg_sh_tr'] = total_short / (end_year - start_year + 1)
         data['properties']['avg_md_tr'] = total_medium / (end_year - start_year + 1)
         data['properties']['avg_tl_tr'] = total_tall / (end_year - start_year + 1)
-        data['properties']['area_in_ha'] = area_in_ha
+        data['properties']['area_in_ha'] = data['area_in_ha']
         data['properties']['uid'] = uid
         
         final_feature = {
@@ -193,7 +191,6 @@ def generate_vector(roi, args, state, district, block, year):
         def process_feature(feature):
             value = feature.get("sum")
             value = ee.Number(value).multiply(0.0001)
-            # Use the new column naming function
             column_name = get_column_name(arg["label"], year)
             return feature.set(column_name, value)
 
