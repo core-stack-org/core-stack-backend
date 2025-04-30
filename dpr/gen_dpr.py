@@ -51,10 +51,6 @@ from .models import (
 from dpr.mapping import populate_maintenance_from_waterbody
 from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
 from utilities.logger import setup_logger
-import environ
-
-env = environ.Env()
-environ.Env.read_env()  # reading .env file
 
 logger = setup_logger(__name__)
 
