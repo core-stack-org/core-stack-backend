@@ -466,7 +466,8 @@
                 <canvas id="Chart-drought"></canvas>
             </div>
         </section>
-
+        
+        {% if villageNames %}
         <section class="section">
             <h2>Village Profile</h2>
             <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
@@ -495,6 +496,7 @@
             </table>
 
         </section>
+        {% endif %}
     </div>
 
     <footer>
