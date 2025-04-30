@@ -431,6 +431,8 @@
                 <canvas id="barChart-swb"></canvas>
             </div>
 
+            <div id="swbMap" class="map"></div>
+
             <p>{{swb_season_desc}}</p>
         </section>
 
@@ -723,6 +725,28 @@
             })
         })
 
+        const swbMap = new ol.Map({
+            target: 'swbMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
         .then(response => response.json())
         .then(data => {
@@ -812,6 +836,7 @@
                     ComparisonMap2.addLayer(vectorLayerComp)
                     ComparisonMap3.addLayer(vectorLayerComp)
                     ComparisonMap4.addLayer(vectorLayerComp)
+                    swbMap.addLayer(vectorLayerComp)
 
                     const arr = vectorSource.getExtent();
                     const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
@@ -839,9 +864,36 @@
 
                     ComparisonMap4.getView().setCenter(mapcenter);
                     ComparisonMap4.getView().setZoom(13);
+
+                    swbMap.getView().setCenter(mapcenter);
+                    swbMap.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/water_bodies/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=water_bodies:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'rgb(0, 150, 255)',
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(137, 207, 240, 0.4)',
+                    }),
+                })
+            });
+
+            swbMap.addLayer(vectorLayer);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Extract Feature
         fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster);
