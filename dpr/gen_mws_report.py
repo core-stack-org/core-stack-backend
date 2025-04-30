@@ -1862,7 +1862,15 @@ def get_village_data(state, district, block, uid):
         selected_columns_ids = [
             col for col in df.columns if col.startswith("Village IDs")
         ]
-        villages = df.loc[df["MWS UID"] == uid, selected_columns_ids].values[0].tolist()
+        # select only the columns you care about
+        matching = df.loc[df["MWS UID"] == uid, selected_columns_ids]
+
+        if matching.empty:
+            # no rows found for this uid
+            villages = []
+        else:
+            # take the first (and presumably only) matching row
+            villages = matching.iloc[0].tolist()
 
         villages_name = []
         villages_sc = []
