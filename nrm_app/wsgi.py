@@ -8,12 +8,18 @@ https://docs.djangoproject.com/en/4.2/howto/deployment/wsgi/
 """
 
 import os
+import site
 
 from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
 
-os.environ['GDAL_DATA'] = '/home/ubuntu/prod_dir/nrm-app/venv/envs/corestack/share/gdal'
-os.environ['LD_LIBRARY_PATH'] = '/home/ubuntu/prod_dir/nrm-app/venv/envs/corestack/lib'
+conda_env = os.path.dirname(site.__file__).split('/lib')[0]
+print("CONDA ENV: ", conda_env)
+os.environ['GDAL_DATA'] = f"{conda_env}/share/gdal"
+os.environ['LD_LIBRARY_PATH'] = f"{conda_env}/lib"
+
+# os.environ['GDAL_DATA'] = '/home/ubuntu/prod_dir/nrm-app/venv/envs/corestack/share/gdal'
+# os.environ['LD_LIBRARY_PATH'] = '/home/ubuntu/prod_dir/nrm-app/venv/envs/corestack/lib'
 
 application = get_wsgi_application()
