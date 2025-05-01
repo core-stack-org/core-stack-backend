@@ -76,7 +76,7 @@ class PlanCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Plan
-        fields = ["name", "state", "district", "block", "village", "gram_panchayat"]
+        fields = ["name", "state", "district", "block", "village", "gram_panchayat", "facilitator_name"]
 
     def validate(self, data):
         """
@@ -89,6 +89,7 @@ class PlanCreateSerializer(serializers.ModelSerializer):
             "block",
             "village",
             "gram_panchayat",
+            "facilitator_name"
         ]
         for field in required_fields:
             if field not in data or not data[field]:
