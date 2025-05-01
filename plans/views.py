@@ -4,8 +4,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from projects.models import Project, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
-from .models import Plan
-from .serializers import PlanSerializer, PlanCreateSerializer
+from .models import PlanApp
+from .serializers import PlanSerializer, PlanCreateSerializer, PlanAppListSerializer
 
 
 class PlanPermission(permissions.BasePermission):
@@ -121,10 +121,10 @@ class PlanViewSet(viewsets.ModelViewSet):
                 project = Project.objects.get(
                     id=project_id, app_type=AppType.WATERSHED, enabled=True
                 )
-                return Plan.objects.filter(project=project)
+                return PlanApp.objects.filter(project=project)
             except Project.DoesNotExist:
-                return Plan.objects.none()
-        return Plan.objects.none()
+                return PlanApp.objects.none()
+        return PlanApp.objects.none()
 
     def get_serializer_class(self):
         """
@@ -132,6 +132,8 @@ class PlanViewSet(viewsets.ModelViewSet):
         """
         if self.action in ["create"]:
             return PlanCreateSerializer
+        elif self.action in ["list", "retrieve"]:
+            return PlanAppListSerializer
         return PlanSerializer
 
     def create(self, request, *args, **kwargs):

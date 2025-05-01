@@ -1100,7 +1100,7 @@ def create_surface_wb_table(doc, plan):
             else "N/A"
         )
 
-        total_area = f"{float(total_area):.2f}" if total_area != "N/A" else "N/A"
+        total_area = f"{float(total_area/10000):.2f}" if total_area != "N/A" else "N/A"
 
         kharif_value = f"{float(kharif_value):.2f}" if kharif_value != "N/A" else "N/A"
         rabi_value = f"{float(rabi_value):.2f}" if rabi_value != "N/A" else "N/A"
@@ -1325,6 +1325,7 @@ def format_work_dimensions(work_dimensions, work_type):
 
 
 # MARK: - Section G
+
 def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Propose New Livelihood Works", level=1)
 
@@ -1572,7 +1573,7 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
     folium.LayerControl().add_to(fol_map)
 
-    # Create a temporary directory for saving files
+    # Create a temporary directory for saving files, fixes the permission issues coming off Apache
     with tempfile.TemporaryDirectory() as temp_dir:
         map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
         fol_map.save(map_filename)
