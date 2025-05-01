@@ -114,7 +114,7 @@ class PlanCreateSerializer(serializers.ModelSerializer):
                 
                 if existing_plan:
                     raise serializers.ValidationError(
-                        {"plan failed": "A plan with this name already exists. Please provide a different name"}
+                        {"message": "A plan with this name already exists. Please provide a different name"}
                     )
 
         if not data["state"].active_status:

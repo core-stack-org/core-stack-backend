@@ -143,7 +143,7 @@ class PlanViewSet(viewsets.ModelViewSet):
         project_id = self.kwargs.get("project_pk")
         if not project_id:
             return Response(
-                {"detail": "Project ID is required."},
+                {"message": "Project ID is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -154,7 +154,7 @@ class PlanViewSet(viewsets.ModelViewSet):
             )
         except Project.DoesNotExist:
             return Response(
-                {"detail": "Watershed planning is not enabled for this project."},
+                {"message": "Watershed Planning is not enabled for this project."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -166,8 +166,13 @@ class PlanViewSet(viewsets.ModelViewSet):
             project=project, organization=project.organization, created_by=request.user
         )
 
-        # Use the full serializer for response
-        return Response(PlanSerializer(plan).data, status=status.HTTP_201_CREATED)
+        # Use the full serializer for response with success message
+        response_data = {
+            "plan_data": PlanAppListSerializer(plan).data,
+            "message": f"Successfully created the watershed plan,{plan.plan}"
+        }
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         """
