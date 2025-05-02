@@ -6,6 +6,9 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
+from .lulc.v4.classify_raster import classify_raster
+from .lulc.v4.lulc_v4 import generate_lulc_v4
+from .lulc.v4.time_series import time_series
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order_vector
 from .utils import (
@@ -256,6 +259,27 @@ def lulc_vector(request):
         )
     except Exception as e:
         print("Exception in lulc_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def lulc_v4(request):
+    print("Inside lulc_time_series")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        generate_lulc_v4.apply_async(
+            args=[state, district, block, start_year, end_year], queue="nrm"
+        )
+        return Response(
+            {"Success": "lulc_time_series task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in lulc_time_series api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
