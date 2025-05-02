@@ -1,9 +1,19 @@
 import ee
-from utilities.gee_utils import ee_initialize
+from utilities.gee_utils import (
+    ee_initialize,
+    valid_gee_text,
+    get_gee_asset_path,
+    is_gee_asset_exists,
+)
 
 
-def classify_raster(state, district, block, start_year, end_year):
-    directory = "Area_Peddapally"
+def classify_raster(state, district, block):
+    directory = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+    description = directory + "_boundaries_refined"
+    asset_id = get_gee_asset_path(state, district, block) + description
+
+    if is_gee_asset_exists(asset_id):
+        return
 
     mapping = {"farm": 1, "plantation": 2, "scrubland": 3, "rest": 0}
     reversed_mapping = {v: k for k, v in mapping.items()}
@@ -18,8 +28,8 @@ def classify_raster(state, district, block, start_year, end_year):
     easy_scurbland = [ee.Filter.gte("size", 60000), ee.Filter.gt("red", 0.9)]
     easy_plantation = [ee.Filter.lt("area", 20000), ee.Filter.gt("area", 1000)]
 
-    all = get_feature_collection(
-        "projects/ee-raman/assets/" + directory + "_boundaries"
+    all = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block) + directory + "_boundaries"
     )
     farm = all.filter(ee.Filter.And(*easy_farm))
     scrubland = all.filter(ee.Filter.And(easy_scurbland))
@@ -39,9 +49,8 @@ def classify_raster(state, district, block, start_year, end_year):
         .where(scrubland_mask, mapping["scrubland"])
         .where(plantation_mask, mapping["plantation"])
     )
-    # ts_data = ee.Image("projects/ee-raman/assets/ts_data_" + directory) # TODO
     ts_data = ee.Image(
-        "projects/ee-corestack-helper/assets/apps/ts_data_Area_Peddapally"
+        get_gee_asset_path(state, district, block) + "ts_data_" + directory
     )
     # Classes to sample (exclude background = 0)
     class_values = [(1, 20000), (2, 20000), (3, 20000)]
@@ -98,31 +107,10 @@ def classify_raster(state, district, block, start_year, end_year):
 
     task = ee.batch.Export.table.toAsset(
         collection=all_labels,
-        description="Classification",
-        assetId="projects/ee-corestack-helper/assets/apps/"
-        + directory
-        + "_boundaries_refined",
+        description=description,
+        assetId=asset_id,
     )
 
     # Start the task
     task.start()
-
-
-def get_feature_collection(asset_id):
-    """Check if an asset exists, and load it as a FeatureCollection if it does.
-    Otherwise, return an empty FeatureCollection.
-
-    Args:
-        asset_id (str): The Earth Engine asset ID.
-
-    Returns:
-        ee.FeatureCollection: The loaded FeatureCollection or an empty one.
-    """
-    try:
-        # Get asset information to check existence
-        ee.data.getAsset(asset_id)
-        print(f"Asset '{asset_id}' exists. Loading FeatureCollection.")
-        return ee.FeatureCollection(asset_id)
-    except Exception as e:
-        print(f"Asset '{asset_id}' does not exist. Returning empty FeatureCollection.")
-        return ee.FeatureCollection([])
+    return task.status()["id"]

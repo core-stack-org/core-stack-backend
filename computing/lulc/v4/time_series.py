@@ -1,5 +1,5 @@
 import ee
-from datetime import datetime, timedelta
+import os
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 import math
@@ -7,16 +7,25 @@ from itertools import product
 from pathlib import Path
 import ast
 from computing.lulc.v4.cropping_frequency_detection import Get_Padded_NDVI_TS_Image
-from utilities.gee_utils import ee_initialize
-from nrm_app.celery import app
+from utilities.gee_utils import get_gee_asset_path, valid_gee_text, is_gee_asset_exists
 
 
-@app.task(bind=True)
 def time_series(state, district, block, start_year, end_year):
-    roi_boundary = ee.FeatureCollection("users/mtpictd/india_block_boundaries").filter(
-        ee.Filter.eq("block", "Peddapally")
+    directory = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+    description = "ts_data_" + directory
+    asset_id = get_gee_asset_path(state, district, block) + description
+
+    if is_gee_asset_exists(asset_id):
+        return
+
+    roi_boundary = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
+        + "filtered_mws_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_uid"
     )
-    directory = "Area_Peddapally"
 
     # Function to convert latitude to pixel Y at a given zoom level
     def lat_to_pixel_y(lat, zoom):
@@ -73,10 +82,13 @@ def time_series(state, district, block, start_year, end_year):
         longs = [i[1] for i in diagonal_lat_lon]
         return list(product(lats, longs))
 
-    def get_points(roi, directory):
-        points_file = Path("data/" + directory + "/status.csv")
+    def get_points(roi):
+        file_path = os.path.join("data/lulc_v4", directory)
+        if not os.path.exists(file_path):
+            os.mkdir(file_path)
+        points_file = Path(file_path + "/status.csv")
         if points_file.is_file():
-            df = pd.read_csv("data/" + directory + "/status.csv", index_col=False)
+            df = pd.read_csv(file_path + "/status.csv", index_col=False)
             df["points"] = df["points"].apply(ast.literal_eval)
             return df
         zoom = 17
@@ -113,16 +125,16 @@ def time_series(state, district, block, start_year, end_year):
                 index += 1
             print(intersects)
         df = pd.DataFrame(intersect_list, columns=["index", "points"])
-        df["overall_status"] = False
-        df["download_status"] = False
-        df["model_status"] = False
-        df["segmentation_status"] = False
-        df["postprocessing_status"] = False
-        df["plantation_status"] = False
-        df.to_csv("data/" + directory + "/status.csv", index=False)
+        # df["overall_status"] = False
+        # df["download_status"] = False
+        # df["model_status"] = False
+        # df["segmentation_status"] = False
+        # df["postprocessing_status"] = False
+        # df["plantation_status"] = False
+        df.to_csv("data/lulc_v4/" + directory + "/status.csv", index=False)
         return df
 
-    blocks_df = get_points(roi_boundary, directory)
+    blocks_df = get_points(roi_boundary)
     points = list(blocks_df["points"])
 
     roi_boundary = ee.FeatureCollection(
@@ -138,55 +150,55 @@ def time_series(state, district, block, start_year, end_year):
 
     """ LULC execution for years 2017 onwards with temporal correction """
 
-    startDate = "2023-07-01"
-    endDate = "2024-07-01"
+    start_date = f"{start_year}-07-01"
+    end_date = f"{end_year}-07-01"
 
-    scale = 10
+    # loopStart = start_date
+    # loopEnd = (datetime.strptime(end_date, "%Y-%m-%d")).strftime("%Y-%m-%d")
+    #
+    # while loopStart != loopEnd:
+    #     currStartDate = datetime.strptime(loopStart, "%Y-%m-%d")
+    #     currEndDate = currStartDate + relativedelta(years=1) - timedelta(days=1)
+    #
+    #     loopStart = (currStartDate + relativedelta(years=1)).strftime("%Y-%m-%d")
+    #
+    #     currStartDate = currStartDate.strftime("%Y-%m-%d")
+    #     currEndDate = currEndDate.strftime("%Y-%m-%d")
+    #
+    #     print(
+    #         "\n EXECUTING LULC PREDICTION FOR ",
+    #         currStartDate,
+    #         " TO ",
+    #         currEndDate,
+    #         "\n",
+    #     )
+    #
+    #     # curr_filename = directory + "_" + currStartDate + "_" + currEndDate
+    #
+    #     if datetime.strptime(currStartDate, "%Y-%m-%d").year < 2017:
+    #         print(
+    #             "To generate LULC output of year ",
+    #             datetime.strptime(currStartDate, "%Y-%m-%d").year,
+    #             " , go to cell-LULC execution for years before 2017",
+    #         )
+    #         continue
+    ts_data, _ = Get_Padded_NDVI_TS_Image(start_date, end_date, roi_boundary)
 
-    loopStart = startDate
-    loopEnd = (datetime.strptime(endDate, "%Y-%m-%d")).strftime("%Y-%m-%d")
+    ts_data = ts_data.select(ts_data.bandNames().getInfo()).rename(
+        [
+            "_".join(i.split("_")[1:]) + "_" + i.split("_")[0]
+            for i in ts_data.bandNames().getInfo()
+        ]
+    )
+    task = ee.batch.Export.image.toAsset(
+        image=ts_data.clip(roi_boundary.geometry()),
+        description=description,
+        assetId=asset_id,
+        # pyramidingPolicy = {'predicted_label': 'mode'},
+        scale=10,
+        maxPixels=1e13,
+        crs="EPSG:4326",
+    )
+    task.start()
 
-    while loopStart != loopEnd:
-        currStartDate = datetime.strptime(loopStart, "%Y-%m-%d")
-        currEndDate = currStartDate + relativedelta(years=1) - timedelta(days=1)
-
-        loopStart = (currStartDate + relativedelta(years=1)).strftime("%Y-%m-%d")
-
-        currStartDate = currStartDate.strftime("%Y-%m-%d")
-        currEndDate = currEndDate.strftime("%Y-%m-%d")
-
-        print(
-            "\n EXECUTING LULC PREDICTION FOR ",
-            currStartDate,
-            " TO ",
-            currEndDate,
-            "\n",
-        )
-
-        # curr_filename = directory + "_" + currStartDate + "_" + currEndDate
-
-        if datetime.strptime(currStartDate, "%Y-%m-%d").year < 2017:
-            print(
-                "To generate LULC output of year ",
-                datetime.strptime(currStartDate, "%Y-%m-%d").year,
-                " , go to cell-LULC execution for years before 2017",
-            )
-            continue
-        ts_data, _ = Get_Padded_NDVI_TS_Image(startDate, endDate, roi_boundary)
-
-        ts_data = ts_data.select(ts_data.bandNames().getInfo()).rename(
-            [
-                "_".join(i.split("_")[1:]) + "_" + i.split("_")[0]
-                for i in ts_data.bandNames().getInfo()
-            ]
-        )
-        task = ee.batch.Export.image.toAsset(
-            image=ts_data.clip(roi_boundary.geometry()),
-            description="TimeSeries_" + directory,
-            assetId="projects/ee-corestack-helper/assets/apps/ts_data_" + directory,
-            # pyramidingPolicy = {'predicted_label': 'mode'},
-            scale=scale,
-            maxPixels=1e13,
-            crs="EPSG:4326",
-        )
-        task.start()
+    return task.status()["id"]
