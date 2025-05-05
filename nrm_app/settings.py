@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "projects",
     "plantations",
     "plans",
+    "community_engagement",
 ]
 
 # CORS_ALLOW_ALL_ORIGINS = True
