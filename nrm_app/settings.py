@@ -81,16 +81,34 @@ INSTALLED_APPS = [
 
 # CORS_ALLOW_ALL_ORIGINS = True
 
+# CORS_ALLOWED_ORIGINS = [
+#     "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
+#     "https://nrm.core-stack.org",
+#     "https://nrm.gramvaanidev.org",
+#     "https://dashboard.core-stack.org",
+#     "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
+#     "https://uat.dashboard.core-stack.org/",
+#     "https://www.explorer.core-stack.org/",
+#     "https://www.explorer.core-stack.org/landscape_explorer",
+#     "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
+#
+#     "http://127.0.0.1:8000",
+#     "http://192.168.222.27:8000",
+#     "http://192.168.222.23:3000",
+#     "http://192.168.20.236:3000",
+#     "http://localhost:3000",
+#     "http://localhost:3001",
+# ]  # TODO Add extra URLs if required
+
 CORS_ALLOWED_ORIGINS = [
     "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
     "https://nrm.core-stack.org",
     "https://nrm.gramvaanidev.org",
     "https://dashboard.core-stack.org",
-    "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
-    "https://uat.dashboard.core-stack.org/",
-    "https://www.explorer.core-stack.org/",
-    "https://www.explorer.core-stack.org/landscape_explorer",
-    "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
+    "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
+    "https://uat.dashboard.core-stack.org",
+    "https://www.explorer.core-stack.org",
+    "https://development.d2s4eeyazvtd2g.amplifyapp.com",
 
     "http://127.0.0.1:8000",
     "http://192.168.222.27:8000",
@@ -99,7 +117,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
 ]  # TODO Add extra URLs if required
-
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",

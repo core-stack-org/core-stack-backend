@@ -367,7 +367,6 @@ dependencies:
       - fastapi==0.115.12
       - lxml==5.3.2
       - mysql-connector-python==9.2.0
-      - mysqlclient==2.2.7
       - psycopg==3.2.6
       - pydantic==2.11.3
       - pydantic-core==2.33.1
