@@ -62,7 +62,7 @@ def clip_raster(roi, state, district, block, description):
         crs="EPSG:4326",
     )
     task.start()
-    check_task_status(task.status()["id"])
+    check_task_status([task.status()["id"]])
 
     return asset_id
 
