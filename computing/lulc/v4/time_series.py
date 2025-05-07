@@ -25,7 +25,7 @@ def time_series(state, district, block, start_year, end_year):
         + "_"
         + valid_gee_text(block.lower())
         + "_uid"
-    )
+    ).union()
 
     # Function to convert latitude to pixel Y at a given zoom level
     def lat_to_pixel_y(lat, zoom):

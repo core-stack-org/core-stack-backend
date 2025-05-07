@@ -52,7 +52,7 @@ def generate_final(state, district, block, start_year, end_year):
         + "_"
         + valid_gee_text(block.lower())
         + "_uid"
-    )
+    ).union()
 
     all = ee.FeatureCollection(
         get_gee_asset_path(state, district, block) + filename_prefix + "_boundaries"
