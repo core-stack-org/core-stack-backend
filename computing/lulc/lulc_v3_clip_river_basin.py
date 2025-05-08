@@ -28,7 +28,7 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         + "_"
         + valid_gee_text(block_name.lower())
         + "_uid"
-    )
+    ).union()
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
