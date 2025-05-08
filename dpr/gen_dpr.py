@@ -3,10 +3,13 @@ import json
 import os
 import tempfile
 import threading
+import time
 from collections import defaultdict
 from datetime import date, datetime
 from io import BytesIO
 from multiprocessing import Process
+
+from selenium import webdriver
 from nrm_app.settings import (
     EMAIL_HOST_USER,
     EMAIL_HOST_PASSWORD,
@@ -1330,13 +1333,15 @@ def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Propose New Livelihood Works", level=1)
 
     livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
+    
+    # Table for Livestock and Fisheries
+    doc.add_heading("G.1 Livestock and Fisheries", level=2)
     headers = [
         "Livelihood Works",
         "Name of Beneficiary Settlement",
         "Name of Beneficiary",
         "Beneficiary Father's Name",
         "Type of Work Demand",
-        "Area",
         "Latitude",
         "Longitude",
     ]
@@ -1367,11 +1372,10 @@ def add_section_g(doc, plan, mws):
                 )
             row_cells[4].text = livestock_demand or "No Data Provided"
 
-            row_cells[5].text = "No Data"  # Area not specified for livestock
-            row_cells[6].text = (
+            row_cells[5].text = (
                 str(record.latitude) if record.latitude else "No Data Provided"
             )
-            row_cells[7].text = (
+            row_cells[6].text = (
                 str(record.longitude) if record.longitude else "No Data Provided"
             )
 
@@ -1395,17 +1399,35 @@ def add_section_g(doc, plan, mws):
                 )
             row_cells[4].text = fisheries_demand or "No Data Provided"
 
-            row_cells[5].text = "No Data Provided"  # Area not specified for fisheries
-            row_cells[6].text = (
+            row_cells[5].text = (
                 str(record.latitude) if record.latitude else "No Data Provided"
             )
-            row_cells[7].text = (
+            row_cells[6].text = (
                 str(record.longitude) if record.longitude else "No Data Provided"
             )
 
+    # Table for Plantation
+    doc.add_heading("G.2 Plantations", level=2)
+    plantation_headers = [
+        "Livelihood Works",
+        "Name of Beneficiary Settlement",
+        "Name of Beneficiary",
+        "Beneficiary Father's Name",
+        "Name of Plantation Crop",
+        "Total Area",
+        "Latitude",
+        "Longitude",
+    ]
+    plantation_table = doc.add_table(rows=1, cols=len(plantation_headers))
+    plantation_table.style = "Table Grid"
+    plantation_hdr_cells = plantation_table.rows[0].cells
+    for i, header in enumerate(plantation_headers):
+        plantation_hdr_cells[i].paragraphs[0].add_run(header).bold = True
+
+    for record in livelihood_records:
         # Handle Plantation category
         if record.data_livelihood.get("select_one_demand_plantation") == "Yes":
-            row_cells = table.add_row().cells
+            row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Plantations"
             row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
             row_cells[2].text = record.data_livelihood.get(
@@ -1573,16 +1595,71 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
     folium.LayerControl().add_to(fol_map)
 
-    # Create a temporary directory for saving files, fixes the permission issues coming off Apache
-    with tempfile.TemporaryDirectory() as temp_dir:
-        map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
-        fol_map.save(map_filename)
-        img_data = fol_map._to_png(5)
-        img = Image.open(BytesIO(img_data))
-        img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
-        img.save(img_filename)
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Save map and convert to image
+            map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
+            fol_map.save(map_filename)
 
-        doc.add_picture(img_filename, width=Inches(6))
+            img_data = custom_to_png(fol_map, delay=5, window_size=(1920, 1080), headless=True)
+            img = Image.open(BytesIO(img_data))
+            img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
+            img.save(img_filename)
+
+            # Add to document
+            doc.add_picture(img_filename, width=Inches(6))
+
+    except Exception as e:
+        logger.error(f"DEBUG: Error creating map: {str(e)}")
+        return
+
+
+def custom_to_png(folium_map, delay=5, window_size=(1920, 1080), headless=True):
+    """Custom implementation of _to_png for folium maps with customizable driver settings.
+    
+    Args:
+        folium_map: The folium map object
+        delay: Time in seconds to wait between render and snapshot (default: 5)
+        window_size: Tuple of (width, height) for browser window size (default: 1920x1080)
+        headless: Whether to run browser in headless mode (default: True)
+        
+    Returns:
+        PNG image data as bytes
+    """
+    
+    # Configure Firefox options
+    options = webdriver.firefox.options.Options()
+    if headless:
+        options.add_argument("--headless")
+    
+    # Create driver with custom options
+    driver = webdriver.Firefox(options=options)
+    
+    # Set window size
+    driver.set_window_size(window_size[0], window_size[1])
+    
+    # Create temporary HTML file
+    html = folium_map.get_root().render()
+    with tempfile.NamedTemporaryFile('w', suffix='.html', delete=False) as f:
+        f.write(html)
+        fname = f.name
+    
+    try: 
+        # Load the HTML file
+        driver.get(f"file:///{fname}")
+        
+        # Wait for map to render
+        time.sleep(delay)
+        
+        # Take screenshot
+        div = driver.find_element("class name", "folium-map")
+        png = div.screenshot_as_png
+        
+        return png
+    finally:
+        # Clean up
+        driver.quit()
+        os.unlink(fname)
 
 
 def show_all_mws(doc, plan, mws):
@@ -1720,7 +1797,7 @@ def show_all_mws(doc, plan, mws):
         map_filename = os.path.join(temp_dir, "all_mws_map.html")
         fol_map.save(map_filename)
 
-        img_data = fol_map._to_png(5)
+        img_data = custom_to_png(fol_map, delay=5, window_size=(1920, 1080), headless=True)
         img = Image.open(BytesIO(img_data))
         img_filename = os.path.join(temp_dir, "all_mws_map.png")
         img.save(img_filename)
@@ -1732,6 +1809,9 @@ def show_all_mws(doc, plan, mws):
 
 
 # MARK: - Section H
+# TODO: Fix the sync between the settlements marked for maintenance in resource mapping that 
+# they are also treated as first class citizens and added to the maintenance tables
+
 def add_section_h(doc, plan, mws):
     populate_maintenance_from_waterbody(plan)
 

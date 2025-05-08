@@ -1,6 +1,5 @@
-import os
 import pandas as pd
-from .models import State, District, Block
+from geoadmin.models import State, District, Block
 
 
 def import_data_to_db(state_csv_path):
@@ -28,6 +27,3 @@ def import_data_to_db(state_csv_path):
                 block_census_code = str(block_df['Subdistrict census code'].iloc[0])
                 Block.objects.get_or_create(block_name=block_name, block_census_code=block_census_code, district=district)
 
-# if __name__=="__main__":
-#     csv_path = "/home/ankit/gramvaani/nrm/checkin/backend/nrm-app/data/admin-boundaries/json-data/andhra pradesh.json"
-#     import_data_to_db(csv_path)

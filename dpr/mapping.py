@@ -4,7 +4,9 @@ from dpr.models import (
     Agri_maintenance,
     SWB_maintenance,
 )
-import uuid
+from utilities.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 all_water_structures = [
     "Farm pond",
@@ -78,15 +80,16 @@ def populate_maintenance_from_waterbody(plan):
     Args:
         plan: Plan object containing plan details
     """
-
+    print("HERE WE GO")
     # Get all waterbody records for the plan
     waterbodies = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    logger.info(f"Found {waterbodies.count()} waterbody records for plan {plan.plan_id}")
 
     for waterbody in waterbodies:
+        print("*******************  JUST FOR A CHECK  **********************")
+        print("Waterbody:", waterbody)
         structure_type = waterbody.water_structure_type
-
-        print("MAPPING")
-        print("Water Structure:", structure_type)
+        logger.info("Water Structure Type:", structure_type)
 
         # Skip if no maintenance needed
         if waterbody.need_maintenance.lower() != "yes":
@@ -98,11 +101,11 @@ def populate_maintenance_from_waterbody(plan):
             "select_one_activities": "Maintenance",
         }
 
-        print("Common Data:", common_data)
+        logger.info("Common Data:", common_data)
 
         work_id = waterbody.waterbody_id
 
-        print("Work ID:", work_id)
+        logger.info("Work ID:", work_id)
 
         if structure_type in recharge_structures:
             existing = GW_maintenance.objects.filter(
