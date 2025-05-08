@@ -22,12 +22,27 @@ def get_lulc_data(suitability_vector, start_year, end_year):
 
     # Retrieve Dynamic World Land Use/Land Cover collection
     # Dynamic World provides high-resolution global land cover classification
-    dynamic_world = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1").filterDate(
-        start_date, end_date
-    )
+    # dynamic_world = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1").filterDate(
+    #     start_date, end_date
+    # )
 
-    # Create a list of years to process
-    years = ee.List.sequence(start_year, end_year)
+    lulc_years = {}
+    # for (year = start year <= end year++) {
+    for year in range(start_year, end_year + 1):
+        asset_id = (
+            "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+            + str(year)
+            + "_"
+            + str(year + 1)
+        )
+
+        lulc_years[year] = (
+            ee.Image(asset_id)
+            .select(["predicted_label"])
+            .clip(suitability_vector.geometry())
+        )
+
+    lulc_years_dict = ee.Dictionary(lulc_years)
 
     def get_lulc(feature):
         """
@@ -56,15 +71,21 @@ def get_lulc_data(suitability_vector, start_year, end_year):
             e_date = s_date.advance(1, "year")
 
             # Calculate the mode (most frequent) LULC classification for the feature
-            mode_lulc = (
-                dynamic_world.filterDate(s_date, e_date)
-                .filterBounds(feature.geometry())
-                .mode()
-                .select("label")
+            # mode_lulc = (
+            #     dynamic_world.filterDate(s_date, e_date)
+            #     .filterBounds(feature.geometry())
+            #     .mode()
+            #     .select("label")
+            # )
+
+            annual_lulc = (
+                ee.Image(lulc_years_dict.get(year))
+                .select(["predicted_label"])
+                .clip(feature.geometry())
             )
 
             # Compute histogram of LULC classes within the feature's geometry
-            lulc_histogram = mode_lulc.reduceRegion(
+            lulc_histogram = annual_lulc.reduceRegion(
                 reducer=ee.Reducer.frequencyHistogram(),
                 geometry=feature.geometry(),
                 scale=10,  # 10-meter resolution
@@ -72,7 +93,7 @@ def get_lulc_data(suitability_vector, start_year, end_year):
             )
 
             # Extract the label histogram
-            temp_dict = ee.Dictionary(lulc_histogram.get("label"))
+            temp_dict = ee.Dictionary(lulc_histogram.get("predicted_label"))
 
             # Convert pixel counts to hectares
             # Conversion assumes 10m resolution:
@@ -92,7 +113,7 @@ def get_lulc_data(suitability_vector, start_year, end_year):
             return lulc_dict.combine(temp_dict)
 
         # Process LULC data for all years in the analysis period
-        lulc_by_year = years.map(process_year)
+        lulc_by_year = lulc_years_dict.keys().map(process_year)
 
         # Set LULC data as an encoded JSON string in the feature's properties
         return feature.set("LULC", ee.String.encodeJSON(lulc_by_year))

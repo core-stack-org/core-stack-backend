@@ -42,37 +42,40 @@ def site_suitability(self, project_id, state, start_year, end_year):
     organization = project.organization.name
     project_name = project.name
 
-    kml_files_obj = KMLFile.objects.filter(project=project)
+    # kml_files_obj = KMLFile.objects.filter(project=project)
 
     # Initialize Earth Engine connection for the project
     ee_initialize()
 
-    # Create a project-specific directory in Google Earth Engine
-    create_gee_dir([organization, project_name], gee_project_path=GEE_PATH_PLANTATION)
-
-    # Construct a unique description and asset ID for the project
-    description = valid_gee_text(organization) + "_" + valid_gee_text(project_name)
-    asset_id = (
-        get_gee_dir_path([organization, project_name], asset_path=GEE_PATH_PLANTATION)
-        + description
+    # # Create a project-specific directory in Google Earth Engine
+    # create_gee_dir([organization, project_name], gee_project_path=GEE_PATH_PLANTATION)
+    #
+    # # Construct a unique description and asset ID for the project
+    # description = valid_gee_text(organization) + "_" + valid_gee_text(project_name)
+    # asset_id = (
+    #     get_gee_dir_path([organization, project_name], asset_path=GEE_PATH_PLANTATION)
+    #     + description
+    # )
+    #
+    # # Check if the asset already exists and handle accordingly
+    # if is_gee_asset_exists(asset_id):
+    #     merge_new_kmls(asset_id, description, project_name, kml_files_obj)
+    # else:
+    #     generate_project_roi(asset_id, description, project_name, kml_files_obj)
+    #
+    # # Load the region of interest (ROI) feature collection
+    # roi = ee.FeatureCollection(asset_id)
+    roi = ee.FeatureCollection(
+        "projects/ee-corestackdev/assets/apps/plantation/cfpt/infosys/CFPT_Infosys"
     )
-
-    # Check if the asset already exists and handle accordingly
-    if is_gee_asset_exists(asset_id):
-        merge_new_kmls(asset_id, description, project_name, kml_files_obj)
-    else:
-        generate_project_roi(asset_id, description, project_name, kml_files_obj)
-
-    # Load the region of interest (ROI) feature collection
-    roi = ee.FeatureCollection(asset_id)
 
     # Perform site suitability analysis
     vector_asset_id = check_site_suitability(
         roi, organization, project, state, start_year, end_year
     )
 
-    # Sync the results to GeoServer for visualization
-    sync_suitability_to_geoserver(vector_asset_id, organization, project_name)
+    # # Sync the results to GeoServer for visualization
+    # sync_suitability_to_geoserver(vector_asset_id, organization, project_name)
 
 
 def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
@@ -171,8 +174,10 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
 
     # Generate Plantation Site Suitability raster
     pss_rasters_asset, is_default_profile = get_pss(
-        roi, org, project, state, asset_name
+        roi, org, project, state, asset_name, start_year, end_year
     )
+
+    print("is_default_profile>>>", is_default_profile)
 
     # Prepare asset description and path
     description = asset_name + "_vector"
@@ -238,7 +243,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
         )
         check_task_status([merge_task_id], 120)
     else:
-        generate_vector(
+        task_id = generate_vector(
             roi,
             start_year,
             end_year,
@@ -247,6 +252,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
             description,
             asset_id,
         )
+        check_task_status([task_id], 120)
 
     return asset_id
 

@@ -19,7 +19,7 @@ from utilities.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-def get_pss(roi, org, project, state, asset_name):
+def get_pss(roi, org, project, state, asset_name, start_year, end_year):
     """
     Generate Plantation Site Suitability (PSS) raster.
 
@@ -36,6 +36,8 @@ def get_pss(roi, org, project, state, asset_name):
         project: Project object
         state: Geographic state
         asset_name: Name for the output asset
+        start_year: Start year
+        end_year: End year
 
     Returns:
         Asset ID of the generated suitability raster
@@ -65,7 +67,8 @@ def get_pss(roi, org, project, state, asset_name):
 
     # Remove existing asset if it exists to prevent conflicts
     if is_gee_asset_exists(asset_id):
-        ee.data.deleteAsset(asset_id)
+        # ee.data.deleteAsset(asset_id)
+        return asset_id, is_default_profile
 
     # Define analysis layers and their processing functions
     # Each subsequent section follows a similar pattern:
@@ -99,7 +102,7 @@ def get_pss(roi, org, project, state, asset_name):
 
     # Create climate sub-layers by classifying each variable
     climate_sub_layers = create_classification(
-        project_variables, climate_variables, roi, state
+        project_variables, climate_variables, roi, state, start_year, end_year
     )
 
     # Prepare weighted expression for climate layer
@@ -185,7 +188,7 @@ def get_pss(roi, org, project, state, asset_name):
     # soil_variable_weights = get_weights(soil_variable_weights)
 
     soil_sub_layers = create_classification(
-        project_variables, soil_variables, roi, state
+        project_variables, soil_variables, roi, state, start_year, end_year
     )
 
     # Topsoil Nutrient Layer
@@ -274,7 +277,7 @@ def get_pss(roi, org, project, state, asset_name):
     # socioeconomic_variable_weights = get_weights(socioeconomic_variable_weights)
 
     socioeconomic_sub_layers = create_classification(
-        project_variables, socioeconomic_variables, roi, state
+        project_variables, socioeconomic_variables, roi, state, start_year, end_year
     )
 
     socioeconomic_layer = socioeconomic_sub_layers.expression(
@@ -304,7 +307,7 @@ def get_pss(roi, org, project, state, asset_name):
     # ecology_variable_weights = get_weights(ecology_variable_weights)
 
     ecology_sub_layers = create_classification(
-        project_variables, ecology_variables, roi, state
+        project_variables, ecology_variables, roi, state, start_year, end_year
     )
 
     ecology_layer = ecology_sub_layers.expression(
@@ -332,7 +335,7 @@ def get_pss(roi, org, project, state, asset_name):
     # topography_variable_weights = get_weights(topography_variable_weights)
 
     topography_sub_layers = create_classification(
-        project_variables, topography_variables, roi, state
+        project_variables, topography_variables, roi, state, start_year, end_year
     )
 
     topography_layer = topography_sub_layers.expression(
@@ -475,7 +478,7 @@ def get_pss(roi, org, project, state, asset_name):
 
 
 # Helper functions for dataset retrieval and classification
-def get_dataset(variable, state, roi):
+def get_dataset(variable, state, roi, start_year, end_year):
     """
     Retrieve and preprocess geospatial dataset for a specific variable.
 
@@ -483,6 +486,8 @@ def get_dataset(variable, state, roi):
         variable (str): The type of geospatial data to retrieve.
         state (str): The state for which data is being retrieved.
         roi (FeatureCollection): Region of interest
+        start_year: Start year
+        end_year: End year
     Returns:
         ee.Image: Processed geospatial dataset for the specified variable.
 
@@ -517,27 +522,35 @@ def get_dataset(variable, state, roi):
 
     # Land Use and Land Cover (LULC)
     if variable == "LULC":
-        return (
-            ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
-            .filterDate(
-                "2023-07-01", "2024-06-30"
-            )  # TODO: Update with IndiaSAT data when available
-            .median()
-            .select("label")
-        )
+        s_year = start_year
+        lulc_years = []
+        while s_year <= end_year:
+            asset_id = f"projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year+1)}"
+            lulc_img = (
+                ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
+            )
+            lulc_years.append(lulc_img)
+            s_year += 1
+        return ee.ImageCollection(lulc_years).mode()
+        # return (
+        #     ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+        #     .filterDate("2023-07-01", "2024-06-30")
+        #     .median()
+        #     .select("label")
+        # )
     # Normalized Difference Vegetation Index (NDVI)
     if variable == "NDVI":
-        # final_LSMC_NDVI_TS = Get_Padded_NDVI_TS_Image(
-        #     "2023-07-01", "2024-06-30", roi
-        # )  # TODO Remove hard-coded dates
-        # ndvi = final_LSMC_NDVI_TS.select("gapfilled_NDVI_lsc").reduce(ee.Reducer.mean())
-        # return ndvi
-        return (
-            ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
-            .filterDate("2023-07-01", "2024-06-30")
-            .select("NDVI")
-            .reduce(ee.Reducer.mean())
-        )
+        start_date = f"{start_year}-07-01"
+        end_date = f"{end_year + 1}-06-30"
+        final_lsmc_ndvi_ts = Get_Padded_NDVI_TS_Image(start_date, end_date, roi)
+        ndvi = final_lsmc_ndvi_ts.select("gapfilled_NDVI_lsc").reduce(ee.Reducer.mean())
+        return ndvi
+        # return (
+        #     ee.ImageCollection("LANDSAT/COMPOSITES/C02/T1_L2_ANNUAL_NDVI")
+        #     .filterDate("2023-07-01", "2024-06-30")
+        #     .select("NDVI")
+        #     .reduce(ee.Reducer.mean())
+        # )
     # Distance to Roads
     if variable == "distToRoad":
         dataset_collection = ee.FeatureCollection(
@@ -595,7 +608,9 @@ def get_dataset(variable, state, roi):
 #     return new_dict
 
 
-def create_classification(project_intervals, variable_list, roi, state):
+def create_classification(
+    project_intervals, variable_list, roi, state, start_year, end_year
+):
     """
     Create classification layers for multiple variables.
 
@@ -607,7 +622,8 @@ def create_classification(project_intervals, variable_list, roi, state):
         variable_list: List of variables to classify
         roi: Region of Interest
         state: Geographic state
-
+        start_year: Start year
+        end_year: End year
     Returns:
         Multi-band image with classified layers
     """
@@ -617,7 +633,9 @@ def create_classification(project_intervals, variable_list, roi, state):
         nonlocal sub_layer
         labels = project_intervals[variable]["labels"].split(",")
         thresholds = project_intervals[variable]["thresholds"].split(",")
-        dataset = get_dataset(variable, state, roi).clip(roi.geometry())
+        dataset = get_dataset(variable, state, roi, start_year, end_year).clip(
+            roi.geometry()
+        )
 
         classification = ee.Image(1)
         classification = classification.rename(variable)
