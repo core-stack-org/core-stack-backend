@@ -40,7 +40,7 @@ def generate_final(state, district, block, start_year, end_year):
         f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
 
-    asset_id = get_gee_asset_path(state, district, block) + filename_prefix + "_v4"
+    asset_id = get_gee_asset_path(state, district, block) + filename_prefix + "_lulc_v4"
 
     if is_gee_asset_exists(asset_id):
         return
