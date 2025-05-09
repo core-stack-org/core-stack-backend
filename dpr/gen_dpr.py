@@ -1450,7 +1450,7 @@ def add_section_g(doc, plan, mws):
                 str(record.longitude) if record.longitude else "No Data Provided"
             )
 
-
+# TODO: fix the marked works selenium webdriver issue
 def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     logger.info(f"\nDEBUG: Starting show_marked_works for MWS: {uid}")
     logger.info(f"DEBUG: Polygon bounds: {polygon.bounds}")
@@ -1600,7 +1600,7 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
             # Save map and convert to image
             map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
             fol_map.save(map_filename)
-
+            # HACK: selenium webdriver issue
             img_data = custom_to_png(fol_map, delay=5, window_size=(1920, 1080), headless=True)
             img = Image.open(BytesIO(img_data))
             img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
