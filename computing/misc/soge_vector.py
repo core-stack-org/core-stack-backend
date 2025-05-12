@@ -12,6 +12,8 @@ from utilities.gee_utils import (
 from computing.utils import (
     sync_layer_to_geoserver,
 )
+from computing.utils import sync_fc_to_geoserver
+
 
 @app.task(bind=True)
 def generate_soge_vector(self, state, district, block):
@@ -20,15 +22,14 @@ def generate_soge_vector(self, state, district, block):
 
     description = f"soge_vector_{valid_gee_text(district)}_{valid_gee_text(block)}"
     asset_path = get_gee_asset_path(state, district, block)
-    full_asset_id = asset_path + description
+    asset_id = asset_path + description
 
     soge_fc = ee.FeatureCollection('projects/ee-corestackdev/assets/datasets/SOGE_vector_2020')
     
-    if is_gee_asset_exists(full_asset_id):
-        print(f"Asset already exists: {full_asset_id}")
-        return  # or load and return if needed
+    if is_gee_asset_exists(asset_id):
+        print(f"Asset already exists: {asset_id}")
+        return
 
-    # If we are here, we need to process and export
     mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid'
     mws_fc = ee.FeatureCollection(mws_asset_id)
 
@@ -110,25 +111,12 @@ def generate_soge_vector(self, state, district, block):
     task = ee.batch.Export.table.toAsset(
         collection=all_results,
         description=description,
-        assetId=full_asset_id
+        assetId=asset_id
     )
     task.start()
+    check_task_status([task.status()["id"]])
 
-    def get_features(fc, chunk_size=500):  # Reduced from 1000 to 500
-        features = []
-        size = fc.size().getInfo()
-        for i in range(0, size, chunk_size):
-            chunk = fc.toList(chunk_size, i).getInfo()
-            features.extend(chunk)
-        return features
-
-    all_features = get_features(all_results)
-
-    final_fc = {
-        'type': 'FeatureCollection',
-        'features': all_features
-    }
-
-    print("GEE Export task started")
-    return sync_layer_to_geoserver(state, final_fc, description, "soge")
+    print("Geoserver Sync task started")
+    fc = ee.FeatureCollection(asset_id)
+    return sync_fc_to_geoserver(fc, state, description, 'soge')
 
