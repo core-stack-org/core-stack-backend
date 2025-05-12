@@ -155,6 +155,8 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
         gdf.to_file(path + ".gpkg", driver="GPKG")
 
         return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+    else:
+        return "No features in FeatureCollection"
         # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
         #
         # state_dir = os.path.join("data/fc_to_shape", state_name)
