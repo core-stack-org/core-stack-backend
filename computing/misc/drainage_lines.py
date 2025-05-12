@@ -1,6 +1,6 @@
 import ee
 
-from computing.utils import sync_fc_to_geoserver, sync_layer_to_geoserver
+from computing.utils import sync_layer_to_geoserver
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
