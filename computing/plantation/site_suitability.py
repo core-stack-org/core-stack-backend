@@ -321,12 +321,14 @@ def generate_vector(
     suitability_vector = roi.map(get_max_val)
 
     # Add NDVI data for the specified time range
-    suitability_vector = get_ndvi_data(suitability_vector, start_year, end_year)
+    suitability_vector = get_ndvi_data(
+        suitability_vector.limit(1), start_year, end_year
+    )
     logger.info("NDVI calculation completed")
 
-    # Add Land Use/Land Cover data
-    suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
-    logger.info("LULC calculation completed")
+    # # Add Land Use/Land Cover data
+    # suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
+    # logger.info("LULC calculation completed")
 
     try:
         # Export annotated feature collection to Earth Engine

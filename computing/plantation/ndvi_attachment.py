@@ -1,8 +1,43 @@
 import ee
-from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+
+# from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+from computing.plantation.ndvi import harmonizedNDVI
 
 
 def get_ndvi_data(suitability_vector, start_year, end_year):
+    start_date = f"{start_year}-07-01"
+    end_date = f"{end_year + 1}-06-30"
+    ndvi_collection = harmonizedNDVI(
+        start_date, end_date, suitability_vector.geometry()
+    )
+
+    def get_ndvi(feature):
+        def extract_ndvi(image):
+            mean_ndvi = image.reduceRegion(
+                reducer=ee.Reducer.mean(), geometry=feature.geometry(), scale=10
+            ).get("gapfilled_NDVI_lsc")
+            date_str = image.date().format("YYYY-MM-dd")
+
+            temp_dict = ee.Dictionary(
+                {
+                    "NDVI": ee.Algorithms.If(
+                        ee.Algorithms.IsEqual(mean_ndvi, None), -9999, mean_ndvi
+                    ),
+                    "date": date_str,
+                }
+            )
+            return ee.Feature(None, temp_dict)
+
+        ndvi_series = ndvi_collection.map(extract_ndvi)
+        ndvi_list = ndvi_series.aggregate_array("NDVI")
+        date_list = ndvi_series.aggregate_array("date")
+        return feature.set({"NDVI": ndvi_list, "date_NDVI": date_list})
+
+    ndvi_features = suitability_vector.map(get_ndvi)
+    return ndvi_features
+
+
+def get_ndvi_data1(suitability_vector, start_year, end_year):
     """
     Retrieve Normalized Difference Vegetation Index (NDVI) data
     for a given set of features across a specified time range.
