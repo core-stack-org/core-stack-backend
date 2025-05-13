@@ -1,6 +1,6 @@
 import ee
 
-from computing.utils import sync_layer_to_geoserver
+from computing.utils import sync_layer_to_geoserver, sync_fc_to_geoserver
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -44,21 +44,20 @@ def clip_drainage_lines(
         )
         task.start()
         print("Successfully started the drainage task", task.status())
-        # return task.status()["id"]
+
         task_id_list = check_task_status([task.status()["id"]])
         print("task_id_list", task_id_list)
 
-        make_asset_public(get_gee_asset_path(state, district, block) + description)
+        make_asset_public(asset_id)
     except Exception as e:
         print(f"Error occurred in running drainage task: {e}")
 
     try:
         # Load feature collection from Earth Engine
-        fc = ee.FeatureCollection(asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = sync_layer_to_geoserver(
-            state,
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(
             fc,
+            state,
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
             "drainage",
         )
