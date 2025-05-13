@@ -4,6 +4,8 @@ from utilities.gee_utils import (
     check_task_status,
     valid_gee_text,
     get_gee_asset_path, is_gee_asset_exists,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
 )
 from nrm_app.celery import app
 from computing.utils import (
@@ -62,7 +64,12 @@ def clip_raster(roi, state, district, block, description):
         crs="EPSG:4326",
     )
     task.start()
-    check_task_status(task.status()["id"])
+    check_task_status([task.status()["id"]])
+
+    image = ee.Image(asset_id)
+    task_id= sync_raster_to_gcs(image, 60, description + "_raster")
+    check_task_status([task_id])
+    sync_raster_gcs_to_geoserver("restoration", description + "_raster", description + "_raster", "restoration_style")
 
     return asset_id
 

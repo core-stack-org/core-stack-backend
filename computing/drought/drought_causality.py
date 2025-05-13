@@ -114,22 +114,27 @@ def calculation_df(year, df, gdf):
     ##SPI START
     spiCols = [col for col in df.columns if 'spi' in col]
     for l in spilabels:
-        df[f'spi_{year}_{l}']=0
+        df[f'spi_{year}_{l}'] = 0
+
     for index, row in df.iterrows():
         for col in spiCols:
             spi_value = row[col]
-            category = pd.cut([spi_value], bins=spibins, labels=spilabels)[0]
+            if pd.isna(spi_value):
+                continue
+            category = pd.cut([spi_value], bins=spibins, labels=spilabels, include_lowest=True)[0]
+            if pd.isna(category):
+                continue
             df.at[index, f'spi_{year}_{category}'] += 1
 
-    df[f'spi_{year}_mode']=0
+    df[f'spi_{year}_mode'] = 0
     for index, row in df.iterrows():
-        templ=[]
-        i=1
+        templ = []
+        i = 1
         for l in spilabels[::-1]:
-            templ.append([df.at[index , f'spi_{year}_{l}'],i])
-            i+=1
+            templ.append([df.at[index, f'spi_{year}_{l}'], i])
+            i += 1
         templ.sort()
-        df.at[index ,f'spi_{year}_mode']=templ[-1][1]
+        df.at[index, f'spi_{year}_mode'] = templ[-1][1]
 
     # Option to drop columns from df before merging
     columns_to_drop = [col for col in df.columns if col in gdf.columns and col != 'uid']
@@ -499,4 +504,3 @@ def drought_causality(self, state, district, block, start_year, end_year):
         print(f"Error syncing aggregated data to GeoServer: {e}")
 
     return {"status": "Completed"}
-

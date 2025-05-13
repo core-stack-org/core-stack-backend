@@ -169,14 +169,20 @@ def create_excel_for_aquifer(data, xlsx_file, writer):
     ]
     
     # First pass - collect all data
-    for feature in features:  
-        properties = feature['properties']  
+    for feature in features:
+        properties = feature['properties']
+        area_aquifer = (
+            properties.get('%_area_aquifer') or 
+            properties.get('%_area_aqu')
+        )
+        
         row = {
-            'UID': properties['uid'],  
-            'area_in_ha': properties['area_in_ha'],
-            'principal_aquifer': properties['Principal_'],
-            '%_area_aquifer': properties['%_area_aqu']
+            'UID': properties.get('uid'),
+            'area_in_ha': properties.get('area_in_ha'),
+            'principal_aquifer': properties.get('Principal_'),
+            '%_area_aquifer': area_aquifer
         }
+        
         df_data.append(row)
     
     df = pd.DataFrame(df_data).sort_values(['UID'])

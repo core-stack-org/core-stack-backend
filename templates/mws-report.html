@@ -443,6 +443,8 @@
             <p>{{wb_desc}}</p>
             <p>{{good_rainfall}}</p>
             <p>{{bad_rainfall}}</p>
+
+            <p>Do note that currently we only consider the vertical flux in the microwatershed. We are working on how to model incoming runoff into the microwatershed, as well as sub-surface flow from adjacent areas.</p>
             <div class="chart-container">
                 <canvas id="lineChart-water"></canvas>
             </div>
@@ -500,6 +502,10 @@
     <footer>
         <div class="container">
             <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>
+                Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
+                <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
+            </p>
         </div>
     </footer>
 
@@ -1173,7 +1179,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Value'
+                            text: 'Precipitation & Runoff(mm)'
                         }
                     },
                     x : {
@@ -1215,7 +1221,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Evapotranspiration'
+                            text: 'Evapotranspiration(mm)'
                         }
                     },
                     x : {
@@ -1257,7 +1263,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Groundwater'
+                            text: 'Groundwater(m)'
                         }
                     },
                     x : {
