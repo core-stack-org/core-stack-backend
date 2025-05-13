@@ -2,8 +2,6 @@ import io
 import json
 import os
 import tempfile
-import threading
-import time
 from collections import defaultdict
 from datetime import date, datetime
 from io import BytesIO
@@ -57,7 +55,6 @@ from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-
 def get_plan(plan_id):
     try:
         return Plan.objects.get(plan_id=plan_id)
@@ -101,7 +98,7 @@ def create_dpr_document(plan):
 
     add_section_e(doc, plan)
 
-    add_section_f(doc, plan, mws_fortnight)
+    add_section_f(doc, plan, mws_fortnight) # generates maps as well
 
     add_section_g(doc, plan, mws_fortnight)
 
@@ -624,7 +621,7 @@ def create_land_use_table(doc, specific_mws_row):
     return table_cropping_intensity
 
 
-def plot_graph_ci(table_cropping_intensity, doc):
+def plot_graph_ci(table_ci, doc):
     years = list(range(2017, 2023))
     single_cropping_values = []
     double_cropping_values = []
@@ -632,7 +629,7 @@ def plot_graph_ci(table_cropping_intensity, doc):
     uncropped_land_values = []
 
     for i, year in enumerate(years):
-        row_cells = table_cropping_intensity.rows[i + 1].cells
+        row_cells = table_ci.rows[i + 1].cells
         single_cropping_values.append(float(row_cells[1].text))
         double_cropping_values.append(float(row_cells[2].text))
         triple_cropping_values.append(float(row_cells[3].text))
@@ -755,7 +752,6 @@ def populate_well(doc, plan, mws_id, mws_gdf):
     ]
     table_well = doc.add_table(rows=1, cols=len(headers_well))
     table_well.style = "Table Grid"
-
     hdr_cells = table_well.rows[0].cells
     for i, header in enumerate(headers_well):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
@@ -1327,6 +1323,290 @@ def format_work_dimensions(work_dimensions, work_type):
     return dimensions_str.rstrip(", ")
 
 
+# TODO: fix the marked works selenium webdriver issue
+def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
+    logger.info(f"\nDEBUG: Starting show_marked_works for MWS: {uid}")
+    logger.info(f"DEBUG: Polygon bounds: {polygon.bounds}")
+
+    layers = {
+        "settlement": {
+            "workspace": "resources",
+            "layer_name": f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+            "label_key": "Settleme_1",
+            "legend_name": "Settlement (Resource)",
+        },
+        "well": {
+            "workspace": "resources",
+            "layer_name": f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+            "label_key": "well_id",
+            "legend_name": "Well (Resource)",
+        },
+        "waterbody": {
+            "workspace": "resources",
+            "layer_name": f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
+            "label_key": "wbs_type",
+            "legend_name": "Water Structure (Resource)",
+        },
+        "recharge": {
+            "workspace": "works",
+            "layer_name": f"plan_gw_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+            "label_key": "work_type",
+            "legend_name": "Recharge Structure (Proposed Work)",
+        },
+        "irrigation": {
+            "workspace": "works",
+            "layer_name": f"plan_agri_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
+            "label_key": "work_type",
+            "legend_name": "Irrigation Work (Proposed Work)",
+        },
+    }
+
+    centroid = polygon.centroid
+    map_center = [centroid.y, centroid.x]
+    fol_map = folium.Map(location=map_center, zoom_start=14)
+
+    folium.GeoJson(
+        mws_filtered,
+        name="MWS boundary",
+        style_function=lambda feature: {
+            "fillColor": "blue",
+            "color": "black",
+            "weight": 2,
+            "fillOpacity": 0.3,
+        },
+    ).add_to(fol_map)
+
+    legend_html = """
+    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; height: 180px; 
+    border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
+    ">&nbsp;<b>Legend:</b><br>
+    """
+
+    has_features = False
+
+    for key in ["settlement", "well", "waterbody"]:
+        if resources[key]:
+            has_features = True
+            feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
+
+            for resource in resources[key]:
+                icon = folium.features.CustomIcon(
+                    layers[key]["icon_url"], icon_size=(25, 41)
+                )
+                coords = [resource.latitude, resource.longitude]
+                folium.Marker(
+                    location=coords,
+                    icon=icon,
+                    popup=getattr(resource, layers[key]["label_key"], "N/A"),
+                ).add_to(feature_group)
+
+            feature_group.add_to(fol_map)
+            legend_html += f"""
+            <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
+            {layers[key]["legend_name"]}<br>
+            """
+
+    for key in ["recharge", "irrigation"]:
+        try:
+            layer = get_vector_layer_geoserver(
+                geoserver_url=GEOSERVER_URL,
+                workspace=layers[key]["workspace"],
+                layer_name=layers[key]["layer_name"],
+            )
+            if layer is not None:
+                features = [
+                    feature
+                    for feature in layer["features"]
+                    if shape(feature["geometry"]).within(polygon)
+                ]
+                if features:
+                    has_features = True
+                    feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
+                    for feature in features:
+                        icon = folium.features.CustomIcon(
+                            layers[key]["icon_url"], icon_size=(25, 41)
+                        )
+                        label_text = feature["properties"].get(
+                            layers[key]["label_key"], "N/A"
+                        )
+                        folium.Marker(
+                            location=[
+                                feature["geometry"]["coordinates"][1],
+                                feature["geometry"]["coordinates"][0],
+                            ],
+                            icon=icon,
+                            popup=label_text,
+                        ).add_to(feature_group)
+                    feature_group.add_to(fol_map)
+
+                    # Add to legend
+                    legend_html += f"""
+                    <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
+                    {layers[key]["legend_name"]}<br>
+                    """
+
+        except Exception as e:
+            logger.error(f"DEBUG: Error processing {key} layer: {str(e)}")
+            continue
+
+    if not has_features:
+        logger.info(f"DEBUG: No features found for MWS: {uid}")
+        return
+
+    logger.info("DEBUG: Features were found, completing map creation")
+
+    legend_html += "</div>"
+    fol_map.get_root().html.add_child(folium.Element(legend_html))
+
+    folium.LayerControl().add_to(fol_map)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
+        fol_map.save(map_filename)
+        img_data = fol_map._to_png(5)
+        img = Image.open(BytesIO(img_data))
+        img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
+        img.save(img_filename)
+
+        doc.add_picture(img_filename, width=Inches(6))
+def show_all_mws(doc, plan, mws):
+    """
+    Creates a map showing all MWS polygons with resources and proposed works,
+    regardless of intersections.
+
+    Args:
+        doc: Document object to add the map to
+        plan: Plan object containing plan details
+        mws: GeoJSON object containing MWS features
+    """
+
+    layers = {
+        "settlement": {
+            "workspace": "resources",
+            "layer_name": f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+            "label_key": "Settleme_1",
+            "legend_name": "Settlement (Resource)",
+        },
+        "well": {
+            "workspace": "resources",
+            "layer_name": f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+            "label_key": "well_id",
+            "legend_name": "Well (Resource)",
+        },
+        "waterbody": {
+            "workspace": "resources",
+            "layer_name": f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
+            "label_key": "wbs_type",
+            "legend_name": "Water Structure (Resource)",
+        },
+        "recharge": {
+            "workspace": "works",
+            "layer_name": f"plan_gw_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+            "label_key": "work_type",
+            "legend_name": "Recharge Structure (Proposed Work)",
+        },
+        "irrigation": {
+            "workspace": "works",
+            "layer_name": f"plan_agri_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
+            "label_key": "work_type",
+            "legend_name": "Irrigation Work (Proposed Work)",
+        },
+    }
+
+    all_polygons = [shape(feature["geometry"]) for feature in mws["features"]]
+    combined_polygon = unary_union(all_polygons)
+    map_center = [combined_polygon.centroid.y, combined_polygon.centroid.x]
+
+    fol_map = folium.Map(location=map_center, zoom_start=11)
+
+    for feature in mws["features"]:
+        uid = feature["properties"]["uid"]
+        folium.GeoJson(
+            {"type": "FeatureCollection", "features": [feature]},
+            name=f"MWS {uid}",
+            style_function=lambda x: {
+                "fillColor": "blue",
+                "color": "black",
+                "weight": 2,
+                "fillOpacity": 0.3,
+            },
+            popup=folium.Popup(f"MWS UID: {uid}", max_width=300),
+        ).add_to(fol_map)
+
+    features = {}
+    for key, layer_info in layers.items():
+        try:
+            layer = get_vector_layer_geoserver(
+                geoserver_url=GEOSERVER_URL,
+                workspace=layer_info["workspace"],
+                layer_name=layer_info["layer_name"],
+            )
+            features[key] = layer["features"] if layer is not None else []
+        except Exception as e:
+            logger.error(f"Error retrieving {key} layer: {str(e)}")
+            features[key] = []
+
+    legend_html = """
+    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; 
+    border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
+    ">&nbsp;<b>Legend:</b><br>
+    """
+
+    for key, feature_list in features.items():
+        if len(feature_list) > 0:
+            feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
+            for feature in feature_list:
+                icon = folium.features.CustomIcon(
+                    layers[key]["icon_url"], icon_size=(25, 41)
+                )
+                label_text = feature["properties"].get(layers[key]["label_key"], "N/A")
+                folium.Marker(
+                    location=[
+                        feature["geometry"]["coordinates"][1],
+                        feature["geometry"]["coordinates"][0],
+                    ],
+                    icon=icon,
+                    popup=label_text,
+                ).add_to(feature_group)
+            feature_group.add_to(fol_map)
+
+            legend_html += f"""
+            <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
+            {layers[key]["legend_name"]}<br>
+            """
+
+    legend_html += """
+    <div style="background-color:blue;opacity:0.3;border:1px solid black;width:15px;height:15px;display:inline-block;"></div>
+    MWS Boundary<br>
+    </div>
+    """
+
+    fol_map.get_root().html.add_child(folium.Element(legend_html))
+    folium.LayerControl().add_to(fol_map)
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        map_filename = os.path.join(temp_dir, "all_mws_map.html")
+        fol_map.save(map_filename)
+
+        img_data = fol_map._to_png(5)
+        img = Image.open(BytesIO(img_data))
+        img_filename = os.path.join(temp_dir, "all_mws_map.png")
+        img.save(img_filename)
+
+        doc.add_heading("Overview Map of All MWS", level=1)
+        doc.add_picture(img_filename, width=Inches(6))
+        doc.add_page_break()
+
 # MARK: - Section G
 
 def add_section_g(doc, plan, mws):
@@ -1387,7 +1667,7 @@ def add_section_g(doc, plan, mws):
             row_cells[2].text = record.data_livelihood.get(
                 "beneficiary_name", "No Data Provided"
             )
-            row_cells[3].text = "No Data Provided"  # Father's name not specified
+            row_cells[3].text = "No Data"  # Father's name not specified
 
             # Get fisheries demand type
             fisheries_demand = record.data_livelihood.get(
@@ -1449,363 +1729,6 @@ def add_section_g(doc, plan, mws):
             row_cells[7].text = (
                 str(record.longitude) if record.longitude else "No Data Provided"
             )
-
-# TODO: fix the marked works selenium webdriver issue
-def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
-    logger.info(f"\nDEBUG: Starting show_marked_works for MWS: {uid}")
-    logger.info(f"DEBUG: Polygon bounds: {polygon.bounds}")
-
-    layers = {
-        "settlement": {
-            "workspace": "resources",
-            "layer_name": f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-            "label_key": "Settleme_1",
-            "legend_name": "Settlement (Resource)",
-        },
-        "well": {
-            "workspace": "resources",
-            "layer_name": f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-            "label_key": "well_id",
-            "legend_name": "Well (Resource)",
-        },
-        "waterbody": {
-            "workspace": "resources",
-            "layer_name": f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
-            "label_key": "wbs_type",
-            "legend_name": "Water Structure (Resource)",
-        },
-        "recharge": {
-            "workspace": "works",
-            "layer_name": f"plan_gw_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-            "label_key": "work_type",
-            "legend_name": "Recharge Structure (Proposed Work)",
-        },
-        "irrigation": {
-            "workspace": "works",
-            "layer_name": f"plan_agri_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
-            "label_key": "work_type",
-            "legend_name": "Irrigation Work (Proposed Work)",
-        },
-    }
-
-    centroid = polygon.centroid
-    map_center = [centroid.y, centroid.x]
-    fol_map = folium.Map(location=map_center, zoom_start=14)
-
-    # Add MWS boundary
-    folium.GeoJson(
-        mws_filtered,
-        name="MWS boundary",
-        style_function=lambda feature: {
-            "fillColor": "blue",
-            "color": "black",
-            "weight": 2,
-            "fillOpacity": 0.3,
-        },
-    ).add_to(fol_map)
-
-    legend_html = """
-    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; height: 180px; 
-    border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
-    ">&nbsp;<b>Legend:</b><br>
-    """
-
-    has_features = False
-
-    # Add resources first
-    for key in ["settlement", "well", "waterbody"]:
-        if resources[key]:
-            has_features = True
-            feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
-
-            for resource in resources[key]:
-                icon = folium.features.CustomIcon(
-                    layers[key]["icon_url"], icon_size=(25, 41)
-                )
-                coords = [resource.latitude, resource.longitude]
-                folium.Marker(
-                    location=coords,
-                    icon=icon,
-                    popup=getattr(resource, layers[key]["label_key"], "N/A"),
-                ).add_to(feature_group)
-
-            feature_group.add_to(fol_map)
-            legend_html += f"""
-            <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
-            {layers[key]["legend_name"]}<br>
-            """
-
-    # Now process works layers
-    for key in ["recharge", "irrigation"]:
-        try:
-            layer = get_vector_layer_geoserver(
-                geoserver_url=GEOSERVER_URL,
-                workspace=layers[key]["workspace"],
-                layer_name=layers[key]["layer_name"],
-            )
-            if layer is not None:
-                features = [
-                    feature
-                    for feature in layer["features"]
-                    if shape(feature["geometry"]).within(polygon)
-                ]
-                if features:
-                    has_features = True
-                    feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
-                    for feature in features:
-                        icon = folium.features.CustomIcon(
-                            layers[key]["icon_url"], icon_size=(25, 41)
-                        )
-                        label_text = feature["properties"].get(
-                            layers[key]["label_key"], "N/A"
-                        )
-                        folium.Marker(
-                            location=[
-                                feature["geometry"]["coordinates"][1],
-                                feature["geometry"]["coordinates"][0],
-                            ],
-                            icon=icon,
-                            popup=label_text,
-                        ).add_to(feature_group)
-                    feature_group.add_to(fol_map)
-
-                    # Add to legend
-                    legend_html += f"""
-                    <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
-                    {layers[key]["legend_name"]}<br>
-                    """
-
-        except Exception as e:
-            logger.error(f"DEBUG: Error processing {key} layer: {str(e)}")
-            continue
-
-    if not has_features:
-        logger.info(f"DEBUG: No features found for MWS: {uid}")
-        return
-
-    logger.info("DEBUG: Features were found, completing map creation")
-
-    legend_html += "</div>"
-    fol_map.get_root().html.add_child(folium.Element(legend_html))
-
-    folium.LayerControl().add_to(fol_map)
-
-    try:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Save map and convert to image
-            map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
-            fol_map.save(map_filename)
-            # HACK: selenium webdriver issue
-            img_data = custom_to_png(fol_map, delay=5, window_size=(1920, 1080), headless=True)
-            img = Image.open(BytesIO(img_data))
-            img_filename = os.path.join(temp_dir, f"marked_works_{uid}.png")
-            img.save(img_filename)
-
-            # Add to document
-            doc.add_picture(img_filename, width=Inches(6))
-
-    except Exception as e:
-        logger.error(f"DEBUG: Error creating map: {str(e)}")
-        return
-
-
-def custom_to_png(folium_map, delay=5, window_size=(1920, 1080), headless=True):
-    """Custom implementation of _to_png for folium maps with customizable driver settings.
-    
-    Args:
-        folium_map: The folium map object
-        delay: Time in seconds to wait between render and snapshot (default: 5)
-        window_size: Tuple of (width, height) for browser window size (default: 1920x1080)
-        headless: Whether to run browser in headless mode (default: True)
-        
-    Returns:
-        PNG image data as bytes
-    """
-    
-    # Configure Firefox options
-    options = webdriver.firefox.options.Options()
-    if headless:
-        options.add_argument("--headless")
-    
-    # Create driver with custom options
-    driver = webdriver.Firefox(options=options)
-    
-    # Set window size
-    driver.set_window_size(window_size[0], window_size[1])
-    
-    # Create temporary HTML file
-    html = folium_map.get_root().render()
-    with tempfile.NamedTemporaryFile('w', suffix='.html', delete=False) as f:
-        f.write(html)
-        fname = f.name
-    
-    try: 
-        # Load the HTML file
-        driver.get(f"file:///{fname}")
-        
-        # Wait for map to render
-        time.sleep(delay)
-        
-        # Take screenshot
-        div = driver.find_element("class name", "folium-map")
-        png = div.screenshot_as_png
-        
-        return png
-    finally:
-        # Clean up
-        driver.quit()
-        os.unlink(fname)
-
-
-def show_all_mws(doc, plan, mws):
-    """
-    Creates a map showing all MWS polygons with resources and proposed works,
-    regardless of intersections.
-
-    Args:
-        doc: Document object to add the map to
-        plan: Plan object containing plan details
-        mws: GeoJSON object containing MWS features
-    """
-
-    # Define layer configurations
-    layers = {
-        "settlement": {
-            "workspace": "resources",
-            "layer_name": f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
-            "label_key": "Settleme_1",
-            "legend_name": "Settlement (Resource)",
-        },
-        "well": {
-            "workspace": "resources",
-            "layer_name": f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-            "label_key": "well_id",
-            "legend_name": "Well (Resource)",
-        },
-        "waterbody": {
-            "workspace": "resources",
-            "layer_name": f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
-            "label_key": "wbs_type",
-            "legend_name": "Water Structure (Resource)",
-        },
-        "recharge": {
-            "workspace": "works",
-            "layer_name": f"plan_gw_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
-            "label_key": "work_type",
-            "legend_name": "Recharge Structure (Proposed Work)",
-        },
-        "irrigation": {
-            "workspace": "works",
-            "layer_name": f"plan_agri_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
-            "label_key": "work_type",
-            "legend_name": "Irrigation Work (Proposed Work)",
-        },
-    }
-
-    # Calculate the centroid of all MWS features for map center
-    all_polygons = [shape(feature["geometry"]) for feature in mws["features"]]
-    combined_polygon = unary_union(all_polygons)
-    map_center = [combined_polygon.centroid.y, combined_polygon.centroid.x]
-
-    # Create the map
-    fol_map = folium.Map(location=map_center, zoom_start=11)
-
-    # Add MWS boundaries with different colors and labels
-    for feature in mws["features"]:
-        uid = feature["properties"]["uid"]
-        folium.GeoJson(
-            {"type": "FeatureCollection", "features": [feature]},
-            name=f"MWS {uid}",
-            style_function=lambda x: {
-                "fillColor": "blue",
-                "color": "black",
-                "weight": 2,
-                "fillOpacity": 0.3,
-            },
-            popup=folium.Popup(f"MWS UID: {uid}", max_width=300),
-        ).add_to(fol_map)
-
-    # Fetch and add all resources and proposed works
-    features = {}
-    for key, layer_info in layers.items():
-        try:
-            layer = get_vector_layer_geoserver(
-                geoserver_url=GEOSERVER_URL,
-                workspace=layer_info["workspace"],
-                layer_name=layer_info["layer_name"],
-            )
-            features[key] = layer["features"] if layer is not None else []
-        except Exception as e:
-            logger.error(f"Error retrieving {key} layer: {str(e)}")
-            features[key] = []
-
-    # Create legend
-    legend_html = """
-    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; 
-    border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
-    ">&nbsp;<b>Legend:</b><br>
-    """
-
-    # Add all features to the map
-    for key, feature_list in features.items():
-        if len(feature_list) > 0:
-            feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
-            for feature in feature_list:
-                icon = folium.features.CustomIcon(
-                    layers[key]["icon_url"], icon_size=(25, 41)
-                )
-                label_text = feature["properties"].get(layers[key]["label_key"], "N/A")
-                folium.Marker(
-                    location=[
-                        feature["geometry"]["coordinates"][1],
-                        feature["geometry"]["coordinates"][0],
-                    ],
-                    icon=icon,
-                    popup=label_text,
-                ).add_to(feature_group)
-            feature_group.add_to(fol_map)
-
-            # Add to legend
-            legend_html += f"""
-            <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
-            {layers[key]["legend_name"]}<br>
-            """
-
-    # Add MWS boundary to legend
-    legend_html += """
-    <div style="background-color:blue;opacity:0.3;border:1px solid black;width:15px;height:15px;display:inline-block;"></div>
-    MWS Boundary<br>
-    </div>
-    """
-
-    fol_map.get_root().html.add_child(folium.Element(legend_html))
-    folium.LayerControl().add_to(fol_map)
-
-    # Create a temporary directory for saving files
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Save map and convert to image
-        map_filename = os.path.join(temp_dir, "all_mws_map.html")
-        fol_map.save(map_filename)
-
-        img_data = custom_to_png(fol_map, delay=5, window_size=(1920, 1080), headless=True)
-        img = Image.open(BytesIO(img_data))
-        img_filename = os.path.join(temp_dir, "all_mws_map.png")
-        img.save(img_filename)
-
-        # Add heading and map to document
-        doc.add_heading("Overview Map of All MWS", level=1)
-        doc.add_picture(img_filename, width=Inches(6))
-        doc.add_page_break()
 
 
 # MARK: - Section H
