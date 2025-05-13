@@ -4,7 +4,9 @@ from dpr.models import (
     Agri_maintenance,
     SWB_maintenance,
 )
-import uuid
+from utilities.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 all_water_structures = [
     "Farm pond",
@@ -17,6 +19,7 @@ all_water_structures = [
     "Sokage pits",
     "Trench cum bund Network",
     "Large Water bodies",
+    "Large Water Body",
     "Irrigation Channel",
     "Continuous contour trenches (CCT)",
     "Staggered Contour trenches(SCT)",
@@ -26,9 +29,10 @@ all_water_structures = [
     "Stone bunding",
     "Diversion drains",
     "Contour bunds/graded bunds",  # Under "Bunding:"
+    "Bunding:Contour bunds/ graded bunds",
     "Farm bund",
     "Well",
-    "5% Model",
+    "5% model structure",
     "30-40 Model",
     "Community pond",
 ]
@@ -49,8 +53,9 @@ recharge_structures = [
     "Stone bunding",
     "Diversion drains",
     "Contour bunds/graded bunds",
-    "5% Model",
-    "30-40 Model",
+    "Bunding:Contour bunds/ graded bunds",
+    "5% model structure",
+    "30-40 model structure",
 ]
 
 irrigation_structures = ["Farm pond", "Canal", "Farm bund", "Well", "Community pond"]
@@ -61,12 +66,11 @@ surface_waterbodies = [
     "Check dam",
     "Percolation Tank",
     "Large Water bodies",
+    "Large Water Body",
     "Irrigation Channel",
     "Rock fill Dam",
     "Loose Boulder Structure",
-    "5% Model",
-    "30-40 Model",
-    "Community pond",
+    "Community pond"
 ]
 
 
@@ -78,17 +82,18 @@ def populate_maintenance_from_waterbody(plan):
     Args:
         plan: Plan object containing plan details
     """
-
     # Get all waterbody records for the plan
     waterbodies = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    print(f"Found {waterbodies.count()} waterbody records for plan {plan.plan_id}")
 
     for waterbody in waterbodies:
+        print("*******************  JUST FOR A CHECK  **********************")
+        print("Waterbody:", waterbody)
         structure_type = waterbody.water_structure_type
-
-        print("MAPPING")
-        print("Water Structure:", structure_type)
+        print("Water Structure Type:", structure_type)
 
         # Skip if no maintenance needed
+        print("Maintenance needed:", waterbody.need_maintenance)
         if waterbody.need_maintenance.lower() != "yes":
             continue
 
@@ -98,13 +103,17 @@ def populate_maintenance_from_waterbody(plan):
             "select_one_activities": "Maintenance",
         }
 
-        print("Common Data:", common_data)
 
         work_id = waterbody.waterbody_id
-
         print("Work ID:", work_id)
 
-        if structure_type in recharge_structures:
+
+        structure_type_lower = structure_type.lower()
+        recharge_structures_lower = [s.lower() for s in recharge_structures]
+        irrigation_structures_lower = [s.lower() for s in irrigation_structures]
+        surface_waterbodies_lower = [s.lower() for s in surface_waterbodies]
+
+        if structure_type_lower in recharge_structures_lower:
             existing = GW_maintenance.objects.filter(
                 plan_id=plan.plan_id,
                 work_id=work_id,
@@ -134,7 +143,7 @@ def populate_maintenance_from_waterbody(plan):
                 )
                 print(f"GW Maintenance record created successfully for {work_id}")
 
-        elif structure_type in irrigation_structures:
+        elif structure_type_lower in irrigation_structures_lower:
             existing = Agri_maintenance.objects.filter(
                 plan_id=plan.plan_id,
                 work_id=work_id,
@@ -165,7 +174,7 @@ def populate_maintenance_from_waterbody(plan):
                 )
                 print(f"Agri Maintenance record created successfully for {work_id}")
 
-        elif structure_type in surface_waterbodies:
+        elif structure_type_lower in surface_waterbodies_lower:
             existing = SWB_maintenance.objects.filter(
                 plan_id=plan.plan_id,
                 work_id=work_id,
@@ -185,7 +194,7 @@ def populate_maintenance_from_waterbody(plan):
                 SWB_maintenance.objects.create(
                     uuid=waterbody.uuid,
                     plan_id=plan.plan_id,
-                    plan_name=plan.plan_name,
+                    plan_name=plan.plan,
                     latitude=waterbody.latitude,
                     longitude=waterbody.longitude,
                     status_re=waterbody.status_re,

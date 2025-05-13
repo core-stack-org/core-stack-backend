@@ -462,7 +462,8 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
     "district": "district-id",
     "block": "block-id",
     "village_name": "Village Name",
-    "gram_panchayat": "Gram Panchayat Name"
+    "gram_panchayat": "Gram Panchayat Name",
+    "facilitator_name": "Facilitator Name"
   }
   ```
 - **Authentication**: Required
