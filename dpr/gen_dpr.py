@@ -1650,13 +1650,13 @@ def add_section_g(doc, plan, mws):
                 livestock_demand = record.data_livelihood.get(
                     "select_one_promoting_livestock_other", "No Data Provided"
                 )
-            row_cells[4].text = livestock_demand or "No Data Provided"
+            row_cells[4].text = format_text(livestock_demand) or "No Data Provided"
 
             row_cells[5].text = (
-                str(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
             )
             row_cells[6].text = (
-                str(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
             )
 
         # Handle Fisheries category
@@ -1677,13 +1677,13 @@ def add_section_g(doc, plan, mws):
                 fisheries_demand = record.data_livelihood.get(
                     "select_one_promoting_fisheries_other", "No Data Provided"
                 )
-            row_cells[4].text = fisheries_demand or "No Data Provided"
+            row_cells[4].text = format_text(fisheries_demand) or "No Data Provided"
 
             row_cells[5].text = (
-                str(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
             )
             row_cells[6].text = (
-                str(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
             )
 
     # Table for Plantation
@@ -1724,10 +1724,10 @@ def add_section_g(doc, plan, mws):
             row_cells[5].text = plantation_area or "No Data Provided"
 
             row_cells[6].text = (
-                str(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
             )
             row_cells[7].text = (
-                str(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
             )
 
 
