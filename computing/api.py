@@ -41,7 +41,7 @@ from .drought.drought_causality import drought_causality
 from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
-
+from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 
 @api_view(["POST"])
 def generate_admin_boundary(request):
@@ -642,4 +642,21 @@ def restoration_opportunity(request):
         )
     except Exception as e:
         print("Exception in restoration_opportunity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["POST"])
+def swb_pond_merging(request):
+    print("Inside merge_swb_ponds API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        merge_swb_ponds.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_block_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

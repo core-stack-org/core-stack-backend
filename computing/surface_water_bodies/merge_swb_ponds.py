@@ -6,6 +6,9 @@ import shapely
 import ee
 import geemap
 import re
+from nrm_app.celery import app
+
+@app.task(bind=True)
 
 def split_multipolygon_into_individual_polygons(data_gdf):
     data_gdf = data_gdf.explode()
@@ -236,15 +239,20 @@ def merge_swb_ponds(state,
 
     merged_gdf = merged_gdf.set_crs('epsg:4326')
     merged_fc = geemap.geopandas_to_ee(merged_gdf)
-
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": merged_fc,
-            "description": 'merging swb and pond layer',
-            "assetId": block_path_ee + str(district) + '_' + str(block) + output_suffix + '_test',
-        }
-    )
-    task.start() 
+    
+    try:
+        task = ee.batch.Export.table.toAsset(
+            **{
+                "collection": merged_fc,
+                "description": 'merging swb and pond layer',
+                "assetId": block_path_ee + str(district) + '_' + str(block) + output_suffix + '_test',
+            }
+        )
+        task.start()
+        print("Successfully started the merge chunk", task.status())
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running merge task: {e}")
 
 #example run for a block (gobindpur)
 

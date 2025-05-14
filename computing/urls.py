@@ -80,4 +80,9 @@ urlpatterns = [
         api.restoration_opportunity,
         name="restoration_opportunity",
     ),
+    path(
+        "merge_swb_ponds/",
+        api.merge_swb_ponds,
+        name="merge_swb_ponds",
+    )    
 ]
