@@ -1694,7 +1694,7 @@ def add_section_g(doc, plan, mws):
         "Name of Beneficiary",
         "Beneficiary Father's Name",
         "Name of Plantation Crop",
-        "Total Area",
+        "Total Acres",
         "Latitude",
         "Longitude",
     ]
@@ -1713,7 +1713,7 @@ def add_section_g(doc, plan, mws):
             row_cells[2].text = record.data_livelihood.get(
                 "beneficiary_name", "No Data Provided"
             )
-            row_cells[3].text = "No Data Provided"  # Father's name not specified
+            row_cells[3].text = "No Data"  # Father's name not specified
 
             # Get plantation type
             plantation_type = record.data_livelihood.get("Plantation")
@@ -1918,10 +1918,10 @@ def maintenance_rs_waterstructures_table(doc, plan, mws):
         row_cells = table.add_row().cells
         row_cells[0].text = maintenance.data_swb_rs_maintenance.get(
             "beneficiary_settlement"
-        )
-        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name")
+        ) or "No Data"
+        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "No Data"
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK")
-        row_cells[5].text = str(maintenance.latitude)
-        row_cells[6].text = str(maintenance.longitude)
+        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "No Data"
+        row_cells[5].text = str(maintenance.latitude) 
+        row_cells[6].text = str(maintenance.longitude) 
