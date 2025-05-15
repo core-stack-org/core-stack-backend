@@ -706,19 +706,21 @@ def fes_clart_upload_layer(request):
         state = request.data.get("state", "").lower().strip().replace(" ", "_")
         district = request.data.get("district", "").lower().strip().replace(" ", "_")
         block = request.data.get("block", "").lower().strip().replace(" ", "_")
-
         uploaded_file = request.FILES.get("clart_file")
+
         if not uploaded_file:
             return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         temp_upload_dir = os.path.join(BASE_DIR, 'data', 'fes_clart_file', state, district)
         os.makedirs(temp_upload_dir, exist_ok=True)
 
-        file_path = os.path.join(temp_upload_dir, uploaded_file.name)
+        file_extension = os.path.splitext(uploaded_file.name)[1]
+        clart_filename = f"{district}_{block}_clart{file_extension}"
+        file_path = os.path.join(temp_upload_dir, clart_filename)
         with open(file_path, "wb+") as destination:
             for chunk in uploaded_file.chunks():
                 destination.write(chunk)
-        generate_fes_clart_layer.apply_async(args=[state, district, block, file_path], queue="nrm")
+        generate_fes_clart_layer.apply_async(args=[state, district, block, file_path, clart_filename], queue="nrm")
 
         return Response(
             {"success": "Fes clart task Initiated"},
