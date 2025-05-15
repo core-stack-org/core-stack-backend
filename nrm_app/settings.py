@@ -11,17 +11,18 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import re
 from pathlib import Path
 import environ
+from datetime import timedelta
+from corsheaders.defaults import default_headers
 
 env = environ.Env()
-# reading .env file
-environ.Env.read_env()
 
+environ.Env.read_env()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -43,15 +44,17 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
+
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
     "e697-2001-df4-e000-3fc4-e2e1-373c-2498-b87c.ngrok-free.app",
+    "74f2-2001-df4-e000-3fc4-bb09-a94e-b440-7621.ngrok-free.app"
 ]
 
-# Application definition
+# MARK: Django Apps
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -60,34 +63,105 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # django apps
-    "app_controller",
-    "gee_computing",
-    "plans",
+    # core apps
     "computing",
     "dpr",
     "geoadmin",
-    # third party apps
+    "stats_generator",
+    # rest framework for APIs
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
-    "stats_generator",
+    # project applications
+    "users",
+    "organization",
+    "projects",
+    "plantations",
+    "plans",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+# MARK: CORS Settings
 
-CORS_ALLOWED_ORIGINS = [
-    "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
-    "http://127.0.0.1:8000",
-    "http://192.168.222.27:8000",
-    "http://192.168.222.23:3000",
-    "http://192.168.20.236:3000",
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
+        "https://nrm.core-stack.org",
+        "https://nrm.gramvaanidev.org",
+        "https://dashboard.core-stack.org",
+        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
+        "https://uat.dashboard.core-stack.org",
+        "https://www.explorer.core-stack.org",
+        "https://www.explorer.core-stack.org/landscape_explorer",
+        "https://development.d2s4eeyazvtd2g.amplifyapp.com",
+
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1",
+
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"
 ]
 
-CORS_ALLOW_HEADERS = [
+CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
-    "content-type",
+    "content-disposition",  # Important for file uploads in form data
 ]
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
+
+# MARK: REST Framework
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+}
+
+# MARK: JWT settings
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": False,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "JTI_CLAIM": "jti",
+}
+
+AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -102,6 +176,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nrm_app.urls"
 
+# MARK: Templates
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -120,24 +195,21 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "nrm_app.wsgi.application"
 
+DATA_UPLOAD_MAX_NUMBER_FILES = 1000
 
-# Database
+# MARK: Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": DB_NAME,
         "USER": DB_USER,
         "PASSWORD": DB_PASSWORD,
         "HOST": "127.0.0.1",
         "PORT": "",
-        "OPTIONS": {
-            "unix_socket": "/tmp/mysql.sock",
-        },
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -157,7 +229,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
@@ -169,12 +240,13 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+
+EXCEL_PATH = env("EXCEL_PATH")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -207,10 +279,10 @@ OD_DATA_URL_plan = {
     },
 }
 
-# Report requirements
+# MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
 
-# EMAIL Settings
+# MARK: Email Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtpout.secureserver.net"
 EMAIL_PORT = 465
@@ -228,4 +300,5 @@ EARTH_DATA_USER = env("EARTH_DATA_USER")
 EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
+
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")

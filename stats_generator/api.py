@@ -2,6 +2,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .utils import *
+from .mws_indicators import get_generate_filter_mws_data, download_KYL_filter_data
+from .village_indicators import get_generate_filter_data_village
+from utilities.auth_utils import auth_free
 import logging
 
 logging.basicConfig(
@@ -10,6 +13,7 @@ logging.basicConfig(
 )
 
 @api_view(["GET"])
+@auth_free
 def generate_excel_file_layer(request):
     try:
         state = request.query_params.get("state", "").lower().strip()
@@ -44,6 +48,7 @@ def generate_excel_file_layer(request):
 
 
 @api_view(["GET"])
+@auth_free
 def generate_kyl_data_excel(request):
     try:
         print("Inside generate_kyl_data_excel API.")
@@ -54,7 +59,7 @@ def generate_kyl_data_excel(request):
         file_type = request.query_params.get("file_type", "").lower().strip()
         
         # Generate data for the file
-        creating_kyl_data = get_generate_filter_mws_data(state, district, block)
+        creating_kyl_data = get_generate_filter_mws_data(state, district, block, file_type)
         print("Data generated in the file")
         excel_file = download_KYL_filter_data(state, district, block, file_type)
         logging.info(f"Download function returned: {excel_file}")
@@ -68,7 +73,7 @@ def generate_kyl_data_excel(request):
                 raise ValueError("Invalid file format received from download_KYL_filter_data.")
         else:
             raise ValueError("Failed to download the KYL filter data file")
-    
+        
     except Exception as e:
         logging.error(f"Validation error: {str(e)}")
         return Response({
@@ -78,6 +83,7 @@ def generate_kyl_data_excel(request):
 
 
 @api_view(["GET"])
+@auth_free
 def generate_kyl_village_data(request):
     try:
         print("Inside generate_filter_data_village API.")

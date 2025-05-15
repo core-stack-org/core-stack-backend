@@ -61,7 +61,7 @@ else
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda/miniconda.sh
     bash ~/miniconda/miniconda.sh -b -u -p ~/miniconda
     rm -rf ~/miniconda/miniconda.sh
-    
+
     # Initialize conda for the detected shell
     shell_type=$(detect_shell)
     if [ "$shell_type" = "zsh" ]; then
@@ -69,10 +69,10 @@ else
     else
         ~/miniconda/bin/conda init bash
     fi
-    
+
     # Disable auto activation of base environment
     ~/miniconda/bin/conda config --set auto_activate_base false
-    
+
     echo "Miniconda installed successfully"
 fi
 
@@ -81,9 +81,9 @@ refresh_shell_config
 
 # Get environment name and location from user
 print_section "Environment Configuration"
-read -p "Enter the name for your conda environment: " ENV_NAME
+read -p "Enter the name for your conda environment (press Enter for default 'corestack'): " ENV_NAME
 if [ -z "$ENV_NAME" ]; then
-    ENV_NAME="nrm-backend"
+    ENV_NAME="corestack"
     echo "No name provided, using default: $ENV_NAME"
 fi
 
@@ -94,71 +94,41 @@ if [ -z "$ENV_PATH" ]; then
 fi
 
 # Create the full path if it doesn't exist
-mkdir -p "$ENV_PATH"
-echo "Created directory: $ENV_PATH"
+mkdir -p "$(dirname "$ENV_PATH")"
+echo "Created directory: $(dirname "$ENV_PATH")"
 
-# Create and configure virtual environment
-print_section "Creating virtual environment"
-~/miniconda/bin/conda create --prefix "$ENV_PATH" python=3.10 -y
+# Create and configure virtual environment using environment.yml
+print_section "Creating virtual environment from environment.yml"
+echo "Using environment.yml file to create conda environment..."
 
-# Configure conda to show only environment name
-~/miniconda/bin/conda config --set env_prompt '(${name}) '
+# Check if environment.yml exists
+if [ ! -f "environment.yml" ]; then
+    echo "Error: environment.yml file not found in the current directory."
+    exit 1
+fi
 
-# Install conda packages
-print_section "Installing conda packages"
-CONDA_PACKAGES=(
-    "conda-forge::Django"
-    "conda-forge::django-cors-headers"
-    "conda-forge::djangorestframework"
-    "conda-forge::drf-yasg==1.21.7"
-    "conda-forge::earthengine-api"
-    "conda-forge::Fiona"
-    "conda-forge::geojson"
-    "conda-forge::geopandas"
-    "conda-forge::matplotlib"
-    "conda-forge::pandas"
-    "conda-forge::python-dotenv"
-    "conda-forge::requests"
-    "conda-forge::seaborn"
-    "conda-forge::xmltodict"
-    "conda-forge::folium"
-    "conda-forge::pcraster"
-    "conda-forge::geetools"
-    "conda-forge::sqlite"
-    "conda-forge::celery"
-    "conda-forge::unidecode"
-    "conda-forge::rasterio"
-    "conda-forge::unidecode"
-    "conda-forge::shapely"
-    "conda-forge::pyshp"
-    "conda-forge::pyproj"
-    "conda-forge::gdal"
-)
+# Create environment from yml file with custom prefix
+echo "Creating conda environment from environment.yml with prefix: $ENV_PATH"
+echo "This may take some time as it installs all dependencies including pip packages..."
+~/miniconda/bin/conda env create -f environment.yml --prefix "$ENV_PATH"
 
-# Activate virtual environment and install packages
+# Activate the environment
 source ~/miniconda/bin/activate "$ENV_PATH"
 
-for package in "${CONDA_PACKAGES[@]}"; do
-    echo "Installing $package..."
-    conda install -y $package
-done
+# Install system dependencies
+print_section "Installing system dependencies"
+echo "Updating package lists and installing required system packages..."
 
-# Install pip packages
-print_section "Installing pip packages"
-PIP_PACKAGES=(
-    "django-environ"
-    "mysql-connector-python"
-    "mysqlclient"
-    "python-docx"
-    "pymannkendall"
-    "pydantic"
-    "fastapi"
-)
-
-for package in "${PIP_PACKAGES[@]}"; do
-    echo "Installing $package..."
-    pip install --upgrade $package
-done
+# Check if running on KDE Neon
+if [ -f /etc/os-release ] && grep -q "KDE neon" /etc/os-release; then
+    echo "Detected KDE Neon, using pkcon..."
+    sudo pkcon refresh -y
+    sudo pkcon install -y pkg-config python3-dev default-libmysqlclient-dev build-essential
+else
+    echo "Using apt-get..."
+    sudo apt-get update
+    sudo apt-get install -y pkg-config python3-dev default-libmysqlclient-dev build-essential
+fi
 
 # Check and install RabbitMQ if not present
 print_section "Setting up RabbitMQ"

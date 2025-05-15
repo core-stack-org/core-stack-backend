@@ -178,7 +178,16 @@ def sync_settlement():
         settlement.nrega_past_work = mgnrega_info.get("work_demands", "") or "0"
         settlement.nrega_raise_demand = mgnrega_info.get("select_one_Y_N", "") or "0"
         settlement.nrega_demand = mgnrega_info.get("select_one_demands", "") or "0"
-        settlement.nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
+        # Get NREGA issues and handle "other" option
+        nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
+        if isinstance(nrega_issues, str) and "other" in nrega_issues.lower():
+            other_text = mgnrega_info.get("select_multiple_issues_other", "")
+            if other_text:
+                if nrega_issues.lower() == "other":
+                    nrega_issues = other_text
+                else:
+                    nrega_issues = f"{nrega_issues}"
+        settlement.nrega_issues = nrega_issues
         settlement.nrega_community = (
             mgnrega_info.get("select_one_contributions", "") or "0"
         )
@@ -228,9 +237,6 @@ def sync_well():
         )
         well.plan_id = record.get("plan_id", "") or "0"
         well.plan_name = record.get("plan_name", "") or "0"
-        well.status_re = (
-            record.get("__system", {}).get("reviewState", "") or "in progress"
-        )
         try:
             coordinates = (
                 record.get("GPS_point", {})
@@ -370,7 +376,6 @@ def sync_groundwater():
                 )
         recharge_st.data_groundwater = record
         if recharge_st.status_re.lower() != "rejected":
-            print("SAVING RECHARGE STRUCTURE")
             recharge_st.save()
 
 
