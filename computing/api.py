@@ -721,7 +721,7 @@ def fes_clart_upload_layer(request):
         generate_fes_clart_layer.apply_async(args=[state, district, block, file_path], queue="nrm")
 
         return Response(
-            {"success": f"File '{uploaded_file.name}' uploaded successfully and processing started."},
+            {"success": "Fes clart task Initiated"},
             status=status.HTTP_200_OK
         )
 

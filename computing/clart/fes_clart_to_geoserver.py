@@ -80,16 +80,8 @@ def generate_fes_clart_layer(self, state, district, block, file_path):
         image = ee.Image(asset_id)
         task_id = sync_raster_to_gcs(image, 30, description)
         check_task_status([task_id])
-        sync_raster_gcs_to_geoserver("clart", description, description, "testClart")
-
-        #Clean up temp COG
         os.remove(cog_file_path)
-
-        return {
-            "success": f"File '{new_filename}' uploaded to GEE and published to GeoServer.",
-            "asset_id": asset_id,
-            "location": {"state": state, "district": district, "block": block}
-        }
+        return sync_raster_gcs_to_geoserver("clart", description, description, "testClart")
 
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"GDAL conversion failed: {e}")
