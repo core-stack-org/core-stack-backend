@@ -7,6 +7,9 @@ import ee
 import geemap
 import re
 from nrm_app.celery import app
+from utilities.gee_utils import (ee_initialize,
+                                 valid_gee_text,
+                                 get_gee_asset_path)
 
 def split_multipolygon_into_individual_polygons(data_gdf):
     data_gdf = data_gdf.explode()
@@ -30,18 +33,17 @@ def dissolve_boundary(data_gdf):
     data_gdf = data_gdf.dissolve()
     return data_gdf
 
-def valid_gee_text(description):
-    description = re.sub(r"[^a-zA-Z0-9 .,:;_-]", "", description)
-    return description.replace(" ", "_")
+# def valid_gee_text(description):
+#     description = re.sub(r"[^a-zA-Z0-9 .,:;_-]", "", description)
+#     return description.replace(" ", "_")
 
-def get_gee_asset_path(asset_path, state, district=None, block=None):
-    gee_path = asset_path + valid_gee_text(state.lower()) + "/"
-    if district:
-        gee_path += valid_gee_text(district.lower()) + "/"
-    if block:
-        gee_path += valid_gee_text(block.lower()) + "/"
-    return gee_path
-
+# def get_gee_asset_path(asset_path, state, district=None, block=None):
+#     gee_path = asset_path + valid_gee_text(state.lower()) + "/"
+#     if district:
+#         gee_path += valid_gee_text(district.lower()) + "/"
+#     if block:
+#         gee_path += valid_gee_text(block.lower()) + "/"
+#     return gee_path
 
 @app.task(bind=True)
 def merge_swb_ponds(state,
@@ -53,7 +55,8 @@ def merge_swb_ponds(state,
     '''
     module to merge swb and ponds layer
     '''
-    ee.Initialize()
+    # ee.Initialize()
+    ee_initialize()
 
     state = state.lower()
     district = district.lower()
