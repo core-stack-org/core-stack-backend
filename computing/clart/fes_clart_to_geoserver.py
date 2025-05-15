@@ -69,7 +69,7 @@ def generate_fes_clart_layer(self, state, district, block, file_path):
             description=description,
             assetId=asset_id,
             pyramidingPolicy={"predicted_label": "mode"},
-            scale=10,
+            scale=30,
             maxPixels=1e13,
             crs="EPSG:4326",
         )
@@ -78,7 +78,7 @@ def generate_fes_clart_layer(self, state, district, block, file_path):
 
         #Export to GCS and sync with GeoServer
         image = ee.Image(asset_id)
-        task_id = sync_raster_to_gcs(image, 10, description)
+        task_id = sync_raster_to_gcs(image, 30, description)
         check_task_status([task_id])
         sync_raster_gcs_to_geoserver("clart", description, description, "testClart")
 
