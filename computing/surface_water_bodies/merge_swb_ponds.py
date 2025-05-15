@@ -8,8 +8,6 @@ import geemap
 import re
 from nrm_app.celery import app
 
-@app.task(bind=True)
-
 def split_multipolygon_into_individual_polygons(data_gdf):
     data_gdf = data_gdf.explode()
     return data_gdf
@@ -44,6 +42,8 @@ def get_gee_asset_path(asset_path, state, district=None, block=None):
         gee_path += valid_gee_text(block.lower()) + "/"
     return gee_path
 
+
+@app.task(bind=True)
 def merge_swb_ponds(state,
                     district,
                     block,

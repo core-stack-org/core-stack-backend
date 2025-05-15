@@ -658,5 +658,5 @@ def swb_pond_merging(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_block_layer api :: ", e)
+        print("Exception in merge_swb_ponds api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
