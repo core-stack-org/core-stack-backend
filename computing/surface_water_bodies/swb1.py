@@ -1,7 +1,7 @@
 import datetime
 import ee
 from computing.utils import (
-    sync_fc_to_geoserver,
+    sync_fc_to_geoserver, sync_project_fc_to_geoserver,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -14,62 +14,65 @@ from utilities.gee_utils import (
 from dateutil.relativedelta import relativedelta
 
 from nrm_app.celery import app
+from waterrejuvenation.utils import wait_for_task_completion, WATER_REJ_GEE_ASSET
 from .swb2 import calculate_swb2
 from .swb3 import calculate_swb3
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @app.task(bind=True)
-def generate_swb_layer(self, state, district, block, start_year, end_year):
-    ee_initialize()
-
-    aoi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
-
+def generate_swb_layer(self,  start_year, end_year, state=None, district=None, block=None, roi=None, app_name=None, proj_name = None, force_regenerate = False):
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
 
-    swb1 = calculate_swb1(aoi, state, district, block, start_date, end_date)
-    if swb1:
-        task_id_list = check_task_status([swb1])
-        print("swb1_task_id_list", task_id_list)
+    ee_initialize()
+    if state and district and block:
+        aoi = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
+        layer_name = (
+                "surface_waterbodies_"
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
+        )
+    else:
+        description = "swb1_" + str(app_name) + "_" + str(proj_name)
+        aoi = ee.FeatureCollection(
 
-    swb2, asset_id = calculate_swb2(aoi, state, district, block)
-    if swb2:
-        task_id_list = check_task_status([swb2])
-        print("SWB task completed - swb2_task_id_list:", task_id_list)
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
-    print(res)
-
-    swb3, asset_id = calculate_swb3(aoi, state, district, block)
-    if swb3:
-        task_id_list = check_task_status([swb3])
-        print("SWB task completed - swb3_task_id_list:", task_id_list)
-
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-    )
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
-    print(res)
+            WATER_REJ_GEE_ASSET + str(proj_name)+ "/"+"filtered_mws_" + str(proj_name)
+        )
+        layer_name = (
+                description
+               )
 
 
-def calculate_swb1(aoi, state, district, block, start_date, end_date):
+    calculate_swb1(start_date, end_date, aoi, force_regenerate, state, district, block, roi, app_name, proj_name)
+    swb2_asset_id = calculate_swb2(aoi, force_regenerate, state, district,  block, roi, app_name, proj_name)
+
+    if not swb2_asset_id:
+        swb3_asset_id = calculate_swb3(aoi, state, district, block,roi,app_name,proj_name)
+        fc = ee.FeatureCollection(swb3_asset_id)
+        res = sync_fc_to_geoserver(fc, app_name, layer_name, workspace="water_rej")
+        print(res)
+        return swb3_asset_id
+
+
+    else:
+        return swb2_asset_id
+
+
+
+
+def calculate_swb1(start_date, end_date, aoi,  forece_regenerate, state=None, district=None, block=None, roi=None, app_name=None, proj_id =None):
+
     """
     Calculate surface water bodies analysis version 1.
     Analyzes water body presence and characteristics over time.
@@ -82,13 +85,28 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         Task ID if successful, None if asset already exists
     """
     # Generate description and asset ID for the analysis
-    description = (
+
+    if state and district and block:
+        print ("insdie dist flow")
+        description = (
         "swb1_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
-    asset_id = get_gee_asset_path(state, district, block) + description
 
+        asset_id = get_gee_asset_path(state, district, block) + description
+    else:
+        print ("inside else")
+        description = "swb1_"+str(app_name) +"_" +str(proj_id)
+        asset_id = roi +"/" + description
+    if forece_regenerate:
+        try:
+             ee.data.deleteAsset(asset_id)
+
+             logger.info(f"Deleted existing asset: {asset_id}")
+        except Exception as e:
+             logger.info(f"No existing asset to delete or error occurred: {e}")
+    print("asset_id: "+asset_id)
     # Skip if asset already exists
-    if is_gee_asset_exists(asset_id):
+    if is_gee_asset_exists(asset_id) and not forece_regenerate:
         return
 
     # Calculate date range for analysis
@@ -113,19 +131,27 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         loop_start = (curr_start_date + relativedelta(years=1)).strftime("%Y-%m-%d")
         curr_start_date = curr_start_date.strftime("%Y-%m-%d")
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
-
+        print (curr_start_date)
+        print (curr_end_date)
         # Get LULC map for current period
-        image = ee.Image(
-            get_gee_asset_path(state, district, block)
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + curr_start_date
-            + "_"
-            + curr_end_date
-            + "_LULCmap_10m"
-        )
+        if state and district and block:
+            image = ee.Image(
+                get_gee_asset_path(state, district, block)
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
+                + "_"
+                + curr_start_date
+                + "_"
+                + curr_end_date
+                + "_LULCmap_10m"
+                )
+        else:
+            image = ee.Image(roi+"/"+"clipped_lulc_filtered_mws"+"_"+str(proj_id)+ "_"
+                + curr_start_date[:4]
+                + "_"
+                + curr_end_date[:4])
+
 
         # Add water presence masks to collections
         collec.append(image.gte(2).And(image.lte(4)))
@@ -213,10 +239,10 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
             count2 = counts[2].add(counts[3])
 
             # Store percentages
-            p1.append((counts[0].divide(total_count)).multiply(100))
-            p2.append((count1.divide(total_count)).multiply(100))
-            p3.append((count2.divide(total_count)).multiply(100))
-            p4.append((counts[3].divide(total_count)).multiply(100))
+            p1.append((counts[0].divide(total_cnt)).multiply(100))
+            p2.append((count1.divide(total_cnt)).multiply(100))
+            p3.append((count2.divide(total_cnt)).multiply(100))
+            p4.append((counts[3].divide(total_cnt)).multiply(100))
             j += 1
 
         # Set properties for the feature
@@ -275,7 +301,10 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         )
 
         swb_task.start()
+        wait_for_task_completion(swb_task)
         print("Successfully started the swb 1", swb_task.status())
         return swb_task.status()["id"]
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"Error occurred in running swb1 task: {e}")

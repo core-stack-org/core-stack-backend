@@ -1,13 +1,28 @@
 import ee
 from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+from waterrejuvenation.utils import wait_for_task_completion, WATER_REJ_GEE_ASSET
 
 
-def calculate_swb3(aoi, state, district, block):
+def calculate_swb3(aoi, state=None, district=None, block=None, roi=None, app_name=None, proj_name=None):
     # Generate a unique description and asset ID for the water body processing
-    description = (
+    if state and block and district:
+        description = (
         "swb3_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
-    asset_id = get_gee_asset_path(state, district, block) + description
+        asset_id = get_gee_asset_path(state, district, block) + description
+        water_bodies = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "swb2_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+        )
+    else:
+        description = "swb3_" + str(app_name) + "_" + str(proj_name)
+        asset_id = WATER_REJ_GEE_ASSET + str(proj_name)+ "/"+"filtered_mws_" + str(proj_name)+"/"+str(description)
+        water_bodies = ee.FeatureCollection(
+             WATER_REJ_GEE_ASSET + str(proj_name)+ "/"+"filtered_mws_" + str(proj_name)+"/"+"swb2_" + str(app_name) + "_" + str(proj_name)
+           )
 
     # Check if the asset already exists to avoid redundant processing
     if is_gee_asset_exists(asset_id):
@@ -17,13 +32,7 @@ def calculate_swb3(aoi, state, district, block):
     census_state = ee.FeatureCollection(
         "projects/ee-vatsal/assets/WBC_" + state.upper().replace(" ", "") + "_UPD"
     )
-    water_bodies = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "swb2_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+
 
     # Filter points and polygons within the area of interest (aoi)
     points = census_state.filterBounds(aoi)
@@ -177,6 +186,7 @@ def calculate_swb3(aoi, state, district, block):
         )
 
         swb_task.start()
+        wait_for_task_completion(swb_task)
         print("Successfully started the swb3", swb_task.status())
         return swb_task.status()["id"], asset_id
     except Exception as e:
