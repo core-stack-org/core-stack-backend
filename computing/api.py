@@ -715,7 +715,7 @@ def fes_clart_upload_layer(request):
         os.makedirs(temp_upload_dir, exist_ok=True)
 
         file_extension = os.path.splitext(uploaded_file.name)[1]
-        clart_filename = f"{district}_{block}_clart{file_extension}"
+        clart_filename = f"{district}_{block}_clart_fes{file_extension}"
         file_path = os.path.join(temp_upload_dir, clart_filename)
         with open(file_path, "wb+") as destination:
             for chunk in uploaded_file.chunks():
