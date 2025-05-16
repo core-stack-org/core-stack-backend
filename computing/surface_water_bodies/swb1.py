@@ -98,8 +98,8 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
     ).strftime("%Y-%m-%d")
 
     # Initialize collections for analysis
-    collec = []  # Binary water presence
-    collec2 = []  # Original LULC images
+    lulc_water_pixel_collec = []  # Binary water presence
+    lulc_collec = []  # Original LULC images
 
     lulc_bandname = "predicted_label"
 
@@ -128,13 +128,13 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         )
 
         # Add water presence masks to collections
-        collec.append(image.gte(2).And(image.lte(4)))
-        collec2.append(image)
+        lulc_water_pixel_collec.append(image.gte(2).And(image.lte(4)))
+        lulc_collec.append(image)
 
     # Create OR operation string for combining all years
-    ored_str = "collec[0]"
-    for i in range(1, len(collec) - 1):
-        ored_str = ored_str + ".Or(collec[" + str(i) + "])"
+    ored_str = "lulc_water_pixel_collec[0]"
+    for i in range(1, len(lulc_water_pixel_collec) - 1):
+        ored_str = ored_str + ".Or(lulc_water_pixel_collec[" + str(i) + "])"
 
     ored = eval(ored_str)
 
@@ -160,19 +160,22 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         Including area and seasonal water presence
         """
         # Calculate total area
-        fi = ored.clip(feature.geometry())
-        total_cnt = fi.reduceRegion(
-            reducer=ee.Reducer.sum(),
-            geometry=feature.geometry(),
-            scale=10,
-            maxPixels=1e13,
-        ).getNumber(lulc_bandname)
+        total_ored_area = (
+            ored.clip(feature.geometry())
+            .reduceRegion(
+                reducer=ee.Reducer.sum(),
+                geometry=feature.geometry(),
+                scale=10,
+                maxPixels=1e13,
+            )
+            .getNumber(lulc_bandname)
+        )
 
         # Calculate yearly statistics
         cnt_res = []
         ci = 0
-        while ci < len(collec):
-            clipped_image = collec[ci].clip(feature.geometry())
+        while ci < len(lulc_water_pixel_collec):
+            clipped_image = lulc_water_pixel_collec[ci].clip(feature.geometry())
             count = clipped_image.reduceRegion(
                 reducer=ee.Reducer.sum(),
                 geometry=feature.geometry(),
@@ -183,10 +186,10 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
             ci += 1
 
         # Calculate seasonal percentages
-        p1, p2, p3, p4 = [], [], [], []
+        p2, p3, p4 = [], [], []
         j = 0
-        while j < len(collec2):
-            binary_collection = collec2[j]
+        while j < len(lulc_collec):
+            binary_collection = lulc_collec[j]
 
             # Create binary masks for different classes
             binary_image0 = binary_collection.lte(1)  # Non-water
@@ -206,21 +209,21 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
                 ).getNumber(lulc_bandname)
                 counts.append(count)
 
-            total_count = counts[0].add(counts[1]).add(counts[2]).add(counts[3])
+            # total_count = counts[0].add(counts[1]).add(counts[2]).add(counts[3])
 
             # Calculate percentages for each season
             count1 = counts[1].add(counts[2]).add(counts[3])
             count2 = counts[2].add(counts[3])
 
             # Store percentages
-            p1.append((counts[0].divide(total_count)).multiply(100))
-            p2.append((count1.divide(total_count)).multiply(100))
-            p3.append((count2.divide(total_count)).multiply(100))
-            p4.append((counts[3].divide(total_count)).multiply(100))
+            # p1.append((counts[0].divide(total_ored_area)).multiply(100))
+            p2.append((count1.divide(total_ored_area)).multiply(100))
+            p3.append((count2.divide(total_ored_area)).multiply(100))
+            p4.append((counts[3].divide(total_ored_area)).multiply(100))
             j += 1
 
         # Set properties for the feature
-        properties = {"area_ored": total_cnt.multiply(100)}
+        properties = {"area_ored": total_ored_area.multiply(100)}
         i = 0
         loop_start = start_date
         while loop_start < loop_end:
