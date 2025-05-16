@@ -1,3 +1,6 @@
+# Notebook corresponding to this logic is here: 
+# https://github.com/Nirzaree/ponds_and_wells_detection/blob/master/final_merging_logic_ee_pipeline.ipynb
+
 import geopandas as gpd
 import pandas as pd
 import numpy as np
@@ -39,17 +42,12 @@ def dissolve_boundary(data_gdf):
     data_gdf = data_gdf.dissolve()
     return data_gdf
 
-# def valid_gee_text(description):
-#     description = re.sub(r"[^a-zA-Z0-9 .,:;_-]", "", description)
-#     return description.replace(" ", "_")
-
-# def get_gee_asset_path(asset_path, state, district=None, block=None):
-#     gee_path = asset_path + valid_gee_text(state.lower()) + "/"
-#     if district:
-#         gee_path += valid_gee_text(district.lower()) + "/"
-#     if block:
-#         gee_path += valid_gee_text(block.lower()) + "/"
-#     return gee_path
+def uid_for_ponds(mws_id_list,pond_id):
+    # print(row)
+    row_uid = [str(x) for x in mws_id_list]
+    row_uid = '_'.join(row_uid)
+    row_uid = '_'.join([row_uid,str(pond_id)])
+    return row_uid
 
 #from onprem repo utils.py
 def sync_fc_to_gee(fc, description, asset_id):
@@ -163,6 +161,11 @@ def merge_swb_ponds(state,
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fc.getInfo())
     admin_boundary_gdf = gpd.GeoDataFrame.from_features(admin_boundary_fc.getInfo())
 
+    ponds_gdf = ponds_gdf.set_crs(target_crs)
+    swb_gdf = swb_gdf.set_crs(target_crs)
+    mws_gdf = mws_gdf.set_crs(target_crs)
+    admin_boundary_gdf = admin_boundary_gdf.set_crs(target_crs)
+
     if ponds_gdf.shape[0] == 1:
         ponds_gdf = split_multipolygon_into_individual_polygons(ponds_gdf)
 
@@ -190,19 +193,29 @@ def merge_swb_ponds(state,
         data_gdf=swb_gdf,
         boundary_gdf=mws_outer_boundary_gdf)    
 
-    #create merged df
-    #add standalone swbs
+    #Create merged df
+    #1. add standalone swbs
     intersecting_UIDs = swb_gdf.sjoin(ponds_gdf)['UID'].tolist()
     standalone_swb_gdf = swb_gdf[~swb_gdf['UID'].isin(intersecting_UIDs)]
     merged_gdf = standalone_swb_gdf
 
-    #add standalone ponds
+    #2. add standalone ponds
     intersecting_pond_ids = ponds_gdf.sjoin(swb_gdf)['pond_id'].tolist()
     standalone_ponds_gdf = ponds_gdf[~ponds_gdf['pond_id'].isin(intersecting_pond_ids)]
+
+    #add UID column to standalone ponds
+    mws_gdf.rename(columns= {'uid':'MWS_UID'},inplace=True)
+    mws_uid_ponds_df = standalone_ponds_gdf.sjoin(mws_gdf[['MWS_UID','geometry']],
+                                                              how = 'left')
+    mws_uid_ponds_df.drop('index_right',inplace=True,axis=1)
+    pond_mws_intersections_df = mws_uid_ponds_df.groupby(['pond_id'])['MWS_UID'].unique().reset_index()
+    pond_mws_intersections_df['UID'] = pond_mws_intersections_df.apply(lambda row : uid_for_ponds(row.MWS_UID,row.pond_id),axis=1)
+    standalone_ponds_gdf = standalone_ponds_gdf.merge(pond_mws_intersections_df[['pond_id','UID']])
+
     merged_gdf = pd.concat([merged_gdf,
                         standalone_ponds_gdf])
     
-    ## Intersection scenarios 
+    ## 3.Intersection scenarios 
     #case 1:
     intersections_gdf = swb_gdf.sjoin(ponds_gdf)
     swb_intersections_df = intersections_gdf.groupby(['UID'])['pond_id'].unique().reset_index()
@@ -306,6 +319,8 @@ def merge_swb_ponds(state,
     merged_gdf = pd.concat([
         merged_gdf,
         case3_4_gdf])
+    
+
     
     merged_gdf.reset_index(drop=True,inplace=True)
     merged_gdf = merged_gdf.set_crs(target_crs)
