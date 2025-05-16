@@ -1,6 +1,9 @@
-from rest_framework.decorators import api_view
+import os
+from nrm_app.settings import BASE_DIR
+from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
@@ -45,6 +48,7 @@ from .tree_health.ccd_vector import tree_health_ccd_vector
 from .plantation.site_suitability import site_suitability
 from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
+from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 
 
 @api_view(["POST"])
@@ -692,4 +696,38 @@ def soge_vector(request):
     except Exception as e:
         print("Exception in SOGE vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@parser_classes([MultiPartParser, FormParser])
+def fes_clart_upload_layer(request):
+    try:
+        print("Inside upload_fes_clart_layer API")
+        state = request.data.get("state", "").lower().strip().replace(" ", "_")
+        district = request.data.get("district", "").lower().strip().replace(" ", "_")
+        block = request.data.get("block", "").lower().strip().replace(" ", "_")
+        uploaded_file = request.FILES.get("clart_file")
+
+        if not uploaded_file:
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        temp_upload_dir = os.path.join(BASE_DIR, 'data', 'fes_clart_file', state, district)
+        os.makedirs(temp_upload_dir, exist_ok=True)
+
+        file_extension = os.path.splitext(uploaded_file.name)[1]
+        clart_filename = f"{district}_{block}_clart_fes{file_extension}"
+        file_path = os.path.join(temp_upload_dir, clart_filename)
+        with open(file_path, "wb+") as destination:
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+        generate_fes_clart_layer.apply_async(args=[state, district, block, file_path, clart_filename], queue="nrm")
+
+        return Response(
+            {"success": "Fes clart task Initiated"},
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        print("Exception in clart upload_geoserver_layer API:", e)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

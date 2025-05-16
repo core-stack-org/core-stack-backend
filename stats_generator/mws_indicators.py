@@ -386,6 +386,8 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         try:
             df_aquifer_vector_mws_data = sheets['aquifer_vector'][sheets['aquifer_vector']['UID'] == specific_mws_id]
             aquifer_class = df_aquifer_vector_mws_data.get('aquifer_class', None).iloc[0]
+            if aquifer_class =='Alluvium':
+                aquifer_class = 'Alluvial'
         except:
             aquifer_class = ''
 
