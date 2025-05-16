@@ -9,7 +9,13 @@ import re
 from nrm_app.celery import app
 from utilities.gee_utils import (ee_initialize,
                                  valid_gee_text,
-                                 get_gee_asset_path)
+                                 get_gee_asset_path,
+                                 create_gee_directory,
+                                 make_asset_public,
+                                 check_task_status
+                                 )
+
+from utilities.constants import GEE_HELPER_PATH
 
 def split_multipolygon_into_individual_polygons(data_gdf):
     data_gdf = data_gdf.explode()
@@ -45,12 +51,75 @@ def dissolve_boundary(data_gdf):
 #         gee_path += valid_gee_text(block.lower()) + "/"
 #     return gee_path
 
+#from onprem repo utils.py
+def sync_fc_to_gee(fc, description, asset_id):
+    try:
+        task = ee.batch.Export.table.toAsset(
+            **{"collection": fc, "description": description, "assetId": asset_id}
+        )
+        task.start()
+        print("Successfully started task", task.status())
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error in task: {e}")
+
+
+#inspired from https://github.com/core-stack-org/core-stack-backend-onprem/blob/latest_common_download/compute/layers/utils.py
+def export_gdf_to_gee_in_chunks(gdf,
+                      output_suffix,
+                      ee_assets_prefix,
+                      description,
+                      state,
+                      district,
+                      block):
+    df_size = gdf.shape[0]
+    chunk_size = 2000
+    if df_size > chunk_size:
+        asset_ids = []
+        assets = []
+        task_ids = []
+        ee_initialize(project = "helper")
+        create_gee_directory(state, district, block, GEE_HELPER_PATH)
+        for i in range(0, df_size, chunk_size):
+            chunk = gdf.iloc[i : i + chunk_size]
+            fc = geemap.geopandas_to_ee(chunk)
+            chunk_output_suffix = f"{output_suffix}_{i}_{i + chunk_size}"
+            asset_id = (
+                get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
+                + chunk_output_suffix
+            )
+            asset_ids.append(asset_id)
+            assets.append(ee.FeatureCollection(asset_id))
+
+            task_id = sync_fc_to_gee(fc, chunk_output_suffix, asset_id)
+            task_ids.append(task_id)
+
+        check_task_status(task_ids)
+        for asset_id in asset_ids:
+            make_asset_public(asset_id)
+
+        final_asset = ee.FeatureCollection(assets).flatten()
+
+        ee_initialize()
+        asset_id = (
+            get_gee_asset_path(state, district, block, ee_assets_prefix) + output_suffix
+        )
+        sync_fc_to_gee(final_asset, description, asset_id)
+    else:
+        fc = geemap.geopandas_to_ee(gdf)
+        asset_id = (
+            get_gee_asset_path(state, district, block, ee_assets_prefix) + output_suffix
+        )
+        sync_fc_to_gee(fc, description, asset_id)
+
+
 @app.task(bind=True)
 def merge_swb_ponds(state,
                     district,
                     block,
                     ee_assets_prefix = 'projects/ee-corestackdev/assets/apps/mws/',
-                    output_suffix = '_merged_swb_ponds'
+                    output_suffix = '_merged_swb_ponds',
+                    target_crs = 'epsg:4326'
                     ):
     '''
     module to merge swb and ponds layer
@@ -103,23 +172,23 @@ def merge_swb_ponds(state,
     if admin_boundary_gdf.shape[0] > 1:
         admin_boundary_gdf = dissolve_boundary(admin_boundary_gdf)
 
-    ponds_gdf = clip_to_boundary(
-        data_gdf=ponds_gdf,
-        boundary_gdf=admin_boundary_gdf)
-    
-    swb_gdf = clip_to_boundary(
-        data_gdf=swb_gdf,
-        boundary_gdf=admin_boundary_gdf)
-
-    # mws_outer_boundary_gdf = dissolve_boundary(mws_gdf)
-
     # ponds_gdf = clip_to_boundary(
     #     data_gdf=ponds_gdf,
-    #     boundary_gdf=mws_outer_boundary_gdf)
+    #     boundary_gdf=admin_boundary_gdf)
     
     # swb_gdf = clip_to_boundary(
     #     data_gdf=swb_gdf,
-    #     boundary_gdf=mws_outer_boundary_gdf)    
+    #     boundary_gdf=admin_boundary_gdf)
+
+    mws_outer_boundary_gdf = dissolve_boundary(mws_gdf)
+
+    ponds_gdf = clip_to_boundary(
+        data_gdf=ponds_gdf,
+        boundary_gdf=mws_outer_boundary_gdf)
+    
+    swb_gdf = clip_to_boundary(
+        data_gdf=swb_gdf,
+        boundary_gdf=mws_outer_boundary_gdf)    
 
     #create merged df
     #add standalone swbs
@@ -239,24 +308,33 @@ def merge_swb_ponds(state,
         case3_4_gdf])
     
     merged_gdf.reset_index(drop=True,inplace=True)
-
-    merged_gdf = merged_gdf.set_crs('epsg:4326')
-    merged_fc = geemap.geopandas_to_ee(merged_gdf)
+    merged_gdf = merged_gdf.set_crs(target_crs)
+   
+    # merged_fc = geemap.geopandas_to_ee(merged_gdf)
     
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": merged_fc,
-                "description": 'merging swb and pond layer',
-                "assetId": block_path_ee + str(district) + '_' + str(block) + output_suffix + '_test',
-            }
-        )
-        task.start()
-        print("Successfully started the merge chunk", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running merge task: {e}")
+    # try:
+    #     task = ee.batch.Export.table.toAsset(
+    #         **{
+    #             "collection": merged_fc,
+    #             "description": 'merging swb and pond layer',
+    #             "assetId": block_path_ee + str(district) + '_' + str(block) + output_suffix + '_test',
+    #         }
+    #     )
+    #     task.start()
+    #     print("Successfully started the merge chunk", task.status())
+    #     return task.status()["id"]
+    # except Exception as e:
+    #     print(f"Error occurred in running merge task: {e}")
 
+    fc_output_suffix = str(district) + '_' + str(block) + output_suffix
+    export_gdf_to_gee_in_chunks(gdf=merged_gdf,
+                      output_suffix=fc_output_suffix,
+                      ee_assets_prefix = ee_assets_prefix,
+                      description = 'merging swb and pond layer',
+                      state=state,
+                      district=district,
+                      block=block)
+    
 #example run for a block (gobindpur)
 
 # merge_swb_ponds(
