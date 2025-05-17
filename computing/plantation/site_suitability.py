@@ -42,40 +42,37 @@ def site_suitability(self, project_id, state, start_year, end_year):
     organization = project.organization.name
     project_name = project.name
 
-    # kml_files_obj = KMLFile.objects.filter(project=project)
+    kml_files_obj = KMLFile.objects.filter(project=project)
 
     # Initialize Earth Engine connection for the project
     ee_initialize()
 
-    # # Create a project-specific directory in Google Earth Engine
-    # create_gee_dir([organization, project_name], gee_project_path=GEE_PATH_PLANTATION)
-    #
-    # # Construct a unique description and asset ID for the project
-    # description = valid_gee_text(organization) + "_" + valid_gee_text(project_name)
-    # asset_id = (
-    #     get_gee_dir_path([organization, project_name], asset_path=GEE_PATH_PLANTATION)
-    #     + description
-    # )
-    #
-    # # Check if the asset already exists and handle accordingly
-    # if is_gee_asset_exists(asset_id):
-    #     merge_new_kmls(asset_id, description, project_name, kml_files_obj)
-    # else:
-    #     generate_project_roi(asset_id, description, project_name, kml_files_obj)
-    #
-    # # Load the region of interest (ROI) feature collection
-    # roi = ee.FeatureCollection(asset_id)
-    roi = ee.FeatureCollection(
-        "projects/ee-corestackdev/assets/apps/plantation/cfpt/infosys/CFPT_Infosys"
+    # Create a project-specific directory in Google Earth Engine
+    create_gee_dir([organization, project_name], gee_project_path=GEE_PATH_PLANTATION)
+
+    # Construct a unique description and asset ID for the project
+    description = valid_gee_text(organization) + "_" + valid_gee_text(project_name)
+    asset_id = (
+        get_gee_dir_path([organization, project_name], asset_path=GEE_PATH_PLANTATION)
+        + description
     )
+
+    # Check if the asset already exists and handle accordingly
+    if is_gee_asset_exists(asset_id):
+        merge_new_kmls(asset_id, description, project_name, kml_files_obj)
+    else:
+        generate_project_roi(asset_id, description, project_name, kml_files_obj)
+
+    # Load the region of interest (ROI) feature collection
+    roi = ee.FeatureCollection(asset_id)
 
     # Perform site suitability analysis
     vector_asset_id = check_site_suitability(
         roi, organization, project, state, start_year, end_year
     )
 
-    # # Sync the results to GeoServer for visualization
-    # sync_suitability_to_geoserver(vector_asset_id, organization, project_name)
+    # Sync the results to GeoServer for visualization
+    sync_suitability_to_geoserver(vector_asset_id, organization, project_name)
 
 
 def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
@@ -219,6 +216,8 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
                     is_default_profile,
                     descs[i],
                     chunk_asset_id,
+                    org,
+                    project_name,
                 )
                 if task_id:
                     tasks.append(task_id)
@@ -251,8 +250,11 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
             is_default_profile,
             description,
             asset_id,
+            org,
+            project_name,
         )
-        check_task_status([task_id], 120)
+        if task_id:
+            check_task_status([task_id], 120)
 
     return asset_id
 
@@ -265,6 +267,8 @@ def generate_vector(
     is_default_profile,
     description,
     asset_id,
+    organization,
+    project_name,
 ):
 
     def get_max_val(feature):
@@ -322,13 +326,13 @@ def generate_vector(
 
     # Add NDVI data for the specified time range
     suitability_vector = get_ndvi_data(
-        suitability_vector.limit(1), start_year, end_year
+        suitability_vector, start_year, end_year, organization, project_name
     )
     logger.info("NDVI calculation completed")
 
-    # # Add Land Use/Land Cover data
-    # suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
-    # logger.info("LULC calculation completed")
+    # Add Land Use/Land Cover data
+    suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
+    logger.info("LULC calculation completed")
 
     try:
         # Export annotated feature collection to Earth Engine
@@ -336,6 +340,7 @@ def generate_vector(
             collection=suitability_vector,
             description=description,
             assetId=asset_id,
+            project="ee-corestackdev",
         )
         task.start()
 
