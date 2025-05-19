@@ -82,7 +82,7 @@ urlpatterns = [
     ),
     path(
         "merge_swb_ponds/",
-        api.merge_swb_ponds,
+        api.swb_pond_merging,
         name="merge_swb_ponds",
     )    
 ]
