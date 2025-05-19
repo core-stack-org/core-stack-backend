@@ -1,217 +1,147 @@
 import ee
 from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+from utilities.gee_utils import check_task_status, is_gee_asset_exists
 
 
-def get_ndvi_data(suitability_vector, start_year, end_year):
+def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
     """
-    Retrieve Normalized Difference Vegetation Index (NDVI) data
-    for a given set of features across a specified time range.
+    Extracts and exports NDVI data for a set of features by aggregating NDVI values
+    into a per-feature dictionary {date: NDVI} over the specified time range.
+
+    Each feature is stored as a single row, with NDVI values stored as a JSON string
+    in a property called NDVI_<year>.
 
     Args:
-        suitability_vector: Earth Engine FeatureCollection to annotate with NDVI data
-        start_year: Beginning of the temporal analysis range
-        end_year: End of the temporal analysis range
+        suitability_vector (ee.FeatureCollection): Features to calculate NDVI over.
+        start_year (int): Start of the NDVI analysis range.
+        end_year (int): End of the NDVI analysis range.
+        description (str): Description to use in the export task name.
+        asset_id (str): Base asset ID to export the result to.
 
     Returns:
-        FeatureCollection with NDVI values and dates added as encoded JSON strings
+        ee.FeatureCollection: Merged NDVI time series across years.
     """
-    # Sentinel-2 bands for NDVI calculation
-    # NIR (Near Infrared): B8, Red: B4
-    ndvi_bands = ["B8", "B4"]
+    task_ids = []
+    asset_ids = []
+    # Loop over each year
+    while start_year <= end_year:
+        start_date = f"{start_year}-07-01"
+        end_date = f"{start_year+1}-06-30"
 
-    # Cloud cover threshold for image filtering
-    cloud_threshold = 20
+        # Define export task details
+        ndvi_description = f"ndvi_{start_year}_{description}"
+        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"
 
-    # Construct start and end dates for the entire analysis period
-    # Uses July 1st to June 30th to align with agricultural/seasonal cycles
-    start_date = f"{start_year}-07-01"
-    end_date = f"{end_year+1}-06-30"
+        # Remove previous asset if it exists to avoid overwrite issues
+        if is_gee_asset_exists(ndvi_asset_id):
+            ee.data.deleteAsset(ndvi_asset_id)
 
-    # Retrieve and process Sentinel-2 imagery
-    # Note: Commented out Landsat option suggests flexibility in data source
-    # landsat_collection = get_landsat_data(roi, cloud_threshold, start_date, end_date)
-    sentinel_collection = get_sentinel_data(cloud_threshold, start_date, end_date)
-
-    # Compute NDVI for the Sentinel-2 image collection
-    # NDVI = (NIR - Red) / (NIR + Red)
-    ndvi = sentinel_collection.map(
-        lambda image: image.normalizedDifference(ndvi_bands)
-        .set("system:time_start", image.get("system:time_start"))
-        .rename("NDVI")
-    )
-    # ndvi = Get_Padded_NDVI_TS_Image(start_date, end_date, suitability_vector.geometry())
-
-    def get_ndvi(feature):
-        """
-        Extract NDVI data for a single feature.
-
-        Args:
-            feature: A single geographic feature to analyze
-
-        Returns:
-            Feature with NDVI values and dates added as properties
-        """
-        # Filter NDVI collection to images intersecting the feature's geometry
-        ndvi_collection = ndvi.filterBounds(feature.geometry())
-
-        def extract_ndvi(image):
-            """
-            Extract mean NDVI value for a specific image and feature.
-
-            Args:
-                image: Satellite image to analyze
-
-            Returns:
-                Feature with NDVI value and date
-            """
-            # Calculate mean NDVI for the feature's geometry
-            mean_ndvi = image.reduceRegion(
-                reducer=ee.Reducer.mean(), geometry=feature.geometry(), scale=10
-            ).get("NDVI")
-
-            # Get the date and extract the year
-            date = image.date()
-            date_str = date.format("YYYY-MM-dd")
-            # Extract year as number for proper filtering
-            year_num = date.get("year")
-
-            # Handle potential missing NDVI values
-            ndvi_value = ee.Algorithms.If(
-                ee.Algorithms.IsEqual(mean_ndvi, None), -9999, mean_ndvi
-            )
-
-            return ee.Feature(
-                None,
-                {
-                    "date": date_str,
-                    "ndvi": ndvi_value,
-                    "year": year_num,  # Store year as number for filtering
-                },
-            )
-
-        # Extract NDVI for all images intersecting the feature
-        ndvi_series = ndvi_collection.map(extract_ndvi)
-
-        # Initialize the feature to be returned (will add year properties to it)
-        result_feature = feature
-
-        # Process each year and add it as a separate property
-        for year in range(start_year, end_year + 1):
-            # Define field name for this year
-            field_name = f"NDVI_{year}"
-
-            # Filter features for the current year
-            year_features = ndvi_series.filter(ee.Filter.eq("year", year))
-
-            # Get the size of the collection after filtering
-            count = year_features.size()
-
-            # Convert to list for processing
-            year_ndvi_list = ee.Algorithms.If(
-                ee.Algorithms.IsEqual(count, 0),
-                ee.List([]),  # Empty list if no features
-                year_features.toList(count).map(
-                    lambda feature: ee.List(
-                        [
-                            ee.Feature(feature).get("date"),
-                            ee.Feature(feature).get("ndvi"),
-                        ]
-                    )
-                ),
-            )
-
-            # Encode as JSON string
-            year_ndvi_json = ee.String.encodeJSON(year_ndvi_list)
-
-            # Add as property to the result feature
-            result_feature = result_feature.set(field_name, year_ndvi_json)
-
-        return result_feature
-
-    # Apply NDVI data retrieval to each feature in the suitability vector
-    return suitability_vector.map(get_ndvi)
-
-
-def get_sentinel_data(cloud_threshold, start_date, end_date):
-    """
-    Retrieve and preprocess Sentinel-2 satellite imagery.
-
-    Args:
-        cloud_threshold: Maximum acceptable cloud percentage
-        start_date: Start of the date range
-        end_date: End of the date range
-
-    Returns:
-        Processed Sentinel-2 image collection
-    """
-    sentinel_collection = (
-        # Select Harmonized Sentinel-2 surface reflectance collection
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
-        # Filter by date range
-        .filterDate(start_date, end_date)
-        # Filter out images with high cloud coverage
-        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", cloud_threshold))
-        # Apply cloud masking
-        .map(mask_s2clouds)
-        # Add timestamp to each image based on its index
-        .map(
-            lambda image: image.set(
-                "system:time_start",
-                ee.Date.parse(
-                    "yyyyMMdd", ee.String(image.get("system:index")).slice(0, 8)
-                ).millis(),
-            )
+        # Get NDVI image collection (with 'gapfilled_NDVI_lsc' band)
+        ndvi = Get_Padded_NDVI_TS_Image(
+            start_date, end_date, suitability_vector.bounds()
         )
-    )
-    return sentinel_collection
+
+        def map_image(image):
+            date_str = image.date().format("YYYY-MM-dd")
+
+            # Compute mean NDVI for all features at once
+            reduced = image.reduceRegions(
+                collection=suitability_vector,
+                reducer=ee.Reducer.mean(),
+                scale=10,
+            )
+
+            # Add NDVI value and image date to each feature
+            def annotate(feature):
+                ndvi_val = ee.Algorithms.If(
+                    ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
+                    -9999,
+                    feature.get("gapfilled_NDVI_lsc"),
+                )
+                return feature.set("ndvi_date", date_str).set("ndvi", ndvi_val)
+
+            return reduced.map(annotate)
+
+        # Map image-wise extraction and flatten to a single FeatureCollection
+        all_ndvi = ndvi.map(map_image).flatten()
+
+        # Extract all unique UIDs from the input feature collection
+        uids = suitability_vector.aggregate_array("uid")
+
+        # For each UID, filter NDVI features and aggregate to dict
+        def build_feature(uid):
+            """
+            Reconstruct a single feature by merging its NDVI values across all images
+            into one property NDVI_<year> as a JSON dictionary {date: value}.
+            """
+            # Get the geometry and properties of the original feature
+            feature_geom = ee.Feature(
+                suitability_vector.filter(ee.Filter.eq("uid", uid)).first()
+            )
+
+            # Filter all NDVI records related to this UID
+            filtered = all_ndvi.filter(ee.Filter.eq("uid", uid))
+
+            # Create dictionary: {date: ndvi}
+            date_ndvi_list = filtered.aggregate_array("ndvi_date").zip(
+                filtered.aggregate_array("ndvi")
+            )
+
+            # Convert to dictionary and encode as JSON string
+            ndvi_dict = ee.Dictionary(date_ndvi_list.flatten())
+            ndvi_json = ee.String.encodeJSON(ndvi_dict)
+
+            return feature_geom.set(f"NDVI_{start_year}", ndvi_json)
+
+        # Apply feature-wise aggregation
+        merged_fc = ee.FeatureCollection(uids.map(build_feature))
+
+        # Export as single-row-per-feature collection
+        try:
+            task = ee.batch.Export.table.toAsset(
+                collection=merged_fc,
+                description=ndvi_description,
+                assetId=ndvi_asset_id,
+            )
+            task.start()
+            print(f"Started export for {start_year}")
+            asset_ids.append(ndvi_asset_id)
+            task_ids.append(task.status()["id"])
+        except Exception as e:
+            print("Export error:", e)
+
+        start_year += 1
+
+    check_task_status(task_ids)
+
+    # Merge year-wise outputs into a single collection
+    return merge_assets_chunked_on_year(asset_ids)
 
 
-def mask_s2clouds(image):
-    """
-    Remove clouds and cirrus from Sentinel-2 images using QA60 band.
+def merge_assets_chunked_on_year(chunk_assets):
+    def merge_features(feature):
+        # Get the unique ID of the current feature
+        uid = feature.get("uid")
+        matched_features = []
+        for i in range(1, len(chunk_assets)):
+            # Find the matching feature in the second collection
+            matched_feature = ee.Feature(
+                ee.FeatureCollection(chunk_assets[i])
+                .filter(ee.Filter.eq("uid", uid))
+                .first()
+            )
+            matched_features.append(matched_feature)
 
-    Args:
-        image: Sentinel-2 satellite image
+        merged_properties = feature.toDictionary()
+        for f in matched_features:
+            # Combine properties from both features
+            merged_properties = merged_properties.combine(
+                f.toDictionary(), overwrite=False
+            )
 
-    Returns:
-        Cloud-masked and normalized image
-    """
-    # Select the QA60 quality assessment band
-    qa = image.select("QA60")
+        # Return a new feature with merged properties
+        return ee.Feature(feature.geometry(), merged_properties)
 
-    # Define bit masks for clouds and cirrus
-    # Bits 10 and 11 represent clouds and cirrus, respectively
-    cloud_bit_mask = 1 << 10
-    cirrus_bit_mask = 1 << 11
-
-    # Create a mask where both cloud and cirrus bits are zero
-    # This indicates clear atmospheric conditions
-    # Both flags should be set to zero, indicating clear conditions.
-    mask = qa.bitwiseAnd(cloud_bit_mask).eq(0).And(qa.bitwiseAnd(cirrus_bit_mask).eq(0))
-
-    # Apply the mask and normalize pixel values
-    # Divide by 10000 to convert to reflectance values
-    return image.updateMask(mask).divide(10000)
-
-
-# def get_landsat_data(roi, cloud_threshold, start_date, end_date):
-#     # Landsat ImageCollection
-#     landsat_collection = (
-#         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
-#         .filterDate(start_date, end_date)
-#         .filterBounds(roi.geometry())
-#         .filter(ee.Filter.lt("CLOUD_COVER", cloud_threshold))
-#         .map(mask_clouds_qa)
-#     )
-#     return landsat_collection
-#
-# def mask_clouds_qa(image):
-#     qa = image.select("QA_PIXEL")
-#     cloud = (
-#         qa.bitwiseAnd(1 << 5)
-#         .And(qa.bitwiseAnd(1 << 6).Or(qa.bitwiseAnd(1 << 7)))
-#         .Or(qa.bitwiseAnd(1 << 4))
-#         .Or(qa.bitwiseAnd(1 << 3))
-#         .Or(qa.bitwiseAnd(1 << 8).And(qa.bitwiseAnd(1 << 9)))
-#     )
-#     return image.updateMask(cloud.Not())
+    # Map the merge function over the first feature collection
+    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+    return merged_fc

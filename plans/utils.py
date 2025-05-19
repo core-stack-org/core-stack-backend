@@ -8,7 +8,7 @@ import requests
 from datetime import datetime, timezone
 import dateutil.parser
 
-from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
+from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from utilities.constants import (
     ODK_URL_agri,
     ODK_URL_gw,
@@ -69,9 +69,6 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
     request_obj_odk = requests.get(ODK_url, auth=(ODK_USERNAME, ODK_PASSWORD))
     response_dict = json.loads(request_obj_odk.content)
     response_list = response_dict["value"]
-    print("INCOMING ODK DATA")
-    print(response_list[0:1])
-    print("DONE")
     logger.info(f"Fetched data from the ODK: {ODK_url}")
     all_keys = set()
 

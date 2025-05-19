@@ -284,11 +284,11 @@
             <h4>Land use on slopes and plains</h4>
             <p>{{terrain_land_use}}</p>
 
-            <div class="chart-container">
+            <div class="chart-container" id="slopeChartContainer">
                 <canvas id="barChart-terrain-lulc-slope"></canvas>
             </div>
 
-            <div class="chart-container">
+            <div class="chart-container" id="plainChartContainer">
                 <canvas id="barChart-terrain-lulc-plain"></canvas>
             </div>
 
@@ -422,10 +422,6 @@
             <p>{{trend_desc}}</p>
 
             <p>{{final_desc}}</p>
-
-            {% if not trend_desc %}
-                <p>No surface water body descriptions available.</p>
-            {% endif %}
 
             <div class="chart-container">
                 <canvas id="barChart-swb"></canvas>
@@ -944,71 +940,82 @@
 
         const lulc_mws_plain = JSON.parse('{{lulc_mws_plain|safe}}')
         const lulc_block_plain = JSON.parse('{{lulc_block_plain|safe}}')
+        
+        const slopeContainer = document.getElementById('slopeChartContainer');
+        const plainContainer = document.getElementById('plainChartContainer');
 
-
-        const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Slope',
-                    data: lulc_block_slope,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Slope',
-                    data: lulc_mws_slope,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
-                        }
-                    }
+        if(lulc_mws_slope.some(v => v > 0)){
+            const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Block Terrain Area under Slope',
+                        data: lulc_block_slope,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Slope',
+                        data: lulc_mws_slope,
+                        backgroundColor: '#2ecc71'
+                    }]
                 },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
-
-        const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Plain',
-                    data: lulc_block_plain,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Plain',
-                    data: lulc_mws_plain,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
                         }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
                     }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
                 }
-            }
-        });
+            });
+        } else {
+            slopeContainer.style.display = 'none';
+          }
+        
+
+        if(lulc_mws_plain.some(v => v > 0)){
+            const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Block Terrain Area under Plain',
+                        data: lulc_block_plain,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Plain',
+                        data: lulc_mws_plain,
+                        backgroundColor: '#2ecc71'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
+                    }
+                }
+            });
+        } else {
+            plainContainer.style.display = 'none';
+          }
 
         // Waterbody Graphs
         const kharifData = JSON.parse('{{kharif_data|safe}}')
