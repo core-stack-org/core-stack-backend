@@ -1,166 +1,120 @@
 import ee
 from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
-from utilities.constants import GEE_PATH_PLANTATION
-from utilities.gee_utils import (
-    check_task_status,
-    get_gee_dir_path,
-    valid_gee_text,
-    is_gee_asset_exists,
-)
+from utilities.gee_utils import check_task_status, is_gee_asset_exists
 
 
-def get_ndvi_data(suitability_vector, start_year, end_year, organization, project_name):
+def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
     """
-    Retrieve Normalized Difference Vegetation Index (NDVI) data
-    for a given set of features across a specified time range.
+    Extracts and exports NDVI data for a set of features by aggregating NDVI values
+    into a per-feature dictionary {date: NDVI} over the specified time range.
+
+    Each feature is stored as a single row, with NDVI values stored as a JSON string
+    in a property called NDVI_<year>.
 
     Args:
-        suitability_vector: Earth Engine FeatureCollection to annotate with NDVI data
-        start_year: Beginning of the temporal analysis range
-        end_year: End of the temporal analysis range
+        suitability_vector (ee.FeatureCollection): Features to calculate NDVI over.
+        start_year (int): Start of the NDVI analysis range.
+        end_year (int): End of the NDVI analysis range.
+        description (str): Description to use in the export task name.
+        asset_id (str): Base asset ID to export the result to.
 
     Returns:
-        FeatureCollection with NDVI values and dates added as encoded JSON strings
+        ee.FeatureCollection: Merged NDVI time series across years.
     """
-    s_year = start_year
     task_ids = []
     asset_ids = []
-    # Construct start and end dates for the entire analysis period
-    # Uses July 1st to June 30th to align with agricultural/seasonal cycles
-    while s_year <= end_year:
-        start_date = f"{s_year}-07-01"
-        end_date = f"{s_year+1}-06-30"
-        description = (
-            "ndvi_"
-            + str(s_year)
-            + "_"
-            + valid_gee_text(organization)
-            + "_"
-            + valid_gee_text(project_name)
-        )
-        asset_id = (
-            get_gee_dir_path(
-                [organization, project_name], asset_path=GEE_PATH_PLANTATION
-            )
-            + description
-        )
+    # Loop over each year
+    while start_year <= end_year:
+        start_date = f"{start_year}-07-01"
+        end_date = f"{start_year+1}-06-30"
 
-        # Remove existing asset if it exists
-        if is_gee_asset_exists(asset_id):
-            ee.data.deleteAsset(asset_id)
+        # Define export task details
+        ndvi_description = f"ndvi_{start_year}_{description}"
+        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"
 
+        # Remove previous asset if it exists to avoid overwrite issues
+        if is_gee_asset_exists(ndvi_asset_id):
+            ee.data.deleteAsset(ndvi_asset_id)
+
+        # Get NDVI image collection (with 'gapfilled_NDVI_lsc' band)
         ndvi = Get_Padded_NDVI_TS_Image(
             start_date, end_date, suitability_vector.bounds()
         )
 
-        def get_ndvi(feature):
+        def map_image(image):
+            date_str = image.date().format("YYYY-MM-dd")
+
+            # Compute mean NDVI for all features at once
+            reduced = image.reduceRegions(
+                collection=suitability_vector,
+                reducer=ee.Reducer.mean(),
+                scale=10,
+            )
+
+            # Add NDVI value and image date to each feature
+            def annotate(feature):
+                ndvi_val = ee.Algorithms.If(
+                    ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
+                    -9999,
+                    feature.get("gapfilled_NDVI_lsc"),
+                )
+                return feature.set("ndvi_date", date_str).set("ndvi", ndvi_val)
+
+            return reduced.map(annotate)
+
+        # Map image-wise extraction and flatten to a single FeatureCollection
+        all_ndvi = ndvi.map(map_image).flatten()
+
+        # Extract all unique UIDs from the input feature collection
+        uids = suitability_vector.aggregate_array("uid")
+
+        # For each UID, filter NDVI features and aggregate to dict
+        def build_feature(uid):
             """
-            Extract NDVI data for a single feature.
-
-            Args:
-                feature: A single geographic feature to analyze
-
-            Returns:
-                Feature with NDVI values and dates added as properties
+            Reconstruct a single feature by merging its NDVI values across all images
+            into one property NDVI_<year> as a JSON dictionary {date: value}.
             """
-            # Filter NDVI collection to images intersecting the feature's geometry
-            ndvi_collection = ndvi.filterBounds(feature.geometry())
+            # Get the geometry and properties of the original feature
+            feature_geom = ee.Feature(
+                suitability_vector.filter(ee.Filter.eq("uid", uid)).first()
+            )
 
-            def extract_ndvi(image):
-                """
-                Extract mean NDVI value for a specific image and feature.
+            # Filter all NDVI records related to this UID
+            filtered = all_ndvi.filter(ee.Filter.eq("uid", uid))
 
-                Args:
-                    image: Satellite image to analyze
+            # Create dictionary: {date: ndvi}
+            date_ndvi_list = filtered.aggregate_array("ndvi_date").zip(
+                filtered.aggregate_array("ndvi")
+            )
 
-                Returns:
-                    Feature with NDVI value and date
-                """
-                # Calculate mean NDVI for the feature's geometry
-                mean_ndvi = image.reduceRegion(
-                    reducer=ee.Reducer.mean(), geometry=feature.geometry(), scale=10
-                ).get("gapfilled_NDVI_lsc")
+            # Convert to dictionary and encode as JSON string
+            ndvi_dict = ee.Dictionary(date_ndvi_list.flatten())
+            ndvi_json = ee.String.encodeJSON(ndvi_dict)
 
-                # Get the date and extract the year
-                date = image.date()
-                date_str = date.format("YYYY-MM-dd")
-                # Extract year as number for proper filtering
-                year_num = date.get("year")
+            return feature_geom.set(f"NDVI_{start_year}", ndvi_json)
 
-                # Handle potential missing NDVI values
-                ndvi_value = ee.Algorithms.If(
-                    ee.Algorithms.IsEqual(mean_ndvi, None), -9999, mean_ndvi
-                )
+        # Apply feature-wise aggregation
+        merged_fc = ee.FeatureCollection(uids.map(build_feature))
 
-                return ee.Feature(
-                    None,
-                    {
-                        "date": date_str,
-                        "ndvi": ndvi_value,
-                        "year": year_num,  # Store year as number for filtering
-                    },
-                )
-
-            # Extract NDVI for all images intersecting the feature
-            ndvi_series = ndvi_collection.map(extract_ndvi)
-
-            # Initialize the feature to be returned (will add year properties to it)
-            result_feature = feature
-
-            # Process each year and add it as a separate property
-            for year in range(s_year, s_year + 1):
-                # Define field name for this year
-                field_name = f"NDVI_{year}"
-
-                # Filter features for the current year
-                year_features = ndvi_series.filter(ee.Filter.eq("year", year))
-
-                # Get the size of the collection after filtering
-                count = year_features.size()
-
-                # Convert to list for processing
-                year_ndvi_list = ee.Algorithms.If(
-                    ee.Algorithms.IsEqual(count, 0),
-                    ee.List([]),  # Empty list if no features
-                    year_features.toList(count).map(
-                        lambda feature: ee.List(
-                            [
-                                ee.Feature(feature).get("date"),
-                                ee.Feature(feature).get("ndvi"),
-                            ]
-                        )
-                    ),
-                )
-
-                # Encode as JSON string
-                year_ndvi_json = ee.String.encodeJSON(year_ndvi_list)
-
-                # Add as property to the result feature
-                result_feature = result_feature.set(field_name, year_ndvi_json)
-
-            return result_feature
-
-        # Apply NDVI data retrieval to each feature in the suitability vector
-        fc = suitability_vector.map(get_ndvi)
-
+        # Export as single-row-per-feature collection
         try:
-            # Export annotated feature collection to Earth Engine
             task = ee.batch.Export.table.toAsset(
-                collection=fc,
-                description=description,
-                assetId=asset_id,
-                project="ee-corestackdev",
+                collection=merged_fc,
+                description=ndvi_description,
+                assetId=ndvi_asset_id,
             )
             task.start()
-            s_year += 1
-            print(f"Asset export task started.")
-            asset_ids.append(asset_id)
+            print(f"Started export for {start_year}")
+            asset_ids.append(ndvi_asset_id)
             task_ids.append(task.status()["id"])
         except Exception as e:
-            print("Exception in exporting suitability vector", e)
+            print("Export error:", e)
+
+        start_year += 1
 
     check_task_status(task_ids)
 
+    # Merge year-wise outputs into a single collection
     return merge_assets_chunked_on_year(asset_ids)
 
 

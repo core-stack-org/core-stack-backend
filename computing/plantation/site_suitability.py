@@ -43,6 +43,7 @@ def site_suitability(self, project_id, state, start_year, end_year):
     project_name = project.name
 
     kml_files_obj = KMLFile.objects.filter(project=project)
+    have_new_sites = False
 
     # Initialize Earth Engine connection for the project
     ee_initialize()
@@ -59,23 +60,27 @@ def site_suitability(self, project_id, state, start_year, end_year):
 
     # Check if the asset already exists and handle accordingly
     if is_gee_asset_exists(asset_id):
-        merge_new_kmls(asset_id, description, project_name, kml_files_obj)
+        have_new_sites = merge_new_kmls(
+            asset_id, description, project_name, kml_files_obj, have_new_sites
+        )
     else:
+        have_new_sites = True
         generate_project_roi(asset_id, description, project_name, kml_files_obj)
+    print("have_new_sites", have_new_sites)
 
     # Load the region of interest (ROI) feature collection
     roi = ee.FeatureCollection(asset_id)
 
     # Perform site suitability analysis
     vector_asset_id = check_site_suitability(
-        roi, organization, project, state, start_year, end_year
+        roi, organization, project, state, start_year, end_year, have_new_sites
     )
 
     # Sync the results to GeoServer for visualization
     sync_suitability_to_geoserver(vector_asset_id, organization, project_name)
 
 
-def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
+def merge_new_kmls(asset_id, description, project_name, kml_files_obj, have_new_sites):
     """
     Merge new KML files into an existing Google Earth Engine asset.
 
@@ -98,6 +103,7 @@ def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
     # If new entries exist, update the asset
     if gdf.shape[0] > 0:
         ee.data.deleteAsset(asset_id)
+        have_new_sites = True
         roi = gdf_to_ee_fc(roi)
         fc = gdf_to_ee_fc(gdf)
         asset = ee.FeatureCollection([roi, fc]).flatten()
@@ -117,6 +123,7 @@ def merge_new_kmls(asset_id, description, project_name, kml_files_obj):
             logger.info("ROI for project: %s exported to GEE", project_name)
         except Exception as e:
             logger.exception("Exception in exporting asset: %s", e)
+    return have_new_sites
 
 
 def generate_project_roi(asset_id, description, project_name, kml_files_obj):
@@ -148,7 +155,9 @@ def generate_project_roi(asset_id, description, project_name, kml_files_obj):
         logger.exception("Exception in exporting asset: %s", e)
 
 
-def check_site_suitability(roi, org, project, state, start_year, end_year):
+def check_site_suitability(
+    roi, org, project, state, start_year, end_year, have_new_sites
+):
     """
     Perform comprehensive site suitability analysis.
 
@@ -159,6 +168,7 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
         state: Geographic state
         start_year: Analysis start year
         end_year: Analysis end year
+        have_new_sites: Boolean flag for if there are new sites in the ROI
 
     Returns:
         Asset ID of the suitability vector
@@ -171,10 +181,10 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
 
     # Generate Plantation Site Suitability raster
     pss_rasters_asset, is_default_profile = get_pss(
-        roi, org, project, state, asset_name, start_year, end_year
+        roi, org, project, state, asset_name, start_year, end_year, have_new_sites
     )
 
-    print("is_default_profile>>>", is_default_profile)
+    print("is_default_profile= ", is_default_profile)
 
     # Prepare asset description and path
     description = asset_name + "_vector"
@@ -185,7 +195,10 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
 
     # Remove existing asset if it exists
     if is_gee_asset_exists(asset_id):
-        ee.data.deleteAsset(asset_id)
+        if have_new_sites:
+            ee.data.deleteAsset(asset_id)
+        else:
+            return asset_id
 
     pss_rasters = ee.Image(pss_rasters_asset)
 
@@ -207,22 +220,21 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
                 )
                 + descs[i]
             )
-            if not is_gee_asset_exists(chunk_asset_id):
-                task_id = generate_vector(
-                    rois[i],
-                    start_year,
-                    end_year,
-                    pss_rasters,
-                    is_default_profile,
-                    descs[i],
-                    chunk_asset_id,
-                    org,
-                    project_name,
-                )
-                if task_id:
-                    tasks.append(task_id)
+            if is_gee_asset_exists(chunk_asset_id):
+                ee.data.deleteAsset(chunk_asset_id)
+            task_id = generate_vector(
+                rois[i],
+                start_year,
+                end_year,
+                pss_rasters,
+                is_default_profile,
+                descs[i],
+                chunk_asset_id,
+            )
+            if task_id:
+                tasks.append(task_id)
 
-        check_task_status(tasks, 500)
+        check_task_status(tasks, 300)
 
         for desc in descs:
             make_asset_public(
@@ -250,8 +262,6 @@ def check_site_suitability(roi, org, project, state, start_year, end_year):
             is_default_profile,
             description,
             asset_id,
-            org,
-            project_name,
         )
         if task_id:
             check_task_status([task_id], 120)
@@ -267,8 +277,6 @@ def generate_vector(
     is_default_profile,
     description,
     asset_id,
-    organization,
-    project_name,
 ):
 
     def get_max_val(feature):
@@ -326,7 +334,7 @@ def generate_vector(
 
     # Add NDVI data for the specified time range
     suitability_vector = get_ndvi_data(
-        suitability_vector, start_year, end_year, organization, project_name
+        suitability_vector, start_year, end_year, description, asset_id
     )
     logger.info("NDVI calculation completed")
 
@@ -340,7 +348,6 @@ def generate_vector(
             collection=suitability_vector,
             description=description,
             assetId=asset_id,
-            project="ee-corestackdev",
         )
         task.start()
 
@@ -348,6 +355,7 @@ def generate_vector(
         return task.status()["id"]
     except Exception as e:
         logger.exception("Exception in exporting suitability vector", e)
+        return None
 
 
 def sync_suitability_to_geoserver(asset_id, organization, project_name):

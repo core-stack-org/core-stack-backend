@@ -19,7 +19,7 @@ from utilities.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-def get_pss(roi, org, project, state, asset_name, start_year, end_year):
+def get_pss(roi, org, project, state, asset_name, start_year, end_year, have_new_sites):
     """
     Generate Plantation Site Suitability (PSS) raster.
 
@@ -67,8 +67,11 @@ def get_pss(roi, org, project, state, asset_name, start_year, end_year):
 
     # Remove existing asset if it exists to prevent conflicts
     if is_gee_asset_exists(asset_id):
-        ee.data.deleteAsset(asset_id)
-        # return asset_id, is_default_profile
+        if have_new_sites:
+            ee.data.deleteAsset(asset_id)
+        else:
+            return asset_id, is_default_profile
+
     # Define analysis layers and their processing functions
     # Each subsequent section follows a similar pattern:
     # 1. Define variables
