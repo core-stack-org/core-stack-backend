@@ -15,19 +15,23 @@ def get_lulc_data(suitability_vector, start_year, end_year):
         FeatureCollection with LULC data added as encoded JSON
     """
 
-    # Construct start and end dates for the entire analysis period
-    # Note: Uses July 1st to June 30th to align with agricultural/seasonal cycles
-    start_date = f"{start_year}-07-01"
-    end_date = f"{end_year+1}-06-30"
+    lulc_years = {}
+    # for (year = start year <= end year++) {
+    for year in range(start_year, end_year + 1):
+        asset_id = (
+            "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+            + str(year)
+            + "_"
+            + str(year + 1)
+        )
 
-    # Retrieve Dynamic World Land Use/Land Cover collection
-    # Dynamic World provides high-resolution global land cover classification
-    dynamic_world = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1").filterDate(
-        start_date, end_date
-    )
+        lulc_years[year] = (
+            ee.Image(asset_id)
+            .select(["predicted_label"])
+            .clip(suitability_vector.geometry())
+        )
 
-    # Create a list of years to process
-    years = ee.List.sequence(start_year, end_year)
+    lulc_years_dict = ee.Dictionary(lulc_years)
 
     def get_lulc(feature):
         """
@@ -50,21 +54,15 @@ def get_lulc_data(suitability_vector, start_year, end_year):
             Returns:
                 Dictionary with LULC data for the given year
             """
-            # Define start and end dates for the current year
-            # (July 1st of current year to July 1st of next year)
-            s_date = ee.Date.fromYMD(year, 7, 1)
-            e_date = s_date.advance(1, "year")
 
-            # Calculate the mode (most frequent) LULC classification for the feature
-            mode_lulc = (
-                dynamic_world.filterDate(s_date, e_date)
-                .filterBounds(feature.geometry())
-                .mode()
-                .select("label")
+            annual_lulc = (
+                ee.Image(lulc_years_dict.get(year))
+                .select(["predicted_label"])
+                .clip(feature.geometry())
             )
 
             # Compute histogram of LULC classes within the feature's geometry
-            lulc_histogram = mode_lulc.reduceRegion(
+            lulc_histogram = annual_lulc.reduceRegion(
                 reducer=ee.Reducer.frequencyHistogram(),
                 geometry=feature.geometry(),
                 scale=10,  # 10-meter resolution
@@ -72,7 +70,7 @@ def get_lulc_data(suitability_vector, start_year, end_year):
             )
 
             # Extract the label histogram
-            temp_dict = ee.Dictionary(lulc_histogram.get("label"))
+            temp_dict = ee.Dictionary(lulc_histogram.get("predicted_label"))
 
             # Convert pixel counts to hectares
             # Conversion assumes 10m resolution:
@@ -92,40 +90,10 @@ def get_lulc_data(suitability_vector, start_year, end_year):
             return lulc_dict.combine(temp_dict)
 
         # Process LULC data for all years in the analysis period
-        lulc_by_year = years.map(process_year)
+        lulc_by_year = lulc_years_dict.keys().map(process_year)
 
         # Set LULC data as an encoded JSON string in the feature's properties
         return feature.set("LULC", ee.String.encodeJSON(lulc_by_year))
 
     # Apply LULC data retrieval to each feature in the suitability vector
     return suitability_vector.map(get_lulc)
-
-    #     result = {}
-    #     year_str = str(year)
-    #
-    #     def process_key(key):
-    #         new_key = f"LULC_{year}_{key}"
-    #         result[new_key] = (
-    #             temp_dict.get(key).multiply(0.01).multiply(1000).round().divide(1000)
-    #         )
-    #         return new_key
-    #
-    #     keys = temp_dict.keys()
-    #     new_keys = keys.map(process_key)
-    #
-    #     return ee.Dictionary(result)
-    #
-    # # Process all years and combine results
-    # all_years = years.map(process_year)
-    # combined_dict = ee.Dictionary({}).combine(all_years, True)
-    # return feature.set(combined_dict)
-
-
-# def export_results():
-#     result = get_lulc(ee.Feature(roi.first()))
-#     task = ee.batch.Export.table.toDrive(
-#         collection=ee.FeatureCollection([result]),
-#         description="LULC_Analysis",
-#         fileFormat="CSV",
-#     )
-#     task.start()
