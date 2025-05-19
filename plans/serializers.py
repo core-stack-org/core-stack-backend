@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Plan
+from .models import Plan, PlanApp
 from geoadmin.models import State, District, Block
 from projects.models import Project, AppType
 
@@ -22,6 +22,14 @@ class PlanSerializer(serializers.ModelSerializer):
 
         return data
 
+class PlanAppListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for listing watershed plans with PlanApp model
+    """
+    
+    class Meta:
+        model = PlanApp
+        fields = "__all__"
 
 class PlanAppSerializer(serializers.ModelSerializer):
     """
@@ -31,7 +39,7 @@ class PlanAppSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Plan
+        model = PlanApp
         fields = [
             "id",
             "plan",
@@ -40,7 +48,7 @@ class PlanAppSerializer(serializers.ModelSerializer):
             "state",
             "district",
             "block",
-            "village",
+            "village_name",
             "gram_panchayat",
             "created_by",
             "created_by_name",
@@ -75,24 +83,39 @@ class PlanCreateSerializer(serializers.ModelSerializer):
     """
 
     class Meta:
-        model = Plan
-        fields = ["name", "state", "district", "block", "village", "gram_panchayat"]
+        model = PlanApp
+        fields = ["plan", "state", "district", "block", "village_name", "gram_panchayat", "facilitator_name"]
 
     def validate(self, data):
         """
         Additional validation to ensure required fields are present
         """
         required_fields = [
-            "name",
+            "plan",
             "state",
             "district",
             "block",
-            "village",
+            "village_name",
             "gram_panchayat",
+            "facilitator_name"
         ]
         for field in required_fields:
             if field not in data or not data[field]:
                 raise serializers.ValidationError(f"{field} is required")
+
+        request = self.context.get('request')
+        if request and request.parser_context.get('kwargs'):
+            project_id = request.parser_context['kwargs'].get('project_pk')
+            if project_id and data.get('plan'):
+                existing_plan = PlanApp.objects.filter(
+                    project_id=project_id,
+                    plan=data['plan']
+                ).exists()
+                
+                if existing_plan:
+                    raise serializers.ValidationError(
+                        {"message": "A plan with this name already exists. Please provide a different name"}
+                    )
 
         if not data["state"].active_status:
             raise serializers.ValidationError("The state is not active.")

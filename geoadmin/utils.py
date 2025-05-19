@@ -7,14 +7,13 @@ def activated_entities():
     Returns:
         List: A list of JSON data
     """
-    # Since active_status is stored as smallint in PostgreSQL, compare with 1 (true)
-    active_states = State.objects.extra(where=["active_status = 1"])
+    active_states = State.objects.filter(active_status=True)
     response_data = []
     for state in active_states:
-        active_districts = District.objects.filter(state=state).extra(where=["active_status = 1"])
+        active_districts = District.objects.filter(state=state, active_status=True)
         districts_data = []
         for district in active_districts:
-            active_blocks = Block.objects.filter(district=district).extra(where=["active_status = 1"])
+            active_blocks = Block.objects.filter(district=district, active_status=True)
             blocks_data = [
                 {"block_name": block.block_name, "block_id": block.id}
                 for block in active_blocks

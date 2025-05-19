@@ -3,10 +3,14 @@ from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
-    get_gee_asset_path,
-    is_gee_asset_exists,
+    get_gee_asset_path, is_gee_asset_exists,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
 )
 from nrm_app.celery import app
+from computing.utils import (
+    sync_layer_to_geoserver,
+)
 
 
 @app.task(bind=True)
@@ -22,7 +26,10 @@ def generate_restoration_opportunity(self, state, district, block):
     )
 
     description = (
-        "restoration_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+            "restoration_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
     )
 
     raster_asset_id = clip_raster(roi, state, district, block, description)
@@ -34,9 +41,7 @@ def generate_restoration_opportunity(self, state, district, block):
         {"value": 3, "label": "Excluded Areas"},
     ]
 
-    return generate_vector(
-        roi, raster_asset_id, args, state, district, block, description + "_vector"
-    )
+    return generate_vector(roi, raster_asset_id, args, state, district, block, description + "_vector")
 
 
 def clip_raster(roi, state, district, block, description):
@@ -44,9 +49,7 @@ def clip_raster(roi, state, district, block, description):
     if is_gee_asset_exists(asset_id):
         return asset_id
 
-    restoration_raster = ee.Image(
-        "projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities"
-    )
+    restoration_raster = ee.Image("projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities")
 
     clipped_raster = restoration_raster.clip(roi.geometry())
 
@@ -61,7 +64,12 @@ def clip_raster(roi, state, district, block, description):
         crs="EPSG:4326",
     )
     task.start()
-    check_task_status(task.status()["id"])
+    check_task_status([task.status()["id"]])
+
+    image = ee.Image(asset_id)
+    task_id= sync_raster_to_gcs(image, 60, description + "_raster")
+    check_task_status([task_id])
+    sync_raster_gcs_to_geoserver("restoration", description + "_raster", description + "_raster", "restoration_style")
 
     return asset_id
 
@@ -75,7 +83,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
             ored_str = "raster.eq(ee.Number(" + str(arg["value"][0]) + "))"
             for i in range(1, len(arg["value"])):
                 ored_str = (
-                    ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
+                        ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
                 )
             print(ored_str)
             mask = eval(ored_str)
@@ -86,7 +94,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         forest_area = pixel_area.updateMask(mask)
 
         fc = forest_area.reduceRegions(
-            collection=fc, reducer=ee.Reducer.sum(), scale=60, crs=raster.projection()
+            collection=fc, reducer=ee.Reducer.sum(), scale=10, crs=raster.projection()
         )
 
         def remove_property(feat, prop):
@@ -113,4 +121,14 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         }
     )
     task.start()
-    return task.status()["id"]
+    task.status()["id"]
+    description = (
+            "restoration_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
+            + "_vector"
+    )
+    fc = ee.FeatureCollection(fc).getInfo()
+    fc = {"features": fc["features"], "type": fc["type"]}
+    return sync_layer_to_geoserver(state, fc, description, "restoration")

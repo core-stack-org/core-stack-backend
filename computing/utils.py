@@ -155,22 +155,23 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
         gdf.to_file(path + ".gpkg", driver="GPKG")
 
         return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
-    return None
-    # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
-    #
-    # state_dir = os.path.join("data/fc_to_shape", state_name)
-    # if not os.path.exists(state_dir):
-    #     os.mkdir(state_dir)
-    # path = os.path.join(state_dir, f"{layer_name}")
-    # # Write the feature collection into json file
-    # with open(path + ".json", "w") as f:
-    #     try:
-    #         f.write(f"{json.dumps(new_fc)}")
-    #     except Exception as e:
-    #         print(e)
-    #
-    # path = generate_shape_files(path)
-    # return push_shape_to_geoserver(path, workspace=workspace)
+    else:
+        return "No features in FeatureCollection"
+        # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
+        #
+        # state_dir = os.path.join("data/fc_to_shape", state_name)
+        # if not os.path.exists(state_dir):
+        #     os.mkdir(state_dir)
+        # path = os.path.join(state_dir, f"{layer_name}")
+        # # Write the feature collection into json file
+        # with open(path + ".json", "w") as f:
+        #     try:
+        #         f.write(f"{json.dumps(new_fc)}")
+        #     except Exception as e:
+        #         print(e)
+        #
+        # path = generate_shape_files(path)
+        # return push_shape_to_geoserver(path, workspace=workspace)
 
 
 def to_camelcase(text):

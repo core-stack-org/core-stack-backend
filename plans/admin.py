@@ -11,6 +11,7 @@ class PlanAppAdmin(admin.ModelAdmin):
         "state",
         "district",
         "village_name",
+        "facilitator_name",
         "created_by",
         "created_at",
     )
@@ -28,6 +29,7 @@ class PlanAppAdmin(admin.ModelAdmin):
         "block",
         "village_name",
         "gram_panchayat",
+        "facilitator_name",
         "created_by__username",
     )
     readonly_fields = ("created_at", "updated_at")
@@ -43,6 +45,7 @@ class PlanAppAdmin(admin.ModelAdmin):
                     "block",
                     "village_name",
                     "gram_panchayat",
+                    "facilitator_name",
                 )
             },
         ),

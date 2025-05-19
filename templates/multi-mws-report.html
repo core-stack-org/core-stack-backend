@@ -205,11 +205,69 @@
             <p>{{block_osm}}</p>
 
             <div id="mainMap" class="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #000000;"></div>
+                    <span>Farm - Farm</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #87CEEB;"></div>
+                    <span>Selected MWS</span>
+                </div>
+            </div>
         </section>
 
         <section class="section">
             <h3>Terrain Description</h3>
             <p>{{terrain_desc}}</p>
+            <div id="terrainMap" class="map"></div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #313695;"></div>
+                    <span>V-shape river valleys, Deep narrow canyons</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4575b4;"></div>
+                    <span>Lateral midslope incised drainages, Local valleys in plains</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a50026;"></div>
+                    <span>Upland incised drainages, Stream headwaters</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                    <span>U-shape valleys</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #fffc00;"></div>
+                    <span>Broad Flat Areas</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #feb24c;"></div>
+                    <span>Broad open slopes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f46d43;"></div>
+                    <span>Mesa tops</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #d73027;"></div>
+                    <span>Upper Slopes</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #91bfdb;"></div>
+                    <span>Local ridge/hilltops within broad valleys</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #800000;"></div>
+                    <span>Lateral midslope drainage divides, Local ridges in plains</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4d0000;"></div>
+                    <span>Mountain tops, high ridges</span>
+                </div>
+            </div>
         </section>
 
         <section class="section">
@@ -221,6 +279,28 @@
             <section class="section">
                 <h4>Degradation of land</h4>
                 <p>{{land_degrad_desc}}</p>
+
+                <div id="landDegredMap" class="map"></div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #eee05d;"></div>
+                        <span>Farm - Farm</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff0000;"></div>
+                        <span>Farm - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                        <span>Farm - Barren</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                        <span>Farm - Scrub Land</span>
+                    </div>
+                </div>
+
             </section>
         {% endif %}
 
@@ -228,6 +308,31 @@
             <section class="section">
                 <h4>Reduction of Tree Cover</h4>
                 <p>{{tree_reduce_desc}}</p>
+
+                <div id="treeReduceMap" class="map"></div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #73bb53;"></div>
+                        <span>Forest - Forest</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff0000;"></div>
+                        <span>Forest - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #eee05d;"></div>
+                        <span>Forest - Farm</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                        <span>Forest - Barren</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                        <span>Forest - Scrub land</span>
+                    </div>
+                </div>
+
             </section>
         {% endif %}
 
@@ -270,15 +375,13 @@
 
     <footer>
         <div class="container">
-            <p>Report generated on <span id="report-date"></span> | CoREStack Team</p>
+            <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
         </div>
     </footer>
 
     <script>
 
         const mwsList = JSON.parse('{{mwsList|safe}}')
-
-        console.log(mwsList)
 
         const mainMap = new ol.Map({
             target: 'mainMap',
@@ -302,6 +405,111 @@
             })
         });
 
+        const landDegrad = new ol.Map({
+            target: 'landDegredMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                }),
+                new ol.layer.Image({
+                    source : new ol.source.ImageWMS({
+                        url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                        params : {
+                            'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
+                            'STYLES' : "change_detection_degradation"
+                        },
+                        ratio : 1,
+                        serverType: 'geoserver',
+                    }),
+                    visible : true,
+                    name : 'degrad_raster'
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        });
+
+        const treeReduceMap = new ol.Map({
+            target: 'treeReduceMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                }),
+                new ol.layer.Image({
+                    source : new ol.source.ImageWMS({
+                        url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                        params : {
+                            'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
+                            'STYLES' : "change_detection_deforestation"
+                        },
+                        ratio : 1,
+                        serverType: 'geoserver',
+                    }),
+                    visible : true,
+                    name : 'tree_raster'
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const terrainMap = new ol.Map({
+            target: 'terrainMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                }),
+                new ol.layer.Image({
+                    source : new ol.source.ImageWMS({
+                        url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                        params : {
+                            'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                            'STYLES' : 'Terrain_Style_11_Classes'
+                        },
+                        ratio : 1,
+                        serverType: 'geoserver',
+                    }),
+                    visible : true,
+                    name : 'terrain_raster'
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
         .then(response => response.json())
         .then(data => {
@@ -311,12 +519,12 @@
 
             const styleFunction = feature => {
                 const uid = feature.get('uid');
-                let strokeColor = 'skyblue'; // Default stroke color
-                let fillColor = 'rgba(135, 206, 235, 0.4)'; // Default fill color with 0.4 opacity
+                let strokeColor = 'black'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.0)'; // Default fill color with 0.4 opacity
 
                 if (mwsList.includes(uid)) {
-                    strokeColor = 'yellow';
-                    fillColor = 'rgba(255, 255, 0, 0.4)';
+                    strokeColor = 'skyblue';
+                    fillColor = 'rgba(255, 255, 0, 0.0)';
                 }
 
                 return new ol.style.Style({
@@ -336,10 +544,17 @@
             });
 
             mainMap.addLayer(vectorLayer);
+            landDegrad.addLayer(vectorLayer)
+            treeReduceMap.addLayer(vectorLayer)
+            terrainMap.addLayer(vectorLayer)
 
             const arr = vectorSource.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
             mainMap.getView().setCenter(mapcenter);
+            
+            landDegrad.getView().setCenter(mapcenter);
+            treeReduceMap.getView().setCenter(mapcenter);
+            terrainMap.getView().setCenter(mapcenter);
         })
         .catch(error => console.error('Error fetching GeoJSON:', error));
 

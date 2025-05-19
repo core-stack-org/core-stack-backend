@@ -284,11 +284,11 @@
             <h4>Land use on slopes and plains</h4>
             <p>{{terrain_land_use}}</p>
 
-            <div class="chart-container">
+            <div class="chart-container" id="slopeChartContainer">
                 <canvas id="barChart-terrain-lulc-slope"></canvas>
             </div>
 
-            <div class="chart-container">
+            <div class="chart-container" id="plainChartContainer">
                 <canvas id="barChart-terrain-lulc-plain"></canvas>
             </div>
 
@@ -423,24 +423,24 @@
 
             <p>{{final_desc}}</p>
 
-            {% if not trend_desc %}
-                <p>No surface water body descriptions available.</p>
-            {% endif %}
-
             <div class="chart-container">
                 <canvas id="barChart-swb"></canvas>
             </div>
+
+            <div id="swbMap" class="map"></div>
 
             <p>{{swb_season_desc}}</p>
         </section>
 
         <section class="section">
             <h4>Water Balance</h4>
-            <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominently through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
+            <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominantly through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
 
             <p>{{wb_desc}}</p>
             <p>{{good_rainfall}}</p>
             <p>{{bad_rainfall}}</p>
+
+            <p>Do note that currently we only consider the vertical flux in the microwatershed. We are working on how to model incoming runoff into the microwatershed, as well as sub-surface flow from adjacent areas.</p>
             <div class="chart-container">
                 <canvas id="lineChart-water"></canvas>
             </div>
@@ -464,7 +464,7 @@
                 <canvas id="Chart-drought"></canvas>
             </div>
         </section>
-
+        
         <section class="section">
             <h2>Village Profile</h2>
             <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
@@ -497,7 +497,11 @@
 
     <footer>
         <div class="container">
-            <p>Report generated on <span id="report-date"></span> | CoREStack Team</p>
+            <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>
+                Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
+                <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
+            </p>
         </div>
     </footer>
 
@@ -723,6 +727,28 @@
             })
         })
 
+        const swbMap = new ol.Map({
+            target: 'swbMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
         .then(response => response.json())
         .then(data => {
@@ -812,6 +838,7 @@
                     ComparisonMap2.addLayer(vectorLayerComp)
                     ComparisonMap3.addLayer(vectorLayerComp)
                     ComparisonMap4.addLayer(vectorLayerComp)
+                    swbMap.addLayer(vectorLayerComp)
 
                     const arr = vectorSource.getExtent();
                     const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
@@ -839,9 +866,36 @@
 
                     ComparisonMap4.getView().setCenter(mapcenter);
                     ComparisonMap4.getView().setZoom(13);
+
+                    swbMap.getView().setCenter(mapcenter);
+                    swbMap.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/water_bodies/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=water_bodies:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'rgb(0, 150, 255)',
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(137, 207, 240, 0.4)',
+                    }),
+                })
+            });
+
+            swbMap.addLayer(vectorLayer);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Extract Feature
         fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster);
@@ -886,71 +940,82 @@
 
         const lulc_mws_plain = JSON.parse('{{lulc_mws_plain|safe}}')
         const lulc_block_plain = JSON.parse('{{lulc_block_plain|safe}}')
+        
+        const slopeContainer = document.getElementById('slopeChartContainer');
+        const plainContainer = document.getElementById('plainChartContainer');
 
-
-        const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Slope',
-                    data: lulc_block_slope,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Slope',
-                    data: lulc_mws_slope,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
-                        }
-                    }
+        if(lulc_mws_slope.some(v => v > 0)){
+            const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Block Terrain Area under Slope',
+                        data: lulc_block_slope,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Slope',
+                        data: lulc_mws_slope,
+                        backgroundColor: '#2ecc71'
+                    }]
                 },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
-
-        const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Plain',
-                    data: lulc_block_plain,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Plain',
-                    data: lulc_mws_plain,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
                         }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
                     }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
                 }
-            }
-        });
+            });
+        } else {
+            slopeContainer.style.display = 'none';
+          }
+        
+
+        if(lulc_mws_plain.some(v => v > 0)){
+            const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Block Terrain Area under Plain',
+                        data: lulc_block_plain,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Plain',
+                        data: lulc_mws_plain,
+                        backgroundColor: '#2ecc71'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
+                    }
+                }
+            });
+        } else {
+            plainContainer.style.display = 'none';
+          }
 
         // Waterbody Graphs
         const kharifData = JSON.parse('{{kharif_data|safe}}')
@@ -1121,7 +1186,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Value'
+                            text: 'Precipitation & Runoff(mm)'
                         }
                     },
                     x : {
@@ -1163,7 +1228,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Evapotranspiration'
+                            text: 'Evapotranspiration(mm)'
                         }
                     },
                     x : {
@@ -1205,7 +1270,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Groundwater'
+                            text: 'Groundwater(m)'
                         }
                     },
                     x : {

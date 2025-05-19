@@ -5,13 +5,16 @@ from django.db import models
 from projects.models import Project, AppType
 from users.models import User
 from utilities.constants import SITE_DATA_PATH
+from utilities.logger import setup_logger
 
+logger = setup_logger(__name__)
 
 def kml_file_path(instance, filename):
     """
     Generates the file path for a KML file.
     Format: saytrees/kml_files/project_{project_id}/{filename}
     """
+    logger.info("Generating KML file path for project: %s", instance.project.name)
     project_id = instance.project.id
     org_name = instance.project.organization.name
     app_type = instance.project.app_type
@@ -20,6 +23,7 @@ def kml_file_path(instance, filename):
     # Create directory if it doesn't exist
     directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
     full_path = os.path.join(SITE_DATA_PATH, directory)
+    logger.info("KML file path: %s", full_path)
     os.makedirs(full_path, exist_ok=True)
 
     return f"{full_path}/{filename}"

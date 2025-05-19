@@ -1333,11 +1333,11 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             result = mk.original_test(filtered_df_kh)
 
             if result.trend == "increasing":
-                parameter_swb_1 += f"Surface water presence has increased by {round(result.slope, 2)} hectares per year during 2017-22."
+                parameter_swb_1 = f"Surface water presence has increased by {round(result.slope, 2)} hectares per year during 2017-22."
             elif result.trend == "decreasing":
-                parameter_swb_1 += f"Surface water presence has decreased by {round(result.slope, 2)} hectares per year during 2017-22.Siltation could be a cause for decrease in surface water presence and therefore may require repair and maintenance of surface water bodies. Waterbody analysis can help identify waterbodies that may need such treatment."
+                parameter_swb_1 = f"Surface water presence has decreased by {round(result.slope, 2)} hectares per year during 2017-22.Siltation could be a cause for decrease in surface water presence and therefore may require repair and maintenance of surface water bodies. Waterbody analysis can help identify waterbodies that may need such treatment."
             else:
-                parameter_swb_1 += f"The surface water presence has remained steady during 2017-22."
+                parameter_swb_1 = f"The surface water presence has remained steady during 2017-22."
 
 
             #? Drought Years SWB
@@ -1376,14 +1376,14 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
 
                 if result.trend == "increasing":
-                    parameter_swb_2 += f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
+                    parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
                     
                 
                 elif result.trend == "decreasing":
-                    parameter_swb_2 += f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
+                    parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
                 
                 else:
-                    parameter_swb_2 += f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
+                    parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
 
             #? Non-Drought Years SWB
             if len(non_drought_year):
@@ -1432,9 +1432,9 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 if result.trend == "increasing":
                     parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh,2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
                 elif result.trend == "decreasing":
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction reaching {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
                 else:
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction reaching {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
 
             # ? Data yearwise for waterbody
             selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_")]
@@ -1617,9 +1617,9 @@ def get_water_balance_data(state, district, block, uid):
             good_rainfall += f"bringing an average annual rainfall of approximately {round(avg_rainfall,2)} mm  with monsoon onset between [{min_date}, {max_date}]."
 
             if avg_fortnight_delg > 0:
-                good_rainfall += f"This favorable rainfall pattern resulted in positive groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating replenishment of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
+                good_rainfall += f"This rainfall pattern resulted in positive groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating replenishment of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
             else:
-                good_rainfall += f"This favorable rainfall pattern resulted in negative groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating depletion of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
+                good_rainfall += f"This rainfall pattern resulted in negative groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating depletion of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
 
         #? Bad Rainfall Years
         if len(drought_years):
@@ -1862,7 +1862,15 @@ def get_village_data(state, district, block, uid):
         selected_columns_ids = [
             col for col in df.columns if col.startswith("Village IDs")
         ]
-        villages = df.loc[df["MWS UID"] == uid, selected_columns_ids].values[0].tolist()
+        # select only the columns you care about
+        matching = df.loc[df["MWS UID"] == uid, selected_columns_ids]
+
+        if matching.empty:
+            # no rows found for this uid
+            villages = []
+        else:
+            # take the first (and presumably only) matching row
+            villages = matching.iloc[0].tolist()
 
         villages_name = []
         villages_sc = []

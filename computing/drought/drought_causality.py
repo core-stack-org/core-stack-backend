@@ -16,6 +16,9 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
 )
+from utilities.constants import (
+    GEE_HELPER_PATH,
+)
 
 
 def calculation_df(year, df, gdf):
@@ -53,71 +56,90 @@ def calculation_df(year, df, gdf):
         # It categorizes each VCI value into bins (based on vcibins and vcilabels)
         # and counts how many values fall into each category for each row.
         # It then determines the most frequent VCI category (the mode) for each row and stores this information in a new column.
+    # VCI START
     vciCols = [col for col in df.columns if 'vci' in col]
     for l in vcilabels:
-        df[f'vci_{year}_{l}']=0
+        df[f'vci_{year}_{l}'] = 0
 
     for index, row in df.iterrows():
         for col in vciCols:
             vci_value = row[col]
-            category = pd.cut([vci_value], bins=vcibins, labels=vcilabels)[0]
-            df.at[index, f'vci_{year}_{category}'] += 1
+            # Check if the value is NaN
+            if pd.isna(vci_value):
+                continue
+            else:
+                category = pd.cut([vci_value], bins=vcibins, labels=vcilabels)[0]
+                if pd.notna(category):
+                    df.at[index, f'vci_{year}_{category}'] += 1
 
-    df[f'vci_{year}_mode']=0
+    df[f'vci_{year}_mode'] = 0
     for index, row in df.iterrows():
-        templ=[]
-        i=1
+        templ = []
+        i = 1
         for l in vcilabels[::-1]:
-            templ.append([df.at[index , f'vci_{year}_{l}'],i])
-            i+=1
+            templ.append([df.at[index, f'vci_{year}_{l}'], i])
+            i += 1
         templ.sort()
-        df.at[index ,f'vci_{year}_mode']=templ[-1][1]
+        df.at[index, f'vci_{year}_mode'] = templ[-1][1]
 
 
-    ##MAI START
+    # MAI START
     maiCols = [col for col in df.columns if 'mai' in col]
     for l in mailabels:
-        df[f'mai_{year}_{l}']=0
+        df[f'mai_{year}_{l}'] = 0
+
     for index, row in df.iterrows():
         for col in maiCols:
             mai_value = row[col]
-            category = pd.cut([mai_value], bins=maibins, labels=mailabels)[0]
-            df.at[index, f'mai_{year}_{category}'] += 1
+            # Check if the value is NaN
+            if pd.isna(mai_value):
+                continue
+            else:
+                category = pd.cut([mai_value], bins=maibins, labels=mailabels)[0]
+                if pd.notna(category):
+                    df.at[index, f'mai_{year}_{category}'] += 1
 
-    df[f'mai_{year}_mode']=0
+    df[f'mai_{year}_mode'] = 0
     for index, row in df.iterrows():
-        templ=[]
-        i=1
+        templ = []
+        i = 1
         for l in mailabels[::-1]:
-        # print(l)
-            templ.append([df.at[index , f'mai_{year}_{l}'],i])
-            i+=1
+            templ.append([df.at[index, f'mai_{year}_{l}'], i])
+            i += 1
         templ.sort()
-        df.at[index ,f'mai_{year}_mode']=templ[-1][1]
+        df.at[index, f'mai_{year}_mode'] = templ[-1][1]
 
 
 
     ##SPI START
     spiCols = [col for col in df.columns if 'spi' in col]
     for l in spilabels:
-        df[f'spi_{year}_{l}']=0
+        df[f'spi_{year}_{l}'] = 0
+
     for index, row in df.iterrows():
         for col in spiCols:
             spi_value = row[col]
-            category = pd.cut([spi_value], bins=spibins, labels=spilabels)[0]
+            if pd.isna(spi_value):
+                continue
+            category = pd.cut([spi_value], bins=spibins, labels=spilabels, include_lowest=True)[0]
+            if pd.isna(category):
+                continue
             df.at[index, f'spi_{year}_{category}'] += 1
 
-    df[f'spi_{year}_mode']=0
+    df[f'spi_{year}_mode'] = 0
     for index, row in df.iterrows():
-        templ=[]
-        i=1
+        templ = []
+        i = 1
         for l in spilabels[::-1]:
-            templ.append([df.at[index , f'spi_{year}_{l}'],i])
-            i+=1
+            templ.append([df.at[index, f'spi_{year}_{l}'], i])
+            i += 1
         templ.sort()
-        df.at[index ,f'spi_{year}_mode']=templ[-1][1]
+        df.at[index, f'spi_{year}_mode'] = templ[-1][1]
 
-    gdf = pd.merge(gdf,df, on='uid', how='left')
+    # Option to drop columns from df before merging
+    columns_to_drop = [col for col in df.columns if col in gdf.columns and col != 'uid']
+    df_cleaned = df.drop(columns=columns_to_drop)
+    gdf = pd.merge(gdf, df_cleaned, on='uid', how='left')
     return gdf
 
 
@@ -401,7 +423,7 @@ def drought_causality(self, state, district, block, start_year, end_year):
 
     for year in range(start_year, end_year + 1):
         asset_path = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
+            get_gee_asset_path(state, district, block, asset_path=GEE_HELPER_PATH)
             + "drought_"
             + valid_gee_text(district.lower())
             + "_"
@@ -436,9 +458,12 @@ def drought_causality(self, state, district, block, start_year, end_year):
             
             if not matching_row.empty:
                 if uid not in combined_uid_data:
+                    # Find the matching mws feature to get area_in_ha
+                    mws_feature = next(f for f in mws_features if f['properties']['uid'] == uid)
                     combined_uid_data[uid] = {
                         'uid': uid,
-                        'geometry': next(f for f in mws_features if f['properties']['uid'] == uid)['geometry']
+                        'area_in_ha': mws_feature['properties'].get('area_in_ha', 0),  # Include area_in_ha
+                        'geometry': mws_feature['geometry']
                     }
 
                 combined_uid_data[uid][f'se_mo_{year}'] = convert_to_dict(str(matching_row[f'severe_moderate_drought_causality_{year}'].iloc[0]))
@@ -456,30 +481,6 @@ def drought_causality(self, state, district, block, start_year, end_year):
             }
             
             features.append(feature_with_geometry)
-
-        updated_fc = ee.FeatureCollection(features)
-        filename = (
-            "drought_causality_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + str(year)
-        )
-        asset_id = get_gee_asset_path(state, district, block) + filename
-        
-        try:
-            export_task = ee.batch.Export.table.toAsset(
-                collection=updated_fc,
-                description=filename,
-                assetId=asset_id
-            )
-            export_task.start()
-            print(f"Started export task for year {year}: {export_task.status()['id']}")
-            
-        except Exception as e:
-            print(f"Error exporting data for year {year}: {e}")
-            continue
 
     # Create final features from combined data
     final_features = []
@@ -503,5 +504,3 @@ def drought_causality(self, state, district, block, start_year, end_year):
         print(f"Error syncing aggregated data to GeoServer: {e}")
 
     return {"status": "Completed"}
-
-
