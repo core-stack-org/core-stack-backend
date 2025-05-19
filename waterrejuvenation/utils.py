@@ -197,7 +197,7 @@ def clip_lulc_output(mws_asset_id,  proj_id):
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
 
-        sync_raster_gcs_to_geoserver("waterrej", layer_name, layer_name, "lulc_level_1_style")
+        sync_raster_gcs_to_geoserver("waterrej", layer_name, layer_name,  "lulc_level_1_style")
 
 
 def delete_asset_on_GEE(asset_id):

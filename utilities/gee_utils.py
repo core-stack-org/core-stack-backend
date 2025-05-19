@@ -1,6 +1,7 @@
 import os
 
 import requests
+import numpy as np
 
 from nrm_app.settings import (
     EARTH_DATA_USER,
@@ -92,6 +93,9 @@ def check_gee_task_status(task_id):
 
 
 def check_task_status(task_id_list, sleep_time=60):
+    print (len(task_id_list))
+    if isinstance(task_id_list, str):
+        return task_id_list
     if len(task_id_list) > 0:
         time.sleep(sleep_time)
         tasks = ee.data.listOperations()
@@ -426,3 +430,12 @@ def harmonize_band_types(image, target_type="Float"):
     # Cast all bands and combine back into single image
     harmonized_bands = band_names.map(lambda name: cast_band(ee.String(name)))
     return ee.ImageCollection(harmonized_bands).toBands().rename(band_names)
+
+def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371
+    return c * r * 1000

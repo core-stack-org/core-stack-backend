@@ -239,14 +239,14 @@ def calculate_swb1(start_date, end_date, aoi,  forece_regenerate, state=None, di
             count2 = counts[2].add(counts[3])
 
             # Store percentages
-            p1.append((counts[0].divide(total_cnt)).multiply(100))
-            p2.append((count1.divide(total_cnt)).multiply(100))
-            p3.append((count2.divide(total_cnt)).multiply(100))
-            p4.append((counts[3].divide(total_cnt)).multiply(100))
+            p1.append((counts[0].divide(ored)).multiply(100))
+            p2.append((count1.divide(ored)).multiply(100))
+            p3.append((count2.divide(ored)).multiply(100))
+            p4.append((counts[3].divide(ored)).multiply(100))
             j += 1
 
         # Set properties for the feature
-        properties = {"area_ored": total_cnt.multiply(100)}
+        properties = {"area_ored": ored.multiply(100)}
         i = 0
         loop_start = start_date
         while loop_start < loop_end:
