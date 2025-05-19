@@ -31,7 +31,7 @@ ODK_URL_settlement = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Settlements_for
 ODK_URL_well = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_well_form_V1.0.1.svc/Submissions"
 ODK_URL_waterbody = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Waterbodies_Form_V1.0.3.svc/Submissions"
 
-# Planning
+# Planning Forms
 ODK_URL_gw = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM_form_propose_new_recharge_structure_V1.0.0.svc/Submissions"
 ODK_URL_swb = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions"
 ODK_URL_agri = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM_form_Agri_Screen_V1.0.0.svc/Submissions"
@@ -43,6 +43,11 @@ ODK_URL_WATERBODY_MAINTENANCE = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Propose_
 ODK_URL_RS_WATERBODY_MAINTENANCE = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/PM_Remote_Sensed_Surface_Water_structure_V1.0.0.svc/Submissions"
 ODK_URL_GW_MAINTENANCE = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions"
 ODK_URL_AGRI_MAINTENANCE = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1.svc/Submissions"
+
+# Sync Offline ODK
+ODK_SYNC_URL_SETTLEMENT = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Settlements_form%20_V1.0.1/submissions"
+ODK_SYNC_URL_WELL = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_well_form_V1.0.1/submissions"
+ODK_SYNC_URL_WATER_STRUCTURES = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Waterbodies_Form_V1.0.3/submissions"
 
 GCS_BUCKET_NAME = "core_stack"
 

@@ -34,9 +34,15 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
+# MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
 
+# MARK: ODK Sync Creds
+ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
+ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
+
+# MARK: DB settings
 DB_NAME = env("DB_NAME")
 DB_USER = env("DB_USER")
 DB_PASSWORD = env("DB_PASSWORD")
