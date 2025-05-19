@@ -383,20 +383,37 @@ def get_generate_filter_mws_data(state, district, block, file_type):
 
 
         ################# Aquifer Vector  #########################
+        aquifer_class_map = {
+            0: "Hard Rock",
+            1: "Alluvial"
+        }
+
+        class_to_id = {v: k for k, v in aquifer_class_map.items()}
         try:
             df_aquifer_vector_mws_data = sheets['aquifer_vector'][sheets['aquifer_vector']['UID'] == specific_mws_id]
-            aquifer_class = df_aquifer_vector_mws_data.get('aquifer_class', None).iloc[0]
-            if aquifer_class =='Alluvium':
-                aquifer_class = 'Alluvial'
-        except:
+            aquifer_class_name = df_aquifer_vector_mws_data.get('aquifer_class', None).iloc[0]
+            if aquifer_class_name == 'Alluvium':
+                aquifer_class_name = 'Alluvial'
+            aquifer_class = int(class_to_id.get(aquifer_class_name, ''))
+        except Exception:
             aquifer_class = ''
 
 
         ################# SOGE Vector  #########################
+        Soge_class = {
+            0: "Safe",
+            1: "Semi-Critical",
+            2: "Critical",
+            3: "Over Exploited",
+            4: "Saline"
+        }
+
+        class_to_id = {v: k for k, v in Soge_class.items()}
         try:
             df_soge_vector_mws_data = sheets['soge_vector'][sheets['soge_vector']['UID'] == specific_mws_id]
-            soge_class = df_soge_vector_mws_data.get('class_name', None).iloc[0]
-        except:
+            soge_class_name = df_soge_vector_mws_data.get('class_name', None).iloc[0]
+            soge_class = int(class_to_id.get(soge_class_name, '')) # Returns None if not found
+        except Exception:
             soge_class = ''
 
 
