@@ -1,7 +1,7 @@
 import ee
 
 from plantations.models import PlantationProfile
-from utilities.constants import GEE_PATH_PLANTATION
+from utilities.constants import GEE_PATH_PLANTATION, GEE_ASSET_PATH
 from utilities.gee_utils import (
     is_gee_asset_exists,
     harmonize_band_types,
@@ -19,7 +19,18 @@ from utilities.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-def get_pss(roi, org, project, state, asset_name, start_year, end_year, have_new_sites):
+def get_pss(
+    roi,
+    start_year,
+    end_year,
+    asset_name,
+    org=None,
+    project=None,
+    have_new_sites=False,
+    state=None,
+    district=None,
+    block=None,
+):
     """
     Generate Plantation Site Suitability (PSS) raster.
 
@@ -35,35 +46,52 @@ def get_pss(roi, org, project, state, asset_name, start_year, end_year, have_new
         org: Organization name
         project: Project object
         state: Geographic state
+        district: Geographic district
+        block: Geographic block
         asset_name: Name for the output asset
         start_year: Start year
         end_year: End year
+        have_new_sites: Boolean flag for if there are new sites in the ROI
+
 
     Returns:
         Asset ID of the generated suitability raster
     """
     # Initialize base image with a constant value of 1
     all_layers = ee.Image(1)
-    project_name = valid_gee_text(project.name)
+    is_default_profile = True
 
     default_profile = PlantationProfile.objects.get(profile_id=1)
     project_weights = default_profile.config_weight
     project_variables = default_profile.config_variables
 
-    plantation_profile = PlantationProfile.objects.filter(project=project)
-    is_default_profile = True
-    if plantation_profile.exists():
-        is_default_profile = False
-        plantation_profile = plantation_profile[0]
-        project_weights = {**project_weights, **plantation_profile.config_weight}
-        project_variables = {**project_variables, **plantation_profile.config_variables}
+    description = f"{asset_name}_raster"
 
-    # Prepare asset description and path
-    description = asset_name + "_raster"
-    asset_id = (
-        get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
-        + description
-    )
+    if project:
+        project_name = valid_gee_text(project.name)
+        state = project.state.state_name.lower()
+
+        plantation_profile = PlantationProfile.objects.filter(project=project)
+
+        if plantation_profile.exists():
+            is_default_profile = False
+            plantation_profile = plantation_profile[0]
+            project_weights = {**project_weights, **plantation_profile.config_weight}
+            project_variables = {
+                **project_variables,
+                **plantation_profile.config_variables,
+            }
+
+        # Prepare asset description and path
+        asset_id = (
+            get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
+            + description
+        )
+    else:
+        asset_id = (
+            get_gee_dir_path([state, district, block], asset_path=GEE_ASSET_PATH)
+            + description
+        )
 
     # Remove existing asset if it exists to prevent conflicts
     if is_gee_asset_exists(asset_id):
@@ -359,13 +387,7 @@ def get_pss(roi, org, project, state, asset_name, start_year, end_year, have_new
 
         make_asset_public(asset_id)
 
-        layer_name = (
-            valid_gee_text(org.lower())
-            + "_"
-            + valid_gee_text(project_name.lower())
-            + "_suitability_raster"
-        )
-        sync_to_gcs_geoserver(asset_id, layer_name, scale)
+        sync_to_gcs_geoserver(asset_id, description, scale)
         return asset_id, is_default_profile
 
     except Exception as e:
