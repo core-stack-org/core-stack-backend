@@ -11,9 +11,14 @@ from .serializers import PlanSerializer
 from .build_layer import build_layer
 from .utils import fetch_odk_data, fetch_bearer_token
 import requests
+from utilities.auth_utils import auth_free
+from utilities.constants import ODK_SYNC_URL_SETTLEMENT, ODK_SYNC_URL_WATER_STRUCTURES, ODK_SYNC_URL_WELL
+from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
+
 
 # MARK: Get Plans API
 @api_view(["GET"])
+@auth_free
 def get_plans(request):
     """
     Get Plans API
@@ -40,6 +45,7 @@ def get_plans(request):
 
 
 @api_view(["POST"])
+@auth_free
 def add_plan(request):
     if request.method == "POST":
         serializer = PlanSerializer(data=request.data)
@@ -55,6 +61,7 @@ def add_plan(request):
 
 # api's for add settlement, add well, add waterbody | add work [new, maintenance]
 @api_view(["POST"])
+@auth_free
 def add_resources(request):
     layer_name = request.data.get("layer_name").lower()
     resource_type = request.data.get("resource_type").lower()
@@ -97,6 +104,7 @@ def add_resources(request):
 
 
 @api_view(["POST"])
+@auth_free
 def add_works(request):
     """
     work type: plan_gw: recharge st., main_swb: maintenance surface water bodies, plan_agri: irrigation works, livelihood
@@ -146,6 +154,7 @@ def add_works(request):
 # API to sync offline data coming from CC app
 @api_view(["POST"])
 @csrf_exempt
+@auth_free
 def sync_offline_data(request, resource_type=None):
     """
     Sync data to ODK based on resource type (settlement, well, water_structures)
@@ -172,20 +181,12 @@ def sync_offline_data(request, resource_type=None):
     print("XML String: ", xml_string)
     print("Resource Type: ", resource_type)
 
-    # ODK_USER_EMAIL = "ankit.kumar@oniondev.com"
-    # ODK_USER_PASSWORD = "offlineNRM@22"
-
-    ODK_USER_EMAIL = "sukriti.kumari@oniondev.com"
-    ODK_USER_PASSWORD = "sukriti@123"
-
     try:
-        bearer_token = fetch_bearer_token(ODK_USER_EMAIL, ODK_USER_PASSWORD)
+        bearer_token = fetch_bearer_token(ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC)
         print("Bearer Token: ", bearer_token)
 
         # Handle different resource types
         if resource_type == "settlement":
-            ODK_SYNC_URL_SETTLEMENT = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Settlements_form%20_V1.0.1/submissions"
-
             try:
                 response = requests.post(
                     ODK_SYNC_URL_SETTLEMENT,
@@ -218,8 +219,6 @@ def sync_offline_data(request, resource_type=None):
                 )
 
         elif resource_type == "well":
-            ODK_SYNC_URL_WELL = "https://odk.gramvaani.org/v1/projects/9/forms/Add_well_form_V1.0.1/submissions"
-
             try:
                 response = requests.post(
                     ODK_SYNC_URL_WELL,
@@ -252,8 +251,6 @@ def sync_offline_data(request, resource_type=None):
                 )
 
         elif resource_type == "water_structures":
-            ODK_SYNC_URL_WATER_STRUCTURES = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Waterbodies_Form_V1.0.3/submissions"
-
             try:
                 response = requests.post(
                     ODK_SYNC_URL_WATER_STRUCTURES,

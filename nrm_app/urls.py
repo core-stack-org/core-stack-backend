@@ -42,6 +42,10 @@ urlpatterns = [
     path("api/v1/", include("plans.urls")),
     path("api/v1/", include("dpr.urls")),
     path("api/v1/", include("stats_generator.urls")),
+    path("api/v1/", include("organization.urls")),
+    path("api/v1/", include("users.urls")),
+    path("api/v1/", include("projects.urls")),
+    path("api/v1/", include("plantations.urls")),
     
     # Swagger Doc
     path(

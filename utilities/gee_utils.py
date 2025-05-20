@@ -16,16 +16,18 @@ import ee, geetools
 import time
 import re
 import json
+import subprocess
 from google.cloud import storage
 from google.api_core import retry
-
 from utilities.geoserver_utils import Geoserver
 
 
 def ee_initialize(project=None):
     try:
         if project == "helper":
-            service_account = "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
+            service_account = (
+                "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
+            )
             credentials = ee.ServiceAccountCredentials(
                 service_account, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH
             )
@@ -43,8 +45,8 @@ def ee_initialize(project=None):
 def gcs_config():
     from google.oauth2 import service_account
 
-    # Authenticate Earth Engine
-    ee_initialize()
+    # # Authenticate Earth Engine
+    # ee_initialize()
 
     # Authenticate Google Cloud Storage
     credentials = service_account.Credentials.from_service_account_file(
@@ -182,6 +184,21 @@ def get_gee_asset_path(state, district=None, block=None, asset_path=GEE_ASSET_PA
         gee_path += valid_gee_text(district.lower()) + "/"
     if block:
         gee_path += valid_gee_text(block.lower()) + "/"
+    return gee_path
+
+
+def create_gee_dir(folder_list, gee_project_path=GEE_ASSET_PATH):
+    folder_path = ""
+    for folder in folder_list:
+        folder_path += valid_gee_text(folder.lower())
+        create_gee_folder(folder_path, gee_project_path)
+        folder_path = folder_path + "/"
+
+
+def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
+    gee_path = asset_path
+    for folder in folder_list:
+        gee_path += valid_gee_text(folder.lower()) + "/"
     return gee_path
 
 
@@ -378,3 +395,128 @@ def get_geojson_from_gcs(gcs_file_name):
     geojson_data = json.loads(geojson_str)
 
     return geojson_data
+
+
+def harmonize_band_types(image, target_type="Float"):
+    """
+    Harmonize all bands in an image to the same data type.
+
+    Args:
+        image (ee.Image): Input image with mixed band types
+        target_type (str): Target data type ('Float', 'Byte', 'Int' etc.)
+
+    Returns:
+        ee.Image: Image with harmonized band types
+    """
+    # Get list of band names
+    band_names = image.bandNames()
+
+    # Function to cast each band to target type
+    def cast_band(band_name):
+        band = image.select(band_name)
+        if target_type == "Float":
+            return band.toFloat()
+        elif target_type == "Byte":
+            return band.toByte()
+        elif target_type == "Int":
+            return band.toInt()
+        elif target_type == "Double":
+            return band.toDouble()
+        else:
+            raise ValueError(f"Unsupported target type: {target_type}")
+
+    # Cast all bands and combine back into single image
+    harmonized_bands = band_names.map(lambda name: cast_band(ee.String(name)))
+    return ee.ImageCollection(harmonized_bands).toBands().rename(band_names)
+
+
+def upload_file_to_gcs(local_file_path, destination_blob_name):
+    """Upload a file to a Google Cloud Storage bucket"""
+    bucket = gcs_config()
+    print(local_file_path)
+    blob = bucket.blob(destination_blob_name)
+
+    # Set the chunk size to 100 MB (must be a multiple of 256 KB)
+    blob.chunk_size = 100 * 1024 * 1024  # 100 MB
+
+    # Upload the file using a resumable upload
+    blob.upload_from_filename(local_file_path)
+
+    print(f"File {local_file_path} uploaded to {destination_blob_name}.")
+
+
+def extract_task_id(command_output):
+    """
+    Extract the Earth Engine task ID from command output.
+
+    Args:
+        command_output (str): The stdout from the earthengine command
+
+    Returns:
+        str or None: The task ID if found, otherwise None
+    """
+    # Looking for patterns like:
+    # "Started upload task with ID: abcdef1234567890"
+    # or "Task ID: abcdef1234567890"
+
+    import re
+
+    # Try different possible patterns
+    patterns = [
+        r"Started upload task with ID: ([a-zA-Z0-9_]+)",
+        r"Task ID: ([a-zA-Z0-9_]+)",
+        r"ID: ([a-zA-Z0-9_]+)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, command_output)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def gcs_to_gee_asset_cli(gcs_uri, asset_id):
+    """Use earthengine CLI to upload from GCS to GEE asset"""
+    ee_initialize()
+    command = [
+        "earthengine",
+        f"--service_account_file={GEE_SERVICE_ACCOUNT_KEY_PATH}",
+        "upload",
+        "table",
+        f"--asset_id={asset_id}",
+        gcs_uri,
+    ]
+
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        print("Upload initiated successfully.")
+        print("Output:", result.stdout)
+        if result.returncode == 0:
+            return extract_task_id(result.stdout)
+        return None
+    except subprocess.CalledProcessError as e:
+        print("An error occurred during the upload.")
+        print("Error Output:", e)
+        return None
+
+
+def upload_shp_to_gee(shapefile_path, file_name, asset_id):
+    gcs_blob_name = f"{GCS_BUCKET_NAME}/{file_name}/{file_name}.shp"
+
+    # Make sure all shapefile components (.shp, .dbf, .shx, .prj) are uploaded
+    components = [".shp", ".dbf", ".shx", ".prj"]
+    for component in components:
+        base_name = os.path.splitext(shapefile_path)[0]
+        component_path = base_name + component
+        if os.path.exists(component_path):
+            dest_blob = gcs_blob_name.replace(".shp", component)
+            upload_file_to_gcs(component_path, dest_blob)
+
+    # GCS URI to the shapefile
+    gcs_uri = f"gs://core_stack/{gcs_blob_name}"
+
+    # Upload from GCS to GEE
+    task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id)
+    if task_id:
+        check_task_status([task_id], 600)

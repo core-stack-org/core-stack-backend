@@ -70,10 +70,21 @@ def generate_vector(state, district, block):
     watersheds = gpd.GeoDataFrame.from_features(mws)
     watersheds.set_crs("EPSG:4326", inplace=True)
 
-    drainage_line_path = os.path.join(
-        DRAINAGE_LINES_OUTPUT,
-        f"""{'_'.join(state.split())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}.shp""",
-    )
+    drainage_lines = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
+        + f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+    ).getInfo()
+
+    if isinstance(drainage_lines, str):
+        drainage_lines = json.loads(drainage_lines)
+
+    drainage_lines = gpd.GeoDataFrame.from_features(drainage_lines)
+    drainage_lines.set_crs("EPSG:4326", inplace=True)
+
+    # drainage_line_path = os.path.join(
+    #     DRAINAGE_LINES_OUTPUT,
+    #     f"""{'_'.join(state.split())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}.shp""",
+    # )
 
     # Define influence factors for stream orders 1 to 11
     influence_factors = [
@@ -91,7 +102,7 @@ def generate_vector(state, district, block):
     ]
 
     # Load drainage lines shapefile
-    drainage_lines = gpd.read_file(drainage_line_path)
+    # drainage_lines = gpd.read_file(drainage_line_path)
 
     # changing CRS for length calculation
     drainage_lines = drainage_lines.to_crs(crs=7755)

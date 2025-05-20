@@ -14,7 +14,6 @@ def activated_entities():
         districts_data = []
         for district in active_districts:
             active_blocks = Block.objects.filter(district=district, active_status=True)
-            print("active_blocks :: ", active_blocks)
             blocks_data = [
                 {"block_name": block.block_name, "block_id": block.id}
                 for block in active_blocks

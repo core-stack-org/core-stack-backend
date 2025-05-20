@@ -1,36 +1,36 @@
 import datetime
 from datetime import timedelta
-
 import ee
 from dateutil.relativedelta import relativedelta
 
-from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path
+from utilities.gee_utils import (
+    ee_initialize,
+    check_task_status,
+    valid_gee_text,
+    get_gee_asset_path,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
+    make_asset_public,
+)
 from nrm_app.celery import app
-from .built_up import *
-from .cropland import *
-from .cropping_frequency import *
-from .water_body import *
-from .misc import *
+from computing.lulc.cropping_frequency import *
 
 
 @app.task(bind=True)
-def generate_lulc_layers(
-    self, state_name, district_name, block_name, start_date, end_date
-):
-    ee_initialize()
-    print("Inside generate lulc")
+def lulc_river_basin(self, state_name, district_name, block_name, start_year, end_year):
+    ee_initialize("aman")
+    print("Inside lulc_river_basin")
+
+    objectid = 12
     roi_boundary = ee.FeatureCollection(
-        get_gee_asset_path(state_name, district_name, block_name)
-        + "filtered_mws_"
-        + valid_gee_text(district_name.lower())
-        + "_"
-        + valid_gee_text(block_name.lower())
-        + "_uid"
-    )  # GEE path to the boundary for which we are generating the LULC
+        "projects/ee-ankit-mcs/assets/CGWB_basin"
+    ).filter(ee.Filter.eq("objectid", objectid))
 
     filename_prefix = (
-        valid_gee_text(district_name.lower()) + "_" + valid_gee_text(block_name.lower())
+            str(objectid) + "_" + roi_boundary.first().get("ba_name").getInfo()
     )
+
+    start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
     loop_start = start_date
     loop_end = end_date
@@ -40,12 +40,6 @@ def generate_lulc_layers(
     crop_freq_array = []
 
     scale = 10
-    if datetime.strptime(loop_start, "%Y-%m-%d").year < 2017:
-        # TODO Check if LULC exists for 2017, 2018 and 2019
-        loop_start = "2017-07-01"
-    if datetime.strptime(loop_end, "%Y-%m-%d").year < 2019:
-        loop_end = "2019-06-30"
-
     print(loop_start, loop_end)
 
     while loop_start < loop_end:
@@ -56,64 +50,29 @@ def generate_lulc_layers(
 
         curr_start_date = curr_start_date.strftime("%Y-%m-%d")
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
-
-        print(
-            "\n EXECUTING LULC PREDICTION FOR ",
-            curr_start_date,
-            " TO ",
-            curr_end_date,
-            "\n",
-        )
-
         curr_filename = filename_prefix + "_" + curr_start_date + "_" + curr_end_date
-
-        if datetime.strptime(curr_start_date, "%Y-%m-%d").year < 2017:
-            print(
-                "To generate LULC output of year ",
-                datetime.strptime(curr_start_date, "%Y-%m-%d").year,
-                " , go to cell-LULC execution for years before 2017",
-            )
-            continue
-
-        # LULC prediction code
-        bu_image = get_builtup_prediction(roi_boundary, curr_start_date, curr_end_date)
-        water_image = get_water_prediction(roi_boundary, curr_start_date, curr_end_date)
-        combined_water_builtup_img = bu_image.where(
-            bu_image.select("predicted_label").eq(0), water_image
-        )
-        bare_image = get_barrenland_prediction(
-            roi_boundary, curr_start_date, curr_end_date
-        )
-        combined_water_builtup_barren_img = combined_water_builtup_img.where(
-            combined_water_builtup_img.select("predicted_label").eq(0), bare_image
-        )
-        cropland_image = get_cropland_prediction(
-            curr_start_date, curr_end_date, roi_boundary
-        )
-        combined_img = combined_water_builtup_barren_img.where(
-            combined_water_builtup_barren_img.select("predicted_label").eq(0),
-            cropland_image,
-        )
         cropping_frequency_img = get_cropping_frequency(
             roi_boundary, curr_start_date, curr_end_date
         )
-        final_lulc_img = combined_img.where(
-            combined_img.select("predicted_label").eq(5), cropping_frequency_img
-        )
-
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
-            get_gee_asset_path(state_name, district_name, block_name)
-            + final_output_filename
-        )
-
-        final_lulc_img = dw_based_shrub_cleaning(
-            roi_boundary, final_lulc_img, curr_start_date, curr_end_date
+            # get_gee_asset_path(state_name, district_name, block_name)
+                "projects/ee-amanverma/assets/lulc_v3/"
+                + final_output_filename
         )
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
-        l1_asset_new.append(final_lulc_img)
         crop_freq_array.append(cropping_frequency_img)
+        lulc_v2 = ee.Image(
+            "projects/nrm-work/assets/river_basin_lulc/"
+            + filename_prefix
+            + "_"
+            + str(curr_start_date)
+            + "_"
+            + str(curr_end_date)
+            + "_LULCmap_10m_v2"
+        )
+        l1_asset_new.append(lulc_v2)
 
     """
         temporal correction for background pixels
@@ -268,7 +227,7 @@ def generate_lulc_layers(
         )
 
     def process_conditions(
-        before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
+            before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
     ):
 
         cond1 = (
@@ -409,7 +368,7 @@ def generate_lulc_layers(
         after = l1_asset_new[i + 1]
 
         updated_images = process_conditions(
-            before, middle, after, zero_image, 1, 1, 0, length, l1_asset_new
+            before, middle, after, zero_image, 1, 1, i, length, l1_asset_new
         )
 
         l1_asset_new[i - 1] = updated_images["before"]
@@ -438,7 +397,7 @@ def generate_lulc_layers(
         after = l1_asset_new[i + 1]
 
         updated_images = process_conditions(
-            before, middle, after, zero_image, 2, length - 4, 0, length, l1_asset_new
+            before, middle, after, zero_image, 2, length - 4, i, length, l1_asset_new
         )
 
         l1_asset_new[i - 1] = updated_images["before"]
@@ -478,10 +437,11 @@ def generate_lulc_layers(
     first_year_image = first_year_image.where(cond4, cropping_frequency_img)
 
     l1_asset_new[0] = first_year_image
-
+    task_list = []
+    geometry = roi_boundary.geometry()
     for i in range(0, len(l1_asset_new)):
         image_export_task = ee.batch.Export.image.toAsset(
-            image=remap_values(l1_asset_new[i].clip(roi_boundary.geometry())),
+            image=l1_asset_new[i].clip(geometry),
             description=final_output_filename_array_new[i],
             assetId=final_output_assetid_array_new[i],
             pyramidingPolicy={"predicted_label": "mode"},
@@ -490,68 +450,57 @@ def generate_lulc_layers(
             crs="EPSG:4326",
         )
         image_export_task.start()
+        print("Successfully started the LULC v3", image_export_task.status())
+        task_list.append(image_export_task.status()["id"])
 
-    """
-        Calculation for year < 2017
-    """
-    if datetime.strptime(start_date, "%Y-%m-%d").year < 2017:
-        lulc_image_2017 = l1_asset_new[0].clip(roi_boundary.geometry())
-        lulc_image_2018 = l1_asset_new[1].clip(roi_boundary.geometry())
-        lulc_image_2019 = l1_asset_new[2].clip(roi_boundary.geometry())
+    task_id_list = check_task_status(task_list)
+    print("LULC task_id_list", task_id_list)
 
-        combined_img_collection = ee.ImageCollection(
-            [lulc_image_2017, lulc_image_2018, lulc_image_2019]
-        )
-        combined_img = combined_img_collection.select("predicted_label").mode()
+    # sync_lulc_to_gcs(
+    #     final_output_filename_array_new,
+    #     final_output_assetid_array_new,
+    #     scale,
+    # )
+    #
+    # sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_name)
 
-        loop_start = start_date
-        loop_end = "2017-06-30"
 
-        while loop_start < loop_end:
+def sync_lulc_to_gcs(
+        final_output_filename_array_new, final_output_assetid_array_new, scale
+):
+    task_ids = []
+    for i in range(0, len(final_output_assetid_array_new)):
+        make_asset_public(final_output_assetid_array_new[i])
+        image = ee.Image(final_output_assetid_array_new[i])
+        name_arr = final_output_filename_array_new[i].split("_20")
+        s_year = name_arr[1][:2]
+        e_year = name_arr[2][:2]
+        layer_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
+        task_ids.append(sync_raster_to_gcs(image, scale, layer_name))
 
-            curr_start_date = datetime.strptime(loop_start, "%Y-%m-%d")
-            curr_end_date = curr_start_date + relativedelta(years=1) - timedelta(days=1)
+    task_id_list = check_task_status(task_ids)
+    print("task_ids sync to gcs ", task_id_list)
 
-            loop_start = (curr_start_date + relativedelta(years=1)).strftime("%Y-%m-%d")
 
-            curr_start_date = curr_start_date.strftime("%Y-%m-%d")
-            curr_end_date = curr_end_date.strftime("%Y-%m-%d")
-
-            print(
-                "\n EXECUTING L3 LULC PREDICTION FOR ",
-                curr_start_date,
-                " TO ",
-                curr_end_date,
-                "\n",
+def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_name):
+    print("Syncing lulc to geoserver")
+    lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
+    for i in range(0, len(l1_asset_new)):
+        name_arr = final_output_filename_array_new[i].split("_20")
+        s_year = name_arr[1][:2]
+        e_year = name_arr[2][:2]
+        gcs_file_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
+        print("Syncing " + gcs_file_name + " to geoserver")
+        for workspace in lulc_workspaces:
+            suff = workspace.replace("LULC", "")
+            style = workspace.lower() + "_style"
+            layer_name = (
+                    "LULC_"
+                    + s_year
+                    + "_"
+                    + e_year
+                    + "_"
+                    + valid_gee_text(block_name.lower())
+                    + suff
             )
-
-            curr_filename = (
-                filename_prefix + "_" + curr_start_date + "_" + curr_end_date
-            )
-
-            cropping_frequency_img = get_cropping_frequency(
-                roi_boundary, curr_start_date, curr_end_date
-            )
-            final_lulc_img = combined_img.where(
-                combined_img.select("predicted_label").eq(5), cropping_frequency_img
-            )
-
-            scale = 10
-            final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
-            final_output_assetid = (
-                get_gee_asset_path(state_name, district_name, block_name)
-                + final_output_filename
-            )
-
-            # Setup the task
-            image_export_task = ee.batch.Export.image.toAsset(
-                image=remap_values(final_lulc_img.clip(roi_boundary.geometry())),
-                description=final_output_filename,
-                assetId=final_output_assetid,
-                pyramidingPolicy={"predicted_label": "mode"},
-                scale=scale,
-                maxPixels=1e13,
-                crs="EPSG:4326",
-            )
-
-            image_export_task.start()
+            sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style)

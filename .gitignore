@@ -26,3 +26,6 @@ ENV/
 .venv
 env.bak/
 venv.bak/
+
+# ignored apps
+dashboard/

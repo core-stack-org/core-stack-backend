@@ -4,12 +4,17 @@ from utilities.gee_utils import (
     check_task_status,
     valid_gee_text,
     get_gee_asset_path, is_gee_asset_exists,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
 )
 from nrm_app.celery import app
+from computing.utils import (
+    sync_layer_to_geoserver,
+)
 
 
 @app.task(bind=True)
-def generate_layers(self, state, district, block):
+def generate_restoration_opportunity(self, state, district, block):
     ee_initialize()
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -59,7 +64,12 @@ def clip_raster(roi, state, district, block, description):
         crs="EPSG:4326",
     )
     task.start()
-    check_task_status(task.status()["id"])
+    check_task_status([task.status()["id"]])
+
+    image = ee.Image(asset_id)
+    task_id= sync_raster_to_gcs(image, 60, description + "_raster")
+    check_task_status([task_id])
+    sync_raster_gcs_to_geoserver("restoration", description + "_raster", description + "_raster", "restoration_style")
 
     return asset_id
 
@@ -111,4 +121,14 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         }
     )
     task.start()
-    return task.status()["id"]
+    task.status()["id"]
+    description = (
+            "restoration_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
+            + "_vector"
+    )
+    fc = ee.FeatureCollection(fc).getInfo()
+    fc = {"features": fc["features"], "type": fc["type"]}
+    return sync_layer_to_geoserver(state, fc, description, "restoration")

@@ -8,7 +8,7 @@ import requests
 from datetime import datetime, timezone
 import dateutil.parser
 
-from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
+from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from utilities.constants import (
     ODK_URL_agri,
     ODK_URL_gw,
@@ -25,6 +25,7 @@ _token_cache = {
     "token": None,
     "expires_at": None,
 }
+
 
 # MARK: Fetch ODK Data
 def fetch_odk_data(csv_path, resource_type, block, plan_id):
@@ -68,9 +69,6 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
     request_obj_odk = requests.get(ODK_url, auth=(ODK_USERNAME, ODK_PASSWORD))
     response_dict = json.loads(request_obj_odk.content)
     response_list = response_dict["value"]
-    print("INCOMING ODK DATA")
-    print(response_list[0:1])
-    print("DONE")
     logger.info(f"Fetched data from the ODK: {ODK_url}")
     all_keys = set()
 
@@ -85,7 +83,7 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
     elif resource_type == "waterbody":
         modified_response_list = modify_response_list_waterbody(
             response_list, block, plan_id
-        )        
+        )
 
     elif resource_type == "plan_gw":
         modified_response_list = modify_response_list_plan(
@@ -126,19 +124,22 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
     if resource_type in ["settlement", "well", "waterbody"]:
         header_keys = modified_response_list[0].keys()
         print("FIELD NAMES", header_keys)
-        with open(csv_path, "w", encoding='utf-8') as output_file:
-            dict_writer = csv.DictWriter(output_file, fieldnames=header_keys, extrasaction='ignore')
+        with open(csv_path, "w", encoding="utf-8") as output_file:
+            dict_writer = csv.DictWriter(
+                output_file, fieldnames=header_keys, extrasaction="ignore"
+            )
             dict_writer.writeheader()
             dict_writer.writerows(modified_response_list)
             logger.info(f"CSV generated for resource : {resource_type}")
     elif resource_type in ["plan_gw", "main_swb", "plan_agri", "livelihood"]:
-        with open(csv_path, "w", newline="", encoding='utf-8') as csvfile:
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
             dict_writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             dict_writer.writeheader()
             for item in modified_response_list:
                 flattened_item = flatten_dict(item)
                 dict_writer.writerow(flattened_item)
             logger.info(f"CSV generated for the work : {resource_type}")
+
 
 # MARK: Modify ODK Settlement Data
 def modify_response_list_settlement(res, block, plan_id):
@@ -171,7 +172,9 @@ def modify_response_list_settlement(res, block, plan_id):
         ):
             try:
                 latitude = result["GPS_point"]["point_mapsappearance"]["coordinates"][1]
-                longitude = result["GPS_point"]["point_mapsappearance"]["coordinates"][0]
+                longitude = result["GPS_point"]["point_mapsappearance"]["coordinates"][
+                    0
+                ]
             except Exception as e:
                 print(f"Could not get the coordinates for settlement: {e}")
 
@@ -197,9 +200,12 @@ def modify_response_list_settlement(res, block, plan_id):
             result["raise_demand"] = mgnrega_info.get("select_one_Y_N", "") or "0"
             result["demand"] = mgnrega_info.get("select_one_demands", "") or "0"
             result["issues"] = mgnrega_info.get("select_multiple_issues", "") or "0"
-            result["community"] = mgnrega_info.get("select_one_contributions", "") or "0"
+            result["community"] = (
+                mgnrega_info.get("select_one_contributions", "") or "0"
+            )
         res_list.append(result)
     return res_list
+
 
 # MARK: Modify ODK Well Data
 def modify_response_list_well(res, block, plan_id):
@@ -256,13 +262,17 @@ def modify_response_list_well(res, block, plan_id):
                 result["owner"] = "0"
             result["hh_benefitted"] = result.get("households_benefited", "") or "0"
             result["caste"] = result.get("select_multiple_caste_use", "") or "0"
-            result["functional"] = result.get("select_one_Functional_Non_functional", "") or 0
+            result["functional"] = (
+                result.get("select_one_Functional_Non_functional", "") or 0
+            )
             result["need_maintenance"] = result.get("select_one_maintenance", "") or "0"
             repair_value = result.get("select_one_repairs_well")
             if repair_value:
                 repair_value = str(repair_value).lower()
                 if repair_value == "other":
-                    result["repair"] = result.get("select_one_repairs_well_other", "") or "0"
+                    result["repair"] = (
+                        result.get("select_one_repairs_well_other", "") or "0"
+                    )
                 else:
                     result["repair"] = repair_value
             else:
@@ -273,6 +283,7 @@ def modify_response_list_well(res, block, plan_id):
         res_list.append(result)
 
     return res_list
+
 
 # MARK: Modify ODK Waterbody Data
 def modify_response_list_waterbody(res, block, plan_id):
@@ -306,10 +317,10 @@ def modify_response_list_waterbody(res, block, plan_id):
         if latitude is not None and longitude is not None:
             result["latitude"] = latitude
             result["longitude"] = longitude
-            
+
         result["status_re"] = result["__system"]["reviewState"]
         result["wb_id"] = result["waterbodies_id"]
-        
+
         # type_of_water_st = result["select_one_water_structure"]
         # if type_of_water_st:
         #         type_of_water_st = str(type_of_water_st).lower()
@@ -321,7 +332,7 @@ def modify_response_list_waterbody(res, block, plan_id):
         #     result["wbs_type"] = "0"
 
         result["wbs_type"] = result.get("select_one_water_structure", "") or "0"
-           
+
         try:
             manager = result["select_one_manages"]
             if manager:
@@ -332,7 +343,7 @@ def modify_response_list_waterbody(res, block, plan_id):
                     result["who_manages"] = result.get("select_one_manages", "") or ""
             else:
                 result["who_manages"] = "0"
-                
+
             who_owns = result["select_one_owns"]
             if who_owns:
                 who_owns = str(who_owns).lower()
@@ -346,7 +357,7 @@ def modify_response_list_waterbody(res, block, plan_id):
             result["hh_benefitted"] = result.get("households_benefited", "") or 0
             result["identified"] = result.get("select_one_identified", "") or "0"
             result["need_maintenance"] = result.get("select_one_maintenance") or "0"
-            
+
             # Handle the dynamic water structure dimensions
             # water_structure_type = result.get("select_one_water_structure", "").lower().replace("_", " ")
             # water_structure_dimension = {}
@@ -370,6 +381,7 @@ def modify_response_list_waterbody(res, block, plan_id):
             continue
         res_list.append(result)
     return res_list
+
 
 # MARK: Modify ODK Plan Data
 def modify_response_list_plan(res, block, plan_id):
@@ -449,6 +461,7 @@ def modify_response_list_plan(res, block, plan_id):
 
     return res_list
 
+
 # MARK: Modify ODK Livelihood Data
 def modify_response_list_livelihood(res, block, plan_id):
     res_list = []
@@ -513,26 +526,31 @@ def extract_keys(d, parent_key="", sep="_"):
             keys.extend(extract_keys(v, new_key, sep=sep))
     return keys
 
+
 # MARK: Bearer Token
 def fetch_bearer_token(email: str, password: str) -> str:
     ODK_SESSION_URL = "https://odk.gramvaani.org/v1/sessions"
     try:
-
         if _token_cache["token"] and _token_cache["expires_at"]:
             now = datetime.now(timezone.utc)
             if now < _token_cache["expires_at"]:
                 return _token_cache["token"]
 
-        response = requests.post(ODK_SESSION_URL, json={"email": email, "password": password})
+        response = requests.post(
+            ODK_SESSION_URL, json={"email": email, "password": password}
+        )
         print("Response: ", response)
         if response.status_code == 200:
             response_data = response.json()
             _token_cache["token"] = response_data.get("token")
-            _token_cache["expires_at"] = dateutil.parser.parse(response_data.get("expiresAt"))
+            _token_cache["expires_at"] = dateutil.parser.parse(
+                response_data.get("expiresAt")
+            )
             return _token_cache["token"]
         else:
-            raise Exception(f"Failed to fetch bearer token. Status code: {response.status_code}")
+            raise Exception(
+                f"Failed to fetch bearer token. Status code: {response.status_code}"
+            )
     except Exception as e:
         print(f"An error occurred while fetching the bearer token: {str(e)}")
         raise
-

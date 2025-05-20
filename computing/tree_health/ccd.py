@@ -16,6 +16,7 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
     print("Inside process Tree health ccd raster")
     ee_initialize()
 
+    # Get the block MWS (Micro Watershed) features
     block_mws = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
@@ -24,9 +25,11 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             + valid_gee_text(block.lower())
             + "_uid"
         )
+    
+    # Get the block geometry once for consistent clipping
+    block_geometry = block_mws.geometry()
 
     for year in range(start_year, end_year + 1):
-
         description = (
             "tree_health_ccd_raster_"
             + valid_gee_text(district.lower())
@@ -37,6 +40,7 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
 
         asset_id = get_gee_asset_path(state, district, block) + description
 
+        # Skip if asset already exists
         if is_gee_asset_exists(asset_id):
             return
 
@@ -46,11 +50,11 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
         else:
             ccd_path = "projects/ee-mtpictd/assets/dhruvi/modal_ccd_" + str(year)
         
-        # Load and process the CCD Image Collection
+        # Load and properly clip the CCD Image Collection once
         ccd_img = ee.ImageCollection(ccd_path) \
-            .filterBounds(block_mws) \
+            .filterBounds(block_geometry) \
             .mean() \
-            .clip(block_mws)
+            .clip(block_geometry)
 
         # Compute CCD statistics function
         def ccd_stats(feature):
@@ -68,11 +72,10 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             })
         
         # Apply CCD statistics function to the feature collection
-        block_mws = block_mws.map(ccd_stats)        
-        # Export the result to GEE
+        block_mws_with_stats = block_mws.map(ccd_stats)
         try:
             image_export_task = ee.batch.Export.image.toAsset(
-                image=ccd_img.clip(block_mws.geometry()),
+                image=ccd_img,
                 description=description,
                 assetId=asset_id,
                 pyramidingPolicy={"predicted_label": "mode"},
@@ -86,10 +89,10 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             task_id_list = check_task_status([image_export_task.status()["id"]])
             print("CCD task_id_list", task_id_list)
 
-            #Sync image to Google Cloud Storage and Geoserver
+            # Sync image to Google Cloud Storage and Geoserver
             layer_name = (
                 "tree_health_ccd_raster_"
-                +valid_gee_text(district.lower())
+                + valid_gee_text(district.lower())
                 + "_"
                 + valid_gee_text(block.lower())
                 + "_" + str(year)

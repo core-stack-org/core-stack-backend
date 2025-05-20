@@ -17,10 +17,10 @@ from utilities.gee_utils import (
 
 def run_off(state, district, block, start_date, end_date, is_annual):
     description = (
-            ("Runoff_annual_" if is_annual else "Runoff_fortnight_")
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        ("Runoff_annual_" if is_annual else "Runoff_fortnight_")
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
 
     asset_id = get_gee_asset_path(state, district, block) + description
@@ -46,7 +46,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
         tasks = []
         for i in range(len(rois)):
             chunk_asset_id = (
-                    get_gee_asset_path(state, district, block, GEE_HELPER_PATH) + descs[i]
+                get_gee_asset_path(state, district, block, GEE_HELPER_PATH) + descs[i]
             )
             if not is_gee_asset_exists(chunk_asset_id):
                 task_id = generate_run_off(
@@ -68,7 +68,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
             )
 
         runoff_task_id = merge_chunks(
-            roi, state, district, block, description, chunk_size
+            roi, [state, district, block], description, chunk_size
         )
     else:
         runoff_task_id = generate_run_off(

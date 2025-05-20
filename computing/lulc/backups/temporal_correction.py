@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta
 
 from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path
 from nrm_app.celery import app
-from .cropping_frequency import *
+from computing.lulc.cropping_frequency import *
 
 
 @app.task(bind=True)

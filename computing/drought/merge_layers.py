@@ -1,10 +1,14 @@
 import ee
+
+from utilities.constants import GEE_HELPER_PATH
 from utilities.gee_utils import (
     check_task_status,
     valid_gee_text,
     gdf_to_ee_fc,
     get_gee_asset_path,
     is_gee_asset_exists,
+    ee_initialize,
+    make_asset_public,
 )
 from functools import reduce
 
@@ -20,7 +24,10 @@ def merge_drought_layers_chunks(
         + "_"
         + str(current_year)
     )
-    asset_id = get_gee_asset_path(state, district_name, block_name) + dst_filename
+    asset_id = (
+        get_gee_asset_path(state, district_name, block_name, GEE_HELPER_PATH)
+        + dst_filename
+    )
 
     size = aoi.size().getInfo()
     parts = size // chunk_size
@@ -40,7 +47,8 @@ def merge_drought_layers_chunks(
             + str(current_year)
         )
         src_asset_id = (
-            get_gee_asset_path(state, district_name, block_name) + block_name_for_parts
+            get_gee_asset_path(state, district_name, block_name, GEE_HELPER_PATH)
+            + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
@@ -66,13 +74,13 @@ def merge_drought_layers_chunks(
 
 def merge_yearly_layers(state, district, block, start_year, end_year):
     # Create required GEE asset path components
-    base_path = get_gee_asset_path(state, district, block)
+    ee_initialize()
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
 
     # Create export asset path (must be constant for export)
     description = f"drought_{district}_{block}_{start_year}_{end_year}"
-    asset_id = f"{base_path}{description}"
+    asset_id = f"{get_gee_asset_path(state, district, block)}{description}"
 
     # Check if asset already exists
     if is_gee_asset_exists(asset_id):
@@ -80,7 +88,7 @@ def merge_yearly_layers(state, district, block, start_year, end_year):
 
     def get_collection_path(year: int) -> str:
         """Get the full path for a year's collection."""
-        return f"{base_path}drought_{district}_{block}_{year}"
+        return f"{get_gee_asset_path(state, district, block, GEE_HELPER_PATH)}drought_{district}_{block}_{year}"
 
     # Get base feature collection
     first_year_fc = ee.FeatureCollection(get_collection_path(start_year))
@@ -218,7 +226,9 @@ def merge_yearly_layers(state, district, block, start_year, end_year):
 
         task.start()
         print(f"Successfully started merge task: {task.status()}")
-        return task.status()["id"]
+        check_task_status([task.status()["id"]])
+
+        make_asset_public(asset_id)
 
     except Exception as e:
         print(f"Error occurred in running merge drought yearly task: {e}")

@@ -11,11 +11,11 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
 )
-from .built_up import *
-from .cropland import *
-from .cropping_frequency import *
-from .water_body import *
-from .misc import *
+from computing.lulc.built_up import *
+from computing.lulc.cropland import *
+from computing.lulc.cropping_frequency import *
+from computing.lulc.water_body import *
+from computing.lulc.misc import *
 from nrm_app.celery import app
 
 
@@ -32,13 +32,17 @@ def generate_layers_v2(state_name, district_name, block_name, start_year, end_ye
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
-    objectid = 2
     roi_boundary_geom = ee.FeatureCollection(
-        "projects/ee-ankit-mcs/assets/CGWB_basin"
-    ).filter(ee.Filter.eq("objectid", objectid))
+        get_gee_asset_path(state_name, district_name, block_name)
+        + "filtered_mws_"
+        + valid_gee_text(district_name.lower())
+        + "_"
+        + valid_gee_text(block_name.lower())
+        + "_uid"
+    )
 
     filename_prefix = (
-        str(objectid) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
+        valid_gee_text(district_name.lower()) + "_" + valid_gee_text(block_name.lower())
     )
 
     loop_start = start_date
@@ -143,7 +147,10 @@ def generate_layers_v2(state_name, district_name, block_name, start_year, end_ye
 
         scale = 10
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m_v2"
-        final_output_assetid = "projects/nrm-work/assets/" + final_output_filename
+        final_output_assetid = (
+            get_gee_asset_path(state_name, district_name, block_name)
+            + final_output_filename
+        )
 
         # Setup the task
         image_export_task = ee.batch.Export.image.toAsset(
@@ -157,4 +164,19 @@ def generate_layers_v2(state_name, district_name, block_name, start_year, end_ye
             crs="EPSG:4326",
         )
 
+        # image_export_task = ee.batch.Export.image.toDrive(
+        #     image=final_lulc_img.clip(roi_boundary_geom.geometry()),
+        #     description="lulc_17_18_sausar_resolution1",
+        #     folder='lulc_resolution_18mar24',
+        #     fileFormat='GeoTIFF',
+        #     scale=30,
+        #     crs='EPSG:4326',
+        #     maxPixels=1e13
+        # )
+
         image_export_task.start()
+
+        # task_id_list = check_task_status([image_export_task.status()["id"]])
+        # print(f"LULC running tasks ids for {loop_start}:", task_id_list)
+        # task_ids.extend(task_id_list)
+        # time.sleep(120)

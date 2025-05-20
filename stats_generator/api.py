@@ -2,6 +2,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .utils import *
+from .mws_indicators import get_generate_filter_mws_data, download_KYL_filter_data
+from .village_indicators import get_generate_filter_data_village
+from utilities.auth_utils import auth_free
 import logging
 
 logging.basicConfig(
@@ -10,40 +13,63 @@ logging.basicConfig(
 )
 
 @api_view(["GET"])
+@auth_free
 def generate_excel_file_layer(request):
     try:
         state = request.query_params.get("state", "").lower().strip()
-        district = request.query_params.get("district", "").lower().strip().replace(" ", "_")
+        district = request.query_params.get("district", "").lower().strip()
         block = request.query_params.get("block", "").lower().strip().replace(" ", "_")
-        logging.info(f"Generating Excel file for state: {state}, district: {district}, block: {block}")
-        creating_xlsx = get_vector_layer_geoserver(state, district, block)
+
+        logging.info(f"Request to generate Excel for state: {state}, district: {district}, block: {block}")
         
-        if creating_xlsx:
-            excel_file = download_layers_excel_file(state, district, block)
-            logging.info(f"Download function returned: {excel_file}")
-            if excel_file:
-                if isinstance(excel_file, str) and os.path.exists(excel_file):
-                    with open(excel_file, 'rb') as file:
-                        response = HttpResponse(file.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                        response['Content-Disposition'] = f'attachment; filename={district}_{block}.xlsx'
-                        return response
-                
-                else:
-                    raise ValueError("Invalid file format received from download_layers_excel_file.")
-            else:
-                raise ValueError("Failed to download Excel file")
+        # Build paths
+        state_folder = state.replace(" ", "_").upper()
+        district_folder = district.replace(" ", "_").upper()
+        base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
+        state_path = os.path.join(base_path, state_folder)
+        district_path = os.path.join(state_path, district_folder)
+        filename = f"{district.replace(' ', '_')}_{block}.xlsx"
+        file_path = os.path.join(district_path, filename)
+
+        # If file exists, return it directly
+        if os.path.exists(file_path):
+            logging.info(f"Excel file already exists at: {file_path}")
         else:
-            raise ValueError("Failed to generate Excel file")
+            logging.info("Excel file does not exist. Generating...")
+            if not get_vector_layer_geoserver(state, district, block):
+                raise ValueError("Failed to generate vector layer from GeoServer.")
             
+            # Ensure directories exist before generating the file
+            os.makedirs(district_path, exist_ok=True)
+            
+            excel_file_path = download_layers_excel_file(state, district, block)
+            logging.info(f"Excel file generated at: {excel_file_path}")
+            
+            if not excel_file_path or not os.path.exists(excel_file_path):
+                raise ValueError("Failed to download or locate generated Excel file.")
+            
+            file_path = excel_file_path  # Use the actual generated path, in case it's different
+
+        # Serve the file
+        with open(file_path, 'rb') as file:
+            response = HttpResponse(
+                file.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response['Content-Disposition'] = f'attachment; filename={filename}'
+            return response
+
     except Exception as e:
-        logging.error(f"Validation error: {str(e)}")
+        logging.error(f"Error generating Excel file: {str(e)}")
         return Response({
             "status": "error",
             "message": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 @api_view(["GET"])
+@auth_free
 def generate_kyl_data_excel(request):
     try:
         print("Inside generate_kyl_data_excel API.")
@@ -54,7 +80,7 @@ def generate_kyl_data_excel(request):
         file_type = request.query_params.get("file_type", "").lower().strip()
         
         # Generate data for the file
-        creating_kyl_data = get_generate_filter_mws_data(state, district, block)
+        creating_kyl_data = get_generate_filter_mws_data(state, district, block, file_type)
         print("Data generated in the file")
         excel_file = download_KYL_filter_data(state, district, block, file_type)
         logging.info(f"Download function returned: {excel_file}")
@@ -68,7 +94,7 @@ def generate_kyl_data_excel(request):
                 raise ValueError("Invalid file format received from download_KYL_filter_data.")
         else:
             raise ValueError("Failed to download the KYL filter data file")
-    
+        
     except Exception as e:
         logging.error(f"Validation error: {str(e)}")
         return Response({
@@ -78,6 +104,7 @@ def generate_kyl_data_excel(request):
 
 
 @api_view(["GET"])
+@auth_free
 def generate_kyl_village_data(request):
     try:
         print("Inside generate_filter_data_village API.")
