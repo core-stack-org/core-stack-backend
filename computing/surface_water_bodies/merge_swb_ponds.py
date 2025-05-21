@@ -9,6 +9,11 @@ import shapely
 import ee
 import geemap
 import re
+
+from computing.utils import (sync_vector_to_gcs,
+                             get_geojson_from_gcs)
+from utilities.constants import GEE_HELPER_PATH
+
 from nrm_app.celery import app
 from utilities.gee_utils import (ee_initialize,
                                  valid_gee_text,
@@ -17,8 +22,6 @@ from utilities.gee_utils import (ee_initialize,
                                  make_asset_public,
                                  check_task_status
                                  )
-
-from utilities.constants import GEE_HELPER_PATH
 
 def split_multipolygon_into_individual_polygons(data_gdf):
     data_gdf = data_gdf.explode()
@@ -60,7 +63,7 @@ def sync_fc_to_gee(fc, description, asset_id):
         return task.status()["id"]
     except Exception as e:
         print(f"Error in task: {e}")
-
+        return None
 
 #inspired from https://github.com/core-stack-org/core-stack-backend-onprem/blob/latest_common_download/compute/layers/utils.py
 def export_gdf_to_gee_in_chunks(gdf,
@@ -71,7 +74,7 @@ def export_gdf_to_gee_in_chunks(gdf,
                       district,
                       block):
     df_size = gdf.shape[0]
-    chunk_size = 2000
+    chunk_size = 1000
     if df_size > chunk_size:
         asset_ids = []
         assets = []
@@ -88,9 +91,10 @@ def export_gdf_to_gee_in_chunks(gdf,
             )
             asset_ids.append(asset_id)
             assets.append(ee.FeatureCollection(asset_id))
-
+            print("asset_id" + asset_id)
             task_id = sync_fc_to_gee(fc, chunk_output_suffix, asset_id)
-            task_ids.append(task_id)
+            if (task_id):
+                task_ids.append(task_id)
 
         check_task_status(task_ids)
         for asset_id in asset_ids:
@@ -112,7 +116,8 @@ def export_gdf_to_gee_in_chunks(gdf,
 
 
 @app.task(bind=True)
-def merge_swb_ponds(state,
+def merge_swb_ponds(self,
+                    state,
                     district,
                     block,
                     ee_assets_prefix = 'projects/ee-corestackdev/assets/apps/mws/',
@@ -149,22 +154,52 @@ def merge_swb_ponds(state,
     mws_layer_path = [asset['id'] for asset in assets if 'mws_' in os.path.basename(asset['id'])]
 
     #admin boundary asset
-    admin_boundary_layer_path = [asset['id'] for asset in assets if 'admin_boundary' in os.path.basename(asset['id'])]
+    # admin_boundary_layer_path = [asset['id'] for asset in assets if 'admin_boundary' in os.path.basename(asset['id'])]
 
     swb_fc = ee.FeatureCollection(swb_layer_path[0])
     ponds_fc = ee.FeatureCollection(ponds_layer_path[0])
     mws_fc = ee.FeatureCollection(mws_layer_path[0])
-    admin_boundary_fc = ee.FeatureCollection(admin_boundary_layer_path[0])
+    # admin_boundary_fc = ee.FeatureCollection(admin_boundary_layer_path[0])
+
+    #Adding handling for cases where there are more than 5000 rows in any of the files below, 
+    #in which case just getInfo() won't work
 
     ponds_gdf = gpd.GeoDataFrame.from_features(ponds_fc.getInfo())
-    swb_gdf = gpd.GeoDataFrame.from_features(swb_fc.getInfo())
-    mws_gdf = gpd.GeoDataFrame.from_features(mws_fc.getInfo())
-    admin_boundary_gdf = gpd.GeoDataFrame.from_features(admin_boundary_fc.getInfo())
+    # swb_gdf = gpd.GeoDataFrame.from_features(swb_fc.getInfo())
+    # mws_gdf = gpd.GeoDataFrame.from_features(mws_fc.getInfo())
+    # admin_boundary_gdf = gpd.GeoDataFrame.from_features(admin_boundary_fc.getInfo())
+
+    try:
+        ponds_gdf = gpd.GeoDataFrame.from_features(ponds_fc.getInfo())
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        task_id = sync_vector_to_gcs(ponds_fc, 'swb', "GeoJSON")
+        check_task_status([task_id])
+        ponds_dict = get_geojson_from_gcs('ponds')
+        ponds_gdf = gpd.GeoDataFrame.from_features(ponds_dict)
+
+    try:
+        swb_gdf = gpd.GeoDataFrame.from_features(swb_fc.getInfo())
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        task_id = sync_vector_to_gcs(swb_fc, 'swb', "GeoJSON")
+        check_task_status([task_id])
+        swb_dict = get_geojson_from_gcs('swb')
+        swb_gdf = gpd.GeoDataFrame.from_features(swb_dict)
+
+    try:
+        mws_gdf = gpd.GeoDataFrame.from_features(mws_fc.getInfo())
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        task_id = sync_vector_to_gcs(mws_fc, 'swb', "GeoJSON")
+        check_task_status([task_id])
+        mws_dict = get_geojson_from_gcs('mws')
+        mws_gdf = gpd.GeoDataFrame.from_features(mws_dict)
 
     ponds_gdf = ponds_gdf.set_crs(target_crs)
     swb_gdf = swb_gdf.set_crs(target_crs)
     mws_gdf = mws_gdf.set_crs(target_crs)
-    admin_boundary_gdf = admin_boundary_gdf.set_crs(target_crs)
+    # admin_boundary_gdf = admin_boundary_gdf.set_crs(target_crs)
 
     if ponds_gdf.shape[0] == 1:
         ponds_gdf = split_multipolygon_into_individual_polygons(ponds_gdf)
@@ -172,8 +207,8 @@ def merge_swb_ponds(state,
     if 'pond_id' not in ponds_gdf.columns:
         ponds_gdf = generate_pond_id(ponds_gdf)
 
-    if admin_boundary_gdf.shape[0] > 1:
-        admin_boundary_gdf = dissolve_boundary(admin_boundary_gdf)
+    # if admin_boundary_gdf.shape[0] > 1:
+    #     admin_boundary_gdf = dissolve_boundary(admin_boundary_gdf)
 
     # ponds_gdf = clip_to_boundary(
     #     data_gdf=ponds_gdf,
@@ -318,10 +353,8 @@ def merge_swb_ponds(state,
 
     merged_gdf = pd.concat([
         merged_gdf,
-        case3_4_gdf])
-    
-
-    
+        case3_4_gdf])  
+   
     merged_gdf.reset_index(drop=True,inplace=True)
     merged_gdf = merged_gdf.set_crs(target_crs)
    
