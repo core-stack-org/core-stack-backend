@@ -14,6 +14,7 @@ urlpatterns = [
     path("lulc_v3/", api.lulc_v3_river_basin, name="lulc_v3"),
     path("lulc_vector/", api.lulc_vector, name="lulc_vector"),
     path("lulc_v4/", api.lulc_v4, name="lulc_v4"),
+    path("lulc_farm_boundary/", api.lulc_farm_boundary, name="lulc_farm_boundary"),
     path("get_gee_layer/", api.get_gee_layer, name="get_gee_layer"),
     path("generate_ci_layer/", api.generate_ci_layer, name="generate_ci_layer"),
     path("generate_swb/", api.generate_swb, name="generate_swb"),
