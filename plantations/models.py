@@ -42,7 +42,7 @@ def kml_file_path(instance, filename):
         logger.error(f"Error creating directory: {e}")
     
     logger.info(f"Returning path: {relative_directory}/{filename}")
-    return f"{relative_directory}/{filename}"
+    return f"data/{relative_directory}/{filename}"
 
 class KMLFile(models.Model):
     id = models.AutoField(primary_key=True)
