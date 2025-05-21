@@ -127,7 +127,7 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
     return push_shape_to_geoserver(path, workspace=workspace)
 
 
-def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
+def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -138,7 +138,7 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
         geojson_fc = get_geojson_from_gcs(layer_name)
 
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", state_name)
+        state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
             os.mkdir(state_dir)
         path = os.path.join(state_dir, f"{layer_name}")

@@ -645,11 +645,17 @@ def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
     try:
         project_id = request.data.get("project_id")
-        state = request.data.get("state").lower()
+        state = request.data.get("state").lower() if request.data.get("state") else None
+        district = (
+            request.data.get("district").lower()
+            if request.data.get("district")
+            else None
+        )
+        block = request.data.get("block").lower() if request.data.get("block") else None
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         site_suitability.apply_async(
-            args=[project_id, state, start_year, end_year], queue="nrm"
+            args=[project_id, start_year, end_year, state, district, block], queue="nrm"
         )
         return Response(
             {"Success": "Plantation_site_suitability task initiated"},
@@ -667,9 +673,7 @@ def aquifer_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        generate_aquifer_vector.apply_async(
-            args=[state, district, block], queue="nrm"
-        )
+        generate_aquifer_vector.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "aquifer vector task initiated"},
             status=status.HTTP_200_OK,
@@ -686,9 +690,7 @@ def soge_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        generate_soge_vector.apply_async(
-            args=[state, district, block], queue="nrm"
-        )
+        generate_soge_vector.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "SOGE vector task initiated"},
             status=status.HTTP_200_OK,
@@ -709,9 +711,13 @@ def fes_clart_upload_layer(request):
         uploaded_file = request.FILES.get("clart_file")
 
         if not uploaded_file:
-            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
-        temp_upload_dir = os.path.join(BASE_DIR, 'data', 'fes_clart_file', state, district)
+        temp_upload_dir = os.path.join(
+            BASE_DIR, "data", "fes_clart_file", state, district
+        )
         os.makedirs(temp_upload_dir, exist_ok=True)
 
         file_extension = os.path.splitext(uploaded_file.name)[1]
@@ -720,14 +726,14 @@ def fes_clart_upload_layer(request):
         with open(file_path, "wb+") as destination:
             for chunk in uploaded_file.chunks():
                 destination.write(chunk)
-        generate_fes_clart_layer.apply_async(args=[state, district, block, file_path, clart_filename], queue="nrm")
+        generate_fes_clart_layer.apply_async(
+            args=[state, district, block, file_path, clart_filename], queue="nrm"
+        )
 
         return Response(
-            {"success": "Fes clart task Initiated"},
-            status=status.HTTP_200_OK
+            {"success": "Fes clart task Initiated"}, status=status.HTTP_200_OK
         )
 
     except Exception as e:
         print("Exception in clart upload_geoserver_layer API:", e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
