@@ -26,29 +26,21 @@ def kml_file_path(instance, filename):
     
     logger.info(f"Generating KML file path for project: {instance.project.name}")
     
-    # Get project details
     project_id = instance.project.id
     org_name = instance.project.organization.name
     app_type = instance.project.app_type
     project_name = instance.project.name
     
-    # Create the relative directory path
-    # This is relative to MEDIA_ROOT which is set to data/ in settings
     relative_directory = f"site_data/{org_name}/{app_type}/{project_id}_{valid_gee_text(project_name)}"
     
-    # For directory creation, we need the absolute path
-    # Using settings.MEDIA_ROOT (data/) + relative_directory
     full_path = os.path.join(settings.MEDIA_ROOT, relative_directory)
     
-    # Create the directory if it doesn't exist
     logger.info(f"Ensuring directory exists: {full_path}")
     try:
         os.makedirs(full_path, exist_ok=True)
     except Exception as e:
         logger.error(f"Error creating directory: {e}")
     
-    # Return only the relative path for Django's FileField
-    # Django will prepend MEDIA_ROOT to this path
     logger.info(f"Returning path: {relative_directory}/{filename}")
     return f"{relative_directory}/{filename}"
 
@@ -62,7 +54,7 @@ class KMLFile(models.Model):
         null=True,
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to=kml_file_path, storage=overwrite_storage)
+    file = models.FileField(upload_to=kml_file_path, storage=overwrite_storage, max_length=511)
     kml_hash = models.CharField(max_length=64, unique=True)  # md5 hash of file
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
