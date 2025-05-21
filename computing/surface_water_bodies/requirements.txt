@@ -1,0 +1,10 @@
+numpy
+pandas
+geopandas
+matplotlib
+folium
+plotly
+mapclassify
+ipykernel
+geemap
+ee
