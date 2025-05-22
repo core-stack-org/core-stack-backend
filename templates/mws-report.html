@@ -365,6 +365,12 @@
             <section class="section">
                 <h4>Urbanization</h4>
                 <p>{{urbanization}}</p>
+
+                <div class="map-group">
+                    <div id="urbanMap" class="map"></div>
+                    <div id="compMap5" class="map"></div>
+                </div>
+
             </section>
         {% endif %}
 
@@ -466,6 +472,7 @@
         </section>
         
         <section class="section">
+            <div class="village-section">
             <h2>Village Profile</h2>
             <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
             <ul id="village-names"></ul>
@@ -491,8 +498,9 @@
                 </thead>
                 <tbody></tbody>
             </table>
-
+            </div>
         </section>
+
     </div>
 
     <footer>
@@ -688,6 +696,28 @@
             })
         })
 
+        const ComparisonMap5 = new ol.Map({
+            target: 'compMap5',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
         const lulcMap = new ol.Map({
             target: 'lulcMap',
             layers: [lulcRaster],
@@ -739,6 +769,19 @@
                     preload: 4,
                 })
             ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const urbanMap = new ol.Map({
+            target: 'urbanMap',
+            layers: [treeReduceRaster],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -813,6 +856,7 @@
                         degradRaster1.addFilter(crop);
                         lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
+                        urbanMap.addFilter(crop);
                     }
 
                     const styleFunctionComp = feature => {
@@ -838,6 +882,7 @@
                     ComparisonMap2.addLayer(vectorLayerComp)
                     ComparisonMap3.addLayer(vectorLayerComp)
                     ComparisonMap4.addLayer(vectorLayerComp)
+                    ComparisonMap5.addLayer(vectorLayerComp)
                     swbMap.addLayer(vectorLayerComp)
 
                     const arr = vectorSource.getExtent();
@@ -866,6 +911,12 @@
 
                     ComparisonMap4.getView().setCenter(mapcenter);
                     ComparisonMap4.getView().setZoom(13);
+                    
+                    ComparisonMap5.getView().setCenter(mapcenter);
+                    ComparisonMap5.getView().setZoom(13);
+
+                    urbanMap.getView().setCenter(mapcenter);
+                    urbanMap.getView().setZoom(13);
 
                     swbMap.getView().setCenter(mapcenter);
                     swbMap.getView().setZoom(13);
@@ -1332,6 +1383,11 @@
         //Village Profile section
         const villageNames = JSON.parse('{{ villages_name|safe }}')
         var ulElement = document.getElementById("village-names");
+
+        if(villageNames.length === 0){
+            const section = document.querySelector('.village-section');
+            if (section) section.style.display = 'none';
+        }
 
         const swc_works = JSON.parse('{{ swc_works|safe }}')
         const lr_works = JSON.parse('{{ lr_works|safe }}')
