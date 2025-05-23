@@ -5,48 +5,43 @@ from dateutil.relativedelta import relativedelta
 from computing.utils import create_chunk, merge_chunks
 from utilities.constants import GEE_HELPER_PATH
 from utilities.gee_utils import (
-    valid_gee_text,
-    get_gee_asset_path,
     is_gee_asset_exists,
     check_task_status,
     make_asset_public,
     ee_initialize,
-    create_gee_directory,
+    create_gee_dir,
+    get_gee_dir_path,
 )
 
 
-def run_off(state, district, block, start_date, end_date, is_annual):
-    description = (
-        ("Runoff_annual_" if is_annual else "Runoff_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+def run_off(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
+):
 
-    asset_id = get_gee_asset_path(state, district, block) + description
+    description = (
+        "Runoff_annual_" if is_annual else "Runoff_fortnight_"
+    ) + asset_suffix
+    asset_id = get_gee_dir_path(asset_folder_list) + description
 
     if is_gee_asset_exists(asset_id):
-        return
+        return None, asset_id
 
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
     if roi.size().getInfo() > 50:
         chunk_size = 30
         rois, descs = create_chunk(roi, description, chunk_size)
 
         ee_initialize("helper")
-        create_gee_directory(state, district, block, GEE_HELPER_PATH)
+        create_gee_dir(asset_folder_list, GEE_HELPER_PATH)
 
         tasks = []
         for i in range(len(rois)):
             chunk_asset_id = (
-                get_gee_asset_path(state, district, block, GEE_HELPER_PATH) + descs[i]
+                get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + descs[i]
             )
             if not is_gee_asset_exists(chunk_asset_id):
                 task_id = generate_run_off(
@@ -64,17 +59,15 @@ def run_off(state, district, block, start_date, end_date, is_annual):
 
         for desc in descs:
             make_asset_public(
-                get_gee_asset_path(state, district, block, GEE_HELPER_PATH) + desc
+                get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + desc
             )
 
-        runoff_task_id = merge_chunks(
-            roi, [state, district, block], description, chunk_size
-        )
+        runoff_task_id = merge_chunks(roi, asset_folder_list, description, chunk_size)
     else:
         runoff_task_id = generate_run_off(
             roi, description, asset_id, start_date, end_date, is_annual
         )
-    return runoff_task_id
+    return runoff_task_id, asset_id
 
 
 def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual):
@@ -372,16 +365,13 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
 
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": roi,
-                "description": description,
-                "assetId": asset_id,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
+            collection=roi,
+            description=description,
+            assetId=asset_id,
         )
         task.start()
         print("Successfully started the task run_off", task.status())
         return task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running run-off task: {e}")
+        return None

@@ -6,9 +6,8 @@ from utilities.gee_utils import valid_gee_text
 import json
 
 
-def calculate_g(state, start_date, end_date, asset_id, layer_name, is_annual):
-    delta_g = ee.FeatureCollection(asset_id)
-    fc = delta_g.getInfo()
+def calculate_g(asset_id, layer_name, shp_folder, start_date, end_date, is_annual):
+    fc = ee.FeatureCollection(asset_id).getInfo()
     features = fc["features"]
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
@@ -55,5 +54,5 @@ def calculate_g(state, start_date, end_date, asset_id, layer_name, is_annual):
 
         f["properties"] = properties
     fc["features"] = features
-    res = sync_layer_to_geoserver(state, fc, layer_name, "mws_layers")
+    res = sync_layer_to_geoserver(shp_folder, fc, layer_name, "mws_layers")
     print(res)

@@ -2,11 +2,6 @@ import ee
 import geopandas as gpd
 from nrm_app.celery import app
 from utilities.constants import MERGE_MWS_PATH
-from .precipitation import precipitation
-from .run_off_chunks import run_off
-from .evapotranspiration_chunk import evapotranspiration
-from .delta_g import delta_g
-from .net_value import net_value
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -16,79 +11,19 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
     make_asset_public,
+    upload_shp_to_gee,
 )
 import zipfile
-from .well_depth import well_depth
-from .calculateG import calculate_g
 import pandas as pd
 from osgeo import gdal
 from shapely.geometry import box
 from pcraster import *
 import os
-import sys
 
 
 @app.task(bind=True)
-def mws_layer(self, state, district, block, start_year, end_year, is_annual):
+def mws_layer(self, state, district, block):
     ee_initialize()
-
-    sys.setrecursionlimit(6000)
-
-    generate_mws_layer(state, district, block)
-    end_year = end_year + 1
-    task_list = []
-    start_date = f"{start_year}-07-01"
-    end_date = f"{end_year}-06-30"
-    ppt_task_id = precipitation(state, district, block, start_date, end_date, is_annual)
-    if ppt_task_id:
-        task_list.append(ppt_task_id)
-
-    et_task_id = evapotranspiration(
-        state, district, block, start_year, end_year, is_annual
-    )
-    if et_task_id:
-        task_list.append(et_task_id)
-
-    ro_task_id = run_off(state, district, block, start_date, end_date, is_annual)
-    if ro_task_id:
-        task_list.append(ro_task_id)
-
-    task_id_list = check_task_status(task_list) if len(task_list) > 0 else []
-    print("task_id_list", task_id_list)
-
-    dg_task_id, asset_id = delta_g(
-        state, district, block, start_date, end_date, is_annual
-    )
-    task_id_list = check_task_status([dg_task_id]) if dg_task_id else []
-    print("dg task_id_list", task_id_list)
-
-    layer_name = (
-        "deltaG_fortnight_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-
-    if is_annual:
-        wd_task_id = well_depth(state, district, block, start_date, end_date)
-        task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
-        print("wd task_id_list", task_id_list)
-
-        wd_task_id, asset_id = net_value(state, district, block, start_date, end_date)
-        task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
-        print("wdn task_id_list", task_id_list)
-
-        layer_name = (
-            "deltaG_well_depth_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-        )
-
-    calculate_g(state, start_date, end_date, asset_id, layer_name, is_annual)
-
-
-def generate_mws_layer(state, district, block):
     description = (
         "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -117,31 +52,44 @@ def generate_mws_layer(state, district, block):
             return feature.set("area_in_ha", area_in_hec)
 
         filtered_mws_block_uid = filtered_mws_block_uid.map(area_func)
-        layer_path = merge_small_mwses(
+        layer_path, is_heavy_data = merge_small_mwses(
             filtered_mws_block_uid.getInfo(), state, district, block
         )
+        if is_heavy_data:
+            export_shp_to_gee(district, block, layer_path, asset_id)
+        else:
+            gdf = gpd.read_file(layer_path + ".geojson")
+            gdf = gdf.to_crs("EPSG:4326")
+            fc = gdf_to_ee_fc(gdf)
 
-        gdf = gpd.read_file(layer_path)
-        gdf = gdf.to_crs("EPSG:4326")
-        fc = gdf_to_ee_fc(gdf)
-
-        try:
-            task = ee.batch.Export.table.toAsset(
-                **{
-                    "collection": fc,
-                    "description": description,
-                    "assetId": asset_id,
-                }
-            )
-            task.start()
-            print("Successfully started the mws_task", task.status())
-            # return task.status()["id"]
-            mws_task_id_list = check_task_status([task.status()["id"]])
-            print("mws_task_id_list", mws_task_id_list)
-        except Exception as e:
-            print(f"Error occurred in running mws_task: {e}")
-
+            try:
+                task = ee.batch.Export.table.toAsset(
+                    **{
+                        "collection": fc,
+                        "description": description,
+                        "assetId": asset_id,
+                    }
+                )
+                task.start()
+                print("Successfully started the mws_task", task.status())
+                mws_task_id_list = check_task_status([task.status()["id"]])
+                print("mws_task_id_list", mws_task_id_list)
+            except Exception as e:
+                print(f"Error occurred in running mws_task: {e}")
+                if (
+                    e.args[0]
+                    == "Request payload size exceeds the limit: 10485760 bytes."
+                ):
+                    export_shp_to_gee(district, block, layer_path, asset_id)
     make_asset_public(asset_id)
+
+
+def export_shp_to_gee(district, block, layer_path, asset_id):
+    layer_name = (
+        "mws_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    )
+    layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
+    upload_shp_to_gee(layer_path, layer_name, asset_id)
 
 
 def merge_small_mwses(gdf_mwses, state, district, block):
@@ -170,14 +118,6 @@ def merge_small_mwses(gdf_mwses, state, district, block):
     gdf_lt_500.plot()
 
     srtm30_bbs = gpd.read_file(MERGE_MWS_PATH + "/srtm30m_bounding_boxes.geojson")
-
-    # total_bounds = gdf_lt_500.total_bounds
-    # minx, miny, maxx, maxy = (
-    #     total_bounds[0],
-    #     total_bounds[1],
-    #     total_bounds[2],
-    #     total_bounds[3],
-    # )
 
     # convert to polygon
     geom = box(*gdf_lt_500.total_bounds)
@@ -338,6 +278,15 @@ def merge_small_mwses(gdf_mwses, state, district, block):
 
     rdf.drop(["DN", "geometry_x", "geometry_y", "uid_x", "uid_y"], axis=1, inplace=True)
     rdf = rdf.to_crs(3857)
-    layer_path = mws_path + "/rdf_revised_pcraster.geojson"
-    rdf.to_file(layer_path, driver="GeoJSON")
-    return layer_path
+    layer_path = mws_path + "/rdf_revised_pcraster"
+    rdf.to_file(layer_path + ".geojson", driver="GeoJSON")
+
+    file_size_bytes = os.path.getsize(layer_path + ".geojson")
+    file_size_mb = file_size_bytes / (1024 * 1024)
+
+    print(f"File size: {file_size_bytes} bytes ({file_size_mb:.2f} MB)")
+    is_heavy_data = False
+    if file_size_mb > 10:
+        is_heavy_data = True
+        rdf.to_file(layer_path, driver="ESRI Shapefile", encoding="UTF-8")
+    return layer_path, is_heavy_data

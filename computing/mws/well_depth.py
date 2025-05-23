@@ -2,31 +2,32 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
 
 
-def well_depth(state, district, block, start_date, end_date):
+def well_depth(
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_date=None,
+    end_date=None,
+):
     print("Inside well depth script")
-    description = (
-        "well_depth_annual_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    if is_gee_asset_exists(get_gee_asset_path(state, district, block) + description):
-        return
+    description = "well_depth_annual_" + asset_suffix
+    asset_id = get_gee_dir_path(asset_folder_list) + description
+    if is_gee_asset_exists(asset_id):
+        return None, asset_id
 
     principal_aquifers = ee.FeatureCollection(
         "projects/ee-anz208490/assets/principalAquifer"
     )
+
     slopes = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+        get_gee_dir_path(asset_folder_list)
         + "filtered_delta_g_annual_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
         + "_uid"
     )  # Feature collection path of any deltag asset of any location
+
     yeild__ = ee.List(principal_aquifers.aggregate_array("yeild__"))
     distinct = yeild__.distinct()
 
@@ -132,16 +133,13 @@ def well_depth(state, district, block, start_date, end_date):
 
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": get_gee_asset_path(state, district, block) + description,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
+            collection=shape,
+            description=description,
+            assetId=asset_id,
         )
         print("Successfully started the task well_depth_annual ", task.status())
         task.start()
-        return task.status()["id"]
+        return task.status()["id"], asset_id
     except Exception as e:
         print(f"Error occurred in running well_depth task: {e}")
+        return None

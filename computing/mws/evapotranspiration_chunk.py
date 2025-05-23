@@ -4,24 +4,26 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from utilities.gee_utils import (
     check_task_status,
-    valid_gee_text,
-    get_gee_asset_path,
+    get_gee_dir_path,
     is_gee_asset_exists,
 )
 import calendar
 
 
-def evapotranspiration(state, district, block, start_year, end_year, is_annual):
-    description = (
-        ("ET_annual_" if is_annual else "ET_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+def evapotranspiration(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=None,
+    end_year=None,
+    is_annual=False,
+):
 
-    asset_id = get_gee_asset_path(state, district, block) + description
+    description = ("ET_annual_" if is_annual else "ET_fortnight_") + asset_suffix
+
+    asset_id = get_gee_dir_path(asset_folder_list) + description
     if is_gee_asset_exists(asset_id):
-        return
+        return None, asset_id
 
     if not is_annual and (end_year - start_year > 5):
         print("In chunking")
@@ -40,11 +42,9 @@ def evapotranspiration(state, district, block, start_year, end_year, is_annual):
             chunk_assets.append(chunk_asset_id)
 
             task_id = calculate_et(
+                roi,
                 chunk_asset_id,
                 description + "_" + str(s_year) + "_" + str(e_year),
-                state,
-                district,
-                block,
                 start_date,
                 end_date,
                 is_annual,
@@ -54,20 +54,24 @@ def evapotranspiration(state, district, block, start_year, end_year, is_annual):
 
         task_list = check_task_status(task_ids)
         print("Task list ", task_list)
-        return merge_assets_chunked_on_year(chunk_assets, description, asset_id)
+        return (
+            merge_assets_chunked_on_year(chunk_assets, description, asset_id),
+            asset_id,
+        )
     else:
         print("In else")
         start_date = f"{start_year}-07-01"
         end_date = f"{end_year}-06-30"
-        return calculate_et(
+        return (
+            calculate_et(
+                roi,
+                asset_id,
+                description,
+                start_date,
+                end_date,
+                is_annual,
+            ),
             asset_id,
-            description,
-            state,
-            district,
-            block,
-            start_date,
-            end_date,
-            is_annual,
         )
 
 
@@ -100,31 +104,20 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
 
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": merged_fc,
-                "description": description,
-                "assetId": asset_id,
-            }
+            collection=merged_fc,
+            description=description,
+            assetId=asset_id,
         )
         task.start()
         print("Successfully started the task evapotranspiration chunk", task.status())
         return task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running evapotranspiration chunk task: {e}")
+        return None
 
 
-def calculate_et(
-    asset_id, description, state, district, block, start_date, end_date, is_annual
-):
+def calculate_et(roi, asset_id, description, start_date, end_date, is_annual):
     bounding_box = ee.Image("projects/ee-dharmisha-siddharth/assets/Hydro_2020_2021_4")
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
     bbox_geometry = bounding_box.geometry()
     is_within = bbox_geometry.contains(roi.geometry(), ee.ErrorMargin(1))
     if is_within.getInfo():
@@ -245,17 +238,16 @@ def et_fldas(
         start_date = str(f_start_date.date())
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
+            collection=shape,
+            description=description,
+            assetId=asset_id,
         )
         task.start()
         print("Successfully started the task evapotranspiration", task.status())
         return task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running evapotranspiration task: {e}")
+        return None
 
 
 def et_global_fldas(
@@ -373,17 +365,16 @@ def et_global_fldas(
 
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
+            collection=shape,
+            description=description,
+            assetId=asset_id,
         )
         task.start()
         print("Successfully started the task evapotranspiration", task.status())
         return task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running evapotranspiration task: {e}")
+        return None
 
 
 def filter_dataset(f_start_date, number_of_days, fldas_dataset):

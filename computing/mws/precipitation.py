@@ -2,29 +2,23 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
 
 
-def precipitation(state, district, block, start_date, end_date, is_annual):
-    description = (
-        ("Prec_annual_" if is_annual else "Prec_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+def precipitation(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
+):
 
-    asset_id = get_gee_asset_path(state, district, block) + description
+    description = ("Prec_annual_" if is_annual else "Prec_fortnight_") + asset_suffix
+
+    asset_id = get_gee_dir_path(asset_folder_list) + description
     if is_gee_asset_exists(asset_id):
-        return
-
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+        return None, asset_id
 
     size = ee.Number(roi.size())
     size1 = size.subtract(ee.Number(1))
@@ -72,15 +66,14 @@ def precipitation(state, district, block, start_date, end_date, is_annual):
 
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": roi,
-                "description": description,
-                "assetId": asset_id,
-            }
+            collection=roi,
+            description=description,
+            assetId=asset_id,
         )
 
         task.start()
         print("Successfully started the task fortnight_precipitation", task.status())
-        return task.status()["id"]
+        return task.status()["id"], asset_id
     except Exception as e:
         print(f"Error occurred in running precipitation task: {e}")
+        return None

@@ -9,11 +9,10 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
-from .lulc.v4.classify_raster import classify_raster
 from .lulc.v4.lulc_v4 import generate_lulc_v4
-from .lulc.v4.time_series import time_series
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order_vector
+from .mws.generate_hydrology import generate_hydrology
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -194,11 +193,7 @@ def generate_mws_layer(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = int(request.data.get("start_year"))
-        end_year = int(request.data.get("end_year"))
-        mws_layer.apply_async(
-            args=[state, district, block, start_year, end_year, False], queue="nrm"
-        )
+        mws_layer.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -208,22 +203,42 @@ def generate_mws_layer(request):
 
 
 @api_view(["POST"])
-def generate_well_depth(request):
-    print("Inside generate_well_depth")
+def generate_fortnightly_hydrology(request):
+    print("Inside generate_fortnightly_hydrology")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
-        mws_layer.apply_async(
+        generate_hydrology.apply_async(
+            args=[state, district, block, start_year, end_year, False], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_fortnightly_hydrology api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def generate_annual_hydrology(request):
+    print("Inside generate_annual_hydrology")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
+        generate_hydrology.apply_async(
             args=[state, district, block, start_year, end_year, True], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_well_depth api :: ", e)
+        print("Exception in generate_annual_hydrology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

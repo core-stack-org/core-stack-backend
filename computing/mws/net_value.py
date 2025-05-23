@@ -1,27 +1,23 @@
 import ee
 import datetime
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
 
 
-def net_value(state, district, block, start_date, end_date):
-    description = (
-        "well_depth_net_value_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
+def net_value(
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_date=None,
+    end_date=None,
+):
+    description = "well_depth_net_value_" + asset_suffix
+    asset_id = get_gee_dir_path(asset_folder_list) + description
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
     well_depth_fc = (
-        get_gee_asset_path(state, district, block)
-        + "well_depth_annual_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        get_gee_dir_path(asset_folder_list) + "well_depth_annual_" + asset_suffix
     )
     shape = ee.FeatureCollection(well_depth_fc)
 
@@ -53,16 +49,13 @@ def net_value(state, district, block, start_date, end_date):
 
     try:
         task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
+            collection=shape,
+            description=description,
+            assetId=asset_id,
         )
         task.start()
         print("Successfully started the task well_depth_net_value ", task.status())
         return task.status()["id"], asset_id
     except Exception as e:
         print(f"Error occurred in running well_depth_net_value task: {e}")
+        return None
