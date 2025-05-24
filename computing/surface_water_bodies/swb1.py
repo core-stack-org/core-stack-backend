@@ -1,107 +1,51 @@
 import datetime
 import ee
-from computing.utils import (
-    sync_fc_to_geoserver,
-)
 from utilities.gee_utils import (
-    ee_initialize,
-    check_task_status,
-    valid_gee_text,
-    get_gee_asset_path,
+    get_gee_dir_path,
     is_gee_asset_exists,
-    sync_vector_to_gcs,
 )
 from dateutil.relativedelta import relativedelta
 
-from nrm_app.celery import app
-from .swb2 import calculate_swb2
-from .swb3 import calculate_swb3
 
-
-@app.task(bind=True)
-def generate_swb_layer(self, state, district, block, start_year, end_year):
-    ee_initialize()
-
-    aoi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
-
-    start_date = f"{start_year}-07-01"
-    end_date = f"{end_year}-06-30"
-
-    swb1 = calculate_swb1(aoi, state, district, block, start_date, end_date)
-    if swb1:
-        task_id_list = check_task_status([swb1])
-        print("swb1_task_id_list", task_id_list)
-
-    swb2, asset_id = calculate_swb2(aoi, state, district, block)
-    if swb2:
-        task_id_list = check_task_status([swb2])
-        print("SWB task completed - swb2_task_id_list:", task_id_list)
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
-    print(res)
-
-    swb3, asset_id = calculate_swb3(aoi, state, district, block)
-    if swb3:
-        task_id_list = check_task_status([swb3])
-        print("SWB task completed - swb3_task_id_list:", task_id_list)
-
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-    )
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
-    print(res)
-
-
-def calculate_swb1(aoi, state, district, block, start_date, end_date):
+def vectorize_water_pixels(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_date=None,
+    end_date=None,
+):
     """
-    Calculate surface water bodies analysis version 1.
     Analyzes water body presence and characteristics over time.
 
     Args:
-        aoi: Area of interest
-        state, district, block: Geographic location parameters
-        start_date, end_date: Analysis period
+        roi: Area of interest
+        asset_suffix: Suffix to be added in layer name e.g.- _{district_name}_{block_name}
+        asset_folder_list: folder name in hierarchy in which asset should be saved on GEE
+        e.g. [state_name, district_name, block_name] or [org_name, project_name]
+        start_date: Analysis start date
+        end_date: Analysis end date
     Returns:
         Task ID if successful, None if asset already exists
     """
     # Generate description and asset ID for the analysis
-    description = (
-        "swb1_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
+    description = "swb1_" + asset_suffix
+    asset_id = get_gee_dir_path(asset_folder_list) + description
 
     # Skip if asset already exists
     if is_gee_asset_exists(asset_id):
-        return
-
-    # Calculate date range for analysis
-    loop_start = start_date
-    loop_end = (
-        datetime.datetime.strptime(end_date, "%Y-%m-%d") + relativedelta(years=1)
-    ).strftime("%Y-%m-%d")
+        return None
 
     # Initialize collections for analysis
     lulc_water_pixel_collec = []  # Binary water presence
     lulc_collec = []  # Original LULC images
 
     lulc_bandname = "predicted_label"
+
+    # Calculate date range for analysis
+    loop_start = start_date
+    loop_end = (
+        datetime.datetime.strptime(end_date, "%Y-%m-%d") + relativedelta(years=1)
+    ).strftime("%Y-%m-%d")
 
     # Process each year in the date range
     while loop_start < loop_end:
@@ -115,11 +59,9 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
 
         # Get LULC map for current period
-        image = ee.Image(
-            get_gee_asset_path(state, district, block)
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        lulc_image = ee.Image(
+            get_gee_dir_path(asset_folder_list)
+            + asset_suffix
             + "_"
             + curr_start_date
             + "_"
@@ -128,8 +70,8 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         )
 
         # Add water presence masks to collections
-        lulc_water_pixel_collec.append(image.gte(2).And(image.lte(4)))
-        lulc_collec.append(image)
+        lulc_water_pixel_collec.append(lulc_image.gte(2).And(lulc_image.lte(4)))
+        lulc_collec.append(lulc_image)
 
     # Create OR operation string for combining all years
     ored_str = "lulc_water_pixel_collec[0]"
@@ -138,11 +80,12 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
 
     ored = eval(ored_str)
 
-    # Convert to vector polygons
     multi_band_image = ored.addBands(ored)
+
+    # Convert to vector polygons
     vector_polygons = multi_band_image.reduceToVectors(
         reducer=ee.Reducer.anyNonZero(),
-        geometry=aoi.geometry(),
+        geometry=roi.geometry(),
         scale=10,
         maxPixels=1e13,
         crs=multi_band_image.projection(),
@@ -152,7 +95,7 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
     )
 
     # Filter water features
-    features = vector_polygons.filter(ee.Filter.eq("water", 1))
+    water_bodies = vector_polygons.filter(ee.Filter.eq("water", 1))
 
     def calculate_metrics(feature):
         """
@@ -186,7 +129,7 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
             ci += 1
 
         # Calculate seasonal percentages
-        p2, p3, p4 = [], [], []
+        kharif_percentage, rabi_percentage, zaid_percentage = [], [], []
         j = 0
         while j < len(lulc_collec):
             binary_collection = lulc_collec[j]
@@ -217,13 +160,30 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
 
             # Store percentages
             # p1.append((counts[0].divide(total_ored_area)).multiply(100))
-            p2.append((count1.divide(total_ored_area)).multiply(100))
-            p3.append((count2.divide(total_ored_area)).multiply(100))
-            p4.append((counts[3].divide(total_ored_area)).multiply(100))
+            kharif_percentage.append((count1.divide(total_ored_area)).multiply(100))
+            rabi_percentage.append((count2.divide(total_ored_area)).multiply(100))
+            zaid_percentage.append((counts[3].divide(total_ored_area)).multiply(100))
             j += 1
 
         # Set properties for the feature
-        properties = {"area_ored": total_ored_area.multiply(100)}
+        area_ored = total_ored_area.multiply(100)
+        properties = {"area_ored": area_ored.multiply(0.0001)}
+
+        # Categorize based on area ranges
+        wb_category = ee.Algorithms.If(
+            ee.Number(area_ored).lte(499),
+            "0-500",
+            ee.Algorithms.If(
+                ee.Number(area_ored).lte(999),
+                "500-1000",
+                ee.Algorithms.If(
+                    ee.Number(area_ored).lte(4999), "1000-5000", "5000 and above"
+                ),
+            ),
+        )
+
+        properties["category_sq_m"] = wb_category
+
         i = 0
         loop_start = start_date
         while loop_start < loop_end:
@@ -231,10 +191,10 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
             year = f"{curr_start_date.year % 100}-{curr_start_date.year % 100 + 1}"
 
             # Store area and seasonal percentages
-            properties[f"area_{year}"] = cnt_res[i].multiply(100)
-            properties[f"k_{year}"] = p2[i]  # Kharif
-            properties[f"kr_{year}"] = p3[i]  # Kharif+Rabi
-            properties[f"krz_{year}"] = p4[i]  # Kharif+Rabi+Zaid
+            properties[f"area_{year}"] = cnt_res[i].multiply(100).multiply(0.0001)
+            properties[f"k_{year}"] = kharif_percentage[i]  # Kharif
+            properties[f"kr_{year}"] = rabi_percentage[i]  # Kharif+Rabi
+            properties[f"krz_{year}"] = zaid_percentage[i]  # Kharif+Rabi+Zaid
 
             i += 1
             loop_start = (curr_start_date + relativedelta(years=1)).strftime("%Y-%m-%d")
@@ -242,37 +202,12 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         return feature.set(properties)
 
     # Apply metrics calculation to all features
-    feature_collection_with_metrics = features.map(calculate_metrics)
-
-    def updated_feature_collection(feature):
-        """
-        Categorize water bodies based on area
-        """
-        area = feature.getNumber("area_ored")
-
-        # Categorize based on area ranges
-        new_category = ee.Algorithms.If(
-            ee.Number(area).lte(499),
-            "0-500",
-            ee.Algorithms.If(
-                ee.Number(area).lte(999),
-                "500-1000",
-                ee.Algorithms.If(
-                    ee.Number(area).lte(4999), "1000-5000", "5000 and above"
-                ),
-            ),
-        )
-        return feature.set("0_category_sq_m", new_category)
-
-    # Apply categorization
-    updated_feature_collection_with_metrics = feature_collection_with_metrics.map(
-        updated_feature_collection
-    )
+    feature_collection_with_metrics = water_bodies.map(calculate_metrics)
 
     # Export results to GEE asset
     try:
         swb_task = ee.batch.Export.table.toAsset(
-            collection=updated_feature_collection_with_metrics,
+            collection=feature_collection_with_metrics,
             description=description,
             assetId=asset_id,
         )
@@ -282,3 +217,4 @@ def calculate_swb1(aoi, state, district, block, start_date, end_date):
         return swb_task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running swb1 task: {e}")
+        return None

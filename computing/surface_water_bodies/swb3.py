@@ -1,13 +1,19 @@
 import ee
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
 
 
-def calculate_swb3(aoi, state, district, block):
-    # Generate a unique description and asset ID for the water body processing
-    description = (
-        "swb3_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
+def waterbody_wbc_intersection(
+    roi=None,
+    state=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+):
+    if not state:
+        print("State name must be provided to run this script")
+        return None
+
+    description = "swb3_" + asset_suffix
+    asset_id = get_gee_dir_path(asset_folder_list) + description
 
     # Check if the asset already exists to avoid redundant processing
     if is_gee_asset_exists(asset_id):
@@ -18,16 +24,12 @@ def calculate_swb3(aoi, state, district, block):
         "projects/ee-vatsal/assets/WBC_" + state.upper().replace(" ", "") + "_UPD"
     )
     water_bodies = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "swb2_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        get_gee_dir_path(asset_folder_list) + "swb2_" + asset_suffix
     )
 
     # Filter points and polygons within the area of interest (aoi)
-    points = census_state.filterBounds(aoi)
-    polygons = water_bodies.filterBounds(aoi)
+    points = census_state.filterBounds(roi)
+    polygons = water_bodies.filterBounds(roi)
 
     feature_collection = points
 
