@@ -12,7 +12,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     make_asset_public,
     upload_shp_to_gee,
-    export_vector_to_gee,
+    export_vector_asset_to_gee,
 )
 import zipfile
 import pandas as pd
@@ -63,7 +63,7 @@ def mws_layer(self, state, district, block):
             gdf = gdf.to_crs("EPSG:4326")
             fc = gdf_to_ee_fc(gdf)
             # Export feature collection to GEE
-            task_id = export_vector_to_gee(fc, description, asset_id)
+            task_id = export_vector_asset_to_gee(fc, description, asset_id)
             mws_task_id_list = check_task_status([task_id])
             print("mws_task_id_list", mws_task_id_list)
 

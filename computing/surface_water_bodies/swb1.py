@@ -3,6 +3,7 @@ import ee
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
 from dateutil.relativedelta import relativedelta
 
@@ -205,16 +206,7 @@ def vectorize_water_pixels(
     feature_collection_with_metrics = water_bodies.map(calculate_metrics)
 
     # Export results to GEE asset
-    try:
-        swb_task = ee.batch.Export.table.toAsset(
-            collection=feature_collection_with_metrics,
-            description=description,
-            assetId=asset_id,
-        )
-
-        swb_task.start()
-        print("Successfully started the swb 1", swb_task.status())
-        return swb_task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running swb1 task: {e}")
-        return None
+    task_id = export_vector_asset_to_gee(
+        feature_collection_with_metrics, description, asset_id
+    )
+    return task_id

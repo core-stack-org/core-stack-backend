@@ -6,7 +6,7 @@ from utilities.gee_utils import (
     check_task_status,
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_to_gee,
+    export_vector_asset_to_gee,
 )
 import calendar
 
@@ -104,7 +104,7 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
     merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
 
     # Export feature collection to GEE
-    task_id = export_vector_to_gee(merged_fc, description, asset_id)
+    task_id = export_vector_asset_to_gee(merged_fc, description, asset_id)
     return task_id
 
 
@@ -230,7 +230,7 @@ def et_fldas(
         start_date = str(f_start_date.date())
 
     # Export feature collection to GEE
-    task_id = export_vector_to_gee(shape, description, asset_id)
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
     return task_id
 
 
@@ -348,7 +348,7 @@ def et_global_fldas(
         f_start_date = f_end_date
 
     # Export feature collection to GEE
-    task_id = export_vector_to_gee(shape, description, asset_id)
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
     return task_id
 
 

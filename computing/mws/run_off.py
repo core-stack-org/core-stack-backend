@@ -11,7 +11,7 @@ from utilities.gee_utils import (
     ee_initialize,
     create_gee_dir,
     get_gee_dir_path,
-    export_vector_to_gee,
+    export_vector_asset_to_gee,
 )
 
 
@@ -365,5 +365,5 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
         start_date = str(f_start_date.date())
 
     # Export feature collection to GEE
-    task_id = export_vector_to_gee(roi, description, asset_id)
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id

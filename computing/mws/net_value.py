@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_to_gee,
+    export_vector_asset_to_gee,
 )
 
 
@@ -52,5 +52,5 @@ def net_value(
         shape = shape.map(feat)
 
     # Export feature collection to GEE
-    task_id = export_vector_to_gee(shape, description, asset_id)
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
     return task_id, asset_id

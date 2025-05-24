@@ -2,6 +2,7 @@ import ee
 from utilities.gee_utils import (
     is_gee_asset_exists,
     get_gee_dir_path,
+    export_vector_asset_to_gee,
 )
 
 
@@ -59,18 +60,6 @@ def waterbody_mws_intersection(
     )
     fc_without_columns = fc.select(columns_to_keep)
 
-    try:
-        swb_task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": fc_without_columns,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        swb_task.start()
-        print("Successfully started the swb2 task", swb_task.status())
-        return swb_task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running swb2 task: {e}")
-        return None
+    # Export results to GEE asset
+    task_id = export_vector_asset_to_gee(fc_without_columns, description, asset_id)
+    return task_id, asset_id

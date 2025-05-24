@@ -7,6 +7,7 @@ from utilities.gee_utils import (
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
+    make_asset_public,
 )
 
 from nrm_app.celery import app
@@ -67,6 +68,7 @@ def generate_swb_layer(
     if swb2:
         task_id_list = check_task_status([swb2])
         print("SWB2 task completed - task_id_list:", task_id_list)
+        make_asset_public(asset_id)
     layer_name = (
         "surface_waterbodies_"
         + valid_gee_text(district.lower())
@@ -74,20 +76,21 @@ def generate_swb_layer(
         + valid_gee_text(block.lower())
     )
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="water_bodies")
     print(res)
 
     # SWB3: Intersect water bodies with WBC (Water Body Census) to get more data on intersecting water bodies
     swb3, asset_id = waterbody_wbc_intersection(
         roi=roi,
-        state=state,
+        state=state,  # Mandatory
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
     )
     if swb3:
         task_id_list = check_task_status([swb3])
         print("SWB task completed - swb3_task_id_list:", task_id_list)
+        make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, workspace="water_bodies")
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="water_bodies")
     print(res)

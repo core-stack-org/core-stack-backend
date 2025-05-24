@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_to_gee,
+    export_vector_asset_to_gee,
 )
 
 
@@ -69,5 +69,5 @@ def precipitation(
         start_date = str(f_start_date.date())
 
     # Export feature collection to GEE
-    task_id = export_vector_to_gee(roi, description, asset_id)
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id, asset_id

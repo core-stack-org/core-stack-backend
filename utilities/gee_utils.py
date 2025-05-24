@@ -202,7 +202,7 @@ def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
     return gee_path
 
 
-def export_vector_to_gee(fc, description, asset_id):
+def export_vector_asset_to_gee(fc, description, asset_id):
     try:
         task = ee.batch.Export.table.toAsset(
             collection=fc,
@@ -220,7 +220,7 @@ def export_vector_to_gee(fc, description, asset_id):
         return None
 
 
-def export_raster_to_gee(
+def export_raster_asset_to_gee(
     image,
     description,
     asset_id,

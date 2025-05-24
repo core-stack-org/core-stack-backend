@@ -137,7 +137,7 @@ def generate_hydrology(
     calculate_g(
         asset_id=asset_id,
         layer_name=layer_name,
-        shp_folder=state,
+        shp_folder=asset_suffix,
         start_date=start_date,
         end_date=end_date,
         is_annual=is_annual,

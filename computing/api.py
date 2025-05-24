@@ -212,7 +212,15 @@ def generate_fortnightly_hydrology(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         generate_hydrology.apply_async(
-            args=[state, district, block, start_year, end_year, False], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_annual": False,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -232,7 +240,15 @@ def generate_annual_hydrology(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         generate_hydrology.apply_async(
-            args=[state, district, block, start_year, end_year, True], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_annual": True,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -347,7 +363,14 @@ def generate_swb(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         generate_swb_layer.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Generate swb task initiated"}, status=status.HTTP_200_OK
@@ -367,7 +390,14 @@ def generate_drought_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         calculate_drought.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "generate_drought_layer task initiated"},

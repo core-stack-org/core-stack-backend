@@ -1,5 +1,9 @@
 import ee
-from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
 
 
 def waterbody_wbc_intersection(
@@ -167,19 +171,5 @@ def waterbody_wbc_intersection(
     final_upd = filtered_fc1.merge(merged)
 
     # Export the final feature collection to Google Earth Engine asset
-    try:
-        swb_task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": final_upd,
-                "description": description,
-                "assetId": asset_id,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
-        )
-
-        swb_task.start()
-        print("Successfully started the swb3", swb_task.status())
-        return swb_task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running swb3 task: {e}")
+    task_id = export_vector_asset_to_gee(final_upd, description, asset_id)
+    return task_id, asset_id
