@@ -12,6 +12,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     get_gee_dir_path,
+    export_vector_to_gee,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -226,21 +227,8 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
-    try:
-        # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": asset,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        task.start()
-        print("Successfully started the merge chunk", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running merge task: {e}")
+    task_id = export_vector_to_gee(asset, description, asset_id)
+    return task_id
 
 
 def fix_invalid_geometry_in_gdf(gdf):

@@ -2,7 +2,11 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_to_gee,
+)
 
 
 def well_depth(
@@ -131,15 +135,6 @@ def well_depth(
         f_start_date = f_end_date
         start_date = f_start_date
 
-    try:
-        task = ee.batch.Export.table.toAsset(
-            collection=shape,
-            description=description,
-            assetId=asset_id,
-        )
-        print("Successfully started the task well_depth_annual ", task.status())
-        task.start()
-        return task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running well_depth task: {e}")
-        return None
+    # Export feature collection to GEE
+    task_id = export_vector_to_gee(shape, description, asset_id)
+    return task_id, asset_id

@@ -3,8 +3,8 @@ import geopandas as gpd
 from nrm_app.celery import app
 from utilities.constants import MERGE_MWS_PATH
 from .precipitation import precipitation
-from .run_off_chunks import run_off
-from .evapotranspiration_chunk import evapotranspiration
+from .run_off import run_off
+from .evapotranspiration import evapotranspiration
 from .delta_g import delta_g
 from .net_value import net_value
 from utilities.gee_utils import (
@@ -20,7 +20,18 @@ import sys
 
 
 @app.task(bind=True)
-def generate_hydrology(self, state, district, block, start_year, end_year, is_annual):
+def generate_hydrology(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=None,
+    end_year=None,
+    is_annual=False,
+):
     ee_initialize()
 
     sys.setrecursionlimit(6000)
@@ -30,19 +41,20 @@ def generate_hydrology(self, state, district, block, start_year, end_year, is_an
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
 
-    asset_suffix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_folder_list = [state, district, block]
+    if state and district and block:
+        asset_suffix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
 
-    roi = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+        roi = ee.FeatureCollection(
+            get_gee_dir_path(asset_folder_list)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
 
     ppt_task_id, ppt_asset_id = precipitation(
         roi=roi,

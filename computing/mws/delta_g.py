@@ -2,7 +2,11 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import get_gee_dir_path, is_gee_asset_exists
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_to_gee,
+)
 
 
 def delta_g(
@@ -87,17 +91,6 @@ def delta_g(
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
 
-    try:
-
-        task = ee.batch.Export.table.toAsset(
-            collection=roi,
-            description=description,
-            assetId=asset_id,
-        )
-        task.start()
-        print("Successfully started the task deltaG", task.status())
-
-        return task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running delta_G task: {e}")
-        return None
+    # Export feature collection to GEE
+    task_id = export_vector_to_gee(roi, description, asset_id)
+    return task_id, asset_id

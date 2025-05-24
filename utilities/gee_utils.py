@@ -202,6 +202,55 @@ def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
     return gee_path
 
 
+def export_vector_to_gee(fc, description, asset_id):
+    try:
+        task = ee.batch.Export.table.toAsset(
+            collection=fc,
+            description=description,
+            assetId=asset_id,
+        )
+
+        task.start()
+        print(
+            f"Successfully started the task for {description}, task id:{task.status()}"
+        )
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running {description} task: {e}")
+        return None
+
+
+def export_raster_to_gee(
+    image,
+    description,
+    asset_id,
+    scale,
+    geometry,
+    pyramiding_policy=None,
+    max_pixel=1e13,
+    crs="EPSG:4326",
+):
+    try:
+        task = ee.batch.Export.image.toAsset(
+            image=image,
+            description=description,
+            assetId=asset_id,
+            pyramidingPolicy=pyramiding_policy,
+            scale=scale,
+            region=geometry,
+            maxPixels=max_pixel,
+            crs=crs,
+        )
+        task.start()
+        print(
+            f"Successfully started the task for {description}, task id:{task.status()}"
+        )
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running {description} task: {e}")
+        return None
+
+
 def geojson_to_ee_featurecollection(geojson_data):
     """
     Convert a GeoJSON FeatureCollection to an Earth Engine FeatureCollection
