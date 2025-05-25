@@ -342,7 +342,14 @@ def generate_ci_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         generate_cropping_intensity.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Cropping Intensity task initiated"},

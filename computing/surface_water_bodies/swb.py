@@ -6,8 +6,8 @@ from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
-    get_gee_asset_path,
     make_asset_public,
+    get_gee_dir_path,
 )
 
 from nrm_app.celery import app
@@ -30,19 +30,19 @@ def generate_swb_layer(
 ):
     ee_initialize()
     if state and district and block:
+        asset_suffix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
+
         roi = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
+            get_gee_dir_path(asset_folder_list)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
             + "_uid"
         )
-
-        asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-        )
-        asset_folder_list = [state, district, block]
 
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
