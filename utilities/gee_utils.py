@@ -202,6 +202,55 @@ def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
     return gee_path
 
 
+def export_vector_asset_to_gee(fc, description, asset_id):
+    try:
+        task = ee.batch.Export.table.toAsset(
+            collection=fc,
+            description=description,
+            assetId=asset_id,
+        )
+
+        task.start()
+        print(
+            f"Successfully started the task for {description}, task id:{task.status()}"
+        )
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running {description} task: {e}")
+        return None
+
+
+def export_raster_asset_to_gee(
+    image,
+    description,
+    asset_id,
+    scale,
+    geometry,
+    pyramiding_policy=None,
+    max_pixel=1e13,
+    crs="EPSG:4326",
+):
+    try:
+        task = ee.batch.Export.image.toAsset(
+            image=image,
+            description=description,
+            assetId=asset_id,
+            pyramidingPolicy=pyramiding_policy,
+            scale=scale,
+            region=geometry,
+            maxPixels=max_pixel,
+            crs=crs,
+        )
+        task.start()
+        print(
+            f"Successfully started the task for {description}, task id:{task.status()}"
+        )
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running {description} task: {e}")
+        return None
+
+
 def geojson_to_ee_featurecollection(geojson_data):
     """
     Convert a GeoJSON FeatureCollection to an Earth Engine FeatureCollection
@@ -478,7 +527,6 @@ def extract_task_id(command_output):
 
 def gcs_to_gee_asset_cli(gcs_uri, asset_id):
     """Use earthengine CLI to upload from GCS to GEE asset"""
-    ee_initialize()
     command = [
         "earthengine",
         f"--service_account_file={GEE_SERVICE_ACCOUNT_KEY_PATH}",
@@ -497,12 +545,15 @@ def gcs_to_gee_asset_cli(gcs_uri, asset_id):
         return None
     except subprocess.CalledProcessError as e:
         print("An error occurred during the upload.")
-        print("Error Output:", e)
+        print("Command:", " ".join(command))
+        print("Return Code:", e.returncode)
+        print("STDOUT:", e.stdout)
+        print("STDERR:", e.stderr)
         return None
 
 
 def upload_shp_to_gee(shapefile_path, file_name, asset_id):
-    gcs_blob_name = f"{GCS_BUCKET_NAME}/{file_name}/{file_name}.shp"
+    gcs_blob_name = f"shapefiles/{file_name}/{file_name}.shp"
 
     # Make sure all shapefile components (.shp, .dbf, .shx, .prj) are uploaded
     components = [".shp", ".dbf", ".shx", ".prj"]

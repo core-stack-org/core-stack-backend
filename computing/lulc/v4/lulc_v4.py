@@ -1,13 +1,13 @@
 import ee
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from computing.lulc.built_up import get_builtup_prediction
-from computing.lulc.cropland import get_cropland_prediction
+from computing.lulc.backups.built_up import get_builtup_prediction
+from computing.lulc.backups.cropland import get_cropland_prediction
 from computing.lulc.misc import get_barrenland_prediction
 from computing.lulc.v4.classify_raster import classify_raster
 from computing.lulc.v4.cropping_frequency_detection import get_cropping_frequency
 from computing.lulc.v4.time_series import time_series
-from computing.lulc.water_body import get_water_prediction
+from computing.lulc.backups.water_body import get_water_prediction
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
