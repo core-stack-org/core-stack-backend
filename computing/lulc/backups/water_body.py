@@ -1,5 +1,5 @@
 import ee
-from .misc import mask_s2cloud
+from computing.lulc.misc import mask_s2cloud
 
 """
 Function to get the first date of the month of input start date and the last date of this month.

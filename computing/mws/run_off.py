@@ -3,7 +3,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from computing.utils import create_chunk, merge_chunks
-from utilities.constants import GEE_HELPER_PATH
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
     check_task_status,
@@ -19,6 +19,7 @@ def run_off(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_date=None,
     end_date=None,
     is_annual=False,
@@ -27,7 +28,12 @@ def run_off(
     description = (
         "Runoff_annual_" if is_annual else "Runoff_fortnight_"
     ) + asset_suffix
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
@@ -37,12 +43,15 @@ def run_off(
         rois, descs = create_chunk(roi, description, chunk_size)
 
         ee_initialize("helper")
-        create_gee_dir(asset_folder_list, GEE_HELPER_PATH)
+        create_gee_dir(asset_folder_list, GEE_PATHS[app_type]["GEE_HELPER_PATH"])
 
         tasks = []
         for i in range(len(rois)):
             chunk_asset_id = (
-                get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + descs[i]
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+                )
+                + descs[i]
             )
             if not is_gee_asset_exists(chunk_asset_id):
                 task_id = generate_run_off(
@@ -60,10 +69,20 @@ def run_off(
 
         for desc in descs:
             make_asset_public(
-                get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + desc
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+                )
+                + desc
             )
 
-        runoff_task_id = merge_chunks(roi, asset_folder_list, description, chunk_size)
+        runoff_task_id = merge_chunks(
+            roi,
+            asset_folder_list,
+            description,
+            chunk_size,
+            chunk_asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"],
+            merge_asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
     else:
         runoff_task_id = generate_run_off(
             roi, description, asset_id, start_date, end_date, is_annual

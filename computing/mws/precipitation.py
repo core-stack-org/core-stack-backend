@@ -2,6 +2,8 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -13,6 +15,7 @@ def precipitation(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_date=None,
     end_date=None,
     is_annual=False,
@@ -20,7 +23,12 @@ def precipitation(
 
     description = ("Prec_annual_" if is_annual else "Prec_fortnight_") + asset_suffix
 
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 

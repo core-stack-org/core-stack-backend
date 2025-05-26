@@ -2,7 +2,7 @@ import ee
 from computing.utils import (
     sync_layer_to_geoserver,
 )
-from utilities.constants import GEE_HELPER_PATH
+from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -28,6 +28,7 @@ def calculate_drought(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type="MWS",
     start_year=None,
     end_year=None,
 ):
@@ -51,7 +52,9 @@ def calculate_drought(
         asset_folder_list = [state, district, block]
 
         roi = ee.FeatureCollection(
-            get_gee_dir_path(asset_folder_list)
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
@@ -59,7 +62,12 @@ def calculate_drought(
             + "_uid"
         )
 
-    asset_id = get_gee_dir_path(asset_folder_list) + dst_filename
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + dst_filename
+    )
 
     if not is_gee_asset_exists(asset_id):
         chunk_size = 30  # if shapefile is large, running the script on the complete file will result an error,
@@ -71,7 +79,9 @@ def calculate_drought(
         while current_year <= end_year:
             print("current_year", current_year)
             yearly_drought = (
-                get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH)
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+                )
                 + "drought_"
                 + asset_suffix
                 + "_"
@@ -83,6 +93,7 @@ def calculate_drought(
                     roi,
                     asset_suffix,
                     asset_folder_list,
+                    app_type,
                     current_year,
                     start_year,
                     end_year,
@@ -90,7 +101,12 @@ def calculate_drought(
                 )
 
                 task_id = merge_drought_layers_chunks(
-                    roi, asset_suffix, asset_folder_list, current_year, chunk_size
+                    roi,
+                    asset_suffix,
+                    asset_folder_list,
+                    app_type,
+                    current_year,
+                    chunk_size,
                 )
                 if task_id:
                     merged_tasks.append(task_id)
@@ -103,7 +119,7 @@ def calculate_drought(
             make_asset_public(asset)
 
         task_id = merge_yearly_layers(
-            asset_suffix, asset_folder_list, start_year, end_year
+            asset_suffix, asset_folder_list, app_type, start_year, end_year
         )
         check_task_status([task_id])
         make_asset_public(asset_id)

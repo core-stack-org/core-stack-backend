@@ -1,6 +1,8 @@
 import ee
 import datetime
 from dateutil.relativedelta import relativedelta
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -11,17 +13,27 @@ from utilities.gee_utils import (
 def net_value(
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_date=None,
     end_date=None,
 ):
     description = "well_depth_net_value_" + asset_suffix
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
     well_depth_fc = (
-        get_gee_dir_path(asset_folder_list) + "well_depth_annual_" + asset_suffix
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + "well_depth_annual_"
+        + asset_suffix
     )
     shape = ee.FeatureCollection(well_depth_fc)
 

@@ -1,7 +1,7 @@
 import ee
 import geopandas as gpd
 from nrm_app.celery import app
-from utilities.constants import MERGE_MWS_PATH
+from utilities.constants import MERGE_MWS_PATH, GEE_PATHS
 from .precipitation import precipitation
 from .run_off import run_off
 from .evapotranspiration import evapotranspiration
@@ -28,6 +28,7 @@ def generate_hydrology(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type="MWS",
     start_year=None,
     end_year=None,
     is_annual=False,
@@ -48,7 +49,9 @@ def generate_hydrology(
         asset_folder_list = [state, district, block]
 
         roi = ee.FeatureCollection(
-            get_gee_dir_path(asset_folder_list)
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
@@ -60,6 +63,7 @@ def generate_hydrology(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
         start_date=start_date,
         end_date=end_date,
         is_annual=is_annual,
@@ -71,6 +75,7 @@ def generate_hydrology(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
         start_year=start_year,
         end_year=end_year,
         is_annual=is_annual,
@@ -82,6 +87,7 @@ def generate_hydrology(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
         start_date=start_date,
         end_date=end_date,
         is_annual=is_annual,
@@ -101,6 +107,7 @@ def generate_hydrology(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
         start_date=start_date,
         end_date=end_date,
         is_annual=is_annual,
@@ -115,6 +122,7 @@ def generate_hydrology(
         wd_task_id, wd_asset_id = well_depth(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
+            app_type=app_type,
             start_date=start_date,
             end_date=end_date,
         )
@@ -125,6 +133,7 @@ def generate_hydrology(
         wd_task_id, asset_id = net_value(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
+            app_type=app_type,
             start_date=start_date,
             end_date=end_date,
         )

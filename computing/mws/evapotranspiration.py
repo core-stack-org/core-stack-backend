@@ -2,6 +2,8 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     check_task_status,
     get_gee_dir_path,
@@ -15,6 +17,7 @@ def evapotranspiration(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_year=None,
     end_year=None,
     is_annual=False,
@@ -22,7 +25,12 @@ def evapotranspiration(
 
     description = ("ET_annual_" if is_annual else "ET_fortnight_") + asset_suffix
 
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 

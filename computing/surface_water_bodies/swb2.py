@@ -1,4 +1,6 @@
 import ee
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
     get_gee_dir_path,
@@ -10,15 +12,25 @@ def waterbody_mws_intersection(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
 ):
     description = "swb2_" + asset_suffix
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
     water_bodies = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list) + "swb1_" + asset_suffix
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + "swb1_"
+        + asset_suffix
     )
 
     def intersect_with_mws(feature):

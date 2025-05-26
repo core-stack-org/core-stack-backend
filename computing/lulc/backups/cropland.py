@@ -1,5 +1,5 @@
 import ee
-from .misc import mask_s2cloud
+from computing.lulc.misc import mask_s2cloud
 from datetime import datetime
 import pandas as pd
 

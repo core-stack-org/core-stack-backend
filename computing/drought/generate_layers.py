@@ -1,5 +1,5 @@
 import ee
-from utilities.constants import GEE_HELPER_PATH
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
     ee_initialize,
@@ -80,6 +80,7 @@ def generate_drought_layers(
     aoi,
     asset_suffix,
     asset_folder_list,
+    app_type,
     current_year,
     start_year,
     end_year,
@@ -93,7 +94,9 @@ def generate_drought_layers(
     parts = size // chunk_size
     print("parts=", parts)
     ee_initialize("helper")
-    create_gee_dir(asset_folder_list, GEE_HELPER_PATH)
+    create_gee_dir(
+        asset_folder_list, gee_project_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+    )
     for part in range(parts + 1):
         start = part * chunk_size
         end = start + chunk_size
@@ -118,6 +121,7 @@ def generate_drought_layers(
                 asset_ids,
                 asset_suffix,
                 asset_folder_list,
+                app_type,
             )
 
     print("Done iterating")
@@ -138,9 +142,13 @@ def drought_chunk(
     asset_ids,
     asset_suffix,
     asset_folder_list,
+    app_type,
 ):
     asset_id = (
-        get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + block_name_for_parts
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+        )
+        + block_name_for_parts
     )
 
     if is_gee_asset_exists(asset_id):
@@ -159,7 +167,9 @@ def drought_chunk(
     modis_scale = 500
     # modis_available_from_year = 2000  # it is available from 2000-01-01
     lulc_path = (
-        get_gee_dir_path(asset_folder_list)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + asset_suffix
         + "_"
         + str(current_year)
@@ -175,7 +185,9 @@ def drought_chunk(
     while lulc_y <= end_year:
         lulc_images.append(
             ee.Image(
-                get_gee_dir_path(asset_folder_list)
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
                 + asset_suffix
                 + "_"
                 + str(lulc_y)

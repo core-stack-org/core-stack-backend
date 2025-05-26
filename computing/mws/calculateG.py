@@ -2,7 +2,6 @@ import ee
 import datetime
 from dateutil.relativedelta import relativedelta
 from computing.utils import sync_layer_to_geoserver
-from utilities.gee_utils import valid_gee_text
 import json
 
 

@@ -2,6 +2,8 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -13,6 +15,7 @@ def delta_g(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_date=None,
     end_date=None,
     is_annual=False,
@@ -23,27 +26,38 @@ def delta_g(
         + asset_suffix
         + "_uid"
     )
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
     prec = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "Prec_"
         + ("annual_" if is_annual else "fortnight_")
         + asset_suffix
     )  # Prec feature collection
 
     runoff = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "Runoff_"
         + ("annual_" if is_annual else "fortnight_")
         + asset_suffix
     )  # RO feature collection
 
     et = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "ET_"
         + ("annual_" if is_annual else "fortnight_")
         + asset_suffix

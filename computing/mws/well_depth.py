@@ -2,6 +2,8 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -12,12 +14,18 @@ from utilities.gee_utils import (
 def well_depth(
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_date=None,
     end_date=None,
 ):
     print("Inside well depth script")
     description = "well_depth_annual_" + asset_suffix
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
@@ -26,7 +34,9 @@ def well_depth(
     )
 
     slopes = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "filtered_delta_g_annual_"
         + asset_suffix
         + "_uid"

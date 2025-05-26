@@ -1,6 +1,6 @@
 import ee
 
-from utilities.constants import GEE_HELPER_PATH
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
     ee_initialize,
@@ -11,10 +11,15 @@ from functools import reduce
 
 
 def merge_drought_layers_chunks(
-    roi, asset_suffix, asset_folder_list, current_year, chunk_size
+    roi, asset_suffix, asset_folder_list, app_type, current_year, chunk_size
 ):
     dst_filename = "drought_" + asset_suffix + "_" + str(current_year)
-    asset_id = get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + dst_filename
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+        )
+        + dst_filename
+    )
 
     size = roi.size().getInfo()
     parts = size // chunk_size
@@ -32,7 +37,10 @@ def merge_drought_layers_chunks(
             + str(current_year)
         )
         src_asset_id = (
-            get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH) + block_name_for_parts
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+            )
+            + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
@@ -42,7 +50,9 @@ def merge_drought_layers_chunks(
     return task_id
 
 
-def merge_yearly_layers(asset_suffix, asset_folder_list, start_year, end_year):
+def merge_yearly_layers(
+    asset_suffix, asset_folder_list, app_type, start_year, end_year
+):
     # Create required GEE asset path components
     ee_initialize()
 
@@ -56,7 +66,7 @@ def merge_yearly_layers(asset_suffix, asset_folder_list, start_year, end_year):
 
     def get_collection_path(year: int) -> str:
         """Get the full path for a year's collection."""
-        return f"{get_gee_dir_path(asset_folder_list, GEE_HELPER_PATH)}drought_{asset_suffix}_{year}"
+        return f"{get_gee_dir_path(asset_folder_list, asset_path=GEE_PATHS[app_type]['GEE_HELPER_PATH'])}drought_{asset_suffix}_{year}"
 
     # Get base feature collection
     first_year_fc = ee.FeatureCollection(get_collection_path(start_year))

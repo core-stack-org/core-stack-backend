@@ -2,6 +2,7 @@ import ee
 from computing.utils import (
     sync_fc_to_geoserver,
 )
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -25,6 +26,7 @@ def generate_swb_layer(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type="MWS",
     start_year=None,
     end_year=None,
 ):
@@ -36,7 +38,9 @@ def generate_swb_layer(
         asset_folder_list = [state, district, block]
 
         roi = ee.FeatureCollection(
-            get_gee_dir_path(asset_folder_list)
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
@@ -52,6 +56,7 @@ def generate_swb_layer(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
         start_date=start_date,
         end_date=end_date,
     )
@@ -64,6 +69,7 @@ def generate_swb_layer(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
     )
     if swb2:
         task_id_list = check_task_status([swb2])
@@ -85,6 +91,7 @@ def generate_swb_layer(
         state=state,  # Mandatory
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        app_type=app_type,
     )
     if swb3:
         task_id_list = check_task_status([swb3])

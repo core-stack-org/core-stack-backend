@@ -1,4 +1,6 @@
 import ee
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -11,13 +13,19 @@ def waterbody_wbc_intersection(
     state=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
 ):
     if not state:
         print("State name must be provided to run this script")
         return None
 
     description = "swb3_" + asset_suffix
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     # Check if the asset already exists to avoid redundant processing
     if is_gee_asset_exists(asset_id):
@@ -28,7 +36,11 @@ def waterbody_wbc_intersection(
         "projects/ee-vatsal/assets/WBC_" + state.upper().replace(" ", "") + "_UPD"
     )
     water_bodies = ee.FeatureCollection(
-        get_gee_dir_path(asset_folder_list) + "swb2_" + asset_suffix
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + "swb2_"
+        + asset_suffix
     )
 
     # Filter points and polygons within the area of interest (aoi)

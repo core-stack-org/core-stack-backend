@@ -1,5 +1,7 @@
 import datetime
 import ee
+
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -12,6 +14,7 @@ def vectorize_water_pixels(
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    app_type=None,
     start_date=None,
     end_date=None,
 ):
@@ -23,6 +26,7 @@ def vectorize_water_pixels(
         asset_suffix: Suffix to be added in layer name e.g.- _{district_name}_{block_name}
         asset_folder_list: folder name in hierarchy in which asset should be saved on GEE
         e.g. [state_name, district_name, block_name] or [org_name, project_name]
+        app_type: Type of the App (MWS, PLANTATION, WATER_REJ)
         start_date: Analysis start date
         end_date: Analysis end date
     Returns:
@@ -30,7 +34,12 @@ def vectorize_water_pixels(
     """
     # Generate description and asset ID for the analysis
     description = "swb1_" + asset_suffix
-    asset_id = get_gee_dir_path(asset_folder_list) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     # Skip if asset already exists
     if is_gee_asset_exists(asset_id):
@@ -61,7 +70,9 @@ def vectorize_water_pixels(
 
         # Get LULC map for current period
         lulc_image = ee.Image(
-            get_gee_dir_path(asset_folder_list)
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
             + asset_suffix
             + "_"
             + curr_start_date
