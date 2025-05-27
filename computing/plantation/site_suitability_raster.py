@@ -350,7 +350,10 @@ def get_pss(
     # 7 (Barren lands), 8 (Single Kharif Cropping), 9 (Single Non Kharif Cropping),
     # 10 (Double Cropping), 11 (Triple Cropping), 12 (Shrub and Scrub)
     lulc = get_dataset("LULC", state, roi, start_year, end_year)
-    lulc_mask = lulc.gte(5)
+    if is_default_profile:
+        lulc_mask = lulc.eq(5).Or(lulc.gte(7))
+    else:
+        lulc_mask = lulc.gte(5)
 
     # Final score with LULC masking and clipping to ROI
     final_plantation_score = (

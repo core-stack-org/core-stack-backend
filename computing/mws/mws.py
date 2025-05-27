@@ -35,7 +35,7 @@ def mws_layer(self, state, district, block):
     asset_id = get_gee_asset_path(state, district, block) + description
     if not is_gee_asset_exists(asset_id):
         mwses_uid_fc = ee.FeatureCollection(
-            "projects/ee-dharmisha-siddharth/assets/India_mws_UID_Merged"
+            "projects/ee-corestackdev/assets/datasets/India_mws_UID_Merged"
         )
 
         admin_boundary = ee.FeatureCollection(
