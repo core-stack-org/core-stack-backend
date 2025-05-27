@@ -48,7 +48,7 @@ from .plantation.site_suitability import site_suitability
 from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
-
+from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 
 @api_view(["POST"])
 def generate_admin_boundary(request):
@@ -789,3 +789,20 @@ def fes_clart_upload_layer(request):
     except Exception as e:
         print("Exception in clart upload_geoserver_layer API:", e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["POST"])
+def swb_pond_merging(request):
+    print("Inside merge_swb_ponds API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        merge_swb_ponds.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in merge_swb_ponds api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
