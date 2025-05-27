@@ -1256,30 +1256,30 @@ def create_nrm_works_table(doc, plan, mws):
                     2
                 ].text = (
                     structure.beneficiary_settlement
-                )  # Name of Beneficiary's Settlement
+                )
                 row_cells[3].text = structure.data_groundwater.get(
                     "Beneficiary_Name"
-                )  # Beneficiary Name
-                row_cells[4].text = structure.work_type  # Type of work
-                row_cells[5].text = structure.recharge_structure_id  # Work ID
-                row_cells[6].text = str(structure.latitude)  # Latitude
-                row_cells[7].text = str(structure.longitude)  # Longitude
+                ) or "No Data Provided"
+                row_cells[4].text = structure.work_type
+                row_cells[5].text = structure.recharge_structure_id
+                row_cells[6].text = str(structure.latitude)
+                row_cells[7].text = str(structure.longitude)
                 row_cells[8].text = format_work_dimensions(
                     structure.work_dimensions, structure.work_type.lower()
-                )  # Work Dimension
+                )
 
             # Add rows for irrigation works
             offset = len(recharge_works) + 1
             for i, work in enumerate(irrigation_works, start=offset):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
-                row_cells[1].text = "Irrigation Work"  # Work Category
+                row_cells[1].text = "Irrigation Work"  
                 row_cells[
                     2
-                ].text = work.beneficiary_settlement  # Name of Beneficiary's Settlement
+                ].text = work.beneficiary_settlement  
                 row_cells[3].text = (
-                    work.data_agri.get("Beneficiary_Name") or "No Data"
-                )  # Beneficiary Name
+                    work.data_agri.get("Beneficiary_Name") or "No Data Provided"
+                )  
 
                 if (
                     work.work_type.lower() == "other"
@@ -1806,7 +1806,7 @@ def maintenance_gw_table(doc, plan, mws):
         row_cells = table.add_row().cells
         row_cells[0].text = maintenance.data_gw_maintenance.get(
             "beneficiary_settlement"
-        )
+        ) or "No Data"
         row_cells[1].text = (
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "No Data"
         )
@@ -1856,10 +1856,10 @@ def maintenance_agri_table(doc, plan, mws):
         row_cells[3].text = maintenance.corresponding_work_id
         row_cells[4].text = maintenance.data_agri_maintenance.get(
             "select_one_irrigation_structure"
-        )
+        ) or "No Data"
         row_cells[5].text = maintenance.data_agri_maintenance.get(
             "select_one_activities"
-        )
+        ) or "No Data"
         row_cells[6].text = str(maintenance.latitude)
         row_cells[7].text = str(maintenance.longitude)
 
@@ -1887,11 +1887,11 @@ def maintenance_waterstructures_table(doc, plan, mws):
         row_cells = table.add_row().cells
         row_cells[0].text = maintenance.data_swb_maintenance.get(
             "beneficiary_settlement"
-        )
-        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name")
+        ) or "No Data"
+        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name") or "No Data"
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
+        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "No Data"
         row_cells[5].text = str(maintenance.latitude)
         row_cells[6].text = str(maintenance.longitude)
 
