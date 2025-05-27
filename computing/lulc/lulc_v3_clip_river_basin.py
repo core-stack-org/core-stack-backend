@@ -18,22 +18,22 @@ from .misc import clip_lulc_from_river_basin
 
 
 @app.task(bind=True)
-def lulc_river_basin(self, state_name, district_name, block_name, start_year, end_year):
+def lulc_river_basin(self, state, district, block, start_year, end_year):
     ee_initialize()
     print("Inside lulc_river_basin")
-    roi_boundary = ee.FeatureCollection(
-        get_gee_asset_path(state_name, district_name, block_name)
+    roi = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
         + "filtered_mws_"
-        + valid_gee_text(district_name.lower())
+        + valid_gee_text(district.lower())
         + "_"
-        + valid_gee_text(block_name.lower())
+        + valid_gee_text(block.lower())
         + "_uid"
     ).union()
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
     filename_prefix = (
-        valid_gee_text(district_name.lower()) + "_" + valid_gee_text(block_name.lower())
+        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
 
     loop_start = start_date
@@ -57,20 +57,19 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
 
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
-            get_gee_asset_path(state_name, district_name, block_name)
-            + final_output_filename
+            get_gee_asset_path(state, district, block) + final_output_filename
         )
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         river_basin = ee.FeatureCollection("projects/ee-ankit-mcs/assets/CGWB_basin")
         l1_asset_new.append(
             clip_lulc_from_river_basin(
-                river_basin, roi_boundary, scale, curr_start_date, curr_end_date
+                river_basin, roi, scale, curr_start_date, curr_end_date
             )
         )
 
     task_list = []
-    geometry = roi_boundary.geometry()
+    geometry = roi.geometry()
     for i in range(0, len(l1_asset_new)):
         image_export_task = ee.batch.Export.image.toAsset(
             image=l1_asset_new[i].clip(geometry),
@@ -94,7 +93,7 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         scale,
     )
 
-    sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_name)
+    sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block)
 
 
 def sync_lulc_to_gcs(

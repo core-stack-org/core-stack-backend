@@ -29,15 +29,32 @@ dataset_paths = {
 }
 
 
+def fix_invalid_geometries(gdf):
+    def clean_geometry(geom):
+        if geom is None:
+            return None
+        if not geom.is_valid:
+            # buffer(0) tries to clean the geometry (fixes self-intersections)
+            fixed = geom.buffer(0)
+            abc = fixed if fixed.is_valid else None
+            return abc
+        return geom
+
+    # Apply cleaning
+    gdf["geometry"] = gdf["geometry"].apply(clean_geometry)
+
+    # Drop any geometries that could not be fixed
+    gdf = gdf.dropna(subset=["geometry"])
+    gdf = gdf[gdf.is_valid]
+    gdf = gdf[~gdf.is_empty]
+    gdf = gdf.dropna(axis=1, how="any")
+
+    return gdf
+
+
 def combine_kmls(kml_files_obj):
     # Enable KML driver
     fiona.drvsupport.supported_drivers["KML"] = "rw"
-
-    # # Get all KML files in directory
-    # kml_files = list(Path(input_dir).glob("*.kml"))
-    #
-    # if not kml_files:
-    #     raise ValueError(f"No KML files found in {input_dir}")
 
     # Read and combine all KML files
     gdfs = []
@@ -57,7 +74,6 @@ def combine_kmls(kml_files_obj):
 
     # Combine all geodataframes
     combined_gdf = gpd.GeoDataFrame(pd.concat(gdfs, ignore_index=True))
-
     return combined_gdf
 
 

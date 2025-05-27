@@ -2,55 +2,66 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
 
 
-def delta_g(state, district, block, start_date, end_date, is_annual):
+def delta_g(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
+):
     description = (
         "filtered_delta_g_"
         + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
         + "_uid"
     )
-    asset_id = get_gee_asset_path(state, district, block) + description
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
     prec = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "Prec_"
         + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
     )  # Prec feature collection
+
     runoff = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "Runoff_"
         + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
     )  # RO feature collection
+
     et = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "ET_"
         + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
     )  # et feature collection
-    shape = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )  # mws feature collection
 
     keys = ["Precipitation", "RunOff", "ET", "DeltaG"]
 
@@ -90,22 +101,10 @@ def delta_g(state, district, block, start_date, end_date, is_annual):
             feat = feat.set(ee.String(col_date), ee.String.encodeJSON(d))
             return feat
 
-        shape = shape.map(res)
+        roi = roi.map(res)
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
 
-    try:
-
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the task deltaG", task.status())
-
-        return task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running delta_G task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
+    return task_id, asset_id

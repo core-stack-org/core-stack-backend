@@ -2,29 +2,35 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
 
 
-def precipitation(state, district, block, start_date, end_date, is_annual):
-    description = (
-        ("Prec_annual_" if is_annual else "Prec_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+def precipitation(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
+):
+
+    description = ("Prec_annual_" if is_annual else "Prec_fortnight_") + asset_suffix
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
-
-    asset_id = get_gee_asset_path(state, district, block) + description
     if is_gee_asset_exists(asset_id):
-        return
-
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+        return None, asset_id
 
     size = ee.Number(roi.size())
     size1 = size.subtract(ee.Number(1))
@@ -70,17 +76,6 @@ def precipitation(state, district, block, start_date, end_date, is_annual):
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
 
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": roi,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        task.start()
-        print("Successfully started the task fortnight_precipitation", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running precipitation task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
+    return task_id, asset_id
