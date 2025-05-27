@@ -99,5 +99,5 @@ def generate_swb_layer(
         make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="water_bodies")
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
     print(res)
