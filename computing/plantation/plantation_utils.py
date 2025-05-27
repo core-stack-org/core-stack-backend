@@ -47,7 +47,6 @@ def fix_invalid_geometries(gdf):
     gdf = gdf.dropna(subset=["geometry"])
     gdf = gdf[gdf.is_valid]
     gdf = gdf[~gdf.is_empty]
-    gdf = gdf.dropna(axis=1, how="any")
 
     return gdf
 
@@ -74,6 +73,7 @@ def combine_kmls(kml_files_obj):
 
     # Combine all geodataframes
     combined_gdf = gpd.GeoDataFrame(pd.concat(gdfs, ignore_index=True))
+    combined_gdf = combined_gdf.dropna(axis=1, how="any")
     return combined_gdf
 
 
