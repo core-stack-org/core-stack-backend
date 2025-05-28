@@ -46,42 +46,61 @@ def layer_status(request):
     if district_name and block_name:
         formatted_district = district_name.lower().replace(" ", "_")
         formatted_block = block_name.lower().replace(" ", "_")
-        flag = True
 
         for workspace_display, config in workspace_config.items():
             workspace = config.get("name")
             suffix = config.get("suffix", "")
             prefix = config.get("prefix", "")
             layer_type = config.get("type", "")
+
+            layer_name_parts = [prefix, formatted_district, formatted_block, suffix]
+            layer_name = "_".join(part for part in layer_name_parts if part)
+
             if layer_type == "vector":
-                layer_name_parts = [prefix, formatted_district, formatted_block, suffix]
-                layer_name = "_".join(part for part in layer_name_parts if part)
                 server_url = get_url(GEOSERVER_URL, workspace, layer_name)
                 res_server = requests.get(server_url)
-                content_type = res_server.headers.get('Content-Type', "")
-                print(f"{res_server.headers.get('Content-Type')=}")
+                content_type = res_server.headers.get("Content-Type", "")
+
                 if "application/json" in content_type:
                     try:
                         data = res_server.json()
-                        if not data['totalFeatures']:
-                            status_code = 400
-                        else:
-                            status_code = 200
+                        status_code = 200 if data.get("totalFeatures") else 400
                     except ValueError:
                         print("Invalid JSON.")
+                        status_code = 400
                 else:
                     status_code = 400
-                all_workspace_statuses[workspace_display] = {
-                    "workspace": workspace,
-                    "layer_name": layer_name,
-                    "status_code": status_code
-                }
-            else:
-                if flag:
-                    print(f"---------------raster-------------")
-                    server_url = f"ttps://geoserver.core-stack.org:8443/geoserver/clart/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=panchayat_boundaries:{formatted_district}_{formatted_block}&outputFormat=application/json"
-                    print(f"{server_url=}")
-                    flag = False
+
+            else:  
+                raster_workspaces = ['clart', 'terrain', 'restoration', 'tree_overall_ch', 'change_detection']
+                status_code = 400  
+
+                for raster_workspace in raster_workspaces:
+                    capabilities_url = (
+                        f"https://geoserver.core-stack.org:8443/geoserver/{raster_workspace}/wms"
+                        "?service=WMS&request=GetCapabilities"
+                    )
+                    response = requests.get(capabilities_url)
+
+                    if response.status_code != 200:
+                        print(f"Failed to retrieve capabilities from {raster_workspace}.")
+                        continue
+
+                    root = ET.fromstring(response.content)
+                    ns = {'wms': root.tag.split("}")[0].strip("{")}
+                    layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
+                    available_layers = [layer.text for layer in layers]
+
+                    if layer_name in available_layers:
+                        status_code = 200
+                        break  
+
+            all_workspace_statuses[workspace_display] = {
+                "workspace": workspace,
+                "layer_name": layer_name,
+                "status_code": status_code,
+            }
+
     return render(request, 'layer-status.html', {
         "states": states,
         "districts": districts,
