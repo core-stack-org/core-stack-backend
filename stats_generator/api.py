@@ -16,19 +16,16 @@ logging.basicConfig(
 @auth_free
 def generate_excel_file_layer(request):
     try:
-        state = request.query_params.get("state", "").lower().strip()
-        district = request.query_params.get("district", "").lower().strip()
+        state = request.query_params.get("state", "").lower().strip().replace(" ", "_")
+        district = request.query_params.get("district", "").lower().strip().replace(" ", "_")
         block = request.query_params.get("block", "").lower().strip().replace(" ", "_")
 
         logging.info(f"Request to generate Excel for state: {state}, district: {district}, block: {block}")
         
-        # Build paths
-        state_folder = state.replace(" ", "_").upper()
-        district_folder = district.replace(" ", "_").upper()
         base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
-        state_path = os.path.join(base_path, state_folder)
-        district_path = os.path.join(state_path, district_folder)
-        filename = f"{district.replace(' ', '_')}_{block}.xlsx"
+        state_path = os.path.join(base_path, state.upper())
+        district_path = os.path.join(state_path, district.upper())
+        filename = f"{district}_{block}.xlsx"
         file_path = os.path.join(district_path, filename)
 
         # If file exists, return it directly
@@ -39,7 +36,6 @@ def generate_excel_file_layer(request):
             if not get_vector_layer_geoserver(state, district, block):
                 raise ValueError("Failed to generate vector layer from GeoServer.")
             
-            # Ensure directories exist before generating the file
             os.makedirs(district_path, exist_ok=True)
             
             excel_file_path = download_layers_excel_file(state, district, block)
