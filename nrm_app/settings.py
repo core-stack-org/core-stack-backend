@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     "projects",
     "plantations",
     "plans",
+    "waterrejuvenation"
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -218,6 +219,7 @@ TIME_ZONE = "Asia/Kolkata"
 USE_I18N = True
 
 USE_TZ = True
+CELERY_RESULT_BACKEND = 'rpc://'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -274,3 +276,10 @@ EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
+
+#Paths
+PAN_INDIA_LULC_PATH='projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024'
+PAN_INDIA_MWS_PATH='projects/ee-corestackdev/assets/datasets/India_mws_UID_Merged'
+lulc_years = ['2017_2018', '2018_2019', '2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
+water_classes = [2, 3, 4]
+

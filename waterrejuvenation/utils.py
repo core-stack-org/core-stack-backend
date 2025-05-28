@@ -9,10 +9,12 @@ import time
 import ee
 import logging
 logger = logging.getLogger(__name__)
+from datetime import datetime
+from nrm_app.settings import  lulc_years, water_classes
 
 
 
-years = ['2017_2018', '2018_2019', '2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
+years = ['2017_2018','2018_2019','2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
 def get_filtered_mws_layer_name(project_name, layer_name):
     return  WATER_REJ_GEE_ASSET+str(project_name)+'/'+str(layer_name)+'_'+str(project_name)
 
@@ -75,10 +77,7 @@ def get_waterbody_id_for_lat_long(excel_hash, water_body_asset_id):
 
 def get_water_mask(year):
     # Define your water classes
-    water_classes = [2, 3, 5]
-
-
-
+    water_classes = [2, 3, 4]
     image = ee.Image('projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_' + year)
     water_mask = image.select('predicted_label') \
             .remap(water_classes, [1] * len(water_classes), 0) \
@@ -88,29 +87,81 @@ def get_water_mask(year):
 
 def fine_closest_wb_pixel(lon, lat):
     ee_initialize()
-    reference_point = ee.Geometry.Point([lon, lat])
-    final_water_mask = generate_water_mask_lulc()
-    distance_image = final_water_mask.fastDistanceTransform(30).sqrt() \
-        .rename('distance')
 
-    # Step 3: Get the distance at the input point
-    distance_result = distance_image.reduceRegion(
-        reducer=ee.Reducer.first(),
-        geometry=reference_point,
-        scale=30,
+
+def find_nearest_water_pixel(lat, lon, distance_threshold):
+    """
+    Finds the nearest water pixel within a given threshold.
+
+    Parameters:
+        lat (float): Latitude of the input location.
+        lon (float): Longitude of the input location.
+        lulc_years (list of str): List of LULC year identifiers (e.g., '2017_2018').
+        water_classes (list of int): List of LULC class codes considered as water.
+        distance_threshold (float): Maximum distance (in meters) to consider.
+
+    Returns:
+        dict: {
+            'success': bool,
+            'latitude': float (if success),
+            'longitude': float (if success),
+            'distance_m': float (if success)
+        }
+    """
+    ee_initialize()
+    point = ee.Geometry.Point([lon, lat])
+
+    # Create water masks from each LULC year
+    water_masks = []
+    for year in lulc_years:
+        image = ee.Image(f'projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}')
+        water_mask = image.select('predicted_label') \
+            .remap(water_classes, [1] * len(water_classes), 0) \
+            .rename('water')
+        water_masks.append(water_mask)
+
+    # Combine water masks across years to get union of water pixels
+    water_union = ee.ImageCollection(water_masks).sum()
+    water_binary = water_union.gte(2).selfMask()
+
+
+
+    # Compute distance to nearest water pixel (in meters)
+    distance_img = water_binary.fastDistanceTransform(30).sqrt().multiply(30).rename('distance')
+    distance_to_water = distance_img.reduceRegion(
+        reducer=ee.Reducer.min(),
+        geometry=point,
+        scale=10,
         maxPixels=1e9
-    )
+    ).get('distance')
 
-    # Extract the result using correct band name
-    closest_distance = distance_result.get('distance')
+    # Convert EE object to native value
+    distance_value = ee.Number(distance_to_water).getInfo()
+    print (distance_value)
+    if distance_value is None or distance_value > distance_threshold:
+        return {'success': False}
 
-    if closest_distance is None:
-        print("No water pixel found near this point.")
-    else:
-        print("Distance (in meters) to nearest water pixel:", closest_distance.getInfo())
+    # Buffer the point to extract nearby water pixels
+    buffer = point.buffer(distance_value + 30)
 
-def generate_water_mask_lulc():
-    years = ['2017_2018', '2018_2019', '2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
+    # Get coordinates of the closest water pixel
+    water_vector = water_binary.reduceToVectors(
+        geometry=buffer,
+        geometryType='centroid',
+        scale=10,
+        labelProperty='water',
+        maxPixels=1e8
+    ).geometry().coordinates().get(0)
+
+    coords = ee.List(water_vector).getInfo()
+
+    return {
+        'success': True,
+        'latitude': coords[1],
+        'longitude': coords[0],
+        'distance_m': distance_value
+    }
+def generate_water_mask_lulc(years):
     water_masks = [get_water_mask(year) for year in years]
 
     # Convert to image collection
@@ -122,40 +173,6 @@ def generate_water_mask_lulc():
     # Final mask: where water was present in at least 2 years
     final_water_mask = water_sum.gte(2)
     return final_water_mask
-    # merged_df = pd.merge(gdf_points, waterbodies[['latitude', 'longitude', 'waterbody_name', 'matched']],
-    #                      left_on=['closest_wb_long', 'closest_wb_lat'],
-    #                      right_on=['longitude', 'latitude'],
-    #                      how='left')
-
-    # for _, row in merged_df.iterrows():
-    #     lat = row['closest_wb_lat']
-    #     lon = row['closest_wb_long']
-    #     matched = row.get('matched', False)
-    #
-    #     if pd.notna(matched) and matched:
-    #         try:
-    #
-    #             data_dict = json.loads(matched)
-    #             wb_id = data_dict['properties']['MWS_UID']
-    #             print(wb_id)
-    #             # Get the waterbody instance by its coordinates (or ID if available)
-    #             desilt_log = WaterbodiesDesiltingLog.objects.filter(closest_wb_lat=row['closest_wb_lat'], closest_wb_long=row['closest_wb_long'])
-    #             desilt_log_obj = desilt_log[0]
-    #             desilt_log_obj.waterbody_id = wb_id
-    #             desilt_log_obj.save()
-    #             print (desilt_log)
-    #             try:
-    #                 desilt_log[1].delete()
-    #             except Exception as e:
-    #                 print ("desilt ")
-    #
-    #             # Update the matching desilting log record
-    #             #desilt_log = WaterbodiesDesiltingLog.objects.get(closest_wb_lat=lat, closest_wb_long=lon)
-    #             #desilt_log.waterbody_id = waterbody
-    #             #desilt_log.save()
-    #         except WaterbodiesDesiltingLog.DoesNotExist:
-    #             print(f"Waterbody not found for lat={row['latitude']}, lon={row['longitude']}")
-    #
 
 
 def clip_lulc_output(mws_asset_id,  proj_id):
@@ -167,13 +184,14 @@ def clip_lulc_output(mws_asset_id,  proj_id):
     lulc_asset_id_base = get_filtered_mws_layer_name(proj_obj.name, 'clipped_lulc_filtered_mws')
     PAN_INDIA_LULC_BASE_PATH = "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
     for year in years:
+        current_date_time = int(datetime.now().timestamp())
         asset_id = f"{lulc_asset_id_base}_{year}"
         delete_asset_on_GEE(asset_id)
         lulc_path = f'{PAN_INDIA_LULC_BASE_PATH}_{year}'  # Adjust this according to your naming convention
         lulc = ee.Image(lulc_path)
 
         # Clip the LULC image to the MWS boundary
-        lulc_clipped = lulc.clip(mws)
+        lulc_clipped = lulc.clip(mws.geometry())
 
         # Define export task
         description = f"lulc_clipped_task_{year}"
@@ -190,14 +208,15 @@ def clip_lulc_output(mws_asset_id,  proj_id):
 
         task.start()
         wait_for_task_completion(task)
+        gcs_file_name = 'raster_' + str(proj_obj.name) + '_' + str(proj_obj.id) + '_' + str(year)
         layer_name = 'clipped_lulc_filtered_mws_'+str(proj_obj.name)+'_'+str(proj_obj.id)+'_'+str(year)
         image = ee.Image(asset_id)
-        task_id = sync_raster_to_gcs(image, 10, layer_name)
+        task_id = sync_raster_to_gcs(image, 10, gcs_file_name)
 
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
 
-        sync_raster_gcs_to_geoserver("waterrej", layer_name, layer_name,  "lulc_level_1_style")
+        sync_raster_gcs_to_geoserver("waterrej", gcs_file_name, layer_name,  "lulc_level_1_style")
 
 
 def delete_asset_on_GEE(asset_id):
