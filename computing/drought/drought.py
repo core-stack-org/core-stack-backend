@@ -1,13 +1,10 @@
 import ee
-from computing.utils import (
-    sync_layer_to_geoserver,
-)
-from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
+from utilities.constants import GEE_HELPER_PATH
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
-    get_gee_dir_path,
+    get_gee_asset_path,
     is_gee_asset_exists,
     make_asset_public,
 )
@@ -17,21 +14,11 @@ from .merge_layers import (
     merge_yearly_layers,
 )
 from nrm_app.celery import app
+from computing.utils import sync_fc_to_geoserver
 
 
 @app.task(bind=True)
-def calculate_drought(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    app_type="MWS",
-    start_year=None,
-    end_year=None,
-):
+def calculate_drought(self, state, district, block, start_year, end_year):
     ee_initialize()
 
     dst_filename = (
@@ -45,16 +32,11 @@ def calculate_drought(
         + str(end_year)
     )
 
-    if state and district and block:
-        asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-        )
-        asset_folder_list = [state, district, block]
+    asset_id = get_gee_asset_path(state, district, block) + dst_filename
 
-        roi = ee.FeatureCollection(
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
+    if not is_gee_asset_exists(asset_id):
+        aoi = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
@@ -62,15 +44,7 @@ def calculate_drought(
             + "_uid"
         )
 
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + dst_filename
-    )
-
-    if not is_gee_asset_exists(asset_id):
-        chunk_size = 30  # if shapefile is large, running the script on the complete file will result an error,
+        chunk_size_ = 30  # if shapefile is large, running the script on the complete file will result an error,
         # so divide into chunks and run on the chunks when the chunks are got exported,
         # then the next joining script join the chunks
         current_year = start_year
@@ -79,34 +53,29 @@ def calculate_drought(
         while current_year <= end_year:
             print("current_year", current_year)
             yearly_drought = (
-                get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
-                )
+                get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
                 + "drought_"
-                + asset_suffix
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
                 + "_"
                 + str(current_year)
             )
             yearly_assets.append(yearly_drought)
             if not is_gee_asset_exists(yearly_drought):
                 generate_drought_layers(
-                    roi,
-                    asset_suffix,
-                    asset_folder_list,
-                    app_type,
+                    aoi,
+                    state,
+                    district,
+                    block,
                     current_year,
                     start_year,
                     end_year,
-                    chunk_size,
+                    chunk_size_,
                 )
 
                 task_id = merge_drought_layers_chunks(
-                    roi,
-                    asset_suffix,
-                    asset_folder_list,
-                    app_type,
-                    current_year,
-                    chunk_size,
+                    aoi, state, district, block, current_year, chunk_size_
                 )
                 if task_id:
                     merged_tasks.append(task_id)
@@ -118,20 +87,9 @@ def calculate_drought(
         for asset in yearly_assets:
             make_asset_public(asset)
 
-        task_id = merge_yearly_layers(
-            asset_suffix, asset_folder_list, app_type, start_year, end_year
-        )
-        check_task_status([task_id])
-        make_asset_public(asset_id)
+        merge_yearly_layers(state, district, block, start_year, end_year)
 
     fc = ee.FeatureCollection(asset_id)
-    fc = fc.toList(fc.size()).getInfo()
-    fc = {"features": fc, "type": "FeatureCollection"}
-    res = sync_layer_to_geoserver(
-        asset_suffix,
-        fc,
-        asset_suffix + "_drought",
-        "cropping_drought",
-    )
-
+    description = valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_drought"
+    res = sync_fc_to_geoserver(fc, state, description, 'cropping_drought')
     print(res)
