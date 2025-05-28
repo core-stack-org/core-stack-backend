@@ -26,6 +26,7 @@ ENV/
 .venv
 env.bak/
 venv.bak/
+home
 
 # ignored apps
 dashboard/

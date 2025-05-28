@@ -262,7 +262,11 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# MARK: ODK settings
+STATICFILES_DIRS  = [
+    os.path.join(BASE_DIR, 'static')
+]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# ODK settings
 # https://odk.gramvaani.org/#/projects/9/forms/Add_Settlements_form%20_V1.0.1
 OD_DATA_URL_hemlet = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Hamlet_form%20_V1.0.1.svc/Submissions"
 OD_DATA_URL_well = (

@@ -45,6 +45,11 @@ def get_url(geoserver_url, workspace, layer_name):
     return geojson_url
 
 
+def get_url_wms(layerName, dynamicBbox):
+    geojson_url_wms = f"https://geoserver.core-stack.org:8443/geoserver/wms?service=WMS&version=1.1.0&request=GetMap&layers=${layerName}&bbox=${dynamicBbox}&width=768&height=330&srs=EPSG%3A4326&styles=&format=application/openlayers"
+    return geojson_url_wms
+
+
 def get_vector_layer_geoserver(geoserver_url, workspace, layer_name):
     """Fetch vector layer data from GeoServer and return as GeoJSON."""
     url = get_url(geoserver_url, workspace, layer_name)
