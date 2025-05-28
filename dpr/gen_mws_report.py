@@ -835,11 +835,11 @@ def get_terrain_data(state, district, block, uid):
         total_block_area = df["area_in_hac"].sum()
 
         #* Calculate weighted area for each topography type
-        block_hill_slope = sum(df["% of area hill_slope"] * df["area_in_hac"] / 100)
-        block_plain_area = sum(df["% of area plain_area"] * df["area_in_hac"] / 100)
-        block_ridge_area = sum(df["% of area ridge_area"] * df["area_in_hac"] / 100)
-        block_slopy_area = sum(df["% of area slopy_area"] * df["area_in_hac"] / 100)
-        block_valley_area = sum(df["% of area valley_area"] * df["area_in_hac"] / 100)
+        block_hill_slope = sum(df["% of area hill_slope"] * df["area_in_hac"])
+        block_plain_area = sum(df["% of area plain_area"] * df["area_in_hac"])
+        block_ridge_area = sum(df["% of area ridge_area"] * df["area_in_hac"])
+        block_slopy_area = sum(df["% of area slopy_area"] * df["area_in_hac"])
+        block_valley_area = sum(df["% of area valley_area"] * df["area_in_hac"])
 
         #? Create Dictionary for comparison
         terrain_types = [
@@ -850,7 +850,7 @@ def get_terrain_data(state, district, block, uid):
             "Hill Slopes",
         ]
 
-        mws_areas = [plain_area, ridge_area, slopy_area, valley_area, hill_slope]
+        mws_areas = [plain_area * 100, ridge_area * 100, slopy_area * 100, valley_area * 100, hill_slope * 100]
 
         block_areas = [
             block_plain_area * 100 / total_block_area,

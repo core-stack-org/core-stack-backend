@@ -125,6 +125,26 @@
             margin-right: 5px;
         }
         
+        .doc-button {
+            position: absolute;
+            top: 20px;
+            right: 140px; /* shift left of the PDF button */
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .doc-button:hover { background-color: #005a9e; }
+        
+        @media print { .doc-button { display: none; } }
+
         /* Hide print button when printing */
         @media print {
             .print-button {
@@ -195,6 +215,8 @@
                 Save as PDF
             </button>
         </div>
+
+
     </header>
 
     <div class="container">
@@ -558,7 +580,7 @@
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params : {
                     'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
-                    'STYLES' : "change_detection_degradation"
+                    'STYLES' : "degradation"
                 },
                 ratio : 1,
                 serverType: 'geoserver',
@@ -586,7 +608,7 @@
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params : {
                     'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
-                    'STYLES' : "change_detection_deforestation"
+                    'STYLES' : "deforestation"
                 },
                 ratio : 1,
                 serverType: 'geoserver',
