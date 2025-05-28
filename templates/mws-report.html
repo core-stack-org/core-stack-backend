@@ -603,6 +603,20 @@
             name : 'lulc_raster'
         })
 
+        const urbanRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
+                    'STYLES' : "urbanization"
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'tree_raster'
+        })
+
         const treeReduceRaster = new ol.layer.Image({
             source : new ol.source.ImageWMS({
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
@@ -803,7 +817,7 @@
 
         const urbanMap = new ol.Map({
             target: 'urbanMap',
-            layers: [treeReduceRaster],
+            layers: [urbanRaster],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -878,7 +892,7 @@
                         degradRaster1.addFilter(crop);
                         lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
-                        urbanMap.addFilter(crop);
+                        urbanRaster1.addFilter(crop);
                     }
 
                     const styleFunctionComp = feature => {
@@ -971,7 +985,7 @@
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Extract Feature
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster);
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
