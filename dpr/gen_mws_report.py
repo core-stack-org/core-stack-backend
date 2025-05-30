@@ -850,14 +850,14 @@ def get_terrain_data(state, district, block, uid):
             "Hill Slopes",
         ]
 
-        mws_areas = [plain_area * 100, ridge_area * 100, slopy_area * 100, valley_area * 100, hill_slope * 100]
+        mws_areas = [plain_area, ridge_area, slopy_area, valley_area, hill_slope]
 
         block_areas = [
-            block_plain_area * 100 / total_block_area,
-            block_ridge_area * 100 / total_block_area,
-            block_slopy_area * 100 / total_block_area,
-            block_valley_area * 100 / total_block_area,
-            block_hill_slope * 100 / total_block_area,
+            block_plain_area / total_block_area,
+            block_ridge_area / total_block_area,
+            block_slopy_area / total_block_area,
+            block_valley_area / total_block_area,
+            block_hill_slope / total_block_area,
         ]
 
         #? Test for terrain comparison
