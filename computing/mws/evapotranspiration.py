@@ -2,34 +2,124 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    check_task_status,
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
 import calendar
 
 
-def evapotranspiration(state, district, block, start_date, end_date, is_annual):
-    description = (
-        ("ET_annual_" if is_annual else "ET_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+def evapotranspiration(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_year=None,
+    end_year=None,
+    is_annual=False,
+):
 
-    asset_id = get_gee_asset_path(state, district, block) + description
+    description = ("ET_annual_" if is_annual else "ET_fortnight_") + asset_suffix
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
     if is_gee_asset_exists(asset_id):
-        return
+        return None, asset_id
 
+    if not is_annual and (end_year - start_year > 5):
+        print("In chunking")
+        chunk_assets = []
+        s_year = start_year
+        task_ids = []
+        while s_year <= end_year:
+            start_date = f"{s_year}-07-01"
+
+            e_year = end_year if s_year + 5 > end_year else s_year + 5
+            end_date = f"{e_year}-06-30"
+
+            print(start_date, end_date)
+
+            chunk_asset_id = asset_id + "_" + str(s_year) + "_" + str(e_year)
+            chunk_assets.append(chunk_asset_id)
+
+            task_id = calculate_et(
+                roi,
+                chunk_asset_id,
+                description + "_" + str(s_year) + "_" + str(e_year),
+                start_date,
+                end_date,
+                is_annual,
+            )
+            task_ids.append(task_id)
+            s_year += 5
+
+        task_list = check_task_status(task_ids)
+        print("Task list ", task_list)
+        return (
+            merge_assets_chunked_on_year(chunk_assets, description, asset_id),
+            asset_id,
+        )
+    else:
+        print("In else")
+        start_date = f"{start_year}-07-01"
+        end_date = f"{end_year}-06-30"
+        return (
+            calculate_et(
+                roi,
+                asset_id,
+                description,
+                start_date,
+                end_date,
+                is_annual,
+            ),
+            asset_id,
+        )
+
+
+def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
+    def merge_features(feature):
+        # Get the unique ID of the current feature
+        uid = feature.get("uid")
+        matched_features = []
+        for i in range(1, len(chunk_assets)):
+            # Find the matching feature in the second collection
+            matched_feature = ee.Feature(
+                ee.FeatureCollection(chunk_assets[i])
+                .filter(ee.Filter.eq("uid", uid))
+                .first()
+            )
+            matched_features.append(matched_feature)
+
+        merged_properties = feature.toDictionary()
+        for f in matched_features:
+            # Combine properties from both features
+            merged_properties = merged_properties.combine(
+                f.toDictionary(), overwrite=False
+            )
+
+        # Return a new feature with merged properties
+        return ee.Feature(feature.geometry(), merged_properties)
+
+    # Map the merge function over the first feature collection
+    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(merged_fc, description, asset_id)
+    return task_id
+
+
+def calculate_et(roi, asset_id, description, start_date, end_date, is_annual):
     bounding_box = ee.Image("projects/ee-dharmisha-siddharth/assets/Hydro_2020_2021_4")
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
     bbox_geometry = bounding_box.geometry()
     is_within = bbox_geometry.contains(roi.geometry(), ee.ErrorMargin(1))
-
     if is_within.getInfo():
         return et_fldas(
             roi,
@@ -146,19 +236,10 @@ def et_fldas(
         shape = ee.FeatureCollection(mws.map(res))
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the task evapotranspiration", task.status())
-        return task.status()
-    except Exception as e:
-        print(f"Error occurred in running evapotranspiration task: {e}")
+
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
+    return task_id
 
 
 def et_global_fldas(
@@ -274,19 +355,9 @@ def et_global_fldas(
         shape = ee.FeatureCollection(mws.map(res))
         f_start_date = f_end_date
 
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the task evapotranspiration", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running evapotranspiration task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
+    return task_id
 
 
 def filter_dataset(f_start_date, number_of_days, fldas_dataset):

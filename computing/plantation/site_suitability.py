@@ -237,11 +237,12 @@ def check_site_suitability(
         GEE_HELPER = GEE_HELPER_PATH
 
     # Generate Plantation Site Suitability raster
+    # Here, kept start_year=end_year-2 as in this site assessment script, we are taking into account the data of latest three years only.
     pss_rasters_asset, is_default_profile = get_pss(
-        roi,
-        start_year,
-        end_year,
-        asset_name,
+        roi=roi,
+        start_year=end_year - 2,
+        end_year=end_year,
+        asset_name=asset_name,
         org=org,
         project=project,
         have_new_sites=have_new_sites,

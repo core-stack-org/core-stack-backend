@@ -246,7 +246,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+
+# Media files (User uploaded content)
+MEDIA_ROOT = os.path.join(BASE_DIR, 'data/')
+MEDIA_URL = '/media/'
 
 EXCEL_PATH = env("EXCEL_PATH")
 

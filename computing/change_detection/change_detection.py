@@ -399,5 +399,5 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list):
             "change_detection",
             description + "_" + change,
             description + "_" + change,
-            None,
+            change.lower(),
         )

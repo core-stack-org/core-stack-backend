@@ -10,11 +10,10 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
-from .lulc.v4.classify_raster import classify_raster
 from .lulc.v4.lulc_v4 import generate_lulc_v4
-from .lulc.v4.time_series import time_series
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order_vector
+from .mws.generate_hydrology import generate_hydrology
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -24,7 +23,7 @@ from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
-from .surface_water_bodies.swb1 import generate_swb_layer
+from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster import terrain_raster
@@ -50,7 +49,7 @@ from .plantation.site_suitability import site_suitability
 from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
-
+from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 
 @api_view(["POST"])
 def generate_admin_boundary(request):
@@ -195,11 +194,7 @@ def generate_mws_layer(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = int(request.data.get("start_year"))
-        end_year = int(request.data.get("end_year"))
-        mws_layer.apply_async(
-            args=[state, district, block, start_year, end_year, False], queue="nrm"
-        )
+        mws_layer.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -209,22 +204,58 @@ def generate_mws_layer(request):
 
 
 @api_view(["POST"])
-def generate_well_depth(request):
-    print("Inside generate_well_depth")
+def generate_fortnightly_hydrology(request):
+    print("Inside generate_fortnightly_hydrology")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
-        mws_layer.apply_async(
-            args=[state, district, block, start_year, end_year, True], queue="nrm"
+        generate_hydrology.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_annual": False,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_well_depth api :: ", e)
+        print("Exception in generate_fortnightly_hydrology api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def generate_annual_hydrology(request):
+    print("Inside generate_annual_hydrology")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
+        generate_hydrology.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_annual": True,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_annual_hydrology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -312,7 +343,14 @@ def generate_ci_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         generate_cropping_intensity.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Cropping Intensity task initiated"},
@@ -333,7 +371,14 @@ def generate_swb(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         generate_swb_layer.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Generate swb task initiated"}, status=status.HTTP_200_OK
@@ -353,7 +398,14 @@ def generate_drought_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         calculate_drought.apply_async(
-            args=[state, district, block, start_year, end_year], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "generate_drought_layer task initiated"},
@@ -738,6 +790,23 @@ def fes_clart_upload_layer(request):
     except Exception as e:
         print("Exception in clart upload_geoserver_layer API:", e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["POST"])
+def swb_pond_merging(request):
+    print("Inside merge_swb_ponds API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        merge_swb_ponds.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in merge_swb_ponds api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])

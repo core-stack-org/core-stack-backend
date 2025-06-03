@@ -1,36 +1,50 @@
 import ee
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    is_gee_asset_exists,
+    get_gee_dir_path,
+    export_vector_asset_to_gee,
+)
 
 
-def calculate_swb2(aoi, state, district, block):
-    description = (
-        "swb2_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+def waterbody_mws_intersection(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+):
+    description = "swb2_" + asset_suffix
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
-    asset_id = get_gee_asset_path(state, district, block) + description
 
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
-    waterbodies = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+    water_bodies = ee.FeatureCollection(
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
         + "swb1_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
     )
 
-    def check_intersection(feature):
-        mws = aoi.filterBounds(feature.geometry())
+    def intersect_with_mws(feature):
+        mws = roi.filterBounds(feature.geometry())
         uid_list = mws.aggregate_array("uid")
         mws_uid = uid_list.join("_")
         return feature.set("MWS_UID", mws_uid)
 
-    intersected_features = waterbodies.map(check_intersection)
+    intersected_features = water_bodies.map(intersect_with_mws)
 
     size = intersected_features.size()
     intersected_features = intersected_features.toList(size)
 
-    def ui(n):
+    def get_waterbody_index(n):
         f = ee.Feature(intersected_features.get(n))
         i = ee.Number(n).toInt()
         s = ee.String("_").cat(ee.Number(i).format())
@@ -40,17 +54,16 @@ def calculate_swb2(aoi, state, district, block):
     size = ee.Number(size).subtract(ee.Number(1))
     nl = ee.List.sequence(0, size)
 
-    f = nl.map(ui)
+    f = nl.map(get_waterbody_index)
     f = ee.FeatureCollection(f)
 
-    def final(feature):
+    def generate_waterbody_uid(feature):
         id1 = feature.get("MWS_UID")
         id2 = feature.get("index")
         s = ee.String(id1).cat(ee.String(id2))
         return feature.set("UID", s)
 
-    collec = f.map(final)
-    fc = collec
+    fc = f.map(generate_waterbody_uid)
 
     columns_to_remove = ["index", "ID"]
     all_columns = fc.first().toDictionary().keys()
@@ -58,18 +71,7 @@ def calculate_swb2(aoi, state, district, block):
         ee.Filter.inList("item", columns_to_remove).Not()
     )
     fc_without_columns = fc.select(columns_to_keep)
-    try:
 
-        swb_task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": fc_without_columns,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        swb_task.start()
-        print("Successfully started the swb2 task", swb_task.status())
-        return swb_task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running swb2 task: {e}")
+    # Export results to GEE asset
+    task_id = export_vector_asset_to_gee(fc_without_columns, description, asset_id)
+    return task_id, asset_id

@@ -12,6 +12,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     get_gee_dir_path,
+    export_vector_asset_to_gee,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -111,8 +112,8 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
     os.remove(shapefile_layer_path + ".zip")
 
 
-def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
-    state_dir = os.path.join("data/fc_to_shape", state_name)
+def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
+    state_dir = os.path.join("data/fc_to_shape", shp_folder)
     if not os.path.exists(state_dir):
         os.mkdir(state_dir)
     path = os.path.join(state_dir, f"{layer_name}")
@@ -226,21 +227,8 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
-    try:
-        # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": asset,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        task.start()
-        print("Successfully started the merge chunk", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running merge task: {e}")
+    task_id = export_vector_asset_to_gee(asset, description, asset_id)
+    return task_id
 
 
 def fix_invalid_geometry_in_gdf(gdf):

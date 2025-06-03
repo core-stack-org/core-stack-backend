@@ -13,8 +13,8 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
-from .cropping_frequency import *
-from .misc import clip_lulc_from_river_basin
+from computing.lulc.cropping_frequency import *
+from computing.lulc.misc import clip_lulc_from_river_basin
 
 
 @app.task(bind=True)

@@ -10,6 +10,8 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     upload_tif_to_gcs,
     upload_tif_from_gcs_to_gee,
+    sync_vector_to_gcs,
+    get_geojson_from_gcs,
 )
 from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
@@ -73,7 +75,17 @@ def generate_vector(state, district, block):
     drainage_lines = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-    ).getInfo()
+    )
+
+    try:
+        drainage_lines = drainage_lines.getInfo()
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        layer_name = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        task_id = sync_vector_to_gcs(drainage_lines, layer_name, "GeoJSON")
+        check_task_status([task_id])
+
+        drainage_lines = get_geojson_from_gcs(layer_name)
 
     if isinstance(drainage_lines, str):
         drainage_lines = json.loads(drainage_lines)
