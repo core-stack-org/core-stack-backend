@@ -225,22 +225,26 @@ def export_raster_asset_to_gee(
     description,
     asset_id,
     scale,
-    geometry,
+    region,
     pyramiding_policy=None,
     max_pixel=1e13,
     crs="EPSG:4326",
 ):
     try:
-        task = ee.batch.Export.image.toAsset(
-            image=image,
-            description=description,
-            assetId=asset_id,
-            pyramidingPolicy=pyramiding_policy,
-            scale=scale,
-            region=geometry,
-            maxPixels=max_pixel,
-            crs=crs,
-        )
+        export_params = {
+            "image": image,
+            "description": description,
+            "assetId": asset_id,
+            "scale": scale,
+            "region": region,
+            "maxPixels": max_pixel,
+            "crs": crs,
+        }
+        if pyramiding_policy:
+            export_params["pyramidingPolicy"] = pyramiding_policy
+
+        task = ee.batch.Export.image.toAsset(**export_params)
+
         task.start()
         print(
             f"Successfully started the task for {description}, task id:{task.status()}"

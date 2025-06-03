@@ -3,9 +3,12 @@ from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
-    get_gee_asset_path, is_gee_asset_exists,
+    get_gee_asset_path,
+    is_gee_asset_exists,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
+    export_raster_asset_to_gee,
+    export_vector_asset_to_gee,
 )
 from nrm_app.celery import app
 from computing.utils import (
@@ -26,10 +29,7 @@ def generate_restoration_opportunity(self, state, district, block):
     )
 
     description = (
-            "restoration_"
-            + valid_gee_text(district)
-            + "_"
-            + valid_gee_text(block)
+        "restoration_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
 
     raster_asset_id = clip_raster(roi, state, district, block, description)
@@ -41,7 +41,9 @@ def generate_restoration_opportunity(self, state, district, block):
         {"value": 3, "label": "Excluded Areas"},
     ]
 
-    return generate_vector(roi, raster_asset_id, args, state, district, block, description + "_vector")
+    return generate_vector(
+        roi, raster_asset_id, args, state, district, block, description + "_vector"
+    )
 
 
 def clip_raster(roi, state, district, block, description):
@@ -49,27 +51,29 @@ def clip_raster(roi, state, district, block, description):
     if is_gee_asset_exists(asset_id):
         return asset_id
 
-    restoration_raster = ee.Image("projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities")
+    restoration_raster = ee.Image(
+        "projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities"
+    )
 
     clipped_raster = restoration_raster.clip(roi.geometry())
-
-    task = ee.batch.Export.image.toAsset(
+    task_id = export_raster_asset_to_gee(
         image=clipped_raster,
         description=description + "_raster",
-        assetId=asset_id,
-        pyramidingPolicy={"predicted_label": "mode"},
+        asset_id=asset_id,
         scale=60,
         region=roi.geometry(),
-        maxPixels=1e13,
-        crs="EPSG:4326",
     )
-    task.start()
-    check_task_status([task.status()["id"]])
+    check_task_status([task_id])
 
     image = ee.Image(asset_id)
-    task_id= sync_raster_to_gcs(image, 60, description + "_raster")
+    task_id = sync_raster_to_gcs(image, 60, description + "_raster")
     check_task_status([task_id])
-    sync_raster_gcs_to_geoserver("restoration", description + "_raster", description + "_raster", "restoration_style")
+    sync_raster_gcs_to_geoserver(
+        "restoration",
+        description + "_raster",
+        description + "_raster",
+        "restoration_style",
+    )
 
     return asset_id
 
@@ -83,7 +87,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
             ored_str = "raster.eq(ee.Number(" + str(arg["value"][0]) + "))"
             for i in range(1, len(arg["value"])):
                 ored_str = (
-                        ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
+                    ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
                 )
             print(ored_str)
             mask = eval(ored_str)
@@ -112,23 +116,13 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         fc = fc.map(process_feature)
 
     fc = ee.FeatureCollection(fc)
+    task_id = export_vector_asset_to_gee(
+        fc,
+        description,
+        asset_id=get_gee_asset_path(state, district, block) + description,
+    )
+    check_task_status([task_id])
 
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": description,
-            "assetId": get_gee_asset_path(state, district, block) + description,
-        }
-    )
-    task.start()
-    task.status()["id"]
-    description = (
-            "restoration_"
-            + valid_gee_text(district)
-            + "_"
-            + valid_gee_text(block)
-            + "_vector"
-    )
     fc = ee.FeatureCollection(fc).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     return sync_layer_to_geoserver(state, fc, description, "restoration")

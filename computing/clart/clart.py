@@ -8,6 +8,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
+    export_raster_asset_to_gee,
 )
 from utilities.constants import GEE_ASSET_PATH
 from nrm_app.celery import app
@@ -200,24 +201,20 @@ def clart_layer(state, district, block):
 
         try:
             scale = 30
-            image_export_task = ee.batch.Export.image.toAsset(
+            task_id = export_raster_asset_to_gee(
                 image=tc,
                 description=description,
-                assetId=final_output_assetid,
-                pyramidingPolicy={"predicted_label": "mode"},
+                asset_id=final_output_assetid,
                 scale=scale,
                 region=geometry,
-                maxPixels=1e13,
-                crs="EPSG:4326",
             )
-            image_export_task.start()
-            print("Successfully started the mws_task", image_export_task.status())
 
-            clart_task_id_list = check_task_status([image_export_task.status()["id"]])
+            clart_task_id_list = check_task_status([task_id])
             print("clart_task_id_list", clart_task_id_list)
         except Exception as e:
             print(f"Error occurred in running clart: {e}")
-        """ Sync image to google cloud storage and then to geoserver"""
+
+    """ Sync image to google cloud storage and then to geoserver"""
     layer_name = (
         valid_gee_text(district.lower())
         + "_"

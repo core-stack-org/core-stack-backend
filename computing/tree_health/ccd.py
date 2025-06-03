@@ -8,6 +8,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     check_task_status,
     sync_raster_gcs_to_geoserver,
+    export_raster_asset_to_gee,
 )
 
 
@@ -18,14 +19,14 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
 
     # Get the block MWS (Micro Watershed) features
     block_mws = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
-            + "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_uid"
-        )
-    
+        get_gee_asset_path(state, district, block)
+        + "filtered_mws_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_uid"
+    )
+
     # Get the block geometry once for consistent clipping
     block_geometry = block_mws.geometry()
 
@@ -35,7 +36,8 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-            + "_" + str(year)
+            + "_"
+            + str(year)
         )
 
         asset_id = get_gee_asset_path(state, district, block) + description
@@ -49,12 +51,14 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             ccd_path = "projects/ee-mtpictd/assets/harsh/ccd_" + str(year)
         else:
             ccd_path = "projects/ee-mtpictd/assets/dhruvi/modal_ccd_" + str(year)
-        
+
         # Load and properly clip the CCD Image Collection once
-        ccd_img = ee.ImageCollection(ccd_path) \
-            .filterBounds(block_geometry) \
-            .mean() \
+        ccd_img = (
+            ee.ImageCollection(ccd_path)
+            .filterBounds(block_geometry)
+            .mean()
             .clip(block_geometry)
+        )
 
         # Compute CCD statistics function
         def ccd_stats(feature):
@@ -62,31 +66,28 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
                 reducer=ee.Reducer.frequencyHistogram().unweighted(),
                 geometry=feature.geometry(),
                 scale=25,
-                maxPixels=1e10
+                maxPixels=1e10,
             )
-            pixel_counts = ee.Dictionary(stats.get('classification'))
-            return feature.set({
-                'ccd_0': pixel_counts.get('0.0', 0),  # Low Density
-                'ccd_1': pixel_counts.get('1.0', 0),  # High Density
-                'ccd_2': pixel_counts.get('2.0', 0)   # Missing Data
-            })
-        
+            pixel_counts = ee.Dictionary(stats.get("classification"))
+            return feature.set(
+                {
+                    "ccd_0": pixel_counts.get("0.0", 0),  # Low Density
+                    "ccd_1": pixel_counts.get("1.0", 0),  # High Density
+                    "ccd_2": pixel_counts.get("2.0", 0),  # Missing Data
+                }
+            )
+
         # Apply CCD statistics function to the feature collection
         block_mws_with_stats = block_mws.map(ccd_stats)
         try:
-            image_export_task = ee.batch.Export.image.toAsset(
+            task_id = export_raster_asset_to_gee(
                 image=ccd_img,
                 description=description,
-                assetId=asset_id,
-                pyramidingPolicy={"predicted_label": "mode"},
+                asset_id=asset_id,
                 scale=25,
-                maxPixels=1e13,
-                crs="EPSG:4326",
+                region=block_geometry,
             )
-            image_export_task.start()
-            print("Successfully started the CCD export task", image_export_task.status())
-
-            task_id_list = check_task_status([image_export_task.status()["id"]])
+            task_id_list = check_task_status([task_id])
             print("CCD task_id_list", task_id_list)
 
             # Sync image to Google Cloud Storage and Geoserver
@@ -95,7 +96,8 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
                 + valid_gee_text(district.lower())
                 + "_"
                 + valid_gee_text(block.lower())
-                + "_" + str(year)
+                + "_"
+                + str(year)
             )
             task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, layer_name)
 
