@@ -8,7 +8,12 @@ from pathlib import Path
 import ast
 from computing.lulc.v4.cropping_frequency_detection import Get_Padded_NDVI_TS_Image
 from nrm_app.settings import MEDIA_ROOT
-from utilities.gee_utils import get_gee_asset_path, valid_gee_text, is_gee_asset_exists
+from utilities.gee_utils import (
+    get_gee_asset_path,
+    valid_gee_text,
+    is_gee_asset_exists,
+    export_raster_asset_to_gee,
+)
 
 
 def time_series(state, district, block, start_year, end_year):
@@ -283,15 +288,12 @@ def time_series(state, district, block, start_year, end_year):
             for i in ts_data.bandNames().getInfo()
         ]
     )
-    task = ee.batch.Export.image.toAsset(
+    task_id = export_raster_asset_to_gee(
         image=ts_data.clip(roi_boundary.geometry()),
         description=description,
-        assetId=asset_id,
-        # pyramidingPolicy = {'predicted_label': 'mode'},
+        asset_id=asset_id,
         scale=10,
-        maxPixels=1e13,
-        crs="EPSG:4326",
+        region=roi_boundary.geometry(),
     )
-    task.start()
 
-    return task.status()["id"]
+    return task_id
