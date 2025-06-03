@@ -1,7 +1,5 @@
 import ee
-from computing.utils import (
-    sync_layer_to_geoserver,
-)
+from computing.utils import sync_fc_to_geoserver
 from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
@@ -125,13 +123,6 @@ def calculate_drought(
         make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    fc = fc.toList(fc.size()).getInfo()
-    fc = {"features": fc, "type": "FeatureCollection"}
-    res = sync_layer_to_geoserver(
-        asset_suffix,
-        fc,
-        asset_suffix + "_drought",
-        "cropping_drought",
-    )
-
+    description = valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_drought"
+    res = sync_fc_to_geoserver(fc, state, description, 'cropping_drought')
     print(res)
