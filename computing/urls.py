@@ -13,8 +13,8 @@ urlpatterns = [
     path("generate_mws_layer/", api.generate_mws_layer, name="generate_mws_layer"),
     path("lulc_v3/", api.lulc_v3_river_basin, name="lulc_v3"),
     path("lulc_vector/", api.lulc_vector, name="lulc_vector"),
-    path("lulc_v4/", api.lulc_v4, name="lulc_v4"),
     path("lulc_farm_boundary/", api.lulc_farm_boundary, name="lulc_farm_boundary"),
+    path("lulc_v4/", api.lulc_v4, name="lulc_v4"),
     path("get_gee_layer/", api.get_gee_layer, name="get_gee_layer"),
     path("generate_ci_layer/", api.generate_ci_layer, name="generate_ci_layer"),
     path("generate_swb/", api.generate_swb, name="generate_swb"),
@@ -88,4 +88,6 @@ urlpatterns = [
     path("aquifer_vector/", api.aquifer_vector, name="aquifer_vector"),
     path("soge_vector/", api.soge_vector, name="soge_vector"),
     path("fes_clart_layer/", api.fes_clart_upload_layer, name="fes_clart_layer"),
+    path("generate_ponds/", api.ponds_compute, name="ponds_compute"),
+    path("generate_wells/", api.wells_compute, name="wells_compute"),
 ]
