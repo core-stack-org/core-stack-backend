@@ -101,11 +101,9 @@ else:
         "https://www.explorer.core-stack.org",
         "https://www.explorer.core-stack.org/landscape_explorer",
         "https://development.d2s4eeyazvtd2g.amplifyapp.com",
-
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1",
-
         "http://localhost:3000",
         "http://localhost:3001",
     ]
@@ -114,7 +112,7 @@ else:
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
     r"^http://127\.0\.0\.1:\d+$",
-    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"
+    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -307,3 +305,5 @@ EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
+
+LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")

@@ -1,5 +1,6 @@
 import os
-from nrm_app.settings import BASE_DIR
+import requests
+from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -806,3 +807,126 @@ def swb_pond_merging(request):
     except Exception as e:
         print("Exception in merge_swb_ponds api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+def lulc_farm_boundary(request):
+    print("Inside lulc_farm_boundary api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        headers = {"Content-Type": "application/json"}
+        payload = {"state": state, "district": district, "block": block}
+
+        response = requests.post(
+            LOCAL_COMPUTE_API_URL + "farm-boundary/",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        print(data)
+
+        return Response({"Success": "lulc_farm_boundary task initiated"}, status=200)
+
+    except requests.exceptions.HTTPError as e:
+        return Response(
+            {
+                "error": "External API returned an error",
+                "details": str(e),
+                "status_code": e.response.status_code,
+                "url": e.response.url,
+                "response_text": e.response.text,
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except requests.exceptions.RequestException as e:
+        return Response(
+            {"error": "Request to external API failed", "details": str(e)}, status=502
+        )
+    except Exception as e:
+        return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def ponds_compute(request):
+    print("Inside ponds_compute api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        headers = {"Content-Type": "application/json"}
+        payload = {"state": state, "district": district, "block": block}
+
+        response = requests.post(
+            LOCAL_COMPUTE_API_URL + "ponds/",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        print(data)
+
+        return Response({"Success": "ponds_compute task initiated"}, status=200)
+
+    except requests.exceptions.HTTPError as e:
+        return Response(
+            {
+                "error": "External API returned an error",
+                "details": str(e),
+                "status_code": e.response.status_code,
+                "url": e.response.url,
+                "response_text": e.response.text,
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except requests.exceptions.RequestException as e:
+        return Response(
+            {"error": "Request to external API failed", "details": str(e)}, status=502
+        )
+    except Exception as e:
+        return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def wells_compute(request):
+    print("Inside wells_compute api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        headers = {"Content-Type": "application/json"}
+        payload = {"state": state, "district": district, "block": block}
+
+        response = requests.post(
+            LOCAL_COMPUTE_API_URL + "wells/",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+        print(data)
+
+        return Response({"Success": "wells_compute task initiated"}, status=200)
+
+    except requests.exceptions.HTTPError as e:
+        return Response(
+            {
+                "error": "External API returned an error",
+                "details": str(e),
+                "status_code": e.response.status_code,
+                "url": e.response.url,
+                "response_text": e.response.text,
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    except requests.exceptions.RequestException as e:
+        return Response(
+            {"error": "Request to external API failed", "details": str(e)}, status=502
+        )
+    except Exception as e:
+        return Response({"error": "Unhandled error", "details": str(e)}, status=500)
