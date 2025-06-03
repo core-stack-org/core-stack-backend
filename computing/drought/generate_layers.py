@@ -97,34 +97,51 @@ def generate_drought_layers(
     create_gee_dir(
         asset_folder_list, gee_project_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
     )
-    for part in range(parts + 1):
-        start = part * chunk_size
-        end = start + chunk_size
-        block_name_for_parts = (
-            asset_suffix
-            + "_drought_"
-            + str(start)
-            + "-"
-            + str(end)
-            + "_"
-            + str(current_year)
-        )
-        chunk = ee.FeatureCollection(aoi.toList(aoi.size()).slice(start, end))
-        if chunk.size().getInfo() > 0:
-            drought_chunk(
-                chunk,
-                block_name_for_parts,
-                current_year,
-                end_year,
-                start_year,
-                task_ids,
-                asset_ids,
-                asset_suffix,
-                asset_folder_list,
-                app_type,
+    print("parts>>", parts)
+    if parts > 0:
+        for part in range(parts + 1):
+            print("part", part)
+            start = part * chunk_size
+            end = start + chunk_size
+            block_name_for_parts = (
+                asset_suffix
+                + "_drought_"
+                + str(start)
+                + "-"
+                + str(end)
+                + "_"
+                + str(current_year)
             )
+            chunk = ee.FeatureCollection(aoi.toList(aoi.size()).slice(start, end))
+            if chunk.size().getInfo() > 0:
+                drought_chunk(
+                    chunk,
+                    block_name_for_parts,
+                    current_year,
+                    end_year,
+                    start_year,
+                    task_ids,
+                    asset_ids,
+                    asset_suffix,
+                    asset_folder_list,
+                    app_type,
+                )
 
-    print("Done iterating")
+        print("Done iterating")
+    else:
+        block_name_for_parts = "drought_" + asset_suffix + "_" + str(current_year)
+        drought_chunk(
+            aoi,
+            block_name_for_parts,
+            current_year,
+            end_year,
+            start_year,
+            task_ids,
+            asset_ids,
+            asset_suffix,
+            asset_folder_list,
+            app_type,
+        )
     task_id_list = check_task_status(task_ids)
     print("All chunks' asset generated, task id: ", task_id_list)
     for asset_id in asset_ids:

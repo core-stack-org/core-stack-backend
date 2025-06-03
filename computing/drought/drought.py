@@ -25,7 +25,7 @@ def calculate_drought(
     state=None,
     district=None,
     block=None,
-    roi=None,
+    roi_path=None,
     asset_suffix=None,
     asset_folder_list=None,
     app_type="MWS",
@@ -34,16 +34,7 @@ def calculate_drought(
 ):
     ee_initialize()
 
-    dst_filename = (
-        "drought_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_"
-        + str(start_year)
-        + "_"
-        + str(end_year)
-    )
+
 
     if state and district and block:
         asset_suffix = (
@@ -61,13 +52,23 @@ def calculate_drought(
             + valid_gee_text(block.lower())
             + "_uid"
         )
-
+    else:
+        roi = ee.FeatureCollection(roi_path)
+    dst_filename = (
+            "drought_"
+            + asset_suffix
+            + "_"
+            + str(start_year)
+            + "_"
+            + str(end_year)
+    )
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + dst_filename
     )
+    print(f"asset:{asset_id}")
 
     if not is_gee_asset_exists(asset_id):
         chunk_size = 30  # if shapefile is large, running the script on the complete file will result an error,

@@ -23,7 +23,7 @@ def generate_swb_layer(
     state=None,
     district=None,
     block=None,
-    roi=None,
+    roi_path=None,
     asset_suffix=None,
     asset_folder_list=None,
     app_type="MWS",
@@ -47,7 +47,8 @@ def generate_swb_layer(
             + valid_gee_text(block.lower())
             + "_uid"
         )
-
+    else:
+        roi = ee.FeatureCollection(roi_path)
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
 
@@ -75,29 +76,44 @@ def generate_swb_layer(
         task_id_list = check_task_status([swb2])
         print("SWB2 task completed - task_id_list:", task_id_list)
         make_asset_public(asset_id)
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+    if  state and district and block:
+        layer_name = (
+            "surface_waterbodies_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+        )
+    else:
+        layer_name = (
+                "surface_waterbodies_"
+                + asset_suffix
+                + "_"
+                + app_type
+        )
+
+
     fc = ee.FeatureCollection(asset_id)
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="water_bodies")
     print(res)
 
     # SWB3: Intersect water bodies with WBC (Water Body Census) to get more data on intersecting water bodies
-    swb3, asset_id = waterbody_wbc_intersection(
-        roi=roi,
-        state=state,  # Mandatory
-        asset_suffix=asset_suffix,
-        asset_folder_list=asset_folder_list,
-        app_type=app_type,
-    )
-    if swb3:
-        task_id_list = check_task_status([swb3])
-        print("SWB task completed - swb3_task_id_list:", task_id_list)
-        make_asset_public(asset_id)
+    try:
+        swb3, asset_id = waterbody_wbc_intersection(
+            roi=roi,
+            state=state,  # Mandatory
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+        )
+        if swb3:
+            task_id_list = check_task_status([swb3])
+            print("SWB task completed - swb3_task_id_list:", task_id_list)
+            make_asset_public(asset_id)
 
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
-    print(res)
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
+        return {'Sucess':True, 'swb_asset_id':swb3}
+    except Exception as e:
+        print("Not required")
+        return {'Sucess': False, 'swb_asset_id':asset_id}
+

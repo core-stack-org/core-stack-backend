@@ -20,7 +20,7 @@ import subprocess
 from google.cloud import storage
 from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
-
+import numpy as np
 
 def ee_initialize(project=None):
     try:
@@ -204,6 +204,7 @@ def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
 
 def export_vector_asset_to_gee(fc, description, asset_id):
     try:
+
         task = ee.batch.Export.table.toAsset(
             collection=fc,
             description=description,
@@ -571,3 +572,12 @@ def upload_shp_to_gee(shapefile_path, file_name, asset_id):
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id)
     if task_id:
         check_task_status([task_id], 600)
+
+def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371
+    return c * r * 1000

@@ -69,6 +69,18 @@ def vectorize_water_pixels(
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
 
         # Get LULC map for current period
+        print ("issue")
+        print (str(get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix
+            + "_"
+            + curr_start_date
+            + "_"
+            + curr_end_date
+            + "_LULCmap_10m"
+        ))
+
         lulc_image = ee.Image(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -215,7 +227,7 @@ def vectorize_water_pixels(
 
     # Apply metrics calculation to all features
     feature_collection_with_metrics = water_bodies.map(calculate_metrics)
-
+    print("feature collection extracted")
     # Export results to GEE asset
     task_id = export_vector_asset_to_gee(
         feature_collection_with_metrics, description, asset_id

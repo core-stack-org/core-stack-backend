@@ -20,34 +20,37 @@ def merge_drought_layers_chunks(
         )
         + dst_filename
     )
-
+    print ("merge mws task started")
+    print (asset_id)
     size = roi.size().getInfo()
     parts = size // chunk_size
     assets = []
-    for part in range(parts + 1):
-        start = part * chunk_size
-        end = start + chunk_size
-        block_name_for_parts = (
-            asset_suffix
-            + "_drought_"
-            + str(start)
-            + "-"
-            + str(end)
-            + "_"
-            + str(current_year)
-        )
-        src_asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+    if parts > 0:
+        for part in range(parts + 1):
+            start = part * chunk_size
+            end = start + chunk_size
+            block_name_for_parts = (
+                asset_suffix
+                + "_drought_"
+                + str(start)
+                + "-"
+                + str(end)
+                + "_"
+                + str(current_year)
             )
-            + block_name_for_parts
-        )
-        if is_gee_asset_exists(src_asset_id):
-            assets.append(ee.FeatureCollection(src_asset_id))
+            src_asset_id = (
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+                )
+                + block_name_for_parts
+            )
+            if is_gee_asset_exists(src_asset_id):
+                assets.append(ee.FeatureCollection(src_asset_id))
 
-    asset = ee.FeatureCollection(assets).flatten()
-    task_id = export_vector_asset_to_gee(asset, dst_filename, asset_id)
-    return task_id
+        asset = ee.FeatureCollection(assets).flatten()
+        task_id = export_vector_asset_to_gee(asset, dst_filename, asset_id)
+        return task_id
+    return None
 
 
 def merge_yearly_layers(
@@ -58,7 +61,12 @@ def merge_yearly_layers(
 
     # Create export asset path (must be constant for export)
     description = f"drought_{asset_suffix}_{start_year}_{end_year}"
-    asset_id = f"{get_gee_dir_path(asset_folder_list)}{description}"
+    asset_id = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
+    )
 
     # Check if asset already exists
     if is_gee_asset_exists(asset_id):

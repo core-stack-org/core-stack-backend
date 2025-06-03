@@ -2,6 +2,7 @@ import os
 
 import geopandas as gpd
 import fiona
+import copy
 
 from utilities.gee_utils import (
     ee_initialize,
@@ -12,7 +13,6 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     get_gee_dir_path,
-    export_vector_asset_to_gee,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -27,7 +27,7 @@ import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
-
+from datetime import datetime
 
 def generate_shape_files(path):
     gdf = gpd.read_file(path + ".json")
@@ -112,8 +112,8 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
     os.remove(shapefile_layer_path + ".zip")
 
 
-def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
-    state_dir = os.path.join("data/fc_to_shape", shp_folder)
+def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
+    state_dir = os.path.join("data/fc_to_shape", state_name)
     if not os.path.exists(state_dir):
         os.mkdir(state_dir)
     path = os.path.join(state_dir, f"{layer_name}")
@@ -128,7 +128,7 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
     return push_shape_to_geoserver(path, workspace=workspace)
 
 
-def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
+def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -139,7 +139,7 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
         geojson_fc = get_geojson_from_gcs(layer_name)
 
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", shp_folder)
+        state_dir = os.path.join("data/fc_to_shape", state_name)
         if not os.path.exists(state_dir):
             os.mkdir(state_dir)
         path = os.path.join(state_dir, f"{layer_name}")
@@ -156,8 +156,6 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
         gdf.to_file(path + ".gpkg", driver="GPKG")
 
         return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
-    else:
-        return "No features in FeatureCollection"
         # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
         #
         # state_dir = os.path.join("data/fc_to_shape", state_name)
@@ -173,7 +171,34 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
         #
         # path = generate_shape_files(path)
         # return push_shape_to_geoserver(path, workspace=workspace)
+def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
+    try:
+        geojson_fc = fc.getInfo()
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        task_id = sync_vector_to_gcs(fc, layer_name, "GeoJSON")
+        check_task_status([task_id])
 
+        geojson_fc = get_geojson_from_gcs(layer_name)
+
+    if len(geojson_fc["features"]) > 0:
+        state_dir = os.path.join("data/fc_to_shape", project_name)
+        if not os.path.exists(state_dir):
+            os.mkdir(state_dir)
+        path = os.path.join(state_dir, f"{layer_name}")
+
+        # Convert to GeoDataFrame
+        gdf = gpd.GeoDataFrame.from_features(geojson_fc["features"])
+
+        # Set CRS (Earth Engine uses EPSG:4326 by default)
+        gdf.crs = "EPSG:4326"
+
+        gdf = fix_invalid_geometry_in_gdf(gdf)
+
+        # Save as GeoPackage
+        gdf.to_file(path + ".gpkg", driver="GPKG")
+
+        return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
 
 def to_camelcase(text):
     words = text.split()
@@ -227,8 +252,21 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
-    task_id = export_vector_asset_to_gee(asset, description, asset_id)
-    return task_id
+    try:
+        # Export an ee.FeatureCollection as an Earth Engine asset.
+        task = ee.batch.Export.table.toAsset(
+            **{
+                "collection": asset,
+                "description": description,
+                "assetId": asset_id,
+            }
+        )
+
+        task.start()
+        print("Successfully started the merge chunk", task.status())
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running merge task: {e}")
 
 
 def fix_invalid_geometry_in_gdf(gdf):
@@ -240,3 +278,60 @@ def fix_invalid_geometry_in_gdf(gdf):
             gdf.loc[idx, "geometry"] = gdf.loc[idx, "geometry"].buffer(0)
 
     return gdf
+
+
+def get_season_key(date):
+    """Return season key like 'rabi_2017' based on Indian cropping seasons."""
+    month = date.month
+    year = date.year
+
+    if month in [10, 11, 12]:
+        return f"rabi_{year}"
+    elif month in [1, 2, 3]:
+        return f"rabi_{year - 1}"
+    elif month in [4, 5, 6]:
+        return f"zaid_{year}"
+    elif month in [7, 8, 9]:
+        return f"kharif_{year}"
+    else:
+        return None
+
+
+def calculate_precipitation_season(geojson_filepath):
+    # Load the GeoJSON file
+    with open(geojson_filepath, "r") as f:
+        feature_collection = json.load(f)
+
+    features_ee = []
+    for feature in feature_collection["features"]:
+        original_props = feature["properties"]
+        new_props = {}
+
+        # Copy UID if available
+        if "uid" in original_props:
+            new_props["uid"] = original_props["uid"]
+
+        season_totals = {}
+
+        for key, val in original_props.items():
+            try:
+                date = datetime.strptime(key, "%Y-%m-%d")
+                season_key = get_season_key(date)  # You need to define this function
+                if season_key:
+                    season_totals[season_key] = season_totals.get(season_key, 0) + float(val)
+            except (ValueError, TypeError):
+                continue  # skip non-date keys and non-numeric values
+
+        # Add precipitation season totals
+        for season, total in season_totals.items():
+            new_props[f"precipitation_{season}"] = total
+
+        # Create an ee.Feature with geometry and properties
+        # Note: ee.Geometry expects GeoJSON geometry dict
+        geom_ee = ee.Geometry(feature["geometry"])
+        feature_ee = ee.Feature(geom_ee, new_props)
+
+        features_ee.append(feature_ee)
+
+    # Return an ee.FeatureCollection
+    return ee.FeatureCollection(features_ee)
