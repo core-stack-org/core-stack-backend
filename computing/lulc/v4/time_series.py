@@ -7,6 +7,7 @@ from itertools import product
 from pathlib import Path
 import ast
 from computing.lulc.v4.cropping_frequency_detection import Get_Padded_NDVI_TS_Image
+from nrm_app.settings import MEDIA_ROOT
 from utilities.gee_utils import get_gee_asset_path, valid_gee_text, is_gee_asset_exists
 
 
@@ -172,7 +173,7 @@ def time_series(state, district, block, start_year, end_year):
         return new_lat, new_lon
 
     def get_points(roi, zoom, scale):
-        file_path = os.path.join("data/lulc_v4", directory)
+        file_path = os.path.join(MEDIA_ROOT, "lulc_v4", directory)
         if not os.path.exists(file_path):
             os.mkdir(file_path)
         points_file = Path(file_path + "/status.csv")
@@ -223,7 +224,7 @@ def time_series(state, district, block, start_year, end_year):
         # df["segmentation_status"] = False
         # df["postprocessing_status"] = False
         # df["plantation_status"] = False
-        df.to_csv(directory + "/status.csv", index=False)
+        df.to_csv(file_path + "/status.csv", index=False)
         return df
 
     blocks_df = get_points(roi_boundary, 17, 16)
