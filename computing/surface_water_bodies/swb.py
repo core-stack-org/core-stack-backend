@@ -82,7 +82,7 @@ def generate_swb_layer(
         + valid_gee_text(block.lower())
     )
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="water_bodies")
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
     print(res)
 
     # SWB3: Intersect water bodies with WBC (Water Body Census) to get more data on intersecting water bodies
