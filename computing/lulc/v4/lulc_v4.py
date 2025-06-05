@@ -15,6 +15,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     is_gee_asset_exists,
     export_raster_asset_to_gee,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
 )
 from nrm_app.celery import app
 
@@ -56,7 +58,9 @@ def generate_final(state, district, block, start_year, end_year):
     ).union()
 
     all = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block) + filename_prefix + "_boundaries"
+        get_gee_asset_path(state, district, block)
+        + filename_prefix
+        + "_boundaries_refined"
     )
 
     farm = all.filter(ee.Filter.eq("class", "farm"))
@@ -174,3 +178,12 @@ def generate_final(state, district, block, start_year, end_year):
             pyramiding_policy={"predicted_label": "mode"},
             region=roi_boundary.geometry(),
         )
+        # check_task_status([task_id])
+        #
+        # task_id = sync_raster_to_gcs(final_lulc_img, 10, filename_prefix + "_v4")
+        #
+        # check_task_status([task_id])
+        #
+        # sync_raster_gcs_to_geoserver(
+        #     "lulc_v4", filename_prefix + "_v4", filename_prefix + "_v4", None
+        # )
