@@ -7,6 +7,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
+    export_raster_asset_to_gee,
 )
 import ee
 
@@ -39,19 +40,14 @@ def terrain_raster(self, state, district, block):
             roi_boundary.map(generate_terrain_classified_raster)
         )
         mwsheds_lf_raster = mwsheds_lf_rasters.mosaic()
-        image_export_task = ee.batch.Export.image.toAsset(
+        task_id = export_raster_asset_to_gee(
             image=mwsheds_lf_raster.clip(roi_boundary.geometry()),
             description=description,
-            assetId=asset_id,
-            pyramidingPolicy={"predicted_label": "mode"},
+            asset_id=asset_id,
             scale=30,
-            maxPixels=1e13,
-            crs="EPSG:4326",
+            region=roi_boundary.geometry(),
         )
-        image_export_task.start()
-        print("Successfully started the terrain_raster", image_export_task.status())
-
-        task_id_list = check_task_status([image_export_task.status()["id"]])
+        task_id_list = check_task_status([task_id])
         print("terrain_raster task_id_list", task_id_list)
 
     """ Sync image to google cloud storage and then to geoserver"""

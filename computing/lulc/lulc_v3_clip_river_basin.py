@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
+    export_raster_asset_to_gee,
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
@@ -71,18 +72,15 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
     task_list = []
     geometry = roi.geometry()
     for i in range(0, len(l1_asset_new)):
-        image_export_task = ee.batch.Export.image.toAsset(
+        task_id = export_raster_asset_to_gee(
             image=l1_asset_new[i].clip(geometry),
             description=final_output_filename_array_new[i],
-            assetId=final_output_assetid_array_new[i],
-            pyramidingPolicy={"predicted_label": "mode"},
+            asset_id=final_output_assetid_array_new[i],
             scale=scale,
-            maxPixels=1e13,
-            crs="EPSG:4326",
+            region=geometry,
+            pyramiding_policy={"predicted_label": "mode"},
         )
-        image_export_task.start()
-        print("Successfully started the LULC v3", image_export_task.status())
-        task_list.append(image_export_task.status()["id"])
+        task_list.append(task_id)
 
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)
