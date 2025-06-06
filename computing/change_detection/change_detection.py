@@ -73,7 +73,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
         )
         task_id = export_raster_asset_to_gee(
             image=change_asset[index],
-            description=description,
+            description=description + "_" + change,
             asset_id=asset_id,
             scale=10,
             region=roi_boundary.geometry(),
