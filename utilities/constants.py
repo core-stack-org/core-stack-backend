@@ -24,6 +24,7 @@ SITE_DATA_PATH = "data/site_data"
 
 # MARK: ODK URLs
 ODK_BASE_URL = "https://odk.core-stack.org/v1/projects/"
+ODK_URL_SESSION = "https://odk.core-stack.org/v1/sessions"
 ODK_PROJECT_ID = "2"
 
 # Resource Mapping
