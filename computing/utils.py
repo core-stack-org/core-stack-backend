@@ -240,3 +240,17 @@ def fix_invalid_geometry_in_gdf(gdf):
             gdf.loc[idx, "geometry"] = gdf.loc[idx, "geometry"].buffer(0)
 
     return gdf
+
+
+def extract_soi_properties(latitude, longitude):
+    ee_initialize()
+    point = ee.Geometry.Point([longitude, latitude])
+    feature_collection = ee.FeatureCollection("projects/ee-corestackdev/assets/datasets/SOI_tehsil_vector")
+    intersected = feature_collection.filterBounds(point)
+    features = intersected.toList(intersected.size())
+    properties_list = []
+    for i in range(intersected.size().getInfo()):
+        feature = ee.Feature(features.get(i))
+        props = feature.getInfo().get('properties', {})
+        properties_list.append(props)
+    return properties_list

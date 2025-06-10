@@ -49,6 +49,10 @@ from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
+from utilities.auth_utils import auth_free
+import ee
+from utilities.gee_utils import (ee_initialize)
+from .utils import extract_soi_properties
 
 @api_view(["POST"])
 def generate_admin_boundary(request):
@@ -806,3 +810,17 @@ def swb_pond_merging(request):
     except Exception as e:
         print("Exception in merge_swb_ponds api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@auth_free
+def properties_from_soi(request,longitude, latitude):
+    latitude = float(latitude)
+    longitude = float(longitude)
+    properties_list = extract_soi_properties(latitude, longitude)
+    return Response({
+        "lat": latitude,
+        "lon": longitude,
+        "properties": properties_list,
+        "message": "Properties fetched successfully"
+    })
