@@ -58,9 +58,22 @@ def generate_cropping_intensity(
     make_asset_public(asset_id)
 
     # Export asset to Geoserver
-    fc = ee.FeatureCollection(asset_id)
-    layer_name = f"{asset_suffix}_intensity"
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "cropping_intensity")
+    # fc = ee.FeatureCollection(asset_id)
+    # layer_name = f"{asset_suffix}_intensity"
+    # res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "cropping_intensity")
+    # print(res)
+
+    fc = ee.FeatureCollection(asset_id).getInfo()
+    fc = {"features": fc["features"], "type": fc["type"]}
+    res = sync_layer_to_geoserver(
+        valid_gee_text(state.lower()),
+        fc,
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_intensity",
+        "cropping_intensity",
+    )
     print(res)
 
 

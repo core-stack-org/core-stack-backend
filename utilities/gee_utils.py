@@ -225,22 +225,26 @@ def export_raster_asset_to_gee(
     description,
     asset_id,
     scale,
-    geometry,
+    region,
     pyramiding_policy=None,
     max_pixel=1e13,
     crs="EPSG:4326",
 ):
     try:
-        task = ee.batch.Export.image.toAsset(
-            image=image,
-            description=description,
-            assetId=asset_id,
-            pyramidingPolicy=pyramiding_policy,
-            scale=scale,
-            region=geometry,
-            maxPixels=max_pixel,
-            crs=crs,
-        )
+        export_params = {
+            "image": image,
+            "description": description,
+            "assetId": asset_id,
+            "scale": scale,
+            "region": region,
+            "maxPixels": max_pixel,
+            "crs": crs,
+        }
+        if pyramiding_policy:
+            export_params["pyramidingPolicy"] = pyramiding_policy
+
+        task = ee.batch.Export.image.toAsset(**export_params)
+
         task.start()
         print(
             f"Successfully started the task for {description}, task id:{task.status()}"
@@ -444,6 +448,25 @@ def get_geojson_from_gcs(gcs_file_name):
     geojson_data = json.loads(geojson_str)
 
     return geojson_data
+
+
+def download_csv_from_gcs(bucket_name, blob_name, destination_file_name):
+    try:
+        bucket = gcs_config()
+        blob = bucket.blob(bucket_name + "/" + blob_name)
+        if blob.exists():
+            blob.download_to_filename(destination_file_name)
+            print(
+                f"Downloaded {blob_name} from bucket {bucket_name} to {destination_file_name}"
+            )
+        else:
+            print(
+                f"Blob '{blob_name}' does not exist in bucket '{bucket_name}'. No file downloaded."
+            )
+    except Exception as e:
+        print(
+            f"Exception in downloading csv {blob_name} from GCS bucket {bucket_name}", e
+        )
 
 
 def harmonize_band_types(image, target_type="Float"):

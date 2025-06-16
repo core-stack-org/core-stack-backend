@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
+    export_raster_asset_to_gee,
 )
 from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
@@ -371,22 +372,14 @@ def get_pss(
     # Export to GEE asset
     try:
         scale = 30
-        export_params = {
-            "image": all_layers.clip(roi.geometry()),
-            "description": description,
-            "assetId": asset_id,
-            "pyramidingPolicy": {"predicted_label": "mode"},
-            "scale": scale,
-            "maxPixels": 1e13,
-            "crs": "EPSG:4326",
-            "region": roi.geometry(),
-        }
-
-        export_task = ee.batch.Export.image.toAsset(**export_params)
-        export_task.start()
-
-        logger.info(f"Export task started with ID: {export_task.status()['id']}")
-        check_task_status([export_task.status()["id"]])
+        task_id = export_raster_asset_to_gee(
+            image=all_layers.clip(roi.geometry()),
+            description=description,
+            asset_id=asset_id,
+            scale=scale,
+            region=roi.geometry(),
+        )
+        check_task_status([task_id])
 
         make_asset_public(asset_id)
 
