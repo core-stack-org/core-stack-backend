@@ -358,20 +358,21 @@ def create_socio_eco_table(doc, plan):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
     for item in data_settlement:
-        row_cells = table_socio.add_row().cells
-        row_cells[0].text = item.settlement_name
-        row_cells[1].text = str(item.number_of_households)
-        row_cells[2].text = item.largest_caste
+        if item.status_re != "rejected":
+            row_cells = table_socio.add_row().cells
+            row_cells[0].text = item.settlement_name
+            row_cells[1].text = str(item.number_of_households)
+            row_cells[2].text = item.largest_caste
 
-        # Determine the caste group based on settlement type
-        if item.largest_caste.lower() == "single caste group":
-            row_cells[3].text = item.smallest_caste
-        elif item.largest_caste.lower() == "mixed caste group":
-            row_cells[3].text = item.settlement_status
-        else:
-            row_cells[3].text = "NA"
+            # Determine the caste group based on settlement type
+            if item.largest_caste.lower() == "single caste group":
+                row_cells[3].text = item.smallest_caste
+            elif item.largest_caste.lower() == "mixed caste group":
+                row_cells[3].text = item.settlement_status
+            else:
+                row_cells[3].text = "NA"
 
-        row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
+            row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
     headers_nrega = [
         "Settlement's Name",
@@ -391,19 +392,20 @@ def create_socio_eco_table(doc, plan):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
     for settlement_nrega in data_settlement:
-        row_cells = table_nrega.add_row().cells
-        row_cells[0].text = settlement_nrega.settlement_name
-        row_cells[1].text = (
-            "applied: "
-            + str(settlement_nrega.nrega_job_applied)
-            + "\n"
-            + "having: "
-            + str(settlement_nrega.nrega_job_card)
-        )
-        row_cells[2].text = str(settlement_nrega.nrega_work_days)
-        row_cells[3].text = format_text(settlement_nrega.nrega_past_work)
-        row_cells[4].text = settlement_nrega.nrega_demand
-        row_cells[5].text = format_text(settlement_nrega.nrega_issues)
+        if settlement_nrega.status_re != "rejected":
+            row_cells = table_nrega.add_row().cells
+            row_cells[0].text = settlement_nrega.settlement_name
+            row_cells[1].text = (
+                "applied: "
+                + str(settlement_nrega.nrega_job_applied)
+                + "\n"
+                + "having: "
+                + str(settlement_nrega.nrega_job_card)
+            )
+            row_cells[2].text = str(settlement_nrega.nrega_work_days)
+            row_cells[3].text = format_text(settlement_nrega.nrega_past_work)
+            row_cells[4].text = settlement_nrega.nrega_demand
+            row_cells[5].text = format_text(settlement_nrega.nrega_issues)
 
 
 def create_livelihood_table(doc, plan):
