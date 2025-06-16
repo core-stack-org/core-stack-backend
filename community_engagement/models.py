@@ -6,25 +6,20 @@ from users.models import User
 
 
 # Create your models here.
-class Location(models.Model):
-    id = models.AutoField(primary_key=True)
-    state = models.ForeignKey(State, blank=True, null=True, on_delete=models.SET_NULL)
-    district = models.ForeignKey(District, blank=True, null=True, on_delete=models.SET_NULL)
-    block = models.ForeignKey(Block, blank=True, null=True, on_delete=models.SET_NULL)
-
-
 class Community(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, blank=True, null=True, on_delete=models.SET_NULL)
     # bot = models.ForeignKey(Bot, on_delete=models.SET_NULL)
+
+    def __str__(self):
+        return self.project.name
 
 
 class Community_user_mapping(models.Model):
     id = models.AutoField(primary_key=True)
     community = models.ForeignKey(Community, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    is_primary_community = models.BooleanField(default=True)
+    is_last_accessed_community = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -36,17 +31,26 @@ class Media_type(models.TextChoices):
     DOC = "DOC", "DOC"
 
 
+class Media_source(models.TextChoices):
+    BOT = "BOT", "BOT"
+    IVR = "IVR", "IVR"
+
+
 class Media(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     media_type = models.CharField(max_length=255, choices=Media_type.choices)
     media_path = models.CharField(max_length=255)
+    source = models.CharField(max_length=255, choices=Media_source.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
 class Item_category(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.name
 
 
 class Item_type(models.TextChoices):

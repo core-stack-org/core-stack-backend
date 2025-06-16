@@ -28,6 +28,8 @@ class ProjectAdmin(admin.ModelAdmin):
                     "description",
                     "geojson_path",
                     "state",
+                    'district',
+                    'block',
                     "app_type",
                     "enabled",
                     "created_by",
