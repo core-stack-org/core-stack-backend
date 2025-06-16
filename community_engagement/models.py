@@ -42,6 +42,7 @@ class Media(models.Model):
     media_type = models.CharField(max_length=255, choices=Media_type.choices)
     media_path = models.CharField(max_length=255)
     source = models.CharField(max_length=255, choices=Media_source.choices)
+    # bot = models.ForeignKey(Bot, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
