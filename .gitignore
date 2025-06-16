@@ -29,3 +29,7 @@ venv.bak/
 
 # ignored apps
 dashboard/
+
+
+# bot_interface
+bot_interface/migrations/__pycache__/
