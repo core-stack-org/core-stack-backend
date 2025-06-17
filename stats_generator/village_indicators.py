@@ -23,10 +23,10 @@ def get_generate_filter_data_village(state, district, block):
         village_id_data = df_soc_eco_indi[df_soc_eco_indi['village_id'] == specific_village_id]
         village_nrega_data = df_nrega_village[df_nrega_village['vill_id'] == specific_village_id]
 
-        total_population = village_id_data.get('total_population', None).iloc[0]
-        SC_percentage = round(village_id_data.get('SC_percentage', None).iloc[0], 4)
-        ST_percentage = round(village_id_data.get('ST_percentage', None).iloc[0], 4)
-        literacy_rate = round(village_id_data.get('literacy_rate', None).iloc[0], 4)
+        total_population = village_id_data.get('total_population_count', None).iloc[0]
+        SC_percentage = round(village_id_data.get('SC_percent', None).iloc[0], 4)
+        ST_percentage = round(village_id_data.get('ST_percent', None).iloc[0], 4)
+        literacy_rate = round(village_id_data.get('literacy_rate_percent', None).iloc[0], 4)
         total_assets = int(village_nrega_data.drop(columns=['vill_id', 'vill_name']).sum(axis=1).sum())
 
         if specific_village_id!=0:
