@@ -19,6 +19,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
@@ -192,8 +193,10 @@ def generate_final(state, district, block, start_year, end_year):
             pyramiding_policy={"predicted_label": "mode"},
             region=roi_boundary.geometry(),
         )
-        # check_task_status([task_id])
-        #
+        check_task_status([task_id])
+
+        make_asset_public(asset_id)
+
         # task_id = sync_raster_to_gcs(final_lulc_img, 10, filename_prefix + "_v4")
         #
         # check_task_status([task_id])
