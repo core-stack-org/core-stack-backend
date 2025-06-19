@@ -747,6 +747,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         "Which Caste uses the well?",
         "Functional or Non-functional",
         "Need Maintenance",
+        "Type of Well",
         "Latitude",
         "Longitude",
     ]
@@ -764,6 +765,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[3].text = well.caste_uses
         row_cells[4].text = well.is_functional
         row_cells[5].text = well.need_maintenance
+        row_cells[6].text = well.data_well.get("select_one_well_type") or "No Data"
         row_cells[6].text = str(well.latitude)
         row_cells[7].text = str(well.longitude)
 
@@ -1334,21 +1336,21 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
         "settlement": {
             "workspace": "resources",
             "layer_name": f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": os.path.join(os.path.dirname(__file__), "utils", "icons", "settlement.svg"),
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
             "label_key": "Settleme_1",
             "legend_name": "Settlement (Resource)",
         },
         "well": {
             "workspace": "resources",
             "layer_name": f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": os.path.join(os.path.dirname(__file__), "utils", "icons", "well.svg"),
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
             "label_key": "well_id",
             "legend_name": "Well (Resource)",
         },
         "waterbody": {
             "workspace": "resources",
             "layer_name": f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": os.path.join(os.path.dirname(__file__), "utils", "icons", "waterbody.svg"),
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
             "label_key": "wbs_type",
             "legend_name": "Water Structure (Resource)",
         },
@@ -1491,21 +1493,21 @@ def show_all_mws(doc, plan, mws):
         "settlement": {
             "workspace": "resources",
             "layer_name": f"settlement_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": os.path.join(os.path.dirname(__file__), "utils", "icons", "settlement.svg"),
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
             "label_key": "Settleme_1",
             "legend_name": "Settlement (Resource)",
         },
         "well": {
             "workspace": "resources",
             "layer_name": f"well_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": os.path.join(os.path.dirname(__file__), "utils", "icons", "well.svg"),
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
             "label_key": "well_id",
             "legend_name": "Well (Resource)",
         },
         "waterbody": {
             "workspace": "resources",
             "layer_name": f"waterbody_{plan.plan_id}_{plan.district.district_name.lower()}_{plan.block.block_name.lower()}",
-            "icon_url": os.path.join(os.path.dirname(__file__), "utils", "icons", "waterbody.svg"),
+            "icon_url": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png",
             "label_key": "wbs_type",
             "legend_name": "Water Structure (Resource)",
         },
