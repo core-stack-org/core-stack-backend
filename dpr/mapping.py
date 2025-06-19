@@ -1,12 +1,45 @@
 from dpr.models import (
     ODK_waterbody,
+    ODK_well,
     GW_maintenance,
     Agri_maintenance,
     SWB_maintenance,
 )
 from utilities.logger import setup_logger
+from dpr.utils import format_text
 
 logger = setup_logger(__name__)
+
+STRUCTURE_TO_REPAIR_MAPPING = {
+    # Normalize structure types to repair activity keys
+    "farm pond": "Repair_of_farm_ponds",
+    "community pond": "Repair_of_community_pond", 
+    "large water body": "Repair_of_large_water_body",
+    "large water bodies": "Repair_of_large_water_body",
+    "canal": "Repair_of_canal",
+    "check dam": "Repair_of_check_dam",
+    "percolation tank": "Repair_of_percolation_tank",
+    "earthen gully plug": "Repair_of_earthen_gully_plug",
+    "earthern gully plugs": "Repair_of_earthen_gully_plug",  
+    "drainage/soakage channels": "Repair_of_drainage_soakage_channels",
+    "recharge pits": "Repair_of_recharge_pits",
+    "soakage pits": "Repair_of_soakage_pits",
+    "sokage pits": "Repair_of_soakage_pits", 
+    "trench cum bund network": "Repair_of_trench_cum_bund_network",
+    "continuous contour trenches (cct)": "Repair_of_Continuous_contour_trenches",
+    "staggered contour trenches(sct)": "Repair_of_Staggered_contour_trenches",
+    "water absorption trenches(wat)": "Repair_of_Water_absorption_trenches",
+    "loose boulder structure": "Repair_of_loose_boulder_structure",
+    "rock fill dam": "Repair_of_rock_fill_dam",
+    "stone bunding": "Repair_of_stone_bunding",
+    "diversion drains": "Repair_of_diversion_drains",
+    "contour bunds/graded bunds": "Repair_of_bunding",
+    "bunding:contour bunds/ graded bunds": "Repair_of_bunding",
+    "farm bund": "Repair_of_farm_bund",
+    "5% model structure": "Repair_of_model5_structure",
+    "30-40 model": "Repair_of_30_40_model_structure",
+    "30-40 model structure": "Repair_of_30_40_model_structure",
+}
 
 all_water_structures = [
     "Farm pond",
@@ -28,7 +61,7 @@ all_water_structures = [
     "Loose Boulder Structure",
     "Stone bunding",
     "Diversion drains",
-    "Contour bunds/graded bunds",  # Under "Bunding:"
+    "Contour bunds/graded bunds", 
     "Bunding:Contour bunds/ graded bunds",
     "Farm bund",
     "Well",
@@ -73,40 +106,106 @@ surface_waterbodies = [
     "Community pond"
 ]
 
+def get_activity_type_from_waterbody(waterbody):
+    """
+    Extract the activity type VALUE from waterbody based on structure type and data_waterbody content.
+    
+    Args:
+        waterbody: ODK_waterbody instance
+        
+    Returns:
+        str: The value of the appropriate activity type (e.g., "yes", "no", etc.) or 'Maintenance'
+    """
+    structure_type = waterbody.water_structure_type.lower().strip()
+    data = waterbody.data_waterbody
+    
+    expected_repair_key = STRUCTURE_TO_REPAIR_MAPPING.get(structure_type)
+    print(f"Expected repair key: {expected_repair_key}")
+    
+    if expected_repair_key:
+        repair_value = data.get(expected_repair_key)
+
+        if repair_value.lower() == "other":
+            other_value = data.get(f"{expected_repair_key}_other")
+            if other_value:
+                print(f"Found repair activity '{expected_repair_key}' with value '{other_value}' for waterbody {waterbody.waterbody_id}")
+                return other_value
+            else:
+                print(f"Repair activity '{expected_repair_key}' is 'other' but no 'other' value specified for waterbody {waterbody.waterbody_id}")
+        elif repair_value:
+            print(f"Found repair activity '{expected_repair_key}' with value '{repair_value}' for waterbody {waterbody.waterbody_id}")
+            return repair_value
+        else:
+            print(f"Repair activity '{expected_repair_key}' is not 'other' but no value specified for waterbody {waterbody.waterbody_id}")
+            return "Maintenance"
+
+def get_activity_type_from_well(well):
+    """
+    Extract the activity type VALUE from well based on data_well content.
+    
+    Args:
+        well: ODK_well instance
+        
+    Returns:
+        str: The value of the repair activity or 'Maintenance'
+    """
+    data = well.data_well
+    
+    # Navigate to the Well_condition section
+    well_condition = data.get("Well_condition", {})
+    
+    repair_type = well_condition.get("select_one_repairs_well")
+    print(f"Repair type well: {repair_type}")
+
+    if repair_type:
+        if repair_type.lower() == "other":
+            other_value = well_condition.get("select_one_repairs_well_other")
+            if other_value:
+                print(f"Found well repair type 'other' with value '{other_value}' for well {well.well_id}")
+                return other_value
+            else:
+                print(f"Well repair type is 'other' but no 'other' value specified for well {well.well_id}")
+                return repair_type  
+        else:
+            print(f"Found well repair type '{repair_type}' for well {well.well_id}")
+            return repair_type
+    
+    print(f"No repair type found for well {well.well_id}, using 'Maintenance'")
+    return "Maintenance"
 
 def populate_maintenance_from_waterbody(plan):
     """
     Filter ODK_waterbody records by water structure type and populate the appropriate maintenance tables
     (GW_maintenance, Agri_maintenance, SWB_maintenance) based on the structure type.
 
+    Does the same for wells maintenance -- populating the irrigation table
+
     Args:
         plan: Plan object containing plan details
     """
     # Get all waterbody records for the plan
-    waterbodies = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    waterbodies = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    wells = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     print(f"Found {waterbodies.count()} waterbody records for plan {plan.plan_id}")
 
     for waterbody in waterbodies:
-        print("*******************  JUST FOR A CHECK  **********************")
-        print("Waterbody:", waterbody)
         structure_type = waterbody.water_structure_type
-        print("Water Structure Type:", structure_type)
 
         # Skip if no maintenance needed
-        print("Maintenance needed:", waterbody.need_maintenance)
         if waterbody.need_maintenance.lower() != "yes":
             continue
 
+        # Get the dynamic activity type VALUE based on structure type and data_waterbody
+        activity_type = get_activity_type_from_waterbody(waterbody)
+        
         common_data = {
             "beneficiary_settlement": waterbody.beneficiary_settlement,
             "Beneficiary_Name": waterbody.data_waterbody.get("Beneficiary_name"),
-            "select_one_activities": "Maintenance",
+            "select_one_activities": format_text(activity_type), 
         }
-
 
         work_id = waterbody.waterbody_id
         print("Work ID:", work_id)
-
 
         structure_type_lower = structure_type.lower()
         recharge_structures_lower = [s.lower() for s in recharge_structures]
@@ -117,7 +216,7 @@ def populate_maintenance_from_waterbody(plan):
             existing = GW_maintenance.objects.filter(
                 plan_id=plan.plan_id,
                 work_id=work_id,
-            ).first()
+            ).exclude(status_re="rejected").first()
 
             print(
                 f"GW Maintenance - Existing record check: {'Found' if existing else 'Not found'}"
@@ -126,9 +225,6 @@ def populate_maintenance_from_waterbody(plan):
             if not existing:
                 maintenance_data = common_data.copy()
                 maintenance_data["select_one_water_structure"] = structure_type
-
-                print(f"Creating GW Maintenance record for {work_id}")
-                print(f"Maintenance data: {maintenance_data}")
 
                 GW_maintenance.objects.create(
                     uuid=waterbody.uuid,
@@ -147,7 +243,7 @@ def populate_maintenance_from_waterbody(plan):
             existing = Agri_maintenance.objects.filter(
                 plan_id=plan.plan_id,
                 work_id=work_id,
-            ).first()
+            ).exclude(status_re="rejected").first()
 
             print(
                 f"Agri Maintenance - Existing record check: {'Found' if existing else 'Not found'}"
@@ -203,3 +299,44 @@ def populate_maintenance_from_waterbody(plan):
                     data_swb_maintenance=maintenance_data,
                 )
                 print(f"SWB Maintenance record created successfully for {work_id}")
+
+    for well in wells:
+        if well.need_maintenance.lower() != "yes":
+            continue
+
+        # Get the dynamic activity type VALUE from well data
+        activity_type = get_activity_type_from_well(well)
+        
+        common_data = {
+            "beneficiary_settlement": well.beneficiary_settlement,
+            "Beneficiary_Name": well.data_well.get("Beneficiary_name"),
+            "select_one_activities": format_text(activity_type),  
+        }
+
+        well_id = well.well_id
+
+        existing_well = Agri_maintenance.objects.filter(
+            plan_id=plan.plan_id,
+            work_id=well_id,
+        ).exclude(status_re="rejected").first()
+
+        if not existing_well:
+            maintenance_data = common_data.copy()
+            maintenance_data["select_one_irrigation_structure"] = "Well"
+            
+            Agri_maintenance.objects.create(
+                uuid=well.uuid,
+                plan_id=plan.plan_id,
+                plan_name=plan.plan,
+                latitude=well.latitude,
+                longitude=well.longitude,
+                status_re=well.status_re,
+                work_id=well_id,
+                corresponding_work_id=well.well_id,
+                data_agri_maintenance=maintenance_data,
+            )
+            print(f"Well maintenance record created successfully for {well_id}")
+        else:
+            print(f"Well maintenance record already exists for {well_id}")
+
+    print("Maintenance records created successfully")
