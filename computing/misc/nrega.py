@@ -12,33 +12,43 @@ from utilities.constants import (
     NREGA_ASSETS_OUTPUT_DIR,
 )
 from unidecode import unidecode
+import boto3
+from io import BytesIO
+from nrm_app.settings import NREGA_BUCKET, NREGA_ACCESS_KEY, NREGA_SECRET_KEY
+
 
 
 @app.task(bind=True)
 def clip_nrega_district_block(self, state_name, district_name, block_name):
     print("inside clip")
+    s3 = boto3.resource(
+        service_name="s3",
+        region_name="ap-south-1",
+        aws_access_key_id=NREGA_ACCESS_KEY,
+        aws_secret_access_key=NREGA_SECRET_KEY
+    )
+
     formatted_state_name = state_name.title()
+    formatted_district_name = district_name.title()
     if " " in formatted_state_name:
         formatted_state_name = formatted_state_name.replace(" ", "_")
     if " " in district_name:
-        district_name = district_name.replace(" ", "_")
-    
-    geojson_path = os.path.join(
-        NREGA_ASSETS_INPUT_DIR,
-        f"{formatted_state_name.upper()}/{district_name.upper()}.geojson"
-    )
-    
+        formatted_district_name = district_name.replace(" ", "_")
+
+    nrega_dist_file = f"{formatted_state_name.upper()}/{formatted_district_name.upper()}.geojson"
+
     try:
-        district_gdf = gpd.read_file(geojson_path)
-        print(f"Successfully loaded GeoJSON from {geojson_path}")
+        file_obj = s3.Object(NREGA_BUCKET, nrega_dist_file).get()
+        district_gdf = gpd.read_file(BytesIO(file_obj['Body'].read()))
     except Exception as e:
-        print(f"Could not load GeoJSON: {e}")
-        district_gdf = gpd.GeoDataFrame(
-            columns=["Work Name", "Panchayat", "lon", "lat", "geometry"],
-            geometry="geometry",
-            crs="EPSG:4326"
-        )
-        print("Generated empty GeoDataFrame due to missing location data")
+        print(f"Error reading file from S3: {e}")
+        district_gdf = gpd.GeoDataFrame(columns=["Work Name", "Panchayat", "lon", "lat", "geometry"], geometry="geometry", crs="EPSG:4326")
+
+    # If geometry is missing but lat/lon present, build Point geometry
+    if 'geometry' not in district_gdf.columns and 'lon' in district_gdf.columns and 'lat' in district_gdf.columns:
+        print("Creating geometry from lat/lon...")
+        district_gdf['geometry'] = [Point(xy) for xy in zip(district_gdf["lon"], district_gdf["lat"])]
+        district_gdf = gpd.GeoDataFrame(district_gdf, geometry='geometry', crs="EPSG:4326")
     
     # If GeoJSON was loaded but has no geometry, create Point geometries from lat/lon
     if 'geometry' not in district_gdf.columns and 'lon' in district_gdf.columns and 'lat' in district_gdf.columns:

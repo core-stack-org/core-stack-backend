@@ -593,4 +593,4 @@ def upload_shp_to_gee(shapefile_path, file_name, asset_id):
     # Upload from GCS to GEE
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id)
     if task_id:
-        check_task_status([task_id], 600)
+        check_task_status([task_id], 100)
