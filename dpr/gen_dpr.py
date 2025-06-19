@@ -766,8 +766,8 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[4].text = well.is_functional
         row_cells[5].text = well.need_maintenance
         row_cells[6].text = well.data_well.get("select_one_well_type") or "No Data"
-        row_cells[6].text = str(well.latitude)
-        row_cells[7].text = str(well.longitude)
+        row_cells[7].text = str(well.latitude)
+        row_cells[8].text = str(well.longitude)
 
 
 def populate_waterbody(doc, plan, mws_id, mws_gdf):
