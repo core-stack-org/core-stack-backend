@@ -781,27 +781,27 @@ def get_terrain_data(state, district, block, uid):
             sheet_name="terrain",
         )
 
-        df["area_in_hac"] = pd.to_numeric(df["area_in_hac"], errors="coerce")
-        df["% of area hill_slope"] = pd.to_numeric(df["% of area hill_slope"], errors="coerce")
-        df["% of area plain_area"] = pd.to_numeric(df["% of area plain_area"], errors="coerce")
-        df["% of area ridge_area"] = pd.to_numeric(df["% of area ridge_area"], errors="coerce")
-        df["% of area slopy_area"] = pd.to_numeric(df["% of area slopy_area"], errors="coerce")
-        df["% of area valley_area"] = pd.to_numeric(df["% of area valley_area"], errors="coerce")
+        df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
+        df["hill_slope_area_percent"] = pd.to_numeric(df["hill_slope_area_percent"], errors="coerce")
+        df["plain_area_percent"] = pd.to_numeric(df["plain_area_percent"], errors="coerce")
+        df["ridge_area_percent"] = pd.to_numeric(df["ridge_area_percent"], errors="coerce")
+        df["slopy_area_percent"] = pd.to_numeric(df["slopy_area_percent"], errors="coerce")
+        df["valley_area_percent"] = pd.to_numeric(df["valley_area_percent"], errors="coerce")
 
         (area, hill_slope,plain_area,ridge_area,slopy_area,valley_area) = df.loc[df["UID"] == uid,
-            [   "area_in_hac",
-                "% of area hill_slope",
-                "% of area plain_area",
-                "% of area ridge_area",
-                "% of area slopy_area",
-                "% of area valley_area"
+            [   "area_in_ha",
+                "hill_slope_area_percent",
+                "plain_area_percent",
+                "ridge_area_percent",
+                "slopy_area_percent",
+                "valley_area_percent"
             ],
         ].values[0]
 
-        selected_columns_cluster = [col for col in df.columns if col.startswith("Terrain_Description")]
+        selected_columns_cluster = [col for col in df.columns if col.startswith("terrain_description")]
         
         filtered_df = df.loc[df["UID"] == uid, selected_columns_cluster].values[0]
-        mws_area = df.loc[df["UID"] == uid, "area_in_hac"].values[0]
+        mws_area = df.loc[df["UID"] == uid, "area_in_ha"].values[0]
 
         #? Parameters Desc
         parameter_main = f""
@@ -813,10 +813,10 @@ def get_terrain_data(state, district, block, uid):
         mws_lulc_area_plain = [0, 0, 0, 0]
         block_lulc_area_plain = [0, 0, 0, 0]
 
-        percent_slope = df.loc[df["UID"] == uid, "% of area slopy_area"].values[0]
-        percent_plain = df.loc[df["UID"] == uid, "% of area plain_area"].values[0]
-        percent_hill = df.loc[df["UID"] == uid, "% of area hill_slope"].values[0]
-        percent_valley = df.loc[df["UID"] == uid, "% of area valley_area"].values[0]
+        percent_slope = df.loc[df["UID"] == uid, "slopy_area_percent"].values[0]
+        percent_plain = df.loc[df["UID"] == uid, "plain_area_percent"].values[0]
+        percent_hill = df.loc[df["UID"] == uid, "hill_slope_area_percent"].values[0]
+        percent_valley = df.loc[df["UID"] == uid, "valley_area_percent"].values[0]
 
         if filtered_df[0] == "Broad Plains and Slopes":
             parameter_main += f"The micro-watershed is spread across {round(mws_area,2)} hectares. The micro-watershed includes flat plains and gentle slopes with {round(percent_plain, 2)} % area as plains and {round(percent_slope, 2)} % area under broad slopes."
@@ -832,14 +832,14 @@ def get_terrain_data(state, district, block, uid):
 
         #? Divergence Test
 
-        total_block_area = df["area_in_hac"].sum()
+        total_block_area = df["area_in_ha"].sum()
 
         #* Calculate weighted area for each topography type
-        block_hill_slope = sum(df["% of area hill_slope"] * df["area_in_hac"] / 100)
-        block_plain_area = sum(df["% of area plain_area"] * df["area_in_hac"] / 100)
-        block_ridge_area = sum(df["% of area ridge_area"] * df["area_in_hac"] / 100)
-        block_slopy_area = sum(df["% of area slopy_area"] * df["area_in_hac"] / 100)
-        block_valley_area = sum(df["% of area valley_area"] * df["area_in_hac"] / 100)
+        block_hill_slope = sum(df["hill_slope_area_percent"] * df["area_in_ha"] / 100)
+        block_plain_area = sum(df["plain_area_percent"] * df["area_in_ha"] / 100)
+        block_ridge_area = sum(df["ridge_area_percent"] * df["area_in_ha"] / 100)
+        block_slopy_area = sum(df["slopy_area_percent"] * df["area_in_ha"] / 100)
+        block_valley_area = sum(df["valley_area_percent"] * df["area_in_ha"] / 100)
 
         #? Create Dictionary for comparison
         terrain_types = [
@@ -891,13 +891,13 @@ def get_terrain_data(state, district, block, uid):
 
             df_slopes = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="terrain_lulc_slope")
 
-            block_shrub_area = sum(df_slopes["% of area shrub_scrubs"] * df_slopes["area_in_hac"] / 100)
-            block_barren_area = sum(df_slopes["% of area barren"] * df_slopes["area_in_hac"] / 100)
-            block_tree_area = sum(df_slopes["% of area forests"] * df_slopes["area_in_hac"] / 100)
-            block_kh_area = sum(df_slopes["% of area single_kharif"] * df_slopes["area_in_hac"] / 100)
-            block_non_kh_area = sum(df_slopes["% of area single_non_kharif"] * df_slopes["area_in_hac"] / 100)
-            block_double_area = sum(df_slopes["% of area double cropping"] * df_slopes["area_in_hac"] / 100)
-            block_triple_area = sum(df_slopes["% of area triple cropping"] * df_slopes["area_in_hac"] / 100)
+            block_shrub_area = sum(df_slopes["shrub_scrubs_area_percent"] * df_slopes["area_in_ha"] / 100)
+            block_barren_area = sum(df_slopes["barren_area_percent"] * df_slopes["area_in_ha"] / 100)
+            block_tree_area = sum(df_slopes["forests_area_percent"] * df_slopes["area_in_ha"] / 100)
+            block_kh_area = sum(df_slopes["single_kharif_area_percent"] * df_slopes["area_in_ha"] / 100)
+            block_non_kh_area = sum(df_slopes["single_non_kharif_area_percent"] * df_slopes["area_in_ha"] / 100)
+            block_double_area = sum(df_slopes["double_cropping_area_percent"] * df_slopes["area_in_ha"] / 100)
+            block_triple_area = sum(df_slopes["triple_cropping_area_percent"] * df_slopes["area_in_ha"] / 100)
 
             block_lulc_area_slope[0] += (block_shrub_area / total_block_area) * 100
             block_lulc_area_slope[1] += (block_barren_area / total_block_area) * 100
@@ -905,7 +905,7 @@ def get_terrain_data(state, district, block, uid):
             block_lulc_area_slope[3] += ((block_kh_area + block_non_kh_area + block_double_area + block_triple_area) / total_block_area) * 100
 
             if uid in df_slopes["UID"].values:
-                (area, tree_percent, shrub_percent, barren_percent, single_crop_kh, single_crop_non_kh, double_crop, triple_crop) = df_slopes.loc[df_slopes["UID"] == uid, ["area_in_hac", "% of area forests", "% of area shrub_scrubs", "% of area barren", "% of area single_kharif", "% of area single_non_kharif", "% of area double cropping", "% of area triple cropping"]].values[0]
+                (area, tree_percent, shrub_percent, barren_percent, single_crop_kh, single_crop_non_kh, double_crop, triple_crop) = df_slopes.loc[df_slopes["UID"] == uid, ["area_in_ha", "forests_area_percent", "shrub_scrubs_area_percent", "barren_area_percent", "single_kharif_area_percent", "single_non_kharif_area_percent", "double_cropping_area_percent", "triple_cropping_area_percent"]].values[0]
 
                 mws_lulc_area_slope[0] += float(shrub_percent)
 
@@ -926,12 +926,12 @@ def get_terrain_data(state, district, block, uid):
         if "terrain_lulc_plain" in excel_file.sheet_names:
             df_plain = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="terrain_lulc_plain")
 
-            block_shrub_area = sum(df_plain["% of area shrub_scrubs"] * df_plain["area_in_hac"] / 100)
-            block_barren_area = sum(df_plain["% of area barren"] * df_plain["area_in_hac"] / 100)
-            block_tree_area = sum(df_plain["% of area forests"] * df_plain["area_in_hac"] / 100)
-            block_single_area = sum(df_plain["% of area single_cropping"] * df_plain["area_in_hac"] / 100)
-            block_double_area = sum(df_plain["% of area double cropping"] * df_plain["area_in_hac"] / 100)
-            block_triple_area = sum(df_plain["% of area triple cropping"] * df_plain["area_in_hac"] / 100)
+            block_shrub_area = sum(df_plain["shrub_scrubs_area_percent"] * df_plain["area_in_ha"] / 100)
+            block_barren_area = sum(df_plain["barren_area_percent"] * df_plain["area_in_ha"] / 100)
+            block_tree_area = sum(df_plain["forests_area_percent"] * df_plain["area_in_ha"] / 100)
+            block_single_area = sum(df_plain["single_kharif_area_percent"] * df_plain["area_in_ha"] / 100)
+            block_double_area = sum(df_plain["double_cropping_area_percent"] * df_plain["area_in_ha"] / 100)
+            block_triple_area = sum(df_plain["triple_cropping_area_percent"] * df_plain["area_in_ha"] / 100)
 
             block_lulc_area_plain[0] += (block_shrub_area / total_block_area) * 100
             block_lulc_area_plain[1] += (block_barren_area / total_block_area) * 100
@@ -940,7 +940,7 @@ def get_terrain_data(state, district, block, uid):
 
             if uid in df_plain["UID"].values:
                 
-                (area, barren_percent, shrub_percent, tree_percent, single_crop, double_crop, triple_crop) = df_plain.loc[df_plain["UID"] == uid, ["area_in_hac", "% of area barren", "% of area shrub_scrubs", "% of area forests", "% of area single_cropping", "% of area double cropping", "% of area triple cropping"]].values[0]
+                (area, barren_percent, shrub_percent, tree_percent, single_crop, double_crop, triple_crop) = df_plain.loc[df_plain["UID"] == uid, ["area_in_ha", "barren_area_percent", "shrub_scrubs_area_percent", "forests_area_percent", "single_kharif_area_percent", "double_cropping_area_percent", "triple_cropping_area_percent"]].values[0]
 
                 mws_lulc_area_plain[0] += float(shrub_percent)
 
@@ -960,7 +960,7 @@ def get_terrain_data(state, district, block, uid):
 
                 parameter_lulc += f" On the plains, land use has predominance of {round(farmland_area_percent,2)} % farmlands, {round(barren_percent,2)} % barren areas, and {round(shrub_percent,2)} % shrubs."
 
-
+        print("parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain", parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain)
         return parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain
 
     except Exception as e:
@@ -1014,32 +1014,32 @@ def get_change_detection_data(state, district, block, uid):
         parameter_urban = f""
 
         # ? Land Degradation
-        df_degrad["Total_degradation"] = df_degrad["Total_degradation"].apply(
+        df_degrad["total_degradation_area_in_ha"] = df_degrad["total_degradation_area_in_ha"].apply(
             pd.to_numeric, errors="coerce"
         )
-        filtered_df = df_degrad.loc[df_degrad["UID"] == uid, "Total_degradation"]
+        filtered_df = df_degrad.loc[df_degrad["UID"] == uid, "total_degradation_area_in_ha"]
         degradation = filtered_df.iloc[0]
-        avg = df_degrad["Total_degradation"].mean()
+        avg = df_degrad["total_degradation_area_in_ha"].mean()
 
         if degradation >= 20:
             parameter_land += f"There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2022. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
 
         # ? Tree Reduction
-        df_defo["total_deforestation"] = df_defo["total_deforestation"].apply(
+        df_defo["total_deforestation_area_in_ha"] = df_defo["total_deforestation_area_in_ha"].apply(
             pd.to_numeric, errors="coerce"
         )
-        filtered_df = df_defo.loc[df_defo["UID"] == uid, "total_deforestation"]
+        filtered_df = df_defo.loc[df_defo["UID"] == uid, "total_deforestation_area_in_ha"]
         reduction = filtered_df.iloc[0]
-        avg = df_defo["total_deforestation"].mean()
+        avg = df_defo["total_deforestation_area_in_ha"].mean()
 
         if reduction >= 50:
             parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2022, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares on average in the entire block."
 
         # ? Urbanization
-        df_urban["Total_urbanization"] = df_urban["Total_urbanization"].apply(
+        df_urban["total_urbanization_area_in_ha"] = df_urban["total_urbanization_area_in_ha"].apply(
             pd.to_numeric, errors="coerce"
         )
-        filtered_df = df_urban.loc[df_urban["UID"] == uid, "Total_urbanization"]
+        filtered_df = df_urban.loc[df_urban["UID"] == uid, "total_urbanization_area_in_ha"]
         built_up_area = filtered_df.iloc[0]
 
         if built_up_area >= 40:
@@ -1115,7 +1115,7 @@ def get_cropping_intensity(state, district, block, uid):
             non_drought_inten = 0
 
             for year in drought_years:
-                selected_columns_d = [col for col in df.columns if col.startswith("cropping_intensity_" + year)]
+                selected_columns_d = [col for col in df.columns if col.startswith("cropping_intensity_unit_less_" + year)]
 
                 filtered_d_df = df.loc[df["UID"] == uid, selected_columns_d]
 
@@ -1123,7 +1123,7 @@ def get_cropping_intensity(state, district, block, uid):
                     drought_inten += filtered_d_df.values[0][0]
 
             for year in non_drought_years:
-                selected_columns_nd = [col for col in df.columns if col.startswith("cropping_intensity_" + year)]
+                selected_columns_nd = [col for col in df.columns if col.startswith("cropping_intensity_unit_less_" + year)]
 
                 filtered_nd_df = df.loc[df["UID"] == uid, selected_columns_nd]
 
@@ -1317,7 +1317,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
         if not filtered_df.empty:
 
-            selected_columns_kh = [col for col in df.columns if col.startswith("kharif_area_")]
+            selected_columns_kh = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
 
             selected_columns_moderate = [col for col in df_drought.columns if col.startswith("Moderate_")]
             selected_columns_severe = [col for col in df_drought.columns if col.startswith("Severe_")]
@@ -1363,13 +1363,13 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 total_area_nd = 0
 
                 for year in drought_years:
-                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_" + year)]
+                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
                     total_area_d += yearly_area[0]
 
 
                 for year in non_drought_year:
-                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_" + year)]
+                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
                     total_area_nd += yearly_area[0]
                 
@@ -1392,10 +1392,10 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 percent_rb_kh = 0
 
                 for year in non_drought_year:
-                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_" + year)]
+                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values[0]
 
-                    selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_" + year)]
+                    selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
                     yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values[0]
 
                     area_under_rb_nd += yearly_area_rb[0]
@@ -1417,10 +1417,10 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 percent_rb_kh = 0
 
                 for year in drought_years:
-                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_" + year)]
+                    selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values[0]
 
-                    selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_" + year)]
+                    selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
                     yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values[0]
 
                     area_under_rb += yearly_area_rb[0]
@@ -1437,9 +1437,9 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
 
             # ? Data yearwise for waterbody
-            selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_")]
-            selected_columns_rabi = [col for col in df.columns if col.startswith("rabi_area")]
-            selected_columns_zaid = [col for col in df.columns if col.startswith("zaid_area_")]
+            selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
+            selected_columns_rabi = [col for col in df.columns if col.startswith("rabi_area_in_ha_")]
+            selected_columns_zaid = [col for col in df.columns if col.startswith("zaid_area_in_ha_")]
 
             df[selected_columns_kharif] = df[selected_columns_kharif].apply(pd.to_numeric, errors="coerce")
             df[selected_columns_rabi] = df[selected_columns_rabi].apply(pd.to_numeric, errors="coerce")
@@ -1576,7 +1576,7 @@ def get_water_balance_data(state, district, block, uid):
             for year in non_drought_years:
 
                 #? Rainfall
-                selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_" + year)]
+                selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
                 rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
                 avg_rainfall += rainfall[0]
 
@@ -1586,9 +1586,9 @@ def get_water_balance_data(state, district, block, uid):
                 monsoon_onset.append(onset[0])
 
                 #? Fortnight Delg Calc
-                selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_" + year)]
-                selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_" + year)]
-                selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_" + year)]
+                selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
+                selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
+                selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
                 delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
                 delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
@@ -1597,7 +1597,7 @@ def get_water_balance_data(state, district, block, uid):
                 avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
 
                 #? Runoff
-                selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_" + year)]
+                selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
                 runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
 
                 runoff_percent += ((runoff[0] / rainfall[0]) * 100)
@@ -1630,14 +1630,14 @@ def get_water_balance_data(state, district, block, uid):
             for year in drought_years:
 
                 #? Rainfall
-                selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_" + year)]
+                selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
                 rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
                 avg_rainfall += rainfall[0]
 
                 #? Fortnight Delg Calc
-                selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_" + year)]
-                selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_" + year)]
-                selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_" + year)]
+                selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
+                selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
+                selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
                 delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
                 delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
@@ -1646,7 +1646,7 @@ def get_water_balance_data(state, district, block, uid):
                 avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
 
                 #? Runoff
-                selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_" + year)]
+                selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
                 runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
 
                 runoff_percent += ((runoff[0] / rainfall[0]) * 100)
@@ -1779,7 +1779,7 @@ def get_drought_data(state, district, block, uid):
             years = []
             drysp_tuple = []
 
-            selected_columns_drysp = [col for col in df.columns if any(col.startswith(f"drysp_{year}") for year in drought_years)]
+            selected_columns_drysp = [col for col in df.columns if any(col.startswith(f"drysp_unit_4_weeks_{year}") for year in drought_years)]
             df[selected_columns_drysp] = df[selected_columns_drysp].apply(
                 pd.to_numeric, errors="coerce"
             )
@@ -1979,7 +1979,7 @@ def get_village_data(state, district, block, uid):
                 ca_cols = [
                     col
                     for col in df_village.columns
-                    if col.startswith("Community assets_2018")
+                    if col.startswith("Community assets_count")
                 ]
                 df_village[ca_cols] = df_village[ca_cols].apply(
                     pd.to_numeric, errors="coerce"
@@ -2009,7 +2009,7 @@ def get_village_data(state, district, block, uid):
                 )
 
                 sc_percent_col = [
-                    col for col in df_socio.columns if col.startswith("SC_percentage")
+                    col for col in df_socio.columns if col.startswith("SC_percent")
                 ]
                 df_socio[sc_percent_col] = df_socio[sc_percent_col].apply(
                     pd.to_numeric, errors="coerce"
@@ -2022,7 +2022,7 @@ def get_village_data(state, district, block, uid):
                 villages_sc.append(round(sc_percent[0], 2))
 
                 st_percent_col = [
-                    col for col in df_socio.columns if col.startswith("ST_percentage")
+                    col for col in df_socio.columns if col.startswith("ST_percent")
                 ]
                 df_socio[st_percent_col] = df_socio[st_percent_col].apply(
                     pd.to_numeric, errors="coerce"
