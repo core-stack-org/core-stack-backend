@@ -17,6 +17,7 @@ from utilities.constants import (
     ODK_URL_swb,
     ODK_URL_waterbody,
     ODK_URL_well,
+    ODK_URL_SESSION,
 )
 
 logger = logging.getLogger(__name__)
@@ -531,7 +532,6 @@ def extract_keys(d, parent_key="", sep="_"):
 
 # MARK: Bearer Token
 def fetch_bearer_token(email: str, password: str) -> str:
-    ODK_SESSION_URL = "https://odk.gramvaani.org/v1/sessions"
     try:
         if _token_cache["token"] and _token_cache["expires_at"]:
             now = datetime.now(timezone.utc)
@@ -539,7 +539,7 @@ def fetch_bearer_token(email: str, password: str) -> str:
                 return _token_cache["token"]
 
         response = requests.post(
-            ODK_SESSION_URL, json={"email": email, "password": password}
+            ODK_URL_SESSION, json={"email": email, "password": password}
         )
         print("Response: ", response)
         if response.status_code == 200:

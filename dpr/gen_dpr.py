@@ -65,7 +65,7 @@ def get_plan(plan_id):
 def create_dpr_document(plan):
     doc = initialize_document()
     logger.info("Generating DPR for plan ID: %s", plan.plan_id)
-    logger.info("Syncing ODK database")
+    logger.info("Syncing ODK data with database")
 
     sync_db_odk()
     logger.info("Database sync complete")
@@ -166,15 +166,15 @@ def send_dpr_email(doc, email_id, plan_name):
 
 
 def get_data_for_settlement(planid):
-    return ODK_settlement.objects.filter(plan_id=planid)
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected")
 
 
 def get_settlement_count_for_plan(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).count()
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").count()
 
 
 def get_settlement_coordinates_for_plan(planid):
-    settlements = ODK_settlement.objects.filter(plan_id=planid).values(
+    settlements = ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").values(
         "settlement_name", "latitude", "longitude"
     )
     return [
@@ -235,7 +235,7 @@ def create_team_details_table(doc, plan):
 
     row_cells = table.add_row().cells
     row_cells[0].text = plan.facilitator_name
-    row_cells[1].text = plan.plan
+    row_cells[1].text = plan.plan.replace('_', ' ').title()
     row_cells[2].text = "PRA, Gram Sabha, Transect Walk, GIS Mapping"
 
     for cell in hdr_cells:
@@ -296,14 +296,14 @@ def create_village_brief_table(
     headers_data = [
         ("Name of the Village", plan.village_name),
         ("Name of the Gram Panchayat", plan.gram_panchayat),
-        ("Block", plan.block.block_name),
+        ("Tehsil", plan.block.block_name),
         ("District", plan.district.district_name),
         ("State", plan.state.state_name),
         ("Number of Settlements in the Village", str(total_settlements)),
         ("Intersecting Micro Watershed IDs", intersecting_mws_ids),
         (
             "Latitude and Longitude of the Village",
-            f"{centroid.y:.6f}, {centroid.x:.6f}",
+            f"{centroid.y:.8f}, {centroid.x:.8f}",
         ),
     ]
 
@@ -409,7 +409,7 @@ def create_socio_eco_table(doc, plan):
 def create_livelihood_table(doc, plan):
     # Crop Info section remains the same
     doc.add_heading("Crop Info", level=4)
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id)
+    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     headers_cropping_pattern = [
         "Name of the Settlement",
         "Irrigation Source",
@@ -518,7 +518,7 @@ def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf):
         matching_feature = mws_gdf[mws_gdf["uid"] == mws_id]
         if not matching_feature.empty:
             centroid = matching_feature.geometry.centroid.iloc[0]
-            row_cells[1].text = f"{centroid.y:.2f}, {centroid.x:.2f}"
+            row_cells[1].text = f"{centroid.y:.8f}, {centroid.x:.8f}"
         else:
             row_cells[1].text = "Not found"
 
@@ -687,7 +687,7 @@ def populate_water_structures(doc, plan, mws_id, mws_gdf):
 
 def populate_well(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id)
+    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
 
     wells_in_mws = []
     for well in wells_in_plan:
@@ -720,7 +720,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
 
     doc.add_heading(f"Well Information for MWS: {mws_id}", level=2)
     headers_well_info = [
-        "Name of Beneficiary Settlement",
+        "Name of Beneficiary's Settlement",
         "Number of Wells",
         "Total Number of Household Benefitted",
     ]
@@ -747,6 +747,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         "Which Caste uses the well?",
         "Functional or Non-functional",
         "Need Maintenance",
+        "Type of Well",
         "Latitude",
         "Longitude",
     ]
@@ -764,13 +765,15 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[3].text = well.caste_uses
         row_cells[4].text = well.is_functional
         row_cells[5].text = well.need_maintenance
-        row_cells[6].text = str(well.latitude)
-        row_cells[7].text = str(well.longitude)
+        row_cells[6].text = well.data_well.get("select_one_well_type") or "No Data"
+        row_cells[7].text = str(well.latitude)
+        row_cells[8].text = str(well.longitude)
 
 
 def populate_waterbody(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    # basically water structures
+    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     waterbody_in_mws = []
     for waterbody in waterbodies_in_plan:
         waterbody_point = Point(waterbody.longitude, waterbody.latitude)
@@ -813,7 +816,7 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
 
     doc.add_heading(f"Waterbody Information for MWS: {mws_id}", level=2)
     headers_waterstructure = [
-        "Name of the Beneficiary Settlement",
+        "Name of the Beneficiary's Settlement",
         "Who manages?",
         "Who owns the water structure?",
         "Which Caste uses the water structure?",
@@ -1030,7 +1033,7 @@ def create_surface_wb_table(doc, plan):
 
     swb = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
-        workspace="water_bodies",
+        workspace="swb", # Surface Water Bodies Workspace
         layer_name="surface_waterbodies_"
         + str(plan.district.district_name).lower().replace(" ", "_")
         + "_"
@@ -1122,6 +1125,7 @@ def create_surface_wb_table(doc, plan):
 
 
 # MARK: - Section F
+# Works and Maps Section
 def add_section_f(doc, plan, mws):
     doc.add_heading("Section F: Proposed New NRM works on basis through Gram Sabha")
     para = doc.add_paragraph()
@@ -1133,11 +1137,11 @@ def add_section_f(doc, plan, mws):
 
 
 def create_nrm_works_table(doc, plan, mws):
-    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id)
-    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id)
-    settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
-    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id)
-    waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
 
     mws_uids = list(set([feature["properties"]["uid"] for feature in mws["features"]]))
 
@@ -1607,8 +1611,7 @@ def show_all_mws(doc, plan, mws):
         doc.add_picture(img_filename, width=Inches(6))
         doc.add_page_break()
 
-# MARK: - Section G
-
+# MARK: - Section G -- Plantations and Livelihood Works
 def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Propose New Livelihood Works", level=1)
 
@@ -1736,6 +1739,8 @@ def add_section_g(doc, plan, mws):
 # they are also treated as first class citizens and added to the maintenance tables
 
 def add_section_h(doc, plan, mws):
+
+    # populater the database with the records from resource mapping
     populate_maintenance_from_waterbody(plan)
 
     doc.add_heading(
@@ -1789,7 +1794,7 @@ def maintenance_gw_table(doc, plan, mws):
         "Work ID",
         "Corresponding Work ID",
         "Type of Recharge Structure",
-        "Previous Maintenance Activity",
+        "Repair Activity",
         "Latitude",
         "Longitude",
     ]
@@ -1828,9 +1833,8 @@ def maintenance_agri_table(doc, plan, mws):
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
         "Work ID",
-        "Corresponding Work ID",
         "Type of Irrigation Structure",
-        "Previous Maintenance Activity",
+        "Repair Activity",
         "Latitude",
         "Longitude",
     ]
@@ -1853,15 +1857,14 @@ def maintenance_agri_table(doc, plan, mws):
             or "No Data Provided"
         )
         row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_agri_maintenance.get(
+        row_cells[3].text = maintenance.data_agri_maintenance.get(
             "select_one_irrigation_structure"
         ) or "No Data"
-        row_cells[5].text = maintenance.data_agri_maintenance.get(
+        row_cells[4].text = maintenance.data_agri_maintenance.get(
             "select_one_activities"
         ) or "No Data"
-        row_cells[6].text = str(maintenance.latitude)
-        row_cells[7].text = str(maintenance.longitude)
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
 
 
 def maintenance_waterstructures_table(doc, plan, mws):
