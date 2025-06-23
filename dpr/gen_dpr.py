@@ -1615,7 +1615,7 @@ def show_all_mws(doc, plan, mws):
 def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Propose New Livelihood Works", level=1)
 
-    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
+    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     
     # Table for Livestock and Fisheries
     doc.add_heading("G.1 Livestock and Fisheries", level=2)

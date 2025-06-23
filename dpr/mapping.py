@@ -125,7 +125,7 @@ def get_activity_type_from_waterbody(waterbody):
     if expected_repair_key:
         repair_value = data.get(expected_repair_key)
 
-        if repair_value.lower() == "other":
+        if repair_value and repair_value.lower() == "other":
             other_value = data.get(f"{expected_repair_key}_other")
             if other_value:
                 print(f"Found repair activity '{expected_repair_key}' with value '{other_value}' for waterbody {waterbody.waterbody_id}")
@@ -158,7 +158,7 @@ def get_activity_type_from_well(well):
     print(f"Repair type well: {repair_type}")
 
     if repair_type:
-        if repair_type.lower() == "other":
+        if repair_type and repair_type.lower() == "other":
             other_value = well_condition.get("select_one_repairs_well_other")
             if other_value:
                 print(f"Found well repair type 'other' with value '{other_value}' for well {well.well_id}")
