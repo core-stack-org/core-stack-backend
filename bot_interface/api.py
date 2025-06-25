@@ -5,11 +5,12 @@ from rest_framework import status
 import bot_interface.models
 import bot_interface.utils
 import bot_interface.tasks
-import bot_interface.auth
+# import bot_interface.auth
 import requests
 import os
 import emoji
 # from deep_translator import GoogleTranslator
+from utilities.auth_utils import auth_free
 
 import time
 from datetime import datetime, timedelta
@@ -21,10 +22,19 @@ from requests.exceptions import RequestException
 # Set to track processed message IDs
 processed_message_ids = set()
 
+# Define WhatsApp media path
+WHATSAPP_MEDIA_PATH = "/tmp/whatsapp_media/"
+
+# Create the directory if it doesn't exist
+os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)
+
 def mark_message_as_read(app_instance_config_id, message_id):
     """Mark WhatsApp message as read"""
     try:
-        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(app_instance_config_id)
+        # Temporarily disable auth call until bot_interface.auth is available
+        # BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(app_instance_config_id)
+        print(f"Would mark message as read: {message_id} for bot {app_instance_config_id}")
+        return  # Temporarily return early
         
         print("message_id : ", message_id)
         
@@ -45,13 +55,14 @@ def mark_message_as_read(app_instance_config_id, message_id):
         print(f"Error marking message as read: {str(e)}")
 
 @api_view(["POST"])
+@auth_free
 def whatsapp_webhook(request):
     print("Webhook start")
     print("START TIME = ", datetime.now())
     webhook_params = request.GET.dict()
     # Extract JSON data from the POST body
     json_data = request.data
-    # print("Webhook request JSON data ::: ", json.dumps(json_data,indent=4))
+    print("Webhook request JSON data ::: ", json.dumps(json_data,indent=4))
     
     # Extract msisdn from the nested structure
     entry = json_data.get("entry", [])
@@ -140,7 +151,7 @@ def send_text_url(app_instance_config_id, contact_number, text):
                 "to": contact_number,
                 "type": "text",
                 "text": {
-                    "preview_url": true,
+                    "preview_url": True,
                     "body": text
                 }
             },

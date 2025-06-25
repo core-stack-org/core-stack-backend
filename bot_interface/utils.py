@@ -9,7 +9,7 @@ import bot_interface.api
 import bot_interface.models
 import bot_interface.interface.generic, bot_interface.interface.whatsapp
 import json
-from ai4bharat.transliteration import XlitEngine
+# from ai4bharat.transliteration import XlitEngine
 from PIL import Image
 import decimal
 import ast
@@ -18,13 +18,13 @@ from botocore.exceptions import ClientError
 import speech_recognition as sr
 import subprocess
 import mimetypes
-from gtts import gTTS
+# from gtts import gTTS
 from collections import OrderedDict
 import bot_interface.api
 import bot_interface.models
 import bot_interface.interface.generic, bot_interface.interface.whatsapp
 from community_engagement.models import Media
-from WhatsappConnect.settings import BUCKET_URL, BUCKET_NAME, WHATSAPP_MEDIA_PATH
+# from WhatsappConnect.settings import BUCKET_URL, BUCKET_NAME, WHATSAPP_MEDIA_PATH
 
 status_map = {
             "UNASSIGNED": "सौंपा नहीं गया",
@@ -37,13 +37,13 @@ status_map = {
             "REJECTED": "रद्द किया है"
         }
 
-class Transliterate:
-    def __init__(self, source_language, beam_width=10, rescore=True, source_script_type="en"):
-        self.engine = XlitEngine(source_language, beam_width=beam_width, rescore=rescore, src_script_type=source_script_type)
+# class Transliterate:
+#     def __init__(self, source_language, beam_width=10, rescore=True, source_script_type="en"):
+#         self.engine = XlitEngine(source_language, beam_width=beam_width, rescore=rescore, src_script_type=source_script_type)
 
-    def translit_sentence(self, sentence, target_language):
-        transcript = self.engine.translit_sentence(sentence,target_language)
-        return transcript
+#     def translit_sentence(self, sentence, target_language):
+#         transcript = self.engine.translit_sentence(sentence,target_language)
+#         return transcript
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):

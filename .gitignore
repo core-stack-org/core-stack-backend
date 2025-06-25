@@ -32,4 +32,4 @@ dashboard/
 
 
 # bot_interface
-bot_interface/migrations/__pycache__/
+bot_interface/migrations/

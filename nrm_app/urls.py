@@ -20,6 +20,7 @@ from django.urls import path, include
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from bot_interface.api import whatsapp_webhook
 
 
 schema_view = get_schema_view(
@@ -47,6 +48,7 @@ urlpatterns = [
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
     path("api/v1/", include("community_engagement.urls")),
+    path("webhook", whatsapp_webhook, name="whatsapp_webhook"),
     
     # Swagger Doc
     path(
