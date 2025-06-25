@@ -99,5 +99,6 @@ urlpatterns = [
         "merge_swb_ponds/",
         api.swb_pond_merging,
         name="merge_swb_ponds",
-    )
+    ),
+    path('generate_api_key/', api.generate_api_key, name='generate-api-key'),
 ]

@@ -869,7 +869,7 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
     if 'crs' in nrega_data:
         nrega.set_crs(nrega_data['crs']['properties']['name'], inplace=True)
 
-    joined = gpd.sjoin(nrega, mws, how="inner", predicate="within")
+    joined = gpd.sjoin(nrega, mws, how="inner", op="within")
     counts = {}
 
     df_data = []
@@ -886,6 +886,7 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
         "%d-%m-%Y %H:%M:%S",
         "%Y-%m-%d %H:%M:%S.%f",
         "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M:%S.%f",
     ]
 
     for _, row in joined.iterrows():
@@ -895,6 +896,8 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
 
         if isinstance(creation_t, pd.Timestamp):
             creation_t = creation_t.strftime('%d-%m-%Y %H:%M:%S')
+        elif isinstance(creation_t, pd.Timestamp):
+            creation_t = creation_t.strftime('%Y/%m/%d %H:%M:%S')
 
         date_obj = None
         for date_format in date_formats:
@@ -1071,7 +1074,7 @@ def fetch_village_asset_count(state, district, block, writer, output_file, start
         points_gdf.set_crs(village_gdf.crs, inplace=True)
     
     # 5. Find which village each asset belongs to
-    joined_gdf = gpd.sjoin(points_gdf, village_gdf, how='inner', predicate='within')
+    joined_gdf = gpd.sjoin(points_gdf, village_gdf, how='inner', op='within')
     
     # 6. Get asset + village info
     result_df = joined_gdf[[ 

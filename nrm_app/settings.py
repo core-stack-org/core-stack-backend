@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    "rest_framework_api_key",
     # project applications
     "users",
     "organization",
@@ -312,3 +313,4 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 NREGA_BUCKET = env("NREGA_BUCKET")
 NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
 NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+

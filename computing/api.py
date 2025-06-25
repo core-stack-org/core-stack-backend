@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework_api_key.models import APIKey
 
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
@@ -930,3 +931,18 @@ def wells_compute(request):
         )
     except Exception as e:
         return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def generate_api_key(request):
+    print("Inside API key Generation")
+    try:
+        name = request.data.get("name").lower()
+        key, api_key = APIKey.objects.create_key(name=name)
+        return Response(
+            {"Success": "API Key generated", "api_key": api_key, "name":name},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generation api_key :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
