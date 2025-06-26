@@ -1,7 +1,7 @@
 from django.contrib import admin
-import bot_interface.models
+from .models import Bot, SMJ
 
 # Register your models here.
 
-admin.site.register(bot_interface.models.Bot)
-admin.site.register(bot_interface.models.SMJ)
+admin.site.register(Bot)
+admin.site.register(SMJ)
