@@ -3,13 +3,14 @@ import uuid
 from geoadmin.models import State, District, Block
 from projects.models import Project
 from users.models import User
+from bot_interface.models import Bot
 
 
 # Create your models here.
 class Community(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
-    # bot = models.ForeignKey(Bot, on_delete=models.SET_NULL)
+    project = models.ForeignKey(Project, null=True, on_delete=models.CASCADE)
+    bot = models.ForeignKey(Bot, null=True, on_delete=models.SET_NULL)
 
     def __str__(self):
         return self.project.name
@@ -42,7 +43,7 @@ class Media(models.Model):
     media_type = models.CharField(max_length=255, choices=Media_type.choices)
     media_path = models.CharField(max_length=255)
     source = models.CharField(max_length=255, choices=Media_source.choices)
-    # bot = models.ForeignKey(Bot, on_delete=models.SET_NULL)
+    bot = models.ForeignKey(Bot, null=True, on_delete=models.SET_NULL)
     created_at = models.DateTimeField(auto_now_add=True)
 
 

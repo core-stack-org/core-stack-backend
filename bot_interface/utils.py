@@ -23,7 +23,6 @@ from collections import OrderedDict
 import bot_interface.api
 import bot_interface.models
 import bot_interface.interface.generic, bot_interface.interface.whatsapp
-from community_engagement.models import Media
 # from WhatsappConnect.settings import BUCKET_URL, BUCKET_NAME, WHATSAPP_MEDIA_PATH
 
 status_map = {
@@ -240,6 +239,7 @@ def check_event_type(app_instance_config_id, event_packet, expected_response_typ
 
 
 def create_media_entry(user, media_path, media_type, app_type='WA'):
+    from community_engagement.models import Media
     media_details = Media(
         app_type=app_type, app_instance_config=user.app_instance_config, user=user, media_type=media_type, media_path=media_path)
     media_details.save()
