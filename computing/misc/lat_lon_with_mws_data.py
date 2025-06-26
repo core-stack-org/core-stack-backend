@@ -30,6 +30,7 @@ def get_mws_id_by_lat_lon(lon, lat):
     ee_initialize()
     data_dict = get_location_info_by_lat_lon(lon, lat)
     print("data_dict", data_dict)
+
     state = data_dict['STATE']
     district = data_dict['District']
     block = data_dict['TEHSIL']
@@ -40,8 +41,15 @@ def get_mws_id_by_lat_lon(lon, lat):
     mws_fc = ee.FeatureCollection(mws_asset_id)
     point = ee.Geometry.Point([lon, lat])
     matching_feature = mws_fc.filterBounds(point).first()
-    uid = ee.String(matching_feature.get('uid'))
-    return uid.getInfo()
+    uid = ee.String(matching_feature.get('uid')).getInfo()
+
+    return {
+        'uid': uid,
+        'state': state,
+        'district': district,
+        'block': block
+    }
+
 
 
 def get_mws_json_from_stats_excel(state, district, block, mws_id):
