@@ -17,13 +17,13 @@ from utilities.constants import (
     ODK_SYNC_URL_SETTLEMENT,
     ODK_SYNC_URL_WELL,
     ODK_SYNC_URL_WATER_STRUCTURES,
-    ODK_URL_crop,
-    ODK_URL_gw,
-    ODK_URL_agri,
-    ODK_URL_livelihood,
-    ODK_URL_RS_WATERBODY_MAINTENANCE,
-    ODK_URL_GW_MAINTENANCE,
-    ODK_URL_AGRI_MAINTENANCE,
+    ODK_SYNC_URL_CROP,
+    ODK_SYNC_URL_RECHARGE_STRUCTURE,
+    ODK_SYNC_URL_IRRIGATION_STRUCTURE,
+    ODK_SYNC_URL_LIVELIHOOD,
+    ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
+    ODK_SYNC_URL_GW_MAINTENANCE,
+    ODK_SYNC_URL_AGRI_MAINTENANCE,
 )
 from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
 
@@ -181,7 +181,7 @@ def _get_resource_config() -> Dict[str, Dict[str, Any]]:
             "success_message": "Water structures data synced successfully",
         },
         "cropping_pattern": {
-            "url": ODK_URL_crop,
+            "url": ODK_SYNC_URL_CROP,
             "success_message": "Cropping pattern data synced successfully",
         },
     }
@@ -191,27 +191,27 @@ def _get_work_config() -> Dict[str, Dict[str, Any]]:
     """Configuration mapping for different work types."""
     return {
         "recharge_st": {
-            "url": ODK_URL_gw,
+            "url": ODK_SYNC_URL_RECHARGE_STRUCTURE,
             "success_message": "Recharge structure data synced successfully",
         },
         "irrigation_st": {
-            "url": ODK_URL_agri,
+            "url": ODK_SYNC_URL_IRRIGATION_STRUCTURE,
             "success_message": "Irrigation structure data synced successfully",
         },
         "propose_maintenance_recharge_st": {
-            "url": ODK_URL_GW_MAINTENANCE,
+            "url": ODK_SYNC_URL_GW_MAINTENANCE,
             "success_message": "Recharge structure maintenance data synced successfully",
         },
         "propose_maintenance_rs_swb": {
-            "url": ODK_URL_RS_WATERBODY_MAINTENANCE,
+            "url": ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
             "success_message": "Surface water body maintenance data synced successfully",
         },
         "propose_maintenance_irrigation_st": {
-            "url": ODK_URL_AGRI_MAINTENANCE,
+            "url": ODK_SYNC_URL_AGRI_MAINTENANCE,
             "success_message": "Irrigation structure maintenance data synced successfully",
         },
         "livelihood": {
-            "url": ODK_URL_livelihood,
+            "url": ODK_SYNC_URL_LIVELIHOOD,
             "success_message": "Livelihood data synced successfully",
         },
     }
