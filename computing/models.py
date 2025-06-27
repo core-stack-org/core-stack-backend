@@ -23,6 +23,9 @@ class Dataset(models.Model):
         verbose_name = "Dataset"
         verbose_name_plural = "Datasets"
 
+    def __str__(self):
+        return str(self.name)
+
 
 class Layer(models.Model):
     id = models.AutoField(primary_key=True)
@@ -46,3 +49,6 @@ class Layer(models.Model):
     class Meta:
         verbose_name = "Layer"
         verbose_name_plural = "Layers"
+
+    def __str__(self):
+        return str(self.block)
