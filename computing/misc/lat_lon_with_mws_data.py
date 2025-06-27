@@ -33,11 +33,11 @@ def get_mws_id_by_lat_lon(lon, lat):
 
     state = data_dict['STATE']
     district = data_dict['District']
-    block = data_dict['TEHSIL']
-    print(state, district, block)
+    tehsil = data_dict['TEHSIL']
+    print(state, district, tehsil)
 
-    asset_path = get_gee_asset_path(state, district, block)
-    mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_uid'
+    asset_path = get_gee_asset_path(state, district, tehsil)
+    mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
     mws_fc = ee.FeatureCollection(mws_asset_id)
     point = ee.Geometry.Point([lon, lat])
     matching_feature = mws_fc.filterBounds(point).first()
@@ -47,15 +47,15 @@ def get_mws_id_by_lat_lon(lon, lat):
         'uid': uid,
         'state': state,
         'district': district,
-        'block': block
+        'tehsil': tehsil
     }
 
 
 
-def get_mws_json_from_stats_excel(state, district, block, mws_id):
+def get_mws_json_from_stats_excel(state, district, tehsil, mws_id):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper() 
-    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + block
+    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + tehsil
     xlsx_file = file_xl_path + '.xlsx'
 
     sheets = {
@@ -109,11 +109,11 @@ def get_mws_json_from_stats_excel(state, district, block, mws_id):
     return result
 
 
-def get_mws_json_from_kyl_indicator(state, district, block, mws_id):
-    get_generate_filter_mws_data(state, district, block, 'xlsx')
+def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
+    get_generate_filter_mws_data(state, district, tehsil, 'xlsx')
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + block
+    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + tehsil
     xlsx_file = file_xl_path + '_KYL_filter_data.xlsx'
 
     try:

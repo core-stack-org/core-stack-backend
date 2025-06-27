@@ -152,13 +152,21 @@ def get_mws_by_lat_lon(request):
         - `longitude` (float): Longitude coordinate (-180 to 180)
 
         Example Request:
-        GET /api/v1/get_mws_id_by_lat_lon/?latitude=25.9717644&longitude=82.44364023
+        `GET /api/v1/get_mws_id_by_lat_lon/?latitude=25.9717644&longitude=82.44364023`
 
         Returns code:
         - 200 OK: JSON data (if file_type=json) or Excel file download
         - 400 Bad Request: Invalid parameters or logic error
         - 401 Unauthorized: Invalid or missing API key
         - 500 Internal Server Error: File generation or reading issue
+
+        Response data:
+            `{
+                "uid": "12_234647",
+                "state": "UTTAR PRADESH",
+                "district": "JAUNPUR",
+                "tehsil": "BADLAPUR"
+            }`
     """
 
     print("Inside Get mws id by lat lon layer API")
@@ -182,7 +190,7 @@ def get_mws_by_lat_lon(request):
 @permission_classes([HasAPIKey])
 def get_mws_json_by_stats_excel(request):
     """
-        Retrieve MWS data for a given state, district, block, and MWS ID.
+        Retrieve MWS data for a given state, district, tehsil, and MWS ID.
 
         Authorization in header:
         - Requires an API key passed in the `Authorization` header.
@@ -191,26 +199,55 @@ def get_mws_json_by_stats_excel(request):
         Query params should contain:
         - `state` (str): Name of the state (e.g. Odisha)
         - `district` (str): Name of the district (e.g. Ganjam)
-        - `block` (str): Name of the block (e.g. Chatrapur)
+        - `tehsil` (str): Name of the tehsil (e.g. Chatrapur)
         - `mws_id` (str): Unique MWS identifier (e.g. 12_12345)
 
         Example Request:
-        GET /api/v1/get_mws_data?state=Uttar Pradesh&district=Jaunpur&block=Badlapur&mws_id=12_234647
+        `GET /api/v1/get_mws_data?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur&mws_id=12_234647`
 
         Returns code:
         - 200 OK: JSON data (if file_type=json) or Excel file download
         - 400 Bad Request: Invalid parameters or logic error
         - 401 Unauthorized: Invalid or missing API key
         - 500 Internal Server Error: File generation or reading issue
+
+        Response Data:
+            `{
+                "hydrological_annual": [
+                    {
+                        "uid": "12_234647",
+                        "et_in_mm_2017-2018": 894.1,
+                        "runoff_in_mm_2017-2018": 148.57,
+                        "g_in_mm_2017-2018": -321.06,
+                        "deltag_in_mm_2017-2018": -321.06,
+                        "precipitation_in_mm_2017-2018": 721.62,
+                        "welldepth_in_m_2017-2018": -1.78,
+                        ............
+                    }
+                ],
+                "terrain": [
+                    {
+                        "uid": "12_234647",
+                        "area_in_ha": 4317.15,
+                        "terrain_cluster_id": 1,
+                        "terrain_description": "Mostly Plains",
+                        "hill_slope_area_percent": 0.02,
+                        "plain_area_percent": 95.75,
+                        "ridge_area_percent": 2.17,
+                        "slopy_area_percent": 1.1,
+                        "valley_area_percent": 0.96
+                    }
+                ]
+            }`
     """
 
     print("Inside mws data by excel api")
     try:
         state = request.query_params.get("state").lower()
         district = request.query_params.get("district").lower()
-        block = request.query_params.get("block").lower()
+        tehsil = request.query_params.get("tehsil").lower()
         mws_id = request.query_params.get("mws_id")
-        data = get_mws_json_from_stats_excel(state, district, block, mws_id)
+        data = get_mws_json_from_stats_excel(state, district, tehsil, mws_id)
         return Response(data)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -221,7 +258,7 @@ def get_mws_json_by_stats_excel(request):
 @permission_classes([HasAPIKey])
 def generate_tehsil_data(request):
     """
-    Retrieve Tehsil-level Excel or JSON data for a given state, district, and block.
+    Retrieve Tehsil-level Excel or JSON data for a given state, district, and tehsil.
 
     Authorization in header:
     - Requires an API key passed in the `Authorization` header.
@@ -230,17 +267,66 @@ def generate_tehsil_data(request):
     Query params should contain:
     - `state` (str): Name of the state (e.g. Odisha)
     - `district` (str): Name of the district (e.g. Ganjam)
-    - `block` (str): Name of the block (e.g. Chatrapur)
+    - `tehsil` (str): Name of the tehsil (e.g. Chatrapur)
     - `file_type` (optional str): For file type if passed json then json else excel (e.g. json)
 
     Example Request:
-    GET /api/v1/get_tehsil_data?state=Uttar Pradesh&district=Jaunpur&block=Badlapur&file_type=json
+    GET `/api/v1/get_tehsil_data?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur&file_type=json`
 
     Returns code:
     - 200 OK: JSON data (if file_type=json) or Excel file download
     - 400 Bad Request: Invalid parameters or logic error
     - 401 Unauthorized: Invalid or missing API key
     - 500 Internal Server Error: File generation or reading issue
+
+    Response Data:
+        `{
+            "aquifer_vector": [
+                {
+                "uid": "12_207597",
+                "area_in_ha": 2336.11,
+                "aquifer_class": "Alluvium",
+                "principle_aq_alluvium_percent": 100,
+                "principle_aq_banded gneissic complex_percent": 0,
+                "principle_aq_basalt_percent": 0,
+                "principle_aq_charnockite_percent": 0,
+                "principle_aq_gneiss_percent": 0,
+                "principle_aq_granite_percent": 0,
+                "principle_aq_intrusive_percent": 0,
+                "principle_aq_khondalite_percent": 0,
+                "principle_aq_laterite_percent": 0,
+                "principle_aq_limestone_percent": 0,
+                "principle_aq_none_percent": 0,
+                "principle_aq_quartzite_percent": 0,
+                "principle_aq_sandstone_percent": 0,
+                "principle_aq_schist_percent": 0,
+                "principle_aq_shale_percent": 0
+                },
+                {
+                "uid": "12_208413",
+                "area_in_ha": 864.04,
+                "aquifer_class": "Alluvium",
+                "principle_aq_alluvium_percent": 100,
+                "principle_aq_banded gneissic complex_percent": 0,
+                "principle_aq_basalt_percent": 0,
+                "principle_aq_charnockite_percent": 0,
+                "principle_aq_gneiss_percent": 0,
+                "principle_aq_granite_percent": 0,
+                "principle_aq_intrusive_percent": 0,
+                "principle_aq_khondalite_percent": 0,
+                "principle_aq_laterite_percent": 0,
+                "principle_aq_limestone_percent": 0,
+                "principle_aq_none_percent": 0,
+                "principle_aq_quartzite_percent": 0,
+                "principle_aq_sandstone_percent": 0,
+                "principle_aq_schist_percent": 0,
+                "principle_aq_shale_percent": 0
+                }
+            ]
+            .............
+            ............
+        }`
+
     """
 
     print("Inside generating tehsil excel data")
@@ -248,25 +334,25 @@ def generate_tehsil_data(request):
         # Get query parameters
         state = request.query_params.get("state", "").lower().strip().replace(" ", "_")
         district = request.query_params.get("district", "").lower().strip().replace(" ", "_")
-        block = request.query_params.get("block", "").lower().strip().replace(" ", "_")
+        tehsil = request.query_params.get("tehsil", "").lower().strip().replace(" ", "_")
         file_type = request.query_params.get("file_type", "excel").lower()
 
-        logging.info(f"Request to generate Excel for state: {state}, district: {district}, block: {block}, file_type: {file_type}")
+        logging.info(f"Request to generate Excel for state: {state}, district: {district}, tehsil: {tehsil}, file_type: {file_type}")
 
         # Construct file path
         base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
         state_path = os.path.join(base_path, state.upper())
         district_path = os.path.join(state_path, district.upper())
-        filename = f"{district}_{block}.xlsx"
+        filename = f"{district}_{tehsil}.xlsx"
         file_path = os.path.join(district_path, filename)
 
         # Generate file if not exists
         if not os.path.exists(file_path):
             logging.info("Excel file does not exist. Generating...")
-            if not get_vector_layer_geoserver(state, district, block):
+            if not get_vector_layer_geoserver(state, district, tehsil):
                 raise ValueError("Failed to generate vector layer from GeoServer.")
             os.makedirs(district_path, exist_ok=True)
-            file_path = download_layers_excel_file(state, district, block)
+            file_path = download_layers_excel_file(state, district, tehsil)
             if not file_path or not os.path.exists(file_path):
                 raise ValueError("Failed to download or locate generated Excel file.")
 
@@ -302,7 +388,7 @@ def generate_tehsil_data(request):
 @permission_classes([HasAPIKey])
 def get_mws_json_by_kyl_indicator(request):
     """
-        Retrieve KYL indicator data for a specific MWS ID in a given state, district, and block.
+        Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.
 
         Authorization in header:
         - Requires an API key passed in the `Authorization` header.
@@ -311,25 +397,61 @@ def get_mws_json_by_kyl_indicator(request):
         Query params should contain:
         - `state` (str): Name of the state (e.g. Odisha)
         - `district` (str): Name of the district (e.g. Ganjam)
-        - `block` (str): Name of the block (e.g. Chatrapur)
+        - `tehsil` (str): Name of the tehsil (e.g. Chatrapur)
         - `mws_id` (str): Unique MWS identifier
 
         Example Request:
-        - GET /api/v1/get_mws_kyl_indicator?state=Uttar Pradesh&district=Jaunpur&block=Badlapur&mws_id=12_234647
+        - `GET /api/v1/get_mws_kyl_indicator?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur&mws_id=12_234647`
         
         Returns code :
         - 200 OK: JSON list of KYL indicator data
         - 400 Bad Request: Missing or invalid parameters
         - 401 Unauthorized: Missing or invalid API key
         - 500 Internal Server Error: Unexpected failure
+
+        Response Data:
+            `[
+                {
+                    "mws_id": "12_234647",
+                    "terraincluster_id": 1,
+                    "avg_precipitation": 764.4457,
+                    "cropping_intensity_trend": 0,
+                    "cropping_intensity_avg": 1.7417,
+                    "avg_single_cropped": 8.2647,
+                    "avg_double_cropped": 80.1709,
+                    "avg_triple_cropped": 1.8198,
+                    "avg_wsr_ratio_kharif": 0.0262,
+                    "avg_wsr_ratio_rabi": 0.028,
+                    "avg_wsr_ratio_zaid": 0.43,
+                    "avg_kharif_surface_water_mws": 28.2033,
+                    "avg_rabi_surface_water_mws": 27.7095,
+                    "avg_zaid_surface_water_mws": 9.381,
+                    "trend_g": -1,
+                    "drought_category": 2,
+                    "avg_number_dry_spell": 2.1667,
+                    "avg_runoff": 167.7886,
+                    "total_nrega_assets": 550,
+                    "mws_intersect_villages": "[200586, 200587, 200588, 200589, 200594, 200595, 200722, 200725, 200726, 200727, 200728, 200729, 200730, 200731, 200604, 200605, 200606, 200607, 200608, 200733, 200734, 200611, 200612, 200613, 200614, 200615, 200616, 200617, 200618, 200739, 200744, 200634, 200635, 200639, 200640, 200735]",
+                    "degradation_land_area": 108.92,
+                    "increase_in_tree_cover": 150.02,
+                    "decrease_in_tree_cover": 109.18,
+                    "built_up_area": 87.33,
+                    "lulc_slope_category": null,
+                    "lulc_plain_category": "~67% Double Cropped",
+                    "area_wide_scale_restoration": 21.84,
+                    "area_protection": 3453.75,
+                    "aquifer_class": 1,
+                    "soge_class": 2
+                }
+                ]`
     """
     print("Inside Mws kyl Indicator api")
     try:
         state = request.query_params.get("state").lower()
         district = request.query_params.get("district").lower()
-        block = request.query_params.get("block").lower()
+        tehsil = request.query_params.get("tehsil").lower()
         mws_id = request.query_params.get("mws_id").lower()
-        data = get_mws_json_from_kyl_indicator(state, district, block, mws_id)
+        data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
         return Response(data)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
