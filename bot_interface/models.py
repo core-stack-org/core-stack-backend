@@ -4,6 +4,18 @@ from users.models import User
 from bot_interface.interface.whatsapp import WhatsAppInterface
 import json
 
+APP_TYPE_CHOICES = [
+        ("WA", "WhatsApp"),
+        ("TG", "Telegram"),
+        ("FB", "Facebook"),
+    ]
+    
+LANGUAGE_CHOICES = [
+    ("hi", "Hindi"),
+    ("en", "English"),
+    # Add more languages as needed
+]
+
 class FactoryInterface:
     """
     Factory pattern implementation for creating appropriate interfaces based on app type.
@@ -47,18 +59,7 @@ class Bot(models.Model):
     """
     Configuration for bot application instances.
     """
-    APP_TYPE_CHOICES = [
-        ("WA", "WhatsApp"),
-        ("TG", "Telegram"),
-        ("FB", "Facebook"),
-    ]
-    
-    LANGUAGE_CHOICES = [
-        ("hi", "Hindi"),
-        ("en", "English"),
-        # Add more languages as needed
-    ]
-    
+
     app_type = models.CharField(max_length=2, choices=APP_TYPE_CHOICES, help_text="Application platform")
     bot_name = models.CharField(max_length=32, help_text="Name of the bot")
     desc = models.CharField(max_length=100, help_text="Description of the bot")
@@ -136,7 +137,7 @@ class UserLogs(models.Model):
     """
     Logs user interactions and events.
     """
-    app_type = models.CharField(max_length=2, choices=Bot.APP_TYPE_CHOICES)
+    app_type = models.CharField(max_length=2, choices=APP_TYPE_CHOICES, help_text="Application platform")
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name="logs")
     user = models.ForeignKey(BotUsers, on_delete=models.CASCADE, related_name="logs")
     key1 = models.CharField(max_length=50, blank=True, null=True)
@@ -163,7 +164,7 @@ class UserArchive(models.Model):
     """
     Archives user current session after user completed the flow and there is no continuation.
     """
-    app_type = models.CharField(max_length=2, choices=Bot.APP_TYPE_CHOICES)
+    app_type = models.CharField(max_length=2, choices=APP_TYPE_CHOICES)
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name="archives")
     user = models.ForeignKey(BotUsers, on_delete=models.CASCADE, related_name="archives")
     archived_at = models.DateTimeField(default=timezone.now)
@@ -171,19 +172,3 @@ class UserArchive(models.Model):
 
     def __str__(self):
         return f"{self.user.user.username} - {self.bot.bot_name} Archive {self.id}"
-
-
-# Interface classes referenced in FactoryInterface
-class WhatsAppInterface:
-    """WhatsApp interface implementation"""
-    pass
-
-
-class TelegramInterface:
-    """Telegram interface implementation"""
-    pass
-
-
-class FacebookInterface:
-    """Facebook interface implementation"""
-    pass
