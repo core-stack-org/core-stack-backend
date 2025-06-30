@@ -210,10 +210,7 @@ def modify_response_list_settlement(res, block, plan_id):
 
 # MARK: Modify ODK Well Data
 def modify_response_list_well(res, block, plan_id):
-    print(f"block name from app: {block} and plan id: {plan_id}")
-
     res_list = []
-
     for result in res:
         if result is None:
             continue
@@ -222,7 +219,6 @@ def modify_response_list_well(res, block, plan_id):
             continue
 
         try:
-            print("Block name from odk: ", result.get("block_name").lower())
             if result.get("block_name").lower() != block.lower():
                 continue
         except AttributeError:
