@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    "rest_framework_api_key",
     # project applications
     "users",
     "organization",

@@ -5,6 +5,7 @@ from .utils import *
 from .mws_indicators import get_generate_filter_mws_data, download_KYL_filter_data
 from .village_indicators import get_generate_filter_data_village
 from utilities.auth_utils import auth_free
+from utilities.auth_check_decorator import api_security_check
 import logging
 
 logging.basicConfig(
@@ -12,8 +13,10 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-@api_view(["GET"])
-@auth_free
+
+@api_security_check(auth_type="API_key", allowed_methods=["GET"], required_headers=["X-API-KEY"])
+#@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+#@api_security_check(auth_type="JWT", allowed_methods=["GET"])
 def generate_excel_file_layer(request):
     try:
         state = request.query_params.get("state", "").lower().strip().replace(" ", "_")
