@@ -121,7 +121,7 @@ def generate_mws_report(request):
         )
 
         # ? Drought Description
-        drought_desc, drought_weeks = get_drought_data(
+        drought_desc, drought_weeks, mod_drought, sev_drought = get_drought_data(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
@@ -190,6 +190,8 @@ def generate_mws_report(request):
             "ca_works": json.dumps(ca_works),
             "ofw_works": json.dumps(ofw_works),
             "drought_weeks": json.dumps(drought_weeks),
+            "mod_drought": json.dumps(mod_drought.astype(int).tolist()),
+            "sev_drought" : json.dumps(sev_drought.astype(int).tolist()),
             "villages_name": json.dumps(villages_name),
             "villages_sc": json.dumps(villages_sc),
             "villages_st": json.dumps(villages_st),

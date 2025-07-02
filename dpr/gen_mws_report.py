@@ -960,7 +960,6 @@ def get_terrain_data(state, district, block, uid):
 
                 parameter_lulc += f" On the plains, land use has predominance of {round(farmland_area_percent,2)} % farmlands, {round(barren_percent,2)} % barren areas, and {round(shrub_percent,2)} % shrubs."
 
-        print("parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain", parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain)
         return parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain
 
     except Exception as e:
@@ -1809,7 +1808,7 @@ def get_drought_data(state, district, block, uid):
                         formatted_sentence += f"and in {item[1]} lasted {item[0]} weeks."
                 parameter_drought += formatted_sentence
 
-        return parameter_drought, drought_weeks
+        return parameter_drought, drought_weeks, mws_drought_moderate, mws_drought_severe
 
     except Exception as e:
         logger.info(
