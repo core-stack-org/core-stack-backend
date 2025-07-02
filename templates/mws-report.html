@@ -491,6 +491,10 @@
             <div class="chart-container">
                 <canvas id="Chart-drought"></canvas>
             </div>
+
+            <div class="chart-container">
+                <canvas id="Chart-drought-weeks"></canvas>
+            </div>
         </section>
         
         <section class="section">
@@ -1375,6 +1379,8 @@
 
         // Drought Graphs
         const droughtData = JSON.parse('{{drought_weeks|safe}}')
+        const mod_weeks = JSON.parse('{{mod_drought|safe}}')
+        const sev_weeks = JSON.parse('{{sev_drought|safe}}')
 
         const droughtChart = new Chart(document.getElementById('Chart-drought'), {
             type: 'bar',
@@ -1413,6 +1419,56 @@
                 animation: {
                     duration: 0 // Disable animation for better print support
                 }
+            }
+        });
+
+        const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                datasets: [
+                {
+                    label: 'Moderate Weeks',
+                    data: mod_weeks,
+                    backgroundColor: '#ffc413',
+
+                },
+                {
+                    label: 'Severe Weeks',
+                    data: sev_weeks,
+                    backgroundColor: '#fe8200'
+
+                },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x : {
+                        stacked : true,
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    },
+                    y: {
+                        stacked : true,
+                        title : {
+                            display: true,
+                            text: 'No. of Weeks'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Area under single, double, triple cropping over the years',
+                },
             }
         });
 
