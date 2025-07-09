@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    "rest_framework_api_key",
     # project applications
     "users",
     "organization",
@@ -87,7 +88,6 @@ INSTALLED_APPS = [
 ]
 
 # MARK: CORS Settings
-
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
@@ -140,6 +140,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # MARK: JWT settings
