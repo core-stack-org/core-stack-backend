@@ -3,11 +3,15 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
+from django.utils import timezone
+from datetime import timedelta
 
 from .models import Block, District, State
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
 from .utils import transform_data, activated_entities
 from utilities.auth_utils import auth_free
+from .models import UserAPIKey
+from utilities.auth_check_decorator import api_security_check
 
 
 # state id is the census code while the district id is the id of the district from the DB
@@ -229,3 +233,50 @@ def activate_location(request):
     except Exception as e:
         print(f"Exception in activate_location api: {e}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_security_check(auth_type="JWT", allowed_methods="POST")
+@api_view(['POST'])
+def generate_api_key(request):
+    """
+        Generate a new API key for the authenticated user
+        POST /api/v1/generate_api_key/
+        {
+            "name": "user_name",
+            "expiry_days": 365
+        }
+
+        Response Json:
+        {
+        "name": "Test API Key",
+        "prefix": "knog3H",
+        "key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2",
+        "message": "API key created successfully."
+        }
+    """
+    try:
+        name = request.data.get('name', 'Unknown')
+        expiry_days = request.data.get('expiry_days', 365)
+        
+        if expiry_days <= 0:
+            return Response(
+                {"error": "Expiry days must be positive"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        expires_at = timezone.now() + timedelta(days=expiry_days)
+        api_key_obj, generated_key = UserAPIKey.objects.create_key(name=name.strip(), user=request.user,expires_at=expires_at)
+        
+        return Response({
+            'name': api_key_obj.name,
+            'prefix': api_key_obj.prefix,
+            'key': generated_key,
+            'message': 'API key created successfully.'
+        }, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to create API key: {str(e)}"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
