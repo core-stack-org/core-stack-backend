@@ -51,6 +51,7 @@ ALLOWED_HOSTS = [
     "e697-2001-df4-e000-3fc4-e2e1-373c-2498-b87c.ngrok-free.app",
     "74f2-2001-df4-e000-3fc4-bb09-a94e-b440-7621.ngrok-free.app",
     ".ngrok-free.app",
+    "uat.core-stack.org",
 ]
 
 # Application definition
@@ -72,6 +73,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    "rest_framework_api_key",
     # project applications
     "users",
     "organization",
@@ -79,7 +81,8 @@ INSTALLED_APPS = [
     "plantations",
     "plans",
     "community_engagement",
-    "bot_interface"
+    "bot_interface",
+    "public_api",
 ]
 
 # CORS_ALLOW_ALL_ORIGINS = True
@@ -112,6 +115,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://uat.dashboard.core-stack.org",
     "https://www.explorer.core-stack.org",
     "https://development.d2s4eeyazvtd2g.amplifyapp.com",
+    "https://development-waterbody-dashboard.d2s4eeyazvtd2g.amplifyapp.com/water_dashboard",
 
     "http://127.0.0.1:8000",
     "http://192.168.222.27:8000",
