@@ -7,9 +7,9 @@ import boto3
 import uuid
 import pandas as pd
 
-from .models import Community, Item, Community_user_mapping, Media
-from .utils import get_media_type, get_community_summary_data
-from geoadmin.models import State
+from .models import Community, Item, Community_user_mapping, Media, Location
+from .utils import get_media_type, get_community_summary_data, get_communities
+from geoadmin.models import State, District, Block
 from projects.models import Project, AppType
 from users.models import User
 from utilities.auth_utils import auth_free
@@ -33,7 +33,7 @@ def create_item(request):
         item = Item(title=title, transcript=transcript, category_id=category_id, rating=rating, item_type=item_type, coordinates=coordinates, state=state, user_id=user_id, community_id=community_id)
         item.save()
 
-        return Response({"success": True}, status=status.HTTP_201_CREATED)
+        return Response({"success": True, "item_id": item.id}, status=status.HTTP_201_CREATED)
     except Exception as e:
         print("Exception in create_item api :: ", e)
         return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -89,46 +89,33 @@ def get_community_details(request):
 @auth_free
 def get_communities_by_location(request):
     try:
-        state_id = request.data.get("state_id", "")
-        district_id = request.data.get("district_id", "")
-        block_id = request.data.get("block_id", "")
-
-        if block_id:
-            communities = Community.objects.filter(project__block_id=block_id)
-            if not communities.exist():
-                if district_id:
-                    communities = Community.objects.filter(project__district_id=district_id)
-                    if not communities.exist():
-                        if state_id:
-                            communities = Community.objects.filter(project__state_id=state_id)
-                        else:
-                            communities = Community.objects.all()
-                else:
-                    if state_id:
-                        communities = Community.objects.filter(project__state_id=state_id)
-                    else:
-                        communities = Community.objects.all()
-        else:
-            if district_id:
-                communities = Community.objects.filter(project__district_id=district_id)
-                if not communities.exist():
-                    if state_id:
-                        communities = Community.objects.filter(project__state_id=state_id)
-                    else:
-                        communities = Community.objects.all()
-            else:
-                if state_id:
-                    communities = Community.objects.filter(project__state_id=state_id)
-                else:
-                    communities = Community.objects.all()
-
-        data = []
-        for community in communities:
-            data.append(get_community_summary_data(community.id))
-
-        return Response({"success": True, "data": data}, status=status.HTTP_201_CREATED)
+        state_name    = (request.query_params.get("state") or "").strip()
+        district_name = (request.query_params.get("district") or "").strip()
+        block_name    = (request.query_params.get("block") or "").strip()
+        data = get_communities(state_name, district_name, block_name)
+        return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in get_communities_by_location api :: ", e)
+        print("Exception in get_communities_by_location:", e)
+        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@auth_free
+def get_communities_by_lat_lon(request):
+    try:
+        from public_api.views import get_location_info_by_lat_lon
+        lat = float(request.query_params.get("latitude"))
+        lon = float(request.query_params.get("longitude"))
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return Response({"error": "Latitude or longitude out of bounds."}, status=400)
+        location = get_location_info_by_lat_lon(lat, lon)
+        state_name = location.get("State", "")
+        district_name = location.get("District", "")
+        block_name = location.get("Tehsil", "")
+        data = get_communities(state_name, district_name, block_name)
+        return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_communities_by_lat_lon api :: ", e)
         return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -137,13 +124,13 @@ def get_communities_by_location(request):
 def get_community_by_user(request):
     try:
         data = []
-        number = request.data.get('number')
+        number = request.query_params.get('number')
         users = User.objects.filter(contact_number=number)
         if users.exists():
             user = users[0]
-            communities = Community_user_mapping.objects.filter(user=user)
-            for community in communities:
-                data.append(get_community_summary_data(community.id))
+            community_user_mappings = Community_user_mapping.objects.filter(user=user)
+            for community_user_mapping in community_user_mappings:
+                data.append(get_community_summary_data(community_user_mapping.community.id))
 
         return Response({"success": True, "data": data}, status=status.HTTP_201_CREATED)
     except Exception as e:
@@ -239,32 +226,173 @@ def add_user_to_community(request):
 @auth_free
 def is_user_in_community(request):
     try:
-        data = {}
         number = request.data.get("number")
-        if number:
-            user_objs = User.objects.filter(contact_number=number)
-            if user_objs.exists():
-                user = user_objs[0]
-                community_user_mapping_qs = Community_user_mapping.objects.filter(user=user)
-                if community_user_mapping_qs.exists():
-                    communities_list = []
-                    for community_user_mapping_obj in community_user_mapping_qs:
-                        communities_list.append(get_community_summary_data(community_user_mapping_obj.community.id))
+        if not number:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Either 'number' field is missing or it is empty."
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-                    data["is_in_community"] = True
-                    data["data_type"] = "community"
-                    data["data"] = communities_list
-                else:
-                    states = State.objects.all()
-                    states_list = []
-                    for state in states:
-                        state_dict = {"id": state.pk, "name": state.state_name}
-                        states_list.append(state_dict)
+        user_objs = User.objects.filter(contact_number=number)
+        data = {}
 
-                    data["is_in_community"] = False
-                    data["data_type"] = "state"
-                    data["data"] = states_list
-        return Response({"success": True, "data": data}, status=status.HTTP_201_CREATED)
+        if user_objs.exists():
+            user = user_objs.first()
+            community_user_mapping_qs = Community_user_mapping.objects.filter(user=user)
+
+            if community_user_mapping_qs.exists():
+                communities_list = []
+                last_accessed_community_id = ""
+                for mapping in community_user_mapping_qs:
+                    communities_list.append(get_community_summary_data(mapping.community.id))
+                    if mapping.is_last_accessed_community:
+                        last_accessed_community_id = mapping.community.id
+
+                data["is_in_community"] = True
+                data["data_type"] = "community"
+                data["data"] = communities_list
+                data["misc"] = {"last_accessed_community_id": last_accessed_community_id}
+                return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
+
+        state_ids_with_community = Location.objects.filter(communities__isnull=False).values_list('state_id', flat=True).distinct()
+        states = State.objects.filter(pk__in=state_ids_with_community).order_by('state_name')
+        data["is_in_community"] = False
+        data["data_type"] = "state"
+        data["data"] = [{"id": state.pk, "name": state.state_name} for state in states]
+        data["misc"] = {}
+        return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in if_user_in_community api :: ", e)
+        print("Exception in is_user_in_community API ::", e)
         return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@auth_free
+def get_districts_with_community(request):
+    try:
+        state_id = request.query_params.get("state_id").strip()
+        state_obj = State.objects.filter(pk=state_id).first()
+
+        if state_obj:
+            district_ids = Location.objects.filter(state=state_obj).values_list("district_id", flat=True)
+            districts = District.objects.filter(pk__in=district_ids).order_by("district_name")
+        else:
+            districts = District.objects.none()
+
+        districts_data = [{"id": district.pk, "name": district.district_name} for district in districts]
+        return Response({"success": True, "data": districts_data}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_districts_with_community API ::", e)
+        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@auth_free
+def get_blocks_with_community(request):
+    try:
+        district_id = request.query_params.get("district_id").strip()
+        district_obj = District.objects.filter(pk=district_id).first()
+
+        if district_obj:
+            block_ids = Location.objects.filter(district=district_obj).values_list("block_id", flat=True)
+            blocks = Block.objects.filter(pk__in=block_ids).order_by("block_name")
+        else:
+            blocks = Block.objects.none()
+
+        blocks_data = [{"id": block.pk, "name": block.block_name} for block in blocks]
+        return Response({"success": True, "data": blocks_data}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_districts_with_community API ::", e)
+        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# @api_view(["GET"])
+# @auth_free
+# def get_items_by_community(request):
+#     try:
+#         data = []
+#         community_id = request.query_params.get("community_id")
+#         if not community_id:
+#             return Response(
+#                 {"success": False, "message": "Missing 'community_id' in query parameters."},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+#
+#         items = Item.objects.filter(community_id=community_id)
+#         for item in items:
+#             item_dict = {'id': item.id,
+#                          'number': item.user.contact_number,
+#                          'title': item.title,
+#                          'item_type': item.item_type}
+#             data.append(item_dict)
+#         return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
+#     except Exception as e:
+#         print("Exception in get_items_by_community API:", str(e))
+#         return Response(
+#             {"success": False, "message": "Internal server error."},
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
+
+
+@api_view(["GET"])
+@auth_free
+def get_items_by_community(request):
+    try:
+        community_id = request.query_params.get("community_id")
+        if not community_id:
+            return Response(
+                {"success": False, "message": "Missing 'community_id' in query parameters."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Optional filters
+        item_type = request.query_params.get("item_type")
+        item_state = request.query_params.get("item_state")
+
+        # Pagination parameters
+        limit = int(request.query_params.get("limit", 5))
+        offset = int(request.query_params.get("offset", 0))
+
+        # Base queryset
+        items_qs = Item.objects.filter(community_id=community_id)
+
+        if item_type:
+            items_qs = items_qs.filter(item_type=item_type)
+
+        if item_state:
+            items_qs = items_qs.filter(state=item_state)
+
+        items_qs = items_qs.order_by('-created_at')
+        total_count = items_qs.count()
+        paginated_items = items_qs[offset:offset + limit]
+
+        data = []
+        for item in paginated_items:
+            data.append({
+                'id': item.id,
+                'number': item.user.contact_number,
+                'title': item.title,
+                'item_type': item.item_type,
+                'state': item.state,
+                'created_at': item.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            })
+
+        return Response({
+            "success": True,
+            "data": data,
+            "total": total_count,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + limit < total_count
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("Exception in get_items_by_community API:", str(e))
+        return Response(
+            {"success": False, "message": "Internal server error."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+

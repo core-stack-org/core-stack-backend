@@ -7,10 +7,40 @@ from bot_interface.models import Bot
 
 
 # Create your models here.
+class LocationLevel(models.TextChoices):
+    STATE = 'state', 'State'
+    DISTRICT = 'district', 'District'
+    BLOCK = 'block', 'Block'
+
+
+class Location(models.Model):
+    level = models.CharField(max_length=10, choices=LocationLevel.choices)
+    state = models.ForeignKey(State, on_delete=models.CASCADE)
+    district = models.ForeignKey(District, on_delete=models.CASCADE, null=True, blank=True)
+    block = models.ForeignKey(Block, on_delete=models.CASCADE, null=True, blank=True)
+
+    class Meta:
+        unique_together = ("level", "state", "district", "block")
+
+    def __str__(self):
+        parts = []
+
+        if self.state:
+            parts.append(self.state.state_name)
+        if self.district:
+            parts.append(self.district.district_name)
+        if self.block:
+            parts.append(self.block.block_name)
+
+        label = " / ".join(parts) if parts else "Unknown location"
+        return f"[{self.level.upper()}] {label}"
+
+
 class Community(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(Project, null=True, on_delete=models.CASCADE)
     bot = models.ForeignKey(Bot, null=True, on_delete=models.SET_NULL)
+    locations = models.ManyToManyField(Location, related_name='communities')
 
     def __str__(self):
         return self.project.name
@@ -63,9 +93,9 @@ class Item_type(models.TextChoices):
 
 
 class Item_state(models.TextChoices):
+    UNM = "UNM", "UNM"
     PUB = "PUB", "PUB"
     ARC = "ARC", "ARC"
-    UNM = "UNM", "UNM"
     REJ = "REJ", "REJ"
 
 

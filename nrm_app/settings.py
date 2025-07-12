@@ -119,6 +119,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://192.168.20.236:3000",
     "http://localhost:3000",
     "http://localhost:3001",
+    'http://localhost:5173',
 ]  # TODO Add extra URLs if required
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
