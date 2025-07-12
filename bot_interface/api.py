@@ -5,7 +5,7 @@ from rest_framework import status
 import bot_interface.models
 import bot_interface.utils
 import bot_interface.tasks
-# import bot_interface.auth
+import bot_interface.auth
 import requests
 import os
 import emoji
@@ -28,16 +28,11 @@ WHATSAPP_MEDIA_PATH = "/tmp/whatsapp_media/"
 # Create the directory if it doesn't exist
 os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)
 
-def mark_message_as_read(app_instance_config_id, message_id):
+def mark_message_as_read(bot_instance_id, message_id):
     """Mark WhatsApp message as read"""
     try:
-        # Temporarily disable auth call until bot_interface.auth is available
-        # BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(app_instance_config_id)
-        print(f"Would mark message as read: {message_id} for bot {app_instance_config_id}")
-        return  # Temporarily return early
-        
+        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(bot_instance_id)
         print("message_id : ", message_id)
-        
         response = requests.post(
             f"{BSP_URL}messages",
             headers=HEADERS,
@@ -95,7 +90,7 @@ def whatsapp_webhook(request):
         return Response({"error": "App_instance_config not found"}, status=status.HTTP_404_NOT_FOUND)
   
     bot_id = bot.id
-    print("bot_id :: ", bot.id)
+    print("bot_id :: ", bot_id)
     # Check if the message status is "read"
     # if 'statuses' in entry[0]['changes'][0]['value']:
     #     message_status = entry[0]['changes'][0]['value']['statuses'][0]['status']
@@ -111,18 +106,19 @@ def whatsapp_webhook(request):
         mark_message_as_read(bot.id, message_id)
         Response({"success": True}, status=status.HTTP_200_OK)
 
-    print("Flating user data")
+    # print("Flating user data")
     event = ""
     # create event packet
     factoryInterface = bot_interface.models.FactoryInterface()
-    interface = factoryInterface.build_interface(bot.app_type)
+    print("Factory Interface created :", bot.app_type)
+    interface = factoryInterface.build_interface(app_type=bot.app_type)
 
     print("START TIME FOR CREATE EVENT PACKET= ", datetime.now())
 
     # Convert entry to JSON string as the create_event_packet expects a JSON string
     entry_json = json.dumps(entry)
     event_packet = interface.create_event_packet(
-        entry_json, bot_id, event
+        json_obj=entry_json, bot_id=bot.id, event=event
     )
     print("EVENT PACKET= ", event_packet)
 
