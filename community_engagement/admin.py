@@ -1,28 +1,53 @@
 from django.contrib import admin
-from .models import Community, Community_user_mapping, Item_category
+from .models import Location, Community, Community_user_mapping, Item_category
 
 
 admin.site.register(Item_category)
+
+
+class LocationInline(admin.TabularInline):
+    model = Community.locations.through
+    extra = 1
+    autocomplete_fields = ("location",)
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    """Make it easy to see — and filter by — the scope of each Location row."""
+
+    list_display  = ("id", "level", "state", "district", "block")
+    list_filter   = ("level", "state")            # quick dropdowns on right sidebar
+    search_fields = (
+        "state__name",
+        "district__name",
+        "block__name",
+    )
+
 
 @admin.register(Community)
 class CommunityAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "project",
+        "bot",
+        "locations_display",            # ← new column
     )
-    list_filter = ("project",)
-    search_fields = ("project",)
+    inlines        = [LocationInline]
+    exclude        = ("locations",)
+    list_filter    = ("project",)
+    search_fields  = ("project__name",)
 
-    fieldsets = (
-        (
-            None,
-            {
-                "fields": (
-                    "project",
-                )
-            },
-        ),
-    )
+    @admin.display(description="Locations")
+    def locations_display(self, obj):
+        return ", ".join(str(loc) for loc in obj.locations.all())
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.prefetch_related(
+            "locations__state",
+            "locations__district",
+            "locations__block",
+        )
 
 
 @admin.register(Community_user_mapping)
