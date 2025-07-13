@@ -1,4 +1,4 @@
-from .models import Media_type, Community
+from .models import Media_type, Community, Location, LocationLevel
 from geoadmin.models import State, District, Block
 from django.db.models import Q
 
@@ -60,3 +60,25 @@ def update_last_accessed_community(user, community_id):
         defaults={"is_last_accessed_community": True},
     )
     Community_user_mapping.objects.filter(user=user).exclude(pk=mapping.pk).update(is_last_accessed_community=False)
+
+
+def create_community_for_project(project):
+    if project.block_id:
+        level = LocationLevel.BLOCK
+    elif project.district_id:
+        level = LocationLevel.DISTRICT
+    elif project.state_id:
+        level = LocationLevel.STATE
+    else:
+        raise ValueError("Project has no location fields set")
+
+    location, created = Location.objects.get_or_create(
+        level=level,
+        state_id=project.state_id,
+        district_id=project.district_id,
+        block_id=project.block_id,
+    )
+
+    community = Community.objects.create(project=project)
+    community.locations.add(location)
+    return community
