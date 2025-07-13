@@ -8,5 +8,5 @@ def handle_project_created(sender, instance, created, **kwargs):
     if created:
         print(f"New project created: {instance.name}")
         if instance.app_type == "community_engagement":
-            from community_engagement.models import Community
-            Community.objects.create(project=instance)
+            from community_engagement.utils import create_community_for_project
+            create_community_for_project(instance)
