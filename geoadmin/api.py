@@ -1,6 +1,6 @@
 from django.http import HttpRequest
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 from django.utils import timezone
@@ -18,11 +18,14 @@ from utilities.auth_check_decorator import api_security_check
 # block id is the id of the block from the DB
 @api_view(["GET"])
 @auth_free
+@schema(None)
+# @api_security_check(auth_type="Auth_free", allowed_methods="GET", include_in_schema=False)
+@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
 def get_states(request):
     try:
         states = State.objects.all()
         serializer = StateSerializer(states, many=True)
-        return Response({"states": serializer.data}, status=status.HTTP_200_OK)
+        return Response(serializer.data)
     except Exception as e:
         print("Exception in get_states api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -30,6 +33,7 @@ def get_states(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_districts(request, state_id):
     try:
         districts = District.objects.filter(state_id=state_id)
@@ -42,6 +46,7 @@ def get_districts(request, state_id):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_blocks(request, district_id):
     try:
         blocks = Block.objects.filter(district=district_id)
@@ -54,6 +59,7 @@ def get_blocks(request, district_id):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def activate_entities(request):
     try:
         messages = []
@@ -115,6 +121,7 @@ def activate_entities(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def proposed_blocks(request):
     try:
         response_data = activated_entities()
@@ -129,6 +136,7 @@ def proposed_blocks(request):
 
 @api_view(["PATCH"])
 @auth_free
+@schema(None)
 def activate_location(request):
     """
     Update activation status of a location (state/district/block).
@@ -235,8 +243,9 @@ def activate_location(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="JWT", allowed_methods="POST")
-@api_view(['POST'])
+@api_view(["POST"])
+@schema(None)
+@api_security_check(auth_type="JWT", allowed_methods="POST", include_in_schema=False)
 def generate_api_key(request):
     """
         Generate a new API key for the authenticated user
@@ -255,24 +264,19 @@ def generate_api_key(request):
         }
     """
     try:
-        name = request.data.get('name', 'Unknown')
-        expiry_days = request.data.get('expiry_days', 365)
-        
+        name = request.POST.get('name', 'Unknown')
+        expiry_days = request.POST.get('expiry_days', 365)
         if expiry_days <= 0:
             return Response(
                 {"error": "Expiry days must be positive"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         expires_at = timezone.now() + timedelta(days=expiry_days)
         api_key_obj, generated_key = UserAPIKey.objects.create_key(name=name.strip(), user=request.user,expires_at=expires_at)
-        
-        return Response({
-            'name': api_key_obj.name,
-            'prefix': api_key_obj.prefix,
-            'key': generated_key,
-            'message': 'API key created successfully.'
-        }, status=status.HTTP_201_CREATED)
+        response_data = {"name": api_key_obj.name, "prefix": api_key_obj.prefix, "key": generated_key}
+
+        return Response(response_data)
             
     except Exception as e:
         return Response(

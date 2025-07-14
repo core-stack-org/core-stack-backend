@@ -76,18 +76,18 @@ class PlanCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Plan
-        fields = ["name", "state", "district", "block", "village", "gram_panchayat"]
+        fields = ["plan", "state", "district", "block", "village_name", "gram_panchayat"]
 
     def validate(self, data):
         """
         Additional validation to ensure required fields are present
         """
         required_fields = [
-            "name",
+            "plan",
             "state",
             "district",
             "block",
-            "village",
+            "village_name",
             "gram_panchayat",
         ]
         for field in required_fields:

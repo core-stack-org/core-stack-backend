@@ -2,6 +2,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
+from rest_framework.decorators import action, schema
 from projects.models import Project, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
 from .models import Plan
@@ -17,6 +18,7 @@ class PlanViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, HasProjectPermission]
     # For the HasProjectPermission to work correctly
     app_type = AppType.WATERSHED
+    schema = None
 
     def get_queryset(self):
         """

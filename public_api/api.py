@@ -54,7 +54,7 @@ def get_admin_details_by_lat_lon(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"], include_in_schema=False)
+@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
 def get_mws_by_lat_lon(request):
     """
         Retrieve MWS ID data based on given latitude and longitude coordinates.

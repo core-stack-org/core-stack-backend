@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 from django.shortcuts import render
 
@@ -29,6 +29,7 @@ logger = setup_logger(__name__)
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
@@ -69,6 +70,7 @@ def generate_dpr(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def generate_mws_report(request):
     try:
         # ? district, block, mwsId
@@ -210,6 +212,7 @@ def generate_mws_report(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def generate_multi_report(request):
     try:
         #? district, block

@@ -115,7 +115,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://uat.dashboard.core-stack.org",
     "https://www.explorer.core-stack.org",
     "https://development.d2s4eeyazvtd2g.amplifyapp.com",
-    "https://development-waterbody-dashboard.d2s4eeyazvtd2g.amplifyapp.com/water_dashboard",
+    "https://development-waterbody-dashboard.d2s4eeyazvtd2g.amplifyapp.com",
 
     "http://127.0.0.1:8000",
     "http://192.168.222.27:8000",

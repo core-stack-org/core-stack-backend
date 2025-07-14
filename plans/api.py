@@ -1,4 +1,4 @@
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, schema
 from rest_framework.response import Response
 from rest_framework import status, renderers
 from rest_framework.parsers import JSONParser
@@ -17,6 +17,7 @@ from utilities.auth_utils import auth_free
 # MARK: Get Plans API
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_plans(request):
     """
     Get Plans API
@@ -44,6 +45,7 @@ def get_plans(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def add_plan(request):
     if request.method == "POST":
         serializer = PlanSerializer(data=request.data)
@@ -60,6 +62,7 @@ def add_plan(request):
 # api's for add settlement, add well, add waterbody | add work [new, maintenance]
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def add_resources(request):
     layer_name = request.data.get("layer_name").lower()
     resource_type = request.data.get("resource_type").lower()
@@ -103,6 +106,7 @@ def add_resources(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def add_works(request):
     """
     work type: plan_gw: recharge st., main_swb: maintenance surface water bodies, plan_agri: irrigation works, livelihood
@@ -153,6 +157,7 @@ def add_works(request):
 @api_view(["POST"])
 @csrf_exempt
 @auth_free
+@schema(None)
 def sync_offline_data(request, resource_type=None):
     """
     Sync data to ODK based on resource type (settlement, well, water_structures)

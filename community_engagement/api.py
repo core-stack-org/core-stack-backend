@@ -1,6 +1,6 @@
 from django.http import HttpRequest
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 import boto3
@@ -18,6 +18,7 @@ from nrm_app.settings import S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY, S3_
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def create_item(request):
     try:
         title = request.data.get("title")
@@ -41,6 +42,7 @@ def create_item(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def attach_media_to_item(request):
     try:
         s3_client = boto3.client('s3',
@@ -76,6 +78,7 @@ def attach_media_to_item(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_community_details(request):
     try:
         data = get_community_summary_data(request.data.get('community_id'))
@@ -87,6 +90,7 @@ def get_community_details(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_communities_by_location(request):
     try:
         state_id = request.data.get("state_id", "")
@@ -134,6 +138,7 @@ def get_communities_by_location(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_community_by_user(request):
     try:
         data = []
@@ -153,6 +158,7 @@ def get_community_by_user(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def map_users_to_community(request):
     try:
         project_id = request.data.get("project_id")
@@ -217,6 +223,7 @@ def map_users_to_community(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def add_user_to_community(request):
     try:
         community_id = request.data.get("community_id")
@@ -237,6 +244,7 @@ def add_user_to_community(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def is_user_in_community(request):
     try:
         data = {}
