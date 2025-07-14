@@ -366,40 +366,44 @@ def get_mws_json_by_kyl_indicator(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="API_key", allowed_methods=["GET"])
+@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
 def get_generated_layer_urls(request):
     """
-    Retrieve generated layer URLs for a given state, district, and block.
-    
-    This endpoint is hidden from API documentation.
-    
-    Query params:
-    - state (str): Name of the state
-    - district (str): Name of the district  
-    - block (str): Name of the block
+        Retrieve generated layer URLs for a given state, district, and block.
 
-    Example Request:
-    - `GET /api/v1/get_generated_layer_urls?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur`
+        Authorization in header:
+        - Requires an API key passed in the `Authorization` header.
+        - Example: `Authorization: Api-Key <your-api-key>`
 
-    Response Data:
-    [
-        {
-            "layer_desc": "Change Detection Afforestation",
-            "layer_type": "raster",
-            "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_jaunpur__Afforestation&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
-            "style_name": "deforestation"
-        },
-        {
-            "layer_desc": "Aquifer layer data",
-            "layer_type": "vector",
-            "layer_url": "https://geoserver.core-stack.org:8443/geoserver/aquifer/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=aquifer:aquifer_vector_jaunpur_&outputFormat=application/json",
-            "style_name": ""
-        }
-    ]
-    
-    Returns:
-    - 200 OK: Success with layer details
-    - 500 Internal Server Error: Processing error
+        Query params should contain:
+        - `state` (str): Name of the state
+        - `district` (str): Name of the district
+        - `block` (str): Name of the block
+
+        Example Request:
+        `GET /api/v1/get_generated_layer_urls?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur`
+
+        Returns code:
+        - 200 OK: JSON data
+        - 400 Bad Request: Invalid parameters or logic error
+        - 401 Unauthorized: Invalid or missing API key
+        - 500 Internal Server Error: File generation or reading issue
+
+        Response data:
+            `[
+                {
+                    "layer_desc": "Change Detection Afforestation",
+                    "layer_type": "raster",
+                    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_jaunpur__Afforestation&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+                    "style_name": "deforestation"
+                },
+                {
+                    "layer_desc": "Aquifer layer data",
+                    "layer_type": "vector",
+                    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/aquifer/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=aquifer:aquifer_vector_jaunpur_&outputFormat=application/json",
+                    "style_name": ""
+                }
+            ]`
     """
     try:
         print("Inside Get Generated Layer Urls API.")
