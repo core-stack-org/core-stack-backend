@@ -1,7 +1,12 @@
 import os
+<<<<<<< HEAD
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import api_view, parser_classes
+=======
+from nrm_app.settings import BASE_DIR
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+>>>>>>> get_admin_details_by_lat_lon
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -50,6 +55,12 @@ from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
+from utilities.auth_utils import auth_free
+import ee
+from utilities.gee_utils import (ee_initialize)
+from .utils import extract_soi_properties
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework_api_key.permissions import HasAPIKey
 
 @api_view(["POST"])
 def generate_admin_boundary(request):
@@ -808,6 +819,7 @@ def swb_pond_merging(request):
         print("Exception in merge_swb_ponds api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+<<<<<<< HEAD
 
 @api_view(["POST"])
 def lulc_farm_boundary(request):
@@ -930,3 +942,30 @@ def wells_compute(request):
         )
     except Exception as e:
         return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+=======
+# @swagger_auto_schema(method='get', auto_schema=None)
+@api_view(["GET"])
+@permission_classes([HasAPIKey])
+def properties_from_soi(request,longitude, latitude):
+    """
+        **Description**:  
+    This API accepts **latitude** and **longitude** as input parameters and returns the corresponding administrative details—such as **state**, **district**, and **tehsil**—in **JSON** format.
+
+    **Response Example**:
+    {
+        "properties": {
+            "STATE": "ODISHA",
+            "District": "KALAHANDI",
+            "TEHSIL": "BHAWANIPATNA"}
+    }
+    """
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+        properties_list = extract_soi_properties(latitude, longitude)
+        return Response({
+            "properties": properties_list,
+        })
+    except Exception as e:
+        print(f"error occurred as {e}")
+>>>>>>> get_admin_details_by_lat_lon

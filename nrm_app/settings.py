@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    'rest_framework_api_key',
     # project applications
     "users",
     "organization",
@@ -320,9 +321,21 @@ GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 
+<<<<<<< HEAD
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
 #NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
 NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+=======
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header'
+        }
+    },
+}
+>>>>>>> get_admin_details_by_lat_lon
