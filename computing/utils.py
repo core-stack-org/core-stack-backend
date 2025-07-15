@@ -243,25 +243,6 @@ def fix_invalid_geometry_in_gdf(gdf):
     return gdf
 
 
-<<<<<<< HEAD
-def extract_soi_properties(latitude, longitude):
-    try:
-        ee_initialize()
-        point = ee.Geometry.Point([longitude, latitude])
-        feature_collection = ee.FeatureCollection("projects/ee-corestackdev/assets/datasets/SOI_tehsil_vector")
-        intersected = feature_collection.filterBounds(point)
-        features = intersected.toList(intersected.size())
-        properties_list = []
-        for i in range(intersected.size().getInfo()):
-            feature = ee.Feature(features.get(i))
-            props = feature.getInfo().get('properties', {})
-            properties_list.append(props)
-        properties_list = [{k: v for k, v in prop.items() if k not in ('Shape_Area', 'Shape_Leng')}
-        for prop in properties_list]
-        return properties_list
-    except Exception as e:
-        print(f"error occurred as {e}")
-=======
 def save_layer_info_to_db(state, district, block, layer_name,asset_id, workspace_name):
     print("inside the save_layer_info_to_db function ")
     dataset = Dataset.objects.get(
@@ -290,4 +271,3 @@ def save_layer_info_to_db(state, district, block, layer_name,asset_id, workspace
         }
         
     )
->>>>>>> layer/save_db
