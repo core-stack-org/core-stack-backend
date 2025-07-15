@@ -13,9 +13,7 @@ class DistrictAdmin(admin.ModelAdmin):
 
 @admin.register(Block)
 class BlockAdmin(admin.ModelAdmin):
-    search_fields = ("block_name",)
-admin.site.register(District)
-admin.site.register(Block)
+    search_fields = ("block_name",) 
 admin.site.register(State_SOI)
 admin.site.register(District_SOI)
 admin.site.register(Block_SOI)
