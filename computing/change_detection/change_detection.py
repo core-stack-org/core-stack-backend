@@ -59,7 +59,6 @@ def get_change_detection(self, state, district, block, start_year, end_year):
         + "_uid"
     )
     task_list = []
-<<<<<<< HEAD
     for index, change in enumerate(param_list):
         asset_id = (
             get_gee_asset_path(state, district, block) + description + "_" + change
@@ -73,8 +72,6 @@ def get_change_detection(self, state, district, block, start_year, end_year):
         )
         task_list.append(task_id)
         save_layer_info_to_db(state, district, block, f"change_{district.title()}_{block.title()}", asset_id, "Change Detection Raster")
-=======
->>>>>>> restoration_work
 
     for change_detection_key, change_detection_values in param_dict.items():
         asset_id = (

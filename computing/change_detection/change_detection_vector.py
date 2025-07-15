@@ -119,7 +119,6 @@ def generate_vector(roi, args, state, district, block, layer_name):
     asset_id = (
         get_gee_asset_path(state, district, block) + description 
     )
-<<<<<<< HEAD
     task.start()
     return task.status()["id"]
     save_layer_info_to_db(
@@ -130,7 +129,6 @@ def generate_vector(roi, args, state, district, block, layer_name):
         asset_id=f"{get_gee_asset_path(state, district, block) + description}", 
         workspace_name='Change Detection Vector'
         )
-=======
     if not is_gee_asset_exists(asset_id):
         print(f"{asset_id} doesn't exist")
         
@@ -192,7 +190,6 @@ def generate_vector(roi, args, state, district, block, layer_name):
         )
         task.start()
         return task.status()["id"]
->>>>>>> restoration_work
 
 
 def sync_change_to_geoserver(block, district, state):
