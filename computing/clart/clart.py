@@ -14,6 +14,7 @@ from utilities.constants import GEE_ASSET_PATH
 from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -228,3 +229,4 @@ def clart_layer(state, district, block):
     print("task_id_list sync to gcs ", task_id_list)
 
     sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
+    save_layer_info_to_db(state, district, block, layer_name, final_output_assetid,"CLART")

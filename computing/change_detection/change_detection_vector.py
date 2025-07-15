@@ -1,6 +1,7 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -171,6 +172,14 @@ def generate_vector(roi, args, state, district, block, layer_name):
     )
     task.start()
     return task.status()["id"]
+    save_layer_info_to_db(
+        state, 
+        district, 
+        block, 
+        f"change_vector_{district.title()}_{block.title()}", 
+        asset_id=f"{get_gee_asset_path(state, district, block) + description}", 
+        workspace_name='Change Detection Vector'
+        )
 
 
 def sync_change_to_geoserver(block, district, state):

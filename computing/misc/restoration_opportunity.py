@@ -13,6 +13,7 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 
 
@@ -74,7 +75,7 @@ def clip_raster(roi, state, district, block, description):
         description + "_raster",
         "restoration_style",
     )
-
+    save_layer_info_to_db(state, district, block, f"restoration_{district.title()}_{block.title()}_raster", asset_id, "Restoration Raster")
     return asset_id
 
 
@@ -126,3 +127,11 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
     fc = ee.FeatureCollection(fc).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     return sync_layer_to_geoserver(state, fc, description, "restoration")
+    save_layer_info_to_db(
+        state, 
+        district, 
+        block, 
+        layer_name=f"restoration_{district.title()}_{block.title()}_vector", 
+        asset_id=f"{get_gee_asset_path(state, district, block) + description}", 
+        workspace_name="Restoration Vector"
+        )

@@ -10,7 +10,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
 )
-
+from computing.utils import save_layer_info_to_db
 
 @app.task(bind=True)
 def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
@@ -105,5 +105,7 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             print("task_id_list sync to GCS", task_id_list)
 
             sync_raster_gcs_to_geoserver("ccd", layer_name, layer_name, "ccd_style")
+            save_layer_info_to_db(state, district, block,layer_name, asset_id, "Ccd Raster")
+
         except Exception as e:
             print(f"Error occurred in running process_ccd task: {e}")

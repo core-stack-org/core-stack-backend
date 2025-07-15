@@ -1,6 +1,7 @@
 import ee
 from computing.utils import (
     sync_fc_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -101,3 +102,4 @@ def generate_swb_layer(
     fc = ee.FeatureCollection(asset_id)
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
     print(res)
+    save_layer_info_to_db(state, district, block, f"surface_waterbodies_{state.title()}_{block.title()}", asset_id, 'Surface Water Bodies')

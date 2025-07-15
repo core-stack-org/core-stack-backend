@@ -20,7 +20,7 @@ from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
     CROP_GRID_PATH,
 )
-
+from computing.utils import save_layer_info_to_db
 
 @app.task(bind=True)
 def create_crop_grids(self, state, district, block):
@@ -66,6 +66,14 @@ def create_crop_grids(self, state, district, block):
             print("task_id_list", task_id_list)
 
     crop_grids_lulc(state, district, block)
+    save_layer_info_to_db(
+        state, 
+        district, 
+        block, 
+        layer_name =f"{district.title()}_{block.title()}_grid", 
+        asset_id=f"{get_gee_asset_path(state, district, block) + description}",
+        workspace_name="Crop Grid"
+        )
 
 
 def get_block_coordinates(state, district, block):

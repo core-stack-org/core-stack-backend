@@ -2,6 +2,7 @@ import ee
 from computing.utils import (
     sync_layer_to_geoserver,
     sync_fc_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -75,7 +76,7 @@ def generate_cropping_intensity(
         "cropping_intensity",
     )
     print(res)
-
+    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_intensity",asset_id, 'Cropping Intensity')
 
 def generate_gee_asset(
     roi, asset_suffix, asset_folder_list, app_type, start_year, end_year

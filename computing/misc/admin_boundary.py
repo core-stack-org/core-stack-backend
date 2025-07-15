@@ -20,8 +20,7 @@ from utilities.gee_utils import (
     upload_shp_to_gee,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
-from computing.models import Dataset, Layer, LayerType
-from geoadmin.models import State, District, Block
+from computing.utils import save_layer_info_to_db
 
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block):
@@ -57,39 +56,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         # upload_shp_to_gee(layer_path, layer_name, asset_id)
 
-    def save_layer_info_to_db(state, district, block, layer_name, layer_version, algorithm, algorithm_version, style_name,  asset_id, workspace, updated_layer_version, updated_algorithm_version):
-        print("inside the save_layer_info_to_db function ")
-        dataset = Dataset.objects.get(
-            name = f"{district.title()}_{block.title()}"
-        )  
-        try:
-            state_obj = State.objects.get(state_name__iexact=state)
-            district_obj = District.objects.get(district_name__iexact=district, state=state_obj)
-            block_obj = Block.objects.get(block_name__iexact=block, district=district_obj)
-        except Exception as e:
-            print("Error fetching in state district block:", e)
-            return
-        layer_obj, created = Layer.objects.get_or_create(
-            dataset=dataset,
-            layer_name=layer_name,
-            layer_version=layer_version,
-            state=state_obj,    
-            district=district_obj,
-            block=block_obj,
-            algorithm=algorithm,
-            algorithm_version=algorithm_version,
-            style_name=style_name,
-            is_excel_generated=False,
-            gee_asset_path=asset_id,
-            is_public_gee_asset=False,
-            workspace=workspace
-        )
-        if not created:
-            layer_obj.layer_version=updated_layer_version
-            layer_obj.algorithm_version=updated_algorithm_version
-            layer_obj.save()
-
-    save_layer_info_to_db(state, district, block, "lulc", "v54", "lulc", "v54", "default", "worskspace/admin", "panchayat_boundaries","v1", "v1")
+    save_layer_info_to_db(state, district, block,f"{district.title()}_{block.title()}", asset_id, 'Admin Boundary')
 
 def sync_admin_boundry_to_geoserver(collection, state_dir, district, block):
     path = os.path.join(

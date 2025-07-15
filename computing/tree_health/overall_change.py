@@ -13,6 +13,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
 )
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -125,3 +126,9 @@ def tree_health_overall_change_raster(self, state, district, block):
 
     except Exception as e:
         print(f"Error occurred in running process_ch task: {e}")
+    save_layer_info_to_db(state, 
+    district, 
+    block,
+    f"tree_health_overall_change_raster_{district.title()}_{block.title()}", 
+    asset_id, 
+    "Tree Overall Change Raster")
