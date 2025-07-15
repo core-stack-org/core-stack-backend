@@ -8,6 +8,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
+    is_gee_asset_exists,
 )
 from nrm_app.celery import app
 from computing.utils import save_layer_info_to_db
@@ -17,7 +18,19 @@ from computing.utils import save_layer_info_to_db
 def get_change_detection(self, state, district, block, start_year, end_year):
     # Initialize the Earth Engine
     ee_initialize()
-
+    param_dict = {
+        "Urbanization":built_up,
+        "Degradation":change_degradation,
+        "Deforestation":change_deforestation,
+        "Afforestation":change_deforestation,
+        "CropIntensity":change_cropping_intensity
+    }
+    description = (
+        "change_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
     l1_asset = []
     s_year = start_year
     while s_year <= end_year:
@@ -45,29 +58,8 @@ def get_change_detection(self, state, district, block, start_year, end_year):
         + valid_gee_text(block.lower())
         + "_uid"
     )
-
-    change_bu = built_up(roi_boundary, l1_asset)
-    change_deg = change_degradation(roi_boundary, l1_asset)
-    change_def, change_af = change_deforestation(roi_boundary, l1_asset)
-    change_far = change_cropping_intensity(roi_boundary, l1_asset)
-
-    change_asset = [change_bu, change_deg, change_def, change_af, change_far]
-    description = (
-        "change_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-
-    param_list = [
-        "Urbanization",
-        "Degradation",
-        "Deforestation",
-        "Afforestation",
-        "CropIntensity",
-    ]
-
     task_list = []
+<<<<<<< HEAD
     for index, change in enumerate(param_list):
         asset_id = (
             get_gee_asset_path(state, district, block) + description + "_" + change
@@ -81,7 +73,29 @@ def get_change_detection(self, state, district, block, start_year, end_year):
         )
         task_list.append(task_id)
         save_layer_info_to_db(state, district, block, f"change_{district.title()}_{block.title()}", asset_id, "Change Detection Raster")
+=======
+>>>>>>> restoration_work
 
+    for change_detection_key, change_detection_values in param_dict.items():
+        asset_id = (
+            get_gee_asset_path(state, district, block) + description + "_" + change_detection_key
+        )
+        if not is_gee_asset_exists(asset_id):
+            print(f"{asset_id} doesn't exist")
+            
+            result = eval("change_detection_values(roi_boundary, l1_asset)")
+            if change_detection_key == 'Deforestation':
+                result = result[0]
+            if change_detection_key == 'Afforestation':
+                result = result[1]
+            task_id = export_raster_asset_to_gee(
+                    image=result,
+                    description=description + "_" + change_detection_key,
+                    asset_id=asset_id,
+                    scale=10,
+                    region=roi_boundary.geometry(),
+                )
+            task_list.append(task_id)
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)
 
@@ -89,7 +103,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
 
 
 def built_up(roi_boundary, l1_asset):
-
+    print("built_up function is runing")
     # Remap values function
     def remap_values(image):
         return image.remap(
@@ -157,6 +171,7 @@ def change_degradation(roi_boundary, l1_asset):
 
 
 def change_deforestation(roi_boundary, l1_asset):
+    print("change_deforestation is runing")
     # Create an initial zero image
     zero_image2 = ee.Image.constant(0).clip(l1_asset[0].geometry())
 

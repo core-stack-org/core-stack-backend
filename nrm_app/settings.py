@@ -322,13 +322,20 @@ GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> restoration_work
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
 #NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
 NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+<<<<<<< HEAD
 =======
+=======
+
+>>>>>>> restoration_work
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Bearer': {
@@ -337,5 +344,9 @@ SWAGGER_SETTINGS = {
             'in': 'header'
         }
     },
+<<<<<<< HEAD
 }
 >>>>>>> get_admin_details_by_lat_lon
+=======
+}
+>>>>>>> restoration_work

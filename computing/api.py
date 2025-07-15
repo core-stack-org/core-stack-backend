@@ -1,5 +1,6 @@
 import os
 <<<<<<< HEAD
+<<<<<<< HEAD
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import api_view, parser_classes
@@ -7,6 +8,13 @@ from rest_framework.decorators import api_view, parser_classes
 from nrm_app.settings import BASE_DIR
 from rest_framework.decorators import api_view, parser_classes, permission_classes
 >>>>>>> get_admin_details_by_lat_lon
+=======
+from nrm_app.settings import BASE_DIR
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+import requests
+from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
+from rest_framework.decorators import api_view, parser_classes
+>>>>>>> restoration_work
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -820,6 +828,35 @@ def swb_pond_merging(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+# @swagger_auto_schema(method='get', auto_schema=None)
+@api_view(["GET"])
+@permission_classes([HasAPIKey])
+def properties_from_soi(request,longitude, latitude):
+    """
+        **Description**:  
+    This API accepts **latitude** and **longitude** as input parameters and returns the corresponding administrative details—such as **state**, **district**, and **tehsil**—in **JSON** format.
+
+    **Response Example**:
+    {
+        "properties": {
+            "STATE": "ODISHA",
+            "District": "KALAHANDI",
+            "TEHSIL": "BHAWANIPATNA"}
+    }
+    """
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+        properties_list = extract_soi_properties(latitude, longitude)
+        return Response({
+            "properties": properties_list,
+        })
+    except Exception as e:
+        print(f"error occurred as {e}")
+
+>>>>>>> restoration_work
 
 @api_view(["POST"])
 def lulc_farm_boundary(request):
@@ -942,6 +979,7 @@ def wells_compute(request):
         )
     except Exception as e:
         return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+<<<<<<< HEAD
 =======
 # @swagger_auto_schema(method='get', auto_schema=None)
 @api_view(["GET"])
@@ -969,3 +1007,5 @@ def properties_from_soi(request,longitude, latitude):
     except Exception as e:
         print(f"error occurred as {e}")
 >>>>>>> get_admin_details_by_lat_lon
+=======
+>>>>>>> restoration_work

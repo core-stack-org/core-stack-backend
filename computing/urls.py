@@ -102,6 +102,7 @@ urlpatterns = [
         api.swb_pond_merging,
         name="merge_swb_ponds",
 <<<<<<< HEAD
+<<<<<<< HEAD
     )
 =======
     path("layer-status/", layer_status, name="layer-status"),
@@ -115,4 +116,8 @@ urlpatterns = [
     ),
     path("get_admin_details_by_lat_lon/<str:longitude>/<str:latitude>/", api.properties_from_soi, name="get_admin_details_by_lat_lon")   
 >>>>>>> get_admin_details_by_lat_lon
+=======
+    ),
+    path("get_admin_details_by_lat_lon/<str:longitude>/<str:latitude>/", api.properties_from_soi, name="get_admin_details_by_lat_lon")   
+>>>>>>> restoration_work
 ]
