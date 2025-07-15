@@ -90,8 +90,6 @@ urlpatterns = [
         api.restoration_opportunity,
         name="restoration_opportunity",
     ),
-<<<<<<< HEAD
-<<<<<<< HEAD
     path("aquifer_vector/", api.aquifer_vector, name="aquifer_vector"),
     path("soge_vector/", api.soge_vector, name="soge_vector"),
     path("fes_clart_layer/", api.fes_clart_upload_layer, name="fes_clart_layer"),
@@ -101,23 +99,18 @@ urlpatterns = [
         "merge_swb_ponds/",
         api.swb_pond_merging,
         name="merge_swb_ponds",
-<<<<<<< HEAD
-<<<<<<< HEAD
-    )
-=======
+
+    ),
+
     path("layer-status/", layer_status, name="layer-status"),
->>>>>>> ceckout
-=======
+
     path("layer-status/", layer_status, name="layer-status"),
     path("aquifer_vector/", api.aquifer_vector, name="aquifer_vector"),
     path("soge_vector/", api.soge_vector, name="soge_vector"),
->>>>>>> feature/layer-status
-=======
-    ),
+
+
+    path("get_admin_details_by_lat_lon/<str:longitude>/<str:latitude>/", api.properties_from_soi, name="get_admin_details_by_lat_lon"),
+
     path("get_admin_details_by_lat_lon/<str:longitude>/<str:latitude>/", api.properties_from_soi, name="get_admin_details_by_lat_lon")   
->>>>>>> get_admin_details_by_lat_lon
-=======
-    ),
-    path("get_admin_details_by_lat_lon/<str:longitude>/<str:latitude>/", api.properties_from_soi, name="get_admin_details_by_lat_lon")   
->>>>>>> restoration_work
+
 ]

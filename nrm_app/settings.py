@@ -261,21 +261,15 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+
 # MARK: ODK settings
-=======
-=======
->>>>>>> feature/layer-status
+
 STATICFILES_DIRS  = [
     os.path.join(BASE_DIR, 'static')
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # ODK settings
-<<<<<<< HEAD
->>>>>>> ceckout
-=======
->>>>>>> feature/layer-status
+
 # https://odk.gramvaani.org/#/projects/9/forms/Add_Settlements_form%20_V1.0.1
 OD_DATA_URL_hemlet = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Hamlet_form%20_V1.0.1.svc/Submissions"
 OD_DATA_URL_well = (
@@ -321,21 +315,13 @@ GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> restoration_work
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
 #NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
 NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
-<<<<<<< HEAD
-=======
-=======
 
->>>>>>> restoration_work
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
         'Bearer': {
@@ -344,9 +330,4 @@ SWAGGER_SETTINGS = {
             'in': 'header'
         }
     },
-<<<<<<< HEAD
 }
->>>>>>> get_admin_details_by_lat_lon
-=======
-}
->>>>>>> restoration_work
