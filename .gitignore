@@ -26,7 +26,11 @@ ENV/
 .venv
 env.bak/
 venv.bak/
+<<<<<<< HEAD
 home
 
+=======
+home/
+>>>>>>> layer/save_db
 # ignored apps
 dashboard/

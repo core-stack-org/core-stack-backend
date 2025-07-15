@@ -5,7 +5,7 @@ import json
 from nrm_app.celery import app
 from shapely import wkt
 from shapely.geometry import Point
-from computing.utils import push_shape_to_geoserver
+from computing.utils import push_shape_to_geoserver, save_layer_info_to_db
 from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
     NREGA_ASSETS_INPUT_DIR,
@@ -100,3 +100,4 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
 
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
     return push_shape_to_geoserver(path, workspace="nrega_assets")
+    save_layer_info_to_db(state_name, district_name, block_name, f"{district_name.title()}_{block_name.title()}","no asset id", "NREGA Assets")

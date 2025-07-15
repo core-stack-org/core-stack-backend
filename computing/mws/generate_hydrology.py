@@ -17,7 +17,7 @@ from utilities.gee_utils import (
 from .well_depth import well_depth
 from .calculateG import calculate_g
 import sys
-
+from computing.utils import save_layer_info_to_db
 
 @app.task(bind=True)
 def generate_hydrology(
@@ -151,3 +151,4 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
+    save_layer_info_to_db(state,district,block,layer_name, asset_id,'MWS')

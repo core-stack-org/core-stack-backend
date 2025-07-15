@@ -1,5 +1,5 @@
 import ee
-from computing.utils import sync_fc_to_geoserver
+from computing.utils import sync_fc_to_geoserver, save_layer_info_to_db
 from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
@@ -126,3 +126,4 @@ def calculate_drought(
     description = valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_drought"
     res = sync_fc_to_geoserver(fc, state, description, 'cropping_drought')
     print(res)
+    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_drought", asset_id,'Drought')

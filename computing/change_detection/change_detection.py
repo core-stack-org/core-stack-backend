@@ -10,6 +10,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
 )
 from nrm_app.celery import app
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -79,6 +80,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
             region=roi_boundary.geometry(),
         )
         task_list.append(task_id)
+        save_layer_info_to_db(state, district, block, f"change_{district.title()}_{block.title()}", asset_id, "Change Detection Raster")
 
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)

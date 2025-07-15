@@ -16,6 +16,8 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
+from computing.utils import save_layer_info_to_db
+
 
 
 @app.task(bind=True)
@@ -91,7 +93,7 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
         scale,
     )
 
-    sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block)
+    sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, state, district, block,final_output_assetid_array_new)
 
 
 def sync_lulc_to_gcs(
@@ -111,7 +113,7 @@ def sync_lulc_to_gcs(
     print("task_ids sync to gcs ", task_id_list)
 
 
-def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_name):
+def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new,state, district, block_name,final_output_assetid_array_new):
     print("Syncing lulc to geoserver")
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     for i in range(0, len(l1_asset_new)):
@@ -132,4 +134,6 @@ def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_
                 + valid_gee_text(block_name.lower())
                 + suff
             )
+            asset_id=final_output_assetid_array_new[i],
+            save_layer_info_to_db(state, district,block_name, layer_name, asset_id, workspace)
             sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style)

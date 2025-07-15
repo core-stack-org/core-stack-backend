@@ -10,6 +10,7 @@ import numpy as np
 from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -500,6 +501,7 @@ def drought_causality(self, state, district, block, start_year, end_year):
         }
         sync_res = sync_layer_to_geoserver(state, aggregated_feature_collection, geo_filename, "drought_causality")
         print(f"Synced aggregated data to GeoServer: {sync_res}")
+        save_layer_info_to_db(state, district, block,f"{district}_{block}_drought_causality",geo_filename,"Drought Causality" )
     except Exception as e:
         print(f"Error syncing aggregated data to GeoServer: {e}")
 

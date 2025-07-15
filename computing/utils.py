@@ -27,7 +27,8 @@ import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
-
+from computing.models import Dataset, Layer, LayerType
+from geoadmin.models import State, District, Block
 
 def generate_shape_files(path):
     gdf = gpd.read_file(path + ".json")
@@ -242,6 +243,7 @@ def fix_invalid_geometry_in_gdf(gdf):
     return gdf
 
 
+<<<<<<< HEAD
 def extract_soi_properties(latitude, longitude):
     try:
         ee_initialize()
@@ -259,3 +261,33 @@ def extract_soi_properties(latitude, longitude):
         return properties_list
     except Exception as e:
         print(f"error occurred as {e}")
+=======
+def save_layer_info_to_db(state, district, block, layer_name,asset_id, workspace_name):
+    print("inside the save_layer_info_to_db function ")
+    dataset = Dataset.objects.get(
+        name = workspace_name
+    )
+    workspace = str(dataset.workspace)
+    state = state.lower().replace(" ", "_")
+    district=district.lower().replace(" ", "_")
+    block=block.lower().replace(" ", "_")
+    try:
+        state_obj = State.objects.get(state_name__iexact=state)
+        district_obj = District.objects.get(district_name__iexact=district, state=state_obj)
+        block_obj = Block.objects.get(block_name__iexact=block, district=district_obj)
+    except Exception as e:
+        print("Error fetching in state district block:", e)
+        return
+    layer_obj, created = Layer.objects.get_or_create(
+        dataset=dataset,
+        layer_name=layer_name,
+        state=state_obj,    
+        district=district_obj,
+        block=block_obj,
+        gee_asset_path=asset_id,
+        misc={
+            workspace:"district_block"
+        }
+        
+    )
+>>>>>>> layer/save_db

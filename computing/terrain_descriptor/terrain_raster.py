@@ -12,6 +12,7 @@ from utilities.gee_utils import (
 import ee
 
 from .terrain_utils import generate_terrain_classified_raster
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -49,6 +50,8 @@ def terrain_raster(self, state, district, block):
         )
         task_id_list = check_task_status([task_id])
         print("terrain_raster task_id_list", task_id_list)
+        save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_terrain_raster", asset_id, "Terrain Raster")
+
 
     """ Sync image to google cloud storage and then to geoserver"""
     layer_name = (
@@ -63,3 +66,4 @@ def terrain_raster(self, state, district, block):
     print("task_id_list sync to gcs ", task_id_list)
 
     sync_raster_gcs_to_geoserver("terrain", layer_name, layer_name, "terrain_raster")
+    save_layer_info_to_db(state, district, block, layer_name, asset_id, "Terrain Raster")
