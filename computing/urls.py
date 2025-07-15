@@ -91,6 +91,7 @@ urlpatterns = [
         name="restoration_opportunity",
     ),
 <<<<<<< HEAD
+<<<<<<< HEAD
     path("aquifer_vector/", api.aquifer_vector, name="aquifer_vector"),
     path("soge_vector/", api.soge_vector, name="soge_vector"),
     path("fes_clart_layer/", api.fes_clart_upload_layer, name="fes_clart_layer"),
@@ -104,4 +105,9 @@ urlpatterns = [
 =======
     path("layer-status/", layer_status, name="layer-status"),
 >>>>>>> ceckout
+=======
+    path("layer-status/", layer_status, name="layer-status"),
+    path("aquifer_vector/", api.aquifer_vector, name="aquifer_vector"),
+    path("soge_vector/", api.soge_vector, name="soge_vector"),
+>>>>>>> feature/layer-status
 ]

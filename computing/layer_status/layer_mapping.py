@@ -66,5 +66,117 @@ workspace_config = {
         "suffix": "terrain_raster",
         "type":"raster"
 
+    },
+    "restoration_raster":{
+        "name": "restoration",
+        "prefix": "restoration",
+        "suffix": "raster",
+        "type": "raster"
+    },
+    "restoration":{
+        "name": "restoration",
+        "prefix": "restoration",
+        "suffix": "vector",
+        "type": "vector"
+    },
+    "drought_causality":{
+        "name": "drought_causality",
+        "suffix": "drought_causality",
+        "type": "vector"
+    },
+    "tree_overall_ch_raster":{
+        "name": "tree_overall_ch",
+        "prefix": "tree_health_overall_change_raster",
+        "type": "raster"
+    },
+    "tree_overall_ch_vector":{
+        "name": "tree_overall_ch",
+        "prefix": "tree_health_overall_change_vector",
+        "type": "vector"
+    },
+    "lulc_vector":{
+        "name": "lulc_vector",
+        "prefix": "lulc_vector",
+        "type": "vector"
+    },
+    "change_detection_Afforestation_raster":{
+        "name": "change_detection",
+        "prefix": "change",
+        "suffix": "Afforestation",
+        "type": "raster"
+    },
+    "change_detection_CropIntensity_raster":{
+        "name": "change_detection",
+        "prefix": "change",
+        "suffix": "CropIntensity",
+        "type": "raster"
+    },
+    "change_detection_Deforestation_raster":{
+        "name": "change_detection",
+        "prefix": "change",
+        "suffix": "Deforestation",
+        "type": "raster"
+    },
+    "change_detection_Degradation_raster":{
+        "name": "change_detection",
+        "prefix": "change",
+        "suffix": "Degradation",
+        "type": "raster"
+    },
+    "change_detection_Urbanization_raster":{
+        "name": "change_detection",
+        "prefix": "change",
+        "suffix": "Urbanization",
+        "type": "raster"
+    },
+    "change_detection_Afforestation_vector":{
+        "name": "change_detection",
+        "prefix": "change_vector",
+        "suffix": "Afforestation",
+        "type": "vector"
+    },
+    "change_detection_CropIntensity_vector":{
+        "name": "change_detection",
+        "prefix": "change_vector",
+        "suffix": "CropIntensity",
+        "type": "vector"
+    },
+    "change_detection_Deforestation_vector":{
+        "name": "change_detection",
+        "prefix": "change_vector",
+        "suffix": "Deforestation",
+        "type": "vector"
+    },
+    "change_detection_Degradation_vector":{
+        "name": "change_detection",
+        "prefix": "change_vector",
+        "suffix": "Degradation",
+        "type": "vector"
+    },
+    "change_detection_Urbanization_vector":{
+        "name": "change_detection",
+        "prefix": "change_vector",
+        "suffix": "Urbanization",
+        "type": "vector"
+    },
+    "terrain_lulc_plain":{
+        "name": "terrain_lulc",
+        "suffix": "lulc_plain",
+        "type": "vector"
+    },
+    "terrain_lulc_slope":{
+        "name": "terrain_lulc",
+        "suffix": "lulc_slope",
+        "type": "vector"
+    },
+    "aquifer":{
+        "name": "aquifer",
+        "prefix": "aquifer_vector",
+        "type": "vector"
+    },
+    "soge":{
+        "name": "soge",
+        "prefix": "soge_vector",
+        "type": "vector"
     }
    }
