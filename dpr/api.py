@@ -102,6 +102,9 @@ def generate_dpr(request):
 @api_view(["GET"])
 @api_security_check(auth_type="API_key")
 def generate_mws_report(request):
+    """
+        Render MWS report based on given state, district, tehsil and MWS ID.
+    """
     try:
         # ? district, block, mwsId
         params = request.GET

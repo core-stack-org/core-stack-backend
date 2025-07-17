@@ -105,6 +105,7 @@ def get_communities_by_location(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_communities_by_lat_lon(request):
     try:
         from public_api.views import get_location_info_by_lat_lon
@@ -279,6 +280,7 @@ def is_user_in_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_districts_with_community(request):
     try:
         state_id = request.query_params.get("state_id").strip()
@@ -299,6 +301,7 @@ def get_districts_with_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_blocks_with_community(request):
     try:
         district_id = request.query_params.get("district_id").strip()
@@ -347,6 +350,7 @@ def get_blocks_with_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_items_by_community(request):
     try:
         community_id = request.query_params.get("community_id")
