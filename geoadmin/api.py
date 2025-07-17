@@ -5,6 +5,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
+from django.http import JsonResponse
+
 
 from .models import Block, District, State
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
@@ -19,7 +21,6 @@ from utilities.auth_check_decorator import api_security_check
 @api_view(["GET"])
 @auth_free
 @schema(None)
-# @api_security_check(auth_type="Auth_free", allowed_methods="GET", include_in_schema=False)
 @api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
 def get_states(request):
     try:
@@ -243,16 +244,16 @@ def activate_location(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+
+@api_security_check(auth_type="JWT", allowed_methods="POST")
 @schema(None)
-@api_security_check(auth_type="JWT", allowed_methods="POST", include_in_schema=False)
 def generate_api_key(request):
     """
         Generate a new API key for the authenticated user
         POST /api/v1/generate_api_key/
         {
             "name": "user_name",
-            "expiry_days": 365
+            "expiry_days": 30
         }
 
         Response Json:
@@ -263,9 +264,10 @@ def generate_api_key(request):
         "message": "API key created successfully."
         }
     """
+    print("Inside generate API Key")
     try:
         name = request.POST.get('name', 'Unknown')
-        expiry_days = request.POST.get('expiry_days', 365)
+        expiry_days = request.POST.get('expiry_days', 30)
         if expiry_days <= 0:
             return Response(
                 {"error": "Expiry days must be positive"}, 
@@ -274,12 +276,8 @@ def generate_api_key(request):
 
         expires_at = timezone.now() + timedelta(days=expiry_days)
         api_key_obj, generated_key = UserAPIKey.objects.create_key(name=name.strip(), user=request.user,expires_at=expires_at)
-        response_data = {"name": api_key_obj.name, "prefix": api_key_obj.prefix, "key": generated_key}
-
-        return Response(response_data)
+        response_data = {"name": str(request.user), "prefix": api_key_obj.prefix, "key": generated_key}
+        return JsonResponse(response_data, status=status.HTTP_201_CREATED)
             
     except Exception as e:
-        return Response(
-            {"error": f"Failed to create API key: {str(e)}"}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return JsonResponse(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)

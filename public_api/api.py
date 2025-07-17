@@ -2,42 +2,55 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
+import pandas as pd
+import numpy as np
+import os
 
 #from .utils import *
 from utilities.auth_utils import auth_free
 from .views import fetch_generated_layer_urls, get_mws_id_by_lat_lon, get_mws_json_from_stats_excel, get_mws_json_from_kyl_indicator, get_location_info_by_lat_lon
 from utilities.auth_check_decorator import api_security_check
 from django.http import HttpResponse
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
+
+# Common parameters that can be reused across endpoints
+latitude_param = openapi.Parameter('latitude', openapi.IN_QUERY, description="Latitude coordinate (-90 to 90)", type=openapi.TYPE_NUMBER,required=True)
+longitude_param = openapi.Parameter('longitude', openapi.IN_QUERY, description="Longitude coordinate (-180 to 180)", type=openapi.TYPE_NUMBER,required=True)
+authorization_param = openapi.Parameter('x-api-key', openapi.IN_HEADER, description="API Key in format: <your-api-key>", type=openapi.TYPE_STRING,required=True)
+state_param = openapi.Parameter('state',openapi.IN_QUERY,description="Name of the state (e.g. 'Uttar Pradesh')",type=openapi.TYPE_STRING,required=True)
+district_param = openapi.Parameter('district',openapi.IN_QUERY,description="Name of the district (e.g. 'Jaunpur')",type=openapi.TYPE_STRING,required=True)
+tehsil_param = openapi.Parameter('tehsil',openapi.IN_QUERY,description="Name of the tehsil (e.g. 'Badlapur')",type=openapi.TYPE_STRING,required=True)
+mws_id_param = openapi.Parameter('mws_id',openapi.IN_QUERY,description="Unique MWS identifier (e.g. '12_234647')",type=openapi.TYPE_STRING,required=True)
+file_type_param = openapi.Parameter('file_type',openapi.IN_QUERY,description="Output format - 'json' or 'excel' (default: 'excel')",type=openapi.TYPE_STRING,required=False)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+########## Admin Details by lat lon ##########
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[latitude_param, longitude_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": {
+                    "State": "UTTAR PRADESH",
+                    "District": "JAUNPUR",
+                    "Tehsil": "BADLAPUR"
+                }
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
 def get_admin_details_by_lat_lon(request):
     """
         Retrieve admin data based on given latitude and longitude coordinates.
-
-        Authorization in header:
-        - Requires an API key passed in the `Authorization` header.
-        - Example: `Authorization: Api-Key <your-api-key>`
-
-        Query params should contain:
-        - `latitude` (float): Latitude coordinate (-90 to 90)
-        - `longitude` (float): Longitude coordinate (-180 to 180)
-
-        Example Request:
-        `GET /api/v1/get_admin_details_by_lat_lon/?latitude=25.9717644&longitude=82.44364023`
-
-        Returns code:
-        - 200 OK: JSON data (if file_type=json) or Excel file download
-        - 400 Bad Request: Invalid parameters or logic error
-        - 401 Unauthorized: Invalid or missing API key
-        - 500 Internal Server Error: File generation or reading issue
-
-        Response data:
-            `{
-                "State": "UTTAR PRADESH",
-                "District": "JAUNPUR",
-                "Tehsil": "BADLAPUR"
-            }`
     """
     try:
         lat = float(request.query_params.get("latitude"))
@@ -54,37 +67,33 @@ def get_admin_details_by_lat_lon(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+######### Get Mws Id by lat lon #########
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[latitude_param, longitude_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": {
+                    "uid": "12_234647",
+                    "state": "UTTAR PRADESH",
+                    "district": "JAUNPUR",
+                    "tehsil": "BADLAPUR"
+                }
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
 def get_mws_by_lat_lon(request):
     """
         Retrieve MWS ID data based on given latitude and longitude coordinates.
-
-        Authorization in header:
-        - Requires an API key passed in the `Authorization` header.
-        - Example: `Authorization: Api-Key <your-api-key>`
-
-        Query params should contain:
-        - `latitude` (float): Latitude coordinate (-90 to 90)
-        - `longitude` (float): Longitude coordinate (-180 to 180)
-
-        Example Request:
-        `GET /api/v1/get_mws_id_by_lat_lon/?latitude=25.9717644&longitude=82.44364023`
-
-        Returns code:
-        - 200 OK: JSON data (if file_type=json) or Excel file download
-        - 400 Bad Request: Invalid parameters or logic error
-        - 401 Unauthorized: Invalid or missing API key
-        - 500 Internal Server Error: File generation or reading issue
-
-        Response data:
-            `{
-                "uid": "12_234647",
-                "state": "UTTAR PRADESH",
-                "district": "JAUNPUR",
-                "tehsil": "BADLAPUR"
-            }`
     """
-
     print("Inside Get mws id by lat lon layer API")
     try:
         lat = float(request.query_params.get("latitude"))
@@ -99,60 +108,53 @@ def get_mws_by_lat_lon(request):
         return Response({"error": str(e)}, status=500)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+########## Get MWS Data by MWS ID  ##########
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": {
+                    "hydrological_annual": [
+                        {
+                            "uid": "12_234647",
+                            "et_in_mm_2017-2018": 894.1,
+                            "runoff_in_mm_2017-2018": 148.57,
+                            "g_in_mm_2017-2018": -321.06,
+                            "deltag_in_mm_2017-2018": -321.06,
+                            "precipitation_in_mm_2017-2018": 721.62,
+                            "welldepth_in_m_2017-2018": -1.78
+                        }
+                    ],
+                    "terrain": [
+                        {
+                            "uid": "12_234647",
+                            "area_in_ha": 4317.15,
+                            "terrain_cluster_id": 1,
+                            "terrain_description": "Mostly Plains",
+                            "hill_slope_area_percent": 0.02,
+                            "plain_area_percent": 95.75,
+                            "ridge_area_percent": 2.17,
+                            "slopy_area_percent": 1.1,
+                            "valley_area_percent": 0.96
+                        }
+                    ]
+                }
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
 def get_mws_json_by_stats_excel(request):
     """
         Retrieve MWS data for a given state, district, tehsil, and MWS ID.
-
-        Authorization in header:
-        - Requires an API key passed in the `Authorization` header.
-        - Example: `Authorization: Api-Key <your-api-key>`
-
-        Query params should contain:
-        - `state` (str): Name of the state (e.g. Odisha)
-        - `district` (str): Name of the district (e.g. Ganjam)
-        - `tehsil` (str): Name of the tehsil (e.g. Chatrapur)
-        - `mws_id` (str): Unique MWS identifier (e.g. 12_12345)
-
-        Example Request:
-        `GET /api/v1/get_mws_data?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur&mws_id=12_234647`
-
-        Returns code:
-        - 200 OK: JSON data (if file_type=json) or Excel file download
-        - 400 Bad Request: Invalid parameters or logic error
-        - 401 Unauthorized: Invalid or missing API key
-        - 500 Internal Server Error: File generation or reading issue
-
-        Response Data:
-            `{
-                "hydrological_annual": [
-                    {
-                        "uid": "12_234647",
-                        "et_in_mm_2017-2018": 894.1,
-                        "runoff_in_mm_2017-2018": 148.57,
-                        "g_in_mm_2017-2018": -321.06,
-                        "deltag_in_mm_2017-2018": -321.06,
-                        "precipitation_in_mm_2017-2018": 721.62,
-                        "welldepth_in_m_2017-2018": -1.78,
-                        ............
-                    }
-                ],
-                "terrain": [
-                    {
-                        "uid": "12_234647",
-                        "area_in_ha": 4317.15,
-                        "terrain_cluster_id": 1,
-                        "terrain_description": "Mostly Plains",
-                        "hill_slope_area_percent": 0.02,
-                        "plain_area_percent": 95.75,
-                        "ridge_area_percent": 2.17,
-                        "slopy_area_percent": 1.1,
-                        "valley_area_percent": 0.96
-                    }
-                ]
-            }`
     """
-
     print("Inside mws data by excel api")
     try:
         state = request.query_params.get("state").lower()
@@ -166,80 +168,45 @@ def get_mws_json_by_stats_excel(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+######### Get MWS DATA by Admin Details  ##########
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[state_param, district_param, tehsil_param, file_type_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": {
+                    "aquifer_vector": [
+                        {
+                            "uid": "12_207597",
+                            "area_in_ha": 2336.11,
+                            "aquifer_class": "Alluvium",
+                            "principle_aq_alluvium_percent": 100,
+                            "principle_aq_banded gneissic complex_percent": 0
+                        },
+                        {
+                            "uid": "12_208413",
+                            "area_in_ha": 864.04,
+                            "aquifer_class": "Alluvium",
+                            "principle_aq_alluvium_percent": 100,
+                            "principle_aq_banded gneissic complex_percent": 0
+                        }
+                    ]
+                }
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
 def generate_tehsil_data(request):
     """
-    Retrieve Tehsil-level Excel or JSON data for a given state, district, and tehsil.
-
-    Authorization in header:
-    - Requires an API key passed in the `Authorization` header.
-    - Example: `Authorization: Api-Key <your-api-key>`
-
-    Query params should contain:
-    - `state` (str): Name of the state (e.g. Odisha)
-    - `district` (str): Name of the district (e.g. Ganjam)
-    - `tehsil` (str): Name of the tehsil (e.g. Chatrapur)
-    - `file_type` (optional str): For file type if passed json then json else excel (e.g. json)
-
-    Example Request:
-    GET `/api/v1/get_tehsil_data?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur&file_type=json`
-
-    Returns code:
-    - 200 OK: JSON data (if file_type=json) or Excel file download
-    - 400 Bad Request: Invalid parameters or logic error
-    - 401 Unauthorized: Invalid or missing API key
-    - 500 Internal Server Error: File generation or reading issue
-
-    Response Data:
-        `{
-            "aquifer_vector": [
-                {
-                "uid": "12_207597",
-                "area_in_ha": 2336.11,
-                "aquifer_class": "Alluvium",
-                "principle_aq_alluvium_percent": 100,
-                "principle_aq_banded gneissic complex_percent": 0,
-                "principle_aq_basalt_percent": 0,
-                "principle_aq_charnockite_percent": 0,
-                "principle_aq_gneiss_percent": 0,
-                "principle_aq_granite_percent": 0,
-                "principle_aq_intrusive_percent": 0,
-                "principle_aq_khondalite_percent": 0,
-                "principle_aq_laterite_percent": 0,
-                "principle_aq_limestone_percent": 0,
-                "principle_aq_none_percent": 0,
-                "principle_aq_quartzite_percent": 0,
-                "principle_aq_sandstone_percent": 0,
-                "principle_aq_schist_percent": 0,
-                "principle_aq_shale_percent": 0
-                },
-                {
-                "uid": "12_208413",
-                "area_in_ha": 864.04,
-                "aquifer_class": "Alluvium",
-                "principle_aq_alluvium_percent": 100,
-                "principle_aq_banded gneissic complex_percent": 0,
-                "principle_aq_basalt_percent": 0,
-                "principle_aq_charnockite_percent": 0,
-                "principle_aq_gneiss_percent": 0,
-                "principle_aq_granite_percent": 0,
-                "principle_aq_intrusive_percent": 0,
-                "principle_aq_khondalite_percent": 0,
-                "principle_aq_laterite_percent": 0,
-                "principle_aq_limestone_percent": 0,
-                "principle_aq_none_percent": 0,
-                "principle_aq_quartzite_percent": 0,
-                "principle_aq_sandstone_percent": 0,
-                "principle_aq_schist_percent": 0,
-                "principle_aq_shale_percent": 0
-                }
-            ]
-            .............
-            ............
-        }`
-
+        Retrieve Tehsil-level Excel or JSON data for a given state, district, and tehsil.
     """
-
     print("Inside generating tehsil excel data")
     try:
         # Get query parameters
@@ -293,65 +260,49 @@ def generate_tehsil_data(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+########### Get KYL Data based on MWS ID  ###############
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": [
+                    {
+                        "mws_id": "12_234647",
+                        "terraincluster_id": 1,
+                        "avg_precipitation": 764.4457,
+                        "cropping_intensity_trend": 0,
+                        "cropping_intensity_avg": 1.7417,
+                        "avg_single_cropped": 8.2647,
+                        "avg_double_cropped": 80.1709,
+                        "avg_triple_cropped": 1.8198,
+                        "avg_wsr_ratio_kharif": 0.0262,
+                        "avg_wsr_ratio_rabi": 0.028,
+                        "avg_wsr_ratio_zaid": 0.43,
+                        "avg_kharif_surface_water_mws": 28.2033,
+                        "avg_rabi_surface_water_mws": 27.7095,
+                        "avg_zaid_surface_water_mws": 9.381,
+                        "trend_g": -1,
+                        "drought_category": 2,
+                        "avg_number_dry_spell": 2.1667,
+                        "avg_runoff": 167.7886,
+                        "total_nrega_assets": 550
+                    }
+                ]
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
 def get_mws_json_by_kyl_indicator(request):
     """
         Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.
-
-        Authorization in header:
-        - Requires an API key passed in the `Authorization` header.
-        - Example: `Authorization: Api-Key <your-api-key>`
-
-        Query params should contain:
-        - `state` (str): Name of the state (e.g. Odisha)
-        - `district` (str): Name of the district (e.g. Ganjam)
-        - `tehsil` (str): Name of the tehsil (e.g. Chatrapur)
-        - `mws_id` (str): Unique MWS identifier
-
-        Example Request:
-        - `GET /api/v1/get_mws_kyl_indicator?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur&mws_id=12_234647`
-        
-        Returns code :
-        - 200 OK: JSON list of KYL indicator data
-        - 400 Bad Request: Missing or invalid parameters
-        - 401 Unauthorized: Missing or invalid API key
-        - 500 Internal Server Error: Unexpected failure
-
-        Response Data:
-            `[
-                {
-                    "mws_id": "12_234647",
-                    "terraincluster_id": 1,
-                    "avg_precipitation": 764.4457,
-                    "cropping_intensity_trend": 0,
-                    "cropping_intensity_avg": 1.7417,
-                    "avg_single_cropped": 8.2647,
-                    "avg_double_cropped": 80.1709,
-                    "avg_triple_cropped": 1.8198,
-                    "avg_wsr_ratio_kharif": 0.0262,
-                    "avg_wsr_ratio_rabi": 0.028,
-                    "avg_wsr_ratio_zaid": 0.43,
-                    "avg_kharif_surface_water_mws": 28.2033,
-                    "avg_rabi_surface_water_mws": 27.7095,
-                    "avg_zaid_surface_water_mws": 9.381,
-                    "trend_g": -1,
-                    "drought_category": 2,
-                    "avg_number_dry_spell": 2.1667,
-                    "avg_runoff": 167.7886,
-                    "total_nrega_assets": 550,
-                    "mws_intersect_villages": "[200586, 200587, 200588, 200589, 200594, 200595, 200722, 200725, 200726, 200727, 200728, 200729, 200730, 200731, 200604, 200605, 200606, 200607, 200608, 200733, 200734, 200611, 200612, 200613, 200614, 200615, 200616, 200617, 200618, 200739, 200744, 200634, 200635, 200639, 200640, 200735]",
-                    "degradation_land_area": 108.92,
-                    "increase_in_tree_cover": 150.02,
-                    "decrease_in_tree_cover": 109.18,
-                    "built_up_area": 87.33,
-                    "lulc_slope_category": null,
-                    "lulc_plain_category": "~67% Double Cropped",
-                    "area_wide_scale_restoration": 21.84,
-                    "area_protection": 3453.75,
-                    "aquifer_class": 1,
-                    "soge_class": 2
-                }
-                ]`
     """
     print("Inside Mws kyl Indicator api")
     try:
@@ -366,52 +317,50 @@ def get_mws_json_by_kyl_indicator(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
+#############  Get Generated Layers Urls  ##################
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[state_param, district_param, tehsil_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": [
+                    {
+                        "layer_desc": "Change Detection Afforestation",
+                        "layer_type": "raster",
+                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?...",
+                        "layer_version": "v1",
+                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Restoration/Afforestation_climate_change.qml"
+                    },
+                    {
+                        "layer_desc": "Aquifer layer data",
+                        "layer_type": "vector",
+                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/aquifer/ows?...",
+                        "layer_version": "v1",
+                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/Aquifer_style.qml"
+                    }
+                ]
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
 def get_generated_layer_urls(request):
     """
         Retrieve generated layer URLs for a given state, district, and block.
-
-        Authorization in header:
-        - Requires an API key passed in the `Authorization` header.
-        - Example: `Authorization: Api-Key <your-api-key>`
-
-        Query params should contain:
-        - `state` (str): Name of the state
-        - `district` (str): Name of the district
-        - `block` (str): Name of the block
-
-        Example Request:
-        `GET /api/v1/get_generated_layer_urls?state=Uttar Pradesh&district=Jaunpur&tehsil=Badlapur`
-
-        Returns code:
-        - 200 OK: JSON data
-        - 400 Bad Request: Invalid parameters or logic error
-        - 401 Unauthorized: Invalid or missing API key
-        - 500 Internal Server Error: File generation or reading issue
-
-        Response data:
-            `[
-                {
-                    "layer_desc": "Change Detection Afforestation",
-                    "layer_type": "raster",
-                    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_jaunpur__Afforestation&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
-                    "style_name": "deforestation"
-                },
-                {
-                    "layer_desc": "Aquifer layer data",
-                    "layer_type": "vector",
-                    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/aquifer/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=aquifer:aquifer_vector_jaunpur_&outputFormat=application/json",
-                    "style_name": ""
-                }
-            ]`
     """
     try:
         print("Inside Get Generated Layer Urls API.")
         state = request.query_params.get("state", "").lower()
         district = request.query_params.get("district", "").lower().replace(" ", "_")
-        block = request.query_params.get("block", "").lower().replace(" ", "_")
+        tehsil = request.query_params.get("tehsil", "").lower().replace(" ", "_")
 
-        layers_details_json = fetch_generated_layer_urls(district, block)
+        layers_details_json = fetch_generated_layer_urls(district, tehsil)
         return JsonResponse(layers_details_json, status=200, safe=False)
 
     except Exception as e:

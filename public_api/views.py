@@ -25,20 +25,60 @@ def raster_tiff_download_url(workspace, layer_name):
     return geotiff_url
 
 
-def fetch_generated_layer_urls(district, block):
+# def fetch_generated_layer_urls(district, block):
+#     """
+#     Fetch all vector and raster layers and return their metadata as JSON.
+#     """
+#     all_layers = LayerInfo.objects.all()
+#     layer_data = []
+
+#     for layer in all_layers:
+#         workspace = layer.workspace
+#         layer_type = layer.layer_type
+#         layer_desc = layer.layer_desc
+#         style_name = layer.style_name
+#         layer_name = layer.layer_name.format(district=district, block=block)
+
+#         if layer_type == "vector":
+#             layer_url = get_url(workspace, layer_name)
+#         elif layer_type == "raster":
+#             layer_url = raster_tiff_download_url(workspace, layer_name)
+#         else:
+#             continue  # skip unknown layer types
+
+#         layer_data.append({
+#             "layer_desc": layer_desc,
+#             "layer_type": layer_type,
+#             "layer_url": layer_url,
+#             "style_name": style_name
+#         })
+
+#     return layer_data
+
+
+def fetch_generated_layer_urls(state_name, district_name, block_name):
     """
-    Fetch all vector and raster layers and return their metadata as JSON.
+    Fetch all vector and raster layers for given state, district, and block,
+    and return their metadata as JSON.
     """
-    all_layers = LayerInfo.objects.all()
+    # Get all layers matching the state, district, and block
+    layers = Layer.objects.filter(
+        state__name__iexact=state_name,
+        district__name__iexact=district_name,
+        block__name__iexact=block_name
+    ).select_related('dataset', 'state', 'district', 'block')
+    
     layer_data = []
 
-    for layer in all_layers:
-        workspace = layer.workspace
-        layer_type = layer.layer_type
-        layer_desc = layer.layer_desc
-        style_name = layer.style_name
-        layer_name = layer.layer_name.format(district=district, block=block)
-
+    for layer in layers:
+        dataset = layer.dataset
+        workspace = dataset.workspace
+        layer_type = dataset.layer_type
+        layer_name = layer.layer_name
+        
+        # Get layer description from misc if available, otherwise use dataset name
+        layer_desc = dataset.misc.get('description', dataset.name) if dataset.misc else dataset.name
+        
         if layer_type == "vector":
             layer_url = get_url(workspace, layer_name)
         elif layer_type == "raster":
@@ -50,10 +90,12 @@ def fetch_generated_layer_urls(district, block):
             "layer_desc": layer_desc,
             "layer_type": layer_type,
             "layer_url": layer_url,
-            "style_name": style_name
+            "style_name": dataset.style_name
         })
 
     return layer_data
+
+
 
 def get_location_info_by_lat_lon(lat, lon):
     ee_initialize()

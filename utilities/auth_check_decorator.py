@@ -14,8 +14,9 @@ from django.contrib.auth import get_user_model
 from geoadmin.models import UserAPIKey
 from rest_framework.decorators import api_view as drf_api_view
 from rest_framework.schemas import AutoSchema
+User = get_user_model()
 
-def api_security_check(auth_type="JWT", allowed_methods=None, required_headers=None, include_in_schema=True):
+def api_security_check(auth_type="JWT", allowed_methods=None, required_headers=None):
     if allowed_methods is None:
         allowed_methods = ["GET"]
     elif isinstance(allowed_methods, str):
@@ -49,6 +50,20 @@ def api_security_check(auth_type="JWT", allowed_methods=None, required_headers=N
                         {"error": "Authentication failed"},
                         status.HTTP_401_UNAUTHORIZED
                     )
+                
+                # Set the authenticated user on the request
+                if "user_info" in auth_result:
+                    # Assuming user_info contains the user object or user_id
+                    user_info = auth_result["user_info"]
+                    if hasattr(user_info, 'id'):  # If it's already a user object
+                        request.user = user_info
+                    else:  # If it's user data/id, you might need to fetch the user
+                        # Example: request.user = User.objects.get(id=user_info['id'])
+                        request.user = user_info  # Adjust based on your user_info structure
+                
+                # Set the authenticated user on the request
+                if "user" in auth_result:
+                    request.user = auth_result["user"]
 
                 missing_headers = validate_required_headers(request, required_headers)
                 if missing_headers:
@@ -71,15 +86,11 @@ def api_security_check(auth_type="JWT", allowed_methods=None, required_headers=N
                     {"error": "Server error", "details": str(e)},
                     status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-        # Schema visibility control
-        if not include_in_schema:
-            wrapper.exclude_from_schema = True
-        else:
-            # Preserve DRF attributes needed for documentation
-            wrapper.cls = getattr(drf_wrapped_func, 'cls', None)
-            wrapper.initkwargs = getattr(drf_wrapped_func, 'initkwargs', None)
-            wrapper.schema = getattr(drf_wrapped_func, 'schema', AutoSchema())
 
+        # Preserve DRF attributes for drf_yasg compatibility
+        wrapper.cls = getattr(drf_wrapped_func, 'cls', None)
+        wrapper.initkwargs = getattr(drf_wrapped_func, 'initkwargs', {})
+        
         return wrapper
     return decorator
 
@@ -135,61 +146,21 @@ def validate_required_headers(request, required_headers):
 
 
 def validate_api_key(api_key):
-    """We are using API Key, so validate API key using UserAPIKey model"""
-    print("Validating API Key")
     try:
+        # Your API key validation logic
         api_key_obj = UserAPIKey.objects.get_from_key(api_key)
-        if api_key_obj and api_key_obj.is_active and not api_key_obj.revoked:
-            user_info = {
-                "user_id": api_key_obj.user.id,
-                "username": api_key_obj.user.username,
-                "name": api_key_obj.user.get_full_name() or api_key_obj.user.username,
-                "email": api_key_obj.user.email,
-                "api_key_id": api_key_obj.id,
-                "api_key_name": getattr(api_key_obj, 'name', 'Unnamed Key')
-            }
-            return True, user_info
-        else:
-            return False, None
-            
-    except Exception as e:
-        print(str(e))
+        if api_key_obj and not api_key_obj.is_expired:
+            return True, api_key_obj.user  # Return the user object
+        return False, None
+    except:
         return False, None
 
 
 def validate_jwt(token):
-    """We are using JWT, so validate JWT token using rest_framework_simplejwt"""
-    print("Validating JWT token")
     try:
-        UntypedToken(token)
-        decoded_token = jwt.decode(token, settings.SECRET_KEY,  algorithms=["HS256"], options={"verify_signature": True})
-        user_id = decoded_token.get('user_id')
-        if not user_id:
-            return False, None
-        
-        # Get the user from database
-        User = get_user_model()
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user_id = payload.get('user_id')
         user = User.objects.get(id=user_id)
-        
-        # Return user information
-        user_info = {
-            "user_id": user.id,
-            "username": user.username,
-            "name": user.get_full_name() or user.username,
-            "email": user.email,
-            "is_active": user.is_active,
-            "is_staff": user.is_staff,
-            "token_type": decoded_token.get('token_type', 'access'),
-            "exp": decoded_token.get('exp'),
-            "iat": decoded_token.get('iat')
-        }
-        
-        # Check if user is active
-        if not user.is_active:
-            return False, None
-        
-        return True, user_info
-            
-    except Exception as e:
-        print("Error in Validating JWT token", str(e))
+        return True, user  # Return the actual user object
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, User.DoesNotExist):
         return False, None
