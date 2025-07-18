@@ -1,0 +1,78 @@
+{
+    "hindi":{
+    "section_a_hindi":{
+    "section_a_heading":"सेक्शन A : टीम विवरण",
+    "section_a_brief":"यह अनुभाग परियोजना के नाम, डीटेल्ड प्रोजेक्ट रिपोर्ट (DPR) तैयार करने के लिए जिम्मेदार संचालक के विवरण के बारे में संक्षिप्त जानकारी देता है। यह प्रक्रिया पार्टिसिपेटरी रूरल एप्रेज़ल (PRA) से शुरू होती है, जिसमें समुदाय के सदस्यों के साथ सक्रिय सहभागिता होती है ताकि उनकी आवश्यकताओं और संसाधनों की पहचान की जा सके।",
+    "section_a_table1_row1_1":"संचालक का नाम",
+    "section_a_table1_row1_2":"परियोजना का नाम",
+    "section_a_table1_row1_3":"DPR की तैयारी में शामिल प्रक्रिया PRA",
+    "section_a_table1_row2_3":"PRA, ग्राम सभा, ट्रांसेक्ट वॉक, GIS मैपिंग"},
+
+
+    "section_b_hindi":{
+    "section_b_heading":"सेक्शन B : गाँव का संक्षिप्त विवरण",
+    "section_b_brief":"यह अनुभाग गाँव का एक संक्षिप्त अवलोकन प्रस्तुत करता है, जिसमें गाँव का नाम, संबंधित ग्राम पंचायत, स्थान की जानकारी (ब्लॉक, जिला और राज्य), बसावटों की संख्या, इससे जुड़ी माइक्रो वॉटरशेड आईडीज़, और गाँव के भौगोलिक निर्देशांक (अक्षांश और देशांतर) शामिल हैं।",
+    "section_b_table1_row1_1":"गाँव का नाम",
+    "section_b_table1_row2_1":"ग्राम पंचायत का नाम",
+    "section_b_table1_row3_1.1":"ब्लॉक",
+    "section_b_table1_row3_1.2":"जिला",
+    "section_b_table1_row3_1.3":"राज्य",
+    "section_b_table1_row4_1":"गाँव में बसावटों की संख्या",
+    "section_b_table1_row5_1":"इंटरसेक्टिंग माइक्रो वॉटरशेड आईडीज़",
+    "section_b_table1_row6_1":"गाँव का अक्षांश और देशांतर"
+    },
+
+    "section_c_hindi":{
+    "section_c_heading":"सेक्शन C: सामाजिक, आर्थिक और पारिस्थितिक प्रोफ़ाइल",
+    "section_c_brief":"यह अनुभाग बसावट की सामाजिक, आर्थिक और पारिस्थितिक विशेषताओं का एक अवलोकन प्रदान करता है। इसमें संवेदनशीलताओं, मनरेगा से संबंधित जानकारी, आजीविका, फसल और पशुधन की प्रोफ़ाइल शामिल होती है। जाति समूहों, आर्थिक स्थिति, मनरेगा कार्यों और बुनियादी ढांचे से संबंधित विशेष विवरण, साथ ही पूर्व में की गई प्राकृतिक संसाधन प्रबंधन (NRM) की मांगें, बसावट की संपूर्ण स्थिति को समझने में सहायक होती हैं।",
+    "section_c_table1_heading":"आजीविका प्रोफ़ाइल",
+    "section_c_table1_row1_1":"बसावट का नाम",
+    "section_c_table1_row1_2":"कुल घरों की संख्या",
+    "section_c_table1_row1_3":"बसावट का प्रकार",
+    "section_c_table1_row1_4":"जाति समूह",
+    "section_c_table1_row1_5":"कुल सीमांत किसान (<2 एकड़)",
+    "section_c_table2_heading":"मनरेगा जानकारी",
+    "section_c_table2_row1_1":"बसावट का नाम",
+    "section_c_table2_row1_2":"घर-परिवार-आवेदन किए हुए \n- जिनके पास मनरेगा जॉब कार्ड हैं",
+    "section_c_table2_row1_3":"पिछले वर्ष में मनरेगा कार्य दिवसों की संख्या",
+    "section_c_table2_row1_4":"बसावट में पहले किए गए प्राकृतिक संसाधन प्रबंधन (NRM) की मांगें",
+    "section_c_table2_row1_5":"कुल सीमांत किसान (<2 एकड़)"
+
+    }
+    },
+
+    "english" :{
+    "section_a_english":{
+    "section_a_heading":"Section A : Team Details",
+    "section_a_brief":"This section gives brief information about the Project Name, facilitator details responsible for the preparation of the Detailed Project Report (DPR). The process begins with Participatory Rural Appraisal (PRA), involving active engagement with community members to identify their needs and resources.",
+    "section_a_table1_row1_1":"Name of the Facilitator",
+    "section_a_table1_row1_2":"Project Name",
+    "section_a_table1_row1_3":"Process involved in the preparation of DPR PRA:",
+    "section_a_table1_row2_3":"PRA, Gram Sabha, Transect Walk, GIS mapping"},
+
+
+    "section_b_english":{
+    "section_b_heading":"Section B: Brief of Village",
+    "section_b_brief":"This section gives a brief overview of the village, including its name, associated Gram Panchayat, location details (block, district, and state), the number of settlements, intersecting micro watershed IDs, and the geographic coordinates (latitude and longitude) of the village.",
+    "section_b_table1_row1_1":"Name of Village",
+    "section_b_table1_row2_1":"Name of Gram Panchayat",
+    "section_b_table1_row3_1":"Block, District, State",
+    "section_b_table1_row4_1":"Number of Settlements in the village",
+    "section_b_table1_row4_2":"X",
+    "section_b_table1_row5_1":"Intersecting Micro Watershed ID’s",
+    "section_b_table1_row5_2":"X, Y",
+    "section_b_table1_row6_1":"Latitude &amp; Longitude of Village"
+    },
+
+    "section_c_english":{
+    "section_c_heading":"Section C: Social Economic_ Ecological Profile",
+    "section_c_brief":"This section provides an overview of the settlement&#39;s social, economic, and ecological characteristics. It includes information on vulnerabilities, NREGA details, livelihoods, and crop and livestock profiles. The specific details on caste groups, economic conditions, NREGA works, and infrastructure, as well as previous NRM demands, contribute to a comprehensive understanding of the settlement's dynamics.",
+    "section_c_table1_row1_1":"Name of the Settlement",
+    "section_c_table1_row1_2":"Total Number of Households",
+    "section_c_table1_row1_3":"Settlement Type",
+    "section_c_table1_row1_4":"Caste Group",
+    "section_c_table1_row1_5":"Total marginal farmers (&lt;2 acres)"
+    }
+    }
+    
+}

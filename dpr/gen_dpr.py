@@ -52,6 +52,8 @@ from .models import (
 from dpr.mapping import populate_maintenance_from_waterbody
 from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
 from utilities.logger import setup_logger
+import json
+
 
 logger = setup_logger(__name__)
 
@@ -100,17 +102,17 @@ def create_dpr_document(plan):
 
     add_section_f(doc, plan, mws_fortnight) # generates maps as well
 
-    add_section_g(doc, plan, mws_fortnight)
+    # add_section_g(doc, plan, mws_fortnight)
 
     add_section_h(doc, plan, mws_fortnight)
 
     # MARK: local save /tmp/dpr/
     # operations on the document
-    # file_path = "/tmp/dpr/"
+    file_path = "/tmp/dpr/"
 
-    # if not os.path.exists(file_path):
-    #     os.makedirs(file_path)
-    # doc.save(file_path + plan.plan + ".docx")
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
@@ -207,21 +209,17 @@ def initialize_document():
     ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     return doc
 
+with open('dpr/dpr_lang.json', 'r') as file:
+    json_data = json.load(file)
 
 # MARK: - Section A
 def add_section_a(doc, plan):
     """
     Brief about team details.
     """
-    doc.add_heading("Section A: Team Details", level=1)
+    doc.add_heading(json_data['hindi']['section_a_hindi']['section_a_heading'])
     para = doc.add_paragraph()
-    para.add_run(
-        "This section gives brief information about the Project Name, "
-        "facilitator details responsible for the preparation of the Detailed "
-        "Project Report (DPR). The process begins with Community Consultations, "
-        "involving active engagement with community members "
-        "to identify their needs and resources.\n\n"
-    )
+    para.add_run(f"{json_data['hindi']['section_a_hindi']['section_a_brief']}\n\n")
     create_team_details_table(doc, plan)
 
 
@@ -229,14 +227,14 @@ def create_team_details_table(doc, plan):
     table = doc.add_table(rows=1, cols=3)
     table.style = "Table Grid"
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = "Name of the Facilitator"
-    hdr_cells[1].text = "Project Name"
-    hdr_cells[2].text = "Process involved in the preparation of the DPR PRA"
+    hdr_cells[0].text = json_data['hindi']['section_a_hindi']['section_a_table1_row1_1']
+    hdr_cells[1].text = json_data['hindi']['section_a_hindi']['section_a_table1_row1_2']
+    hdr_cells[2].text = json_data['hindi']['section_a_hindi']['section_a_table1_row1_3']
 
     row_cells = table.add_row().cells
     row_cells[0].text = plan.facilitator_name
     row_cells[1].text = plan.plan.replace('_', ' ').title()
-    row_cells[2].text = "PRA, Gram Sabha, Transect Walk, GIS Mapping"
+    row_cells[2].text = json_data['hindi']['section_a_hindi']['section_a_table1_row2_3']
 
     for cell in hdr_cells:
         for paragraph in cell.paragraphs:
@@ -249,15 +247,9 @@ def add_section_b(doc, plan, total_settlements, mws_fortnight):
     """
     Briefs about the village
     """
-    doc.add_heading("Section B: Brief of Village")
+    doc.add_heading(json_data['hindi']['section_b_hindi']['section_b_heading'])
     para = doc.add_paragraph()
-    para.add_run(
-        "This section gives a brief overview of the village, "
-        "including its name, associated Gram Panchayat, location "
-        "details (block, district, and state), the number of settlements, "
-        "intersecting micro watershed IDs, and the geographic coordinates "
-        "(latitude and longitude) of the village.\n\n"
-    )
+    para.add_run(f"{json_data['hindi']['section_b_hindi']['section_b_brief']}\n\n")
 
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
 
@@ -294,15 +286,15 @@ def create_village_brief_table(
     centroid = intersecting_mws.geometry.unary_union.centroid
 
     headers_data = [
-        ("Name of the Village", plan.village_name),
-        ("Name of the Gram Panchayat", plan.gram_panchayat),
-        ("Tehsil", plan.block.block_name),
-        ("District", plan.district.district_name),
-        ("State", plan.state.state_name),
-        ("Number of Settlements in the Village", str(total_settlements)),
-        ("Intersecting Micro Watershed IDs", intersecting_mws_ids),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row1_1'], plan.village_name),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row2_1'], plan.gram_panchayat),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row3_1.1'], plan.block.block_name),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row3_1.2'], plan.district.district_name),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row3_1.3'], plan.state.state_name),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row4_1'], str(total_settlements)),
+        (json_data['hindi']['section_b_hindi']['section_b_table1_row5_1'], intersecting_mws_ids),
         (
-            "Latitude and Longitude of the Village",
+            json_data['hindi']['section_b_hindi']['section_b_table1_row6_1'],
             f"{centroid.y:.8f}, {centroid.x:.8f}",
         ),
     ]
@@ -327,26 +319,24 @@ def add_section_c(doc, plan):
 
     Livelihood Profile: From Livelihood form and Settlement's form (Livestock Info)
     """
-    doc.add_heading("Section C: Social Economic Ecological Profile", level=1)
+    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_heading'], level=1)
     para = doc.add_paragraph()
-    para.add_run(
-        "This section provides an overview of the settlement's social, economic, and ecological characteristics. It includes information on vulnerabilities, NREGA details, livelihoods, and crop and livestock profiles. The specific details on caste groups, economic conditions, NREGA works, and infrastructure, as well as previous NRM demands, contribute to a comprehensive understanding of the settlement's dynamics. \n\n"
-    )
+    para.add_run(f"{json_data['hindi']['section_c_hindi']['section_c_brief']} \n\n")
 
     create_socio_eco_table(doc, plan)
 
-    doc.add_heading("Livelihood Profile", level=3)
+    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table1_heading'], level=3)
 
     create_livelihood_table(doc, plan)
 
 
 def create_socio_eco_table(doc, plan):
     headers_socio = [
-        "Name of the Settlement",
-        "Total Number of Households",
-        "Settlement Type",
-        "Caste Group",
-        "Total marginal farmers (<2 acres)",
+        json_data['hindi']['section_c_hindi']['section_c_table1_row1_1'],
+        json_data['hindi']['section_c_hindi']['section_c_table1_row1_2'],
+        json_data['hindi']['section_c_hindi']['section_c_table1_row1_3'],
+        json_data['hindi']['section_c_hindi']['section_c_table1_row1_4'],
+        json_data['hindi']['section_c_hindi']['section_c_table1_row1_5'],
     ]
 
     data_settlement = get_data_for_settlement(plan.plan_id)
@@ -1311,10 +1301,10 @@ def create_nrm_works_table(doc, plan, mws):
         if has_resources or len(recharge_works) > 0 or len(irrigation_works) > 0:
             if len(recharge_works) == 0 and len(irrigation_works) == 0:
                 doc.add_heading(f"MWS UID: {uid}", level=2)
-            show_marked_works(doc, plan, uid, mws_filtered, polygon, resources)
+            # show_marked_works(doc, plan, uid, mws_filtered, polygon, resources)
             doc.add_page_break()
 
-    show_all_mws(doc, plan, mws)
+    # show_all_mws(doc, plan, mws)
 
 
 def format_work_dimensions(work_dimensions, work_type):
