@@ -82,7 +82,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)
 
-    sync_to_gcs_geoserver(state, district, block, description, param_list)
+    sync_to_gcs_geoserver(state, district, block, description, param_dict.keys())
 
 
 def built_up(roi_boundary, l1_asset):

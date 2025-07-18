@@ -33,6 +33,7 @@ def vectorise_change_detection(self, state, district, block):
     ]
 
     print(task_list)
+    task_list = list(filter(None, task_list))
     task_id_list = check_task_status(task_list)
     print("Change vector task completed - task_id_list:", task_id_list)
 
@@ -179,7 +180,7 @@ def generate_vector(roi, args, state, district, block, layer_name):
         )
         task.start()
         return task.status()["id"]
-
+    return None
 
 def sync_change_to_geoserver(block, district, state):
     param_list = [
