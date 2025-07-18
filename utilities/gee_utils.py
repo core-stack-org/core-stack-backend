@@ -7,6 +7,7 @@ from nrm_app.settings import (
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
     GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
+    GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -30,6 +31,13 @@ def ee_initialize(project=None):
             )
             credentials = ee.ServiceAccountCredentials(
                 service_account, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH
+            )
+        elif project == "datasets":
+            service_account = (
+                "corestack-datasets@corestack-datasets.iam.gserviceaccount.com"
+            )
+            credentials = ee.ServiceAccountCredentials(
+                service_account, GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH
             )
         else:
             service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
