@@ -35,6 +35,7 @@ def vectorise_change_detection(self, state, district, block):
     print(task_list)
     task_list = list(filter(None, task_list))
     task_id_list = check_task_status(task_list)
+    
     print("Change vector task completed - task_id_list:", task_id_list)
 
     sync_change_to_geoserver(block, district, state)
