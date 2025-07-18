@@ -1,5 +1,6 @@
 {
     "hindi":{
+    "hindi_title":"विस्तृत परियोजना रिपोर्ट (DPR)",
     "section_a_hindi":{
     "section_a_heading":"सेक्शन A : टीम विवरण",
     "section_a_brief":"यह अनुभाग परियोजना के नाम, डीटेल्ड प्रोजेक्ट रिपोर्ट (DPR) तैयार करने के लिए जिम्मेदार संचालक के विवरण के बारे में संक्षिप्त जानकारी देता है। यह प्रक्रिया पार्टिसिपेटरी रूरल एप्रेज़ल (PRA) से शुरू होती है, जिसमें समुदाय के सदस्यों के साथ सक्रिय सहभागिता होती है ताकि उनकी आवश्यकताओं और संसाधनों की पहचान की जा सके।",
@@ -36,8 +37,55 @@
     "section_c_table2_row1_2":"घर-परिवार-आवेदन किए हुए \n- जिनके पास मनरेगा जॉब कार्ड हैं",
     "section_c_table2_row1_3":"पिछले वर्ष में मनरेगा कार्य दिवसों की संख्या",
     "section_c_table2_row1_4":"बसावट में पहले किए गए प्राकृतिक संसाधन प्रबंधन (NRM) की मांगें",
-    "section_c_table2_row1_5":"कुल सीमांत किसान (<2 एकड़)"
+    "section_c_table2_row1_5":"क्या ये मांगें आपने उठाई थीं, और क्या आप नए प्राकृतिक संसाधन प्रबंधन (NRM) की योजना में शामिल थे?",
+    "section_c_table2_row1_6":"समस्याएँ",
+    "section_c_table3_heading":"फसल संबंधी जानकारी",
+    "section_c_table3_row1_1":"बसावट का नाम",
+    "section_c_table3_row1_2":"सिंचाई स्रोत",
+    "section_c_table3_row1_3":"भूमि वर्गीकरण",
+    "section_c_table3_row1_4":"ग्रिड का प्रकार (अकृषि योग्य/बंजर)",
+    "section_c_table3_row1_5":"फसल पैटर्न (खरीफ)",
+    "section_c_table3_row1_6":"फसल पैटर्न (रबी)",
+    "section_c_table3_row1_7":"फसल पैटर्न (जायद)",
+    "section_c_table3_row1_8":"फसल तीव्रता",
+    "section_c_table4_heading":"पशुधन जानकारी",
+    "section_c_table4_row1_1":"बसावट का नाम",
+    "section_c_table4_row1_2":"बकरियाँ",
+    "section_c_table4_row1_3":"भेड़ें",
+    "section_c_table4_row1_4":"पशु",
+    "section_c_table4_row1_5":"सूअर पालन",
+    "section_c_table4_row1_6":"मुर्गी पालन"
+    },
 
+
+    "section_d_hindi":{
+    "section_d_heading":"सेक्शन D: गाँव से जुड़ी सभी माइक्रो वॉटरशेड्स की जानकारी",
+    "section_d_brief":"यह अनुभाग गाँव से जुड़ी सभी माइक्रो वॉटरशेड्स का एक संक्षिप्त अवलोकन प्रस्तुत करता है। इसमें व्यक्तिगत और सामुदायिक भूमि पर किए गए पूर्ण प्राकृतिक संसाधन प्रबंधन (NRM) कार्यों, गैर-NRM कार्यों, पिछले 5 वर्षों में भूमि उपयोग में हुए परिवर्तनों, कुओं और जल संरचनाओं की जानकारी, तथा लाभान्वित घरों की जानकारी शामिल होती है।",
+    "section_d_table1_row1_1":"माइक्रो वॉटरशेड आईडी",
+    "section_d_table1_row1_2":"अक्षांश और देशांतर (केन्द्र बिंदु)",
+    "section_d_table1_footer":"भूमि उपयोग की जानकारी",
+    "section_d_table2_heading":"पिछले 5 वर्षों में फसल क्षेत्र में बदलाव",
+    "section_d_table2_row1_2":"वर्ष",
+    "section_d_table2_row1_3":"एकल फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
+    "section_d_table2_row1_4":"दोहरी फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
+    "section_d_table2_row1_5":"तीहरी फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
+    "section_d_table2_row1_6":"अकृषि योग्य नहीं क्षेत्रफल (हेक्टेयर में)",
+    "section_d_table3_heading":"माइक्रो वॉटरशेड के लिए कुएँ की जानकारी",
+    "section_d_table3_row1_1":"बसावट का नाम",
+    "section_d_table3_row1_2":"सिंचाई स्रोत",
+    "section_d_table3_row1_3":"भूमि वर्गीकरण",
+    "section_d_table3_row1_4":"ग्रिड का प्रकार (अकृषि योग्य/बंजर)",
+    "section_d_table3_row1_5":"फसल पैटर्न (खरीफ)",
+    "section_d_table3_row1_6":"फसल पैटर्न (रबी)",
+    "section_d_table3_row1_7":"फसल पैटर्न (जायद)",
+    "section_d_table3_row1_8":"फसल तीव्रता",
+    "section_d_table4_heading":"पशुधन जानकारी",
+    "section_d_table4_row1_1":"बसावट का नाम",
+    "section_d_table4_row1_2":"बकरियाँ",
+    "section_d_table4_row1_3":"भेड़ें",
+    "section_d_table4_row1_4":"पशु",
+    "section_d_table4_row1_5":"सूअर पालन",
+    "section_d_table4_row1_6":"मुर्गी पालन"
     }
     },
 
@@ -67,11 +115,35 @@
     "section_c_english":{
     "section_c_heading":"Section C: Social Economic_ Ecological Profile",
     "section_c_brief":"This section provides an overview of the settlement&#39;s social, economic, and ecological characteristics. It includes information on vulnerabilities, NREGA details, livelihoods, and crop and livestock profiles. The specific details on caste groups, economic conditions, NREGA works, and infrastructure, as well as previous NRM demands, contribute to a comprehensive understanding of the settlement's dynamics.",
+    "section_c_table1_heading":"Livelihood Profile",
     "section_c_table1_row1_1":"Name of the Settlement",
     "section_c_table1_row1_2":"Total Number of Households",
     "section_c_table1_row1_3":"Settlement Type",
     "section_c_table1_row1_4":"Caste Group",
-    "section_c_table1_row1_5":"Total marginal farmers (&lt;2 acres)"
+    "section_c_table1_row1_5":"Total marginal farmers (&lt;2 acres)",
+    "section_c_table2_heading":"NREGA Info",
+    "section_c_table2_row1_1":"Settlement's Name",
+    "section_c_table2_row1_2":"Households - applied \n- having NREGA job cards",
+    "section_c_table2_row1_3":"NREGA work days in previous year",
+    "section_c_table2_row1_4":"Previous NRM demands made in the settlement",
+    "section_c_table2_row1_5":"Were demands raised by you, and were you involved in the new NRM planning?",
+    "section_c_table2_row1_6":"Issues",
+    "section_c_table3_heading":"Crop Info",
+    "section_c_table3_row1_1":"Name of the Settlement",
+    "section_c_table3_row1_2":"Irrigation Source",
+    "section_c_table3_row1_3":"Land Classification",
+    "section_c_table3_row1_4":"Type of Grid (Uncropped/Barren)",
+    "section_c_table3_row1_5":"Cropping Pattern (Kharif)",
+    "section_c_table3_row1_6":"Cropping Pattern (Rabi)",
+    "section_c_table3_row1_7":"Cropping Pattern (Zaid)",
+    "section_c_table3_row1_8":"Cropping Intensity",
+    "section_c_table4_heading":"Livestock Info",
+    "section_c_table4_row1_1":"Name of the Settlement",
+    "section_c_table4_row1_2":"Goats",
+    "section_c_table4_row1_3":"Sheep",
+    "section_c_table4_row1_4":"Cattle",
+    "section_c_table4_row1_5":"Piggery",
+    "section_c_table4_row1_6":"Poultry"
     }
     }
     

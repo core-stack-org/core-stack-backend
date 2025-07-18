@@ -96,15 +96,15 @@ def create_dpr_document(plan):
 
     add_section_c(doc, plan)
 
-    add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
 
-    add_section_e(doc, plan)
+    # add_section_e(doc, plan)
 
-    add_section_f(doc, plan, mws_fortnight) # generates maps as well
+    # add_section_f(doc, plan, mws_fortnight) # generates maps as well
 
     # add_section_g(doc, plan, mws_fortnight)
 
-    add_section_h(doc, plan, mws_fortnight)
+    # add_section_h(doc, plan, mws_fortnight)
 
     # MARK: local save /tmp/dpr/
     # operations on the document
@@ -202,7 +202,7 @@ def get_mws_uid_for_settlement_gdf(mws_gdf, lat, lon):
 
 def initialize_document():
     doc = Document()
-    heading = doc.add_heading("Detailed Project Report", 0)
+    heading = doc.add_heading(json_data['hindi']['hindi_title'], 0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     doc.add_paragraph(
         date.today().strftime("%B %d, %Y")
@@ -217,7 +217,7 @@ def add_section_a(doc, plan):
     """
     Brief about team details.
     """
-    doc.add_heading(json_data['hindi']['section_a_hindi']['section_a_heading'])
+    doc.add_heading(json_data[language]['section_a_hindi']['section_a_heading'])
     para = doc.add_paragraph()
     para.add_run(f"{json_data['hindi']['section_a_hindi']['section_a_brief']}\n\n")
     create_team_details_table(doc, plan)
@@ -364,15 +364,15 @@ def create_socio_eco_table(doc, plan):
         row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
     headers_nrega = [
-        "Settlement's Name",
-        "Households - applied \n- having NREGA job cards",
-        "NREGA work days in previous year",
-        "Previous NRM demands made in the settlement",
-        "Were demands raised by you, and were you involved in the new NRM planning?",
-        "Issues",
+        json_data['hindi']['section_c_hindi']['section_c_table2_row1_1'],
+        json_data['hindi']['section_c_hindi']['section_c_table2_row1_2'],
+        json_data['hindi']['section_c_hindi']['section_c_table2_row1_3'],
+        json_data['hindi']['section_c_hindi']['section_c_table2_row1_4'],
+        json_data['hindi']['section_c_hindi']['section_c_table2_row1_5'],
+        json_data['hindi']['section_c_hindi']['section_c_table2_row1_6'],
     ]
 
-    doc.add_heading("NREGA Info", level=3)
+    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table2_heading'], level=3)
 
     table_nrega = doc.add_table(rows=1, cols=len(headers_nrega))
     table_nrega.style = "Table Grid"
@@ -398,17 +398,17 @@ def create_socio_eco_table(doc, plan):
 
 def create_livelihood_table(doc, plan):
     # Crop Info section remains the same
-    doc.add_heading("Crop Info", level=4)
+    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table3_heading'], level=4)
     crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     headers_cropping_pattern = [
-        "Name of the Settlement",
-        "Irrigation Source",
-        "Land Classification",
-        "Type of Grid (Uncropped/Barren)",
-        "Cropping Pattern (Kharif)",
-        "Cropping Pattern (Rabi)",
-        "Cropping Pattern (Zaid)",
-        "Cropping Intensity",
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_1'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_2'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_3'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_4'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_5'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_6'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_7'],
+        json_data['hindi']['section_c_hindi']['section_c_table3_row1_8'],
     ]
     table_cropping_pattern = doc.add_table(rows=1, cols=len(headers_cropping_pattern))
     table_cropping_pattern.style = "Table Grid"
@@ -428,15 +428,15 @@ def create_livelihood_table(doc, plan):
         row_cells[7].text = crops.agri_productivity
 
     # Livestock Info section with modified value handling
-    doc.add_heading("Livestock Info", level=4)
+    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table4_heading'], level=4)
     livelihood_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
     headers_livelihood = [
-        "Name of the Settlement",
-        "Goats",
-        "Sheep",
-        "Cattle",
-        "Piggery",
-        "Poultry",
+        json_data['hindi']['section_c_hindi']['section_c_table4_row1_1'],
+        json_data['hindi']['section_c_hindi']['section_c_table4_row1_2'],
+        json_data['hindi']['section_c_hindi']['section_c_table4_row1_3'],
+        json_data['hindi']['section_c_hindi']['section_c_table4_row1_4'],
+        json_data['hindi']['section_c_hindi']['section_c_table4_row1_5'],
+        json_data['hindi']['section_c_hindi']['section_c_table4_row1_6'],
     ]
     table_livelihood = doc.add_table(rows=1, cols=len(headers_livelihood))
     table_livelihood.style = "Table Grid"
