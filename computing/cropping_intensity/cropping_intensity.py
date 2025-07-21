@@ -58,22 +58,9 @@ def generate_cropping_intensity(
     make_asset_public(asset_id)
 
     # Export asset to Geoserver
-    # fc = ee.FeatureCollection(asset_id)
-    # layer_name = f"{asset_suffix}_intensity"
-    # res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "cropping_intensity")
-    # print(res)
-
-    fc = ee.FeatureCollection(asset_id).getInfo()
-    fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        valid_gee_text(state.lower()),
-        fc,
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_intensity",
-        "cropping_intensity",
-    )
+    fc = ee.FeatureCollection(asset_id)
+    layer_name = f"{asset_suffix}_intensity"
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "crop_intensity")
     print(res)
 
 
@@ -153,10 +140,10 @@ def generate_gee_asset(
         {"label": TRIPLE, "txt": "triply_cropped_area_"},
     ]
 
-    def res(feature):
+    def get_class_area(feature):
         value = feature.get("sum")
-        value = ee.Number(value)
-        return feature.set(arg["txt"] + str(sy), value)  # sqm
+        value = ee.Number(value).multiply(0.0001)
+        return feature.set(arg["txt"] + str(sy), value)
 
     for arg in args:
         s_year = start_year
@@ -170,7 +157,7 @@ def generate_gee_asset(
                 roi, ee.Reducer.sum(), lulc_scale, image.projection()
             )
             s_year += 1
-            roi = roi.map(res)
+            roi = roi.map(get_class_area)
     # single cropped area
     s_year = start_year
 
@@ -180,7 +167,8 @@ def generate_gee_asset(
             feature.get("single_non_kharif_cropped_area_" + str(sy))
         )
         return feature.set(
-            "single_cropped_area_" + str(sy), single_kharif.add(single_non_kharif)
+            "single_cropped_area_" + str(sy),
+            single_kharif.add(single_non_kharif),
         )
 
     while s_year <= end_year:
@@ -216,20 +204,20 @@ def generate_gee_asset(
     croppable_area = pixel_area.updateMask(mask)
     roi = croppable_area.reduceRegions(roi, ee.Reducer.sum(), lulc_scale)
 
-    def res2(feature):
+    def calculate_total_cropped_area(feature):
         value = feature.get("sum")
-        value = ee.Number(value)
+        value = ee.Number(value).multiply(0.0001)
         return feature.set(
             "total_cropable_area_ever_hydroyear_"
             + str(start_year)
             + "_"
             + str(end_year),
             value,
-        )  # sqm
+        )
 
-    roi = roi.map(res2)
+    roi = roi.map(calculate_total_cropped_area)
 
-    def res3(feature):
+    def calculate_cropping_intensity(feature):
         st_year = start_year
         while st_year <= end_year:
             year = st_year
@@ -265,7 +253,7 @@ def generate_gee_asset(
 
         return feature
 
-    roi = ee.FeatureCollection(roi.map(res3))
+    roi = ee.FeatureCollection(roi.map(calculate_cropping_intensity))
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, filename, asset_id)

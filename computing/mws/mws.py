@@ -1,25 +1,62 @@
 import ee
+
 import geopandas as gpd
 from nrm_app.celery import app
+
 from utilities.constants import MERGE_MWS_PATH
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
-    earthdata_auth,
-    gdf_to_ee_fc,
     get_gee_asset_path,
     is_gee_asset_exists,
     make_asset_public,
-    upload_shp_to_gee,
     export_vector_asset_to_gee,
+    earthdata_auth,
+    gdf_to_ee_fc,
+    upload_shp_to_gee,
 )
+
 import zipfile
 import pandas as pd
 from osgeo import gdal
 from shapely.geometry import box
 from pcraster import *
 import os
+
+
+# @app.task(bind=True)
+# def mws_layer(self, state, district, block):
+#     ee_initialize()
+#     description = (
+#         "filtered_mws_"
+#         + valid_gee_text(district.lower())
+#         + "_"
+#         + valid_gee_text(block.lower())
+#         + "_uid"
+#     )
+#     asset_id = get_gee_asset_path(state, district, block) + description
+#     if not is_gee_asset_exists(asset_id):
+#         mwses_uid_fc = ee.FeatureCollection(
+#             "projects/ee-corestackdev/assets/datasets/India_mws_uid_area_gt_500"
+#         )
+#
+#         admin_boundary = ee.FeatureCollection(
+#             get_gee_asset_path(state, district, block)
+#             + "admin_boundary_"
+#             + valid_gee_text(district.lower())
+#             + "_"
+#             + valid_gee_text(block.lower())
+#         )
+#         filtered_mws_block_uid = mwses_uid_fc.filterBounds(admin_boundary.geometry())
+#
+#         task_id = export_vector_asset_to_gee(
+#             filtered_mws_block_uid, description, asset_id
+#         )
+#         mws_task_id_list = check_task_status([task_id])
+#         print("mws_task_id_list", mws_task_id_list)
+#
+#     make_asset_public(asset_id)
 
 
 @app.task(bind=True)
