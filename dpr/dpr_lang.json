@@ -32,6 +32,7 @@
     "section_c_table1_row1_3":"बसावट का प्रकार",
     "section_c_table1_row1_4":"जाति समूह",
     "section_c_table1_row1_5":"कुल सीमांत किसान (<2 एकड़)",
+
     "section_c_table2_heading":"मनरेगा जानकारी",
     "section_c_table2_row1_1":"बसावट का नाम",
     "section_c_table2_row1_2":"घर-परिवार-आवेदन किए हुए \n- जिनके पास मनरेगा जॉब कार्ड हैं",
@@ -39,6 +40,7 @@
     "section_c_table2_row1_4":"बसावट में पहले किए गए प्राकृतिक संसाधन प्रबंधन (NRM) की मांगें",
     "section_c_table2_row1_5":"क्या ये मांगें आपने उठाई थीं, और क्या आप नए प्राकृतिक संसाधन प्रबंधन (NRM) की योजना में शामिल थे?",
     "section_c_table2_row1_6":"समस्याएँ",
+
     "section_c_table3_heading":"फसल संबंधी जानकारी",
     "section_c_table3_row1_1":"बसावट का नाम",
     "section_c_table3_row1_2":"सिंचाई स्रोत",
@@ -48,6 +50,7 @@
     "section_c_table3_row1_6":"फसल पैटर्न (रबी)",
     "section_c_table3_row1_7":"फसल पैटर्न (जायद)",
     "section_c_table3_row1_8":"फसल तीव्रता",
+
     "section_c_table4_heading":"पशुधन जानकारी",
     "section_c_table4_row1_1":"बसावट का नाम",
     "section_c_table4_row1_2":"बकरियाँ",
@@ -64,29 +67,144 @@
     "section_d_table1_row1_1":"माइक्रो वॉटरशेड आईडी",
     "section_d_table1_row1_2":"अक्षांश और देशांतर (केन्द्र बिंदु)",
     "section_d_table1_footer":"भूमि उपयोग की जानकारी",
+
     "section_d_table2_heading":"पिछले 5 वर्षों में फसल क्षेत्र में बदलाव",
     "section_d_table2_row1_2":"वर्ष",
     "section_d_table2_row1_3":"एकल फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
     "section_d_table2_row1_4":"दोहरी फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
     "section_d_table2_row1_5":"तीहरी फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
     "section_d_table2_row1_6":"अकृषि योग्य नहीं क्षेत्रफल (हेक्टेयर में)",
+
     "section_d_table3_heading":"माइक्रो वॉटरशेड के लिए कुएँ की जानकारी",
-    "section_d_table3_row1_1":"बसावट का नाम",
-    "section_d_table3_row1_2":"सिंचाई स्रोत",
-    "section_d_table3_row1_3":"भूमि वर्गीकरण",
-    "section_d_table3_row1_4":"ग्रिड का प्रकार (अकृषि योग्य/बंजर)",
-    "section_d_table3_row1_5":"फसल पैटर्न (खरीफ)",
-    "section_d_table3_row1_6":"फसल पैटर्न (रबी)",
-    "section_d_table3_row1_7":"फसल पैटर्न (जायद)",
-    "section_d_table3_row1_8":"फसल तीव्रता",
-    "section_d_table4_heading":"पशुधन जानकारी",
-    "section_d_table4_row1_1":"बसावट का नाम",
-    "section_d_table4_row1_2":"बकरियाँ",
-    "section_d_table4_row1_3":"भेड़ें",
-    "section_d_table4_row1_4":"पशु",
-    "section_d_table4_row1_5":"सूअर पालन",
-    "section_d_table4_row1_6":"मुर्गी पालन"
+    "section_d_table3_row1_1":"लाभार्थी की बसावट का नाम",
+    "section_d_table3_row1_2":"कुओं की संख्या",
+    "section_d_table3_row1_3":"लाभान्वित कुल घरों की संख्या",
+
+    "section_d_table4_heading":"कुएँ से संबंधित जानकारी",
+    "section_d_table4_row1_1":"लाभार्थी बसावट का नाम",
+    "section_d_table4_row1_2":"कुएँ का मालिक कौन है",
+    "section_d_table4_row1_3":"लाभान्वित घरों की संख्या",
+    "section_d_table4_row1_4":"कौन-सी जाति इस कुएं का उपयोग करती है?",
+    "section_d_table4_row1_5":"संचालित या अव्यवस्थित",
+    "section_d_table4_row1_6":"रखरखाव की आवश्यकता है",
+    "section_d_table4_row1_7":"कुएं का प्रकार",
+    "section_d_table4_row1_8":"अक्षांश",
+    "section_d_table4_row1_9":"देशांतर ",
+
+    "section_d_table5_heading":"माइक्रो वॉटरशेड के लिए जलाशय की जानकारी",
+    "section_d_table5_row1_1":"लाभार्थी बसावट का नाम",
+    "section_d_table5_row1_2":"कौन प्रबंधित करता है?",
+    "section_d_table5_row1_3":"जल संरचना का मालिक कौन है?",
+    "section_d_table5_row1_4":"जल संरचना का उपयोग कौन-सी जाति करती है?",
+    "section_d_table5_row1_5":"लाभान्वित घरों की संख्या",
+    "section_d_table5_row1_6":"जल संरचना का प्रकार",
+    "section_d_table5_row1_7":"पहचानकर्तार",
+    "section_d_table5_row1_8":"रखरखाव की आवश्यकता है",
+    "section_d_table5_row1_9":"अक्षांश",
+    "section_d_table5_row1_10":"देशांतर ",
+
+    "section_d_table6_heading":"माइक्रो वॉटरशेड स्तर पर जल बजट",
+    "section_d_table6_brief":"नीचे दी गई तालिका माइक्रो वॉटरशेड स्तर पर वर्षवार जल बजट की जानकारी प्रदान करती है, जिसमें वर्षा, जल प्रवाह (रनऑफ), वाष्पोत्सर्जन (ET), भूजल में परिवर्तन, और कुएं की गहराई से संबंधित विवरण शामिल हैं।",
+    "section_d_table6_row1_1":"वर्ष",
+    "section_d_table6_row1_2":"वर्षा (मिलीमीटर में)",
+    "section_d_table6_row1_3":"जल प्रवाह (मिलीमीटर में)",
+    "section_d_table6_row1_4":"वाष्पोत्सर्जन (ET) (मिलीमीटर में)",
+    "section_d_table6_row1_5":"भूजल में परिवर्तन (G, मिलीमीटर में)",
+    "section_d_table6_row1_6":"कुएं की गहराई (मीटर में)"
+    },
+
+    "section_e_hindi":{
+    "section_e_heading":"सेक्शन E: रिमोट सेंसिंग डेटा - सतही जल संरचनाओं के अंतर्गत कुल क्षेत्रफल",
+    "section_e_brief":"यह अनुभाग प्रत्येक निर्दिष्ट वर्ष के लिए खरीफ, रबी, और जायद मौसम के दौरान सतही जल के अंतर्गत कुल क्षेत्रफल की जानकारी प्रदान करता है।",
+    "section_e_table1_heading":"सतही जल के अंतर्गत कुल क्षेत्रफल",
+    "section_e_table1_row1_1":"वर्ष",
+    "section_e_table1_row1_2":"सतही जल के अंतर्गत कुल क्षेत्रफल (हेक्टेयर में)",
+    "section_e_table1_row1_3":"खरीफ में जल उपलब्धता (पिक्सल प्रतिशत)",
+    "section_e_table1_row1_4":"रबी में जल उपलब्धता (पिक्सल प्रतिशत)",
+    "section_e_table1_row1_5":"जायद में जल उपलब्धता (पिक्सल प्रतिशत)"
+    },
+
+    "section_f_hindi":{
+    "section_f_heading":"सेक्शन F: ग्राम सभा के माध्यम से प्रस्तावित नए प्राकृतिक संसाधन प्रबंधन (NRM) कार्य",
+    "section_f_brief":"यह अनुभाग ग्राम सभा में प्रस्तुत समुदाय के सुझावों के आधार पर प्रस्तावित नए प्राकृतिक संसाधन प्रबंधन (NRM) कार्यों का विवरण प्रस्तुत करता है।",
+    "section_f_table1_row1_1":"क्रम संख्या",
+    "section_f_table1_row1_2":"कार्य श्रेणी : सिंचाई कार्य या रिचार्ज संरचना",
+    "section_f_table1_row1_3":"लाभार्थी बसावट का नाम",
+    "section_f_table1_row1_4":"लाभार्थी का नाम",
+    "section_f_table1_row1_5":"कार्य का प्रकार",
+    "section_f_table1_row1_6":"कार्य आईडी",
+    "section_f_table1_row1_7":"अक्षांश",
+    "section_f_table1_row1_8":"देशांतर",
+    "section_f_table1_row1_9":"कार्य के माप"
+    },
+
+    "section_g_hindi":{
+    "section_g_heading":"सेक्शन G: प्रस्तावित नई आजीविका संबंधी कार्य"
+    },
+
+    "section_g.1_hindi":{
+    "section_g.1_heading":"G.1 पशुधन और मत्स्य पालन",
+    "section_g.1_table1_row1_1":"आजीविका कार्य",
+    "section_g.1_table1_row1_2":"लाभार्थी बसावट का नाम",
+    "section_g.1_table1_row1_3":"लाभार्थी का नाम",
+    "section_g.1_table1_row1_4":"लाभार्थी के पिता का नाम",
+    "section_g.1_table1_row1_5":"काम की मांग का प्रकार",
+    "section_g.1_table1_row1_6":"अक्षांश",
+    "section_g.1_table1_row1_7":"देशांतर"
+    },
+
+    "section_g.2_hindi":{
+    "section_g.2_heading":"जी.2 बागवानी",
+    "section_g.2_table1_row1_1":"जीवनयापन कार्य",
+    "section_g.2_table1_row1_2":"लाभार्थी बस्ती का नाम",
+    "section_g.2_table1_row1_3":"लाभार्थी का नाम",
+    "section_g.2_table1_row1_4":"लाभार्थी के पिता का नाम",
+    "section_g.2_table1_row1_5":"पौधरोपण फसल का नाम",
+    "section_g.2_table1_row1_6":"कुल एकड़",
+    "section_g.2_table1_row1_7":"अक्षांश",
+    "section_g.2_table1_row1_8":"देशांतर"
+    },
+
+    "section_h_hindi":{
+    "section_h_heading":"धारा H: ग्राम सभा के आधार पर मौजूदा संपत्तियों पर प्रस्तावित रखरखाव कार्य",
+    "section_h_brief":"यह खंड ग्राम सभा से प्राप्त जानकारी के आधार पर मौजूदा संपत्तियों के प्रस्तावित रखरखाव कार्यों की जानकारी प्रस्तुत करता है। प्रत्येक रखरखाव कार्य के लिए लाभार्थी बस्ती, कार्य आईडी, कार्य का प्रकार, अक्षांश और देशांतर जैसी विवरण शामिल करें।",
+    "section_h_table1_heading":"संपत्ति प्रकार के अनुसार रखरखाव कार्य",
+    
+    "section_h_table2_row1_1":"लाभार्थी बस्ती का नाम",
+    "section_h_table2_row1_2":"लाभार्थी का नाम",
+    "section_h_table2_row1_3":"कार्य आईडी",
+    "section_h_table2_row1_4":"संबंधित कार्य आईडी",
+    "section_h_table2_row1_5":"पुनर्भरण संरचना का प्रकार",
+    "section_h_table2_row1_6":"मरम्मत गतिविधि",
+    "section_h_table2_row1_7":"अक्षांश",
+    "section_h_table2_row1_8":"देशांतर",
+
+    "section_h_table3_row1_1":"लाभार्थी बस्ती का नाम",
+    "section_h_table3_row1_2":"लाभार्थी का नाम",
+    "section_h_table3_row1_3":"कार्य आईडी",
+    "section_h_table3_row1_4":"सिंचाई संरचना का प्रकार",
+    "section_h_table3_row1_5":"मरम्मत गतिविधि",
+    "section_h_table3_row1_6":"अक्षांश",
+    "section_h_table3_row1_7":"देशांतर",
+
+    "section_h_table4_row1_1":"लाभार्थी बस्ती का नाम",
+    "section_h_table4_row1_2":"लाभार्थी का नाम",
+    "section_h_table4_row1_3":"कार्य आईडी",
+    "section_h_table4_row1_4":"संबंधित कार्य आईडी",
+    "section_h_table4_row1_5":"कार्य का प्रकार",
+    "section_h_table4_row1_6":"अक्षांश",
+    "section_h_table4_row1_7":"देशांतर",
+
+    "section_h_table5_row1_1":"लाभार्थी बस्ती का नाम",
+    "section_h_table5_row1_2":"लाभार्थी का नाम",
+    "section_h_table5_row1_3":"कार्य आईडी",
+    "section_h_table5_row1_4":"संबंधित कार्य आईडी",
+    "section_h_table5_row1_5":"कार्य का प्रकार",
+    "section_h_table5_row1_6":"अक्षांश",
+    "section_h_table5_row1_7":"देशांतर"
     }
+
+
     },
 
     "english" :{
@@ -121,6 +239,7 @@
     "section_c_table1_row1_3":"Settlement Type",
     "section_c_table1_row1_4":"Caste Group",
     "section_c_table1_row1_5":"Total marginal farmers (&lt;2 acres)",
+
     "section_c_table2_heading":"NREGA Info",
     "section_c_table2_row1_1":"Settlement's Name",
     "section_c_table2_row1_2":"Households - applied \n- having NREGA job cards",
@@ -128,6 +247,7 @@
     "section_c_table2_row1_4":"Previous NRM demands made in the settlement",
     "section_c_table2_row1_5":"Were demands raised by you, and were you involved in the new NRM planning?",
     "section_c_table2_row1_6":"Issues",
+
     "section_c_table3_heading":"Crop Info",
     "section_c_table3_row1_1":"Name of the Settlement",
     "section_c_table3_row1_2":"Irrigation Source",
@@ -137,6 +257,7 @@
     "section_c_table3_row1_6":"Cropping Pattern (Rabi)",
     "section_c_table3_row1_7":"Cropping Pattern (Zaid)",
     "section_c_table3_row1_8":"Cropping Intensity",
+    
     "section_c_table4_heading":"Livestock Info",
     "section_c_table4_row1_1":"Name of the Settlement",
     "section_c_table4_row1_2":"Goats",
@@ -144,6 +265,151 @@
     "section_c_table4_row1_4":"Cattle",
     "section_c_table4_row1_5":"Piggery",
     "section_c_table4_row1_6":"Poultry"
+    },
+
+    "section_d_english":{
+    "section_d_heading":"Section D: Information of all Micro Watersheds intersecting the village",
+    "section_d_brief":"This section provides an overview of all micro watersheds intersecting the village, detailing completed NRM works on individual and common lands, non-NRM works, changes in land use over the last 5 years, and information on wells, water structures, and household beneficiaries.",
+    "section_d_table1_row1_1":"Microwatershed ID",
+    "section_d_table1_row1_2":"Latitude and Longitude (Centroid)",
+    "section_d_table1_footer":"Information on Land Use",
+
+    "section_d_table2_heading":"Change in cropping area over last 5 years",
+    "section_d_table2_row1_2":"Year",
+    "section_d_table2_row1_3":"Area under Single Crop (in ha)",
+    "section_d_table2_row1_4":"Area under Double Crop (in ha)",
+    "section_d_table2_row1_5":"Area under Triple Crop (in ha)",
+    "section_d_table2_row1_6":"Uncropped Area (in ha)",
+
+    "section_d_table3_heading":"Well Information for MWS",
+    "section_d_table3_row1_1":"Name of Beneficiary's Settlement",
+    "section_d_table3_row1_2":"Number of Wells",
+    "section_d_table3_row1_3":"Total Number of Household Benefitted",
+
+    "section_d_table4_heading":"Well Info",
+    "section_d_table4_row1_1":"Name of Beneficiary Settlement",
+    "section_d_table4_row1_2":"Who owns the Well",
+    "section_d_table4_row1_3":"Households Benefitted",
+    "section_d_table4_row1_4":"Which Caste uses the well?",
+    "section_d_table4_row1_5":"Functional or Non-functional",
+    "section_d_table4_row1_6":"Need Maintenance",
+    "section_d_table4_row1_7":"Type of Well",
+    "section_d_table4_row1_8":"Latitude",
+    "section_d_table4_row1_9":"Longitude ",
+
+    "section_d_table5_heading":"Waterbody Information for MWS",
+    "section_d_table5_row1_1":"Name of the Beneficiary's Settlement",
+    "section_d_table5_row1_2":"Who manages?",
+    "section_d_table5_row1_3":"Who owns the water structure?",
+    "section_d_table5_row1_4":"Which Caste uses the water structure?",
+    "section_d_table5_row1_5":"Households Benefitted",
+    "section_d_table5_row1_6":"Type of Water Structure",
+    "section_d_table5_row1_7":"Identified By",
+    "section_d_table5_row1_8":"Need Maintenance",
+    "section_d_table5_row1_9":"Latitude",
+    "section_d_table5_row1_10":"Longitude ",
+
+    "section_d_table6_heading":"Water Budgeting at Micro Watershed level",
+    "section_d_table6_brief":"This table below provides year wise information on water budgeting at the micro watershed level,including details on precipitation, runoff, ET, change in groundwater, and well depth.",
+    "section_d_table6_row1_1":"Year",
+    "section_d_table6_row1_2":"Precipitation (in mm)",
+    "section_d_table6_row1_3":"Run-off (in mm)",
+    "section_d_table6_row1_4":"ET (in mm)",
+    "section_d_table6_row1_5":"Change in Groundwater (G in mm)",
+    "section_d_table6_row1_6":"Well Depth (in m)"
+    },
+
+    "section_e_english":{
+    "section_e_heading":"Section E: Remote sensing data- Total Area under Surface Water Structures",
+    "section_e_brief":"This section includes information on  the total area under  surface water during the Kharif, Rabi, and Zaid season for each specified year.",
+    "section_e_table1_heading":"Total area under Surface Water",
+    "section_e_table1_row1_1":"Year",
+    "section_e_table1_row1_2":"Total area under Surface Water (hectare)",
+    "section_e_table1_row1_3":"Water availability in Kharif (pixel percentage)",
+    "section_e_table1_row1_4":"Water availability in Rabi (pixel percentage)",
+    "section_e_table1_row1_5":"Water availability in Zaid (pixel percentage)"
+    },
+
+
+    "section_f_english":{
+    "section_f_heading":"Section F: Proposed New NRM works on basis through Gram Sabha",
+    "section_f_brief":"This section outlines the details of proposed new NRM works based on community inputs put up to the Gram Sabha.",
+    "section_f_table1_row1_1":"S.No",
+    "section_f_table1_row1_2":"Work Category : Irrigation work or Recharge Structure",
+    "section_f_table1_row1_3":"Name of Beneficiary's Settlement",
+    "section_f_table1_row1_4":"Beneficiary Name",
+    "section_f_table1_row1_5":"Type of work",
+    "section_f_table1_row1_6":"Work ID",
+    "section_f_table1_row1_7":"Latitude",
+    "section_f_table1_row1_8":"Longitude",
+    "section_f_table1_row1_9":"Work Dimensions"
+    },
+
+    "section_g_hindi":{
+    "section_g_heading":"Section G: Propose New Livelihood Works"
+    },
+
+    "section_g.1_hindi":{
+    "section_g.1_heading":"G.1 Livestock and Fisheries",
+    "section_g.1_table1_row1_1":"Livelihood Works",
+    "section_g.1_table1_row1_2":"Name of Beneficiary Settlement",
+    "section_g.1_table1_row1_3":"Name of Beneficiary",
+    "section_g.1_table1_row1_4":"Beneficiary Father's Name",
+    "section_g.1_table1_row1_5":"Type of Work Demand",
+    "section_g.1_table1_row1_6":"Latitude",
+    "section_g.1_table1_row1_7":"Longitude"
+    },
+
+    "section_g.2_hindi":{
+    "section_g.2_heading":"G.2 Plantations",
+    "section_g.2_table1_row1_1":"Livelihood Works",
+    "section_g.2_table1_row1_2":"Name of Beneficiary Settlement",
+    "section_g.2_table1_row1_3":"Name of Beneficiary",
+    "section_g.2_table1_row1_4":"Beneficiary Father's Name",
+    "section_g.2_table1_row1_5":"Name of Plantation Crop",
+    "section_g.2_table1_row1_6":"Total Acres",
+    "section_g.2_table1_row1_7":"Latitude",
+    "section_g.2_table1_row1_8":"Longitude"
+    },
+
+
+    "section_h_hindi":{
+    "section_h_heading":"Section H: Proposed Maintenance Works on existing Assets on basis through Gram Sabha",
+    "section_h_brief":"This section presents information on proposed maintenance works for existing assets based on inputs from the Gram Sabha. For each maintenance work, include details such as the beneficiary settlement, work ID, type of work, latitude, and longitude.",
+
+    
+    "section_h_table2_row1_1":"Name of the Beneficiary Settlement",
+    "section_h_table2_row1_2":"Beneficiary Name",
+    "section_h_table2_row1_3":"Work ID",
+    "section_h_table2_row1_4":"Corresponding Work ID",
+    "section_h_table2_row1_5":"Type of Recharge Structure",
+    "section_h_table2_row1_6":"Repair Activity",
+    "section_h_table2_row1_7":"Latitude",
+    "section_h_table2_row1_8":"Longitude",
+
+    "section_h_table3_row1_1":"Name of the Beneficiary Settlement",
+    "section_h_table3_row1_2":"Beneficiary Name",
+    "section_h_table3_row1_3":"Work ID",
+    "section_h_table3_row1_4":"Type of Irrigation Structure",
+    "section_h_table3_row1_5":"Repair Activity",
+    "section_h_table3_row1_6":"Latitude",
+    "section_h_table3_row1_7":"Longitude",
+
+    "section_h_table4_row1_1":"Name of the Beneficiary Settlement",
+    "section_h_table4_row1_2":"Beneficiary Name",
+    "section_h_table4_row1_3":"Work ID",
+    "section_h_table4_row1_4":"Corresponding Work ID",
+    "section_h_table4_row1_5":"Type of Work",
+    "section_h_table4_row1_6":"Latitude",
+    "section_h_table4_row1_7":"Longitude",
+
+    "section_h_table5_row1_1":"Name of the Beneficiary Settlement",
+    "section_h_table5_row1_2":"Beneficiary Name",
+    "section_h_table5_row1_3":"Work ID",
+    "section_h_table5_row1_4":"Corresponding Work ID",
+    "section_h_table5_row1_5":"Type of Work",
+    "section_h_table5_row1_6":"Latitude",
+    "section_h_table5_row1_7":"Longitude"
     }
     }
     

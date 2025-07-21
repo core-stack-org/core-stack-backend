@@ -26,14 +26,6 @@ ENV/
 .venv
 env.bak/
 venv.bak/
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> soi_narega
-home
-
-=======
 home/
->>>>>>> layer/save_db
 # ignored apps
 dashboard/
