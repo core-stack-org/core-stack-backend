@@ -103,6 +103,8 @@ GEE_PATH_PLANTATION_HELPER = "projects/ee-corestack-helper/assets/apps/plantatio
 GEE_BASE_PATH = "projects/ee-corestackdev/assets/apps"
 GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
+GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
+
 GEE_PATHS = {
     "MWS": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/mws/",
