@@ -248,7 +248,6 @@ def save_layer_info_to_db(state, district, block, layer_name,asset_id, workspace
     dataset = Dataset.objects.get(
         name = workspace_name
     )
-    workspace = str(dataset.workspace)
     state = state.lower().replace(" ", "_")
     district=district.lower().replace(" ", "_")
     block=block.lower().replace(" ", "_")
@@ -265,9 +264,6 @@ def save_layer_info_to_db(state, district, block, layer_name,asset_id, workspace
         state=state_obj,    
         district=district_obj,
         block=block_obj,
-        gee_asset_path=asset_id,
-        misc={
-            workspace:"district_block"
-        }
+        gee_asset_path=asset_id
         
     )
