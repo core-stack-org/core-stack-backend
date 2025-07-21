@@ -15,6 +15,9 @@ from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db
 )
+from utilities.constants import (
+    GEE_DATASET_PATH
+)
 
 
 @app.task(bind=True)
@@ -53,7 +56,7 @@ def clip_raster(roi, state, district, block, description):
         return asset_id
 
     restoration_raster = ee.Image(
-        "projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities"
+        GEE_DATASET_PATH + "/WRI/LandscapeRestorationOpportunities"
     )
 
     clipped_raster = restoration_raster.clip(roi.geometry())

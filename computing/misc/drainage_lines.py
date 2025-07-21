@@ -8,6 +8,9 @@ from utilities.gee_utils import (
     check_task_status,
     make_asset_public,
 )
+from utilities.constants import (
+    GEE_DATASET_PATH
+)
 from nrm_app.celery import app
 
 
@@ -20,7 +23,7 @@ def clip_drainage_lines(
 ):
     ee_initialize()
     pan_india_drainage = ee.FeatureCollection(
-        "projects/ee-corestackdev/assets/datasets/drainage-line/pan_india_drainage_lines"
+        GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
