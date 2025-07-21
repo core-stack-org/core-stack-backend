@@ -24,6 +24,12 @@ import bot_interface.api
 import bot_interface.models
 import bot_interface.interface.generic, bot_interface.interface.whatsapp
 # from WhatsappConnect.settings import BUCKET_URL, BUCKET_NAME, WHATSAPP_MEDIA_PATH
+from typing import Dict, Any, Tuple
+from django.core.exceptions import ObjectDoesNotExist
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 status_map = {
             "UNASSIGNED": "सौंपा नहीं गया",
@@ -1071,298 +1077,291 @@ def flat_df(df):
     return rows
 
 
+def check_and_create_user(user_number: str, bot_instance) -> Tuple[str, bool]:
+    """
+    Check if user exists and create if needed. Also ensure BotUser entry exists.
+    
+    Args:
+        user_number: User's phone number
+        bot_instance: Bot instance object
+        
+    Returns:
+        Tuple of (user_id, is_new_user)
+    """
+    try:
+        from users.models import User
+        
+        # Check if user exists in users.User model
+        try:
+            user_obj = User.objects.get(contact_number=user_number)
+            print(f"Existing user found: {user_obj.id}")
+            is_new_user = False
+            user_id = str(user_obj.id)
+        except User.DoesNotExist:
+            # Create new user
+            user_obj = User.objects.create(
+                contact_number=user_number,
+                username=f"user_{user_number}",
+                first_name=f"User {user_number[-4:]}"  # Use last 4 digits as name
+            )
+            print(f"New user created: {user_obj.id}")
+            is_new_user = True
+            user_id = str(user_obj.id)
+        
+        # Check if BotUser entry exists (for both new and existing users)
+        try:
+            bot_user = bot_interface.models.BotUsers.objects.get(  # type: ignore
+                user=user_obj,
+                bot=bot_instance
+            )
+            print(f"Existing BotUser found: {bot_user.id}")
+        except bot_interface.models.BotUsers.DoesNotExist:  # type: ignore
+            # Create BotUser entry
+            bot_user = bot_interface.models.BotUsers.objects.create(  # type: ignore
+                user=user_obj,
+                bot=bot_instance
+            )
+            print(f"New BotUser created: {bot_user.id}")
+
+        return bot_user.id, is_new_user
+
+    except (ObjectDoesNotExist, ValueError) as e:
+        logger.error("Error in check_and_create_user: %s", str(e))
+        # Return empty user_id and assume new user on error
+        return "", True
+
+
+def check_user_community_status_direct(bot_number: str) -> tuple[bool, Dict[str, Any]]:
+    """
+    Check if a user (by phone number) is part of any community using direct function calls.
+    
+    Args:
+        bot_number: User's phone number
+        
+    Returns:
+        Tuple of (success, data) where data contains community information
+    """
+    try:
+        from users.models import User
+        from community_engagement.models import Community_user_mapping, Location
+        from community_engagement.utils import get_community_summary_data
+        from geoadmin.models import State
+        
+        if not bot_number:
+            return False, {"success": False, "message": "Bot number is missing or empty"}
+
+        user_objs = User.objects.get(contact_number=bot_number)
+        print("User objects found:", user_objs)
+        data = {}
+
+        if user_objs:
+            user = user_objs
+            community_user_mapping_qs = Community_user_mapping.objects.filter(user=user)  # type: ignore
+
+            if community_user_mapping_qs.exists():
+                communities_list = []
+                last_accessed_community_id = ""
+                for mapping in community_user_mapping_qs:
+                    communities_list.append(get_community_summary_data(mapping.community.id))
+                    if mapping.is_last_accessed_community:
+                        last_accessed_community_id = mapping.community.id
+
+                data["is_in_community"] = True
+                data["data_type"] = "community"
+                data["data"] = communities_list
+                data["misc"] = {"last_accessed_community_id": last_accessed_community_id}
+                return True, {"success": True, "data": data}
+
+        # User not in community - return available states for onboarding
+        state_ids_with_community = Location.objects.filter(communities__isnull=False).values_list('state_id', flat=True).distinct()  # type: ignore
+        states = State.objects.filter(pk__in=state_ids_with_community).order_by('state_name')  # type: ignore
+        data["is_in_community"] = False
+        data["data_type"] = "state"
+        data["data"] = [{"id": state.pk, "name": state.state_name} for state in states]
+        data["misc"] = {}
+        return True, {"success": True, "data": data}
+        
+    except (ObjectDoesNotExist, AttributeError, ValueError) as model_error:
+        logger.error("Exception in check_user_community_status_direct: %s", model_error)
+        return False, {"success": False, "message": "Internal server error"}
+
+
+def check_user_community_status_http(user_number: str, base_url: str = "http://localhost:8000/api/v1") -> Tuple[bool, Dict[str, Any]]:
+    """
+    Check if a user (by phone number) is part of any community using HTTP API calls.
+    
+    Args:
+        user_number: User's phone number
+        base_url: Base URL for the API (default: http://localhost:8000)
+        
+    Returns:
+        Tuple of (success, data) where data contains community information
+    """
+    try:
+        if not user_number:
+            return False, {"success": False, "message": "User number is missing or empty"}
+
+        # Make HTTP request to the community engagement API
+        url = f"{base_url}/is_user_in_community/"
+        payload = {"number": user_number}
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        logger.info("Making HTTP request to %s for user %s", url, user_number)
+
+        response = requests.post(
+            url, 
+            json=payload, 
+            headers=headers,
+            timeout=30  # 30 second timeout
+        )
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            logger.info("HTTP response received: %s", response_data)
+            return True, response_data
+        else:
+            logger.error("HTTP request failed with status %s: %s", response.status_code, response.text)
+            return False, {"success": False, "message": f"HTTP error: {response.status_code}"}
+            
+    except requests.exceptions.Timeout:
+        logger.error("HTTP request timed out")
+        return False, {"success": False, "message": "Request timeout"}
+    except requests.exceptions.ConnectionError:
+        logger.error("HTTP connection error")
+        return False, {"success": False, "message": "Connection error"}
+    except requests.exceptions.RequestException as req_error:
+        logger.error("HTTP request error: %s", req_error)
+        return False, {"success": False, "message": "Request failed"}
+    except json.JSONDecodeError as json_error:
+        logger.error("JSON parsing error: %s", json_error)
+        return False, {"success": False, "message": "Invalid JSON response"}
+    except (ValueError, TypeError) as general_error:
+        logger.error("Unexpected error in HTTP check: %s", general_error)
+        return False, {"success": False, "message": "Unexpected error"}
+
+
+def check_user_community_status(bot_number: str, method: str = "direct") -> Tuple[bool, Dict[str, Any]]:
+    """
+    Check if a user (by phone number) is part of any community.
+    
+    Args:
+        bot_number: User's phone number
+        method: "direct" for direct function calls, "http" for HTTP API calls
+        
+    Returns:
+        Tuple of (success, data) where data contains community information
+    """
+    if method == "direct":
+        return check_user_community_status_direct(bot_number)
+    else:
+        return check_user_community_status_http(bot_number)
+
+
+
+def jumpToSmj(data_dict):
+    """
+    Jump to a different SMJ by name.
+    
+    Args:
+        data_dict: Contains 'data' with [{'smjName': 'onboarding', 'initState': 'Welcome'}]
+    
+    Returns:
+        str: "success" or "error"
+    """
+    try:
+        # Extract SMJ jump data
+        jump_data = data_dict.get('data', [{}])
+        if not jump_data:
+            print("ERROR: No jump data provided")
+            return "error"
+            
+        jump_info = jump_data[0] if isinstance(jump_data, list) else jump_data
+        smj_name = jump_info.get('smjName')
+        init_state = jump_info.get('initState')
+        
+        print(f"jumpToSmj called with smjName: {smj_name}, initState: {init_state}")
+        
+        if not smj_name or not init_state:
+            print(f"ERROR: Missing smjName or initState in jump data: {jump_info}")
+            return "error"
+        
+        # Check if SMJ exists in database
+        try:
+            new_smj = bot_interface.models.SMJ.objects.get(name=smj_name)
+            new_smj_states = new_smj.smj_json
+            
+            # Handle Django JSONField - can be string or already parsed
+            if isinstance(new_smj_states, str):
+                new_smj_states = json.loads(new_smj_states)
+                
+            print(f"Found SMJ '{smj_name}' with {len(new_smj_states)} states")
+            
+            # Validate that the init_state exists in new SMJ
+            state_exists = False
+            for state in new_smj_states:
+                if state.get('name') == init_state:
+                    state_exists = True
+                    break
+            
+            if not state_exists:
+                print(f"ERROR: State '{init_state}' not found in SMJ '{smj_name}'")
+                return "error"
+            
+            # Store jump information in data_dict for state machine to process
+            # The state machine will handle the actual jump when it receives "success"
+            data_dict['_smj_jump'] = {
+                'smj_name': smj_name,
+                'smj_id': new_smj.pk,
+                'init_state': init_state,
+                'states': new_smj_states
+            }
+            
+            print(f"Prepared SMJ jump to '{smj_name}', state '{init_state}'")
+            return "success"
+            
+        except bot_interface.models.SMJ.DoesNotExist:
+            print(f"ERROR: SMJ '{smj_name}' not found in database")
+            return "error"
+        except json.JSONDecodeError as e:
+            print(f"ERROR: Invalid JSON in SMJ '{smj_name}': {e}")
+            return "error"
+        except Exception as e:
+            print(f"ERROR loading SMJ '{smj_name}': {e}")
+            return "error"
+            
+    except Exception as e:
+        print(f"ERROR in jumpToSmj: {e}")
+        logger.error("Error in jumpToSmj: %s", str(e))
+        return "error"
+
 def callFunctionByName(funct_name, app_type, data_dict):
     event = ''
-    genericInterface = Interface.interfaces.generic.GenericInterface()
-    whatsappInterface = Interface.interfaces.whatsapp.WhatsappInterface()
-    bhashini = Interface.bhashini.bhashini
-    if funct_name == 'uploadItem':
-        genericInterface.uploadItem(data_dict)
-    elif funct_name == 'uploadGrievance':
-        genericInterface.uploadGrievance(data_dict)
-    elif funct_name == 'pickImg':
-        genericInterface.pickImg(data_dict)
-    elif funct_name == 'pickAudio':
-        genericInterface.pickAudio(data_dict)
-    elif funct_name == 'pickAudio_Text':
-        genericInterface.pickAudio_Text(data_dict)
-    elif funct_name == 'pickOrder':
-        genericInterface.pickOrder(data_dict)
-    elif funct_name == 'userInput':
-        genericInterface.userInput(data_dict)
-    elif funct_name == 'moveForward':
-        genericInterface.moveForward(data_dict)
-    elif funct_name == 'sendAudioCardsProfile':
-        event = genericInterface.sendAudioCardsProfile(data_dict)
-    elif funct_name == 'sendAudioCardsSearch':
-        event = genericInterface.sendAudioCardsSearch(data_dict)
-    elif funct_name == 'sendAudio':
-        event = genericInterface.sendAudio(data_dict)
-    elif funct_name == 'ageValidator':
-        event = genericInterface.ageValidator(data_dict)
-    elif funct_name == 'find_keyword':
-        genericInterface.find_keyword(data_dict)
-    elif funct_name == 'find_order':
-        genericInterface.find_order(data_dict)
-    elif funct_name == 'satisfyCallPatch':
-        genericInterface.satisfy_call_patch(data_dict)
-    elif funct_name == 'endSession':
-        genericInterface.endSession(data_dict)
-    elif funct_name == 'GetQnAItems':
-        genericInterface.GetQnAItems(data_dict)
-    elif funct_name == 'GetQnAItemsByTheme':
-        genericInterface.GetQnAItemsByTheme(data_dict)
-    elif funct_name == 'sendWaitText':
-        bhashini.send_wait_text(data_dict)
-    elif funct_name == 'GetItemsinMenu':
-        genericInterface.GetItemsinMenu(data_dict)
-    elif funct_name == 'update_user_log':
-        event = genericInterface.update_user_log(data_dict)
-    elif funct_name == 'checkUserProfileStatus':
-        whatsappInterface.checkUserProfileStatus(data_dict)
-    elif funct_name == 'sendTemplate':
-        whatsappInterface.sendTemplate(data_dict)
+    genericInterface = bot_interface.interface.generic.GenericInterface()
+    whatsappInterface = bot_interface.interface.whatsapp.WhatsAppInterface()
+    bot_id = data_dict.get('bot_id', None)
+
+    if funct_name == 'userInput':
+        genericInterface.user_input(data_dict)
+    elif funct_name == 'pick_img':
+        genericInterface.pick_img(data_dict)
+    elif funct_name == 'pick_audio':
+        genericInterface.pick_audio(data_dict)
+    elif funct_name == 'pick_audio_text':
+        genericInterface.pick_audio_text(data_dict)
+    elif funct_name == 'move_forward':
+        print("calling move_forward and Data dict in move forward: ", data_dict)
+        event = genericInterface.move_forward(data_dict)
+        print(f"move_forward returned: {event}")
+        return event
     elif funct_name == 'jumpToSmj':
-        whatsappInterface.jumpToSmj(data_dict)
-    elif funct_name == 'get_product_categories':
-        Interface.farmphone.farmphone.get_product_categories(data_dict)
-    elif funct_name == 'get_products_by_category':
-        Interface.farmphone.farmphone.get_products_by_category(data_dict)
-    elif funct_name == 'get_item_details':
-        Interface.farmphone.farmphone.get_item_details(data_dict)
-    elif funct_name == 'saveDataToUserLogs':
-        genericInterface.save_data_to_user_logs(data_dict)
-    elif funct_name == 'displayCartList':
-        Interface.farmphone.farmphone.displayCartList(data_dict)
-    elif funct_name == 'updateCart':
-        Interface.farmphone.farmphone.updateCart(data_dict)
-    elif funct_name == 'displayAddedItemDetails':
-        Interface.farmphone.farmphone.displayAddedItemDetails(data_dict)
-    elif funct_name == 'displayCartText':
-        Interface.farmphone.farmphone.displayCartText(data_dict)
-    elif funct_name == 'showCancellableOrders':
-        Interface.farmphone.farmphone.show_cancellable_orders(data_dict)
-    elif funct_name == 'checkCancellableOrders':
-        Interface.farmphone.farmphone.check_cancellable_orders(data_dict)
-    elif funct_name == 'showCancellableOrderDetails':
-        Interface.farmphone.farmphone.show_cancellable_order_details(data_dict)
-    elif funct_name == 'cancelOrder':
-        Interface.farmphone.farmphone.cancel_order(data_dict)
-    elif funct_name == 'pincodeValidator':
-        Interface.farmphone.farmphone.pincode_validator(data_dict)
-    elif funct_name == 'createDraftOrder':
-        Interface.farmphone.farmphone.create_draft_order(data_dict)
-    elif funct_name == 'checkUserExists':
-        Interface.farmphone.farmphone.check_user_exists(data_dict)
-    elif funct_name == 'checkShopifyUser':
-        Interface.farmphone.farmphone.check_shopify_user(data_dict)
-    elif funct_name == 'saveData':
-        genericInterface.saveData(data_dict)
-    elif funct_name == 'checkRefundableOrders':
-        Interface.farmphone.farmphone.check_refundable_orders(data_dict)
-    elif funct_name == 'showRefundableOrders':
-        Interface.farmphone.farmphone.show_refundable_orders(data_dict)
-    elif funct_name == 'showRefundableOrderDetails':
-        Interface.farmphone.farmphone.show_refundable_order_details(data_dict)
-    elif funct_name == 'checkActiveOrders':
-        Interface.farmphone.farmphone.check_active_orders(data_dict)
-    elif funct_name == 'showActiveOrders':
-        Interface.farmphone.farmphone.show_active_orders(data_dict)
-    elif funct_name == 'showActiveOrderDetails':
-        Interface.farmphone.farmphone.show_active_order_details(data_dict)
-    elif funct_name == 'checkOrderQuantity':
-        Interface.farmphone.farmphone.check_order_quantity(data_dict)
-    elif funct_name == 'checkCustomer':
-        Interface.farmphone.farmphone.check_customer(data_dict)
-    elif funct_name == 'createNewCustomer':
-        Interface.farmphone.farmphone.create_new_customer(data_dict)
-    elif funct_name == 'sendNotification':
-        Interface.farmphone.farmphone.send_notification(data_dict)
-    elif funct_name == 'shareContact':
-        Interface.farmphone.farmphone.share_contact(data_dict)
-    elif funct_name == 'emailValidator':
-        Interface.farmphone.farmphone.email_validator(data_dict)
-    elif funct_name == 'sendAudioFile':
-        whatsappInterface.send_Audio_File(data_dict)
-    elif funct_name == 'getResultFromGPT':
-        bhashini.get_result_from_gpt(data_dict)
-    elif funct_name == 'sendLangText':
-        bhashini.send_lang_text(data_dict)
-    elif funct_name == 'getGrievanceList':
-        genericInterface.get_grievance_list(data_dict)
-    elif funct_name == 'sendGrievanceList':
-        genericInterface.send_grievance_list(data_dict)
-    elif funct_name == 'getGrievanceUpdate':
-        genericInterface.get_grievance_update(data_dict)
-    elif funct_name == 'updatePreviousState':
-        genericInterface.update_previous_state(data_dict)
-    elif funct_name == 'sendProductCatalog':
-        Interface.farmphone.farmphone.send_product_catalog(data_dict)
-    elif funct_name == 'getCartDetails':
-        Interface.farmphone.farmphone.get_cart_details(data_dict)
-    elif funct_name == 'couponValidate':
-        Interface.farmphone.farmphone.couponValidate(data_dict)
-    elif funct_name == 'reopenGrievance':
-        genericInterface.re_open_grievance(data_dict)
-
-
+        print(f"calling jumpToSmj with data_dict: {data_dict}")
+        event = jumpToSmj(data_dict)
+        print(f"jumpToSmj returned: {event}")
+    elif funct_name == 'send_location_request':
+        print(f"calling sendLocationRequest with data_dict: {data_dict}")
+        event = whatsappInterface.sendLocationRequest(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"sendLocationRequest returned: {event}")
     return event
-
-
-def text_to_speech(text, file_name, app_instance_config_id):
-    app_instance_config = Interface.models.App_instance_config.objects.get(
-        pk=app_instance_config_id
-    )
-    app_config_json = json.loads(app_instance_config.config_json)
-    lang_model = app_config_json.get("lang_model")
-    if lang_model and lang_model == "bhashini":
-        filepath = Interface.bhashini.api.bhashini_tts(text, "hi", file_name)
-        return filepath if filepath else google_tts(file_name, text)
-    else:
-        return google_tts(file_name, text)
-
-
-def google_tts(file_name, text):
-    audio = gTTS(text=text, slow=False)
-    filepath = WHATSAPP_MEDIA_PATH + file_name + ".mp3"
-    audio.save(filepath)
-    file_identifier, cType = get_filename_extension(filepath)
-    file_name = "docs/audios/" + filepath.split("/")[-1]
-    status, s3_url, exc = push_to_s3(filepath, BUCKET_NAME, file_name, cType)
-    return filepath
-
-
-def convert_html_to_WA_text(text):
-    # Replacing heading tags with asterisk for WA to make them bold
-    text = re.sub(r'<h[^>]+>', '*', text)
-    text = re.sub(r'<\/h[^>]+>', '*', text)
-    # Removing all other html tags
-    text = re.sub(r'<[^>]+>', '', text)
-    return text
-
-
-def getValueByDataType(datatype):
-    try:
-        data_type_obj = eval(datatype)
-        return data_type_obj()
-    except Exception as e:
-        return ""
-    # if datatype == "list":
-    #     return []
-    # elif datatype == "dict":
-    #     return {}
-    # else:
-    #     return ""
-
-
-def email_validator_check(email):
-    print("Email Validator Check for the email")
-    return re.match(r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+", email)
-
-
-def save_context_id_in_user_misc(msisdn, context_id, app_instance_config, app_type):
-    print("In save_context_id_in_user_misc>>>")
-    user = Interface.models.Users.objects.filter(
-        app_type=app_type, app_instance_config=app_instance_config, msisdn=msisdn)
-    print("user", user)
-    if user:
-        user = user[0]
-        misc_data = json.loads(user.misc_data) if user.misc_data else {}
-        misc_data["context_id"] = context_id
-        user.misc_data = json.dumps(misc_data)
-        user.save()
-
-
-from rest_framework.response import Response
-def isAuthenticated_user(func):
-    import traceback
-    def isAuth(request):
-        try:
-            print("request is", request)
-            # from app_controller.models import uuid
-            uuid = request.data.get('uuid') #uuid.objects.get(uuid=str(request.POST['uuid']), password = str(request.POST['password']))
-            if uuid=="shiv":
-                return func(request)
-            else:
-                return Response({"success": False, "message": "You dont have permission for access this API"},
-                                status=403)
-        except Exception as e:
-            print ('Error:' +str(traceback.print_exc()))
-            return Response({"success" : False, "message": "You dont have permission for access this API"}, status=403)
-    return isAuth
-
-def get_content_type(filepath):
-    with open(filepath, 'rb') as file:
-        num_byte = file.read(2)
-    if num_byte == b'\xff\xfb' or num_byte == b'\x49\x44':
-        content_type = 'audio'  # Content type for MP3 files
-    else:
-        content_type = 'image'
-
-    print("Content Type:", content_type)
-    return content_type
-
-
-def get_item_by_skey_ES_query(skey):
-    must_query_array = [
-        {
-            "terms": {"skey": [str(skey)]},
-        }
-    ]
-
-    query = {
-        "query": {"bool": {"must": must_query_array}},
-        "_source": [
-            "skey",
-            "pkey",
-            "ai",
-            "sync_properties",
-            "misc",
-            "channel",
-            "is_comment",
-            "comments",
-            "cm_properties",
-            "time",
-            "callerid"
-        ],
-    }
-    return query
-
-
-def get_grievance_ES_query(msisdn):
-    date_prev_6month = datetime.now().date() - relativedelta(months=6)
-    date_prev_6month = date_prev_6month.strftime("%Y-%m-%d")
-    must_query_array = [
-        {"query_string": {"fields": ["is_comment"], "query": "false"}},
-        {"range": {"time": {"gte": date_prev_6month}}},
-        {
-            "terms": {"callerid": [msisdn]},
-        },
-        {"exists": {"field": "cm_properties"}},
-        {"wildcard": {"cm_properties": "*gr_id*"}},
-    ]
-
-    query = {
-        "query": {"bool": {"must": must_query_array}},
-        "sort": [
-            {"time": {"order": "desc"}}
-        ],
-        "_source": [
-            "skey",
-            "pkey",
-            "ai",
-            "sync_properties",
-            "title",
-            "tags",
-            "server",
-            "misc",
-            "channel",
-            "is_comment",
-            "comments",
-            "cm_properties",
-            "time",
-            "unix_ts_in_secs"
-        ],
-    }
-    return query
-

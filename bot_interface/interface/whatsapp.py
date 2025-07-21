@@ -1,21 +1,21 @@
 import json
-from typing import Dict, Any, Tuple, Optional
-
-import boto3
-from django.db import models
+from typing import Dict, Any
 
 import bot_interface.interface.generic
 import bot_interface.models
 import bot_interface.utils
 import bot_interface.api
+import bot_interface.auth
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     """WhatsApp interface implementation for handling WhatsApp Business API interactions"""
     
-    # Define constants at class level
-    BUCKET_NAME = "your-s3-bucket-name"  # Replace with actual bucket name
-    
+    BUCKET_NAME = "your-s3-bucket-name"  
+
     @staticmethod
     def create_event_packet(json_obj: Any, bot_id: int, event: str = "start") -> Dict[str, Any]:
         """
@@ -32,7 +32,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         print("create_event_packet called with bot_id:", bot_id, type(bot_id))
         
         try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_id)
+            bot_interface.models.Bot.objects.get(id=bot_id)
         except bot_interface.models.Bot.DoesNotExist:
             raise ValueError(f"Bot with id {bot_id} not found")
         
@@ -71,7 +71,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             "wa_id": "",
             "misc": "",
             "type": "",
-            "msisdn": ""
+            "user_number": "",
+            "smj_id": "",
+            "state": ""
         }
         
         # Process different types of incoming data
@@ -87,7 +89,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         """Process regular WhatsApp message data"""
         contacts = json_obj["contacts"][0]
         wa_id = contacts.get("wa_id", "")
-        event_packet["msisdn"] = wa_id
+        event_packet["user_number"] = wa_id
         event_packet["wa_id"] = wa_id
         
         if "messages" not in json_obj:
@@ -125,7 +127,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             event_packet["data"] = interactive["list_reply"]["title"]
             event_packet["misc"] = interactive["list_reply"]["id"]
         else:
-            event_packet["data"] = interactive["button_reply"]["title"]
+            event_packet["data"] = interactive["button_reply"]["id"]
         
         if message.get("context"):
             event_packet["context_id"] = message["context"]["id"]
@@ -198,23 +200,6 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         raise NotImplementedError("download_audio function needs to be implemented")
     
     @staticmethod
-    def _is_shopify_order(json_obj: Dict) -> bool:
-        """Check if the data is a Shopify order"""
-        return (json_obj.get("source_name") == "shopify_draft_order")
-    
-    @staticmethod
-    def _process_shopify_order(json_obj: Dict, event_packet: Dict, 
-                              bot_instance: Any) -> None:
-        """Process Shopify order data"""
-        customer = json_obj.get("customer", {})
-        customer_phone = customer.get("phone", "")
-        
-        event_packet["msisdn"] = str(customer_phone)[1:] if customer_phone else ""
-        event_packet["type"] = "notification"
-        event_packet["state"] = bot_instance.init_state
-        event_packet["data"] = json_obj
-    
-    @staticmethod
     def _is_interactive_message(json_obj: Dict) -> bool:
         """Check if this is an interactive message"""
         return (json_obj.get("id") and 
@@ -226,3 +211,152 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         event_packet["message_id"] = json_obj["id"]
         event_packet["message_to"] = json_obj.get("to", "")
         event_packet["type"] = json_obj["type"]
+
+ 
+    def sendText(self, bot_id, data_dict):
+        # 1 : user profile lnguage 2: config language(app_config_json) 3: default
+        logger.info("data_dict in sendText: %s", data_dict)
+        data = data_dict.get("text")
+        
+        bot_instance = bot_interface.models.Bot.objects.get(id=bot_id)
+        if bot_instance:
+            logger.info("bot_instance language in sendText: %s", bot_instance.language)
+
+        user_id = data_dict.get("user_id")
+        print("user in sendText", user_id)
+        
+        text = data[0].get(bot_instance.language)
+        print(text, bot_id)
+
+        user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+        response = bot_interface.api.send_text(
+            bot_instance_id=bot_id,
+            contact_number=user.phone,
+            text=text)
+        print("Text message response:", response)
+
+        # if bot_interface.utils.detect_url(text):
+        #     # TODO: Implement send_text_url function or use send_text for URLs too
+        #     response = bot_interface.api.send_text(app_instance_config_id, user.phone, text)
+        #     # print(response)
+        # else:
+        #     response = bot_interface.api.send_text(app_instance_config_id, user.phone, text)
+        #     print(response)
+
+        # Update user session state
+        print("user", user.current_session)
+        user.expected_response_type = "text"
+        user.current_state = data_dict.get("state")
+        
+        # Handle SMJ object lookup with error handling
+        smjid = data_dict.get("smj_id")
+        user.current_smj = bot_instance.smj
+        user.save()
+        print("SMJ : ", bot_instance.smj)
+        logger.info("sendText response: %s", response)
+        logger.info("Exiting sendText with response: ")
+
+
+    def sendButton(self, bot_instance_id, data_dict):
+        print("in sendButton")
+        logger.info("data_dict in sendButton: %s", data_dict)
+        bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+        if bot_instance:
+            print("bot_instance", bot_instance.language)
+
+        user_id = data_dict.get("user_id")
+        print("user in sendButton", user_id)
+
+        # bot_user = bot_interface.models.BotUsers.objects.get(user=user_id)
+        # print("bot_user in sendButton", bot_user)
+        data = data_dict.get("menu")
+        caption = data[0].get("caption")
+        print(data)
+        print("caption", caption)
+
+        # try:
+        #     user = bot_interface.models.UserSessions.objects.get(user=bot_user, bot=bot_instance)
+        # except bot_interface.models.UserSessions.DoesNotExist:
+        #     # create a new user session if it doesn't exist with user = bot_user and bot = bot_instance
+        #     user = bot_interface.models.UserSessions.objects.create(
+        #         user=bot_user,
+        #         bot=bot_instance,
+        #         phone=bot_user.user.contact_number,
+        #         app_type=bot_instance.app_type
+        #     )
+        #     print(f"Created new UserSession: {user}")
+        #check if user is created
+        user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+        print("user in sendButton", user)
+        user.expected_response_type = "button"
+        user.current_state = data_dict.get("state")
+        
+        # Handle SMJ object lookup with error handling
+        smj_id = data_dict.get("smj_id")
+        user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+
+        user.save()
+        print("length of data ::", len(data))
+        if len(data) > 3:
+            print("in send_list msg ::")
+            label = "Select Here"
+            response = bot_interface.api.send_list_msg(
+                bot_instance_id=bot_instance_id,
+                contact_number=user.phone,
+                text=caption,
+                menu_list=data,
+                button_label=label
+            )
+            print("List message without description response :", response)
+        elif len(data) <= 3 and ("description" in data[0]):
+            print("in send_list msg with less than equals to 3 options- labels with description::")
+            label = "Select Here"
+            response = bot_interface.api.send_list_msg(
+                bot_instance_id=bot_instance_id,
+                contact_number=user.phone,
+                text=caption,
+                menu_list=data,
+                button_label=label
+            )
+            print("List message with description response :", response)
+        else:
+            print("in send_list msg labels with description::")
+            label = "Select Here"
+            response = bot_interface.api.send_button_msg(
+                bot_instance_id=bot_instance_id,
+                contact_number=user.phone,
+                text=caption,
+                menu_list=data
+            )
+            print("Button message response:", response)
+        return response
+    
+    def sendLocationRequest(self, bot_instance_id, data_dict):
+        print("in sendLocationRequest")
+        bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+        if bot_instance:
+            print("bot_instance", bot_instance.language)
+
+        user_id = data_dict.get("user_id")
+        print("user in sendLocationRequest", user_id)
+        
+        #check if user is created
+        user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+        print("user in sendLocationRequest", user)
+        user.expected_response_type = "location"
+        user.current_state = data_dict.get("state")
+        
+        # Handle SMJ object lookup with error handling
+        smj_id = data_dict.get("smj_id")
+        user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+        user.save()
+
+        response = bot_interface.api.send_location_request(
+            bot_instance_id=bot_instance_id,
+            contact_number=user.phone,
+            text="कृपया स्थान भेजें"
+        )
+
+        print("Location request response:", response)
+        assert False
+        return response
