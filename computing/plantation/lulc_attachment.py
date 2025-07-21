@@ -1,4 +1,7 @@
 import ee
+from utilities.constants import (
+    GEE_DATASET_PATH
+)
 
 
 def get_lulc_data(suitability_vector, start_year, end_year):
@@ -23,7 +26,7 @@ def india_sat_lulc(suitability_vector, start_year, end_year):
     # for (year = start year <= end year++) {
     for year in range(start_year, end_year + 1):
         asset_id = (
-            "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+            GEE_DATASET_PATH + "/LULC_v3_river_basin/pan_india_lulc_v3_"
             + str(year)
             + "_"
             + str(year + 1)

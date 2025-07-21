@@ -28,7 +28,7 @@ def generate_lithology_layer(self, state, district):
         )
         state_aquifer = state_aquifer.to_crs(state_lith.crs)
 
-        joined = gpd.sjoin(state_lith, state_aquifer, how="left", op="intersects")
+        joined = gpd.sjoin(state_lith, state_aquifer, how="left", predicate="intersects")
         output_path = os.path.join(LITHOLOGY_PATH + "output/", "_".join(state.split()))
         if not os.path.exists(output_path):
             os.mkdir(output_path)
