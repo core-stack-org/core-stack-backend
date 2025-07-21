@@ -131,7 +131,7 @@ def clip_lulc_from_river_basin(
         # Clipping river basin lulc for a particular geometry
         lulc = ee.Image(
             GEE_DATASET_PATH
-            + ("LULC_v2_river_basin/" if version == "v2" else "LULC_v3_river_basin/")
+            + ("/LULC_v2_river_basin/" if version == "v2" else "/LULC_v3_river_basin/")
             + lulc_name
         ).clip(roi.geometry())
     return lulc
