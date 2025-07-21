@@ -1,13 +1,13 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
-    is_gee_asset_exists,
 )
 from nrm_app.celery import app
 
@@ -33,9 +33,7 @@ def vectorise_change_detection(self, state, district, block):
     ]
 
     print(task_list)
-    task_list = list(filter(None, task_list))
     task_id_list = check_task_status(task_list)
-    
     print("Change vector task completed - task_id_list:", task_id_list)
 
     sync_change_to_geoserver(block, district, state)
@@ -109,6 +107,53 @@ def crop_intensity_vector(roi, state, district, block):
 
 
 def generate_vector(roi, args, state, district, block, layer_name):
+    raster = ee.Image(
+        get_gee_asset_path(state, district, block)
+        + "change_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_"
+        + layer_name
+    )  # Change detection raster layer
+
+    fc = roi
+    for arg in args:
+        raster = raster.select(["constant"])
+        if isinstance(arg["value"], list) and len(arg["value"]) > 1:
+            ored_str = "raster.eq(ee.Number(" + str(arg["value"][0]) + "))"
+            for i in range(1, len(arg["value"])):
+                ored_str = (
+                    ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
+                )
+            print(ored_str)
+            mask = eval(ored_str)
+        else:
+            mask = raster.eq(ee.Number(arg["value"]))
+
+        pixel_area = ee.Image.pixelArea()
+        forest_area = pixel_area.updateMask(mask)
+
+        fc = forest_area.reduceRegions(
+            collection=fc, reducer=ee.Reducer.sum(), scale=10, crs=raster.projection()
+        )
+
+        def remove_property(feat, prop):
+            properties = feat.propertyNames()
+            select_properties = properties.filter(ee.Filter.neq("item", prop))
+            return feat.select(select_properties)
+
+        def process_feature(feature):
+            value = feature.get("sum")
+            value = ee.Number(value).multiply(0.0001)
+            feature = feature.set(arg["label"], value)
+            feature = remove_property(feature, "sum")
+            return feature
+
+        fc = fc.map(process_feature)
+
+    fc = ee.FeatureCollection(fc)
+
     description = (
         "change_vector_"
         + valid_gee_text(district)
@@ -117,73 +162,28 @@ def generate_vector(roi, args, state, district, block, layer_name):
         + "_"
         + layer_name
     )
-    asset_id = (
-        get_gee_asset_path(state, district, block) + description 
+
+    task = ee.batch.Export.table.toAsset(
+        **{
+            "collection": fc,
+            "description": description,
+            "assetId": get_gee_asset_path(state, district, block) + description,
+        }
     )
-    if not is_gee_asset_exists(asset_id):
-        print(f"{asset_id} doesn't exist")
-        
-        raster = ee.Image(
-            get_gee_asset_path(state, district, block)
-            + "change_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + layer_name
-        )  # Change detection raster layer
+    task.start()
+    save_layer_info_to_db(
+        state,
+        district,
+        block,
+        f"change_vector_{district}_{block}_{layer_name}",
+        asset_id=f"{get_gee_asset_path(state, district, block) + description}",
+        workspace_name='Change Detection Vector'
+    )
+    return task.status()["id"]
 
-        fc = roi
-        for arg in args:
-            raster = raster.select(["constant"])
-            if isinstance(arg["value"], list) and len(arg["value"]) > 1:
-                ored_str = "raster.eq(ee.Number(" + str(arg["value"][0]) + "))"
-                for i in range(1, len(arg["value"])):
-                    ored_str = (
-                        ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
-                    )
-                print(ored_str)
-                mask = eval(ored_str)
-            else:
-                mask = raster.eq(ee.Number(arg["value"]))
-
-            pixel_area = ee.Image.pixelArea()
-            forest_area = pixel_area.updateMask(mask)
-
-            fc = forest_area.reduceRegions(
-                collection=fc, reducer=ee.Reducer.sum(), scale=10, crs=raster.projection()
-            )
-
-            def remove_property(feat, prop):
-                properties = feat.propertyNames()
-                select_properties = properties.filter(ee.Filter.neq("item", prop))
-                return feat.select(select_properties)
-
-            def process_feature(feature):
-                value = feature.get("sum")
-                value = ee.Number(value).multiply(0.0001)
-                feature = feature.set(arg["label"], value)
-                feature = remove_property(feature, "sum")
-                return feature
-
-            fc = fc.map(process_feature)
-
-        fc = ee.FeatureCollection(fc)
-
-        
-
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": fc,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        return task.status()["id"]
-    return None
 
 def sync_change_to_geoserver(block, district, state):
+    ee_initialize()
     param_list = [
         "Urbanization",
         "Degradation",
@@ -215,3 +215,12 @@ def sync_change_to_geoserver(block, district, state):
             "change_detection",
         )
         print(res)
+        if res['status_code'] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                f"change_vector_{district}_{block}_{param}",
+                asset_id,
+                workspace_name='Change Detection Vector'
+            )
