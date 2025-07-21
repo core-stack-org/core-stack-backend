@@ -1,6 +1,6 @@
 import ee
 
-from computing.utils import sync_layer_to_geoserver, sync_fc_to_geoserver
+from computing.utils import sync_layer_to_geoserver, sync_fc_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -64,3 +64,5 @@ def clip_drainage_lines(
         print("Drainage line synced to geoserver:", res)
     except Exception as e:
         print("Exception in syncing Drainage line to geoserver", e)
+
+    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "Drainage")

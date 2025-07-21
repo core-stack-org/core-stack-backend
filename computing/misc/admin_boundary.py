@@ -20,7 +20,7 @@ from utilities.gee_utils import (
     upload_shp_to_gee,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
-
+from computing.utils import save_layer_info_to_db
 
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block):
@@ -44,7 +44,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
         print("task_id", task_id_list)
 
     # Generate shape files and sync to geoserver
-    shp_path = sync_admin_boundry_to_geoserver(collection, state_dir, district, block)
+    # shp_path = sync_admin_boundry_to_geoserver(collection, state_dir, district, block)
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
@@ -54,8 +54,9 @@ def generate_tehsil_shape_file_data(self, state, district, block):
             + valid_gee_text(block.lower())
         )
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
-        upload_shp_to_gee(layer_path, layer_name, asset_id)
+        # upload_shp_to_gee(layer_path, layer_name, asset_id)
 
+    save_layer_info_to_db(state, district, block,f"{district.title()}_{block.title()}", asset_id, 'Admin Boundary')
 
 def sync_admin_boundry_to_geoserver(collection, state_dir, district, block):
     path = os.path.join(

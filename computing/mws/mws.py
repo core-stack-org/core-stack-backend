@@ -23,6 +23,7 @@ from osgeo import gdal
 from shapely.geometry import box
 from pcraster import *
 import os
+from computing.utils import save_layer_info_to_db
 
 
 # @app.task(bind=True)
@@ -103,8 +104,10 @@ def mws_layer(self, state, district, block):
             task_id = export_vector_asset_to_gee(fc, description, asset_id)
             mws_task_id_list = check_task_status([task_id])
             print("mws_task_id_list", mws_task_id_list)
-
+            save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "MWS")
     make_asset_public(asset_id)
+    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "MWS")
+
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id):

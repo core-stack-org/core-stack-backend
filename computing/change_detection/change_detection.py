@@ -65,7 +65,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
         )
         if not is_gee_asset_exists(asset_id):
             print(f"{asset_id} doesn't exist")
-            
+
             result = eval("change_detection_values(roi_boundary, l1_asset)")
             if change_detection_key == 'Deforestation':
                 result = result[0]

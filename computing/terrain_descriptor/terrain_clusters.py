@@ -1,6 +1,7 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -29,6 +30,7 @@ def generate_terrain_clusters(self, state, district, block):
         compute_on_gee(state, district, block, asset_id, asset_name)
 
     sync_to_geoserver(state, district, block, asset_id)
+    save_layer_info_to_db(state, district, block, asset_name, asset_id, "Terrain Vector")
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):

@@ -960,7 +960,7 @@
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
 
-        fetch("https://geoserver.core-stack.org:8443/geoserver/water_bodies/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=water_bodies:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
         .then(response => response.json())
         .then(data => {
             const vectorSource = new ol.source.Vector({

@@ -2,6 +2,7 @@ import ee
 from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -142,6 +143,14 @@ def tree_health_ch_vector(self, state, district, block, start_year, end_year):
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")
         raise
+    save_layer_info_to_db(
+        state, 
+        district, 
+        block, 
+        layer_name= f"{district.title()}_{block.title()}_tree_health_ch_vector",
+        asset_id= "no asset id",
+        workspace_name="Canopy Height Vector"
+        )
 
     return {
         "status": "Completed",

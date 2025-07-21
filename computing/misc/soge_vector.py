@@ -12,7 +12,7 @@ from utilities.gee_utils import (
 from computing.utils import (
     sync_layer_to_geoserver,
 )
-from computing.utils import sync_fc_to_geoserver
+from computing.utils import sync_fc_to_geoserver, save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -119,4 +119,4 @@ def generate_soge_vector(self, state, district, block):
     print("Geoserver Sync task started")
     fc = ee.FeatureCollection(asset_id)
     return sync_fc_to_geoserver(fc, state, description, 'soge')
-
+    save_layer_info_to_db(state, district, block, f"soge_vector_{district.title()}_{block.title()}",asset_id, "SOGE")

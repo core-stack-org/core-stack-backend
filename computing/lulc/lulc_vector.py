@@ -1,6 +1,7 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -121,3 +122,11 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
         "lulc_vector",
     )
     print(res)
+    save_layer_info_to_db(
+        state, 
+        district, 
+        block,
+        f"lulc_vector_{district.title()}_{block.title()}", 
+        f"{get_gee_asset_path(state, district, block) + description}", 
+        'LULC'
+        )

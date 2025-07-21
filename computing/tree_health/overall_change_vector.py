@@ -1,6 +1,7 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -33,6 +34,7 @@ def tree_health_overall_change_vector(self, state, district, block):
     print("Tree health overall change vector task completed - task_id_list:", task_id_list)
 
     sync_change_to_geoserver(block, district, state)
+    save_layer_info_to_db(state, district, block, f"tree_health_overall_change_vector_{district.title()}_{block.title()}","/noassetid", "Tree Overall Change Vector")
 
 
 def overall_vector(roi, state, district, block):

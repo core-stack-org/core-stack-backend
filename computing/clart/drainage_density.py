@@ -16,6 +16,7 @@ from utilities.gee_utils import (
 from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -53,6 +54,7 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
+    save_layer_info_to_db(state, district, block, f"{district}_{block}", asset_id,"Drainage")
 
 
 def generate_vector(state, district, block):
