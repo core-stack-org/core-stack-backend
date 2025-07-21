@@ -64,7 +64,7 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
     # if response["status_code"] in [200, 201, 202]:
     #     os.remove(zip_path)
     #     shutil.rmtree(shape_path_dir)
-    return response["response_text"]
+    return response
 
 
 def kml_to_geojson(state_name, district_name, block_name, kml_path):

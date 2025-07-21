@@ -171,18 +171,19 @@ def generate_vector(roi, args, state, district, block, layer_name):
         }
     )
     task.start()
-    return task.status()["id"]
     save_layer_info_to_db(
-        state, 
-        district, 
-        block, 
-        f"change_vector_{district.title()}_{block.title()}", 
-        asset_id=f"{get_gee_asset_path(state, district, block) + description}", 
+        state,
+        district,
+        block,
+        f"change_vector_{district}_{block}_{layer_name}",
+        asset_id=f"{get_gee_asset_path(state, district, block) + description}",
         workspace_name='Change Detection Vector'
-        )
+    )
+    return task.status()["id"]
 
 
 def sync_change_to_geoserver(block, district, state):
+    ee_initialize()
     param_list = [
         "Urbanization",
         "Degradation",
@@ -214,3 +215,12 @@ def sync_change_to_geoserver(block, district, state):
             "change_detection",
         )
         print(res)
+        if res['status_code'] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                f"change_vector_{district}_{block}_{param}",
+                asset_id,
+                workspace_name='Change Detection Vector'
+            )
