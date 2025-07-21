@@ -7,6 +7,9 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     check_task_status,
 )
+from utilities.constants import (
+    GEE_DATASET_PATH
+)
 from computing.utils import sync_fc_to_geoserver
 
 @app.task(bind=True)
@@ -18,7 +21,7 @@ def generate_aquifer_vector(self, state, district, block):
     input_asset_id = get_gee_asset_path(state, district, block) + f'filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid'
     roi = ee.FeatureCollection(input_asset_id)
     
-    principal_aquifers = ee.FeatureCollection("projects/ee-corestackdev/assets/datasets/Aquifer_vector")
+    principal_aquifers = ee.FeatureCollection(GEE_DATASET_PATH + "/Aquifer_vector")
     
     # Yield value mapping dictionary
     yield_dict = ee.Dictionary({

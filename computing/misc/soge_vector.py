@@ -13,6 +13,9 @@ from computing.utils import (
     sync_layer_to_geoserver,
 )
 from computing.utils import sync_fc_to_geoserver
+from utilities.constants import (
+    GEE_DATASET_PATH
+)
 
 
 @app.task(bind=True)
@@ -24,7 +27,7 @@ def generate_soge_vector(self, state, district, block):
     asset_path = get_gee_asset_path(state, district, block)
     asset_id = asset_path + description
 
-    soge_fc = ee.FeatureCollection('projects/ee-corestackdev/assets/datasets/SOGE_vector_2020')
+    soge_fc = ee.FeatureCollection(GEE_DATASET_PATH + '/SOGE_vector_2020')
     
     if is_gee_asset_exists(asset_id):
         print(f"Asset already exists: {asset_id}")
