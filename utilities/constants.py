@@ -83,7 +83,7 @@ ODK_URL_AGRI_MAINTENANCE = (
     + "/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1.svc/Submissions"
 )
 
-# MARK: Sync Offline ODK
+# MARK: Sync Offline ODK URLs
 ODK_SYNC_URL_SETTLEMENT = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Settlements_form%20_V1.0.1/submissions"
 )
@@ -118,6 +118,12 @@ ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE = (
     + "/forms/PM_Remote_Sensed_Surface_Water_structure_V1.0.0/submissions"
 )
 
+ODK_SYNC_URL_WATER_STRUCTURES_MAINTENANCE = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0/submissions"
+)
+
 ODK_SYNC_URL_GW_MAINTENANCE = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
@@ -128,6 +134,30 @@ ODK_SYNC_URL_AGRI_MAINTENANCE = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
     + "/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1/submissions"
+)
+
+ODK_SYNC_URL_GW_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_GW_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/nrm_groundwater_analysis_feedback_form_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_SWB_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/nrm_waterbody_analysis_feedback_form_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_AGRI_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/nrm_agri_analysis_feedback_form_V1.0.0/submissions"
 )
 
 
