@@ -346,9 +346,10 @@ def _sync_to_odk(
 def sync_offline_data(request, resource_type=None, work_type=None, feedback_type=None):
     """
     Sync data to ODK based on resource type or work type
-    Resource types: settlement, well, water_structures
-    Work types: recharge_st, irrigation_st, propose_maintenance_recharge_st,
-                propose_maintenance_swb, propose_maintenance_irrigation_st, livelihood
+    Resource types: settlement, well, water_structures, cropping_pattern
+    Work types: "recharge_st", "irrigation_st", "propose_maintenance_recharge_st", "propose_maintenance_rs_swb",
+                "propose_maintenance_ws_swb", "propose_maintenance_irrigation_st", "livelihood",
+    Feedback types: "gw_feedback", "swb_feedback", "agri_feedback"
         - fetch Bearer Token from ODK
         - send xmlString to ODK
     """
