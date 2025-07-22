@@ -1,31 +1,34 @@
-from rest_framework.decorators import api_view, parser_classes
-from rest_framework.response import Response
-from rest_framework import status, renderers
-from rest_framework.parsers import JSONParser
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from .models import Plan
-from .serializers import PlanSerializer
-
-from .build_layer import build_layer
-from .utils import fetch_odk_data, fetch_bearer_token
 import requests
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
 from utilities.auth_utils import auth_free
 from utilities.constants import (
-    ODK_SYNC_URL_SETTLEMENT,
-    ODK_SYNC_URL_WELL,
-    ODK_SYNC_URL_WATER_STRUCTURES,
+    ODK_SYNC_URL_AGRI_FEEDBACK,
+    ODK_SYNC_URL_AGRI_MAINTENANCE,
     ODK_SYNC_URL_CROP,
-    ODK_SYNC_URL_RECHARGE_STRUCTURE,
+    ODK_SYNC_URL_GW_FEEDBACK,
+    ODK_SYNC_URL_GW_MAINTENANCE,
     ODK_SYNC_URL_IRRIGATION_STRUCTURE,
     ODK_SYNC_URL_LIVELIHOOD,
+    ODK_SYNC_URL_RECHARGE_STRUCTURE,
     ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
-    ODK_SYNC_URL_GW_MAINTENANCE,
-    ODK_SYNC_URL_AGRI_MAINTENANCE,
+    ODK_SYNC_URL_SETTLEMENT,
+    ODK_SYNC_URL_SWB_FEEDBACK,
+    ODK_SYNC_URL_WATER_STRUCTURES,
+    ODK_SYNC_URL_WATER_STRUCTURES_MAINTENANCE,
+    ODK_SYNC_URL_WELL,
 )
-from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
+
+from .build_layer import build_layer
+from .models import Plan
+from .serializers import PlanSerializer
+from .utils import fetch_bearer_token, fetch_odk_data
 
 
 # MARK: Get Plans API
@@ -206,6 +209,10 @@ def _get_work_config() -> Dict[str, Dict[str, Any]]:
             "url": ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
             "success_message": "Surface water body maintenance data synced successfully",
         },
+        "propose_maintenance_ws_swb": {
+            "url": ODK_SYNC_URL_WATER_STRUCTURES_MAINTENANCE,
+            "success_message": "Water structures maintenance data synced successfully",
+        },
         "propose_maintenance_irrigation_st": {
             "url": ODK_SYNC_URL_AGRI_MAINTENANCE,
             "success_message": "Irrigation structure maintenance data synced successfully",
@@ -217,8 +224,26 @@ def _get_work_config() -> Dict[str, Dict[str, Any]]:
     }
 
 
+def _get_feedback_config() -> Dict[str, Dict[str, Any]]:
+    """Configuration mapping of different feedback types"""
+    return {
+        "gw_feedback": {
+            "url": ODK_SYNC_URL_GW_FEEDBACK,
+            "success_message": "Groundwater feedback data synced successfully",
+        },
+        "swb_feedback": {
+            "url": ODK_SYNC_URL_SWB_FEEDBACK,
+            "success_message": "Surface water body feedback data synced successfully",
+        },
+        "agri_feedback": {
+            "url": ODK_SYNC_URL_AGRI_FEEDBACK,
+            "success_message": "Agriculture feedback data synced successfully",
+        },
+    }
+
+
 def _validate_sync_request(
-    request, resource_type: str = None, work_type: str = None
+    request, resource_type: str = None, work_type: str = None, feedback_type: str = None
 ) -> Optional[Response]:
     """Validate the sync request parameters and content type."""
     if resource_type and work_type:
@@ -247,12 +272,23 @@ def _validate_sync_request(
             "irrigation_st",
             "propose_maintenance_recharge_st",
             "propose_maintenance_rs_swb",
+            "propose_maintenance_ws_swb",
             "propose_maintenance_irrigation_st",
             "livelihood",
         ]
         if work_type not in valid_work_types:
             return Response(
                 {"error": f"Invalid work type. Must be one of {valid_work_types}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    if feedback_type:
+        valid_feedback_types = ["gw_feedback", "swb_feedback", "agri_feedback"]
+        if feedback_type not in valid_feedback_types:
+            return Response(
+                {
+                    "error": f"Invalid feedback type. Must be one of {valid_feedback_types}"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -307,7 +343,7 @@ def _sync_to_odk(
 @api_view(["POST"])
 @csrf_exempt
 @auth_free
-def sync_offline_data(request, resource_type=None, work_type=None):
+def sync_offline_data(request, resource_type=None, work_type=None, feedback_type=None):
     """
     Sync data to ODK based on resource type or work type
     Resource types: settlement, well, water_structures
@@ -317,11 +353,13 @@ def sync_offline_data(request, resource_type=None, work_type=None):
         - send xmlString to ODK
     """
     print(
-        f"Inside sync_offline_data API for resource type: {resource_type}, work type: {work_type}"
+        f"Inside sync_offline_data API for resource type: {resource_type}, work type: {work_type}, feedback type: {feedback_type}"
     )
 
     # Validate request
-    validation_error = _validate_sync_request(request, resource_type, work_type)
+    validation_error = _validate_sync_request(
+        request, resource_type, work_type, feedback_type
+    )
     if validation_error:
         return validation_error
 
@@ -329,13 +367,20 @@ def sync_offline_data(request, resource_type=None, work_type=None):
         configs = _get_resource_config()
         config = configs[resource_type]
         sync_type = f"resource type: {resource_type}"
-    else:
+    elif work_type:
         configs = _get_work_config()
         config = configs[work_type]
         sync_type = f"work type: {work_type}"
+    elif feedback_type:
+        configs = _get_feedback_config()
+        config = configs[feedback_type]
+        sync_type = f"feedback type: {feedback_type}"
+    else:
+        return Response(
+            {"error": "Invalid request"}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     xml_string = request.body.decode("utf-8")
-    print("XML String: ", xml_string)
     print("Sync Type: ", sync_type)
 
     try:

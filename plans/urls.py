@@ -1,9 +1,10 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework_nested import routers
-from . import api
-from .views import PlanViewSet
+
 from projects.urls import router as projects_router
 
+from . import api
+from .views import PlanViewSet
 
 watershed_router = routers.NestedSimpleRouter(
     projects_router, r"projects", lookup="project"
@@ -22,6 +23,11 @@ urlpatterns = [
     ),
     path(
         "sync_offline_data/work/<str:work_type>/",
+        api.sync_offline_data,
+        name="sync_offline_data",
+    ),
+    path(
+        "sync_offline_data/feedback/<str:feedback_type>/",
         api.sync_offline_data,
         name="sync_offline_data",
     ),
