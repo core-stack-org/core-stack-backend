@@ -139,12 +139,6 @@ ODK_SYNC_URL_AGRI_MAINTENANCE = (
 ODK_SYNC_URL_GW_FEEDBACK = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
-    + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0/submissions"
-)
-
-ODK_SYNC_URL_GW_FEEDBACK = (
-    ODK_BASE_URL
-    + ODK_PROJECT_ID
     + "/forms/nrm_groundwater_analysis_feedback_form_V1.0.0/submissions"
 )
 
