@@ -100,7 +100,7 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 def get_location_info_by_lat_lon(lat, lon):
     ee_initialize()
     point = ee.Geometry.Point([lon, lat])
-    feature_collection = ee.FeatureCollection("projects/ee-corestackdev/assets/datasets/SOI_tehsil_vector")
+    feature_collection = ee.FeatureCollection("projects/corestack-datasets/assets/datasets/SOI_tehsil")
     intersected = feature_collection.filterBounds(point)
 
     features = intersected.toList(intersected.size())

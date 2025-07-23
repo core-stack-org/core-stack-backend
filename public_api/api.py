@@ -47,7 +47,7 @@ file_type_param = openapi.Parameter('file_type',openapi.IN_QUERY,description="Ou
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free", allowed_methods="GET")
 def get_admin_details_by_lat_lon(request):
     """
         Retrieve admin data based on given latitude and longitude coordinates.
@@ -89,7 +89,7 @@ def get_admin_details_by_lat_lon(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free", allowed_methods="GET")
 def get_mws_by_lat_lon(request):
     """
         Retrieve MWS ID data based on given latitude and longitude coordinates.
@@ -150,7 +150,7 @@ def get_mws_by_lat_lon(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free", allowed_methods="GET")
 def get_mws_json_by_stats_excel(request):
     """
         Retrieve MWS data for a given state, district, tehsil, and MWS ID.
@@ -202,7 +202,7 @@ def get_mws_json_by_stats_excel(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free", allowed_methods="GET")
 def generate_tehsil_data(request):
     """
         Retrieve Tehsil-level Excel or JSON data for a given state, district, and tehsil.
@@ -299,7 +299,7 @@ def generate_tehsil_data(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free", allowed_methods="GET")
 def get_mws_json_by_kyl_indicator(request):
     """
         Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.
@@ -349,7 +349,7 @@ def get_mws_json_by_kyl_indicator(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free", allowed_methods="GET")
 def get_generated_layer_urls(request):
     """
         Retrieve generated layer URLs for a given state, district, and block.
