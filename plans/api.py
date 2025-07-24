@@ -246,15 +246,12 @@ def _validate_sync_request(
     request, resource_type: str = None, work_type: str = None, feedback_type: str = None
 ) -> Optional[Response]:
     """Validate the sync request parameters and content type."""
-    if resource_type and work_type:
-        return Response(
-            {"error": "Cannot specify both resource_type and work_type"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
 
-    if not resource_type and not work_type:
+    if not resource_type and not work_type and not feedback_type:
         return Response(
-            {"error": "Must specify either resource_type or work_type"},
+            {
+                "error": "Must specify either resource_type or work_type or feedback_type"
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
 
