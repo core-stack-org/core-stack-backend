@@ -1,13 +1,11 @@
 import ee
-from computing.utils import (
-    sync_layer_to_geoserver,
-    save_layer_info_to_db
-)
+from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
+    is_gee_asset_exists,
 )
 from nrm_app.celery import app
 
@@ -36,7 +34,34 @@ def vectorise_change_detection(self, state, district, block):
     task_id_list = check_task_status(task_list)
     print("Change vector task completed - task_id_list:", task_id_list)
 
-    sync_change_to_geoserver(block, district, state)
+    param_list = [
+        "Urbanization",
+        "Degradation",
+        "Deforestation",
+        "Afforestation",
+        "CropIntensity",
+    ]
+    for param in param_list:
+        description = (
+            "change_vector_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
+            + "_"
+            + param
+        )
+        asset_id = get_gee_asset_path(state, district, block) + description
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"change_vector_{district}_{block}_{param}",
+                asset_id=asset_id,
+                dataset_name="Change Detection Vector",
+            )
+
+        sync_change_to_geoserver(block, district, state, asset_id, param)
 
 
 def afforestation_vector(roi, state, district, block):
@@ -171,56 +196,31 @@ def generate_vector(roi, args, state, district, block, layer_name):
         }
     )
     task.start()
-    save_layer_info_to_db(
-        state,
-        district,
-        block,
-        f"change_vector_{district}_{block}_{layer_name}",
-        asset_id=f"{get_gee_asset_path(state, district, block) + description}",
-        workspace_name='Change Detection Vector'
-    )
     return task.status()["id"]
 
 
-def sync_change_to_geoserver(block, district, state):
-    ee_initialize()
-    param_list = [
-        "Urbanization",
-        "Degradation",
-        "Deforestation",
-        "Afforestation",
-        "CropIntensity",
-    ]
-    for param in param_list:
-        asset_id = (
-            get_gee_asset_path(state, district, block)
-            + "change_vector_"
-            + valid_gee_text(district)
-            + "_"
-            + valid_gee_text(block)
-            + "_"
-            + param
-        )
-        fc = ee.FeatureCollection(asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = sync_layer_to_geoserver(
+def sync_change_to_geoserver(block, district, state, asset_id, param):
+    fc = ee.FeatureCollection(asset_id).getInfo()
+    fc = {"features": fc["features"], "type": fc["type"]}
+    res = sync_layer_to_geoserver(
+        state,
+        fc,
+        "change_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_"
+        + param,
+        "change_detection",
+    )
+    print(res)
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
             state,
-            fc,
-            "change_vector_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + param,
-            "change_detection",
+            district,
+            block,
+            layer_name=f"change_vector_{district}_{block}_{param}",
+            asset_id=asset_id,
+            dataset_name="Change Detection Vector",
+            sync_to_geoserver=True,
         )
-        print(res)
-        if res['status_code'] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                f"change_vector_{district}_{block}_{param}",
-                asset_id,
-                workspace_name='Change Detection Vector'
-            )

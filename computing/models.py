@@ -1,4 +1,6 @@
 from django.db import models
+from pygments.lexer import default
+
 from geoadmin.models import State, District, Block
 
 
@@ -23,6 +25,8 @@ class Dataset(models.Model):
     misc = models.JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True, null=True)
+    updated_by = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         verbose_name = "Dataset"
@@ -40,11 +44,17 @@ class Layer(models.Model):
     district = models.ForeignKey(District, on_delete=models.CASCADE)
     block = models.ForeignKey(Block, on_delete=models.CASCADE)
     is_excel_generated = models.BooleanField(default=False, blank=True, null=True)
-    gee_asset_path = models.CharField(max_length=511, blank=True, null=True, default="not available")
+    gee_asset_path = models.CharField(
+        max_length=511, blank=True, null=True, default="not available"
+    )
     is_public_gee_asset = models.BooleanField(default=False)
     misc = models.JSONField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.CharField(max_length=255, blank=True, null=True)
+    updated_by = models.CharField(max_length=255, blank=True, null=True)
+    is_sync_to_geoserver = models.BooleanField(default=False)
+    is_override = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Layer"

@@ -33,7 +33,12 @@ def clart_layer(state, district, block):
         + valid_gee_text(block.lower())
     )
     final_output_assetid = get_gee_asset_path(state, district, block) + description
-
+    layer_name = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_clart"
+    )
     if not is_gee_asset_exists(final_output_assetid):
         srtm = ee.Image("USGS/SRTMGL1_003")
         india_lin = ee.Image("projects/ee-harshita-om/assets/india_lineaments")
@@ -212,21 +217,34 @@ def clart_layer(state, district, block):
 
             clart_task_id_list = check_task_status([task_id])
             print("clart_task_id_list", clart_task_id_list)
+            if is_gee_asset_exists(final_output_assetid):
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=layer_name,
+                    asset_id=final_output_assetid,
+                    dataset_name="CLART",
+                )
         except Exception as e:
             print(f"Error occurred in running clart: {e}")
 
     """ Sync image to google cloud storage and then to geoserver"""
-    layer_name = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_clart"
-    )
+
     image = ee.Image(final_output_assetid)
     task_id = sync_raster_to_gcs(image, 30, layer_name)
 
     task_id_list = check_task_status([task_id])
     print("task_id_list sync to gcs ", task_id_list)
 
-    sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
-    save_layer_info_to_db(state, district, block, layer_name, final_output_assetid,"CLART")
+    res = sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
+    if res:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name,
+            final_output_assetid,
+            "CLART",
+            sync_to_geoserver=True,
+        )

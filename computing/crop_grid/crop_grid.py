@@ -20,7 +20,7 @@ from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
     CROP_GRID_PATH,
 )
-from computing.utils import save_layer_info_to_db
+
 
 @app.task(bind=True)
 def create_crop_grids(self, state, district, block):
@@ -31,10 +31,8 @@ def create_crop_grids(self, state, district, block):
         + "_"
         + valid_gee_text(block.lower() + "_with_uid_16ha")
     )
-
-    if not is_gee_asset_exists(
-        get_gee_asset_path(state, district, block) + description
-    ):
+    asset_id = get_gee_asset_path(state, district, block) + description
+    if not is_gee_asset_exists(asset_id):
         # Get block coordinates
         block_coords = get_block_coordinates(state, district, block)
         geom_len = len(block_coords)
@@ -64,16 +62,7 @@ def create_crop_grids(self, state, district, block):
         if task_id:
             task_id_list = check_task_status([task_id])
             print("task_id_list", task_id_list)
-
-    crop_grids_lulc(state, district, block)
-    save_layer_info_to_db(
-        state, 
-        district, 
-        block, 
-        layer_name =f"{district.title()}_{block.title()}_grid", 
-        asset_id=f"{get_gee_asset_path(state, district, block) + description}",
-        workspace_name="Crop Grid"
-        )
+    crop_grids_lulc(state, district, block, asset_id)
 
 
 def get_block_coordinates(state, district, block):

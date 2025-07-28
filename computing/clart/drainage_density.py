@@ -54,7 +54,6 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
-    save_layer_info_to_db(state, district, block, f"{district}_{block}", asset_id,"Drainage")
 
 
 def generate_vector(state, district, block):

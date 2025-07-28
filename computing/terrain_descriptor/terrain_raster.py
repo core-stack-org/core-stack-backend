@@ -50,8 +50,14 @@ def terrain_raster(self, state, district, block):
         )
         task_id_list = check_task_status([task_id])
         print("terrain_raster task_id_list", task_id_list)
-        save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_terrain_raster", asset_id, "Terrain Raster")
-
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            f"{district.title()}_{block.title()}_terrain_raster",
+            asset_id,
+            "Terrain Raster",
+        )
 
     """ Sync image to google cloud storage and then to geoserver"""
     layer_name = (
@@ -64,6 +70,21 @@ def terrain_raster(self, state, district, block):
 
     task_id_list = check_task_status([task_id])
     print("task_id_list sync to gcs ", task_id_list)
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state, district, block, layer_name, asset_id, "Terrain Raster"
+        )
 
-    sync_raster_gcs_to_geoserver("terrain", layer_name, layer_name, "terrain_raster")
-    save_layer_info_to_db(state, district, block, layer_name, asset_id, "Terrain Raster")
+    res = sync_raster_gcs_to_geoserver(
+        "terrain", layer_name, layer_name, "terrain_raster"
+    )
+    if res:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name,
+            asset_id,
+            "Terrain Raster",
+            sync_to_geoserver=True,
+        )

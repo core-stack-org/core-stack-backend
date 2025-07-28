@@ -1,4 +1,5 @@
 import os
+from tarfile import version
 
 import geopandas as gpd
 import fiona
@@ -13,6 +14,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     get_gee_dir_path,
     export_vector_asset_to_gee,
+    is_asset_public,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -29,6 +31,7 @@ from shapely.validation import explain_validity
 import zipfile
 from computing.models import Dataset, Layer, LayerType
 from geoadmin.models import State, District, Block
+
 
 def generate_shape_files(path):
     gdf = gpd.read_file(path + ".json")
@@ -243,27 +246,50 @@ def fix_invalid_geometry_in_gdf(gdf):
     return gdf
 
 
-def save_layer_info_to_db(state, district, block, layer_name,asset_id, workspace_name):
+def save_layer_info_to_db(
+    state,
+    district,
+    block,
+    layer_name,
+    asset_id,
+    dataset_name,
+    sync_to_geoserver=False,
+    layer_version=1.0,
+    misc=None,
+    is_override=False,
+):
     print("inside the save_layer_info_to_db function ")
-    dataset = Dataset.objects.get(
-        name = workspace_name
-    )
+    dataset = Dataset.objects.get(name=dataset_name, layer_version=layer_version)
     state = state.lower().replace(" ", "_")
-    district=district.lower().replace(" ", "_")
-    block=block.lower().replace(" ", "_")
+    district = district.lower().replace(" ", "_")
+    block = block.lower().replace(" ", "_")
+
     try:
         state_obj = State.objects.get(state_name__iexact=state)
-        district_obj = District.objects.get(district_name__iexact=district, state=state_obj)
+        district_obj = District.objects.get(
+            district_name__iexact=district, state=state_obj
+        )
         block_obj = Block.objects.get(block_name__iexact=block, district=district_obj)
     except Exception as e:
         print("Error fetching in state district block:", e)
         return
-    layer_obj, created = Layer.objects.get_or_create(
+    is_public = is_asset_public(asset_id)
+
+    layer_obj, created = Layer.objects.update_or_create(
         dataset=dataset,
-        layer_name=layer_name,
-        state=state_obj,    
+        layer_name=layer_name.lower(),
+        state=state_obj,
         district=district_obj,
         block=block_obj,
-        gee_asset_path=asset_id
-        
+        gee_asset_path=asset_id,
+        misc=misc,
+        defaults={
+            "is_sync_to_geoserver": sync_to_geoserver,
+            "is_public_gee_asset": is_public,
+            "is_override": is_override,
+        },
     )
+    if layer_obj:
+        print("found layer object and updated")
+    else:
+        print("layer object not found so, created new one")

@@ -205,4 +205,4 @@ def generate_final(state, district, block, start_year, end_year):
         # sync_raster_gcs_to_geoserver(
         #     "lulc_v4", filename_prefix + "_v4", filename_prefix + "_v4", None
         # )
-        save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "LULC")
+        # save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "LULC")

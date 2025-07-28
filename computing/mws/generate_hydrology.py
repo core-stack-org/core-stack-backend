@@ -13,11 +13,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     make_asset_public,
+    is_gee_asset_exists,
 )
 from .well_depth import well_depth
 from .calculateG import calculate_g
 import sys
 from computing.utils import save_layer_info_to_db
+
 
 @app.task(bind=True)
 def generate_hydrology(
@@ -117,6 +119,15 @@ def generate_hydrology(
     make_asset_public(asset_id)
 
     layer_name = "deltaG_fortnight_" + asset_suffix
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="MWS",
+        )
 
     if is_annual:
         wd_task_id, wd_asset_id = well_depth(
@@ -142,8 +153,20 @@ def generate_hydrology(
         make_asset_public(asset_id)
 
         layer_name = "deltaG_well_depth_" + asset_suffix
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=layer_name,
+                asset_id=asset_id,
+                dataset_name="MWS",
+            )
 
     calculate_g(
+        state,
+        district,
+        block,
         asset_id=asset_id,
         layer_name=layer_name,
         shp_folder=asset_suffix,
@@ -151,4 +174,3 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
-    save_layer_info_to_db(state,district,block,layer_name, asset_id,'MWS')

@@ -118,17 +118,30 @@ def tree_health_overall_change_raster(self, state, district, block):
         # Check the task status for GCS sync
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to GCS", task_id_list)
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                f"tree_health_overall_change_raster_{district.title()}_{block.title()}",
+                asset_id,
+                "Tree Overall Change Raster",
+            )
 
         # Sync raster to GeoServer
-        sync_raster_gcs_to_geoserver(
+        res = sync_raster_gcs_to_geoserver(
             "tree_overall_ch", layer_name, layer_name, "tree_overall_ch_style"
         )
+        if res:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                f"tree_health_overall_change_raster_{district.title()}_{block.title()}",
+                asset_id,
+                "Tree Overall Change Raster",
+                sync_to_geoserver=True,
+            )
 
     except Exception as e:
         print(f"Error occurred in running process_ch task: {e}")
-    save_layer_info_to_db(state, 
-    district, 
-    block,
-    f"tree_health_overall_change_raster_{district.title()}_{block.title()}", 
-    asset_id, 
-    "Tree Overall Change Raster")

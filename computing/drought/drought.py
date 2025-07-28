@@ -66,7 +66,12 @@ def calculate_drought(
         )
         + dst_filename
     )
-
+    description = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_drought"
+    )
     if not is_gee_asset_exists(asset_id):
         chunk_size = 30  # if shapefile is large, running the script on the complete file will result an error,
         # so divide into chunks and run on the chunks when the chunks are got exported,
@@ -120,10 +125,29 @@ def calculate_drought(
             asset_suffix, asset_folder_list, app_type, start_year, end_year
         )
         check_task_status([task_id])
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=description,
+                asset_id=asset_id,
+                dataset_name="Drought",
+            )
+
         make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    description = valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()) + "_drought"
-    res = sync_fc_to_geoserver(fc, state, description, 'cropping_drought')
+
+    res = sync_fc_to_geoserver(fc, state, description, "cropping_drought")
     print(res)
-    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_drought", asset_id,'Drought')
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=description,
+            asset_id=asset_id,
+            dataset_name="Drought",
+            sync_to_geoserver=True,
+        )

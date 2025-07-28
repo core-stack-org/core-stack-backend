@@ -12,6 +12,7 @@ from utilities.gee_utils import (
 )
 from computing.utils import save_layer_info_to_db
 
+
 @app.task(bind=True)
 def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
     print("Inside process Tree health ccd raster")
@@ -99,13 +100,29 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
                 + "_"
                 + str(year)
             )
+            if is_gee_asset_exists(asset_id):
+                save_layer_info_to_db(
+                    state, district, block, layer_name, asset_id, "Ccd Raster"
+                )
+
             task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, layer_name)
 
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to GCS", task_id_list)
 
-            sync_raster_gcs_to_geoserver("ccd", layer_name, layer_name, "ccd_style")
-            save_layer_info_to_db(state, district, block,layer_name, asset_id, "Ccd Raster")
+            res = sync_raster_gcs_to_geoserver(
+                "ccd", layer_name, layer_name, "ccd_style"
+            )
+            if res:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name,
+                    asset_id,
+                    "Ccd Raster",
+                    sync_to_geoserver=True,
+                )
 
         except Exception as e:
             print(f"Error occurred in running process_ccd task: {e}")

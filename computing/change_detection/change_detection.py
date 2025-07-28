@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
 )
 from nrm_app.celery import app
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -18,11 +19,11 @@ def get_change_detection(self, state, district, block, start_year, end_year):
     # Initialize the Earth Engine
     ee_initialize()
     param_dict = {
-        "Urbanization":built_up,
-        "Degradation":change_degradation,
-        "Deforestation":change_deforestation,
-        "Afforestation":change_deforestation,
-        "CropIntensity":change_cropping_intensity
+        "Urbanization": built_up,
+        "Degradation": change_degradation,
+        "Deforestation": change_deforestation,
+        "Afforestation": change_deforestation,
+        "CropIntensity": change_cropping_intensity,
     }
     description = (
         "change_"
@@ -61,33 +62,50 @@ def get_change_detection(self, state, district, block, start_year, end_year):
 
     for change_detection_key, change_detection_values in param_dict.items():
         asset_id = (
-            get_gee_asset_path(state, district, block) + description + "_" + change_detection_key
+            get_gee_asset_path(state, district, block)
+            + description
+            + "_"
+            + change_detection_key
         )
         if not is_gee_asset_exists(asset_id):
             print(f"{asset_id} doesn't exist")
 
             result = eval("change_detection_values(roi_boundary, l1_asset)")
-            if change_detection_key == 'Deforestation':
+            if change_detection_key == "Deforestation":
                 result = result[0]
-            if change_detection_key == 'Afforestation':
+            if change_detection_key == "Afforestation":
                 result = result[1]
             task_id = export_raster_asset_to_gee(
-                    image=result,
-                    description=description + "_" + change_detection_key,
-                    asset_id=asset_id,
-                    scale=10,
-                    region=roi_boundary.geometry(),
-                )
+                image=result,
+                description=description + "_" + change_detection_key,
+                asset_id=asset_id,
+                scale=10,
+                region=roi_boundary.geometry(),
+            )
             task_list.append(task_id)
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)
 
-    sync_to_gcs_geoserver(state, district, block, description, param_dict.keys())
+    for param in param_dict.keys():
+        asset_id = (
+            get_gee_asset_path(state, district, block) + description + "_" + param
+        )
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"change_{district}_{block}_{param}",
+                asset_id=asset_id,
+                dataset_name="Change Detection Raster",
+            )
 
+    sync_to_gcs_geoserver(state, district, block, description, param_dict.keys())
 
 
 def built_up(roi_boundary, l1_asset):
     print("built_up function is runing")
+
     # Remap values function
     def remap_values(image):
         return image.remap(
@@ -394,9 +412,22 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list):
     print("task_id sync to gcs ", task_id_list)
 
     for change in param_list:
-        sync_raster_gcs_to_geoserver(
+        res = sync_raster_gcs_to_geoserver(
             "change_detection",
             description + "_" + change,
             description + "_" + change,
             change.lower(),
         )
+        if res:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"change_{district}_{block}_{change}",
+                asset_id=get_gee_asset_path(state, district, block)
+                + description
+                + "_"
+                + change,
+                dataset_name="Change Detection Raster",
+                sync_to_geoserver=True,
+            )

@@ -1,11 +1,21 @@
 import ee
 import datetime
 from dateutil.relativedelta import relativedelta
-from computing.utils import sync_layer_to_geoserver
+from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 import json
 
 
-def calculate_g(asset_id, layer_name, shp_folder, start_date, end_date, is_annual):
+def calculate_g(
+    state,
+    district,
+    block,
+    asset_id,
+    layer_name,
+    shp_folder,
+    start_date,
+    end_date,
+    is_annual,
+):
     fc = ee.FeatureCollection(asset_id).getInfo()
     features = fc["features"]
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
@@ -54,4 +64,14 @@ def calculate_g(asset_id, layer_name, shp_folder, start_date, end_date, is_annua
         f["properties"] = properties
     fc["features"] = features
     res = sync_layer_to_geoserver(shp_folder, fc, layer_name, "mws_layers")
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="MWS",
+            sync_to_geoserver=True,
+        )
     print(res)

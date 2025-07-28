@@ -1,13 +1,12 @@
 import ee
-from computing.utils import (
-    sync_layer_to_geoserver,
-    save_layer_info_to_db
-)
+from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
 from nrm_app.celery import app
 
@@ -94,22 +93,21 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
     description = (
         "lulc_vector_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
-
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": description,
-            "assetId": get_gee_asset_path(state, district, block) + description,
-        }
-    )
-    task.start()
-
-    task_status = check_task_status([task.status()["id"]])
+    asset_id = get_gee_asset_path(state, district, block) + description
+    task = export_vector_asset_to_gee(fc, description, asset_id)
+    task_status = check_task_status([task])
     print("Task completed - ", task_status)
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=description,
+            asset_id=asset_id,
+            dataset_name="LULC",
+        )
 
-    fc = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block) + description
-    ).getInfo()
+    fc = ee.FeatureCollection(asset_id).getInfo()
 
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -122,11 +120,13 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
         "lulc_vector",
     )
     print(res)
-    save_layer_info_to_db(
-        state, 
-        district, 
-        block,
-        f"lulc_vector_{district.title()}_{block.title()}", 
-        f"{get_gee_asset_path(state, district, block) + description}", 
-        'LULC'
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=description,
+            asset_id=asset_id,
+            dataset_name="LULC",
+            sync_to_geoserver=True,
         )

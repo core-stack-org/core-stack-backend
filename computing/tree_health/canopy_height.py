@@ -12,6 +12,7 @@ from utilities.gee_utils import (
 )
 from computing.utils import save_layer_info_to_db
 
+
 @app.task(bind=True)
 def tree_health_ch_raster(self, state, district, block, start_year, end_year):
     ee_initialize()
@@ -120,11 +121,24 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year):
 
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to GCS", task_id_list)
+            if is_gee_asset_exists(asset_id):
+                save_layer_info_to_db(
+                    state, district, block, layer_name, asset_id, "Canopy Height Raster"
+                )
 
-            sync_raster_gcs_to_geoserver(
+            res = sync_raster_gcs_to_geoserver(
                 "canopy_height", layer_name, layer_name, "ch_style"
             )
-            save_layer_info_to_db(state, district, block,layer_name, asset_id, "Canopy Height Raster")
+            if res:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name,
+                    asset_id,
+                    "Canopy Height Raster",
+                    sync_to_geoserver=True,
+                )
 
         except Exception as e:
-            print(f"Error occurred in running process_ch task: {e}")        
+            print(f"Error occurred in running process_ch task: {e}")

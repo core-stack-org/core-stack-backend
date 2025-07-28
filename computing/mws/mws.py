@@ -3,10 +3,7 @@ import ee
 import geopandas as gpd
 from nrm_app.celery import app
 
-from utilities.constants import (
-    MERGE_MWS_PATH,
-    GEE_DATASET_PATH
-)
+from utilities.constants import MERGE_MWS_PATH, GEE_DATASET_PATH
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -75,9 +72,7 @@ def mws_layer(self, state, district, block):
     )
     asset_id = get_gee_asset_path(state, district, block) + description
     if not is_gee_asset_exists(asset_id):
-        mwses_uid_fc = ee.FeatureCollection(
-            GEE_DATASET_PATH + "/India_mws_UID_Merged"
-        )
+        mwses_uid_fc = ee.FeatureCollection(GEE_DATASET_PATH + "/India_mws_UID_Merged")
 
         admin_boundary = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -107,10 +102,7 @@ def mws_layer(self, state, district, block):
             task_id = export_vector_asset_to_gee(fc, description, asset_id)
             mws_task_id_list = check_task_status([task_id])
             print("mws_task_id_list", mws_task_id_list)
-            save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "MWS")
     make_asset_public(asset_id)
-    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "MWS")
-
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id):

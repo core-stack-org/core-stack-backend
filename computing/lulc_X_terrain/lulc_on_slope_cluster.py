@@ -1,15 +1,13 @@
 import ee
 from nrm_app.celery import app
-from computing.utils import (
-    sync_layer_to_geoserver,
-    save_layer_info_to_db
-)
+from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
 
@@ -82,15 +80,18 @@ def lulc_on_slope_cluster(self, state, district, block, start_year, end_year):
             slope_mwsheds, study_area_landforms, study_area_lulc, slope_centroids
         )
         print("Processing completed successfully")
-
-        task = ee.batch.Export.table.toAsset(
-            collection=result, description=asset_description, assetId=asset_id
-        )
-        task.start()
-
-        task_id_list = check_task_status([task.status()["id"]])
+        task = export_vector_asset_to_gee(result, asset_description, asset_id)
+        task_id_list = check_task_status([task])
         print("lulc_on_slope_cluster task completed - task_id_list:", task_id_list)
-        save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_lulc_slope", asset_id, "Terrain LULC")
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{district.title()}_{block.title()}_lulc_slope",
+                asset_id=asset_id,
+                dataset_name="Terrain LULC",
+            )
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -103,8 +104,16 @@ def lulc_on_slope_cluster(self, state, district, block, start_year, end_year):
         "terrain_lulc",
     )
     print(res)
-    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}_lulc_slope", asset_id, "Terrain LULC")
-
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"{district.title()}_{block.title()}_lulc_slope",
+            asset_id=asset_id,
+            dataset_name="Terrain LULC",
+            sync_to_geoserver=True,
+        )
 
 
 def process_feature_collection(fc, landforms, area_lulc, slope_centroids):

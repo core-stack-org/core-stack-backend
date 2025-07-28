@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
+from utilities.auth_utils import auth_free
 
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
@@ -798,9 +799,7 @@ def swb_pond_merging(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        merge_swb_ponds.apply_async(
-            args=[state, district, block], queue="nrm"
-        )
+        merge_swb_ponds.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )

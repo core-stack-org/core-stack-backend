@@ -1,16 +1,20 @@
 import ee
 
-from computing.utils import sync_layer_to_geoserver, sync_fc_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    sync_fc_to_geoserver,
+    save_layer_info_to_db,
+)
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
     check_task_status,
     make_asset_public,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
-from utilities.constants import (
-    GEE_DATASET_PATH
-)
+from utilities.constants import GEE_DATASET_PATH
 from nrm_app.celery import app
 
 
@@ -38,18 +42,19 @@ def clip_drainage_lines(
     description = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     asset_id = get_gee_asset_path(state, district, block) + description
     try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": clipped_drainage,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the drainage task", task.status())
+        task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
 
-        task_id_list = check_task_status([task.status()["id"]])
+        task_id_list = check_task_status([task])
         print("task_id_list", task_id_list)
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{district.title()}_{block.title()}",
+                asset_id=asset_id,
+                dataset_name="Drainage",
+            )
 
         make_asset_public(asset_id)
     except Exception as e:
@@ -65,7 +70,16 @@ def clip_drainage_lines(
             "drainage",
         )
         print("Drainage line synced to geoserver:", res)
+        if res["status_code"] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{district.title()}_{block.title()}",
+                asset_id=asset_id,
+                dataset_name="Drainage",
+                sync_to_geoserver=True,
+            )
+
     except Exception as e:
         print("Exception in syncing Drainage line to geoserver", e)
-
-    save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "Drainage")

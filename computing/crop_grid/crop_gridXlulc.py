@@ -1,16 +1,15 @@
 import ee
-from computing.utils import sync_fc_to_geoserver
+from computing.utils import sync_fc_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
+    export_vector_asset_to_gee,
+    is_gee_asset_exists,
+    check_task_status,
 )
 
 
-def crop_grids_lulc(
-    state,
-    district,
-    block,
-):
+def crop_grids_lulc(state, district, block, asset_id):
     lulc_image = ee.Image(
         get_gee_asset_path(state, district, block)
         + valid_gee_text(district.lower())
@@ -29,11 +28,36 @@ def crop_grids_lulc(
     )
 
     # Generate crop tiles
+    description = (
+        "crop_gridXlulc_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+    )
     crop_tiles = lulc_crop_tiles(tiles_uid, lulc_image)
     layer_name = f"{valid_gee_text(district)}_{valid_gee_text(block.lower())}_grid"
+    task = export_vector_asset_to_gee(crop_tiles, description, asset_id)
+    task_id_list = check_task_status([task])
+    print(f"crop gridXlulc task completed  - task_id_list: {task_id_list}")
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Crop Grid",
+        )
     res = sync_fc_to_geoserver(
         crop_tiles, state, layer_name, workspace="crop_grid_layers"
     )
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Crop Grid",
+            sync_to_geoserver=True,
+        )
     print("Successfully pushed to GeoServer!", res)
 
 
