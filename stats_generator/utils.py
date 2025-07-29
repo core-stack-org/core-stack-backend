@@ -87,7 +87,7 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_mws_inters_villages(mws_geojson_datas, xlsx_file, writer, district, block)
                 # create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
 
-            elif workspace == 'cropping_intensity':
+            elif workspace == 'crop_intensity':
                 create_excel_crop_inten(geojson_data, xlsx_file, writer, start_year, end_year)
             elif workspace == 'cropping_drought':
                 create_excel_crop_drou(geojson_data, xlsx_file, writer, start_year, end_year)
@@ -1112,52 +1112,36 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
         uid = properties.get('uid', 'Unknown')
         row = {'UID': uid, 'area_in_ha': properties.get('area_in_ha', 0)}
 
-        # Loop through each year in the range
+        # Process each year in range using new key naming convention
         for year in range(start_year, end_year + 1):
-            year_offset = year - start_year
-            
-            # Handle special case for 2017 (first year)
-            if year == start_year:
-                cropping_key = 'cropping_i'
-                single_c_key = 'single_cro'
-                single_k_key = 'single_kha'
-                single_n_key = 'single_non'
-                doubly_c_key = 'doubly_cro'
-                triply_c_key = 'triply_cro'
-            else:
-                # For subsequent years
-                cropping_key = f'cropping_{year_offset}'
-                single_c_key = f'single_c_{year_offset}'
-                single_k_key = f'single_k_{year_offset}'
-                single_n_key = f'single_n_{year_offset}'
-                doubly_c_key = f'doubly_c_{year_offset}'
-                triply_c_key = f'triply_c_{year_offset}'
+            cropping_key = f'cropping_intensity_{year}'
+            single_c_key = f'single_cropped_area_{year}'
+            single_k_key = f'single_kharif_cropped_area_{year}'
+            single_n_key = f'single_non_kharif_cropped_area_{year}'
+            doubly_c_key = f'doubly_cropped_area_{year}'
+            triply_c_key = f'triply_cropped_area_{year}'
 
-            # Add cropping intensity and area data for each year
             row[f'cropping_intensity_unit_less_{year}-{year + 1}'] = properties.get(cropping_key, 0)
-            row[f'single_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_c_key, 0) / 10000
-            row[f'single_kharif_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_k_key, 0) / 10000
-            row[f'single_non_kharif_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_n_key, 0) / 10000
-            row[f'doubly_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(doubly_c_key, 0) / 10000
-            row[f'triply_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(triply_c_key, 0) / 10000
+            row[f'single_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_c_key, 0)
+            row[f'single_kharif_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_k_key, 0)
+            row[f'single_non_kharif_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_n_key, 0)
+            row[f'doubly_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(doubly_c_key, 0)
+            row[f'triply_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(triply_c_key, 0)
 
-        # Add the 'sum' field
         row['sum_area_in_ha'] = properties.get('sum', 0) / 10000
-
         df_data.append(row)
 
-    # Create DataFrame
+    # Create and format DataFrame
     df = pd.DataFrame(df_data)
     df = df.sort_values(['UID'])
-
-    ## for roundoff all numeric value upto 2 decimal
+    
+    # Round numeric columns
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    df[numeric_cols] = df[numeric_cols].round(2) 
+    df[numeric_cols] = df[numeric_cols].round(2)
 
     # Write to Excel
     df.to_excel(writer, sheet_name='croppingIntensity_annual', index=False)
     print("Excel file created for cropping intensity.")
-
 
 def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
     df_data = []
@@ -1456,4 +1440,3 @@ def read_tehsil_excel_to_json(state, district, block):
 
     except Exception as e:
         return {"error": str(e)}
-
