@@ -173,6 +173,9 @@ class StateMapData(object):
                     self.setSmjId(jump_info['smj_id'])
                     self.setCurrentState(jump_info['init_state'])
                     
+                    # Update user session to preserve SMJ context
+                    self._update_user_session_context(jump_info['smj_id'], jump_info['init_state'])
+                    
                     print(f"Successfully switched to SMJ '{jump_info['smj_name']}' (ID: {jump_info['smj_id']}), current state: '{jump_info['init_state']}'")
                     
                     # Execute preAction for the new state recursively
@@ -220,6 +223,9 @@ class StateMapData(object):
                     self.setStates(jump_info['states'])
                     self.setSmjId(jump_info['smj_id'])
                     self.setCurrentState(jump_info['init_state'])
+                    
+                    # Update user session to preserve SMJ context  
+                    self._update_user_session_context(jump_info['smj_id'], jump_info['init_state'])
                     
                     print(f"Successfully switched to SMJ '{jump_info['smj_name']}' (ID: {jump_info['smj_id']}), current state: '{jump_info['init_state']}'")
                     
@@ -307,24 +313,96 @@ def findTransitionState(event, transition_dict_list):
 
 
 class SmjController(StateMapData):
+    
     def __init__(self, states, smj_id, app_type, bot_id, user_id, language, current_state, current_session):
         super(SmjController, self).__init__(states, smj_id, app_type, bot_id, user_id, language, current_state, current_session)
+
+    def _update_user_session_context(self, smj_id, current_state):
+        """Update user session to preserve SMJ context after jumps"""
+        try:
+            import bot_interface.models
+            
+            # Get the user session
+            user_session = bot_interface.models.UserSessions.objects.get(user_id=self.user_id, bot_id=self.bot_id)
+            
+            # Update with current SMJ and state
+            smj_instance = bot_interface.models.SMJ.objects.get(id=smj_id)
+            user_session.current_smj = smj_instance
+            user_session.current_state = current_state
+            user_session.save()
+            
+            print(f"Updated user session - SMJ: {smj_id}, State: {current_state}")
+            
+        except Exception as e:
+            print(f"Error updating user session context: {e}")
+            # Don't fail the whole process if session update fails
+
+    def _load_correct_smj_states(self, smj_id, event_state=None):
+        """Load the correct SMJ states when there's a mismatch"""
+        try:
+            import bot_interface.models
+            import json
+            
+            # Load the correct SMJ
+            smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+            smj_states = smj.smj_json
+            
+            # Handle Django JSONField - can be string or already parsed
+            if isinstance(smj_states, str):
+                smj_states = json.loads(smj_states)
+            
+            # Update state machine with correct SMJ
+            self.setStates(smj_states)
+            self.setSmjId(smj_id)
+            
+            # If event_state is provided, use it; otherwise use the first state as default
+            if event_state:
+                self.setCurrentState(event_state)
+                print(f"Set current state to event state: {event_state}")
+            elif smj_states:
+                self.setCurrentState(smj_states[0]['name'])
+                print(f"Set current state to first state: {smj_states[0]['name']}")
+            
+            print(f"Loaded correct SMJ states for SMJ ID: {smj_id}")
+            print(f"Available states: {[state.get('name') for state in smj_states]}")
+            
+        except Exception as e:
+            print(f"Error loading correct SMJ states: {e}")
 
     def runSmj(self, event_data):
         print("Event packet passed in runSmj  >> ",event_data)
         if event_data:
             if event_data.get("event") == "start":
                 print("event is start..")
-                state = self.jumpToSmj(self.states, event_data.get("smj_id"), event_data.get("state"))
-                if state != "ERROR":
-                    getstate = self.ifStateExists(state)
-                    print("state::", state, "getstate::", getstate)
-                    if getstate:
-                        start_time = datetime.now()
-                        self.preAction()
-                        end_time = datetime.now()
-                 
-                        print('Duration of PreAction: {}'.format(end_time - start_time))
+                
+                # Check if we need to load correct SMJ states first
+                event_smj_id = event_data.get("smj_id")
+                event_state = event_data.get("state")
+                
+                if event_smj_id and str(event_smj_id) != str(self.getSmjId()):
+                    print(f"Loading correct SMJ states for start event: SMJ {event_smj_id}, State {event_state}")
+                    self._load_correct_smj_states(event_smj_id, event_state)
+                
+                # Additional check: Don't execute preAction if this is actually a button interaction
+                # that was incorrectly marked as "start"
+                if event_data.get("type") == "button" and event_data.get("context_id"):
+                    print("Detected button interaction marked as start - skipping preAction to prevent duplicate messages")
+                    print(f"Button data: {event_data.get('data')}, Context ID: {event_data.get('context_id')}")
+                    # Process this as a normal transition instead
+                    event_data["event"] = event_data.get("data", "success")  # Use button value as event
+                    # Continue to else block for normal processing
+                else:
+                    state = self.jumpToSmj(self.states, event_data.get("smj_id"), event_data.get("state"))
+                    if state != "ERROR":
+                        getstate = self.ifStateExists(state)
+                        print("state::", state, "getstate::", getstate)
+                        if getstate:
+                            start_time = datetime.now()
+                            self.preAction()
+                            end_time = datetime.now()
+                     
+                            print('Duration of PreAction: {}'.format(end_time - start_time))
+                            return  # Exit early for true start events
             elif hasattr(event_data,'init_state'):  
                 print("initial state event")
                 default_state = self.jumpTodefaultSmj(self.states, event_data.get("smj_id"), event_data.get("init_state"))
@@ -335,7 +413,9 @@ class SmjController(StateMapData):
                     end_time = datetime.now()
                     print('Duration of PreAction: {}'.format(end_time - start_time))
                     # print("ENDED PRE ACTION FUCTION")
-            else:
+            
+            # Handle all non-start events (including button events that were converted from start)
+            if event_data.get("event") != "start" or (event_data.get("event") == "start" and event_data.get("type") == "button"):
                 # print("POSTTT")
                 # print(self.getCurrentState(), event_data.get("state"))
                 #do postAction and transition and next preAction
@@ -344,7 +424,16 @@ class SmjController(StateMapData):
                 # print("POST ACTION FUCTION")
                 start_time = datetime.now()
                 print("postaction event and state >> ",event_data.get("event"), event_data.get("state"))
-                updatedEvent = self.postAction(event_data.get("event"))
+                
+                # Map button data to transition events
+                event_to_process = event_data.get("event")
+                if event_data.get("type") == "button" and event_data.get("data"):
+                    # For button events, use the button data as the event instead of generic "button"
+                    button_data = event_data.get("data")
+                    print(f"Button event detected - mapping button data '{button_data}' as transition event")
+                    event_to_process = button_data
+                
+                updatedEvent = self.postAction(event_to_process)
                 
                 # Check if SMJ jump was completed - if so, skip normal transition logic
                 if updatedEvent == "smj_jump_complete":
@@ -356,9 +445,25 @@ class SmjController(StateMapData):
                     print("Internal transition completed, skipping transition logic")
                     return 1  # Return success
             
-                # transition_dict = self.findTransitiondict(self.getCurrentState())
-                transition_dict = self.findTransitiondict(event_data.get("state"))
-                print(updatedEvent, transition_dict)
+                # Ensure we're using the correct SMJ states for transition lookup
+                current_state_for_transition = event_data.get("state")
+                print(f"Looking for transitions in state: {current_state_for_transition}")
+                print(f"Current SMJ ID: {self.getSmjId()}")
+                print(f"Available states in SMJ: {[state.get('name') for state in self.getStates()]}")
+
+                # Load correct SMJ states if current SMJ doesn't match event SMJ
+                event_smj_id = event_data.get("smj_id")
+                if event_smj_id and str(event_smj_id) != str(self.getSmjId()):
+                    print(f"SMJ mismatch detected. Event SMJ: {event_smj_id}, Current SMJ: {self.getSmjId()}")
+                    self._load_correct_smj_states(event_smj_id, current_state_for_transition)
+
+                transition_dict = self.findTransitiondict(current_state_for_transition)
+                print(f"Transition dict for state '{current_state_for_transition}': {transition_dict}")
+
+                if not transition_dict:
+                    print(f"WARNING: No transitions found for state '{current_state_for_transition}' in current SMJ")
+                    return 0
+
                 state_new = self.findAndDoTransition(updatedEvent, transition_dict)
                 print("state_new::",state_new)
                 if state_new == "finish":

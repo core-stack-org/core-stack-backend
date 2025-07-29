@@ -42,11 +42,15 @@
         "function": "send_states"
       }
     ],
-    "postAction": [],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
     "transition": [
       {
         "SendDistrict": [
-          "*"
+          "success"
         ]
       },
       {
@@ -60,14 +64,21 @@
     "name": "SendDistrict",
     "preAction": [
       {
-        "function": "send_districts"
+        "function": "send_districts",
+        "data": {
+          "getDataFrom": {"state":"SendState", "field":"misc"}
+        }
       }
     ],
-    "postAction": [],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
     "transition": [
       {
         "CommunityByStateDistrict": [
-          "*"
+          "success"
         ]
       },
       {
@@ -87,8 +98,8 @@
     "postAction": [],
     "transition": [
       {
-        "SendDistrict": [
-          "*"
+        "CommunityByLocation": [
+          "success"
         ]
       },
       {
@@ -102,7 +113,10 @@
     "name": "CommunityByLocation",
     "preAction": [
       {
-        "function": "send_community_by_location"
+        "function": "send_community_by_location",
+        "data": {
+          "getDataFrom": {"state":"SendLocationRequest","field": "data"}
+        }
       }
     ],
     "postAction": [],
@@ -118,7 +132,13 @@
     "name": "CommunityByStateDistrict",
     "preAction": [
       {
-        "function": "send_community_by_state_district"
+        "function": "send_community_by_state_district",
+        "data": {
+          "getDataFrom": [
+            {"state":"SendState", "field":"data"},
+            {"state":"SendDistrict", "field":"data"}
+          ]
+        }
       }
     ],
     "postAction": [],

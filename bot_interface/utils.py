@@ -1242,7 +1242,64 @@ def check_user_community_status_http(user_number: str, base_url: str = "http://l
         logger.error("Unexpected error in HTTP check: %s", general_error)
         return False, {"success": False, "message": "Unexpected error"}
 
-
+def get_community_by_lat_lon(lat: str, lon: str, base_url: str = "http://localhost:8000/api/v1") -> Tuple[bool, Dict[str, Any]]:
+    """Get community by latitude and longitude
+    
+    """
+    try:
+        response = requests.get(
+            f"{base_url}/get_communities_by_lat_lon/",
+            params={"latitude": lat, "longitude": lon},
+            timeout=30
+        )
+        logger.info("HTTP request and response to get community by lat/lon: %s", response.url)
+        
+        response.raise_for_status()
+        return True, response.json()
+    except requests.exceptions.Timeout:
+        logger.error("HTTP request timed out")
+        return False, {"success": False, "message": "Request timeout"}
+    except requests.exceptions.ConnectionError:
+        logger.error("HTTP connection error")
+        return False, {"success": False, "message": "Connection error"}
+    except requests.exceptions.RequestException as req_error:
+        logger.error("HTTP request error: %s", req_error)
+        return False, {"success": False, "message": "Request failed"}
+    except json.JSONDecodeError as json_error:
+        logger.error("JSON parsing error: %s", json_error)
+        return False, {"success": False, "message": "Invalid JSON response"}
+    except Exception as e:
+        logger.error("Unexpected error in get_community_by_lat_lon: %s", e)
+        return False, {"success": False, "message": "Unexpected error"}
+    
+def fetch_states(base_url: str = "http://localhost:8000/api/v1") -> Tuple[bool, Dict[str, Any]]:
+    """Fetch all states from the API
+    
+    Args:
+        base_url: Base URL for the API (default: http://localhost:8000)
+        
+    Returns:
+        Tuple of (success, data) where data contains state information
+    """
+    try:
+        response = requests.get(f"{base_url}/get_states/", timeout=30)
+        logger.info("HTTP request to fetch states: %s", response.url)
+        
+        response.raise_for_status()
+        return True, response.json()
+    except requests.exceptions.Timeout:
+        logger.error("HTTP request timed out")
+        return False, {"success": False, "message": "Request timeout"}
+    except requests.exceptions.ConnectionError:
+        logger.error("HTTP connection error")
+        return False, {"success": False, "message": "Connection error"}
+    except requests.exceptions.RequestException as req_error:
+        logger.error("HTTP request error: %s", req_error)
+        return False, {"success": False, "message": "Request failed"}
+    except json.JSONDecodeError as json_error:
+        logger.error("JSON parsing error: %s", json_error)
+        return False, {"success": False, "message": "Invalid JSON response"}
+    
 def check_user_community_status(bot_number: str, method: str = "direct") -> Tuple[bool, Dict[str, Any]]:
     """
     Check if a user (by phone number) is part of any community.
@@ -1364,4 +1421,20 @@ def callFunctionByName(funct_name, app_type, data_dict):
         print(f"calling sendLocationRequest with data_dict: {data_dict}")
         event = whatsappInterface.sendLocationRequest(bot_instance_id=bot_id, data_dict=data_dict)
         print(f"sendLocationRequest returned: {event}")
+    elif funct_name == 'send_community_by_location':
+        print(f"calling sendCommunityByLocation with data_dict: {data_dict}")
+        event = whatsappInterface.sendCommunityByLocation(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"sendCommunityByLocation returned: {event}")
+    elif funct_name == 'send_states':
+        print(f"calling sendStates with data_dict: {data_dict}")
+        event = whatsappInterface.sendStates(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"sendStates returned: {event}")
+    elif funct_name == 'send_districts':
+        print(f"calling sendDistricts with data_dict: {data_dict}")
+        event = whatsappInterface.sendDistricts(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"sendDistricts returned: {event}")
+    elif funct_name == 'send_community_by_state_district':
+        print(f"calling sendCommunityByStateDistrict with data_dict: {data_dict}")
+        event = whatsappInterface.sendCommunityByStateDistrict(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"sendCommunityByStateDistrict returned: {event}")
     return event

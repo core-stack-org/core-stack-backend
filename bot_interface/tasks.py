@@ -108,17 +108,34 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                         user_session = bot_interface.models.UserSessions.objects.get(user_id=bot_user_id)
                         print(f"Found existing UserSession: {user_session}")
                         
-                        # Check if current_session is empty
+                        # Check if current_session is empty - but preserve SMJ context if available
                         if len(user_session.current_session) == 0:
                             print("UserSession current_session is empty, updating event_packet")
+                            
+                            # Preserve current SMJ context if available, otherwise use bot instance defaults
+                            current_smj_id = user_session.current_smj.id if user_session.current_smj else bot_instance.smj.id
+                            current_state = user_session.current_state if user_session.current_state else bot_instance.init_state
+                            
+                            # Only set event to "start" if this is truly a new conversation
+                            # For button/interactive events, preserve the original event type
+                            if event_packet.get("type") in ["button", "interactive", "location"] and event_packet.get("event"):
+                                # This is an existing interaction, don't force start
+                                event_to_set = event_packet.get("event")
+                                print(f"Preserving existing interaction event: {event_to_set}")
+                            else:
+                                # This is a new conversation start
+                                event_to_set = "start"
+                                start_session = True
+                                event_type = True
+                                print("Setting event to start for new conversation")
+                            
                             # Update event packet for existing user with empty session
                             event_packet.update({
-                                "event": "start",
-                                "smj_id": bot_instance.smj.id,  # type: ignore
-                                "state": bot_instance.init_state
+                                "event": event_to_set,
+                                "smj_id": current_smj_id,  # Preserve current SMJ instead of resetting
+                                "state": current_state     # Preserve current state instead of resetting
                             })
-                            start_session = True
-                            event_type = True
+                            print(f"Preserved SMJ context - SMJ: {current_smj_id}, State: {current_state}")
                             logger.info("event packet when UserSessions already exists and is empty: %s", event_packet)
                             current_event_packet["InitState"] = event_packet
                             current_session.append(current_event_packet)
@@ -127,14 +144,18 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                             print(f"UserSession current_session is not empty: {len(user_session.current_session)} items : {user_session.current_session}")
                             print("UserSession current_session is not empty: event_packet: ", event_packet)
                             updated_event = event if event_packet.get("event") else "success"
+                            
+                            # Preserve current SMJ context instead of reverting to bot instance SMJ
+                            current_smj_id = user_session.current_smj.id if user_session.current_smj else bot_instance.smj.id
+                            current_state = user_session.current_state if user_session.current_state else bot_instance.init_state
+                            
                             event_packet.update({
                                 "event": updated_event,
-                                "smj_id": bot_instance.smj.id,  # type: ignore
-                                "state": bot_instance.init_state
+                                "smj_id": current_smj_id,  # Preserve current SMJ instead of resetting
+                                "state": current_state  # Preserve current state instead of resetting
                             })
                             print("Updated event packet for existing usersession:", event_packet)
                             print("Current state in existing session:", user_session.current_state)
-                            current_state = user_session.current_state
                             current_session = user_session.current_session
                             print("Current session in existing session:", current_session)
                             current_session[-1].update({current_state: event_packet}
@@ -165,7 +186,15 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                 print(f"Session flags - start_session: {start_session}, event_type: {event_type}")
                 logger.info("Current event packet after checking start session and event type flags: %s", event_packet)  # Debugging current session content
                 print("Current session content:", user_session.current_session)  # Debugging current session content
-                smj_id = bot_instance.smj.id  # type: ignore
+                
+                # Use event packet SMJ ID if available, otherwise use bot instance SMJ
+                event_smj_id = event_packet.get("smj_id", bot_instance.smj.id)
+                event_state = event_packet.get("state", bot_instance.init_state)
+                
+                print(f"Event packet SMJ ID: {event_smj_id}, State: {event_state}")
+                print(f"Bot instance SMJ ID: {bot_instance.smj.id}, Init state: {bot_instance.init_state}")
+                
+                smj_id = event_smj_id  # Use event packet SMJ ID instead of bot instance
                 try:
                     smj = bot_interface.models.SMJ.objects.get(id=smj_id)  # Use .get() to get single object
                     smj_states = smj.smj_json
@@ -180,21 +209,30 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                     return
                 print("SMJ states loaded:", smj_states)
                 
+                # Enhanced context preservation: Update user session with current SMJ and state
+                try:
+                    current_smj_obj = bot_interface.models.SMJ.objects.get(id=smj_id)
+                    user_session.current_smj = current_smj_obj
+                    user_session.current_state = event_state
+                    print(f"Updated user session context: SMJ ID {smj_id}, State: {event_state}")
+                except bot_interface.models.SMJ.DoesNotExist:
+                    print(f"Warning: SMJ with ID {smj_id} not found for context preservation")
+                    
                 # current_event_packet["InitState"] = event_packet
                 # current_session.append(current_event_packet)
                 user_session.current_session = current_session
                 user_session.save()
                 print("User session updated with current session:", user_session.current_session)
 
-                print(f"Creating SmjController with smj_id: {smj_id}, app_type: {bot_instance.app_type}, user_id: {bot_user_id}, language: {bot_instance.language}, state: {bot_instance.init_state}")
+                print(f"Creating SmjController with smj_id: {smj_id}, app_type: {bot_instance.app_type}, user_id: {bot_user_id}, language: {bot_instance.language}, state: {event_state}")
                 smj_controller = bot_interface.statemachine.SmjController(
                     states = smj_states,  # Use the extracted states list
-                    smj_id = smj_id,
+                    smj_id = smj_id,  # Use event packet SMJ ID
                     app_type = bot_instance.app_type,
                     bot_id = bot_instance.id,  # type: ignore
                     user_id = bot_user_id,
                     language = bot_instance.language,
-                    current_state = bot_instance.init_state,
+                    current_state = event_state,  # Use event packet state instead of bot init state
                     current_session = user_session.current_session if hasattr(user_session, 'current_session') else None
                 )
                 logger.info("SmjController created with parameters: %s", {
