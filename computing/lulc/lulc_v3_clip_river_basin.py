@@ -91,8 +91,6 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
         name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]
-        gcs_file_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
-        print("Syncing " + gcs_file_name + " to geoserver")
         for workspace in lulc_workspaces:
             suff = workspace.replace("LULC", "")
             layer_name = (

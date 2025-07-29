@@ -28,6 +28,17 @@ from utilities.gee_utils import (
 import ee
 
 
+def export_shp_to_gee(district, block, layer_path, asset_id):
+    layer_name = (
+        "nrega_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
+    upload_shp_to_gee(layer_path, layer_name, asset_id)
+
+
 @app.task(bind=True)
 def clip_nrega_district_block(self, state_name, district_name, block_name):
     ee_initialize()
@@ -60,6 +71,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
             geometry="geometry",
             crs="EPSG:4326",
         )
+        file_obj = None
 
     # If geometry is missing but lat/lon present, build Point geometry
     if (
@@ -133,9 +145,6 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
 
     # Ensure CRS is set
     block_metadata_df.crs = "EPSG:4326"
-    print("===================")
-    print(f"{block_metadata_df=}")
-    quit()
 
     path = os.path.join(
         NREGA_ASSETS_OUTPUT_DIR,
@@ -151,11 +160,21 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
         + valid_gee_text(block_name.lower())
     )
     asset_id = get_gee_asset_path(state_name, district_name, block_name) + description
-    fc = gdf_to_ee_fc(block_metadata_df)
-    task_id = export_vector_asset_to_gee(fc, description, asset_id)
-    if task_id:
-        nrega_task_id_list = check_task_status([task_id])
-        print("nrega_task_id_list", nrega_task_id_list)
+    is_heavy_data = False
+    if file_obj:
+        file_size_bytes = file_obj["ContentLength"]
+        file_size_mb = file_size_bytes / (1024 * 1024)
+        if file_size_mb > 10:
+            is_heavy_data = True
+        print(f"{is_heavy_data=}")
+    if is_heavy_data:
+        export_shp_to_gee(district_name, block_name, path, asset_id)
+    else:
+        fc = gdf_to_ee_fc(block_metadata_df)
+        task_id = export_vector_asset_to_gee(fc, description, asset_id)
+        if task_id:
+            nrega_task_id_list = check_task_status([task_id])
+            print("nrega_task_id_list", nrega_task_id_list)
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state_name,

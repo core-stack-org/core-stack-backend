@@ -56,7 +56,16 @@ from computing.utils import save_layer_info_to_db
 #         )
 #         mws_task_id_list = check_task_status([task_id])
 #         print("mws_task_id_list", mws_task_id_list)
-#
+#           if is_gee_asset_exists(asset_id):
+#               save_layer_info_to_db(
+#                   state,
+#                   district,
+#                   block,
+#                   layer_name=f"-",
+#                   asset_id=asset_id,
+#                   dataset_name="MWS",
+#                   layer_version=2.0
+#               )
 #     make_asset_public(asset_id)
 
 
