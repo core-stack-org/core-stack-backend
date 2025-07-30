@@ -7,6 +7,7 @@ from utilities.gee_utils import (
     check_task_status,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
@@ -48,7 +49,7 @@ def tree_health_overall_change_vector(self, state, district, block):
             asset_id,
             "Tree Overall Change Vector",
         )
-
+    make_asset_public(asset_id)
     sync_change_to_geoserver(block, district, state)
 
 

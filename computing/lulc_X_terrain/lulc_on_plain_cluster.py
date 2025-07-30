@@ -8,6 +8,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
 
@@ -89,7 +90,7 @@ def lulc_on_plain_cluster(self, state, district, block, start_year, end_year):
                 asset_id=asset_id,
                 dataset_name="Terrain LULC",
             )
-
+        make_asset_public(asset_id)
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(

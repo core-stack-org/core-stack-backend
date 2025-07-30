@@ -12,6 +12,7 @@ from utilities.gee_utils import (
     upload_tif_from_gcs_to_gee,
     sync_vector_to_gcs,
     get_geojson_from_gcs,
+    export_vector_asset_to_gee,
 )
 from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
@@ -193,23 +194,20 @@ def generate_vector(state, district, block):
     #
     # try:
     #     # Export an ee.FeatureCollection as an Earth Engine asset.
-    #     mws_task = ee.batch.Export.table.toAsset(
-    #         **{
-    #             "collection": fc,
-    #             "description": "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #             "assetId": get_gee_asset_path(state, district, block)
-    #             + "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #         }
+    #     mws_task = export_vector_asset_to_gee(
+    #         fc,
+    #         "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower()),
+    #         get_gee_asset_path(state, district, block)
+    #         + "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower())
     #     )
-    #     mws_task.start()
-    #     print("Successfully started the drainage_density", mws_task.status())
-    #     # return [mws_task.status()["id"]]
+    #     print("Successfully started the drainage_density")
+    #     # return [mws_task]
     # except Exception as e:
     #     print(f"Error occurred in running drainage_density task: {e}")
     return output_path

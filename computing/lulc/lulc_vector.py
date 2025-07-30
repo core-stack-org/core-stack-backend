@@ -7,6 +7,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
@@ -106,7 +107,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
             asset_id=asset_id,
             dataset_name="LULC",
         )
-
+    make_asset_public(asset_id)
     fc = ee.FeatureCollection(asset_id).getInfo()
 
     fc = {"features": fc["features"], "type": fc["type"]}

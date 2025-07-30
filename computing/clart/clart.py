@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
+    make_asset_public,
 )
 from utilities.constants import GEE_ASSET_PATH
 from nrm_app.celery import app
@@ -226,6 +227,7 @@ def clart_layer(state, district, block):
                     asset_id=final_output_assetid,
                     dataset_name="CLART",
                 )
+            make_asset_public(final_output_assetid)
         except Exception as e:
             print(f"Error occurred in running clart: {e}")
 

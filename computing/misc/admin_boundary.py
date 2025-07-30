@@ -19,6 +19,7 @@ from utilities.gee_utils import (
     create_gee_directory,
     upload_shp_to_gee,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
 from computing.utils import save_layer_info_to_db
@@ -53,7 +54,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Admin Boundary",
             )
-
+        make_asset_public(asset_id)
     # Generate shape files and sync to geoserver
     shp_path = sync_admin_boundry_to_geoserver(
         collection, state_dir, district, block, state, asset_id

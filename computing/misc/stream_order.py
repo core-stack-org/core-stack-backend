@@ -8,6 +8,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 
 
@@ -63,7 +64,7 @@ def generate_stream_order_vector(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Stream Order",
             )
-
+        make_asset_public(asset_id)
     # Sync to geoserver
     fc = ee.FeatureCollection(
         get_gee_asset_path(state, district, block) + description

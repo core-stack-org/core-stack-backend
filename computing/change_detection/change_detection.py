@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     is_gee_asset_exists,
+    make_asset_public,
 )
 from nrm_app.celery import app
 from computing.utils import save_layer_info_to_db
@@ -99,6 +100,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
                 asset_id=asset_id,
                 dataset_name="Change Detection Raster",
             )
+        make_asset_public(asset_id)
 
     sync_to_gcs_geoserver(state, district, block, description, param_dict.keys())
 

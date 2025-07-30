@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
+    make_asset_public,
 )
 from computing.utils import save_layer_info_to_db
 
@@ -104,7 +105,7 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
                 save_layer_info_to_db(
                     state, district, block, layer_name, asset_id, "Ccd Raster"
                 )
-
+            make_asset_public(asset_id)
             task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, layer_name)
 
             task_id_list = check_task_status([task_id])

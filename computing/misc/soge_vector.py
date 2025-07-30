@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from computing.utils import sync_fc_to_geoserver
@@ -130,7 +131,7 @@ def generate_soge_vector(self, state, district, block):
             asset_id=asset_id,
             dataset_name="SOGE",
         )
-
+    make_asset_public(asset_id)
     print("Geoserver Sync task started")
     fc = ee.FeatureCollection(asset_id)
     res = sync_fc_to_geoserver(fc, state, description, "soge")

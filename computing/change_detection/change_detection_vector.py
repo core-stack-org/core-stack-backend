@@ -6,6 +6,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
@@ -60,7 +62,7 @@ def vectorise_change_detection(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Change Detection Vector",
             )
-
+        make_asset_public(asset_id)
         sync_change_to_geoserver(block, district, state, asset_id, param)
 
 
@@ -187,16 +189,10 @@ def generate_vector(roi, args, state, district, block, layer_name):
         + "_"
         + layer_name
     )
-
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": description,
-            "assetId": get_gee_asset_path(state, district, block) + description,
-        }
+    task = export_vector_asset_to_gee(
+        fc, description, get_gee_asset_path(state, district, block) + description
     )
-    task.start()
-    return task.status()["id"]
+    return task
 
 
 def sync_change_to_geoserver(block, district, state, asset_id, param):

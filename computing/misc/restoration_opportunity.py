@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
@@ -72,7 +73,7 @@ def clip_raster(roi, state, district, block, description):
             asset_id=asset_id,
             dataset_name="Restoration Raster",
         )
-
+    make_asset_public(asset_id)
     image = ee.Image(asset_id)
     task_id = sync_raster_to_gcs(image, 60, description + "_raster")
     check_task_status([task_id])

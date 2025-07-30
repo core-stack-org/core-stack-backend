@@ -209,12 +209,8 @@ def generate_project_roi(asset_id, description, project_name, kml_files_obj):
 
     try:
         # Export feature collection to Earth Engine
-        task = ee.batch.Export.table.toAsset(
-            **{"collection": fc, "description": description, "assetId": asset_id}
-        )
-        task.start()
-
-        check_task_status([task.status()["id"]])
+        task = export_vector_asset_to_gee(fc, description, asset_id)
+        check_task_status([task])
         make_asset_public(asset_id)
 
         logger.info("ROI for project: %s exported to GEE", project_name)
@@ -435,15 +431,9 @@ def generate_vector(
 
     try:
         # Export annotated feature collection to Earth Engine
-        task = ee.batch.Export.table.toAsset(
-            collection=suitability_vector,
-            description=description,
-            assetId=asset_id,
-        )
-        task.start()
-
+        task = export_vector_asset_to_gee(suitability_vector, description, asset_id)
         logger.info(f"Asset export task started. Asset path: {description}")
-        return task.status()["id"]
+        return task
     except Exception as e:
         logger.exception("Exception in exporting suitability vector", e)
         return None

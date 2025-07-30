@@ -6,6 +6,7 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     is_gee_asset_exists,
     check_task_status,
+    make_asset_public,
 )
 
 
@@ -45,6 +46,7 @@ def crop_grids_lulc(state, district, block, asset_id):
             asset_id=asset_id,
             dataset_name="Crop GridXlulc",
         )
+    make_asset_public(asset_id)
     res = sync_fc_to_geoserver(
         crop_tiles, state, layer_name, workspace="crop_grid_layers"
     )

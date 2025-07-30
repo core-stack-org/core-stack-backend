@@ -24,6 +24,7 @@ from utilities.gee_utils import (
     upload_shp_to_gee,
     is_gee_asset_exists,
     ee_initialize,
+    make_asset_public,
 )
 import ee
 
@@ -189,7 +190,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
             dataset_name="NREGA Assets",
         )
         print("save nrega_assets layer info at the gee level...")
-
+    make_asset_public(asset_id)
     res = push_shape_to_geoserver(path, workspace="nrega_assets")
     if res["status_code"] == 201:
         save_layer_info_to_db(

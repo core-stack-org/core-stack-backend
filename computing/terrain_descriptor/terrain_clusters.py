@@ -7,6 +7,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
@@ -363,6 +364,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
             asset_id=asset_id,
             dataset_name="Terrain Vector",
         )
+    make_asset_public(asset_id)
 
 
 def sync_to_geoserver(state, district, block, asset_id, asset_name):
