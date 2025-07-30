@@ -91,6 +91,8 @@ def whatsapp_webhook(request):
   
     bot_id = bot.id
     print("bot_id :: ", bot_id)
+    app_type = bot.app_type
+    print("app_type :: ", app_type)
     # Check if the message status is "read"
     # if 'statuses' in entry[0]['changes'][0]['value']:
     #     message_status = entry[0]['changes'][0]['value']['statuses'][0]['status']
@@ -106,7 +108,7 @@ def whatsapp_webhook(request):
         mark_message_as_read(bot.id, message_id)
         Response({"success": True}, status=status.HTTP_200_OK)
 
-    # print("Flating user data")
+    print("Flating user data")
     event = ""
     # create event packet
     factoryInterface = bot_interface.models.FactoryInterface()
@@ -126,7 +128,7 @@ def whatsapp_webhook(request):
     #     set_message_id = True
 
     bot_interface.tasks.StartUserSession.apply_async(
-        args=[event_packet, bot.id, event], queue="whatsapp"
+        args=[event_packet, event, bot.id, app_type], queue="whatsapp"
     )
     print("END")
     # WhatsappUserSession.create_session(whatsapp_user, json_obj)
@@ -135,7 +137,7 @@ def whatsapp_webhook(request):
 def send_text_url(app_instance_config_id, contact_number, text):
     print(text)
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
+        bot_instance_id=app_instance_config_id
     )
     # text = emoji.emojize(text)
     response = requests.post(
@@ -155,33 +157,85 @@ def send_text_url(app_instance_config_id, contact_number, text):
     return response
 
 
-def send_text(app_instance_config_id, contact_number, text, bold=False):
+def send_text(bot_instance_id, contact_number, text, bold=False):
+    """ This function sends a text message to a WhatsApp user.
+    Args:
+        bot_instance_id (int): The ID of the bot instance.
+        contact_number (str): The phone number of the recipient.
+        text (str): The text message to send.
+        bold (bool): Whether to send the text in bold.
+    """    
+    print("Sending text message to:", contact_number)
+    print("Text message content:", text)
+    
+    # Validate phone number format
+    if not contact_number:
+        print("ERROR: Empty contact number")
+        return {"error": "Empty contact number"}
+    
+    # Remove any + or - characters for WhatsApp API
+    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    print(f"Cleaned contact number: {type(cleaned_number)}")
+
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
+        bot_instance_id
     )
+    print("BSP_URL:", BSP_URL)
+    print("HEADERS:", HEADERS)
+    
+    # Prepare the request payload
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": cleaned_number,  # Use cleaned number
+        "type": "text",
+        "text": {
+            "body": text
+        }
+    }
+    
     # text = emoji.emojize(text)
     if bold:
         text = "*" + text + "*"
+        payload["text"]["body"] = text
+    
+    print("Request URL:", BSP_URL + "messages")
+    print("Request payload:", json.dumps(payload, indent=2, ensure_ascii=False))
+    print(f"Request headers: {json.dumps(HEADERS, indent=2)}")
+    
     response = requests.post(
         url=BSP_URL + "messages",
         headers=HEADERS,
-        json={
-                "messaging_product": "whatsapp",
-                "recipient_type": "individual",
-                "to": contact_number,
-                "type": "text",
-                "text": {
-                    "body": text
-                }
-            },
+        json=payload,
     )
-    print(f"TEXT SENT: {text} RESPONSE STATUS CODE: {response} RESPONSE JSON: {response.json()}")
-    return response.json()
+    
+    print(f"TEXT SENT: {text}")
+    print(f"RESPONSE STATUS CODE: {response.status_code}")
+    print(f"RESPONSE HEADERS: {dict(response.headers)}")
+    
+    try:
+        response_json = response.json()
+        print(f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
+    except json.JSONDecodeError:
+        print(f"RESPONSE TEXT: {response.text}")
+        response_json = {"error": "Invalid JSON response"}
+    
+    # If error, print more details
+    if response.status_code >= 400:
+        print(f"ERROR DETAILS:")
+        print(f"  Status: {response.status_code}")
+        print(f"  Reason: {response.reason}")
+        print(f"  URL: {response.url}")
+        if hasattr(response, 'request') and response.request:
+            print(f"  Request Headers: {dict(response.request.headers)}")
+            print(f"  Request Body: {response.request.body}")
+        
+    return response_json
 
 
 def send_url(app_instance_config_id, contact_number, item_url):
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
+        bot_instance_id=app_instance_config_id
     )
     return requests.post(
         url=BSP_URL + "messages",
@@ -272,14 +326,37 @@ def send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url
 #             time.sleep(0.5)
 #     time.sleep(1.5)
 
-def send_btn_msg(app_instance_config_id, contact_number, text, menu_list):
+def send_button_msg(bot_instance_id, contact_number, text, menu_list):
     """
-    This function send button message.
-    create_reply_json : This function creates reply json basing on the number of buttons in button list.
+    This function sends a button message to a WhatsApp user.
+    Args:
+        bot_instance_id (int): The ID of the bot instance.
+        contact_number (str): The phone number of the recipient.
+        text (str): The text message to send with buttons.
+        menu_list (list): List of button options with 'label' and 'value' keys.
     """
-    BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
-    )
+    print("Sending button message to:", contact_number)
+    print("Button message content:", text)
+    print("Menu options:", menu_list)
+    
+    # Validate phone number format
+    if not contact_number:
+        print("ERROR: Empty contact number")
+        return {"error": "Empty contact number"}
+    
+    # Remove any + or - characters for WhatsApp API
+    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    print(f"Cleaned contact number: {cleaned_number}")
+
+    try:
+        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+            bot_instance_id=bot_instance_id
+        )
+        print("BSP_URL:", BSP_URL)
+        print("HEADERS:", HEADERS)
+    except Exception as e:
+        print(f"ERROR: Failed to get BSP URL/headers: {str(e)}")
+        return {"error": f"Failed to get BSP URL/headers: {str(e)}"}
 
     def create_reply_json(menu_list):
         reply_json = []
@@ -294,115 +371,283 @@ def send_btn_msg(app_instance_config_id, contact_number, text, menu_list):
 
     reply_btn_json = create_reply_json(menu_list)
     text = emoji.emojize(text)
-    print("reply_btn_json::", reply_btn_json)
-    print("Headers >>", HEADERS)
+    
+    # Prepare the request payload
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": cleaned_number,  # Use cleaned number
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {"text": text},
+            "action": {"buttons": reply_btn_json},
+        },
+    }
+    
+    print("Request URL:", BSP_URL + "messages")
+    print("Request payload:", json.dumps(payload, indent=2, ensure_ascii=False))
+    print(f"Request headers: {json.dumps(HEADERS, indent=2)}")
+    
     response = requests.post(
         BSP_URL + "messages",
         headers=HEADERS,
-        json={
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": contact_number,
-            "type": "interactive",
-            "interactive": {
-                "type": "button",
-                "body": {"text": text},
-                "action": {"buttons": reply_btn_json},
-            },
-        },
+        json=payload,
     )
-    print("response >>> ",response)
-    res_data = vars(response)["_content"]
-    res_data = json.loads(res_data)
-    print("response data", res_data)
-    context_id = res_data["messages"][0]["id"]
-    print("context id >> ",context_id)
-    bot_interface.utils.save_context_id_in_user_misc(
-        contact_number, context_id, app_instance_config_id, "WA"
-    )
+    
+    print(f"BUTTON MESSAGE SENT: {text}")
+    print(f"RESPONSE STATUS CODE: {response.status_code}")
+    print(f"RESPONSE HEADERS: {dict(response.headers)}")
+    
+    try:
+        response_json = response.json()
+        print(f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
+        
+        # Save context ID if successful
+        if response.status_code == 200 and "messages" in response_json and len(response_json["messages"]) > 0:
+            context_id = response_json["messages"][0]["id"]
+            print("context id >> ", context_id)
+            # TODO: Implement save_context_id_in_user_misc function
+            # bot_interface.utils.save_context_id_in_user_misc(
+            #     cleaned_number, context_id, app_instance_config_id, "WA"
+            # )
+        
+    except json.JSONDecodeError:
+        print(f"RESPONSE TEXT: {response.text}")
+        response_json = {"error": "Invalid JSON response"}
+    except Exception as e:
+        print(f"ERROR: Failed to process response: {str(e)}")
+        response_json = {"error": f"Failed to process response: {str(e)}"}
+    
+    # If error, print more details
+    if response.status_code >= 400:
+        print(f"ERROR DETAILS:")
+        print(f"  Status: {response.status_code}")
+        print(f"  Reason: {response.reason}")
+        print(f"  URL: {response.url}")
+        if hasattr(response, 'request') and response.request:
+            print(f"  Request Headers: {dict(response.request.headers)}")
+            print(f"  Request Body: {response.request.body}")
+        
     return response
 
 
 def send_list_msg(
-    app_instance_config_id,
+    bot_instance_id,
     contact_number,
     text,
     menu_list,
     button_label="Menu (मेनू)",
 ):
     """
-    This function sends the list message.
+    This function sends a list message to a WhatsApp user.
+    Args:
+        bot_instance_id (int): The ID of the bot instance.
+        contact_number (str): The phone number of the recipient.
+        text (str): The text message to send with list.
+        menu_list (list): List of menu options.
+        button_label (str): Label for the list button.
     """
-    BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
-    )
-    app_instance_config = bot_interface.models.App_instance_config.objects.get(id = app_instance_config_id)
-    language = app_instance_config.language
-    if language == "hi":
-        section_title = "कोई एक विकल्प चुनें:"
-    else:
-        section_title = "Choose one option :"
+    print("Sending list message to:", contact_number)
+    print("List message content:", text)
+    print("Menu list:", menu_list)
+    print("Button label:", button_label)
+    
+    # Validate phone number format
+    if not contact_number:
+        print("ERROR: Empty contact number")
+        return {"error": "Empty contact number"}
+    
+    # Remove any + or - characters for WhatsApp API
+    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    print(f"Cleaned contact number: {cleaned_number}")
+
+    try:
+        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+            bot_instance_id=bot_instance_id
+        )
+        print("BSP_URL:", BSP_URL)
+        print("HEADERS:", HEADERS)
+    except Exception as e:
+        print(f"ERROR getting BSP URL/Headers: {str(e)}")
+        return {"error": f"Failed to get BSP config: {str(e)}"}
+    
+    # Get language configuration
+    try:
+        bot_instance_config = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+        language = bot_instance_config.language
+        if language == "hi":
+            section_title = "कोई एक विकल्प चुनें:"
+        else:
+            section_title = "Choose one option :"
+        print(f"Language: {language}, Section title: {section_title}")
+    except Exception as e:
+        print(f"ERROR getting app config: {str(e)}")
+        section_title = "Choose one option :"  # Default fallback
 
     def create_reply_json(menu_list):
         reply_json = []
-        for i in range(len(menu_list)):
-            description = (
-                str(menu_list[i]["description"])
-                if "description" in menu_list[i]
-                else ""
-            )
-            reply = {
-                "id": str(menu_list[i]["value"]),
-                "title": str(menu_list[i]["label"]),
-                "description": description,
-            }
-            reply_json.append(reply)
+        try:
+            for i in range(len(menu_list)):
+                description = (
+                    str(menu_list[i]["description"])
+                    if "description" in menu_list[i]
+                    else ""
+                )
+                reply = {
+                    "id": str(menu_list[i]["value"]),
+                    "title": str(menu_list[i]["label"]),
+                    "description": description,
+                }
+                reply_json.append(reply)
+        except Exception as e:
+            print(f"ERROR creating reply JSON: {str(e)}")
+            return []
         return reply_json
 
     reply_list_json = create_reply_json(menu_list)
-    print(reply_list_json)
-    print(text)
-    response = requests.post(
-        BSP_URL + "messages",
-        headers=HEADERS,
-        json={
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": contact_number,
-            "type": "interactive",
-            "interactive": {
-                "type": "list",
-                #  "header": {
-                #      "type": "text",
-                #      "text": "list button text"
-                #  },
-                "body": {"text": emoji.emojize(text)},
-                "action": {
-                    "button": button_label,
-                    "sections": [
-                        {
-                            "title": section_title,
-                            "rows": reply_list_json,
-                        }
-                    ],
-                },
+    if not reply_list_json:
+        print("ERROR: Failed to create reply list JSON")
+        return {"error": "Failed to create list options"}
+    
+    # Prepare the request payload
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": cleaned_number,  # Use cleaned number
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "body": {"text": emoji.emojize(text)},
+            "action": {
+                "button": button_label,
+                "sections": [
+                    {
+                        "title": section_title,
+                        "rows": reply_list_json,
+                    }
+                ],
             },
         },
+    }
+    
+    print("Request URL:", BSP_URL + "messages")
+    print("Request payload:", json.dumps(payload, indent=2, ensure_ascii=False))
+    print(f"Request headers: {json.dumps(HEADERS, indent=2)}")
+    
+    try:
+        response = requests.post(
+            BSP_URL + "messages",
+            headers=HEADERS,
+            json=payload,
+        )
+        
+        print(f"LIST MESSAGE SENT: {text}")
+        print(f"RESPONSE STATUS CODE: {response.status_code}")
+        print(f"RESPONSE HEADERS: {dict(response.headers)}")
+        
+        try:
+            response_json = response.json()
+            print(f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
+        except json.JSONDecodeError:
+            print(f"RESPONSE TEXT: {response.text}")
+            response_json = {"error": "Invalid JSON response"}
+            return response_json
+        
+        # If error, print more details
+        if response.status_code >= 400:
+            print(f"ERROR DETAILS:")
+            print(f"  Status: {response.status_code}")
+            print(f"  Reason: {response.reason}")
+            print(f"  URL: {response.url}")
+            if hasattr(response, 'request') and response.request:
+                print(f"  Request Headers: {dict(response.request.headers)}")
+                print(f"  Request Body: {response.request.body}")
+            return response_json
+        
+        # Save context ID if successful
+        try:
+            if "messages" in response_json and len(response_json["messages"]) > 0:
+                context_id = response_json["messages"][0]["id"]
+                print("Context ID:", context_id)
+                # TODO: Implement save_context_id_in_user_misc function
+                # bot_interface.utils.save_context_id_in_user_misc(
+                #     cleaned_number, context_id, app_instance_config_id, "WA"
+                # )
+            else:
+                print("WARNING: No context ID found in response")
+        except Exception as e:
+            print(f"ERROR saving context ID: {str(e)}")
+        
+        return response_json
+        
+    except Exception as e:
+        print(f"ERROR sending list message: {str(e)}")
+        return {"error": f"Failed to send list message: {str(e)}"}
+    
+def send_location_request(bot_instance_id, contact_number, text):
+    """Send a location request message
+    Args:
+        bot_instance_id (int): The ID of the bot instance.
+        contact_number (str): The phone number of the recipient.
+        text (str): The text message to send with the location request.
+    """
+    BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+        bot_instance_id=bot_instance_id
     )
-    print(f"LIST MESSAGE SENT RESPONSE :: {vars(response)}")
-    res_data = vars(response)["_content"]
-    res_data = json.loads(res_data)
-    context_id = res_data["messages"][0]["id"]
-    bot_interface.utils.save_context_id_in_user_misc(
-        contact_number, context_id, app_instance_config_id, "WA"
-    )
-    return response
+    print("Sending location request to:", contact_number)
+    print("Location request content:", text)
+    # Validate phone number format
+    if not contact_number:
+        print("ERROR: Empty contact number")
+        return {"error": "Empty contact number"}
+    # Remove any + or - characters for WhatsApp API
+    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    print(f"Cleaned contact number: {cleaned_number}")
+    print("BSP_URL:", BSP_URL)
+    print("HEADERS:", HEADERS)
+    # Prepare the request payload
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": cleaned_number,
+        "type": "interactive",
+        "interactive": {
+            "type": "location_request_message",
+            "body": {
+                "text": text
+            },
+        "action": {
+            "name": "send_location"
+            }
+        }
+    }
+
+    try:
+        response = requests.post(
+            BSP_URL + "messages",
+            headers=HEADERS,
+            json=payload
+        )
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"ERROR sending location request: {str(e)}")
+        return {"error": f"Failed to send location request: {str(e)}"} 
+    except json.JSONDecodeError:
+        print(f"ERROR decoding JSON response: {response.text}")
+        return {"error": "Invalid JSON response from WhatsApp API"}
+    except requests.exceptions.Timeout:
+        print("ERROR: Request timed out while sending location request")
+        return {"error": "Request timed out while sending location request"}
+    except Exception as e:
+        print(f"ERROR sending location request: {str(e)}")
+        return {"error": f"Failed to send location request: {str(e)}"}
 
 def download_image(app_instance_config_id, mime_type, media_id):
     """This function downloads image message"""
     print(os.getcwd())
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
+        bot_instance_id=app_instance_config_id
     )
     filepath = WHATSAPP_MEDIA_PATH + media_id + ".jpg"
     url = BSP_URL + media_id
@@ -421,7 +666,7 @@ def download_image(app_instance_config_id, mime_type, media_id):
 def download_audio(app_instance_config_id, mime_type, media_id):
     """This function downloads audio message and voice message"""
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        app_instance_config_id=app_instance_config_id
+        bot_instance_id=app_instance_config_id
     )
     filepath = WHATSAPP_MEDIA_PATH + media_id + ".mp3"
 
@@ -543,7 +788,7 @@ def download_media_from_url(app_instance_config_id, media_response):
         
         # Get BSP URL and headers
         BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-            app_instance_config_id=app_instance_config_id
+            bot_instance_id=app_instance_config_id
         )
         
         # Construct download URL

@@ -1,0 +1,153 @@
+[
+  {
+    "name": "Welcome",
+    "preAction": [
+      {
+        "menu": [
+          {
+            "label": "सूची से चुनें",
+            "value": "state_district",
+            "caption": "आपकी बेहतर सेवा के लिए, हमें आपकी लोकेशन की आवश्यकता है। आप अपनी लोकेशन कैसे भेजना चाहते हैं? \n1. आप राज्य और ज़िले की सूची में से अपनी लोकेशन चुन सकते हैं। \n2. बस अपनी लोकेशन भेजें।"
+          },
+          {
+            "label": "स्थान भेज देंगे",
+            "value": "location_pin"
+          }
+        ]
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "SendState": [
+          "state_district"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "location_pin"
+        ]
+      },
+      {
+        "Welcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendState",
+    "preAction": [
+      {
+        "function": "send_states"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "SendDistrict": [
+          "success"
+        ]
+      },
+      {
+        "SendState": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendDistrict",
+    "preAction": [
+      {
+        "function": "send_districts",
+        "data": {
+          "getDataFrom": {"state":"SendState", "field":"misc"}
+        }
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "CommunityByStateDistrict": [
+          "success"
+        ]
+      },
+      {
+        "SendDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendLocationRequest",
+    "preAction": [
+      {
+        "function": "send_location_request"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityByLocation": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunityByLocation",
+    "preAction": [
+      {
+        "function": "send_community_by_location",
+        "data": {
+          "getDataFrom": {"state":"SendLocationRequest","field": "data"}
+        }
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityByLocation": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunityByStateDistrict",
+    "preAction": [
+      {
+        "function": "send_community_by_state_district",
+        "data": {
+          "getDataFrom": [
+            {"state":"SendState", "field":"data"},
+            {"state":"SendDistrict", "field":"data"}
+          ]
+        }
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityByStateDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]
