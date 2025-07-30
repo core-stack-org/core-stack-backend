@@ -105,9 +105,24 @@ def get_community_details(request):
 @auth_free
 def get_communities_by_location(request):
     try:
-        state_name    = (request.query_params.get("state") or "").strip()
-        district_name = (request.query_params.get("district") or "").strip()
-        block_name    = (request.query_params.get("block") or "").strip()
+        state_id = request.query_params.get("state_id")
+        district_id = request.query_params.get("district_id")
+        block_id = request.query_params.get("block_id")
+
+        state_name = district_name = block_name = ""
+
+        if state_id:
+            state = State.objects.filter(pk=state_id).first()
+            state_name = state.state_name if state else ""
+
+        if district_id:
+            district = District.objects.filter(id=district_id).first()
+            district_name = district.district_name if district else ""
+
+        if block_id:
+            block = Block.objects.filter(id=block_id).first()
+            block_name = block.block_name if block else ""
+
         data = get_communities(state_name, district_name, block_name)
         return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
     except Exception as e:

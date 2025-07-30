@@ -37,7 +37,7 @@ class Location(models.Model):
 
 
 class Community(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.AutoField(primary_key=True)
     project = models.ForeignKey(Project, null=True, on_delete=models.CASCADE)
     bot = models.ForeignKey(Bot, null=True, on_delete=models.SET_NULL)
     locations = models.ManyToManyField(Location, related_name='communities')
