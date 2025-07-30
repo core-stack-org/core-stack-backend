@@ -5,15 +5,17 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 import boto3
 import uuid
+import json
 import pandas as pd
+from collections import defaultdict
 
-from .models import Community, Item, Community_user_mapping, Media, Location
+from .models import Community, Item, Community_user_mapping, Media, Media_type, Location, Item_type, Item_state, ITEM_TYPE_STATE_MAP
 from .utils import get_media_type, get_community_summary_data, get_communities
 from geoadmin.models import State, District, Block
 from projects.models import Project, AppType
 from users.models import User
 from utilities.auth_utils import auth_free
-from nrm_app.settings import S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_ACCESS_KEY, S3_REGION
+from nrm_app.settings import S3_BUCKET, S3_REGION
 
 
 @api_view(["POST"])
@@ -43,35 +45,49 @@ def create_item(request):
 @auth_free
 def attach_media_to_item(request):
     try:
-        s3_client = boto3.client('s3',
-                                 aws_access_key_id=S3_ACCESS_KEY,
-                                 aws_secret_access_key=S3_SECRET_ACCESS_KEY,
-                                 region_name=S3_REGION
-                                 )
+        s3_client = boto3.client('s3')
 
         item_id = request.data.get('item_id')
-        item = Item.objects.get(id=item_id)
-
         user_id = request.data.get('user_id')
 
-        files = request.data.get('files', '')
+        if not item_id or not user_id:
+            return Response({"success": False, "error": "Missing item_id or user_id"}, status=status.HTTP_400_BAD_REQUEST)
 
-        for media_key, media_files in files.items():
+        try:
+            item = Item.objects.get(id=item_id)
+        except Item.DoesNotExist:
+            return Response({"success": False, "error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        media_dict = defaultdict(list)
+        for key in request.FILES:
+            for file in request.FILES.getlist(key):
+                media_dict[key].append(file)
+
+        for media_key, media_files in media_dict.items():
             media_type = get_media_type(media_key)
-            if media_type and len(media_files)>0:
-                for media_file in media_files:
-                    media_file_name = media_file.name
-                    media_file_extension = media_file_name.split(".")[-1]
-                    key = media_key + "/" + str(uuid.uuid4()) + "." + media_file_extension
-                    s3_client.upload_fileobj(media_file, S3_BUCKET, key)
-                    media_path = S3_BUCKET + "/" + key
-                    media_obj = Media.objects.create(user_id=user_id, media_type=media_type, media_path=media_path)
-                    item.media.add(media_obj)
+            s3_folder = media_type.lower() + "s"  # images/, audios/, etc.
 
+            if not media_type:
+                continue
+
+            for media_file in media_files:
+                extension = media_file.name.split(".")[-1]
+                s3_key = f"{s3_folder}/{uuid.uuid4()}.{extension}"
+                print("Key:", s3_key)
+
+                s3_client.upload_fileobj(media_file, S3_BUCKET, s3_key)
+
+                media_path = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{s3_key}"
+                media_obj = Media.objects.create(
+                    user_id=user_id,
+                    media_type=media_type,
+                    media_path=media_path
+                )
+                item.media.add(media_obj)
         return Response({"success": True}, status=status.HTTP_201_CREATED)
     except Exception as e:
-        print("Exception in attach_media_to_item api :: ", e)
-        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print("Exception in attach_media_to_item:", str(e))
+        return Response({"success": False, "error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -309,32 +325,30 @@ def get_blocks_with_community(request):
         return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# @api_view(["GET"])
-# @auth_free
-# def get_items_by_community(request):
-#     try:
-#         data = []
-#         community_id = request.query_params.get("community_id")
-#         if not community_id:
-#             return Response(
-#                 {"success": False, "message": "Missing 'community_id' in query parameters."},
-#                 status=status.HTTP_400_BAD_REQUEST
-#             )
-#
-#         items = Item.objects.filter(community_id=community_id)
-#         for item in items:
-#             item_dict = {'id': item.id,
-#                          'number': item.user.contact_number,
-#                          'title': item.title,
-#                          'item_type': item.item_type}
-#             data.append(item_dict)
-#         return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
-#     except Exception as e:
-#         print("Exception in get_items_by_community API:", str(e))
-#         return Response(
-#             {"success": False, "message": "Internal server error."},
-#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#         )
+@api_view(["POST"])
+@auth_free
+def update_last_accessed_community(request):
+    try:
+        user_id = request.data.get("user_id")
+        community_id = request.data.get("community_id")
+
+        if not user_id or not community_id:
+            return Response(
+                {"success": False, "error": "user_id and community_id are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        mapping, created = Community_user_mapping.objects.update_or_create(
+            user_id=user_id,
+            community_id=community_id,
+            defaults={"is_last_accessed_community": True},
+        )
+
+        Community_user_mapping.objects.filter(user_id=user_id).exclude(pk=mapping.pk).update(is_last_accessed_community=False)
+        return Response({"success": True}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in update_last_accessed_community API :: ", e)
+        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -348,22 +362,31 @@ def get_items_by_community(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Optional filters
         item_type = request.query_params.get("item_type")
         item_state = request.query_params.get("item_state")
 
-        # Pagination parameters
-        limit = int(request.query_params.get("limit", 5))
+        limit = int(request.query_params.get("limit", 10))
         offset = int(request.query_params.get("offset", 0))
 
-        # Base queryset
         items_qs = Item.objects.filter(community_id=community_id)
 
         if item_type:
             items_qs = items_qs.filter(item_type=item_type)
 
-        if item_state:
-            items_qs = items_qs.filter(state=item_state)
+            if item_state:
+                valid_states = [state.value for state in ITEM_TYPE_STATE_MAP.get(item_type, [])]
+                if item_state not in valid_states:
+                    return Response(
+                        {"success": False, "message": f"Invalid item_state '{item_state}' for item_type '{item_type}'."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                items_qs = items_qs.filter(state=item_state)
+
+        elif item_state:
+            return Response(
+                {"success": False, "message": "Cannot filter by item_state without specifying item_type."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         items_qs = items_qs.order_by('-created_at')
         total_count = items_qs.count()
@@ -371,6 +394,17 @@ def get_items_by_community(request):
 
         data = []
         for item in paginated_items:
+            lat, lon = None, None
+            try:
+                coord = json.loads(item.coordinates or '{}')
+                lat = float(coord.get('lat')) if coord.get('lat') else None
+                lon = float(coord.get('lon')) if coord.get('lon') else None
+            except Exception:
+                pass
+
+            images = list(item.media.filter(media_type=Media_type.IMAGE).values_list('media_path', flat=True))
+            audios = list(item.media.filter(media_type=Media_type.AUDIO).values_list('media_path', flat=True))
+
             data.append({
                 'id': item.id,
                 'number': item.user.contact_number,
@@ -378,6 +412,10 @@ def get_items_by_community(request):
                 'item_type': item.item_type,
                 'state': item.state,
                 'created_at': item.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'latitude': lat,
+                'longitude': lon,
+                'images': images,
+                'audios': audios
             })
 
         return Response({
@@ -395,4 +433,5 @@ def get_items_by_community(request):
             {"success": False, "message": "Internal server error."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 

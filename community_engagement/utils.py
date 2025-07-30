@@ -3,14 +3,16 @@ from geoadmin.models import State, District, Block
 from django.db.models import Q
 
 
+
 def get_media_type(param):
-    if param=="images":
+    param = param.lower()
+    if "image" in param:
         return Media_type.IMAGE.value
-    elif param=="audios":
+    elif "audio" in param:
         return Media_type.AUDIO.value
-    elif param=="videos":
+    elif "video" in param:
         return Media_type.VIDEO.value
-    elif params=="docs":
+    elif "doc" in param:
         return Media_type.DOC.value
     return ""
 
@@ -51,15 +53,6 @@ def get_communities(state_name, district_name, block_name):
 
     data = [get_community_summary_data(c.id) for c in communities]
     return data
-
-
-def update_last_accessed_community(user, community_id):
-    mapping, created = Community_user_mapping.objects.update_or_create(
-        user=user,
-        community_id=community_id,
-        defaults={"is_last_accessed_community": True},
-    )
-    Community_user_mapping.objects.filter(user=user).exclude(pk=mapping.pk).update(is_last_accessed_community=False)
 
 
 def create_community_for_project(project):

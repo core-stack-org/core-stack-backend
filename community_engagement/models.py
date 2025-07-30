@@ -93,10 +93,43 @@ class Item_type(models.TextChoices):
 
 
 class Item_state(models.TextChoices):
-    UNM = "UNM", "UNM"
-    PUB = "PUB", "PUB"
-    ARC = "ARC", "ARC"
-    REJ = "REJ", "REJ"
+    UNMODERATED = "UNMODERATED", "UNMODERATED"
+    PUBLISHED = "PUBLISHED", "PUBLISHED"
+    REJECTED = "REJECTED", "REJECTED"
+    ASSIGNED = "ASSIGNED", "ASSIGNED"
+    INPROGRESS = "INPROGRESS", "INPROGRESS"
+    RESOLVED = "RESOLVED", "RESOLVED"
+    ACCEPTED_STAGE_1 = "ACCEPTED_STAGE_1", "ACCEPTED_STAGE_1"
+    ACCEPTED_STAGE_2 = "ACCEPTED_STAGE_2", "ACCEPTED_STAGE_2"
+    REJECTED_STAGE_1 = "REJECTED_STAGE_1", "REJECTED_STAGE_1"
+    REJECTED_STAGE_2 = "REJECTED_STAGE_2", "REJECTED_STAGE_2"
+
+
+ITEM_TYPE_STATE_MAP = {
+    Item_type.CONTENT: [
+        Item_state.UNMODERATED,
+        Item_state.PUBLISHED,
+        Item_state.REJECTED
+    ],
+    Item_type.GRIEVANCE: [
+        Item_state.UNMODERATED,
+        Item_state.INPROGRESS,
+        Item_state.RESOLVED,
+        Item_state.REJECTED
+    ],
+    Item_type.WORK_DEMAND: [
+        Item_state.UNMODERATED,
+        Item_state.ACCEPTED_STAGE_1,
+        Item_state.REJECTED_STAGE_1,
+        Item_state.INPROGRESS,
+        Item_state.RESOLVED
+    ],
+    Item_type.STORY: [
+        Item_state.UNMODERATED,
+        Item_state.PUBLISHED,
+        Item_state.REJECTED
+    ]
+}
 
 
 class Item(models.Model):

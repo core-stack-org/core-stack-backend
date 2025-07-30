@@ -13,4 +13,5 @@ urlpatterns = [
     path("get_items_by_community/", api.get_items_by_community, name="get_items_by_community"),
     path("get_districts_with_community/", api.get_districts_with_community, name="get_districts_with_community"),
     path("get_blocks_with_community/", api.get_blocks_with_community, name="get_blocks_with_community"),
+    path("update_last_accessed_community/", api.update_last_accessed_community, name="update_last_accessed_community"),
 ]
