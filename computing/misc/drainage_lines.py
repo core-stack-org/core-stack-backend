@@ -41,45 +41,44 @@ def clip_drainage_lines(
 
     description = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     asset_id = get_gee_asset_path(state, district, block) + description
-    try:
-        task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
 
-        task_id_list = check_task_status([task])
-        print("task_id_list", task_id_list)
-        if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"{district.title()}_{block.title()}",
-                asset_id=asset_id,
-                dataset_name="Drainage",
-            )
+    task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
 
-            make_asset_public(asset_id)
-    except Exception as e:
-        print(f"Error occurred in running drainage task: {e}")
+    task_id_list = check_task_status([task])
+    print("task_id_list", task_id_list)
 
-    try:
-        # Load feature collection from Earth Engine
-        fc = ee.FeatureCollection(asset_id)
-        res = sync_fc_to_geoserver(
-            fc,
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
             state,
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
-            "drainage",
+            district,
+            block,
+            layer_name=f"{district.title()}_{block.title()}",
+            asset_id=asset_id,
+            dataset_name="Drainage",
         )
-        print("Drainage line synced to geoserver:", res)
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"{district.title()}_{block.title()}",
-                asset_id=asset_id,
-                dataset_name="Drainage",
-                sync_to_geoserver=True,
-            )
 
-    except Exception as e:
-        print("Exception in syncing Drainage line to geoserver", e)
+        make_asset_public(asset_id)
+
+        try:
+            # Load feature collection from Earth Engine
+            fc = ee.FeatureCollection(asset_id)
+            res = sync_fc_to_geoserver(
+                fc,
+                state,
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
+                "drainage",
+            )
+            print("Drainage line synced to geoserver:", res)
+            if res["status_code"] == 201:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=f"{district.title()}_{block.title()}",
+                    asset_id=asset_id,
+                    dataset_name="Drainage",
+                    sync_to_geoserver=True,
+                )
+
+        except Exception as e:
+            print("Exception in syncing Drainage line to geoserver", e)

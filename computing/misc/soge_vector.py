@@ -122,6 +122,7 @@ def generate_soge_vector(self, state, district, block):
     # EXPORT TO GEE ASSET
     task = export_vector_asset_to_gee(all_results, description, asset_id)
     check_task_status([task])
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state,
@@ -132,17 +133,17 @@ def generate_soge_vector(self, state, district, block):
             dataset_name="SOGE",
         )
         make_asset_public(asset_id)
-    print("Geoserver Sync task started")
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, description, "soge")
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"soge_vector_{district.title()}_{block.title()}",
-            asset_id=asset_id,
-            dataset_name="SOGE",
-            sync_to_geoserver=True,
-        )
-    return res
+
+        print("Geoserver Sync task started")
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, state, description, "soge")
+        if res["status_code"] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"soge_vector_{district.title()}_{block.title()}",
+                asset_id=asset_id,
+                dataset_name="SOGE",
+                sync_to_geoserver=True,
+            )

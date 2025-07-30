@@ -45,16 +45,18 @@ def generate_tehsil_shape_file_data(self, state, district, block):
 
         task_id_list = check_task_status([task_id]) if task_id else []
         print("task_id", task_id_list)
-        if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"{district.title()}_{block.title()}",
-                asset_id=asset_id,
-                dataset_name="Admin Boundary",
-            )
-            make_asset_public(asset_id)
+
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"{district.title()}_{block.title()}",
+            asset_id=asset_id,
+            dataset_name="Admin Boundary",
+        )
+        make_asset_public(asset_id)
+
     # Generate shape files and sync to geoserver
     shp_path = sync_admin_boundry_to_geoserver(
         collection, state_dir, district, block, state, asset_id
@@ -69,6 +71,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
         )
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         upload_shp_to_gee(layer_path, layer_name, asset_id)
+        make_asset_public(asset_id)
 
 
 def sync_admin_boundry_to_geoserver(

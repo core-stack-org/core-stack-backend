@@ -355,6 +355,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
     # Export an ee.FeatureCollection as an Earth Engine asset.
     task = export_vector_asset_to_gee(fc, asset_name, asset_id)
     check_task_status([task])
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state,

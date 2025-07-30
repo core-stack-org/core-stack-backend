@@ -170,8 +170,10 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
         + valid_gee_text(block_name.lower())
     )
     asset_id = get_gee_asset_path(state_name, district_name, block_name) + description
+
     file_size_bytes = get_directory_size(path)
     file_size_mb = file_size_bytes / (1024 * 1024)
+
     if file_size_mb > 10:
         export_shp_to_gee(district_name, block_name, path, asset_id)
     else:
@@ -180,6 +182,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
         if task_id:
             nrega_task_id_list = check_task_status([task_id])
             print("nrega_task_id_list", nrega_task_id_list)
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state_name,
@@ -191,16 +194,16 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
         )
         print("save nrega_assets layer info at the gee level...")
         make_asset_public(asset_id)
-    res = push_shape_to_geoserver(path, workspace="nrega_assets")
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state_name,
-            district_name,
-            block_name,
-            layer_name=f"{district_name.title()}_{block_name.title()}",
-            asset_id=asset_id,
-            dataset_name="NREGA Assets",
-            sync_to_geoserver=True,
-        )
-        print("save nrega_assets layer info at the geoserver level...")
-    return res
+
+        res = push_shape_to_geoserver(path, workspace="nrega_assets")
+        if res["status_code"] == 201:
+            save_layer_info_to_db(
+                state_name,
+                district_name,
+                block_name,
+                layer_name=f"{district_name.title()}_{block_name.title()}",
+                asset_id=asset_id,
+                dataset_name="NREGA Assets",
+                sync_to_geoserver=True,
+            )
+            print("save nrega_assets layer info at the geoserver level...")

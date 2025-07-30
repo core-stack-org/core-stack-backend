@@ -385,20 +385,22 @@ def get_pss(
             region=roi.geometry(),
         )
         check_task_status([task_id])
-        if state and district and block and is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description,
-                asset_id=asset_id,
-                dataset_name="Plantation",
-            )
-            print("save site suitability info at the gee level...")
-            make_asset_public(asset_id)
 
-        sync_to_gcs_geoserver(asset_id, description, scale, state, district, block)
-        return asset_id, is_default_profile
+        if is_gee_asset_exists(asset_id):
+            make_asset_public(asset_id)
+            if state and district and block:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=description,
+                    asset_id=asset_id,
+                    dataset_name="Site Suitability",
+                )
+                print("save site suitability info at the gee level...")
+
+            sync_to_gcs_geoserver(asset_id, description, scale, state, district, block)
+            return asset_id, is_default_profile
 
     except Exception as e:
         logger.exception(f"Export failed: {str(e)}")
@@ -598,7 +600,7 @@ def sync_to_gcs_geoserver(
             block,
             layer_name,
             asset_id,
-            dataset_name="Plantation",
+            dataset_name="Site Suitability",
             sync_to_geoserver=True,
         )
         print("save site suitability raster layer info at the geoserver level...")

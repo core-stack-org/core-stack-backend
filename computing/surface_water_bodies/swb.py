@@ -80,9 +80,10 @@ def generate_swb_layer(
     if swb2:
         task_id_list = check_task_status([swb2])
         print("SWB2 task completed - task_id_list:", task_id_list)
-        process_and_sync_asset(
-            asset_id, layer_name, asset_suffix, state, district, block
-        )
+
+    sync_asset_to_db_and_geoserver(
+        asset_id, layer_name, asset_suffix, state, district, block
+    )
 
     # SWB3: Intersect water bodies with WBC (Water Body Census) to get more data on intersecting water bodies
     swb3, asset_id = waterbody_wbc_intersection(
@@ -95,17 +96,13 @@ def generate_swb_layer(
     if swb3:
         task_id_list = check_task_status([swb3])
         print("SWB task completed - swb3_task_id_list:", task_id_list)
-        process_and_sync_asset(
-            asset_id,
-            layer_name,
-            asset_suffix,
-            state,
-            district,
-            block,
-        )
+
+    sync_asset_to_db_and_geoserver(
+        asset_id, layer_name, asset_suffix, state, district, block
+    )
 
 
-def process_and_sync_asset(
+def sync_asset_to_db_and_geoserver(
     asset_id,
     layer_name,
     asset_suffix,
@@ -115,30 +112,29 @@ def process_and_sync_asset(
     dataset_name="Surface Water Bodies",
     workspace="swb",
 ):
-    if not is_gee_asset_exists(asset_id) and state and district and block:
-        return
+    if is_gee_asset_exists(asset_id):
+        if state and district and block:
+            save_layer_info_to_db(
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name,
+                asset_id=asset_id,
+                dataset_name=dataset_name,
+            )
+        make_asset_public(asset_id)
 
-    save_layer_info_to_db(
-        state=state,
-        district=district,
-        block=block,
-        layer_name=layer_name,
-        asset_id=asset_id,
-        dataset_name=dataset_name,
-    )
-    make_asset_public(asset_id)
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace=workspace)
+        print(res)
 
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace=workspace)
-    print(res)
-
-    if res.get("status_code") == 201:
-        save_layer_info_to_db(
-            state=state,
-            district=district,
-            block=block,
-            layer_name=layer_name,
-            asset_id=asset_id,
-            dataset_name=dataset_name,
-            sync_to_geoserver=True,
-        )
+        if res.get("status_code") == 201 and state and district and block:
+            save_layer_info_to_db(
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name,
+                asset_id=asset_id,
+                dataset_name=dataset_name,
+                sync_to_geoserver=True,
+            )

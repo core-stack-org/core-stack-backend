@@ -147,6 +147,7 @@ def generate_aquifer_vector(self, state, district, block):
     asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(fc, description, asset_id)
     check_task_status([task])
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state,
@@ -157,16 +158,16 @@ def generate_aquifer_vector(self, state, district, block):
             dataset_name="Aquifer",
         )
         make_asset_public(asset_id)
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, description, "aquifer")
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"aquifer_vector_{district.title()}_{block.title()}",
-            asset_id=asset_id,
-            dataset_name="Aquifer",
-            sync_to_geoserver=True,
-        )
-    return res
+
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, state, description, "aquifer")
+        if res["status_code"] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"aquifer_vector_{district.title()}_{block.title()}",
+                asset_id=asset_id,
+                dataset_name="Aquifer",
+                sync_to_geoserver=True,
+            )

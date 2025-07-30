@@ -41,7 +41,7 @@ def generate_restoration_opportunity(self, state, district, block):
         {"value": 3, "label": "Excluded Areas"},
     ]
 
-    return generate_vector(
+    generate_vector(
         roi, raster_asset_id, args, state, district, block, description + "_vector"
     )
 
@@ -64,6 +64,7 @@ def clip_raster(roi, state, district, block, description):
         region=roi.geometry(),
     )
     check_task_status([task_id])
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state,
@@ -74,26 +75,28 @@ def clip_raster(roi, state, district, block, description):
             dataset_name="Restoration Raster",
         )
         make_asset_public(asset_id)
-    image = ee.Image(asset_id)
-    task_id = sync_raster_to_gcs(image, 60, description + "_raster")
-    check_task_status([task_id])
-    res = sync_raster_gcs_to_geoserver(
-        "restoration",
-        description + "_raster",
-        description + "_raster",
-        "restoration_style",
-    )
-    if res:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"restoration_{district.title()}_{block.title()}_raster",
-            asset_id=asset_id,
-            dataset_name="Restoration Raster",
-            sync_to_geoserver=True,
+
+        image = ee.Image(asset_id)
+        task_id = sync_raster_to_gcs(image, 60, description + "_raster")
+        check_task_status([task_id])
+        res = sync_raster_gcs_to_geoserver(
+            "restoration",
+            description + "_raster",
+            description + "_raster",
+            "restoration_style",
         )
-    return asset_id
+        if res:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"restoration_{district.title()}_{block.title()}_raster",
+                asset_id=asset_id,
+                dataset_name="Restoration Raster",
+                sync_to_geoserver=True,
+            )
+        return asset_id
+    return None
 
 
 def generate_vector(roi, raster_asset_id, args, state, district, block, description):
@@ -141,6 +144,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         asset_id=asset_id,
     )
     check_task_status([task_id])
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state,
@@ -151,17 +155,16 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
             dataset_name="Restoration Vector",
         )
 
-    fc = ee.FeatureCollection(fc).getInfo()
-    fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(state, fc, description, "restoration")
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"restoration_{district.title()}_{block.title()}_vector",
-            asset_id=asset_id,
-            dataset_name="Restoration Vector",
-            sync_to_geoserver=True,
-        )
-    return res
+        fc = ee.FeatureCollection(fc).getInfo()
+        fc = {"features": fc["features"], "type": fc["type"]}
+        res = sync_layer_to_geoserver(state, fc, description, "restoration")
+        if res["status_code"] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"restoration_{district.title()}_{block.title()}_vector",
+                asset_id=asset_id,
+                dataset_name="Restoration Vector",
+                sync_to_geoserver=True,
+            )

@@ -172,25 +172,13 @@ def merge_new_kmls(
         fc = gdf_to_ee_fc(gdf)
         asset = ee.FeatureCollection([roi, fc]).flatten()
 
-        try:
-            # Export updated feature collection to Earth Engine
-            task = export_vector_asset_to_gee(asset, description, asset_id)
-            check_task_status([task])
-            logger.info("ROI for project: %s exported to GEE", project_name)
-            if state and district and block and is_gee_asset_exists(asset_id):
-                save_layer_info_to_db(
-                    state,
-                    district,
-                    block,
-                    layer_name=project_name,
-                    asset_id=asset_id,
-                    dataset_name="Plantation Vector",
-                )
-                print("save site suitability info at the gee level...")
-                make_asset_public(asset_id)
+        # Export updated feature collection to Earth Engine
+        task = export_vector_asset_to_gee(asset, description, asset_id)
+        check_task_status([task])
+        logger.info("ROI for project: %s exported to GEE", project_name)
+        if is_gee_asset_exists(asset_id):
+            make_asset_public(asset_id)
 
-        except Exception as e:
-            logger.exception("Exception in exporting asset: %s", e)
     return have_new_sites
 
 
@@ -317,9 +305,6 @@ def check_site_suitability(
                 is_default_profile,
                 descs[i],
                 chunk_asset_id,
-                state,
-                district,
-                block,
             )
             if task_id:
                 tasks.append(task_id)
@@ -351,20 +336,24 @@ def check_site_suitability(
         if task_id:
             check_task_status([task_id], 120)
 
+    if is_gee_asset_exists(asset_id):
+        if state and district and block:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=project_name,
+                asset_id=asset_id,
+                dataset_name="Site Suitability Vector",
+            )
+            print("save site suitability info at the gee level...")
+        make_asset_public(asset_id)
+
     return asset_id, asset_name
 
 
 def generate_vector(
-    roi,
-    start_year,
-    end_year,
-    pss_rasters,
-    is_default_profile,
-    description,
-    asset_id,
-    state=None,
-    district=None,
-    block=None,
+    roi, start_year, end_year, pss_rasters, is_default_profile, description, asset_id
 ):
 
     def get_max_val(feature):
@@ -445,11 +434,6 @@ def sync_suitability_to_geoserver(
 ):
     """
     Synchronize suitability analysis results to GeoServer.
-
-    Args:
-        asset_id: Earth Engine asset ID
-        organization: Organization name
-        layer_name: Layer name
     """
 
     try:
@@ -471,7 +455,7 @@ def sync_suitability_to_geoserver(
                 block,
                 layer_name=layer_name,
                 asset_id=asset_id,
-                dataset_name="Plantation Vector",
+                dataset_name="Site Suitability Vector",
                 sync_to_geoserver=True,
             )
             print("save site suitability vector info at the geoserver level...")

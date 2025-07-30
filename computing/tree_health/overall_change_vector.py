@@ -134,7 +134,7 @@ def sync_change_to_geoserver(block, district, state):
             state,
             district,
             block,
-            f"tree_health_overall_change_vector_{district.title()}_{block.title()}",
+            f"tree_health_overall_change_vector_{district.lower()}_{block.lower()}",
             asset_id,
             "Tree Overall Change Vector",
             sync_to_geoserver=True,
