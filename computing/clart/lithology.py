@@ -10,6 +10,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     upload_tif_to_gcs,
     upload_tif_from_gcs_to_gee,
+    make_asset_public,
 )
 from computing.utils import save_layer_info_to_db
 
@@ -47,13 +48,15 @@ def generate_lithology_layer(self, state, district, block):
         task_id = upload_tif_from_gcs_to_gee(gcs_path, asset_id, 30)
         task_list = check_task_status([task_id])
         print("lithology task list ", task_list)
-        if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name="",
-                asset_id=asset_id,
-                dataset_name="Lithology",
-            )
-            print("save lithology info at the gee level...")
+
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name="",
+            asset_id=asset_id,
+            dataset_name="Lithology",
+        )
+        print("save lithology info at the gee level...")
+        make_asset_public(asset_id)

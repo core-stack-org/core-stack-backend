@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     upload_tif_to_gcs,
     upload_tif_from_gcs_to_gee,
     sync_raster_gcs_to_geoserver,
+    make_asset_public,
 )
 from nrm_app.settings import BASE_DIR
 from nrm_app.celery import app
@@ -23,15 +24,11 @@ def generate_fes_clart_layer(self, state, district, block, file_path, clart_file
         description = f"{valid_gee_text(district)}_{valid_gee_text(block)}_clart"
         asset_id = get_gee_asset_path(state, district, block) + description + "_fes"
 
-        if is_gee_asset_exists(asset_id):
-            return {
-                "success": f"Asset already exists: {asset_id}",
-                "asset_id": asset_id,
-            }
+        if not is_gee_asset_exists(asset_id):
+            gcs_path = upload_tif_to_gcs(clart_filename, file_path)
+            task_id = upload_tif_from_gcs_to_gee(gcs_path, asset_id, 30)
+            check_task_status([task_id])
 
-        gcs_path = upload_tif_to_gcs(clart_filename, file_path)
-        task_id = upload_tif_from_gcs_to_gee(gcs_path, asset_id, 30)
-        check_task_status([task_id])
         if is_gee_asset_exists(asset_id):
             save_layer_info_to_db(
                 state,
@@ -42,22 +39,24 @@ def generate_fes_clart_layer(self, state, district, block, file_path, clart_file
                 dataset_name="CLART",
             )
             print("saving fes clart layer info at the gee level...")
-        res = sync_raster_gcs_to_geoserver(
-            "clart", description + "_fes", description, "testClart"
-        )
-        if res:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description,
-                asset_id=asset_id,
-                dataset_name="CLART",
-                sync_to_geoserver=True,
-                misc={"override_name": f"{description}_fes"},
-                is_override=True,
+            make_asset_public(asset_id)
+
+            res = sync_raster_gcs_to_geoserver(
+                "clart", description + "_fes", description, "testClart"
             )
-            print("saving fes clart layer info at the geoserver level...")
-        return res
+            if res:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=description,
+                    asset_id=asset_id,
+                    dataset_name="CLART",
+                    sync_to_geoserver=True,
+                    misc={"override_name": f"{description}_fes"},
+                    is_override=True,
+                )
+                print("saving fes clart layer info at the geoserver level...")
+            return res
     except Exception as e:
         raise e

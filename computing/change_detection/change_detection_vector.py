@@ -62,8 +62,8 @@ def vectorise_change_detection(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Change Detection Vector",
             )
-        make_asset_public(asset_id)
-        sync_change_to_geoserver(block, district, state, asset_id, param)
+            make_asset_public(asset_id)
+            sync_change_to_geoserver(block, district, state, asset_id, param)
 
 
 def afforestation_vector(roi, state, district, block):

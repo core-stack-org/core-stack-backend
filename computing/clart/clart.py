@@ -207,46 +207,45 @@ def clart_layer(state, district, block):
         tc = tc.where(class5, 5)
 
         try:
-            scale = 30
             task_id = export_raster_asset_to_gee(
                 image=tc,
                 description=description,
                 asset_id=final_output_assetid,
-                scale=scale,
+                scale=30,
                 region=geometry,
             )
-
             clart_task_id_list = check_task_status([task_id])
             print("clart_task_id_list", clart_task_id_list)
-            if is_gee_asset_exists(final_output_assetid):
-                save_layer_info_to_db(
-                    state,
-                    district,
-                    block,
-                    layer_name=layer_name,
-                    asset_id=final_output_assetid,
-                    dataset_name="CLART",
-                )
-            make_asset_public(final_output_assetid)
+
         except Exception as e:
             print(f"Error occurred in running clart: {e}")
 
-    """ Sync image to google cloud storage and then to geoserver"""
-
-    image = ee.Image(final_output_assetid)
-    task_id = sync_raster_to_gcs(image, 30, layer_name)
-
-    task_id_list = check_task_status([task_id])
-    print("task_id_list sync to gcs ", task_id_list)
-
-    res = sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
-    if res:
+    if is_gee_asset_exists(final_output_assetid):
         save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name,
-            final_output_assetid,
-            "CLART",
-            sync_to_geoserver=True,
+            layer_name=layer_name,
+            asset_id=final_output_assetid,
+            dataset_name="CLART",
         )
+        make_asset_public(final_output_assetid)
+
+        """ Sync image to google cloud storage and then to geoserver"""
+        image = ee.Image(final_output_assetid)
+        task_id = sync_raster_to_gcs(image, 30, layer_name)
+
+        task_id_list = check_task_status([task_id])
+        print("task_id_list sync to gcs ", task_id_list)
+
+        res = sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
+        if res:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name,
+                final_output_assetid,
+                "CLART",
+                sync_to_geoserver=True,
+            )

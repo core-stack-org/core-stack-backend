@@ -98,6 +98,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
     task = export_vector_asset_to_gee(fc, description, asset_id)
     task_status = check_task_status([task])
     print("Task completed - ", task_status)
+
     if is_gee_asset_exists(asset_id):
         save_layer_info_to_db(
             state,
@@ -107,27 +108,28 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
             asset_id=asset_id,
             dataset_name="LULC",
         )
-    make_asset_public(asset_id)
-    fc = ee.FeatureCollection(asset_id).getInfo()
+        make_asset_public(asset_id)
 
-    fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
-        "lulc_vector_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-        "lulc_vector",
-    )
-    print(res)
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
+        fc = ee.FeatureCollection(asset_id).getInfo()
+
+        fc = {"features": fc["features"], "type": fc["type"]}
+        res = sync_layer_to_geoserver(
             state,
-            district,
-            block,
-            layer_name=description,
-            asset_id=asset_id,
-            dataset_name="LULC",
-            sync_to_geoserver=True,
+            fc,
+            "lulc_vector_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower()),
+            "lulc_vector",
         )
+        print(res)
+        if res["status_code"] == 201:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=description,
+                asset_id=asset_id,
+                dataset_name="LULC",
+                sync_to_geoserver=True,
+            )

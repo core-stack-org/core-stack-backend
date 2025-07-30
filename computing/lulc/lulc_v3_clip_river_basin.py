@@ -86,6 +86,7 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
 
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)
+
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     for i in range(0, len(l1_asset_new)):
         name_arr = final_output_filename_array_new[i].split("_20")
@@ -112,6 +113,8 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
                     dataset_name=workspace,
                 )
                 print("saved info to db at the gee level...")
+        make_asset_public(final_output_assetid_array_new[i])
+
     sync_lulc_to_gcs(
         final_output_filename_array_new,
         final_output_assetid_array_new,

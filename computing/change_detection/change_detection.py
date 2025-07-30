@@ -100,7 +100,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
                 asset_id=asset_id,
                 dataset_name="Change Detection Raster",
             )
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
 
     sync_to_gcs_geoserver(state, district, block, description, param_dict.keys())
 

@@ -13,6 +13,7 @@ from utilities.gee_utils import (
     sync_vector_to_gcs,
     get_geojson_from_gcs,
     export_vector_asset_to_gee,
+    make_asset_public,
 )
 from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
@@ -64,7 +65,8 @@ def drainage_density(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Drainage Density",
             )
-            print("save drainage density info at the gee level...")
+            print("saved drainage density info at the gee level...")
+            make_asset_public(asset_id)
 
 
 def generate_vector(state, district, block):
