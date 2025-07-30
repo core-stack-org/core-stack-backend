@@ -56,7 +56,7 @@ def clip_drainage_lines(
                 dataset_name="Drainage",
             )
 
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
     except Exception as e:
         print(f"Error occurred in running drainage task: {e}")
 

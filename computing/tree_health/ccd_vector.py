@@ -149,7 +149,7 @@ def tree_health_ccd_vector(self, state, district, block, start_year, end_year):
             asset_id=asset_id,
             dataset_name="Ccd Vector",
         )
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
     final_fc = {"type": "FeatureCollection", "features": final_features}
     try:
         sync_res = sync_layer_to_geoserver(state, final_fc, geo_filename, "ccd")

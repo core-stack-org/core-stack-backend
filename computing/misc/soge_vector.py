@@ -131,7 +131,7 @@ def generate_soge_vector(self, state, district, block):
             asset_id=asset_id,
             dataset_name="SOGE",
         )
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
     print("Geoserver Sync task started")
     fc = ee.FeatureCollection(asset_id)
     res = sync_fc_to_geoserver(fc, state, description, "soge")

@@ -364,7 +364,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
             asset_id=asset_id,
             dataset_name="Terrain Vector",
         )
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
 
 
 def sync_to_geoserver(state, district, block, asset_id, asset_name):

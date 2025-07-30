@@ -93,7 +93,7 @@ def lulc_on_slope_cluster(self, state, district, block, start_year, end_year):
                 asset_id=asset_id,
                 dataset_name="Terrain LULC",
             )
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(

@@ -60,7 +60,7 @@ def terrain_raster(self, state, district, block):
                 asset_id,
                 "Terrain Raster",
             )
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
     """ Sync image to google cloud storage and then to geoserver"""
     layer_name = (
         valid_gee_text(district.lower())

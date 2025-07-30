@@ -99,7 +99,7 @@ def generate_hydrology(
 
     task_id_list = check_task_status(task_list) if len(task_list) > 0 else []
     print("task_id_list", task_id_list)
-    if is_gee_asset_exists(et_asset_id):
+    if is_gee_asset_exists(et_asset_id) and state and district and block:
         save_layer_info_to_db(
             state,
             district,
@@ -109,8 +109,9 @@ def generate_hydrology(
             dataset_name="Evapotranspiration",
         )
         print("save Evapotranspiration info at the gee level...")
+        make_asset_public(et_asset_id)
 
-    if is_gee_asset_exists(ppt_asset_id):
+    if is_gee_asset_exists(ppt_asset_id) and state and district and block:
         save_layer_info_to_db(
             state,
             district,
@@ -120,8 +121,9 @@ def generate_hydrology(
             dataset_name="Precipitation",
         )
         print("save Precipitation info at the gee level...")
+        make_asset_public(ppt_asset_id)
 
-    if is_gee_asset_exists(ro_asset_id):
+    if is_gee_asset_exists(ro_asset_id) and state and district and block:
         save_layer_info_to_db(
             state,
             district,
@@ -131,10 +133,7 @@ def generate_hydrology(
             dataset_name="Run Off",
         )
         print("save Run Off info at the gee level...")
-    # Make above asset public on GEE
-    make_asset_public(ppt_asset_id)
-    make_asset_public(et_asset_id)
-    make_asset_public(ro_task_id)
+        make_asset_public(ro_task_id)
 
     dg_task_id, asset_id = delta_g(
         roi=roi,
@@ -147,10 +146,9 @@ def generate_hydrology(
     )
     task_id_list = check_task_status([dg_task_id]) if dg_task_id else []
     print("dg task_id_list", task_id_list)
-    make_asset_public(asset_id)
 
     layer_name = "deltaG_fortnight_" + asset_suffix
-    if is_gee_asset_exists(asset_id):
+    if is_gee_asset_exists(asset_id) and state and district and block:
         save_layer_info_to_db(
             state,
             district,
@@ -159,6 +157,7 @@ def generate_hydrology(
             asset_id=asset_id,
             dataset_name="MWS",
         )
+        make_asset_public(asset_id)
 
     if is_annual:
         wd_task_id, wd_asset_id = well_depth(
@@ -170,7 +169,7 @@ def generate_hydrology(
         )
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wd task_id_list", task_id_list)
-        if is_gee_asset_exists(wd_asset_id):
+        if is_gee_asset_exists(wd_asset_id) and state and district and block:
             save_layer_info_to_db(
                 state,
                 district,
@@ -180,7 +179,7 @@ def generate_hydrology(
                 dataset_name="Well Depth",
             )
             print("save Well Depth info at the gee level...")
-        make_asset_public(wd_asset_id)
+            make_asset_public(wd_asset_id)
 
         wd_task_id, asset_id = net_value(
             asset_suffix=asset_suffix,
@@ -191,10 +190,9 @@ def generate_hydrology(
         )
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wdn task_id_list", task_id_list)
-        make_asset_public(asset_id)
 
         layer_name = "deltaG_well_depth_" + asset_suffix
-        if is_gee_asset_exists(asset_id):
+        if is_gee_asset_exists(asset_id) and state and district and block:
             save_layer_info_to_db(
                 state,
                 district,
@@ -203,15 +201,16 @@ def generate_hydrology(
                 asset_id=asset_id,
                 dataset_name="MWS",
             )
+            make_asset_public(asset_id)
 
     calculate_g(
-        state,
-        district,
-        block,
         asset_id=asset_id,
         layer_name=layer_name,
         shp_folder=asset_suffix,
         start_date=start_date,
         end_date=end_date,
         is_annual=is_annual,
+        state=state,
+        district=district,
+        block=block,
     )

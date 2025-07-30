@@ -1,7 +1,7 @@
 from django.db import models
 from pygments.lexer import default
 
-from geoadmin.models import State, District, Block
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 
 class LayerType(models.TextChoices):
@@ -40,9 +40,9 @@ class Layer(models.Model):
     id = models.AutoField(primary_key=True)
     dataset = models.ForeignKey(Dataset, on_delete=models.CASCADE)
     layer_name = models.CharField(max_length=511, blank=True, null=True)
-    state = models.ForeignKey(State, on_delete=models.CASCADE)
-    district = models.ForeignKey(District, on_delete=models.CASCADE)
-    block = models.ForeignKey(Block, on_delete=models.CASCADE)
+    state = models.ForeignKey(StateSOI, on_delete=models.CASCADE)
+    district = models.ForeignKey(DistrictSOI, on_delete=models.CASCADE)
+    block = models.ForeignKey(TehsilSOI, on_delete=models.CASCADE)
     is_excel_generated = models.BooleanField(default=False, blank=True, null=True)
     gee_asset_path = models.CharField(
         max_length=511, blank=True, null=True, default="not available"

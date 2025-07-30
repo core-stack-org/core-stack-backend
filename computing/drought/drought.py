@@ -125,7 +125,7 @@ def calculate_drought(
             asset_suffix, asset_folder_list, app_type, start_year, end_year
         )
         check_task_status([task_id])
-        if is_gee_asset_exists(asset_id):
+        if state and district and block and is_gee_asset_exists(asset_id):
             save_layer_info_to_db(
                 state,
                 district,
@@ -135,13 +135,13 @@ def calculate_drought(
                 dataset_name="Drought",
             )
 
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
 
     res = sync_fc_to_geoserver(fc, state, description, "cropping_drought")
     print(res)
-    if res["status_code"] == 201:
+    if res["status_code"] == 201 and state and district and block:
         save_layer_info_to_db(
             state,
             district,

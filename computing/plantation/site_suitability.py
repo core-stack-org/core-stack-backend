@@ -141,9 +141,9 @@ def merge_new_kmls(
     project_name,
     kml_files_obj,
     have_new_sites,
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
 ):
     """
     Merge new KML files into an existing Google Earth Engine asset.
@@ -176,9 +176,8 @@ def merge_new_kmls(
             # Export updated feature collection to Earth Engine
             task = export_vector_asset_to_gee(asset, description, asset_id)
             check_task_status([task])
-            make_asset_public(asset_id)
             logger.info("ROI for project: %s exported to GEE", project_name)
-            if is_gee_asset_exists(asset_id):
+            if state and district and block and is_gee_asset_exists(asset_id):
                 save_layer_info_to_db(
                     state,
                     district,
@@ -188,6 +187,8 @@ def merge_new_kmls(
                     dataset_name="Plantation Vector",
                 )
                 print("save site suitability info at the gee level...")
+                make_asset_public(asset_id)
+
         except Exception as e:
             logger.exception("Exception in exporting asset: %s", e)
     return have_new_sites
@@ -361,9 +362,9 @@ def generate_vector(
     is_default_profile,
     description,
     asset_id,
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
 ):
 
     def get_max_val(feature):
@@ -440,7 +441,7 @@ def generate_vector(
 
 
 def sync_suitability_to_geoserver(
-    asset_id, shp_folder, layer_name, state, district, block
+    asset_id, shp_folder, layer_name, state=None, district=None, block=None
 ):
     """
     Synchronize suitability analysis results to GeoServer.
@@ -463,7 +464,7 @@ def sync_suitability_to_geoserver(
             workspace="plantation",
         )
         logger.info("Suitability vector synced to geoserver: %s", res)
-        if res["status_code"] == 201:
+        if res["status_code"] == 201 and state and district and block:
             save_layer_info_to_db(
                 state,
                 district,

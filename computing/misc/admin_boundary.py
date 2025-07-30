@@ -54,7 +54,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Admin Boundary",
             )
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
     # Generate shape files and sync to geoserver
     shp_path = sync_admin_boundry_to_geoserver(
         collection, state_dir, district, block, state, asset_id

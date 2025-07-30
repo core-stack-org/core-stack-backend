@@ -102,6 +102,7 @@ def check_gee_task_status(task_id):
 
 
 def check_task_status(task_id_list, sleep_time=60):
+    task_id_list = list(filter(None, task_id_list))
     if len(task_id_list) > 0:
         time.sleep(sleep_time)
         tasks = ee.data.listOperations()

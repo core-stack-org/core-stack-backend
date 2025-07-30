@@ -6,15 +6,15 @@ import json
 
 
 def calculate_g(
-    state,
-    district,
-    block,
     asset_id,
     layer_name,
     shp_folder,
     start_date,
     end_date,
     is_annual,
+    state=None,
+    district=None,
+    block=None,
 ):
     fc = ee.FeatureCollection(asset_id).getInfo()
     features = fc["features"]
@@ -64,7 +64,7 @@ def calculate_g(
         f["properties"] = properties
     fc["features"] = features
     res = sync_layer_to_geoserver(shp_folder, fc, layer_name, "mws_layers")
-    if res["status_code"] == 201:
+    if res["status_code"] == 201 and state and district and block:
         save_layer_info_to_db(
             state,
             district,

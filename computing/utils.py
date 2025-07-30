@@ -30,7 +30,7 @@ from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
 from computing.models import Dataset, Layer, LayerType
-from geoadmin.models import State, District, Block
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 
 def generate_shape_files(path):
@@ -260,16 +260,18 @@ def save_layer_info_to_db(
 ):
     print("inside the save_layer_info_to_db function ")
     dataset = Dataset.objects.get(name=dataset_name, layer_version=layer_version)
-    state = state.lower().replace(" ", "_")
-    district = district.lower().replace(" ", "_")
-    block = block.lower().replace(" ", "_")
+    state = state.upper()
+    district = district.upper()
+    block = block.upper()
 
     try:
-        state_obj = State.objects.get(state_name__iexact=state)
-        district_obj = District.objects.get(
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
             district_name__iexact=district, state=state_obj
         )
-        block_obj = Block.objects.get(block_name__iexact=block, district=district_obj)
+        block_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=block, district=district_obj
+        )
     except Exception as e:
         print("Error fetching in state district block:", e)
         return

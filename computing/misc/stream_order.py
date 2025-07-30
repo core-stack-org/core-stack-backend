@@ -64,7 +64,7 @@ def generate_stream_order_vector(self, state, district, block):
                 asset_id=asset_id,
                 dataset_name="Stream Order",
             )
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
     # Sync to geoserver
     fc = ee.FeatureCollection(
         get_gee_asset_path(state, district, block) + description

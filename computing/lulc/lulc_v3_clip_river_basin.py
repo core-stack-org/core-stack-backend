@@ -113,7 +113,7 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
                     dataset_name=workspace,
                 )
                 print("saved info to db at the gee level...")
-        make_asset_public(final_output_assetid_array_new[i])
+                make_asset_public(final_output_assetid_array_new[i])
 
     sync_lulc_to_gcs(
         final_output_filename_array_new,

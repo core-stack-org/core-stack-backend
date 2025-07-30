@@ -156,7 +156,7 @@ def generate_aquifer_vector(self, state, district, block):
             asset_id=asset_id,
             dataset_name="Aquifer",
         )
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
     fc = ee.FeatureCollection(asset_id)
     res = sync_fc_to_geoserver(fc, state, description, "aquifer")
     if res["status_code"] == 201:

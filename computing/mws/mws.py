@@ -131,7 +131,7 @@ def mws_layer(self, state, district, block):
                     dataset_name="mws_only",
                 )
                 print("save mws layer info at the gee level...")
-    make_asset_public(asset_id)
+                make_asset_public(asset_id)
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id):

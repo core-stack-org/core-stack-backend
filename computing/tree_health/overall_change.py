@@ -128,7 +128,7 @@ def tree_health_overall_change_raster(self, state, district, block):
                 asset_id,
                 "Tree Overall Change Raster",
             )
-        make_asset_public(asset_id)
+            make_asset_public(asset_id)
         # Sync raster to GeoServer
         res = sync_raster_gcs_to_geoserver(
             "tree_overall_ch", layer_name, layer_name, "tree_overall_ch_style"

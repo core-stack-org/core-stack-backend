@@ -49,7 +49,7 @@ def tree_health_overall_change_vector(self, state, district, block):
             asset_id,
             "Tree Overall Change Vector",
         )
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
     sync_change_to_geoserver(block, district, state)
 
 
