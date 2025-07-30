@@ -20,6 +20,7 @@ from utilities.gee_utils import (
 from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
 from utilities.logger import setup_logger
+from ..utils import save_layer_info_to_db
 
 logger = setup_logger(__name__)
 
@@ -384,10 +385,19 @@ def get_pss(
             region=roi.geometry(),
         )
         check_task_status([task_id])
-
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=description,
+                asset_id=asset_id,
+                dataset_name="Plantation",
+            )
+            print("save site suitability info at the gee level...")
         make_asset_public(asset_id)
 
-        sync_to_gcs_geoserver(asset_id, description, scale)
+        sync_to_gcs_geoserver(asset_id, description, scale, state, district, block)
         return asset_id, is_default_profile
 
     except Exception as e:
@@ -567,15 +577,26 @@ def create_classification(
     return sub_layer
 
 
-def sync_to_gcs_geoserver(asset_id, layer_name, scale):
+def sync_to_gcs_geoserver(asset_id, layer_name, scale, state, district, block):
     image = ee.Image(asset_id)
     task_id = sync_raster_to_gcs(image, scale, layer_name)
     task_id_list = check_task_status([task_id])
     print("task_id sync to gcs ", task_id_list)
 
-    sync_raster_gcs_to_geoserver(
+    res = sync_raster_gcs_to_geoserver(
         "plantation",
         layer_name,
         layer_name,
         None,
     )
+    if res:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name,
+            asset_id,
+            dataset_name="Plantation",
+            sync_to_geoserver=True,
+        )
+        print("save site suitability raster layer info at the geoserver level...")

@@ -99,7 +99,38 @@ def generate_hydrology(
 
     task_id_list = check_task_status(task_list) if len(task_list) > 0 else []
     print("task_id_list", task_id_list)
+    if is_gee_asset_exists(et_asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name="",
+            asset_id=et_asset_id,
+            dataset_name="Evapotranspiration",
+        )
+        print("save Evapotranspiration info at the gee level...")
 
+    if is_gee_asset_exists(ppt_asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name="",
+            asset_id=ppt_asset_id,
+            dataset_name="Precipitation",
+        )
+        print("save Precipitation info at the gee level...")
+
+    if is_gee_asset_exists(ro_asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name="",
+            asset_id=ro_asset_id,
+            dataset_name="Run Off",
+        )
+        print("save Run Off info at the gee level...")
     # Make above asset public on GEE
     make_asset_public(ppt_asset_id)
     make_asset_public(et_asset_id)
@@ -139,6 +170,16 @@ def generate_hydrology(
         )
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wd task_id_list", task_id_list)
+        if is_gee_asset_exists(wd_asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name="",
+                asset_id=wd_asset_id,
+                dataset_name="Well Depth",
+            )
+            print("save Well Depth info at the gee level...")
         make_asset_public(wd_asset_id)
 
         wd_task_id, asset_id = net_value(

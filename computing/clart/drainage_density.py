@@ -54,6 +54,16 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name="",
+                asset_id=asset_id,
+                dataset_name="Drainage Density",
+            )
+            print("save drainage density info at the gee level...")
 
 
 def generate_vector(state, district, block):

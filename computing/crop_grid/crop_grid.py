@@ -20,6 +20,7 @@ from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
     CROP_GRID_PATH,
 )
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -62,6 +63,16 @@ def create_crop_grids(self, state, district, block):
         if task_id:
             task_id_list = check_task_status([task_id])
             print("task_id_list", task_id_list)
+            if is_gee_asset_exists(asset_id):
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name="",
+                    asset_id=asset_id,
+                    dataset_name="Crop Grid",
+                )
+                print("save Crop Grid info at the gee level...")
     crop_grids_lulc(state, district, block, asset_id)
 
 

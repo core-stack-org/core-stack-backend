@@ -1,14 +1,13 @@
 import ee
 from nrm_app.celery import app
-from computing.utils import (
-    sync_layer_to_geoserver,
-)
+from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
 
 
@@ -18,10 +17,14 @@ def generate_stream_order_vector(self, state, district, block):
     description = (
         "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
-
-    if not is_gee_asset_exists(
-        get_gee_asset_path(state, district, block) + description
-    ):
+    layer_name = (
+        "stream_order_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
+    if not is_gee_asset_exists(asset_id):
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
@@ -49,16 +52,17 @@ def generate_stream_order_vector(self, state, district, block):
         ]
 
         fc = calculate_pixel_area(args, roi, raster)
-
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": fc,
-                "description": description,
-                "assetId": get_gee_asset_path(state, district, block) + description,
-            }
-        )
-        task.start()
-        check_task_status([task.status()["id"]])
+        task = export_vector_asset_to_gee(fc, description, asset_id)
+        check_task_status([task])
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=layer_name,
+                asset_id=asset_id,
+                dataset_name="Stream Order",
+            )
 
     # Sync to geoserver
     fc = ee.FeatureCollection(
@@ -68,13 +72,21 @@ def generate_stream_order_vector(self, state, district, block):
     res = sync_layer_to_geoserver(
         state,
         fc,
-        "stream_order_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
+        layer_name,
         "stream_order",
     )
     print(res)
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Stream Order",
+            sync_to_geoserver=True,
+        )
+        print("save stream order layer info at geoserver level...")
 
 
 def calculate_pixel_area(class_labels, fc, raster):

@@ -43,7 +43,7 @@ def crop_grids_lulc(state, district, block, asset_id):
             block,
             layer_name=layer_name,
             asset_id=asset_id,
-            dataset_name="Crop Grid",
+            dataset_name="Crop GridXlulc",
         )
     res = sync_fc_to_geoserver(
         crop_tiles, state, layer_name, workspace="crop_grid_layers"
@@ -55,7 +55,7 @@ def crop_grids_lulc(state, district, block, asset_id):
             block,
             layer_name=layer_name,
             asset_id=asset_id,
-            dataset_name="Crop Grid",
+            dataset_name="Crop GridXlulc",
             sync_to_geoserver=True,
         )
     print("Successfully pushed to GeoServer!", res)

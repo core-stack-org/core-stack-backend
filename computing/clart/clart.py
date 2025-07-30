@@ -21,7 +21,7 @@ from computing.utils import save_layer_info_to_db
 def generate_clart_layer(self, state, district, block):
     ee_initialize()
     drainage_density(state, district, block)
-    generate_lithology_layer(state, district)
+    generate_lithology_layer(state, district, block)
     clart_layer(state, district, block)
 
 
