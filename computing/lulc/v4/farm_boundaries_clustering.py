@@ -10,7 +10,7 @@ from utilities.gee_utils import (
 
 def cluster_farm_boundaries(state, district, block):
     directory = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-    description = directory + "_farm_clusters"
+    description = f"lulc_v4_{directory}_farm_clusters"
     asset_id = get_gee_asset_path(state, district, block) + description
 
     if is_gee_asset_exists(asset_id):
@@ -47,7 +47,7 @@ def cluster_farm_boundaries(state, district, block):
     ]
 
     all_boundaries = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block) + directory + "_boundaries"
+        get_gee_asset_path(state, district, block) + f"lulc_v4_{directory}_boundaries"
     )
     farm = all_boundaries.filter(ee.Filter.And(*easy_farm))
 

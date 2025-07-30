@@ -59,7 +59,7 @@ def generate_final(state, district, block, start_year, end_year):
         f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
 
-    asset_id = get_gee_asset_path(state, district, block) + filename_prefix + "_lulc_v4"
+    asset_id = get_gee_asset_path(state, district, block) + f"lulc_v4_{filename_prefix}"
 
     if is_gee_asset_exists(asset_id):
         return
@@ -75,8 +75,7 @@ def generate_final(state, district, block, start_year, end_year):
 
     all_boundaries = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
-        + filename_prefix
-        + "_boundaries_refined"
+        + f"lulc_v4_{filename_prefix}_boundaries_refined"
     )
 
     farm = all_boundaries.filter(ee.Filter.eq("class", "farm"))
@@ -188,7 +187,7 @@ def generate_final(state, district, block, start_year, end_year):
         # crop_freq_array.append(cropping_frequency_img)
         task_id = export_raster_asset_to_gee(
             image=final_lulc_img,
-            description="lulc_" + filename_prefix + "_v4",
+            description="lulc_v4_" + filename_prefix,
             asset_id=asset_id,
             scale=10,
             pyramiding_policy={"predicted_label": "mode"},

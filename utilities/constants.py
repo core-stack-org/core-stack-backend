@@ -40,6 +40,9 @@ ODK_URL_waterbody = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Waterbodies_Form_V1.0.3.svc/Submissions"
 )
 
+ODK_URL_crop = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/crop_form_V1.0.0.svc/Submissions"
+
+
 # Planning Forms
 ODK_URL_gw = (
     ODK_BASE_URL
@@ -57,7 +60,6 @@ ODK_URL_agri = (
 ODK_URL_livelihood = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM%20Livelihood%20Form.svc/Submissions"
 )
-ODK_URL_crop = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/crop_form_V1.0.0.svc/Submissions"
 
 # Maintenance forms
 ODK_URL_WATERBODY_MAINTENANCE = (
@@ -81,7 +83,7 @@ ODK_URL_AGRI_MAINTENANCE = (
     + "/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1.svc/Submissions"
 )
 
-# Sync Offline ODK
+# MARK: Sync Offline ODK URLs
 ODK_SYNC_URL_SETTLEMENT = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Settlements_form%20_V1.0.1/submissions"
 )
@@ -92,6 +94,68 @@ ODK_SYNC_URL_WATER_STRUCTURES = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Add_Waterbodies_Form_V1.0.3/submissions"
 )
 
+ODK_SYNC_URL_CROP = (
+    ODK_BASE_URL + ODK_PROJECT_ID + "/forms/crop_form_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_RECHARGE_STRUCTURE = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/NRM_form_propose_new_recharge_structure_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_IRRIGATION_STRUCTURE = (
+    ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM_form_Agri_Screen_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_LIVELIHOOD = (
+    ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM%20Livelihood%20Form/submissions"
+)
+
+ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/PM_Remote_Sensed_Surface_Water_structure_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_WATER_STRUCTURES_MAINTENANCE = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_GW_MAINTENANCE = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1/submissions"
+)
+
+ODK_SYNC_URL_AGRI_MAINTENANCE = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1/submissions"
+)
+
+ODK_SYNC_URL_GW_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/nrm_groundwater_analysis_feedback_form_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_SWB_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/nrm_waterbody_analysis_feedback_form_V1.0.0/submissions"
+)
+
+ODK_SYNC_URL_AGRI_FEEDBACK = (
+    ODK_BASE_URL
+    + ODK_PROJECT_ID
+    + "/forms/nrm_agri_analysis_feedback_form_V1.0.0/submissions"
+)
+
+
+# MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
 GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
