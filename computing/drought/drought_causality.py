@@ -617,24 +617,24 @@ def drought_causality(self, state, district, block, start_year, end_year):
             + valid_gee_text(block.lower())
             + "_drought_causality"
         )
-        aggregated_feature_collection = ee.FeatureCollection(final_features)
-        asset_id = get_gee_asset_path(state, district, block) + geo_filename
-        task = export_vector_asset_to_gee(
-            aggregated_feature_collection, geo_filename, asset_id
-        )
-        task_id_list = check_task_status([task])
-        print(
-            f"drought cusality task completed for year {start_year}_{end_year} - task_id_list: {task_id_list}"
-        )
-        if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=geo_filename,
-                asset_id=asset_id,
-                dataset_name="Drought Causality",
-            )
+        # aggregated_feature_collection = ee.FeatureCollection(final_features)
+        # asset_id = get_gee_asset_path(state, district, block) + geo_filename
+        # task = export_vector_asset_to_gee(
+        #     aggregated_feature_collection, geo_filename, asset_id
+        # )
+        # task_id_list = check_task_status([task])
+        # print(
+        #     f"drought cusality task completed for year {start_year}_{end_year} - task_id_list: {task_id_list}"
+        # )
+        # if is_gee_asset_exists(asset_id):
+        #     save_layer_info_to_db(
+        #         state,
+        #         district,
+        #         block,
+        #         layer_name=geo_filename,
+        #         asset_id=asset_id,
+        #         dataset_name="Drought Causality",
+        #     )
         aggregated_feature_collection = {
             "type": "FeatureCollection",
             "features": final_features,
@@ -649,7 +649,7 @@ def drought_causality(self, state, district, block, start_year, end_year):
                 district,
                 block,
                 layer_name=geo_filename,
-                asset_id="not found",
+                asset_id="",
                 dataset_name="Drought Causality",
                 sync_to_geoserver=True,
             )
