@@ -64,8 +64,12 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
             
             if is_in_community:
                 logger.info("User %s is in community, proceeding with session", user_number)
-                # assert False
-                # User is in community, continue with session creation
+                # User is in community, pass "community_member" event to parent SMJ
+                event_packet.update({
+                    "event": "community_member",
+                    "smj_id": bot_instance.smj.id,  # Start with parent SMJ
+                    "state": bot_instance.init_state
+                })
                 _load_or_create_user_session(event_packet, bot_instance, response_data)
             else:
                 logger.info("User %s is not in community, handling onboarding", user_number)
@@ -98,6 +102,12 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                             app_type=app_type
                         )
                         print(f"Created new UserSession for new user: {user_session}")
+                        # Set onboarding event for parent SMJ to route to onboarding flow
+                        event_packet.update({
+                            "event": "onboarding",
+                            "smj_id": bot_instance.smj.id,  # Start with parent SMJ
+                            "state": bot_instance.init_state
+                        })
                         start_session = True
                     except Exception as e:
                         logger.error("Error creating UserSession for new user: %s", str(e))
@@ -123,11 +133,11 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                                 event_to_set = event_packet.get("event")
                                 print(f"Preserving existing interaction event: {event_to_set}")
                             else:
-                                # This is a new conversation start
-                                event_to_set = "start"
+                                # This is a new conversation start - set onboarding event for parent SMJ
+                                event_to_set = "onboarding"
                                 start_session = True
                                 event_type = True
-                                print("Setting event to start for new conversation")
+                                print("Setting event to onboarding for new conversation")
                             
                             # Update event packet for existing user with empty session
                             event_packet.update({
@@ -172,7 +182,7 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                             )
                             print(f"Created new UserSession for existing user: {user_session}")
                             event_packet.update({
-                                "event": "start",
+                                "event": "onboarding",  # Set onboarding event for parent SMJ
                                 "smj_id": bot_instance.smj.id,  # type: ignore
                                 "state": bot_instance.init_state
                             })

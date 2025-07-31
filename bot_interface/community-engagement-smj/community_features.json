@@ -1,0 +1,356 @@
+[
+  {
+    "name": "CheckCommunityStatus",
+    "preAction": [
+      {
+        "function": "check_user_communities"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "SingleCommunityMenu": [
+          "single_community"
+        ]
+      },
+      {
+        "MultipleCommunityMenu": [
+          "multiple_communities"
+        ]
+      },
+      {
+        "CheckCommunityStatus": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SingleCommunityMenu",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "👥 You are a part of this community: {{community_name}}\n\nWhat would you like to do?",
+            "hi": "👥 आप इस समुदाय के सदस्य हैं: {{community_name}}\n\nआप क्या करना चाहते हैं?",
+            "default": "👥 You are a part of this community: {{community_name}}"
+          }
+        ]
+      },
+      {
+        "menu": [
+          {
+            "label": "Continue with this community",
+            "value": "continue_community",
+            "description": "Access community features"
+          },
+          {
+            "label": "Join a new community",
+            "value": "join_new_community",
+            "description": "Add another community"
+          }
+        ],
+        "caption": "Select an option:"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityActionsMenu": [
+          "continue_community"
+        ]
+      },
+      {
+        "JoinNewCommunity": [
+          "join_new_community"
+        ]
+      },
+      {
+        "SingleCommunityMenu": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "MultipleCommunityMenu",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "👥 You accessed community '{{last_community_name}}' last time.\n\nWhat would you like to do?",
+            "hi": "👥 आपने पिछली बार '{{last_community_name}}' समुदाय तक पहुंच बनाई थी।\n\nआप क्या करना चाहते हैं?",
+            "default": "👥 You accessed community '{{last_community_name}}' last time."
+          }
+        ]
+      },
+      {
+        "menu": [
+          {
+            "label": "Continue with last community",
+            "value": "continue_last_community",
+            "description": "Access {{last_community_name}}"
+          },
+          {
+            "label": "Choose other community",
+            "value": "choose_other_community",
+            "description": "Select from your communities"
+          },
+          {
+            "label": "Join a new community",
+            "value": "join_new_community",
+            "description": "Add another community"
+          }
+        ],
+        "caption": "Select an option:"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityActionsMenu": [
+          "continue_last_community"
+        ]
+      },
+      {
+        "SelectCommunityMenu": [
+          "choose_other_community"
+        ]
+      },
+      {
+        "JoinNewCommunity": [
+          "join_new_community"
+        ]
+      },
+      {
+        "MultipleCommunityMenu": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SelectCommunityMenu",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "👥 Select a community to access:",
+            "hi": "👥 पहुंच के लिए एक समुदाय चुनें:",
+            "default": "👥 Select a community to access:"
+          }
+        ]
+      },
+      {
+        "function": "generate_community_list_menu"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "set_selected_community"
+      }
+    ],
+    "transition": [
+      {
+        "CommunityActionsMenu": [
+          "success"
+        ]
+      },
+      {
+        "MultipleCommunityMenu": [
+          "back"
+        ]
+      },
+      {
+        "SelectCommunityMenu": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunityActionsMenu",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "🏠 {{selected_community_name}} - Main Menu\n\nWhat do you want to do?",
+            "hi": "🏠 {{selected_community_name}} - मुख्य मेनू\n\nआप क्या करना चाहते हैं?",
+            "default": "🏠 {{selected_community_name}} - Main Menu"
+          }
+        ]
+      },
+      {
+        "menu": [
+          {
+            "label": "Register a work demand",
+            "value": "register_work_demand",
+            "description": "Submit a new work request"
+          },
+          {
+            "label": "Register a Grievance",
+            "value": "register_grievance",
+            "description": "Report an issue or complaint"
+          },
+          {
+            "label": "Back to previous menu",
+            "value": "back_to_previous",
+            "description": "Go back to community selection"
+          }
+        ],
+        "caption": "Select an option:"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "RegisterWorkDemand": [
+          "register_work_demand"
+        ]
+      },
+      {
+        "RegisterGrievance": [
+          "register_grievance"
+        ]
+      },
+      {
+        "CheckCommunityStatus": [
+          "back_to_previous"
+        ]
+      },
+      {
+        "CommunityActionsMenu": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunityInfo",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "📋 Community Information\n\nThis feature is under development. Coming soon!",
+            "hi": "📋 समुदाय की जानकारी\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
+            "default": "📋 Community Information - Under Development"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "MainMenu": [
+          "success"
+        ]
+      },
+      {
+        "CommunityInfo": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Updates",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "📢 Community Updates\n\nThis feature is under development. Coming soon!",
+            "hi": "📢 समुदाय अपडेट\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
+            "default": "📢 Community Updates - Under Development"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "MainMenu": [
+          "success"
+        ]
+      },
+      {
+        "Updates": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Settings",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "⚙️ Settings\n\nThis feature is under development. Coming soon!",
+            "hi": "⚙️ सेटिंग्स\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
+            "default": "⚙️ Settings - Under Development"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "MainMenu": [
+          "success"
+        ]
+      },
+      {
+        "Settings": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Help",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "❓ Help & Support\n\nThis feature is under development. Coming soon!",
+            "hi": "❓ सहायता और समर्थन\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
+            "default": "❓ Help & Support - Under Development"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "MainMenu": [
+          "success"
+        ]
+      },
+      {
+        "Help": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]

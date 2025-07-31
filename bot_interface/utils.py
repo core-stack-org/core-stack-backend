@@ -31,6 +31,59 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Community membership utility functions
+def get_community_membership(bot_user):
+    """Get the community_membership data from user_misc field"""
+    if bot_user.user_misc and isinstance(bot_user.user_misc, dict):
+        return bot_user.user_misc.get('community_membership', {})
+    return {}
+
+def add_community_membership(bot_user, community_data):
+    """Add community membership data to user_misc field"""
+    from datetime import datetime
+    
+    # Initialize user_misc if it's None
+    if not bot_user.user_misc:
+        bot_user.user_misc = {}
+    
+    # Initialize community_membership if it doesn't exist
+    if 'community_membership' not in bot_user.user_misc:
+        bot_user.user_misc['community_membership'] = {
+            'current_communities': []
+        }
+    
+    # Prepare the community data with joined_date
+    new_community = {
+        'community_id': community_data.get('community_id'),
+        'community_name': community_data.get('community_name'),
+        'community_description': community_data.get('community_description'),
+        'organization': community_data.get('organization'),
+        'joined_date': datetime.now().isoformat()
+    }
+    
+    # Check if user is already in this community
+    current_communities = bot_user.user_misc['community_membership']['current_communities']
+    for community in current_communities:
+        if community.get('community_id') == new_community['community_id']:
+            logger.info(f"User {bot_user.user_id} already in community {new_community['community_id']}")
+            return False
+    
+    # Add the new community
+    current_communities.append(new_community)
+    bot_user.save()
+    logger.info(f"Added user {bot_user.user_id} to community {new_community['community_id']}")
+    return True
+
+def is_user_in_community(bot_user, community_id):
+    """Check if user is already in a specific community"""
+    membership = get_community_membership(bot_user)
+    current_communities = membership.get('current_communities', [])
+    
+    for community in current_communities:
+        if community.get('community_id') == community_id:
+            return True
+    return False
+
 status_map = {
             "UNASSIGNED": "सौंपा नहीं गया",
             "ASSIGNED": "सौंप दिया",
@@ -1437,4 +1490,8 @@ def callFunctionByName(funct_name, app_type, data_dict):
         print(f"calling sendCommunityByStateDistrict with data_dict: {data_dict}")
         event = whatsappInterface.sendCommunityByStateDistrict(bot_instance_id=bot_id, data_dict=data_dict)
         print(f"sendCommunityByStateDistrict returned: {event}")
+    elif funct_name == 'add_user_to_community':
+        print(f"calling addUserToCommunity with data_dict: {data_dict}")
+        event = whatsappInterface.addUserToCommunity(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"addUserToCommunity returned: {event}")
     return event

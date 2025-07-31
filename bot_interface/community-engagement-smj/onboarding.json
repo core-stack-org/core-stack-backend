@@ -135,16 +135,79 @@
         "function": "send_community_by_state_district",
         "data": {
           "getDataFrom": [
-            {"state":"SendState", "field":"data"},
-            {"state":"SendDistrict", "field":"data"}
+            {"state":"SendState", "field":"misc"},
+            {"state":"SendDistrict", "field":"misc"}
           ]
+        }
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "AddUserToCommunity": [
+          "success"
+        ]
+      },
+      {
+        "CommunityByStateDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "AddUserToCommunity",
+    "preAction": [
+      {
+        "function": "add_user_to_community",
+        "data": {
+          "getDataFrom": {"state":"CommunityByStateDistrict", "field":"misc"}
         }
       }
     ],
     "postAction": [],
     "transition": [
       {
-        "CommunityByStateDistrict": [
+        "WelcomeToCommunity": [
+          "success"
+        ]
+      },
+      {
+        "AddUserToCommunity": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "WelcomeToCommunity",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": ":folded_hands: Hello. Welcome to Community engagement Platform bot.",
+            "hi": "उपयोगकर्ता को समुदाय में सफलतापूर्वक जोड़ा गया। सामुदायिक सहभागिता प्लेटफ़ॉर्म बॉट में आपका स्वागत है।",
+            "default": "User successfully added to the community. Welcome to the Community engagement Platform bot."
+          }
+        ]
+      },
+      {
+        "function": "move_forward"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "Welcome": [
+          "success"
+        ]
+      },
+      {
+        "WelcomeToCommunity": [
           "failure"
         ]
       }

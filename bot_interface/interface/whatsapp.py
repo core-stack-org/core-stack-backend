@@ -780,17 +780,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     if state_name == "SendState":
                         # Get state_id from SendState session data
                         if current_session and len(current_session) > 0 and state_name in current_session[0]:
-                            state_name = current_session[0][state_name].get(field_name, "")
-                            print(f"Extracted state_name: {state_name}")
+                            state_id = current_session[0][state_name].get(field_name, "")
+                            print(f"Extracted state_id: {state_id}")
                     elif state_name == "SendDistrict":
-                        # Get district_name from SendDistrict session data
+                        # Get district_id from SendDistrict session data
                         if current_session and len(current_session) > 0 and state_name in current_session[0]:
-                            district_name = current_session[0][state_name].get(field_name, "")
-                            print(f"Extracted district_name: {district_name}")
-            
+                            district_id = current_session[0][state_name].get(field_name, "")
+                            print(f"Extracted district_id: {district_id}")
+
             # Check if we have the required state and district data
-            if not state_name or not district_name:
-                print(f"Missing required data - state_name: {state_name}, district_name: {district_name}")
+            if not state_id or not district_id:
+                print(f"Missing required data - state_id: {state_id}, district_id: {district_id}")
                 return "failure"
             
             # # Get state and district names for API call
@@ -809,8 +809,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 response = requests.get(
                     url="http://localhost:8000/api/v1/get_communities_by_location/",
                     params={
-                        "state_name": state_name,
-                        "district_name": district_name
+                        "state_id": state_id,
+                        "district_id": district_id
                     },
                     timeout=30
                 )
@@ -866,4 +866,151 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 
         except Exception as e:
             print(f"Error in sendCommunityByStateDistrict: {e}")
+            return "failure"
+        
+    def addUserToCommunity(self, bot_instance_id, data_dict):
+        """
+        Add user to a community.
+        This function prepares the user session and adds the user to the selected community.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure" based on operation result.
+        """
+        print("in addUserToCommunity")
+        
+        try:
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            if bot_instance:
+                print("bot_instance", bot_instance.language)
+
+            user_id = data_dict.get("user_id")
+            print("user in addUserToCommunity", user_id)
+            
+            #check if user is created
+            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            print("user in addUserToCommunity", user)
+            
+            # Set user session properties
+            user.expected_response_type = "button"
+            user.current_state = data_dict.get("state")
+            
+            # Handle SMJ object lookup with error handling
+            smj_id = data_dict.get("smj_id")
+            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+
+            data = data_dict.get("data", {})  
+            print("data in addUserToCommunity:", data)
+            
+            # Initialize variable
+            community_id = None
+            
+            # Check if data_dict has 'getDataFrom' key
+            if 'getDataFrom' in data:
+                get_data_from_config = data['getDataFrom']
+                print("getDataFrom configuration:", get_data_from_config)
+                
+                # Normalize getDataFrom to list format for consistent processing
+                if isinstance(get_data_from_config, dict):
+                    # Single object - convert to list
+                    get_data_from_list = [get_data_from_config]
+                elif isinstance(get_data_from_config, list):
+                    # Already a list
+                    get_data_from_list = get_data_from_config
+                else:
+                    print(f"Invalid getDataFrom format: {type(get_data_from_config)}")
+                    return "failure"
+                
+                print("Normalized getDataFrom list:", get_data_from_list)
+                
+                current_session = user.current_session
+                print("Current session in addUserToCommunity:", type(current_session), current_session)
+                
+                # Extract community ID from session data
+                for get_data_from in get_data_from_list:
+                    state_name = get_data_from.get("state", "")
+                    field_name = get_data_from.get("field", "misc")
+                    
+                    print(f"Looking for state: {state_name}, field: {field_name}")
+                    
+                    if state_name == "CommunityByStateDistrict":
+                        # Get community_id from CommunityByStateDistrict session data
+                        if current_session and len(current_session) > 0:
+                            print(f"Session structure check - type: {type(current_session[0])}")
+                            if state_name in current_session[0]:
+                                state_data = current_session[0][state_name]
+                                print(f"State data type: {type(state_data)}, content: {state_data}")
+                                
+                                if isinstance(state_data, dict):
+                                    community_id = state_data.get(field_name)
+                                    print(f"Extracted community_id: {community_id}")
+                                else:
+                                    print(f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}")
+                                    return "failure"
+                            else:
+                                print(f"State {state_name} not found in session")
+                        else:
+                            print("No current session data available")
+
+                # add user to community
+                if community_id:
+                    print(f"Adding user {user.phone} to community {community_id}")
+                    try:
+                        response = requests.post(
+                            url="http://localhost:8000/api/v1/add_user_to_community/",
+                            data={
+                                "community_id": community_id,
+                                "number": user.phone
+                            },
+                            timeout=30
+                        )
+                        response.raise_for_status()
+                        api_response = response.json()
+                        print("Add user to community API response:", api_response)
+                        
+                        # Return success/failure based on API response
+                        if api_response.get('success'):
+                            # Save community membership data locally
+                            try:
+                                from bot_interface.utils import add_community_membership
+                                
+                                # Extract community data from API response
+                                community_data = {
+                                    'community_id': community_id,
+                                    'community_name': api_response.get('community_name', ''),
+                                    'community_description': api_response.get('community_description', ''),
+                                    'organization': api_response.get('organization', '')
+                                }
+                                
+                                # Get the BotUsers object from user_id
+                                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+                                
+                                # Add community membership to user's local data
+                                add_community_membership(bot_user, community_data)
+                                print(f"Successfully added community membership data for user {user.phone}")
+                                
+                            except Exception as e:
+                                print(f"Error saving community membership data: {e}")
+                                # Continue with success even if local tracking fails
+                            
+                            # Save user session only on success
+                            user.save()
+                            return "success"
+                        else:
+                            print("API response indicates failure")
+                            return "failure"
+                            
+                    except requests.exceptions.RequestException as e:
+                        print(f"Error calling add_user_to_community API: {e}")
+                        return "failure"
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing API response: {e}")
+                        return "failure"
+                else:
+                    print("No community ID found in session data")
+                    return "failure"
+                    
+        except Exception as e:
+            print(f"Error in addUserToCommunity: {e}")
             return "failure"

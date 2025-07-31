@@ -10,16 +10,18 @@
             "default": "Hello. Welcome to Community engagement Platform bot."
           }
         ]
-      },
-      {
-        "function": "move_forward"
       }
     ],
     "postAction": [],
     "transition": [
       {
         "JumpToOnboarding": [
-          "success"
+          "onboarding"
+        ]
+      },
+      {
+        "JumpToCommunityFlow": [
+          "community_member"
         ]
       },
       {
@@ -37,6 +39,31 @@
           {
             "smjName": "onboarding",
             "initState": "Welcome"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": []
+  },
+  {
+    "name": "JumpToCommunityFlow",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "Welcome back! You are already a community member. Here are your options:",
+            "hi": "वापस स्वागत है! आप पहले से ही एक समुदाय के सदस्य हैं। यहाँ आपके विकल्प हैं:",
+            "default": "Welcome back! You are already a community member."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "community_features",
+            "initState": "MainMenu"
           }
         ],
         "function": "jumpToSmj"
