@@ -39,7 +39,7 @@ class StateSOI(models.Model):
     state_name = models.CharField(max_length=255)
     active_status = models.BooleanField(default=False)
 
-    def __str__(self) -> str:
+    def __str__(self):
         return self.state_name
 
 
@@ -49,7 +49,7 @@ class DistrictSOI(models.Model):
     district_name = models.CharField(max_length=255)
     active_status = models.BooleanField(default=False)
 
-    def __str__(self) -> str:
+    def __str__(self):
         return self.district_name
 
 
@@ -59,5 +59,5 @@ class TehsilSOI(models.Model):
     tehsil_name = models.CharField(max_length=255)
     active_status = models.BooleanField(default=False)
 
-    def __str__(self) -> str:
+    def __str__(self):
         return self.tehsil_name

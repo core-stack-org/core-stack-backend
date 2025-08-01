@@ -1,13 +1,13 @@
 import ee
-from computing.utils import (
-    sync_layer_to_geoserver,
-)
+from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
@@ -28,7 +28,7 @@ def generate_terrain_clusters(self, state, district, block):
     if not is_gee_asset_exists(asset_id):
         compute_on_gee(state, district, block, asset_id, asset_name)
 
-    sync_to_geoserver(state, district, block, asset_id)
+    sync_to_geoserver(state, district, block, asset_id, asset_name)
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
@@ -353,19 +353,22 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
 
     fc = mt1k.map(process_geometry)
     # Export an ee.FeatureCollection as an Earth Engine asset.
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": asset_name,
-            "assetId": asset_id,
-        }
-    )
-    task.start()
-    print("Successfully started the terrain cluster", task.status())
-    check_task_status([task.status()["id"]])
+    task = export_vector_asset_to_gee(fc, asset_name, asset_id)
+    check_task_status([task])
+
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=asset_name,
+            asset_id=asset_id,
+            dataset_name="Terrain Vector",
+        )
+        make_asset_public(asset_id)
 
 
-def sync_to_geoserver(state, district, block, asset_id):
+def sync_to_geoserver(state, district, block, asset_id, asset_name):
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -378,3 +381,13 @@ def sync_to_geoserver(state, district, block, asset_id):
         "terrain",
     )
     print(res)
+    if res["status_code"] == 201:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=asset_name,
+            asset_id=asset_id,
+            dataset_name="Terrain Vector",
+            sync_to_geoserver=True,
+        )

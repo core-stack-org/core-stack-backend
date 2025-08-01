@@ -12,7 +12,9 @@ from utilities.gee_utils import (
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
+    make_asset_public,
 )
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -92,26 +94,38 @@ def tree_health_overall_change_raster(self, state, district, block):
 
     block_mws = block_mws.map(change_stats)
     print("Updated Feature Collection:")
-    try:
-        # Export the image to the Asset
-        task_id = export_raster_asset_to_gee(
-            image=overall_change.clip(block_mws.geometry()),
-            description=description,
-            asset_id=asset_id,
-            scale=25,
-            region=block_mws.geometry(),
-        )
-        # Check the task status
-        task_id_list = check_task_status([task_id])
-        print("CH task_id_list", task_id_list)
 
-        # Sync image to Google Cloud Storage (GCS)
-        layer_name = (
-            "tree_health_overall_change_raster_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+    # Export the image to the Asset
+    task_id = export_raster_asset_to_gee(
+        image=overall_change.clip(block_mws.geometry()),
+        description=description,
+        asset_id=asset_id,
+        scale=25,
+        region=block_mws.geometry(),
+    )
+    # Check the task status
+    task_id_list = check_task_status([task_id])
+    print("CH task_id_list", task_id_list)
+
+    # Sync image to Google Cloud Storage (GCS)
+    layer_name = (
+        "tree_health_overall_change_raster_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            f"tree_health_overall_change_raster_{district.title()}_{block.title()}",
+            asset_id,
+            "Tree Overall Change Raster",
         )
+        make_asset_public(asset_id)
+
         task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, layer_name)
 
         # Check the task status for GCS sync
@@ -119,9 +133,16 @@ def tree_health_overall_change_raster(self, state, district, block):
         print("task_id_list sync to GCS", task_id_list)
 
         # Sync raster to GeoServer
-        sync_raster_gcs_to_geoserver(
+        res = sync_raster_gcs_to_geoserver(
             "tree_overall_ch", layer_name, layer_name, "tree_overall_ch_style"
         )
-
-    except Exception as e:
-        print(f"Error occurred in running process_ch task: {e}")
+        if res:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                f"tree_health_overall_change_raster_{district.title()}_{block.title()}",
+                asset_id,
+                "Tree Overall Change Raster",
+                sync_to_geoserver=True,
+            )

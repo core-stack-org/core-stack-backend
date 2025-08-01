@@ -8,10 +8,12 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
+    make_asset_public,
 )
 import ee
 
 from .terrain_utils import generate_terrain_classified_raster
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -40,6 +42,7 @@ def terrain_raster(self, state, district, block):
             roi_boundary.map(generate_terrain_classified_raster)
         )
         mwsheds_lf_raster = mwsheds_lf_rasters.mosaic()
+
         task_id = export_raster_asset_to_gee(
             image=mwsheds_lf_raster.clip(roi_boundary.geometry()),
             description=description,
@@ -50,16 +53,43 @@ def terrain_raster(self, state, district, block):
         task_id_list = check_task_status([task_id])
         print("terrain_raster task_id_list", task_id_list)
 
-    """ Sync image to google cloud storage and then to geoserver"""
-    layer_name = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_terrain_raster"
-    )
-    task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            f"{district.title()}_{block.title()}_terrain_raster",
+            asset_id,
+            "Terrain Raster",
+        )
+        make_asset_public(asset_id)
 
-    task_id_list = check_task_status([task_id])
-    print("task_id_list sync to gcs ", task_id_list)
+        """ Sync image to google cloud storage and then to geoserver"""
+        layer_name = (
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_terrain_raster"
+        )
+        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
 
-    sync_raster_gcs_to_geoserver("terrain", layer_name, layer_name, "terrain_raster")
+        task_id_list = check_task_status([task_id])
+        print("task_id_list sync to gcs ", task_id_list)
+
+        save_layer_info_to_db(
+            state, district, block, layer_name, asset_id, "Terrain Raster"
+        )
+
+        res = sync_raster_gcs_to_geoserver(
+            "terrain", layer_name, layer_name, "terrain_raster"
+        )
+        if res:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name,
+                asset_id,
+                "Terrain Raster",
+                sync_to_geoserver=True,
+            )

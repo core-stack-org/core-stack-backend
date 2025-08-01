@@ -1,6 +1,10 @@
 import ee
 from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
-from utilities.gee_utils import check_task_status, is_gee_asset_exists
+from utilities.gee_utils import (
+    check_task_status,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
 
 
 def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
@@ -98,15 +102,12 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
 
         # Export as single-row-per-feature collection
         try:
-            task = ee.batch.Export.table.toAsset(
-                collection=merged_fc,
-                description=ndvi_description,
-                assetId=ndvi_asset_id,
+            task = export_vector_asset_to_gee(
+                merged_fc, ndvi_description, ndvi_asset_id
             )
-            task.start()
             print(f"Started export for {start_year}")
             asset_ids.append(ndvi_asset_id)
-            task_ids.append(task.status()["id"])
+            task_ids.append(task)
         except Exception as e:
             print("Export error:", e)
 

@@ -12,10 +12,13 @@ from utilities.gee_utils import (
     upload_tif_from_gcs_to_gee,
     sync_vector_to_gcs,
     get_geojson_from_gcs,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -53,6 +56,17 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name="",
+                asset_id=asset_id,
+                dataset_name="Drainage Density",
+            )
+            print("saved drainage density info at the gee level...")
+            make_asset_public(asset_id)
 
 
 def generate_vector(state, district, block):
@@ -182,23 +196,20 @@ def generate_vector(state, district, block):
     #
     # try:
     #     # Export an ee.FeatureCollection as an Earth Engine asset.
-    #     mws_task = ee.batch.Export.table.toAsset(
-    #         **{
-    #             "collection": fc,
-    #             "description": "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #             "assetId": get_gee_asset_path(state, district, block)
-    #             + "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #         }
+    #     mws_task = export_vector_asset_to_gee(
+    #         fc,
+    #         "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower()),
+    #         get_gee_asset_path(state, district, block)
+    #         + "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower())
     #     )
-    #     mws_task.start()
-    #     print("Successfully started the drainage_density", mws_task.status())
-    #     # return [mws_task.status()["id"]]
+    #     print("Successfully started the drainage_density")
+    #     # return [mws_task]
     # except Exception as e:
     #     print(f"Error occurred in running drainage_density task: {e}")
     return output_path
