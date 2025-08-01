@@ -1,6 +1,6 @@
 # projects/views.py
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, schema
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from .models import Project, AppType
@@ -16,6 +16,7 @@ from users.serializers import UserProjectGroup, UserProjectGroupSerializer
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated, IsOrganizationMember]
+    schema = None
 
     def get_queryset(self):
         user = self.request.user

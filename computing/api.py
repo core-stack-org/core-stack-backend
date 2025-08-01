@@ -1,7 +1,7 @@
 import os
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, schema
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -51,9 +51,12 @@ from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
+from utilities.auth_check_decorator import api_security_check
+
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
     try:
@@ -72,6 +75,7 @@ def generate_admin_boundary(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_nrega_layer(request):
     print("Inside generate_nrega_layer API.")
     try:
@@ -90,6 +94,7 @@ def generate_nrega_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_drainage_layer(request):
     print("Inside generate_drainage_layer API.")
     try:
@@ -106,6 +111,7 @@ def generate_drainage_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_drainage_density(request):
     print("Inside generate_drainage_density API.")
     try:
@@ -122,6 +128,7 @@ def generate_drainage_density(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_lithology(request):
     print("Inside generate_lithology API.")
     try:
@@ -137,6 +144,7 @@ def generate_lithology(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def create_workspace(request):
     print("Inside create_workspace API.")
     try:
@@ -152,6 +160,7 @@ def create_workspace(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def delete_layer(request):
     print("Inside delete_layer API.")
     try:
@@ -167,6 +176,7 @@ def delete_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def upload_kml(request):
     print("Inside upload_kml API.")
     try:
@@ -190,6 +200,7 @@ def upload_kml(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_mws_layer(request):
     print("Inside generate_mws_layer")
     try:
@@ -206,6 +217,7 @@ def generate_mws_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_fortnightly_hydrology(request):
     print("Inside generate_fortnightly_hydrology")
     try:
@@ -234,6 +246,7 @@ def generate_fortnightly_hydrology(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_annual_hydrology(request):
     print("Inside generate_annual_hydrology")
     try:
@@ -262,6 +275,7 @@ def generate_annual_hydrology(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def lulc_v3_river_basin(request):
     print("Inside generate_lulc_v3")
     try:
@@ -280,6 +294,7 @@ def lulc_v3_river_basin(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def lulc_vector(request):
     print("Inside lulc_vector")
     try:
@@ -301,6 +316,7 @@ def lulc_vector(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def lulc_v4(request):
     print("Inside lulc_time_series")
     try:
@@ -322,6 +338,7 @@ def lulc_v4(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def get_gee_layer(request):
     print("Inside get_gee_layer")
     try:
@@ -336,6 +353,7 @@ def get_gee_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_ci_layer(request):
     print("Inside generate_cropping_intensity_layer")
     try:
@@ -364,6 +382,7 @@ def generate_ci_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_swb(request):
     print("Inside generate_swf")
     try:
@@ -391,6 +410,7 @@ def generate_swb(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_drought_layer(request):
     print("Inside generate_drought_layer")
     try:
@@ -419,6 +439,7 @@ def generate_drought_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
     try:
@@ -438,6 +459,7 @@ def generate_terrain_descriptor(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
@@ -455,6 +477,7 @@ def generate_terrain_raster(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def terrain_lulc_slope_cluster(request):
     print("Inside terrain_lulc_slope_cluster")
     try:
@@ -476,6 +499,7 @@ def terrain_lulc_slope_cluster(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def terrain_lulc_plain_cluster(request):
     print("Inside terrain_lulc_plain_cluster")
     try:
@@ -497,6 +521,7 @@ def terrain_lulc_plain_cluster(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def generate_clart(request):
     print("Inside generate_clart")
     try:
@@ -514,6 +539,7 @@ def generate_clart(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def change_detection(request):
     print("Inside change_detection")
     try:
@@ -535,6 +561,7 @@ def change_detection(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def change_detection_vector(request):
     print("Inside change_detection_vector")
     try:
@@ -554,6 +581,7 @@ def change_detection_vector(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def crop_grid(request):
     print("Inside crop_grid api")
     try:
@@ -571,6 +599,7 @@ def crop_grid(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def mws_drought_causality(request):
     print("Inside Drought Causality API")
     try:
@@ -592,6 +621,7 @@ def mws_drought_causality(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def tree_health_raster(request):
     print("Inside tree_health_change API")
     try:
@@ -618,7 +648,8 @@ def tree_health_raster(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
+@schema(None)
 def tree_health_vector(request):
     print("Inside Overall_change_vector")
     try:
@@ -646,6 +677,7 @@ def tree_health_vector(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def gee_task_status(request):
     print("Inside gee_task_status API.")
     try:
@@ -658,6 +690,7 @@ def gee_task_status(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def stream_order_vector(request):
     print("Inside stream_order_vector api")
     try:
@@ -677,6 +710,7 @@ def stream_order_vector(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def restoration_opportunity(request):
     print("Inside restoration_opportunity api")
     try:
@@ -696,6 +730,7 @@ def restoration_opportunity(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
     try:
@@ -722,6 +757,7 @@ def plantation_site_suitability(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def aquifer_vector(request):
     print("Inside Aquifer vector layer api")
     try:
@@ -739,6 +775,7 @@ def aquifer_vector(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def soge_vector(request):
     print("Inside soge vector layer api")
     try:
@@ -756,6 +793,7 @@ def soge_vector(request):
 
 
 @api_view(["POST"])
+@schema(None)
 @parser_classes([MultiPartParser, FormParser])
 def fes_clart_upload_layer(request):
     try:
@@ -795,6 +833,7 @@ def fes_clart_upload_layer(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def swb_pond_merging(request):
     print("Inside merge_swb_ponds API.")
     try:
@@ -811,6 +850,7 @@ def swb_pond_merging(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def lulc_farm_boundary(request):
     print("Inside lulc_farm_boundary api")
     try:
@@ -852,6 +892,7 @@ def lulc_farm_boundary(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def ponds_compute(request):
     print("Inside ponds_compute api")
     try:
@@ -893,6 +934,7 @@ def ponds_compute(request):
 
 
 @api_view(["POST"])
+@schema(None)
 def wells_compute(request):
     print("Inside wells_compute api")
     try:

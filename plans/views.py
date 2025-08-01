@@ -2,6 +2,7 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
+from rest_framework.decorators import action, schema
 from projects.models import Project, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
 from .models import PlanApp
@@ -15,6 +16,7 @@ class PlanPermission(permissions.BasePermission):
     - Only superadmins, org admins, administrators, and project managers can create/edit plans
     - Plans must be enabled to be visible
     """
+    schema = None
     
     def has_permission(self, request, view):
         # Allow authenticated users only
@@ -107,6 +109,7 @@ class PlanViewSet(viewsets.ModelViewSet):
 
     serializer_class = PlanSerializer
     permission_classes = [permissions.IsAuthenticated, PlanPermission]
+    schema = None
     # For the HasProjectPermission to work correctly
     app_type = AppType.WATERSHED
 

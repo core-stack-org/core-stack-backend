@@ -1,4 +1,7 @@
 from django.db import models
+from django.utils import timezone
+from rest_framework_api_key.models import AbstractAPIKey
+from nrm_app.settings import AUTH_USER_MODEL
 
 
 # Create your models here.
@@ -61,3 +64,22 @@ class TehsilSOI(models.Model):
 
     def __str__(self):
         return self.tehsil_name
+
+
+class UserAPIKey(AbstractAPIKey):
+    user = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys")
+    name = models.CharField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_expired(self):
+        """Check if key is expired"""
+        if self.expires_at is None:
+            return False
+        return timezone.now() > self.expires_at
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.user.username})"

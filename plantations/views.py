@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.db import IntegrityError
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, schema
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
 
 from computing.plantation.process_profile import process_project_profile
@@ -30,6 +30,7 @@ class KMLFileViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, FileUploadParser]
     # For the HasProjectPermission to work correctly
     app_type = AppType.PLANTATION
+    schema = None
 
     def get_queryset(self):
         """Filter KML files by project"""
@@ -216,6 +217,7 @@ class PlantationProfileViewSet(viewsets.ModelViewSet):
 
     serializer_class = PlantationProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+    schema = None
 
     def get_queryset(self):
         """Filter KML files by project"""

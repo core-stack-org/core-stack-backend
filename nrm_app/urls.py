@@ -24,12 +24,12 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="NRM APP APIs",
+        title="CoRE Stack APIs",
         default_version="v1",
-        description="nrm api",
+        description="Core Stack api",
         terms_of_service="",
-        contact=openapi.Contact(email="contact@snippets.local"),
-        license=openapi.License(name="BSD License"),
+        contact=openapi.Contact(email="support@core-stack.org"),
+        license=openapi.License(name=""),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
@@ -46,6 +46,7 @@ urlpatterns = [
     path("api/v1/", include("users.urls")),
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
+    path("api/v1/", include("public_api.urls")),
     
     # Swagger Doc
     path(

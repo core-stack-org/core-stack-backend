@@ -1,5 +1,5 @@
 from rest_framework import status, viewsets, mixins, generics, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, schema
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -28,6 +28,7 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
+    schema = None
 
     @action(detail=False, methods=["get"])
     def available_organizations(self, request):
@@ -67,6 +68,7 @@ class LoginView(TokenObtainPairView):
     API endpoint for user login.
     Extends SimpleJWT's TokenObtainPairView to customize the response.
     """
+    schema = None
 
     def post(self, request, *args, **kwargs):
         # Call parent class method to validate credentials and get tokens
@@ -88,6 +90,7 @@ class LogoutView(generics.GenericAPIView):
     """API endpoint for user logout - invalidates refresh token."""
 
     permission_classes = [permissions.IsAuthenticated]
+    schema = None
 
     def post(self, request):
         try:
@@ -107,6 +110,7 @@ class LogoutView(generics.GenericAPIView):
 
 class IsSuperAdminOrOrgAdmin(permissions.BasePermission):
     """Permission to allow only superadmins or organization admins."""
+    schema = None
 
     def has_permission(self, request, view):
         return request.user.is_authenticated and (
@@ -122,6 +126,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    schema = None
 
     def get_permissions(self):
         """Set custom permissions based on action."""
@@ -412,6 +417,7 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
     permission_classes = [permissions.IsAuthenticated]
+    schema = None
 
 
 class UserProjectGroupViewSet(viewsets.ModelViewSet):
@@ -419,6 +425,7 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
 
     serializer_class = UserProjectGroupSerializer
     permission_classes = [permissions.IsAuthenticated]
+    schema = None
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_pk")

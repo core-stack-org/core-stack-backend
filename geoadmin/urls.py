@@ -8,4 +8,5 @@ urlpatterns = [
     path("activate_entities/", api.activate_entities, name="activate_entities"),
     path("activate_location/", api.activate_location, name="activate_location"),
     path("proposed_blocks/", api.proposed_blocks, name="proposed_blocks"),
+    path("generate_api_key/", api.generate_api_key, name="generate-api-key"),
 ]

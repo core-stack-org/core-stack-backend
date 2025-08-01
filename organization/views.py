@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, serializers, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, schema
 from rest_framework.response import Response
 from .models import Organization
 from .serializers import OrganizationSerializer
@@ -12,6 +12,7 @@ class IsSuperAdmin(permissions.BasePermission):
     """
     Permission class that allows only superadmins to access the endpoint.
     """
+    schema = None
 
     def has_permission(self, request, view):
         return request.user.is_authenticated and (
@@ -27,6 +28,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
     permission_classes = [IsSuperAdmin]
+    schema = None
 
     def get_permissions(self):
         """

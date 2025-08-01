@@ -1,4 +1,4 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 from rest_framework import status
 from .utils import *
@@ -14,6 +14,7 @@ logging.basicConfig(
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def generate_excel_file_layer(request):
     try:
         state = request.query_params.get("state", "").lower().strip().replace(" ", "_")
@@ -67,6 +68,7 @@ def generate_excel_file_layer(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def generate_kyl_data_excel(request):
     try:
         print("Inside generate_kyl_data_excel API.")
@@ -102,6 +104,7 @@ def generate_kyl_data_excel(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def generate_kyl_village_data(request):
     try:
         print("Inside generate_filter_data_village API.")
