@@ -17,11 +17,11 @@ from .merge_layers import (
     merge_yearly_layers,
 )
 from nrm_app.celery import app
+from celery import shared_task
 
 
-@app.task(bind=True)
+@shared_task()
 def calculate_drought(
-    self,
     state=None,
     district=None,
     block=None,
@@ -54,21 +54,21 @@ def calculate_drought(
         )
     else:
         roi = ee.FeatureCollection(roi_path)
-    dst_filename = (
+        dst_filename = (
             "drought_"
             + asset_suffix
             + "_"
             + str(start_year)
             + "_"
             + str(end_year)
-    )
-    asset_id = (
+        )
+        asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + dst_filename
     )
-    print(f"asset:{asset_id}")
+        print(f"asset:{asset_id}")
 
     if not is_gee_asset_exists(asset_id):
         chunk_size = 30  # if shapefile is large, running the script on the complete file will result an error,
@@ -90,6 +90,7 @@ def calculate_drought(
             )
             yearly_assets.append(yearly_drought)
             if not is_gee_asset_exists(yearly_drought):
+                print ("Started Generating drought layer")
                 generate_drought_layers(
                     roi,
                     asset_suffix,

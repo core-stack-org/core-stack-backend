@@ -47,7 +47,12 @@ def generate_cropping_intensity(
             + valid_gee_text(block.lower())
             + "_uid"
         )
-
+    else:
+        print ("inside roi logic")
+        roi = ee.FeatureCollection(
+           roi
+        )
+        print (roi)
     task_id, asset_id = generate_gee_asset(
         roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
     )
@@ -75,13 +80,14 @@ def generate_gee_asset(
         + "-"
         + str(end_year % 100)
     )
+    print (filename)
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + filename
     )
-
+    print (asset_id)
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 

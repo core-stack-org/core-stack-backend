@@ -45,6 +45,7 @@ class WaterbodiesFileUploadLog(models.Model):
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     process = models.BooleanField(default=False)
+    is_closest_wp = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -61,7 +62,8 @@ class WaterbodiesFileUploadLog(models.Model):
 
 
         super().save(*args, **kwargs)
-        Upload_Desilting_Points.delay(self.id)
+        Upload_Desilting_Points.delay(self.id,  self.is_closest_wp, is_lulc_required =
+                            False)
 
     class Meta:
         ordering = ["-created_at"]

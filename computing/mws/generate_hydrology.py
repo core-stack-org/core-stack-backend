@@ -37,7 +37,7 @@ def generate_hydrology(
 
     sys.setrecursionlimit(6000)
 
-    end_year = end_year + 1
+    end_year = int(end_year) + 1
     task_list = []
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
@@ -58,6 +58,8 @@ def generate_hydrology(
             + valid_gee_text(block.lower())
             + "_uid"
         )
+    else:
+        roi = ee.FeatureCollection(roi)
 
     ppt_task_id, ppt_asset_id = precipitation(
         roi=roi,
@@ -151,3 +153,4 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
+    return {"Sucess": True}

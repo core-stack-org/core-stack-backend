@@ -34,15 +34,16 @@ def evapotranspiration(
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
-    if not is_annual and (end_year - start_year > 5):
+    if not is_annual and (int(end_year) - int(start_year) > 5):
         print("In chunking")
         chunk_assets = []
         s_year = start_year
         task_ids = []
-        while s_year <= end_year:
+        while int(s_year) <= int(end_year):
+            s_year = int(s_year)
             start_date = f"{s_year}-07-01"
 
-            e_year = end_year if s_year + 5 > end_year else s_year + 5
+            e_year = end_year if int(s_year) + 5 > int(end_year) else int(s_year) + 5
             end_date = f"{e_year}-06-30"
 
             print(start_date, end_date)

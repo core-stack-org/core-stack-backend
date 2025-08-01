@@ -66,7 +66,7 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
         all_ndvi = ndvi.map(map_image).flatten()
 
         # Extract all unique UIDs from the input feature collection
-        uids = suitability_vector.aggregate_array("uid")
+        uids = suitability_vector.aggregate_array("UID")
 
         # For each UID, filter NDVI features and aggregate to dict
         def build_feature(uid):
@@ -76,11 +76,11 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
             """
             # Get the geometry and properties of the original feature
             feature_geom = ee.Feature(
-                suitability_vector.filter(ee.Filter.eq("uid", uid)).first()
+                suitability_vector.filter(ee.Filter.eq("UID", uid)).first()
             )
 
             # Filter all NDVI records related to this UID
-            filtered = all_ndvi.filter(ee.Filter.eq("uid", uid))
+            filtered = all_ndvi.filter(ee.Filter.eq("UID", uid))
 
             # Create dictionary: {date: ndvi}
             date_ndvi_list = filtered.aggregate_array("ndvi_date").zip(

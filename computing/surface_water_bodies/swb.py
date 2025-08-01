@@ -29,6 +29,7 @@ def generate_swb_layer(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    is_all_classes=False,
 ):
     ee_initialize()
     if state and district and block:
@@ -60,6 +61,7 @@ def generate_swb_layer(
         app_type=app_type,
         start_date=start_date,
         end_date=end_date,
+        is_all_classes = is_all_classes
     )
     if swb1:
         task_id_list = check_task_status([swb1])
@@ -112,8 +114,10 @@ def generate_swb_layer(
 
         fc = ee.FeatureCollection(asset_id)
         res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
-        return {'Sucess':True, 'swb_asset_id':swb3}
+
     except Exception as e:
         print("Not required")
-        return {'Sucess': False, 'swb_asset_id':asset_id}
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace="swb")
+
 

@@ -311,6 +311,8 @@ GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 
 PAN_INDIA_LULC_PATH='projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024'
-PAN_INDIA_MWS_PATH='projects/ee-corestackdev/assets/datasets/India_mws_UID_Merged'
+PAN_INDIA_MWS_PATH='projects/corestack-datasets/assets/datasets/India_mws_UID_Merged'
+PAN_INDIA_CATCHMENT_AREA='projects/corestack-datasets/assets/datasets/catchment_area_multiflow'
+PAN_INDIA_STREAM_ORDER='projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India'
 lulc_years = ['2017_2018', '2018_2019', '2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
 water_classes = [2, 3, 4]

@@ -1,7 +1,8 @@
 import os
-
+import tempfile
+from contextlib import ExitStack
+import time
 import requests
-
 from nrm_app.settings import (
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
@@ -12,8 +13,7 @@ from utilities.constants import (
     GEE_ASSET_PATH,
     GCS_BUCKET_NAME,
 )
-import ee, geetools
-import time
+import ee, geetools, os, tempfile
 import re
 import json
 import subprocess
@@ -22,12 +22,14 @@ from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
 import numpy as np
 
+import rasterio
+from rasterio.merge import merge
+
+
 def ee_initialize(project=None):
     try:
         if project == "helper":
-            service_account = (
-                "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
-            )
+            service_account = "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
             credentials = ee.ServiceAccountCredentials(
                 service_account, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH
             )
@@ -37,9 +39,9 @@ def ee_initialize(project=None):
                 service_account, GEE_SERVICE_ACCOUNT_KEY_PATH
             )
         ee.Initialize(credentials)
-        print("ee initialized", project)
+        print("Earth Engine initialized for project:", project)
     except Exception as e:
-        print("Exception in gee connection", e)
+        print("Exception in GEE connection:", e)
 
 
 def gcs_config():
@@ -94,6 +96,7 @@ def check_gee_task_status(task_id):
 
 
 def check_task_status(task_id_list, sleep_time=60):
+    task_id_list = list(filter(None, task_id_list))
     if len(task_id_list) > 0:
         time.sleep(sleep_time)
         tasks = ee.data.listOperations()
@@ -115,7 +118,6 @@ def check_task_status(task_id_list, sleep_time=60):
             print("Tasks not completed yet...")
             check_task_status(task_id_list)
     return task_id_list
-
 
 def valid_gee_text(description):
     description = re.sub(r"[^a-zA-Z0-9 .,:;_-]", "", description)
@@ -344,11 +346,13 @@ def sync_raster_to_gcs(image, scale, layer_name):
         bucket=GCS_BUCKET_NAME,
         fileNamePrefix="nrm_raster/" + layer_name,
         scale=scale,
-        fileFormat="GeoTIFF",
         crs="EPSG:4326",
         maxPixels=1e13,
+        fileFormat="GeoTIFF",
+        formatOptions={
+            "cloudOptimized": True
+        }
     )
-
     export_task.start()
     print("Successfully started the sync_raster_to_gcs", export_task.status())
     return export_task.status()["id"]
@@ -369,6 +373,155 @@ def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_nam
             layer_name=layer_name, style_name=style_name, workspace=workspace
         )
         print("Style response:", style_res)
+
+def extract_water_pixels(tif_bytes, water_values={2, 3, 4}, nodata_value=0):
+    with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp_in:
+        tmp_in.write(tif_bytes)
+        input_path = tmp_in.name
+
+    output_path = tempfile.mktemp(suffix="_water_only.tif")
+
+    with rasterio.open(input_path) as src:
+        data = src.read(1)  # Assuming single-band raster
+        profile = src.profile
+
+        # Create mask for water values
+        water_mask = np.isin(data, list(water_values))
+        masked_data = np.where(water_mask, data, nodata_value)
+
+        profile.update({
+            "dtype": masked_data.dtype,
+            "nodata": nodata_value,
+            "compress": "LZW"  # Optional: compress output
+        })
+
+        with rasterio.open(output_path, "w", **profile) as dst:
+            dst.write(masked_data, 1)
+
+    # Read the masked raster back as bytes
+    with open(output_path, "rb") as f:
+        water_only_bytes = f.read()
+
+    os.remove(input_path)
+    os.remove(output_path)
+
+    return water_only_bytes
+
+def sync_multiple_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name=None):
+    print("Inside sync_multiple_raster_gcs_to_geoserver")
+
+    try:
+        bucket = gcs_config()
+        prefix = f"nrm_raster/{gcs_file_name}"
+        print(f"Searching for blobs with prefix: {prefix}")
+
+        blobs = list(bucket.list_blobs(prefix=prefix))
+        tif_blobs = [blob for blob in blobs if blob.name.endswith(".tif")]
+
+        print(f"Found {len(tif_blobs)} TIFF file(s).")
+
+        if not tif_blobs:
+            return {"success": False, "error": "No raster files found."}
+
+        # Case 1: Single raster file
+        if len(tif_blobs) == 1:
+            print("Single raster found. Downloading and filtering...")
+            original_bytes = tif_blobs[0].download_as_bytes()
+            tif_content = extract_water_pixels(original_bytes, water_values={2, 3, 4})
+
+        # Case 2: Multiple rasters – filter each, then merge
+        else:
+            print(f"{len(tif_blobs)} rasters found. Downloading, filtering, and merging...")
+            temp_files = []
+            merged_path = None
+
+            try:
+                for blob in tif_blobs:
+                    print(f"Downloading and filtering: {blob.name}")
+                    original_bytes = blob.download_as_bytes()
+                    water_only_bytes = extract_water_pixels(original_bytes, water_values={2, 3, 4})
+
+                    _, temp_path = tempfile.mkstemp(suffix=".tif")
+                    with open(temp_path, "wb") as f:
+                        f.write(water_only_bytes)
+                    temp_files.append(temp_path)
+
+                print("All rasters filtered. Proceeding to merge...")
+
+                with ExitStack() as stack:
+                    src_files_to_mosaic = [stack.enter_context(rasterio.open(fp)) for fp in temp_files]
+                    mosaic, out_trans = merge(src_files_to_mosaic)
+                    print("Mosaic shape:", mosaic.shape)
+                    print("Mosaic dtype:", mosaic.dtype)
+
+                    if mosaic.shape[0] != 1:
+                        raise ValueError("Merged raster should be single-band.")
+
+                    # Convert to uint8 to save space
+                    mosaic_data = mosaic[0].astype(np.uint8)
+
+                    out_meta = src_files_to_mosaic[0].meta.copy()
+                    out_meta.update({
+                        "driver": "GTiff",
+                        "height": mosaic_data.shape[0],
+                        "width": mosaic_data.shape[1],
+                        "transform": out_trans,
+                        "compress": "LZW",  # Efficient compression
+                        "dtype": "uint8",
+                        "count": 1,
+                        "nodata": 0
+                    })
+
+                _, merged_path = tempfile.mkstemp(suffix=".tif")
+                with rasterio.open(merged_path, "w", **out_meta) as dest:
+                    dest.write(mosaic_data, 1)
+
+                with open(merged_path, "rb") as f:
+                    tif_content = f.read()
+
+            finally:
+                for fpath in temp_files:
+                    try:
+                        os.remove(fpath)
+                    except Exception as cleanup_err:
+                        print(f"Warning: Could not remove temp file {fpath}: {cleanup_err}")
+
+                if merged_path:
+                    try:
+                        print (merged_path)
+                        os.remove(merged_path)
+                    except Exception as cleanup_err:
+                        print(f"Warning: Could not remove merged file {merged_path}: {cleanup_err}")
+
+    except Exception as e:
+        print(f"Error preparing raster: {e}")
+        return {"success": False, "error": str(e)}
+
+    # Upload to GeoServer
+    try:
+        geo = Geoserver()
+        print("Uploading water-only raster to GeoServer...")
+        file_upload_res = geo.upload_raster(tif_content, workspace, layer_name)
+        print("File upload response:", file_upload_res)
+    except Exception as e:
+        print(f"Error uploading raster to GeoServer: {e}")
+        return {"success": False, "error": str(e)}
+
+    # Optionally publish style
+    if style_name:
+        try:
+            style_res = geo.publish_style(
+                layer_name=layer_name,
+                style_name=style_name,
+                workspace=workspace
+            )
+            print("Style response:", style_res)
+        except Exception as e:
+            print(f"Error applying style to layer: {e}")
+            return {"success": False, "error": str(e)}
+
+    return {"success": True, "message": "Raster uploaded and styled successfully."}
+
 
 
 def upload_tif_to_gcs(gcs_file_name, local_file_path):

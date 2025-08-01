@@ -72,6 +72,7 @@ def sqm2sqkm(args):
     scale = args.get("scale")
     value = ee.Number(value)
     scale = ee.Number(scale)
+
     value = value.multiply((scale.multiply(scale)).divide(1000000))
     return value
 
@@ -129,6 +130,7 @@ def generate_drought_layers(
 
         print("Done iterating")
     else:
+        print ("else block")
         block_name_for_parts = "drought_" + asset_suffix + "_" + str(current_year)
         drought_chunk(
             aoi,
@@ -167,7 +169,7 @@ def drought_chunk(
         )
         + block_name_for_parts
     )
-
+    print ('draught chunk')
     if is_gee_asset_exists(asset_id):
         return
 
@@ -774,6 +776,7 @@ def drought_chunk(
 
         roi = kharif_cropable.reduceRegions(roi, ee.Reducer.sum(), lulc_scale)
         args = ee.Dictionary({"scale": lulc_scale})
+        print (f"scale: {lulc_scale}")
         roi = rename_column_with_transformation(
             "sum", "kharif_croppable_sqkm", roi, sqm2sqkm, args
         )
@@ -871,7 +874,7 @@ def drought_chunk(
         )
 
         vci = vci_ndvi.min(vci_ndwi)
-
+        print (f"cropping mast: {cropping_mask}")
         vci = ee.Image(vci).multiply(cropping_mask)
         vci = vci.multiply(100)
 
@@ -969,6 +972,7 @@ def drought_chunk(
             et_list = ee.List(et_list)
             img = ee.Image(et_list.get(0))
             weight = ee.Number(et_list.get(1))
+
             return ((img.multiply(weight)).multiply(0.1)).toDouble()
 
         new_et = et_w.map(inner1)
@@ -978,6 +982,7 @@ def drought_chunk(
             pet_list = ee.List(pet_list)
             img = ee.Image(pet_list.get(0))
             weight = ee.Number(pet_list.get(1))
+
             return ((img.multiply(weight)).multiply(0.1)).toDouble()
 
         new_pet = pet_w.map(inner2)
@@ -1405,6 +1410,7 @@ def drought_chunk(
 
     # ************ COMPUTATION START *************
     monsoon_onset = get_monsoon_on_set_date(current_year, aoi)
+
     monsoon_cessation = get_monsoon_cessation_date()  # 30th oct
     start_dates = get_week_start_dates(monsoon_onset, monsoon_cessation)
     # weekly_rainfall_deviations = start_dates.map(

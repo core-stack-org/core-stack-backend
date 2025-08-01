@@ -4,6 +4,7 @@ import geopandas as gpd
 import fiona
 import copy
 
+from projects.models import Project
 from utilities.gee_utils import (
     ee_initialize,
     sync_vector_to_gcs,
@@ -20,14 +21,15 @@ from utilities.constants import (
     ADMIN_BOUNDARY_OUTPUT_DIR,
     SHAPEFILE_DIR,
     GEE_HELPER_PATH,
-    GEE_ASSET_PATH,
+    GEE_ASSET_PATH, GEE_PATHS,
 )
 import ee
 import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 def generate_shape_files(path):
     gdf = gpd.read_file(path + ".json")
@@ -281,28 +283,41 @@ def fix_invalid_geometry_in_gdf(gdf):
 
 
 def get_season_key(date):
-    """Return season key like 'rabi_2017' based on Indian cropping seasons."""
+    """Return season key like 'rabi_2017-2018' based on Indian cropping seasons."""
     month = date.month
     year = date.year
+    next_year = year + 1
 
-    if month in [10, 11, 12]:
-        return f"rabi_{year}"
-    elif month in [1, 2, 3]:
-        return f"rabi_{year - 1}"
-    elif month in [4, 5, 6]:
-        return f"zaid_{year}"
-    elif month in [7, 8, 9]:
-        return f"kharif_{year}"
+    if month in [1, 2]:
+        return f"rabi_{year - 1}-{year}"  # Jan–Feb → Rabi of previous year
+    elif month in [11, 12]:
+        return f"rabi_{year}-{next_year}"  # Nov–Dec → Rabi starting this year
+    elif month in [3, 4, 5, 6]:
+        return f"zaid_{year}-{next_year}"
+    elif month in [7, 8, 9, 10]:
+        return f"kharif_{year}-{next_year}"
     else:
         return None
 
+def get_agri_year_key(season_key):
+    """Convert a season key to agricultural year key (e.g., rabi_2017-2018 → 2017-2018)."""
+    season, years = season_key.split("_")
+    start_year, end_year = map(int, years.split("-"))
 
-def calculate_precipitation_season(geojson_filepath):
+    if season in ["kharif", "rabi"]:
+        return f"{start_year}-{end_year}"
+    elif season == "zaid":
+        return f"{start_year - 1}-{start_year}"  # Zaid 2018-2019 → Agri year 2017-2018
+    else:
+        return None
+
+def calculate_precipitation_season(geojson_filepath, start_year=2017, end_year=2024):
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
         feature_collection = json.load(f)
 
     features_ee = []
+
     for feature in feature_collection["features"]:
         original_props = feature["properties"]
         new_props = {}
@@ -311,27 +326,96 @@ def calculate_precipitation_season(geojson_filepath):
         if "uid" in original_props:
             new_props["uid"] = original_props["uid"]
 
-        season_totals = {}
+        agri_year_totals = {}
 
         for key, val in original_props.items():
             try:
                 date = datetime.strptime(key, "%Y-%m-%d")
-                season_key = get_season_key(date)  # You need to define this function
-                if season_key:
-                    season_totals[season_key] = season_totals.get(season_key, 0) + float(val)
-            except (ValueError, TypeError):
-                continue  # skip non-date keys and non-numeric values
+                season_key = get_season_key(date)
+                if not season_key:
+                    continue
 
-        # Add precipitation season totals
-        for season, total in season_totals.items():
-            new_props[f"precipitation_{season}"] = total
+                agri_key = get_agri_year_key(season_key)
+                if not agri_key:
+                    continue
 
-        # Create an ee.Feature with geometry and properties
-        # Note: ee.Geometry expects GeoJSON geometry dict
+                # Filter by agri year range
+                agri_start = int(agri_key.split("-")[0])
+                if not (start_year <= agri_start <= end_year):
+                    continue
+
+                season = season_key.split("_")[0]  # e.g., 'kharif'
+                full_key = f"{season}_{agri_key}"  # e.g., '2017-2018_kharif'
+
+                agri_year_totals[full_key] = agri_year_totals.get(full_key, 0) + float(val)
+
+            except Exception:
+                continue  # Skip bad keys/values
+
+        # Add precipitation totals per agri year and season
+        for agri_key, total in agri_year_totals.items():
+            new_props[f"precipitation_{agri_key}"] = total
+
+        # Optional debug
+        # print(new_props)
+
+        # Create Earth Engine Feature
         geom_ee = ee.Geometry(feature["geometry"])
         feature_ee = ee.Feature(geom_ee, new_props)
-
         features_ee.append(feature_ee)
 
-    # Return an ee.FeatureCollection
+    # Return as FeatureCollection
     return ee.FeatureCollection(features_ee)
+
+
+def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
+    # Load project
+    proj_obj = Project.objects.get(pk=proj_id)
+
+    # Build CI and NDVI asset paths
+    asset_path_ci = get_gee_dir_path(
+        [proj_obj.name], asset_path=GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]
+    ) + ci_asset
+
+    asset_path_ndvi = get_gee_dir_path(
+        [proj_obj.name], asset_path=GEE_PATHS['NDVI']["GEE_ASSET_PATH"]
+    ) + ndvi_asset
+
+    # Load FeatureCollections
+    zoi = ee.FeatureCollection(zoi_asset)
+    ci = ee.FeatureCollection(asset_path_ci)
+    ndvi = ee.FeatureCollection(asset_path_ndvi)
+
+    # -------------------------
+    # STEP 1: Join ZOI with Cropping Intensity
+    # -------------------------
+    join = ee.Join.inner()
+    filter = ee.Filter.intersects(leftField='.geo', rightField='.geo')
+    zoi_ci_joined = join.apply(zoi, ci, filter)
+
+    def merge_zoi_ci(pair):
+        zoi_feat = ee.Feature(pair.get('primary'))
+        ci_feat = ee.Feature(pair.get('secondary'))
+        merged_props = zoi_feat.toDictionary().combine(ci_feat.toDictionary(), True)
+        return ee.Feature(zoi_feat.geometry(), merged_props)
+
+    zoi_with_ci = ee.FeatureCollection(zoi_ci_joined.map(merge_zoi_ci))
+
+    # -------------------------
+    # STEP 2: Join ZOI+CI with NDVI
+    # -------------------------
+    zoi_ndvi_joined = join.apply(zoi_with_ci, ndvi, filter)
+
+    def merge_zoi_ci_ndvi(pair):
+        ci_feat = ee.Feature(pair.get('primary'))
+        ndvi_feat = ee.Feature(pair.get('secondary'))
+        merged_props = ci_feat.toDictionary().combine(ndvi_feat.toDictionary(), True)
+        return ee.Feature(ci_feat.geometry(), merged_props)
+
+    final_merged = ee.FeatureCollection(zoi_ndvi_joined.map(merge_zoi_ci_ndvi))
+
+    # -------------------------
+    # STEP 3: Export or Push to GeoServer
+    # -------------------------
+    layer_name = f'WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}'
+    sync_project_fc_to_geoserver(final_merged, proj_obj.name, layer_name, 'waterrej')

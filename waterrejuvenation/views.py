@@ -47,6 +47,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         print ("inside create api")
         """Create new excel files - supports both single and multiple file uploads"""
         project_id = self.kwargs.get("project_pk")
+        is_closest_wp = request.POST.get('is_closest_wp')
         print ("Project: " +str(project_id))
         if not project_id:
             return Response(
@@ -68,6 +69,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         # Check if we have files in the request
         files = []
         print (request.FILES)
+
         # Handle single file upload case
         if "file" in request.FILES:
             files.append(request.FILES["file"])
@@ -115,6 +117,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 "name": request.data.get("name", valid_gee_text(uploaded_file.name)),
                 "file": uploaded_file,
                 "project": project.id,
+                "is_closest_wp":  is_closest_wp
             }
             print(data)
             serializer = self.get_serializer(data=data)
