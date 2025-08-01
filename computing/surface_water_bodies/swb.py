@@ -65,12 +65,8 @@ def generate_swb_layer(
         print("SWB1 task completed - task_id_list", task_id_list)
 
     # SWB2: Intersect water bodies with micro-watershed to get unique ids for water bodies per micro-watershed
-    layer_name = (
-        "surface_waterbodies_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+    layer_name = "surface_waterbodies_" + asset_suffix
+
     swb2, asset_id = waterbody_mws_intersection(
         roi=roi,
         asset_suffix=asset_suffix,
