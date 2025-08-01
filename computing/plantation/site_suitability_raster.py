@@ -20,6 +20,7 @@ from utilities.gee_utils import (
 from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
 from utilities.logger import setup_logger
+from ..utils import save_layer_info_to_db
 
 logger = setup_logger(__name__)
 
@@ -385,10 +386,21 @@ def get_pss(
         )
         check_task_status([task_id])
 
-        make_asset_public(asset_id)
+        if is_gee_asset_exists(asset_id):
+            make_asset_public(asset_id)
+            if state and district and block:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=description,
+                    asset_id=asset_id,
+                    dataset_name="Site Suitability",
+                )
+                print("save site suitability info at the gee level...")
 
-        sync_to_gcs_geoserver(asset_id, description, scale)
-        return asset_id, is_default_profile
+            sync_to_gcs_geoserver(asset_id, description, scale, state, district, block)
+            return asset_id, is_default_profile
 
     except Exception as e:
         logger.exception(f"Export failed: {str(e)}")
@@ -567,15 +579,28 @@ def create_classification(
     return sub_layer
 
 
-def sync_to_gcs_geoserver(asset_id, layer_name, scale):
+def sync_to_gcs_geoserver(
+    asset_id, layer_name, scale, state=None, district=None, block=None
+):
     image = ee.Image(asset_id)
     task_id = sync_raster_to_gcs(image, scale, layer_name)
     task_id_list = check_task_status([task_id])
     print("task_id sync to gcs ", task_id_list)
 
-    sync_raster_gcs_to_geoserver(
+    res = sync_raster_gcs_to_geoserver(
         "plantation",
         layer_name,
         layer_name,
         None,
     )
+    if res and state and district and block:
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name,
+            asset_id,
+            dataset_name="Site Suitability",
+            sync_to_geoserver=True,
+        )
+        print("save site suitability raster layer info at the geoserver level...")

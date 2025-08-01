@@ -9,7 +9,9 @@ from utilities.gee_utils import (
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
+    make_asset_public,
 )
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -60,50 +62,64 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             .clip(block_geometry)
         )
 
-        # Compute CCD statistics function
-        def ccd_stats(feature):
-            stats = ccd_img.reduceRegion(
-                reducer=ee.Reducer.frequencyHistogram().unweighted(),
-                geometry=feature.geometry(),
-                scale=25,
-                maxPixels=1e10,
-            )
-            pixel_counts = ee.Dictionary(stats.get("classification"))
-            return feature.set(
-                {
-                    "ccd_0": pixel_counts.get("0.0", 0),  # Low Density
-                    "ccd_1": pixel_counts.get("1.0", 0),  # High Density
-                    "ccd_2": pixel_counts.get("2.0", 0),  # Missing Data
-                }
-            )
+        # # Compute CCD statistics function
+        # def ccd_stats(feature):
+        #     stats = ccd_img.reduceRegion(
+        #         reducer=ee.Reducer.frequencyHistogram().unweighted(),
+        #         geometry=feature.geometry(),
+        #         scale=25,
+        #         maxPixels=1e10,
+        #     )
+        #     pixel_counts = ee.Dictionary(stats.get("classification"))
+        #     return feature.set(
+        #         {
+        #             "ccd_0": pixel_counts.get("0.0", 0),  # Low Density
+        #             "ccd_1": pixel_counts.get("1.0", 0),  # High Density
+        #             "ccd_2": pixel_counts.get("2.0", 0),  # Missing Data
+        #         }
+        #     )
 
         # Apply CCD statistics function to the feature collection
-        block_mws_with_stats = block_mws.map(ccd_stats)
-        try:
-            task_id = export_raster_asset_to_gee(
-                image=ccd_img,
-                description=description,
-                asset_id=asset_id,
-                scale=25,
-                region=block_geometry,
-            )
-            task_id_list = check_task_status([task_id])
-            print("CCD task_id_list", task_id_list)
+        # block_mws_with_stats = block_mws.map(ccd_stats)
+        task_id = export_raster_asset_to_gee(
+            image=ccd_img,
+            description=description,
+            asset_id=asset_id,
+            scale=25,
+            region=block_geometry,
+        )
+        task_id_list = check_task_status([task_id])
+        print("CCD task_id_list", task_id_list)
 
-            # Sync image to Google Cloud Storage and Geoserver
-            layer_name = (
-                "tree_health_ccd_raster_"
-                + valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
-                + "_"
-                + str(year)
+        # Sync image to Google Cloud Storage and Geoserver
+        layer_name = (
+            "tree_health_ccd_raster_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_"
+            + str(year)
+        )
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state, district, block, layer_name, asset_id, "Ccd Raster"
             )
+            make_asset_public(asset_id)
             task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, layer_name)
 
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to GCS", task_id_list)
 
-            sync_raster_gcs_to_geoserver("ccd", layer_name, layer_name, "ccd_style")
-        except Exception as e:
-            print(f"Error occurred in running process_ccd task: {e}")
+            res = sync_raster_gcs_to_geoserver(
+                "ccd", layer_name, layer_name, "ccd_style"
+            )
+            if res:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name,
+                    asset_id,
+                    "Ccd Raster",
+                    sync_to_geoserver=True,
+                )

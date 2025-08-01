@@ -13,10 +13,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     make_asset_public,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
 from .well_depth import well_depth
 from .calculateG import calculate_g
 import sys
+from computing.utils import save_layer_info_to_db, sync_layer_to_geoserver
 
 
 @app.task(bind=True)
@@ -98,10 +101,42 @@ def generate_hydrology(
     task_id_list = check_task_status(task_list) if len(task_list) > 0 else []
     print("task_id_list", task_id_list)
 
-    # Make above asset public on GEE
-    make_asset_public(ppt_asset_id)
-    make_asset_public(et_asset_id)
-    make_asset_public(ro_task_id)
+    if state and district and block:
+        if is_gee_asset_exists(et_asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{district}_{block}_evapotranspiration",
+                asset_id=et_asset_id,
+                dataset_name="Hydrology Evapotranspiration",
+            )
+            print("save Evapotranspiration info at the gee level...")
+            make_asset_public(et_asset_id)
+
+        if is_gee_asset_exists(ppt_asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{district}_{block}_precipitation",
+                asset_id=ppt_asset_id,
+                dataset_name="Hydrology Precipitation",
+            )
+            print("save Precipitation info at the gee level...")
+            make_asset_public(ppt_asset_id)
+
+        if is_gee_asset_exists(ro_asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{district}_{block}_run_off",
+                asset_id=ro_asset_id,
+                dataset_name="Hydrology Run Off",
+            )
+            print("save Run Off info at the gee level...")
+            make_asset_public(ro_task_id)
 
     dg_task_id, asset_id = delta_g(
         roi=roi,
@@ -114,7 +149,6 @@ def generate_hydrology(
     )
     task_id_list = check_task_status([dg_task_id]) if dg_task_id else []
     print("dg task_id_list", task_id_list)
-    make_asset_public(asset_id)
 
     layer_name = "deltaG_fortnight_" + asset_suffix
 
@@ -128,7 +162,6 @@ def generate_hydrology(
         )
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wd task_id_list", task_id_list)
-        make_asset_public(wd_asset_id)
 
         wd_task_id, asset_id = net_value(
             asset_suffix=asset_suffix,
@@ -139,15 +172,48 @@ def generate_hydrology(
         )
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wdn task_id_list", task_id_list)
-        make_asset_public(asset_id)
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    calculate_g(
-        asset_id=asset_id,
-        layer_name=layer_name,
-        shp_folder=asset_suffix,
-        start_date=start_date,
-        end_date=end_date,
-        is_annual=is_annual,
+    fc = calculate_g(
+        asset_id=asset_id, start_date=start_date, end_date=end_date, is_annual=is_annual
     )
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + layer_name
+    )
+    task_id = export_vector_asset_to_gee(fc, layer_name, asset_id)
+
+    if task_id:
+        task_id_list = check_task_status([task_id])
+        print("task_id_list", task_id_list)
+
+    if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Hydrology",
+        )
+
+        fc = ee.FeatureCollection(asset_id).getInfo()
+        fc = {"features": fc["features"], "type": fc["type"]}
+        res = sync_layer_to_geoserver(asset_suffix, fc, layer_name, "mws_layers")
+        print(res)
+
+        if res["status_code"] == 201 and state and district and block:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=layer_name,
+                asset_id=asset_id,
+                dataset_name="Hydrology",
+                sync_to_geoserver=True,
+            )

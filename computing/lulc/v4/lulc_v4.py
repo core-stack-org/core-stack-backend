@@ -22,6 +22,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -203,3 +204,4 @@ def generate_final(state, district, block, start_year, end_year):
         # sync_raster_gcs_to_geoserver(
         #     "lulc_v4", filename_prefix + "_v4", filename_prefix + "_v4", None
         # )
+        # save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "LULC")
