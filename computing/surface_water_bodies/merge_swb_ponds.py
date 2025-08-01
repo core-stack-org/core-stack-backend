@@ -21,6 +21,7 @@ from utilities.gee_utils import (
     create_gee_directory,
     make_asset_public,
     check_task_status,
+    export_vector_asset_to_gee,
 )
 
 
@@ -64,12 +65,9 @@ def uid_for_ponds(mws_id_list, pond_id):
 # from onprem repo utils.py
 def sync_fc_to_gee(fc, description, asset_id):
     try:
-        task = ee.batch.Export.table.toAsset(
-            **{"collection": fc, "description": description, "assetId": asset_id}
-        )
-        task.start()
-        print("Successfully started task", task.status())
-        return task.status()["id"]
+        task = export_vector_asset_to_gee(fc, description, asset_id)
+        print("Successfully started task")
+        return task
     except Exception as e:
         print(f"Error in task: {e}")
         return None
@@ -380,16 +378,9 @@ def merge_swb_ponds(
     # merged_fc = geemap.geopandas_to_ee(merged_gdf)
 
     # try:
-    #     task = ee.batch.Export.table.toAsset(
-    #         **{
-    #             "collection": merged_fc,
-    #             "description": 'merging swb and pond layer',
-    #             "assetId": block_path_ee + str(district) + '_' + str(block) + output_suffix + '_test',
-    #         }
-    #     )
-    #     task.start()
-    #     print("Successfully started the merge chunk", task.status())
-    #     return task.status()["id"]
+    #     task = export_vector_asset_to_gee(merged_fc,'merging swb and pond layer', block_path_ee + str(district) + '_' + str(block) + output_suffix + '_test' )
+    #     print("Successfully started the merge chunk")
+    #     return task
     # except Exception as e:
     #     print(f"Error occurred in running merge task: {e}")
 

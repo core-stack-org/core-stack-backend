@@ -13,6 +13,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
 )
 from .crop_gridXlulc import crop_grids_lulc
 from nrm_app.celery import app
@@ -31,10 +32,8 @@ def create_crop_grids(self, state, district, block):
         + "_"
         + valid_gee_text(block.lower() + "_with_uid_16ha")
     )
-
-    if not is_gee_asset_exists(
-        get_gee_asset_path(state, district, block) + description
-    ):
+    asset_id = get_gee_asset_path(state, district, block) + description
+    if not is_gee_asset_exists(asset_id):
         # Get block coordinates
         block_coords = get_block_coordinates(state, district, block)
         geom_len = len(block_coords)
@@ -64,8 +63,7 @@ def create_crop_grids(self, state, district, block):
         if task_id:
             task_id_list = check_task_status([task_id])
             print("task_id_list", task_id_list)
-
-    crop_grids_lulc(state, district, block)
+    crop_grids_lulc(state, district, block, asset_id)
 
 
 def get_block_coordinates(state, district, block):
@@ -234,14 +232,13 @@ def generate_crop_grid_gee(state, district, block, features, description):
         fc = ee.FeatureCollection(features)
 
         try:
-            task = ee.batch.Export.table.toAsset(
-                collection=fc,
-                description=description,
-                assetId=get_gee_asset_path(state, district, block) + description,
+            task = export_vector_asset_to_gee(
+                fc,
+                description,
+                get_gee_asset_path(state, district, block) + description,
             )
-            task.start()
-            print("Successfully started the crop_grid", task.status())
-            return task.status()["id"]
+            print("Successfully started the crop_grid")
+            return task
         except Exception as e:
             print(f"Error occurred in running crop_grid task: {e}")
     return None
@@ -291,16 +288,8 @@ def merge_chunks(state, district, block, asset_ids):
     asset_id = get_gee_asset_path(state, district, block) + description
     try:
         # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": asset,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        task.start()
-        print("Successfully started the merge crop grid chunk", task.status())
-        return task.status()["id"]
+        task = export_vector_asset_to_gee(asset, description, asset_id)
+        print("Successfully started the merge crop grid chunk")
+        return task
     except Exception as e:
         print(f"Error occurred in running merge crop grid chunk task: {e}")

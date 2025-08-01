@@ -1,5 +1,4 @@
 import os
-
 import geopandas as gpd
 import fiona
 
@@ -13,6 +12,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     get_gee_dir_path,
     export_vector_asset_to_gee,
+    is_asset_public,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -27,6 +27,8 @@ import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
+from computing.models import Dataset, Layer, LayerType
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 
 def generate_shape_files(path):
@@ -63,7 +65,7 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
     # if response["status_code"] in [200, 201, 202]:
     #     os.remove(zip_path)
     #     shutil.rmtree(shape_path_dir)
-    return response["response_text"]
+    return response
 
 
 def kml_to_geojson(state_name, district_name, block_name, kml_path):
@@ -240,3 +242,64 @@ def fix_invalid_geometry_in_gdf(gdf):
             gdf.loc[idx, "geometry"] = gdf.loc[idx, "geometry"].buffer(0)
 
     return gdf
+
+
+def get_directory_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+    return total_size
+
+
+def save_layer_info_to_db(
+    state,
+    district,
+    block,
+    layer_name,
+    asset_id,
+    dataset_name,
+    sync_to_geoserver=False,
+    layer_version=1.0,
+    misc=None,
+    is_override=False,
+):
+    print("inside the save_layer_info_to_db function ")
+    dataset = Dataset.objects.get(name=dataset_name, layer_version=layer_version)
+    state = state.upper()
+    district = district.upper()
+    block = block.upper()
+
+    try:
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
+            district_name__iexact=district, state=state_obj
+        )
+        block_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=block, district=district_obj
+        )
+    except Exception as e:
+        print("Error fetching in state district block:", e)
+        return
+    is_public = is_asset_public(asset_id)
+
+    layer_obj, created = Layer.objects.update_or_create(
+        dataset=dataset,
+        layer_name=layer_name.lower(),
+        state=state_obj,
+        district=district_obj,
+        block=block_obj,
+        gee_asset_path=asset_id,
+        defaults={
+            "is_sync_to_geoserver": sync_to_geoserver,
+            "is_public_gee_asset": is_public,
+            "is_override": is_override,
+            "misc": misc,
+        },
+    )
+    if layer_obj:
+        print("found layer object and updated")
+    else:
+        print("layer object not found so, created new one")

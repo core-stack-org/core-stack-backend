@@ -127,19 +127,13 @@ ODK_SYNC_URL_WATER_STRUCTURES_MAINTENANCE = (
 ODK_SYNC_URL_GW_MAINTENANCE = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
-    + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0/submissions"
+    + "/forms/Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1/submissions"
 )
 
 ODK_SYNC_URL_AGRI_MAINTENANCE = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
     + "/forms/Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1/submissions"
-)
-
-ODK_SYNC_URL_GW_FEEDBACK = (
-    ODK_BASE_URL
-    + ODK_PROJECT_ID
-    + "/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0/submissions"
 )
 
 ODK_SYNC_URL_GW_FEEDBACK = (

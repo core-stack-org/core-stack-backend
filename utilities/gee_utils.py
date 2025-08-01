@@ -102,6 +102,7 @@ def check_gee_task_status(task_id):
 
 
 def check_task_status(task_id_list, sleep_time=60):
+    task_id_list = list(filter(None, task_id_list))
     if len(task_id_list) > 0:
         time.sleep(sleep_time)
         tasks = ee.data.listOperations()
@@ -347,6 +348,19 @@ def make_asset_public(asset_id):
         return False
 
 
+def is_asset_public(asset_id):
+    ee_initialize()
+    try:
+        acl = ee.data.getAssetAcl(asset_id)
+        if acl["all_users_can_read"]:
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Error in checking asset public : {e}")
+        return False
+
+
 def sync_raster_to_gcs(image, scale, layer_name):
     print("inside sync_raster_to_gcs")
     export_task = ee.batch.Export.image.toCloudStorage(
@@ -380,6 +394,7 @@ def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_nam
             layer_name=layer_name, style_name=style_name, workspace=workspace
         )
         print("Style response:", style_res)
+    return f"File response: {file_upload_res}"
 
 
 def upload_tif_to_gcs(gcs_file_name, local_file_path):

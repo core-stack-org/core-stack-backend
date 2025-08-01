@@ -2,6 +2,7 @@ import ee
 from computing.utils import (
     sync_layer_to_geoserver,
     sync_fc_to_geoserver,
+    save_layer_info_to_db,
 )
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -30,7 +31,7 @@ def generate_cropping_intensity(
     end_year=None,
 ):
     ee_initialize()
-
+    layer_name = f"{asset_suffix}_intensity"
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
@@ -55,13 +56,35 @@ def generate_cropping_intensity(
         task_id_list = check_task_status([task_id])
         print("Cropping intensity task completed - task_id_list:", task_id_list)
 
+    if (
+        state and district and block and is_gee_asset_exists(asset_id)
+    ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Cropping Intensity",
+        )
     make_asset_public(asset_id)
 
     # Export asset to Geoserver
     fc = ee.FeatureCollection(asset_id)
-    layer_name = f"{asset_suffix}_intensity"
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "crop_intensity")
     print(res)
+    if (
+        res["status_code"] == 201 and state and district and block
+    ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Cropping Intensity",
+            sync_to_geoserver=True,
+        )
 
 
 def generate_gee_asset(
