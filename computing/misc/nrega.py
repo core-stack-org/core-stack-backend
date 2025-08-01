@@ -5,7 +5,11 @@ import json
 from nrm_app.celery import app
 from shapely import wkt
 from shapely.geometry import Point
-from computing.utils import push_shape_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    push_shape_to_geoserver,
+    save_layer_info_to_db,
+    get_directory_size,
+)
 from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
     NREGA_ASSETS_INPUT_DIR,
@@ -38,16 +42,6 @@ def export_shp_to_gee(district, block, layer_path, asset_id):
     )
     layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
     upload_shp_to_gee(layer_path, layer_name, asset_id)
-
-
-def get_directory_size(path):
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(path):
-        for filename in filenames:
-            file_path = os.path.join(dirpath, filename)
-            if os.path.isfile(file_path):
-                total_size += os.path.getsize(file_path)
-    return total_size
 
 
 @app.task(bind=True)

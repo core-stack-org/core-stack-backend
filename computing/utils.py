@@ -1,6 +1,4 @@
 import os
-from tarfile import version
-
 import geopandas as gpd
 import fiona
 
@@ -244,6 +242,16 @@ def fix_invalid_geometry_in_gdf(gdf):
             gdf.loc[idx, "geometry"] = gdf.loc[idx, "geometry"].buffer(0)
 
     return gdf
+
+
+def get_directory_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+    return total_size
 
 
 def save_layer_info_to_db(

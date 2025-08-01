@@ -52,6 +52,7 @@ from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 
+
 @api_view(["POST"])
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
@@ -125,8 +126,8 @@ def generate_lithology(request):
     print("Inside generate_lithology API.")
     try:
         state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        generate_lithology_layer.apply_async(args=[state, district], queue="nrm")
+        # district = request.data.get("district").lower()
+        generate_lithology_layer.apply_async(args=[state], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -791,6 +792,7 @@ def fes_clart_upload_layer(request):
     except Exception as e:
         print("Exception in clart upload_geoserver_layer API:", e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(["POST"])
 def swb_pond_merging(request):
