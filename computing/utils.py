@@ -284,11 +284,11 @@ def save_layer_info_to_db(
         district=district_obj,
         block=block_obj,
         gee_asset_path=asset_id,
-        misc=misc,
         defaults={
             "is_sync_to_geoserver": sync_to_geoserver,
             "is_public_gee_asset": is_public,
             "is_override": is_override,
+            "misc": misc,
         },
     )
     if layer_obj:

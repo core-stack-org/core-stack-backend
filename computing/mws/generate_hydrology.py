@@ -107,7 +107,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name="",
+                layer_name=f"{district}_{block}_evapotranspiration",
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
             )
@@ -119,7 +119,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name="",
+                layer_name=f"{district}_{block}_precipitation",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
             )
@@ -131,7 +131,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name="",
+                layer_name=f"{district}_{block}_run_off",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
             )

@@ -59,6 +59,7 @@ class Layer(models.Model):
     class Meta:
         verbose_name = "Layer"
         verbose_name_plural = "Layers"
+        unique_together = ("dataset", "layer_name", "state", "district", "block")
 
     def __str__(self):
         return str(self.layer_name)
