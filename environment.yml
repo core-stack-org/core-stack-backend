@@ -379,3 +379,4 @@ dependencies:
       - wsproto==1.2.0
       - rabbitmq==0.2.0
       - rabbitmq-server==0.0.1
+      - djangorestframework-api-key
