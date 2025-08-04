@@ -179,7 +179,7 @@ GEE_PATHS = {
         "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/plantation/",
     },
     "WATER_REJ": {
-        "GEE_ASSET_PATH": GEE_BASE_PATH + "/waterrej/",
-        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/waterrej/",
+        "GEE_ASSET_PATH": GEE_BASE_PATH + "/waterbody/",
+        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/waterbody/",
     },
 }

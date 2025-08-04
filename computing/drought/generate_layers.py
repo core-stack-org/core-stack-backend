@@ -460,7 +460,10 @@ def drought_chunk(
         roi = rainfall_deviation.reduceRegions(roi, ee.Reducer.mean(), 5566)
         roi = roi.map(
             lambda feature: feature.set(
-                "mean", ee.Number(feature.get("mean")).multiply(100)
+                "mean",
+                ee.Algorithms.If(
+                    feature.get("mean"), ee.Number(feature.get("mean")).multiply(100), 0
+                ),
             )
         )
 
@@ -512,7 +515,10 @@ def drought_chunk(
         roi = rainfall_deviation.reduceRegions(roi, ee.Reducer.mean(), 5566)
         roi = roi.map(
             lambda feature: feature.set(
-                "mean", ee.Number(feature.get("mean")).multiply(100)
+                "mean",
+                ee.Algorithms.If(
+                    feature.get("mean"), ee.Number(feature.get("mean")).multiply(100), 0
+                ),
             )
         )
 
@@ -1128,6 +1134,8 @@ def drought_chunk(
             dryspell_value = feature.get(dryspell_col)
             rfdev_value = feature.get(rfdev_col)
             spi_value = ee.Number(feature.get(spi_col))
+            spi_value = ee.Algorithms.If(spi_value, spi_value, 0)
+            spi_value = ee.Number(spi_value)
 
             # if normal rf:
             #     if dryspell:
