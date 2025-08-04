@@ -63,7 +63,7 @@ def mws_layer(self, state, district, block):
             state,
             district,
             block,
-            layer_name="",
+            layer_name=f"mws_{district}_{block}",
             asset_id=asset_id,
             dataset_name="MWS",
             layer_version=2.0,

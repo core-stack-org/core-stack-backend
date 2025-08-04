@@ -32,17 +32,6 @@ def calculate_drought(
 ):
     ee_initialize()
 
-    dst_filename = (
-        "drought_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_"
-        + str(start_year)
-        + "_"
-        + str(end_year)
-    )
-
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
@@ -60,18 +49,19 @@ def calculate_drought(
             + "_uid"
         )
 
+    dst_filename = (
+        "drought_" + asset_suffix + "_" + str(start_year) + "_" + str(end_year)
+    )
+
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + dst_filename
     )
-    description = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_drought"
-    )
+
+    layer_name = asset_suffix + "_drought"
+
     if not is_gee_asset_exists(asset_id):
         chunk_size = 30  # if shapefile is large, running the script on the complete file will result an error,
         # so divide into chunks and run on the chunks when the chunks are got exported,
@@ -132,7 +122,7 @@ def calculate_drought(
                 state,
                 district,
                 block,
-                layer_name=description,
+                layer_name=layer_name,
                 asset_id=asset_id,
                 dataset_name="Drought",
             )
@@ -141,14 +131,14 @@ def calculate_drought(
 
         fc = ee.FeatureCollection(asset_id)
 
-        res = sync_fc_to_geoserver(fc, state, description, "cropping_drought")
+        res = sync_fc_to_geoserver(fc, state, layer_name, "cropping_drought")
         print(res)
         if res["status_code"] == 201 and state and district and block:
             save_layer_info_to_db(
                 state,
                 district,
                 block,
-                layer_name=description,
+                layer_name=layer_name,
                 asset_id=asset_id,
                 dataset_name="Drought",
                 sync_to_geoserver=True,
