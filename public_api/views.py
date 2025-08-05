@@ -3,6 +3,7 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
+    is_gee_asset_exists,
 )
 from datetime import datetime
 from nrm_app.settings import EXCEL_PATH
@@ -11,9 +12,12 @@ import pandas as pd
 import numpy as np
 from stats_generator.mws_indicators import get_generate_filter_mws_data
 import json
+from geoadmin.models import Block, District, State
+
 
 
 from stats_generator.models import LayerInfo
+from computing.models import Layer, Dataset
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 
@@ -61,13 +65,11 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
     Fetch all vector and raster layers for given state, district, and block,
     and return their metadata as JSON.
     """
-    # Get all layers matching the state, district, and block
-    layers = Layer.objects.filter(
-        state__name__iexact=state_name,
-        district__name__iexact=district_name,
-        block__name__iexact=block_name
-    ).select_related('dataset', 'state', 'district', 'block')
+    state = State.objects.get(state_name__iexact=state_name)
+    district = District.objects.get(district_name__iexact=district_name, state_id=state.state_census_code)
+    block = Block.objects.get(block_name__iexact=block_name, district_id=district.id)
     
+    layers = Layer.objects.filter(state_id=state.state_census_code, district_id=district.id, block_id=block.id)
     layer_data = []
 
     for layer in layers:
@@ -75,25 +77,31 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         workspace = dataset.workspace
         layer_type = dataset.layer_type
         layer_name = layer.layer_name
-        
-        # Get layer description from misc if available, otherwise use dataset name
-        layer_desc = dataset.misc.get('description', dataset.name) if dataset.misc else dataset.name
-        
+        gee_asset_path = layer.gee_asset_path
+
+        # Safely get misc data
+        misc = dataset.misc or {}
+        style_url = misc.get('style_url', None)
+
+        # Build the appropriate URL based on layer type
         if layer_type == "vector":
             layer_url = get_url(workspace, layer_name)
         elif layer_type == "raster":
             layer_url = raster_tiff_download_url(workspace, layer_name)
         else:
-            continue  # skip unknown layer types
+            continue  # Skip unknown types
 
         layer_data.append({
-            "layer_desc": layer_desc,
+            "layer_name": layer_name,
             "layer_type": layer_type,
             "layer_url": layer_url,
-            "style_name": dataset.style_name
+            "layer_version": dataset.layer_version,
+            "style_url": style_url,
+            "gee_asset_path": gee_asset_path
         })
 
     return layer_data
+        
 
 
 
@@ -101,14 +109,17 @@ def get_location_info_by_lat_lon(lat, lon):
     ee_initialize()
     point = ee.Geometry.Point([lon, lat])
     feature_collection = ee.FeatureCollection("projects/corestack-datasets/assets/datasets/SOI_tehsil")
-    intersected = feature_collection.filterBounds(point)
-
-    features = intersected.toList(intersected.size())
-    for i in range(intersected.size().getInfo()):
-        feature = ee.Feature(features.get(i))
-        feature_loc = feature.getInfo()['properties']
-        locat_details = {"State": feature_loc.get('STATE'), "District": feature_loc.get('District'), "Tehsil": feature_loc.get('TEHSIL')}
-        return locat_details
+    try:
+        intersected = feature_collection.filterBounds(point)
+        features = intersected.toList(intersected.size())
+        for i in range(intersected.size().getInfo()):
+            feature = ee.Feature(features.get(i))
+            feature_loc = feature.getInfo()['properties']
+            locat_details = {"State": feature_loc.get('STATE'), "District": feature_loc.get('District'), "Tehsil": feature_loc.get('TEHSIL')}
+            return locat_details
+    except Exception as e:
+        print("Exception while getting admin details", str(e))
+        return {"State": "", "District": "", "Tehsil": ""}
 
 
 
@@ -120,12 +131,13 @@ def get_mws_id_by_lat_lon(lon, lat):
 
     asset_path = get_gee_asset_path(state, district, tehsil)
     mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
-    mws_fc = ee.FeatureCollection(mws_asset_id)
-    point = ee.Geometry.Point([lon, lat])
-    matching_feature = mws_fc.filterBounds(point).first()
-    uid = ee.String(matching_feature.get('uid')).getInfo()
-    data_dict["uid"] = uid
-    return data_dict
+    if is_gee_asset_exists(asset_id):
+        mws_fc = ee.FeatureCollection(mws_asset_id)
+        point = ee.Geometry.Point([lon, lat])
+        matching_feature = mws_fc.filterBounds(point).first()
+        uid = ee.String(matching_feature.get('uid')).getInfo()
+        data_dict["uid"] = uid
+        return data_dict
 
 
 

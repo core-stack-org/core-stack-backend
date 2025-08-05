@@ -97,7 +97,7 @@ def generate_dpr(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free")
 def generate_mws_report(request):
     try:
         # ? district, block, mwsId
