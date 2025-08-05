@@ -109,11 +109,11 @@ def create_dpr_document(plan, language):
 
     # MARK: local save /tmp/dpr/
     # operations on the document
-    file_path = "/tmp/dpr/"
-
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    doc.save(file_path + plan.plan + ".docx")
+    # file_path = "/tmp/dpr/"
+    #
+    # if not os.path.exists(file_path):
+    #     os.makedirs(file_path)
+    # doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
@@ -1395,10 +1395,10 @@ def create_nrm_works_table(doc, plan, mws, language):
         if has_resources or len(recharge_works) > 0 or len(irrigation_works) > 0:
             if len(recharge_works) == 0 and len(irrigation_works) == 0:
                 doc.add_heading(f"MWS UID: {uid}", level=2)
-            # show_marked_works(doc, plan, uid, mws_filtered, polygon, resources)
+            show_marked_works(doc, plan, uid, mws_filtered, polygon, resources)
             doc.add_page_break()
 
-    # show_all_mws(doc, plan, mws)
+    show_all_mws(doc, plan, mws)
 
 
 def format_work_dimensions(work_dimensions, work_type):
@@ -1764,9 +1764,9 @@ def add_section_g(doc, plan, mws, language):
             row_cells = table.add_row().cells
             row_cells[0].text = "Fisheries"
             row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
-            # row_cells[2].text = record.data_livelihood.get(
-            #     "beneficiary_name", "No Data Provided"
-            # )
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
             row_cells[3].text = "No Data"  # Father's name not specified
 
             # Get fisheries demand type
