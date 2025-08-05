@@ -68,6 +68,7 @@
     "section_d_table1_row1_2":"अक्षांश और देशांतर (केन्द्र बिंदु)",
     "section_d_table1_footer":"भूमि उपयोग की जानकारी",
 
+    "section_d_common_heading":"जल संरचनाओं पर जानकारी",
     "section_d_table2_heading":"पिछले 5 वर्षों में फसल क्षेत्र में बदलाव",
     "section_d_table2_row1_2":"वर्ष",
     "section_d_table2_row1_3":"एकल फसल के अंतर्गत क्षेत्रफल (हेक्टेयर में)",
@@ -223,7 +224,9 @@
     "section_b_brief":"This section gives a brief overview of the village, including its name, associated Gram Panchayat, location details (block, district, and state), the number of settlements, intersecting micro watershed IDs, and the geographic coordinates (latitude and longitude) of the village.",
     "section_b_table1_row1_1":"Name of Village",
     "section_b_table1_row2_1":"Name of Gram Panchayat",
-    "section_b_table1_row3_1":"Block, District, State",
+    "section_b_table1_row3_1.1":"Block, District, State",
+    "section_b_table1_row3_1.2":"District",
+    "section_b_table1_row3_1.3":"State",
     "section_b_table1_row4_1":"Number of Settlements in the village",
     "section_b_table1_row4_2":"X",
     "section_b_table1_row5_1":"Intersecting Micro Watershed ID’s",
@@ -275,6 +278,7 @@
     "section_d_table1_row1_2":"Latitude and Longitude (Centroid)",
     "section_d_table1_footer":"Information on Land Use",
 
+    "section_d_common_heading":"Information on Water Structures",
     "section_d_table2_heading":"Change in cropping area over last 5 years",
     "section_d_table2_row1_2":"Year",
     "section_d_table2_row1_3":"Area under Single Crop (in ha)",
@@ -346,11 +350,11 @@
     "section_f_table1_row1_9":"Work Dimensions"
     },
 
-    "section_g_hindi":{
+    "section_g_english":{
     "section_g_heading":"Section G: Propose New Livelihood Works"
     },
 
-    "section_g.1_hindi":{
+    "section_g.1_english":{
     "section_g.1_heading":"G.1 Livestock and Fisheries",
     "section_g.1_table1_row1_1":"Livelihood Works",
     "section_g.1_table1_row1_2":"Name of Beneficiary Settlement",
@@ -361,7 +365,7 @@
     "section_g.1_table1_row1_7":"Longitude"
     },
 
-    "section_g.2_hindi":{
+    "section_g.2_english":{
     "section_g.2_heading":"G.2 Plantations",
     "section_g.2_table1_row1_1":"Livelihood Works",
     "section_g.2_table1_row1_2":"Name of Beneficiary Settlement",
@@ -374,9 +378,10 @@
     },
 
 
-    "section_h_hindi":{
+    "section_h_english":{
     "section_h_heading":"Section H: Proposed Maintenance Works on existing Assets on basis through Gram Sabha",
     "section_h_brief":"This section presents information on proposed maintenance works for existing assets based on inputs from the Gram Sabha. For each maintenance work, include details such as the beneficiary settlement, work ID, type of work, latitude, and longitude.",
+    "section_h_table1_heading":"Maintenance Works by Asset Type",
 
     
     "section_h_table2_row1_1":"Name of the Beneficiary Settlement",
