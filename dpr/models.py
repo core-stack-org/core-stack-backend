@@ -44,7 +44,7 @@ class ODK_well(models.Model):
     beneficiary_settlement = models.TextField()
     block_name = models.TextField()
     owner = models.TextField()
-    households_benefitted = models.IntegerField()
+    households_benefitted = models.BigIntegerField()
     caste_uses = models.TextField()
     is_functional = models.TextField()
     need_maintenance = models.TextField()

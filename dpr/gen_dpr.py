@@ -57,6 +57,7 @@ import json
 
 logger = setup_logger(__name__)
 
+
 def get_plan(plan_id):
     try:
         return Plan.objects.get(plan_id=plan_id)
@@ -65,7 +66,7 @@ def get_plan(plan_id):
 
 
 def create_dpr_document(plan, language):
-    doc = initialize_document()
+    doc = initialize_document(language)
     logger.info("Generating DPR for plan ID: %s", plan.plan_id)
     logger.info("Syncing ODK data with database")
 
@@ -90,21 +91,21 @@ def create_dpr_document(plan, language):
 
     add_section_a(doc, plan, language)
 
-    # settlement_mws_ids, mws_gdf = add_section_b(
-    #     doc, plan, total_settlements, mws_fortnight
-    # )
+    settlement_mws_ids, mws_gdf = add_section_b(
+        doc, plan, total_settlements, mws_fortnight, language
+    )
 
-    # add_section_c(doc, plan)
+    add_section_c(doc, plan, language)
 
-    # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    add_section_d(doc, plan, settlement_mws_ids, mws_gdf, language)
 
-    # add_section_e(doc, plan)
+    add_section_e(doc, plan, language)
 
-    # add_section_f(doc, plan, mws_fortnight) # generates maps as well
+    add_section_f(doc, plan, mws_fortnight, language)  # generates maps as well
 
-    # add_section_g(doc, plan, mws_fortnight)
+    add_section_g(doc, plan, mws_fortnight, language)
 
-    # add_section_h(doc, plan, mws_fortnight)
+    add_section_h(doc, plan, mws_fortnight, language)
 
     # MARK: local save /tmp/dpr/
     # operations on the document
@@ -172,12 +173,18 @@ def get_data_for_settlement(planid):
 
 
 def get_settlement_count_for_plan(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").count()
+    return (
+        ODK_settlement.objects.filter(plan_id=planid)
+        .exclude(status_re="rejected")
+        .count()
+    )
 
 
 def get_settlement_coordinates_for_plan(planid):
-    settlements = ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").values(
-        "settlement_name", "latitude", "longitude"
+    settlements = (
+        ODK_settlement.objects.filter(plan_id=planid)
+        .exclude(status_re="rejected")
+        .values("settlement_name", "latitude", "longitude")
     )
     return [
         (
@@ -200,41 +207,55 @@ def get_mws_uid_for_settlement_gdf(mws_gdf, lat, lon):
         return None
 
 
-def initialize_document():
+def initialize_document(language):
     doc = Document()
-    heading = doc.add_heading(json_data['hindi']['hindi_title'], 0)
+    heading = doc.add_heading(json_data[f"{language}"][f"{language}_title"], 0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    doc.add_paragraph(
-        date.today().strftime("%B %d, %Y")
-    ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_paragraph(date.today().strftime("%B %d, %Y")).alignment = (
+        WD_PARAGRAPH_ALIGNMENT.CENTER
+    )
     return doc
 
-with open('dpr/dpr_lang.json', 'r') as file:
+
+with open("dpr/language/dpr_lang.json", "r") as file:
     json_data = json.load(file)
+
 
 # MARK: - Section A
 def add_section_a(doc, plan, language):
     """
     Brief about team details.
     """
-    doc.add_heading(json_data[f'{language}'][f'section_a_{language}']['section_a_heading'])
+    doc.add_heading(
+        json_data[f"{language}"][f"section_a_{language}"]["section_a_heading"]
+    )
     para = doc.add_paragraph()
-    para.add_run(f"{json_data[f'{language}'][f'section_a_{language}']['section_a_brief']}\n\n")
-    create_team_details_table(doc, plan,language)
+    para.add_run(
+        f"{json_data[f'{language}'][f'section_a_{language}']['section_a_brief']}\n\n"
+    )
+    create_team_details_table(doc, plan, language)
 
 
 def create_team_details_table(doc, plan, language):
     table = doc.add_table(rows=1, cols=3)
     table.style = "Table Grid"
     hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = json_data[f'{language}'][f'section_a_{language}']['section_a_table1_row1_1']
-    hdr_cells[1].text = json_data[f'{language}'][f'section_a_{language}']['section_a_table1_row1_2']
-    hdr_cells[2].text = json_data[f'{language}'][f'section_a_{language}']['section_a_table1_row1_3']
+    hdr_cells[0].text = json_data[f"{language}"][f"section_a_{language}"][
+        "section_a_table1_row1_1"
+    ]
+    hdr_cells[1].text = json_data[f"{language}"][f"section_a_{language}"][
+        "section_a_table1_row1_2"
+    ]
+    hdr_cells[2].text = json_data[f"{language}"][f"section_a_{language}"][
+        "section_a_table1_row1_3"
+    ]
 
     row_cells = table.add_row().cells
     row_cells[0].text = plan.facilitator_name
-    row_cells[1].text = plan.plan.replace('_', ' ').title()
-    row_cells[2].text = json_data[f'{language}'][f'section_a_{language}']['section_a_table1_row2_3']
+    row_cells[1].text = plan.plan.replace("_", " ").title()
+    row_cells[2].text = json_data[f"{language}"][f"section_a_{language}"][
+        "section_a_table1_row2_3"
+    ]
 
     for cell in hdr_cells:
         for paragraph in cell.paragraphs:
@@ -243,13 +264,15 @@ def create_team_details_table(doc, plan, language):
 
 
 # MARK: - Section B
-def add_section_b(doc, plan, total_settlements, mws_fortnight):
+def add_section_b(doc, plan, total_settlements, mws_fortnight, language):
     """
     Briefs about the village
     """
-    doc.add_heading(json_data['hindi']['section_b_hindi']['section_b_heading'])
+    doc.add_heading(json_data[language][f"section_b_{language}"]["section_b_heading"])
     para = doc.add_paragraph()
-    para.add_run(f"{json_data['hindi']['section_b_hindi']['section_b_brief']}\n\n")
+    para.add_run(
+        f"{json_data[language][f'section_b_{language}']['section_b_brief']}\n\n"
+    )
 
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
 
@@ -265,14 +288,14 @@ def add_section_b(doc, plan, total_settlements, mws_fortnight):
         [f"{name}: {mws_id}" for name, mws_id in settlement_mws_ids]
     )
     create_village_brief_table(
-        intersecting_mws_ids, doc, plan, total_settlements, mws_gdf
+        intersecting_mws_ids, doc, plan, total_settlements, mws_gdf, language
     )
 
     return settlement_mws_ids, mws_gdf
 
 
 def create_village_brief_table(
-    intersecting_mws_ids, doc, plan, total_settlements, mws_gdf
+    intersecting_mws_ids, doc, plan, total_settlements, mws_gdf, language
 ):
     table = doc.add_table(rows=8, cols=2)
     table.style = "Table Grid"
@@ -286,15 +309,36 @@ def create_village_brief_table(
     centroid = intersecting_mws.geometry.unary_union.centroid
 
     headers_data = [
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row1_1'], plan.village_name),
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row2_1'], plan.gram_panchayat),
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row3_1.1'], plan.block.block_name),
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row3_1.2'], plan.district.district_name),
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row3_1.3'], plan.state.state_name),
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row4_1'], str(total_settlements)),
-        (json_data['hindi']['section_b_hindi']['section_b_table1_row5_1'], intersecting_mws_ids),
         (
-            json_data['hindi']['section_b_hindi']['section_b_table1_row6_1'],
+            json_data[language][f"section_b_{language}"]["section_b_table1_row1_1"],
+            plan.village_name,
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row2_1"],
+            plan.gram_panchayat,
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row3_1.1"],
+            plan.block.block_name,
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row3_1.2"],
+            plan.district.district_name,
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row3_1.3"],
+            plan.state.state_name,
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row4_1"],
+            str(total_settlements),
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row5_1"],
+            intersecting_mws_ids,
+        ),
+        (
+            json_data[language][f"section_b_{language}"]["section_b_table1_row6_1"],
             f"{centroid.y:.8f}, {centroid.x:.8f}",
         ),
     ]
@@ -313,30 +357,34 @@ def create_village_brief_table(
 
 
 # MARK: - Section C
-def add_section_c(doc, plan):
+def add_section_c(doc, plan, language):
     """
     Adds information on Settlement, Vulnerability, NREGA from the settlement's form
 
     Livelihood Profile: From Livelihood form and Settlement's form (Livestock Info)
     """
-    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_heading'], level=1)
+    doc.add_heading(
+        json_data[language]["section_c_hindi"]["section_c_heading"], level=1
+    )
     para = doc.add_paragraph()
     para.add_run(f"{json_data['hindi']['section_c_hindi']['section_c_brief']} \n\n")
 
-    create_socio_eco_table(doc, plan)
+    create_socio_eco_table(doc, plan, language)
 
-    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table1_heading'], level=3)
+    doc.add_heading(
+        json_data[language]["section_c_hindi"]["section_c_table1_heading"], level=3
+    )
 
     create_livelihood_table(doc, plan)
 
 
-def create_socio_eco_table(doc, plan):
+def create_socio_eco_table(doc, plan, language):
     headers_socio = [
-        json_data['hindi']['section_c_hindi']['section_c_table1_row1_1'],
-        json_data['hindi']['section_c_hindi']['section_c_table1_row1_2'],
-        json_data['hindi']['section_c_hindi']['section_c_table1_row1_3'],
-        json_data['hindi']['section_c_hindi']['section_c_table1_row1_4'],
-        json_data['hindi']['section_c_hindi']['section_c_table1_row1_5'],
+        json_data[language]["section_c_hindi"]["section_c_table1_row1_1"],
+        json_data[language]["section_c_hindi"]["section_c_table1_row1_2"],
+        json_data[language]["section_c_hindi"]["section_c_table1_row1_3"],
+        json_data[language]["section_c_hindi"]["section_c_table1_row1_4"],
+        json_data[language]["section_c_hindi"]["section_c_table1_row1_5"],
     ]
 
     data_settlement = get_data_for_settlement(plan.plan_id)
@@ -364,15 +412,17 @@ def create_socio_eco_table(doc, plan):
         row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
     headers_nrega = [
-        json_data['hindi']['section_c_hindi']['section_c_table2_row1_1'],
-        json_data['hindi']['section_c_hindi']['section_c_table2_row1_2'],
-        json_data['hindi']['section_c_hindi']['section_c_table2_row1_3'],
-        json_data['hindi']['section_c_hindi']['section_c_table2_row1_4'],
-        json_data['hindi']['section_c_hindi']['section_c_table2_row1_5'],
-        json_data['hindi']['section_c_hindi']['section_c_table2_row1_6'],
+        json_data[language]["section_c_hindi"]["section_c_table2_row1_1"],
+        json_data[language]["section_c_hindi"]["section_c_table2_row1_2"],
+        json_data[language]["section_c_hindi"]["section_c_table2_row1_3"],
+        json_data[language]["section_c_hindi"]["section_c_table2_row1_4"],
+        json_data[language]["section_c_hindi"]["section_c_table2_row1_5"],
+        json_data[language]["section_c_hindi"]["section_c_table2_row1_6"],
     ]
 
-    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table2_heading'], level=3)
+    doc.add_heading(
+        json_data[language]["section_c_hindi"]["section_c_table2_heading"], level=3
+    )
 
     table_nrega = doc.add_table(rows=1, cols=len(headers_nrega))
     table_nrega.style = "Table Grid"
@@ -396,19 +446,23 @@ def create_socio_eco_table(doc, plan):
         row_cells[5].text = format_text(settlement_nrega.nrega_issues)
 
 
-def create_livelihood_table(doc, plan):
+def create_livelihood_table(doc, plan, language):
     # Crop Info section remains the same
-    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table3_heading'], level=4)
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    doc.add_heading(
+        json_data[language]["section_c_hindi"]["section_c_table3_heading"], level=4
+    )
+    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
     headers_cropping_pattern = [
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_1'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_2'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_3'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_4'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_5'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_6'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_7'],
-        json_data['hindi']['section_c_hindi']['section_c_table3_row1_8'],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_1"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_2"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_3"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_4"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_5"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_6"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_7"],
+        json_data[language]["section_c_hindi"]["section_c_table3_row1_8"],
     ]
     table_cropping_pattern = doc.add_table(rows=1, cols=len(headers_cropping_pattern))
     table_cropping_pattern.style = "Table Grid"
@@ -428,15 +482,17 @@ def create_livelihood_table(doc, plan):
         row_cells[7].text = crops.agri_productivity
 
     # Livestock Info section with modified value handling
-    doc.add_heading(json_data['hindi']['section_c_hindi']['section_c_table4_heading'], level=4)
+    doc.add_heading(
+        json_data[language]["section_c_hindi"]["section_c_table4_heading"], level=4
+    )
     livelihood_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
     headers_livelihood = [
-        json_data['hindi']['section_c_hindi']['section_c_table4_row1_1'],
-        json_data['hindi']['section_c_hindi']['section_c_table4_row1_2'],
-        json_data['hindi']['section_c_hindi']['section_c_table4_row1_3'],
-        json_data['hindi']['section_c_hindi']['section_c_table4_row1_4'],
-        json_data['hindi']['section_c_hindi']['section_c_table4_row1_5'],
-        json_data['hindi']['section_c_hindi']['section_c_table4_row1_6'],
+        json_data[language]["section_c_hindi"]["section_c_table4_row1_1"],
+        json_data[language]["section_c_hindi"]["section_c_table4_row1_2"],
+        json_data[language]["section_c_hindi"]["section_c_table4_row1_3"],
+        json_data[language]["section_c_hindi"]["section_c_table4_row1_4"],
+        json_data[language]["section_c_hindi"]["section_c_table4_row1_5"],
+        json_data[language]["section_c_hindi"]["section_c_table4_row1_6"],
     ]
     table_livelihood = doc.add_table(rows=1, cols=len(headers_livelihood))
     table_livelihood.style = "Table Grid"
@@ -465,15 +521,13 @@ def create_livelihood_table(doc, plan):
 
 
 # MARK: - Section D
-def add_section_d(doc, plan, settlement_mws_ids, mws_gdf):
+def add_section_d(doc, plan, settlement_mws_ids, mws_gdf, language):
     doc.add_heading(
-        json_data['hindi']['section_d_hindi']['section_d_heading'],
+        json_data[language]["section_d_hindi"]["section_d_heading"],
         level=1,
     )
     para = doc.add_paragraph()
-    para.add_run(
-        json_data['hindi']['section_d_hindi']['section_d_brief']
-    )
+    para.add_run(json_data[language]["section_d_hindi"]["section_d_brief"])
 
     create_mws_table(doc, plan, settlement_mws_ids, mws_gdf)
     unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
@@ -482,18 +536,21 @@ def add_section_d(doc, plan, settlement_mws_ids, mws_gdf):
         populate_mws(doc, plan, mws_id, mws_gdf)
 
 
-def populate_mws(doc, plan, mws_id, mws_gdf):
+def populate_mws(doc, plan, mws_id, mws_gdf, language):
     doc.add_heading("MWS: " + mws_id, level=1)
 
-    populate_land_use(doc, plan, mws_id, mws_gdf)  # Land Use Section
-    populate_water_structures(doc, plan, mws_id, mws_gdf)  # Water Structures
-    populate_water_budgeting(doc, plan, mws_id, mws_gdf)
+    populate_land_use(doc, plan, mws_id, mws_gdf, language)  # Land Use Section
+    populate_water_structures(doc, plan, mws_id, mws_gdf, language)  # Water Structures
+    populate_water_budgeting(doc, plan, mws_id, mws_gdf, language)
 
 
-def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf):
+def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf, language):
     unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
 
-    headers_mws = [json_data['hindi']['section_d_hindi']['section_d_table1_row1_1'], json_data['hindi']['section_d_hindi']['section_d_table1_row1_2']]
+    headers_mws = [
+        json_data[language]["section_d_hindi"]["section_d_table1_row1_1"],
+        json_data[language]["section_d_hindi"]["section_d_table1_row1_2"],
+    ]
     table_mws = doc.add_table(rows=len(unique_mws_ids) + 1, cols=len(headers_mws))
     table_mws.style = "Table Grid"
 
@@ -513,9 +570,13 @@ def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf):
             row_cells[1].text = "Not found"
 
 
-def populate_land_use(doc, plan, mws_id, mws_gdf):
-    doc.add_heading(json_data['hindi']['section_d_hindi']['section_d_table1_footer'], level=2)
-    doc.add_heading(json_data['hindi']['section_d_hindi']['section_d_table2_heading'], level=3)
+def populate_land_use(doc, plan, mws_id, mws_gdf, language):
+    doc.add_heading(
+        json_data[language]["section_d_hindi"]["section_d_table1_footer"], level=2
+    )
+    doc.add_heading(
+        json_data[language]["section_d_hindi"]["section_d_table2_heading"], level=3
+    )
 
     logger.info("2. Cropping Intensity Layer")
 
@@ -558,13 +619,13 @@ def populate_land_use(doc, plan, mws_id, mws_gdf):
     plot_graph_ci(table_ci, doc)
 
 
-def create_land_use_table(doc, specific_mws_row):
+def create_land_use_table(doc, specific_mws_row, language):
     headers_cropping_intensity = [
-        json_data['hindi']['section_d_hindi']['section_d_table2_row1_2'],
-        json_data['hindi']['section_d_hindi']['section_d_table2_row1_3'],
-        json_data['hindi']['section_d_hindi']['section_d_table2_row1_4'],
-        json_data['hindi']['section_d_hindi']['section_d_table2_row1_5'],
-        json_data['hindi']['section_d_hindi']['section_d_table2_row1_6'],
+        json_data[language]["section_d_hindi"]["section_d_table2_row1_2"],
+        json_data[language]["section_d_hindi"]["section_d_table2_row1_3"],
+        json_data[language]["section_d_hindi"]["section_d_table2_row1_4"],
+        json_data[language]["section_d_hindi"]["section_d_table2_row1_5"],
+        json_data[language]["section_d_hindi"]["section_d_table2_row1_6"],
     ]
     table_cropping_intensity = doc.add_table(
         rows=8, cols=len(headers_cropping_intensity)
@@ -668,16 +729,18 @@ def plot_graph_ci(table_ci, doc):
     doc.add_picture(image_stream)
 
 
-def populate_water_structures(doc, plan, mws_id, mws_gdf):
+def populate_water_structures(doc, plan, mws_id, mws_gdf, language):
     doc.add_heading("Information on Water Structures", level=2)
 
-    populate_well(doc, plan, mws_id, mws_gdf)
-    populate_waterbody(doc, plan, mws_id, mws_gdf)
+    populate_well(doc, plan, mws_id, mws_gdf, language)
+    populate_waterbody(doc, plan, mws_id, mws_gdf, language)
 
 
-def populate_well(doc, plan, mws_id, mws_gdf):
+def populate_well(doc, plan, mws_id, mws_gdf, language):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
 
     wells_in_mws = []
     for well in wells_in_plan:
@@ -708,11 +771,14 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         for settlement in wells_count
     ]
 
-    doc.add_heading(f"{json_data['hindi']['section_d_hindi']['section_d_table3_heading']}: {mws_id}", level=2)
+    doc.add_heading(
+        f"{json_data['hindi']['section_d_hindi']['section_d_table3_heading']}: {mws_id}",
+        level=2,
+    )
     headers_well_info = [
-        json_data['hindi']['section_d_hindi']['section_d_table3_row1_1'],
-        json_data['hindi']['section_d_hindi']['section_d_table3_row1_2'],
-        json_data['hindi']['section_d_hindi']['section_d_table3_row1_3'],
+        json_data[language]["section_d_hindi"]["section_d_table3_row1_1"],
+        json_data[language]["section_d_hindi"]["section_d_table3_row1_2"],
+        json_data[language]["section_d_hindi"]["section_d_table3_row1_3"],
     ]
     table_well_info = doc.add_table(
         rows=len(wells_info) + 1, cols=len(headers_well_info)
@@ -729,17 +795,19 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[1].text = str(num_wells)
         row_cells[2].text = str(num_households)
 
-    doc.add_heading(json_data['hindi']['section_d_hindi']['section_d_table4_heading'], level=3)
+    doc.add_heading(
+        json_data[language]["section_d_hindi"]["section_d_table4_heading"], level=3
+    )
     headers_well = [
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_1'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_2'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_3'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_4'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_5'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_6'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_7'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_8'],
-        json_data['hindi']['section_d_hindi']['section_d_table4_row1_9'],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_1"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_2"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_3"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_4"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_5"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_6"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_7"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_8"],
+        json_data[language]["section_d_hindi"]["section_d_table4_row1_9"],
     ]
     table_well = doc.add_table(rows=1, cols=len(headers_well))
     table_well.style = "Table Grid"
@@ -760,10 +828,12 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[8].text = str(well.longitude)
 
 
-def populate_waterbody(doc, plan, mws_id, mws_gdf):
+def populate_waterbody(doc, plan, mws_id, mws_gdf, language):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
     # basically water structures
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
     waterbody_in_mws = []
     for waterbody in waterbodies_in_plan:
         waterbody_point = Point(waterbody.longitude, waterbody.latitude)
@@ -804,18 +874,21 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         for (settlement, waterbody_type) in waterbody_count
     ]
 
-    doc.add_heading(f"{json_data['hindi']['section_d_hindi']['section_d_table5_heading']}: {mws_id}", level=2)
+    doc.add_heading(
+        f"{json_data['hindi']['section_d_hindi']['section_d_table5_heading']}: {mws_id}",
+        level=2,
+    )
     headers_waterstructure = [
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_1'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_2'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_3'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_4'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_5'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_6'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_7'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_8'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_9'],
-        json_data['hindi']['section_d_hindi']['section_d_table5_row1_10'],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_1"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_2"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_3"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_4"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_5"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_6"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_7"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_8"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_9"],
+        json_data[language]["section_d_hindi"]["section_d_table5_row1_10"],
     ]
     table_water_structure = doc.add_table(rows=1, cols=len(headers_waterstructure))
     table_water_structure.style = "Table Grid"
@@ -844,10 +917,13 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         row_cells[9].text = str(water_st.longitude)
 
 
-def populate_water_budgeting(doc, plan, mws_id, mws_gdf):
-    doc.add_heading(json_data['hindi']['section_d_hindi']['section_d_table6_heading'], level=2)
+def populate_water_budgeting(doc, plan, mws_id, mws_gdf, language):
+    doc.add_heading(
+        json_data[language]["section_d_hindi"]["section_d_table6_heading"], level=2
+    )
     para = doc.add_paragraph()
-    para.add_run(f"{json_data['hindi']['section_d_hindi']['section_d_table6_brief']}\n\n"
+    para.add_run(
+        f"{json_data[language]['section_d_hindi']['section_d_table6_brief']}\n\n"
     )
 
     mws_well_depth_layer = get_vector_layer_geoserver(
@@ -869,7 +945,7 @@ def populate_water_budgeting(doc, plan, mws_id, mws_gdf):
         properties = feature["properties"]
         properties = properties.items()  # Convert to list of tuples
         yearly_data = extract_yearly_data(properties)
-        fill_yearly_table(doc, yearly_data)
+        fill_yearly_table(doc, yearly_data, language)
 
 
 def extract_yearly_data(properties):
@@ -892,14 +968,14 @@ def extract_yearly_data(properties):
     return data
 
 
-def fill_yearly_table(doc, yearly_data):
+def fill_yearly_table(doc, yearly_data, language):
     headers = [
-        json_data['hindi']['section_d_hindi']['section_d_table6_row1_1'],
-        json_data['hindi']['section_d_hindi']['section_d_table6_row1_2'],
-        json_data['hindi']['section_d_hindi']['section_d_table6_row1_3'],
-        json_data['hindi']['section_d_hindi']['section_d_table6_row1_4'],
-        json_data['hindi']['section_d_hindi']['section_d_table6_row1_5'],
-        json_data['hindi']['section_d_hindi']['section_d_table6_row1_6'],
+        json_data[language]["section_d_hindi"]["section_d_table6_row1_1"],
+        json_data[language]["section_d_hindi"]["section_d_table6_row1_2"],
+        json_data[language]["section_d_hindi"]["section_d_table6_row1_3"],
+        json_data[language]["section_d_hindi"]["section_d_table6_row1_4"],
+        json_data[language]["section_d_hindi"]["section_d_table6_row1_5"],
+        json_data[language]["section_d_hindi"]["section_d_table6_row1_6"],
     ]
     years = sorted(yearly_data.keys())
 
@@ -978,17 +1054,18 @@ def create_and_add_graph(doc, yearly_data):
 
 
 # MARK: - Section E
-def add_section_e(doc, plan):
+def add_section_e(doc, plan, language):
     doc.add_heading(
-        json_data['hindi']['section_e_hindi']['section_e_heading'],
+        json_data[language]["section_e_hindi"]["section_e_heading"],
         level=1,
     )
     para = doc.add_paragraph()
-    para.add_run(f"{json_data['hindi']['section_e_hindi']['section_e_brief']}\n\n"
-    )
+    para.add_run(f"{json_data['hindi']['section_e_hindi']['section_e_brief']}\n\n")
 
-    doc.add_heading(json_data['hindi']['section_e_hindi']['section_e_table1_heading'], level=2)
-    create_surface_wb_table(doc, plan)
+    doc.add_heading(
+        json_data[language]["section_e_hindi"]["section_e_table1_heading"], level=2
+    )
+    create_surface_wb_table(doc, plan, language)
 
 
 def find_closest_mws(point_coords, mws_polygons):
@@ -1006,21 +1083,21 @@ def find_closest_mws(point_coords, mws_polygons):
     return closest_mws
 
 
-def create_surface_wb_table(doc, plan):
+def create_surface_wb_table(doc, plan, language):
     """
     Total area under surface water body. Generates a table about surface water availability during Kharib, Rabi and Zaid seasons
     """
     headers = [
-        json_data['hindi']['section_e_hindi']['section_e_table1_row1_1'],
-        json_data['hindi']['section_e_hindi']['section_e_table1_row1_2'],
-        json_data['hindi']['section_e_hindi']['section_e_table1_row1_3'],
-        json_data['hindi']['section_e_hindi']['section_e_table1_row1_4'],
-        json_data['hindi']['section_e_hindi']['section_e_table1_row1_5'],
+        json_data[language]["section_e_hindi"]["section_e_table1_row1_1"],
+        json_data[language]["section_e_hindi"]["section_e_table1_row1_2"],
+        json_data[language]["section_e_hindi"]["section_e_table1_row1_3"],
+        json_data[language]["section_e_hindi"]["section_e_table1_row1_4"],
+        json_data[language]["section_e_hindi"]["section_e_table1_row1_5"],
     ]
 
     swb = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
-        workspace="swb", # Surface Water Bodies Workspace
+        workspace="swb",  # Surface Water Bodies Workspace
         layer_name="surface_waterbodies_"
         + str(plan.district.district_name).lower().replace(" ", "_")
         + "_"
@@ -1113,22 +1190,30 @@ def create_surface_wb_table(doc, plan):
 
 # MARK: - Section F
 # Works and Maps Section
-def add_section_f(doc, plan, mws):
-    doc.add_heading(json_data['hindi']['section_f_hindi']['section_f_heading'])
+def add_section_f(doc, plan, mws, language):
+    doc.add_heading(json_data[language]["section_f_hindi"]["section_f_heading"])
     para = doc.add_paragraph()
-    para.add_run(
-        f"{json_data['hindi']['section_f_hindi']['section_f_brief']}\n\n\n\n"
-    )
+    para.add_run(f"{json_data['hindi']['section_f_hindi']['section_f_brief']}\n\n\n\n")
 
     create_nrm_works_table(doc, plan, mws)
 
 
 def create_nrm_works_table(doc, plan, mws):
-    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+    settlement_resources_in_plan = ODK_settlement.objects.filter(
+        plan_id=plan.plan_id
+    ).exclude(status_re="rejected")
+    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+    waterbody_resources_in_plan = ODK_waterbody.objects.filter(
+        plan_id=plan.plan_id
+    ).exclude(status_re="rejected")
 
     mws_uids = list(set([feature["properties"]["uid"] for feature in mws["features"]]))
 
@@ -1219,15 +1304,15 @@ def create_nrm_works_table(doc, plan, mws):
         if len(recharge_works) > 0 or len(irrigation_works) > 0:
             doc.add_heading(f"MWS UID: {uid}", level=2)
             headers = [
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_1'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_2'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_3'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_4'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_5'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_6'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_7'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_8'],
-                json_data['hindi']['section_f_hindi']['section_f_table1_row1_9'],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_1"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_2"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_3"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_4"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_5"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_6"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_7"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_8"],
+                json_data[language]["section_f_hindi"]["section_f_table1_row1_9"],
             ]
             table = doc.add_table(
                 rows=1 + len(recharge_works) + len(irrigation_works), cols=len(headers)
@@ -1243,14 +1328,11 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
                 row_cells[1].text = "Recharge Structure"  # Work Category
-                row_cells[
-                    2
-                ].text = (
-                    structure.beneficiary_settlement
+                row_cells[2].text = structure.beneficiary_settlement
+                row_cells[3].text = (
+                    structure.data_groundwater.get("Beneficiary_Name")
+                    or "No Data Provided"
                 )
-                row_cells[3].text = structure.data_groundwater.get(
-                    "Beneficiary_Name"
-                ) or "No Data Provided"
                 row_cells[4].text = structure.work_type
                 row_cells[5].text = structure.recharge_structure_id
                 row_cells[6].text = str(structure.latitude)
@@ -1264,13 +1346,11 @@ def create_nrm_works_table(doc, plan, mws):
             for i, work in enumerate(irrigation_works, start=offset):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
-                row_cells[1].text = "Irrigation Work"  
-                row_cells[
-                    2
-                ].text = work.beneficiary_settlement  
+                row_cells[1].text = "Irrigation Work"
+                row_cells[2].text = work.beneficiary_settlement
                 row_cells[3].text = (
                     work.data_agri.get("Beneficiary_Name") or "No Data Provided"
-                )  
+                )
 
                 if (
                     work.work_type.lower() == "other"
@@ -1465,6 +1545,8 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
         img.save(img_filename)
 
         doc.add_picture(img_filename, width=Inches(6))
+
+
 def show_all_mws(doc, plan, mws):
     """
     Creates a map showing all MWS polygons with resources and proposed works,
@@ -1598,22 +1680,29 @@ def show_all_mws(doc, plan, mws):
         doc.add_picture(img_filename, width=Inches(6))
         doc.add_page_break()
 
+
 # MARK: - Section G -- Plantations and Livelihood Works
 def add_section_g(doc, plan, mws):
-    doc.add_heading(json_data['hindi']['section_g_hindi']['section_g_heading'], level=1)
+    doc.add_heading(
+        json_data[language]["section_g_hindi"]["section_g_heading"], level=1
+    )
 
-    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    
+    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+
     # Table for Livestock and Fisheries
-    doc.add_heading(json_data['hindi']['section_g.1_hindi']['section_g.1_heading'], level=2)
+    doc.add_heading(
+        json_data[language]["section_g.1_hindi"]["section_g.1_heading"], level=2
+    )
     headers = [
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_1'],
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_2'],
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_3'],
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_4'],
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_5'],
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_6'],
-        json_data['hindi']['section_g.1_hindi']['section_g.1_table1_row1_7'],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_1"],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_2"],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_3"],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_4"],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_5"],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_6"],
+        json_data[language]["section_g.1_hindi"]["section_g.1_table1_row1_7"],
     ]
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
@@ -1643,10 +1732,14 @@ def add_section_g(doc, plan, mws):
             row_cells[4].text = format_text(livestock_demand) or "No Data Provided"
 
             row_cells[5].text = (
-                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude)
+                if record.latitude
+                else "No Data Provided"
             )
             row_cells[6].text = (
-                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude)
+                if record.longitude
+                else "No Data Provided"
             )
 
         # Handle Fisheries category
@@ -1670,23 +1763,29 @@ def add_section_g(doc, plan, mws):
             row_cells[4].text = format_text(fisheries_demand) or "No Data Provided"
 
             row_cells[5].text = (
-                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude)
+                if record.latitude
+                else "No Data Provided"
             )
             row_cells[6].text = (
-                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude)
+                if record.longitude
+                else "No Data Provided"
             )
 
     # Table for Plantation
-    doc.add_heading(json_data['hindi']['section_g.2_hindi']['section_g.2_heading'], level=2)
+    doc.add_heading(
+        json_data[language]["section_g.2_hindi"]["section_g.2_heading"], level=2
+    )
     plantation_headers = [
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_1'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_2'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_3'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_4'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_5'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_6'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_7'],
-        json_data['hindi']['section_g.2_hindi']['section_g.2_table1_row1_8'],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_1"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_2"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_3"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_4"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_5"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_6"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_7"],
+        json_data[language]["section_g.2_hindi"]["section_g.2_table1_row1_8"],
     ]
     plantation_table = doc.add_table(rows=1, cols=len(plantation_headers))
     plantation_table.style = "Table Grid"
@@ -1714,16 +1813,21 @@ def add_section_g(doc, plan, mws):
             row_cells[5].text = plantation_area or "No Data Provided"
 
             row_cells[6].text = (
-                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude)
+                if record.latitude
+                else "No Data Provided"
             )
             row_cells[7].text = (
-                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude)
+                if record.longitude
+                else "No Data Provided"
             )
 
 
 # MARK: - Section H
-# TODO: Fix the sync between the settlements marked for maintenance in resource mapping that 
+# TODO: Fix the sync between the settlements marked for maintenance in resource mapping that
 # they are also treated as first class citizens and added to the maintenance tables
+
 
 def add_section_h(doc, plan, mws):
 
@@ -1731,13 +1835,11 @@ def add_section_h(doc, plan, mws):
     populate_maintenance_from_waterbody(plan)
 
     doc.add_heading(
-        json_data['hindi']['section_h_hindi']['section_h_heading'],
+        json_data[language]["section_h_hindi"]["section_h_heading"],
         level=1,
     )
     para = doc.add_paragraph()
-    para.add_run(
-        json_data['hindi']['section_h_hindi']['section_h_brief']
-    )
+    para.add_run(json_data[language]["section_h_hindi"]["section_h_brief"])
     para.add_run("\n\n")
 
     asset_types = [
@@ -1747,7 +1849,9 @@ def add_section_h(doc, plan, mws):
         "Remote Sensed Surface Water Structures",
     ]
 
-    doc.add_heading(json_data['hindi']['section_h_hindi']['section_h_table1_heading'], level=2)
+    doc.add_heading(
+        json_data[language]["section_h_hindi"]["section_h_table1_heading"], level=2
+    )
 
     table = doc.add_table(rows=len(asset_types) + 1, cols=1)
     table.style = "Table Grid"
@@ -1776,14 +1880,14 @@ def add_section_h(doc, plan, mws):
 
 def maintenance_gw_table(doc, plan, mws):
     headers = [
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_1'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_2'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_3'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_4'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_5'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_6'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_7'],
-        json_data['hindi']['section_h_hindi']['section_h_table2_row1_8'],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_1"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_2"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_3"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_4"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_5"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_6"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_7"],
+        json_data[language]["section_h_hindi"]["section_h_table2_row1_8"],
     ]
 
     table = doc.add_table(rows=1, cols=len(headers))
@@ -1796,9 +1900,9 @@ def maintenance_gw_table(doc, plan, mws):
     # Add data rows
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.plan_id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_gw_maintenance.get(
-            "beneficiary_settlement"
-        ) or "No Data"
+        row_cells[0].text = (
+            maintenance.data_gw_maintenance.get("beneficiary_settlement") or "No Data"
+        )
         row_cells[1].text = (
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "No Data"
         )
@@ -1817,13 +1921,13 @@ def maintenance_gw_table(doc, plan, mws):
 
 def maintenance_agri_table(doc, plan, mws):
     headers = [
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_1'],
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_2'],
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_3'],
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_4'],
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_5'],
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_6'],
-        json_data['hindi']['section_h_hindi']['section_h_table3_row1_7'],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_1"],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_2"],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_3"],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_4"],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_5"],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_6"],
+        json_data[language]["section_h_hindi"]["section_h_table3_row1_7"],
     ]
 
     table = doc.add_table(rows=1, cols=len(headers))
@@ -1844,25 +1948,26 @@ def maintenance_agri_table(doc, plan, mws):
             or "No Data Provided"
         )
         row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.data_agri_maintenance.get(
-            "select_one_irrigation_structure"
-        ) or "No Data"
-        row_cells[4].text = maintenance.data_agri_maintenance.get(
-            "select_one_activities"
-        ) or "No Data"
+        row_cells[3].text = (
+            maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
+            or "No Data"
+        )
+        row_cells[4].text = (
+            maintenance.data_agri_maintenance.get("select_one_activities") or "No Data"
+        )
         row_cells[5].text = str(maintenance.latitude)
         row_cells[6].text = str(maintenance.longitude)
 
 
 def maintenance_waterstructures_table(doc, plan, mws):
     headers = [
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_1'],
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_2'],
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_3'],
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_4'],
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_5'],
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_6'],
-        json_data['hindi']['section_h_hindi']['section_h_table4_row1_7'],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_1"],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_2"],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_3"],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_4"],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_5"],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_6"],
+        json_data[language]["section_h_hindi"]["section_h_table4_row1_7"],
     ]
 
     table = doc.add_table(rows=1, cols=len(headers))
@@ -1875,26 +1980,30 @@ def maintenance_waterstructures_table(doc, plan, mws):
     # Add data rows
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.plan_id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_maintenance.get(
-            "beneficiary_settlement"
-        ) or "No Data"
-        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name") or "No Data"
+        row_cells[0].text = (
+            maintenance.data_swb_maintenance.get("beneficiary_settlement") or "No Data"
+        )
+        row_cells[1].text = (
+            maintenance.data_swb_maintenance.get("Beneficiary_Name") or "No Data"
+        )
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "No Data"
+        row_cells[4].text = (
+            maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "No Data"
+        )
         row_cells[5].text = str(maintenance.latitude)
         row_cells[6].text = str(maintenance.longitude)
 
 
 def maintenance_rs_waterstructures_table(doc, plan, mws):
     headers = [
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_1'],
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_2'],
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_3'],
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_4'],
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_5'],
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_6'],
-        json_data['hindi']['section_h_hindi']['section_h_table5_row1_7'],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_1"],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_2"],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_3"],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_4"],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_5"],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_6"],
+        json_data[language]["section_h_hindi"]["section_h_table5_row1_7"],
     ]
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
@@ -1906,12 +2015,17 @@ def maintenance_rs_waterstructures_table(doc, plan, mws):
     # Add data rows
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.plan_id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_rs_maintenance.get(
-            "beneficiary_settlement"
-        ) or "No Data"
-        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "No Data"
+        row_cells[0].text = (
+            maintenance.data_swb_rs_maintenance.get("beneficiary_settlement")
+            or "No Data"
+        )
+        row_cells[1].text = (
+            maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "No Data"
+        )
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "No Data"
-        row_cells[5].text = str(maintenance.latitude) 
-        row_cells[6].text = str(maintenance.longitude) 
+        row_cells[4].text = (
+            maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "No Data"
+        )
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
