@@ -886,6 +886,9 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
         "%d-%m-%Y %H:%M:%S",
         "%Y-%m-%d %H:%M:%S.%f",
         "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M:%S.%f",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%SZ",
     ]
 
     for _, row in joined.iterrows():
@@ -1207,8 +1210,6 @@ def parse_geojson_annual_mws(data):
                         all_data[uid][year] = year_data
                     except Exception as e:
                         print(f"Couldn't parse data for {uid}, {key}: {e}")
-            else:
-                print(f"Skipping non-string key or value for {uid}: {key} -> {value}")
 
     return all_data
 

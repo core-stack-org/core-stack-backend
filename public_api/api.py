@@ -63,7 +63,7 @@ def get_admin_details_by_lat_lon(request):
         print(f"error occurred as {e}")
         return Response({
             "status": "error",
-            "message": str(e)
+            "message": str("SOI does not contain the given lat lon")
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -103,9 +103,9 @@ def get_mws_by_lat_lon(request):
             return Response({"error": "Latitude or longitude out of bounds."}, status=400)
         data = get_mws_id_by_lat_lon(lon, lat)
         return data
-
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        print("Exception while getting the mws_id by lat long", str(e))
+        return Response({"State": "", "District": "", "Tehsil": "", "uid": ""}, status=404)
 
 
 ########## Get MWS Data by MWS ID  ##########
@@ -363,8 +363,8 @@ def get_generated_layer_urls(request):
         district = request.query_params.get("district", "").lower().replace(" ", "_")
         tehsil = request.query_params.get("tehsil", "").lower().replace(" ", "_")
 
-        layers_details_json = fetch_generated_layer_urls(district, tehsil)
-        return JsonResponse(layers_details_json, status=200, safe=False)
+        layers_details_json = fetch_generated_layer_urls(state, district, tehsil)
+        return Response(layers_details_json, status=200)
 
     except Exception as e:
         print(f"Error in get_generated_layer_urls: {str(e)}")
