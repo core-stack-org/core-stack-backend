@@ -129,7 +129,8 @@ def proposed_blocks(request):
         )
 
 
-@api_security_check(auth_type="Auth_free")
+@api_view(["PATCH"])
+@auth_free
 @schema(None)
 def activate_location(request):
     """
@@ -244,13 +245,11 @@ def generate_api_key(request):
         Generate a new API key for the authenticated user
         POST /api/v1/generate_api_key/
         {
-            "name": "user_name",
             "expiry_days": 30
         }
 
         Response Json:
         {
-        "name": "Test API Key",
         "prefix": "knog3H",
         "key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2",
         "message": "API key created successfully."
@@ -258,7 +257,6 @@ def generate_api_key(request):
     """
     print("Inside generate API Key")
     try:
-        name = request.POST.get('name', 'Unknown')
         expiry_days = request.POST.get('expiry_days', 2400)
         if expiry_days <= 0:
             return Response(
@@ -267,8 +265,8 @@ def generate_api_key(request):
             )
 
         expires_at = timezone.now() + timedelta(days=expiry_days)
-        api_key_obj, generated_key = UserAPIKey.objects.create_key(name=name.strip(), user=request.user,expires_at=expires_at)
-        response_data = {"name": str(request.user), "prefix": api_key_obj.prefix, "key": generated_key}
+        api_key_obj, generated_key = UserAPIKey.objects.create_key(user=request.user,expires_at=expires_at)
+        response_data = {"prefix": api_key_obj.prefix, "key": generated_key}
         return Response(response_data, status=status.HTTP_201_CREATED)
             
     except Exception as e:

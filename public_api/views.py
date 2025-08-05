@@ -65,11 +65,11 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
     Fetch all vector and raster layers for given state, district, and block,
     and return their metadata as JSON.
     """
-    state = State.objects.get(state_name__iexact=state_name)
-    district = District.objects.get(district_name__iexact=district_name, state_id=state.state_census_code)
-    block = Block.objects.get(block_name__iexact=block_name, district_id=district.id)
+    state = StateSOI.objects.get(state_name__iexact=state_name)
+    district = DistrictSOI.objects.get(district_name__iexact=district_name, state=state)
+    tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
     
-    layers = Layer.objects.filter(state_id=state.state_census_code, district_id=district.id, block_id=block.id)
+    layers = Layer.objects.filter(state=state, district=district, block=tehsil)
     layer_data = []
 
     for layer in layers:
@@ -81,12 +81,12 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
         # Safely get misc data
         misc = dataset.misc or {}
-        style_url = misc.get('style_url', None)
+        style_url = dataset.style_name  # Now using style_name field directly from Dataset
 
         # Build the appropriate URL based on layer type
-        if layer_type == "vector":
+        if layer_type in [LayerType.VECTOR, LayerType.POINT]:
             layer_url = get_url(workspace, layer_name)
-        elif layer_type == "raster":
+        elif layer_type == LayerType.RASTER:
             layer_url = raster_tiff_download_url(workspace, layer_name)
         else:
             continue  # Skip unknown types
