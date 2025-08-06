@@ -1,4 +1,4 @@
-name: black
+name: corestack-backend
 channels:
   - conda-forge
   - defaults
