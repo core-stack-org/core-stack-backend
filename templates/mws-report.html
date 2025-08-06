@@ -488,9 +488,9 @@
                 four weeks incurring a rainfall deviation of less than 50%. Prolonged dry spells can lead to
                 significant reduction in crop sown area.</p>
 
-            <div class="chart-container">
+            <!-- <div class="chart-container">
                 <canvas id="Chart-drought"></canvas>
-            </div>
+            </div> -->
 
             <div class="chart-container">
                 <canvas id="Chart-drought-weeks"></canvas>
@@ -1112,11 +1112,12 @@
         const kharifData = JSON.parse('{{kharif_data|safe}}')
         const rabiData = JSON.parse('{{rabi_data|safe}}')
         const zaidData = JSON.parse('{{zaid_data|safe}}')
+        const waterYears = JSON.parse('{{water_years|safe}}')
 
         const barChart_swb = new Chart(document.getElementById('barChart-swb'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                labels: waterYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
                 datasets: [
                 {
                     label: 'Kharif-Rabi-Zaid',
@@ -1174,34 +1175,35 @@
         const double = JSON.parse('{{double|safe}}')
         const triple = JSON.parse('{{triple|safe}}')
         const uncrop = JSON.parse('{{uncrop|safe}}')
+        const cropYears = JSON.parse('{{crop_years|safe}}')
 
         const barChart_cropping = new Chart(document.getElementById('barChart-intensity'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                labels: cropYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
                 datasets: [
                 {
                     label: 'Single-Cropping',
                     data: single,
-                    backgroundColor: '#ffc413',
+                    backgroundColor: '#57ad2b',
 
                 },
                 {
                     label: 'Double-Cropping',
                     data: double,
-                    backgroundColor: '#fe8200'
+                    backgroundColor: '#e68600'
 
                 },
                 {
                     label: 'Triple-Cropping',
                     data: triple,
-                    backgroundColor: '#f44336'
+                    backgroundColor: '#b3561d'
 
                 },
                 {
                     label: 'Uncropped',
                     data: uncrop,
-                    backgroundColor: '#999999'
+                    backgroundColor: '#A9A9A9'
 
                 },
                 ]
@@ -1242,11 +1244,12 @@
         const runoffData = JSON.parse('{{runoff_data|safe}}')
         const etData = JSON.parse('{{et_data|safe}}')
         const dgData = JSON.parse('{{dg_data|safe}}')
+        const wbYears = JSON.parse('{{wb_years|safe}}')
 
         const lineChart = new Chart(document.getElementById('lineChart-water'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [
                 {
                     label: 'Runoff',
@@ -1296,7 +1299,7 @@
         const areaChartEvp = new Chart(document.getElementById('lineChart-evp'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [{
                     label: 'Evapotranspiration',
                     data: etData,
@@ -1338,7 +1341,7 @@
         const areaChartGW = new Chart(document.getElementById('lineChart-gw'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [{
                     label: 'Groundwater',
                     data: dgData,
@@ -1378,99 +1381,55 @@
         });
 
         // Drought Graphs
-        const droughtData = JSON.parse('{{drought_weeks|safe}}')
         const mod_weeks = JSON.parse('{{mod_drought|safe}}')
         const sev_weeks = JSON.parse('{{sev_drought|safe}}')
+        const drysp_all = JSON.parse('{{drysp_all|safe}}')
+        const dg_years = JSON.parse('{{dg_years|safe}}')
 
-        const droughtChart = new Chart(document.getElementById('Chart-drought'), {
+       const barChart_weeks = new Chart(
+        document.getElementById('Chart-drought-weeks'),
+        {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
-                datasets: [{
-                    label: 'Drought Index(in Weeks)',
-                    data: droughtData,
-                    type: 'line',
-                    fill: false,
-                    borderColor: '#e67300',
-                    borderWidth: 2,
-                    pointRadius: 5,
-                    order: 1 // Lower order means it's drawn last (in front)
-                }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Drought Index(in Weeks)'
-                        }
-                    },
-                    x : {
-                        title : {
-                            display: true,
-                            text: 'Year'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
-
-        const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'), {
-            type: 'bar',
-            data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
-                datasets: [
+            labels: dg_years,
+            datasets: [
                 {
-                    label: 'Moderate Weeks',
-                    data: mod_weeks,
-                    backgroundColor: '#ffc413',
-
+                label: 'Moderate Weeks',
+                data: mod_weeks,
+                backgroundColor: '#EB984E',
+                stack: 'ms',           // <-- stack group A (Moderate+Severe)
                 },
                 {
-                    label: 'Severe Weeks',
-                    data: sev_weeks,
-                    backgroundColor: '#fe8200'
-
+                label: 'Severe Weeks',
+                data: sev_weeks,
+                backgroundColor: '#E74C3C',
+                stack: 'ms',           // <-- same stack as Moderate
                 },
-                ]
+                {
+                label: 'Dryspell Weeks',
+                data: drysp_all,
+                backgroundColor: '#8884d8',
+                stack: 'dry',          // <-- separate stack = separate bar
+                },
+            ],
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x : {
-                        stacked : true,
-                        title : {
-                            display: true,
-                            text: 'Year'
-                        }
-                    },
-                    y: {
-                        stacked : true,
-                        title : {
-                            display: true,
-                            text: 'No. of Weeks'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true },    // allow multiple stacks side-by-side
+                y: { stacked: true,      // stack within each stack group
+                    title: { display: true, text: 'No. of Weeks' } },
             },
+            animation: { duration: 0 },
             plugins: {
-                title: {
-                    display: true,
-                    text: 'Area under single, double, triple cropping over the years',
-                },
-            }
-        });
+                title: { display: true, text: 'Drought Data over the years' },
+                legend: { display: true },
+            },
+            },
+        }
+        );
+
 
         //Village Profile section
         const villageNames = JSON.parse('{{ villages_name|safe }}')
