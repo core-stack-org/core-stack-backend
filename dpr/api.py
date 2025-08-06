@@ -138,19 +138,19 @@ def generate_mws_report(request):
         )
 
         # ? Surface Waterbody Description
-        swb_desc, trend_desc, final_desc, kharif_data, rabi_data, zaid_data = (
+        swb_desc, trend_desc, final_desc, kharif_data, rabi_data, zaid_data, water_years = (
             get_surface_Water_bodies_data(
                 result["state"], result["district"], result["block"], result["uid"]
             )
         )
 
         # ? Water Balance Description
-        wb_desc, good_rainfall, bad_rainfall, precip_data, runoff_data, et_data, dg_data = get_water_balance_data(
+        wb_desc, good_rainfall, bad_rainfall, precip_data, runoff_data, et_data, dg_data, wb_years = get_water_balance_data(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
         # ? Drought Description
-        drought_desc, drought_weeks, mod_drought, sev_drought = get_drought_data(
+        drought_desc, drought_weeks, mod_drought, sev_drought, drysp_all, dg_years = get_drought_data(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
@@ -172,7 +172,7 @@ def generate_mws_report(request):
         )
 
         #? Cropping Intensity Description
-        inten_desc1, inten_desc2, single, double, triple, uncrop =  get_cropping_intensity(
+        inten_desc1, inten_desc2, single, double, triple, uncrop, crop_years =  get_cropping_intensity(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
@@ -228,7 +228,12 @@ def generate_mws_report(request):
             "single" : json.dumps(single),
             "double" : json.dumps(double),
             "triple" : json.dumps(triple),
-            "uncrop" : json.dumps(uncrop)
+            "uncrop" : json.dumps(uncrop),
+            "crop_years" : json.dumps(crop_years),
+            "water_years" : json.dumps(water_years),
+            "wb_years" : json.dumps(wb_years),
+            "drysp_all" : json.dumps(drysp_all),
+            "dg_years" : json.dumps(dg_years)
         }
 
         return render(request, "mws-report.html", context)
@@ -320,3 +325,26 @@ def generate_multi_report(request):
         logger.exception("Exception in generate_mws_report api :: ", e)
         return render(request, 'error-page.html', {})
 
+
+
+@api_view(["GET"])
+@auth_free
+def generate_resource_report(request):
+    try:
+        # ? district, block, plan_id
+        params = request.GET
+        result = {}
+
+        for key, value in params.items():
+            result[key] = value
+        
+        context = {
+            "district": result["district"],
+            "block": result["block"],
+            "plan_id": result["plan_id"],
+        }
+
+        return render(request, "resource-report.html", context)
+    except Exception as e:
+        logger.exception("Exception in generate_resource_report api :: ", e)
+        return render(request, "error-page.html", {})

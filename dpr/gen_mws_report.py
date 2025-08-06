@@ -122,33 +122,82 @@ def format_years(year_list):
 
 
 def format_date_monsoon_onset(date_list):
+    if not date_list:
+        return (None, None)
+
     standardized_dates = []
-    for date_str in date_list:
-        parts = date_str.split("-")
-        if len(parts) == 3:
-            year, month, day = parts
-            # Add leading zeros if needed
-            standardized_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-            standardized_dates.append(standardized_date)
+    for item in date_list:
+        if not item or isinstance(item, (int, float)):
+            continue
 
-    # Parse string dates into datetime objects
+        s = str(item).strip()
+        parts = s.split("-")
+        if len(parts) != 3:
+            continue
+
+        y, m, d = parts
+        try:
+            y = int(y); m = int(m); d = int(d)
+            standardized_dates.append(f"{y:04d}-{m:02d}-{d:02d}")
+        except ValueError:
+            continue
+
     dates = []
-    for date_str in standardized_dates:
-        # Parse each date string into a datetime object
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        dates.append(date_obj)
+    for ds in standardized_dates:
+        try:
+            dates.append(datetime.strptime(ds, "%Y-%m-%d"))
+        except ValueError:
+            # Invalid calendar dates get skipped
+            continue
 
-    # Find min and max dates
+    if not dates:
+        return (None, None)
+
     min_date = min(dates)
     max_date = max(dates)
 
-    # Format to only show month and day (MM-DD)
-    min_date_formatted = min_date.strftime("%m-%d")
-    max_date_formatted = max_date.strftime("%m-%d")
-
-    return min_date_formatted, max_date_formatted
+    return min_date.strftime("%m-%d"), max_date.strftime("%m-%d")
 
 
+# The Start_only is for case 2023-2024 , so when true it will return 2023 if false then return 2023 and 2024 both
+def extract_years(items, *, start_only=True):
+    years = []
+    seen = set()
+
+    for s in map(str, items):
+        s = s or ""
+
+        if start_only:
+            # Prefer the start of an explicit range YYYY-YYYY
+            m = re.search(r'(?<!\d)((?:19|20)\d{2})(?=\s*-\s*(?:19|20)\d{2})', s)
+            if m:
+                candidates = [m.group(1)]
+            else:
+                # Otherwise take the first standalone year in the string
+                m2 = re.search(r'\b(?:19|20)\d{2}\b', s)
+                candidates = [m2.group(0)] if m2 else []
+        else:
+            # Collect all standalone years
+            candidates = [m.group(0) for m in re.finditer(r'\b(?:19|20)\d{2}\b', s)]
+
+        for y in candidates:
+            if y not in seen:
+                seen.add(y)
+                years.append(y)
+
+    return sorted(years, key=int)
+
+# For columns like "drysp_unit_4_weeks_2018"
+def extract_years_single(items):
+    years, seen = [], set()
+    for s in map(str, items):
+        for m in re.finditer(r'(?<!\d)(?:19|20)\d{2}(?!\d)', s):
+            y = m.group(0)
+            if y not in seen:
+                seen.add(y)
+                years.append(y)
+    return sorted(years, key=int) 
+ 
 def get_rainfall_type(rainfall):
     if rainfall < 740:
         return "Semi-arid"
@@ -1062,6 +1111,8 @@ def get_cropping_intensity(state, district, block, uid):
 
         selected_columns_inten = [col for col in df.columns if col.startswith("cropping_intensity_")]
 
+        current_years = extract_years(selected_columns_inten)
+
         df[selected_columns_inten] = df[selected_columns_inten].apply(pd.to_numeric, errors="coerce")
 
         filtered_df_inten = df.loc[df["UID"] == uid, selected_columns_inten]
@@ -1182,10 +1233,10 @@ def get_cropping_intensity(state, district, block, uid):
                     final_triple_percent.append(round(p3,2))
                     final_non_cropped.append(100 - round(p1+p2+p3, 2))
 
-            return inten_parameter_1, inten_parameter_2, final_single_percent, final_double_percent, final_triple_percent, final_non_cropped
+            return inten_parameter_1, inten_parameter_2, final_single_percent, final_double_percent, final_triple_percent, final_non_cropped, current_years
 
         else:
-            return "", "", [],[],[],[]
+            return "", "", [],[],[],[],[]
 
     except Exception as e:
         logger.info(
@@ -1304,6 +1355,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         df[selected_columns] = df[selected_columns].apply(
             pd.to_numeric, errors="coerce"
         )
+
+        current_years = extract_years(selected_columns)
 
         parameter_swb_1 = f""
         parameter_swb_2 = f""
@@ -1463,6 +1516,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             filtered_df_kharif,
             filtered_df_rabi,
             filtered_df_zaid,
+            current_years
         )
 
     except Exception as e:
@@ -1526,6 +1580,8 @@ def get_water_balance_data(state, district, block, uid):
 
         df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric, errors="coerce")
         df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric, errors="coerce")
+
+        current_years = extract_years(selected_column_dg)
         
         #? Trend Calculation
         filtered_df_dg = df.loc[df["UID"] == uid, selected_column_dg].values[0]
@@ -1691,6 +1747,7 @@ def get_water_balance_data(state, district, block, uid):
             filtered_df_runoff,
             filtered_df_et,
             filtered_df_dg,
+            current_years
         )
 
     except Exception as e:
@@ -1772,6 +1829,17 @@ def get_drought_data(state, district, block, uid):
         parameter_drought += original_string.replace(
             "XXX, YYY and ZZZ", formatted_years
         )
+        
+        #? Get all the Dryspell for data for Graph
+        selected_columns_drysp_all = [col for col in df.columns if col.startswith("drysp_unit_4_weeks")]
+        df[selected_columns_drysp_all] = df[selected_columns_drysp_all].apply(
+            pd.to_numeric, errors="coerce"
+        )
+        filtered_df_drysp_all = df.loc[df["UID"] == uid, selected_columns_drysp_all].values[0].tolist()
+
+        current_years = extract_years_single(selected_columns_drysp_all)
+
+        print(current_years)
 
         if len(drought_years):
             # ? Dryspell Calc
@@ -1808,7 +1876,7 @@ def get_drought_data(state, district, block, uid):
                         formatted_sentence += f"and in {item[1]} lasted {item[0]} weeks."
                 parameter_drought += formatted_sentence
 
-        return parameter_drought, drought_weeks, mws_drought_moderate, mws_drought_severe
+        return parameter_drought, drought_weeks, mws_drought_moderate, mws_drought_severe, filtered_df_drysp_all, current_years
 
     except Exception as e:
         logger.info(
