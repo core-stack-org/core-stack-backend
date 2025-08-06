@@ -16,8 +16,8 @@ def precipitation(
     asset_suffix=None,
     asset_folder_list=None,
     app_type=None,
-    start_date=None,
-    end_date=None,
+    start_year=None,
+    end_year=None,
     is_annual=False,
 ):
 
@@ -29,15 +29,36 @@ def precipitation(
         )
         + description
     )
+
+    start_date = f"{start_year}-07-01"
+    end_date = f"{end_year}-06-30"
+
     if is_gee_asset_exists(asset_id):
-        return None, asset_id
+        print("Asset exists")
+        roi = ee.FeatureCollection(asset_id)
+        col_names = roi.first().propertyNames().getInfo()
+        filtered_col = [col for col in col_names if col.startswith("20")]
+        filtered_col.sort()
+
+        start_year = int(filtered_col[-1].split("-")[0]) + 1
+        start_date = f"{start_year-1}-07-01"
+
+        if (is_annual and start_year < end_year) or (
+            not is_annual and start_date < end_date
+        ):
+            print("Need to merge")
+            pass
+        else:
+            print("Full data")
+            return None, asset_id
 
     size = ee.Number(roi.size())
     size1 = size.subtract(ee.Number(1))
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     fn_index = 0
-
+    print("f_start_date", f_start_date)
+    print("end_date", end_date)
     while f_start_date <= end_date:
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)

@@ -67,10 +67,11 @@ def generate_hydrology(
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
         app_type=app_type,
-        start_date=start_date,
-        end_date=end_date,
+        start_year=start_year,
+        end_year=end_year,
         is_annual=is_annual,
     )
+    return
     if ppt_task_id:
         task_list.append(ppt_task_id)
 
