@@ -12,12 +12,12 @@ import pandas as pd
 import numpy as np
 from stats_generator.mws_indicators import get_generate_filter_mws_data
 import json
-from geoadmin.models import Block, District, State
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 
 
 from stats_generator.models import LayerInfo
-from computing.models import Layer, Dataset
+from computing.models import Layer, Dataset, LayerType
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 
@@ -81,9 +81,8 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
         # Safely get misc data
         misc = dataset.misc or {}
-        style_url = dataset.style_name  # Now using style_name field directly from Dataset
+        style_url = dataset.style_name
 
-        # Build the appropriate URL based on layer type
         if layer_type in [LayerType.VECTOR, LayerType.POINT]:
             layer_url = get_url(workspace, layer_name)
         elif layer_type == LayerType.RASTER:
@@ -92,7 +91,7 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
             continue  # Skip unknown types
 
         layer_data.append({
-            "layer_name": layer_name,
+            "layer_name": dataset.name,
             "layer_type": layer_type,
             "layer_url": layer_url,
             "layer_version": dataset.layer_version,
