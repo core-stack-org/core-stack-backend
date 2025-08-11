@@ -55,7 +55,7 @@ from utilities.auth_check_decorator import api_security_check
 
 
 
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
@@ -74,7 +74,7 @@ def generate_admin_boundary(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_nrega_layer(request):
     print("Inside generate_nrega_layer API.")
@@ -199,7 +199,7 @@ def upload_kml(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_mws_layer(request):
     print("Inside generate_mws_layer")
@@ -216,7 +216,7 @@ def generate_mws_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_fortnightly_hydrology(request):
     print("Inside generate_fortnightly_hydrology")

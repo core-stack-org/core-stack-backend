@@ -89,7 +89,7 @@ def get_admin_details_by_lat_lon(request):
     }
 )
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free")
 def get_mws_by_lat_lon(request):
     """
         Retrieve MWS ID data based on given latitude and longitude coordinates.
