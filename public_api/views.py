@@ -14,8 +14,6 @@ from stats_generator.mws_indicators import get_generate_filter_mws_data
 import json
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
-
-
 from stats_generator.models import LayerInfo
 from computing.models import Layer, Dataset, LayerType
 from stats_generator.utils import get_url
@@ -130,7 +128,7 @@ def get_mws_id_by_lat_lon(lon, lat):
 
     asset_path = get_gee_asset_path(state, district, tehsil)
     mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
-    if is_gee_asset_exists(asset_id):
+    if is_gee_asset_exists(mws_asset_id):
         mws_fc = ee.FeatureCollection(mws_asset_id)
         point = ee.Geometry.Point([lon, lat])
         matching_feature = mws_fc.filterBounds(point).first()
