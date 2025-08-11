@@ -8,6 +8,8 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    check_task_status,
+    merge_fc_into_existing_fc,
 )
 
 
@@ -29,15 +31,45 @@ def precipitation(
         )
         + description
     )
-    if is_gee_asset_exists(asset_id):
-        return None, asset_id
+    db_start_date = "2017-07-01"
+    db_end_date = "2023-06-30"
 
+    if is_gee_asset_exists(asset_id):
+        print(db_end_date, end_date, start_date, db_start_date)
+        # if db_start_date > start_date:
+        #     pass
+        if db_end_date < end_date:
+            new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            new_start_date = new_start_date + relativedelta(months=1, day=1)
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
+
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+            task_id, new_asset_id = generate_data(
+                roi,
+                new_asset_id,
+                new_description,
+                new_start_date,
+                end_date,
+                is_annual,
+            )
+            check_task_status([task_id])
+            print("Prec new year data generated.")
+
+            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+        return None, asset_id
+    else:
+        return generate_data(
+            roi, asset_id, description, start_date, end_date, is_annual
+        )
+
+
+def generate_data(roi, asset_id, description, start_date, end_date, is_annual):
     size = ee.Number(roi.size())
     size1 = size.subtract(ee.Number(1))
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     fn_index = 0
-
     while f_start_date <= end_date:
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)
@@ -75,7 +107,6 @@ def precipitation(
         roi = ee.FeatureCollection(l)
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
-
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id, asset_id
