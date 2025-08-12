@@ -228,12 +228,7 @@ def generate_tehsil_data(request):
         # Generate file if not exists
         if not os.path.exists(file_path):
             print("Excel file does not exist. Generating...")
-            if not get_vector_layer_geoserver(state, district, tehsil):
-                raise ValueError("Failed to generate vector layer from GeoServer.")
-            os.makedirs(district_path, exist_ok=True)
-            file_path = download_layers_excel_file(state, district, tehsil)
-            if not file_path or not os.path.exists(file_path):
-                raise ValueError("Failed to download or locate generated Excel file.")
+            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
 
         # If JSON is requested, return parsed content
         if file_type == "json":
