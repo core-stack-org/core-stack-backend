@@ -8,6 +8,8 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    check_task_status,
+    merge_fc_into_existing_fc,
 )
 
 
@@ -20,31 +22,35 @@ def well_depth(
 ):
     print("Inside well depth script")
     description = "well_depth_annual_" + asset_suffix
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + description
+    asset_path = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
     )
-    if is_gee_asset_exists(asset_id):
-        return None, asset_id
+    asset_id = asset_path + description
 
+    db_end_date = "2023-06-30"
+    if is_gee_asset_exists(asset_id):
+        print("Well depth asset already exists")
+        if db_end_date < end_date:
+            ee.data.deleteAsset(asset_id)
+        else:
+            return None, asset_id
+
+    return _generate_data(
+        asset_id, asset_path, description, asset_suffix, start_date, end_date
+    )
+
+
+def _generate_data(
+    asset_id, asset_path, description, asset_suffix, start_date, end_date
+):
     principal_aquifers = ee.FeatureCollection(
         "projects/ee-anz208490/assets/principalAquifer"
     )
-
     slopes = ee.FeatureCollection(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + "filtered_delta_g_annual_"
-        + asset_suffix
-        + "_uid"
-    )  # Feature collection path of any deltag asset of any location
-
+        asset_path + "filtered_delta_g_annual_" + asset_suffix + "_uid"
+    )
     yeild__ = ee.List(principal_aquifers.aggregate_array("yeild__"))
     distinct = yeild__.distinct()
-
     diction = ee.Dictionary(
         {
             "": "NA",
@@ -117,11 +123,9 @@ def well_depth(
 
     shape = slopes.map(fun2)
     keys = ["Precipitation", "RunOff", "ET", "DeltaG", "WellDepth"]
-
     # year of interest
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-
     while f_start_date <= end_date:
         f_end_date = f_start_date + relativedelta(years=1)
 
@@ -144,7 +148,6 @@ def well_depth(
         shape = shape.map(res)
         f_start_date = f_end_date
         start_date = f_start_date
-
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(shape, description, asset_id)
     return task_id, asset_id

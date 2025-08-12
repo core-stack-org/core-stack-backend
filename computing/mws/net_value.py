@@ -24,9 +24,13 @@ def net_value(
         )
         + description
     )
-
+    db_end_date = "2023-06-30"
     if is_gee_asset_exists(asset_id):
-        return None, asset_id
+        print("Net value asset already exists")
+        if db_end_date < end_date:
+            ee.data.deleteAsset(asset_id)
+        else:
+            return None, asset_id
 
     well_depth_fc = (
         get_gee_dir_path(

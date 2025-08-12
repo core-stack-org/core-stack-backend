@@ -31,13 +31,9 @@ def precipitation(
         )
         + description
     )
-    db_start_date = "2017-07-01"
-    db_end_date = "2023-06-30"
+    db_end_date = "2024-06-30"
 
     if is_gee_asset_exists(asset_id):
-        print(db_end_date, end_date, start_date, db_start_date)
-        # if db_start_date > start_date:
-        #     pass
         if db_end_date < end_date:
             new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
             new_start_date = new_start_date + relativedelta(months=1, day=1)
@@ -45,26 +41,27 @@ def precipitation(
 
             new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
             new_description = f"{description}_{new_start_date}_{end_date}"
-            task_id, new_asset_id = generate_data(
-                roi,
-                new_asset_id,
-                new_description,
-                new_start_date,
-                end_date,
-                is_annual,
-            )
-            check_task_status([task_id])
-            print("Prec new year data generated.")
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_data(
+                    roi,
+                    new_asset_id,
+                    new_description,
+                    new_start_date,
+                    end_date,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("Prec new year data generated.")
 
             merge_fc_into_existing_fc(asset_id, description, new_asset_id)
         return None, asset_id
     else:
-        return generate_data(
+        return _generate_data(
             roi, asset_id, description, start_date, end_date, is_annual
         )
 
 
-def generate_data(roi, asset_id, description, start_date, end_date, is_annual):
+def _generate_data(roi, asset_id, description, start_date, end_date, is_annual):
     size = ee.Number(roi.size())
     size1 = size.subtract(ee.Number(1))
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")

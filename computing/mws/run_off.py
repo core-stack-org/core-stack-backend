@@ -12,6 +12,7 @@ from utilities.gee_utils import (
     create_gee_dir,
     get_gee_dir_path,
     export_vector_asset_to_gee,
+    merge_fc_into_existing_fc,
 )
 
 
@@ -34,10 +35,54 @@ def run_off(
         )
         + description
     )
-
+    db_end_date = "2023-06-30"
     if is_gee_asset_exists(asset_id):
-        return None, asset_id
+        if db_end_date < end_date:
+            new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            new_start_date = new_start_date + relativedelta(months=1, day=1)
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
 
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_layer(
+                    roi,
+                    app_type,
+                    asset_folder_list,
+                    new_asset_id,
+                    new_description,
+                    new_start_date,
+                    end_date,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("Runoff new year data generated.")
+
+            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+        return None, asset_id
+    else:
+        return _generate_layer(
+            roi,
+            app_type,
+            asset_folder_list,
+            asset_id,
+            description,
+            start_date,
+            end_date,
+            is_annual,
+        )
+
+
+def _generate_layer(
+    roi,
+    app_type,
+    asset_folder_list,
+    asset_id,
+    description,
+    start_date,
+    end_date,
+    is_annual,
+):
     if roi.size().getInfo() > 50:
         chunk_size = 30
         rois, descs = create_chunk(roi, description, chunk_size)

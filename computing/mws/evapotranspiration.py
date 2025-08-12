@@ -9,6 +9,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    merge_fc_into_existing_fc,
 )
 import calendar
 
@@ -31,9 +32,31 @@ def evapotranspiration(
         )
         + description
     )
+    db_end_year = 2024
     if is_gee_asset_exists(asset_id):
+        if db_end_year < end_year:
+            new_start_year = db_end_year + 1
+            new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
+            new_description = f"{description}_{new_start_year}_{end_year}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_data(
+                    roi,
+                    new_asset_id,
+                    new_description,
+                    new_start_year,
+                    end_year,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("ET new year data generated.")
+
+            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
         return None, asset_id
 
+    return _generate_data(roi, asset_id, description, start_year, end_year, is_annual)
+
+
+def _generate_data(roi, asset_id, description, start_year, end_year, is_annual):
     if not is_annual and (end_year - start_year > 5):
         print("In chunking")
         chunk_assets = []

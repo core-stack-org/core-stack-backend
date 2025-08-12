@@ -1,7 +1,7 @@
 import ee
 import geopandas as gpd
 from nrm_app.celery import app
-from utilities.constants import MERGE_MWS_PATH, GEE_PATHS
+from utilities.constants import GEE_PATHS
 from .precipitation import precipitation
 from .run_off import run_off
 from .evapotranspiration import evapotranspiration
@@ -14,7 +14,6 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     make_asset_public,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
 )
 from .well_depth import well_depth
 from .calculateG import calculate_g
@@ -95,9 +94,9 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
+
     if ro_task_id:
         task_list.append(ro_task_id)
-
     task_id_list = check_task_status(task_list) if len(task_list) > 0 else []
     print("task_id_list", task_id_list)
 
@@ -138,7 +137,7 @@ def generate_hydrology(
             print("save Run Off info at the gee level...")
             make_asset_public(ro_task_id)
 
-    dg_task_id, asset_id = delta_g(
+    dg_task_id, delta_g_asset_id = delta_g(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -163,7 +162,7 @@ def generate_hydrology(
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wd task_id_list", task_id_list)
 
-        wd_task_id, asset_id = net_value(
+        wd_task_id, delta_g_asset_id = net_value(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
             app_type=app_type,
@@ -175,17 +174,15 @@ def generate_hydrology(
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    fc = calculate_g(
-        asset_id=asset_id, start_date=start_date, end_date=end_date, is_annual=is_annual
+    asset_id, task_id = calculate_g(
+        delta_g_asset_id,
+        asset_folder_list,
+        layer_name,
+        app_type,
+        start_date,
+        end_date,
+        is_annual,
     )
-
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + layer_name
-    )
-    task_id = export_vector_asset_to_gee(fc, layer_name, asset_id)
 
     if task_id:
         task_id_list = check_task_status([task_id])

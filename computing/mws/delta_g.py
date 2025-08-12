@@ -8,6 +8,8 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    check_task_status,
+    merge_fc_into_existing_fc,
 )
 
 
@@ -26,49 +28,76 @@ def delta_g(
         + asset_suffix
         + "_uid"
     )
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + description
-    )
 
+    asset_path = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    asset_id = asset_path + description
+    db_end_date = "2023-06-30"
     if is_gee_asset_exists(asset_id):
+        print("DeltaG asset already exists")
+        if db_end_date < end_date:
+            new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            new_start_date = new_start_date + relativedelta(months=1, day=1)
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
+
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_data(
+                    roi,
+                    new_asset_id,
+                    asset_path,
+                    asset_suffix,
+                    new_description,
+                    new_start_date,
+                    end_date,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("DeltaG new year data generated.")
+
+            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
         return None, asset_id
 
-    prec = ee.FeatureCollection(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + "Prec_"
-        + ("annual_" if is_annual else "fortnight_")
-        + asset_suffix
-    )  # Prec feature collection
+    return _generate_data(
+        roi,
+        asset_id,
+        asset_path,
+        asset_suffix,
+        description,
+        start_date,
+        end_date,
+        is_annual,
+    )
 
+
+def _generate_data(
+    roi,
+    asset_id,
+    asset_path,
+    asset_suffix,
+    description,
+    start_date,
+    end_date,
+    is_annual,
+):
+    prec = ee.FeatureCollection(
+        asset_path + "Prec_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
+    )  # Precipitation feature collection
     runoff = ee.FeatureCollection(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
+        asset_path
         + "Runoff_"
         + ("annual_" if is_annual else "fortnight_")
         + asset_suffix
     )  # RO feature collection
-
     et = ee.FeatureCollection(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + "ET_"
-        + ("annual_" if is_annual else "fortnight_")
-        + asset_suffix
+        asset_path + "ET_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # et feature collection
-
     keys = ["Precipitation", "RunOff", "ET", "DeltaG"]
-
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     fn_index = 0
-
     while f_start_date <= end_date:
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)
@@ -104,7 +133,6 @@ def delta_g(
         roi = roi.map(res)
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
-
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id, asset_id
