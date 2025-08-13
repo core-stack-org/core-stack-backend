@@ -16,17 +16,16 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
-from rest_framework import permissions
-from drf_yasg.views import get_schema_view
+from django.urls import include, path
 from drf_yasg import openapi
-
+from drf_yasg.views import get_schema_view
+from rest_framework import permissions
 
 schema_view = get_schema_view(
     openapi.Info(
         title="CoRE Stack APIs",
         default_version="v1",
-        description="Core Stack api",
+        description="CoRE Stack API",
         terms_of_service="",
         contact=openapi.Contact(email="support@core-stack.org"),
         license=openapi.License(name=""),
@@ -47,7 +46,6 @@ urlpatterns = [
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
     path("api/v1/", include("public_api.urls")),
-    
     # Swagger Doc
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
@@ -57,6 +55,5 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
-    
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
 ]
