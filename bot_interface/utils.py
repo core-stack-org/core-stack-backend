@@ -24,6 +24,7 @@ import bot_interface.api
 import bot_interface.models
 import bot_interface.interface.generic, bot_interface.interface.whatsapp
 # from WhatsappConnect.settings import BUCKET_URL, BUCKET_NAME, WHATSAPP_MEDIA_PATH
+from bot_interface.api import WHATSAPP_MEDIA_PATH
 from typing import Dict, Any, Tuple
 from django.core.exceptions import ObjectDoesNotExist
 
@@ -83,6 +84,72 @@ def is_user_in_community(bot_user, community_id):
         if community.get('community_id') == community_id:
             return True
     return False
+
+def sync_community_data_from_database(bot_user):
+    """
+    Sync community data from database to user_misc for existing users.
+    This function updates incomplete or missing community data.
+    
+    Args:
+        bot_user: BotUsers object
+    
+    Returns:
+        bool: True if data was updated, False if no update needed
+    """
+    try:
+        from community_engagement.models import Community_user_mapping
+        from users.models import User
+        
+        phone_number = bot_user.user.contact_number
+        print(f"Syncing community data from database for user: {phone_number}")
+        
+        # Get current communities from user_misc
+        current_membership = get_community_membership(bot_user)
+        current_communities = current_membership.get('current_communities', [])
+        
+        # Get communities from database
+        user_obj = User.objects.get(contact_number=phone_number)
+        community_mappings = Community_user_mapping.objects.filter(user=user_obj).select_related('community', 'community__project')
+        
+        updated = False
+        
+        # Check if we need to sync data
+        if not current_communities or any(
+            not comm.get('community_name') or not comm.get('organization') 
+            for comm in current_communities
+        ):
+            print("Community data is incomplete, updating from database...")
+            
+            # Initialize if needed
+            if not bot_user.user_misc:
+                bot_user.user_misc = {}
+            if 'community_membership' not in bot_user.user_misc:
+                bot_user.user_misc['community_membership'] = {'current_communities': []}
+            
+            # Clear and rebuild community list
+            bot_user.user_misc['community_membership']['current_communities'] = []
+            
+            for mapping in community_mappings:
+                community_data = {
+                    'community_id': str(mapping.community.id),
+                    'community_name': mapping.community.project.name if mapping.community.project else f"Community {mapping.community.id}",
+                    'community_description': getattr(mapping.community.project, 'description', '') if mapping.community.project else '',
+                    'organization': mapping.community.project.organization.name if (mapping.community.project and mapping.community.project.organization) else 'Unknown Organization',
+                    'joined_date': mapping.created_at.isoformat() if hasattr(mapping, 'created_at') else datetime.now().isoformat()
+                }
+                
+                bot_user.user_misc['community_membership']['current_communities'].append(community_data)
+                updated = True
+            
+            if updated:
+                bot_user.save()
+                print(f"Updated community data for user {phone_number}: {bot_user.user_misc['community_membership']['current_communities']}")
+        
+        return updated
+        
+    except Exception as e:
+        print(f"Error syncing community data from database: {e}")
+        return False
 
 status_map = {
             "UNASSIGNED": "सौंपा नहीं गया",
@@ -254,8 +321,8 @@ def check_event_type(app_instance_config_id, event_packet, expected_response_typ
                 'button': ['button', 'interactive'],
                 'audio': ['audio', 'voice'],
                 'image': ['image'],
-                'audio_text': ['text', 'voice', 'audio'],
-                'order': ['order']
+                'location': ['location'],
+                'audio_text': ['text', 'voice', 'audio']
             }
             is_response = False
             print("expected response type::::", expected_response_type)
@@ -284,6 +351,9 @@ def check_event_type(app_instance_config_id, event_packet, expected_response_typ
             elif expected_response_type == 'image':
                 text = "माफ़ कीजिये, कृपया फोटो अपलोड कर अपनी बात रखें।"
                 fp_text = "Sorry, we are expecting a image response from you."
+            elif expected_response_type == 'location':
+                text = "माफ़ कीजिये, कृपया अपना स्थान भेजें।"
+                fp_text = "Sorry, we are expecting a location response from you."
             else:
                 text = "अमान्य विकल्प!! "
                 fp_text = "Sorry, we are expecting a different input."
@@ -1494,4 +1564,56 @@ def callFunctionByName(funct_name, app_type, data_dict):
         print(f"calling addUserToCommunity with data_dict: {data_dict}")
         event = whatsappInterface.addUserToCommunity(bot_instance_id=bot_id, data_dict=data_dict)
         print(f"addUserToCommunity returned: {event}")
+    elif funct_name == 'get_user_communities':
+        print(f"calling get_user_communities with data_dict: {data_dict}")
+        event = whatsappInterface.get_user_communities(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"get_user_communities returned: {event}")
+    elif funct_name == 'display_single_community_message':
+        print(f"calling display_single_community_message with data_dict: {data_dict}")
+        event = whatsappInterface.display_single_community_message(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"display_single_community_message returned: {event}")
+    elif funct_name == 'display_multiple_community_message':
+        print(f"calling display_multiple_community_message with data_dict: {data_dict}")
+        event = whatsappInterface.display_multiple_community_message(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"display_multiple_community_message returned: {event}")
+    elif funct_name == 'generate_community_menu':
+        print(f"calling generate_community_menu with data_dict: {data_dict}")
+        event = whatsappInterface.generate_community_menu(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"generate_community_menu returned: {event}")
+    elif funct_name == 'store_active_community_and_context':
+        print(f"calling store_active_community_and_context with data_dict: {data_dict}")
+        event = whatsappInterface.store_active_community_and_context(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"store_active_community_and_context returned: {event}")
+    elif funct_name == 'store_selected_community_and_context':
+        print(f"calling store_selected_community_and_context with data_dict: {data_dict}")
+        event = whatsappInterface.store_selected_community_and_context(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"store_selected_community_and_context returned: {event}")
+    elif funct_name == 'handle_service_selection':
+        print(f"calling handle_service_selection with data_dict: {data_dict}")
+        event = whatsappInterface.handle_service_selection(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"handle_service_selection returned: {event}")
+    elif funct_name == 'store_location_data':
+        print(f"calling store_location_data with data_dict: {data_dict}")
+        event = whatsappInterface.store_location_data(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"store_location_data returned: {event}")
+    elif funct_name == 'store_audio_data':
+        print(f"calling store_audio_data with data_dict: {data_dict}")
+        event = whatsappInterface.store_audio_data(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"store_audio_data returned: {event}")
+    elif funct_name == 'store_photo_data':
+        print(f"calling store_photo_data with data_dict: {data_dict}")
+        event = whatsappInterface.store_photo_data(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"store_photo_data returned: {event}")
+    elif funct_name == 'log_work_demand_completion':
+        print(f"calling log_work_demand_completion with data_dict: {data_dict}")
+        event = whatsappInterface.log_work_demand_completion(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"log_work_demand_completion returned: {event}")
+    elif funct_name == 'log_grievance_completion':
+        print(f"calling log_grievance_completion with data_dict: {data_dict}")
+        event = whatsappInterface.log_grievance_completion(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"log_grievance_completion returned: {event}")
+    elif funct_name == 'archive_and_end_session':
+        print(f"calling archive_and_end_session with data_dict: {data_dict}")
+        event = whatsappInterface.archive_and_end_session(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"archive_and_end_session returned: {event}")
     return event

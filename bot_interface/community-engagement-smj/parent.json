@@ -63,7 +63,7 @@
         "data": [
           {
             "smjName": "community_features",
-            "initState": "MainMenu"
+            "initState": "CheckCommunityCount"
           }
         ],
         "function": "jumpToSmj"

@@ -1,353 +1,365 @@
 [
   {
-    "name": "CheckCommunityStatus",
+    "name": "CheckCommunityCount",
     "preAction": [
       {
-        "function": "check_user_communities"
+        "function": "get_user_communities"
       }
     ],
-    "postAction": [
-      {
-        "function": "move_forward"
-      }
-    ],
+    "postAction": [],
     "transition": [
       {
-        "SingleCommunityMenu": [
+        "SingleCommunityWelcome": [
           "single_community"
         ]
       },
       {
-        "MultipleCommunityMenu": [
+        "MultipleCommunityWelcome": [
           "multiple_communities"
         ]
       },
       {
-        "CheckCommunityStatus": [
+        "CheckCommunityCount": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "SingleCommunityMenu",
+    "name": "SingleCommunityWelcome",
+    "preAction": [
+      {
+        "function": "display_single_community_message"
+      },
+      {
+        "menu": [
+          {
+            "label": "समुदाय के साथ जारी रखें",
+            "value": "continue_single",
+            "description": "अपने वर्तमान समुदाय के साथ आगे बढ़ें",
+            "caption": "कोई एक विकल्प चुनें:"
+          },
+          {
+            "label": "नया समुदाय जॉइन करें",
+            "value": "join_new",
+            "description": "एक अतिरिक्त समुदाय में शामिल हों"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_active_community_and_context"
+      }
+    ],
+    "transition": [
+      {
+        "ServiceMenu": [
+          "continue_single"
+        ]
+      },
+      {
+        "JumpToOnboarding": [
+          "join_new"
+        ]
+      },
+      {
+        "SingleCommunityWelcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "MultipleCommunityWelcome",
+    "preAction": [
+      {
+        "function": "display_multiple_community_message"
+      },
+      {
+        "menu": [
+          {
+            "label": "इसी समुदाय में जारी रखें",
+            "value": "continue_last",
+            "description": "अंतिम एक्सेस किए गए समुदाय के साथ जारी रखें",
+            "caption": "आप कैसे आगे बढ़ना चाहते हैं:"
+          },
+          {
+            "label": "अन्य समुदाय चुनें",
+            "value": "choose_other",
+            "description": "अपने समुदायों में से चुनें"
+          },
+          {
+            "label": "नया समुदाय जॉइन करें",
+            "value": "join_new",
+            "description": "एक अतिरिक्त समुदाय में शामिल हों"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_active_community_and_context"
+      }
+    ],
+    "transition": [
+      {
+        "ServiceMenu": [
+          "continue_last"
+        ]
+      },
+      {
+        "CommunitySelectionMenu": [
+          "choose_other"
+        ]
+      },
+      {
+        "JumpToOnboarding": [
+          "join_new"
+        ]
+      },
+      {
+        "MultipleCommunityWelcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunitySelectionMenu",
+    "preAction": [
+      {
+        "function": "generate_community_menu"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_selected_community_and_context"
+      }
+    ],
+    "transition": [
+      {
+        "ServiceMenu": [
+          "community_selected"
+        ]
+      },
+      {
+        "CommunitySelectionMenu": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ServiceMenuNew",
     "preAction": [
       {
         "text": [
           {
-            "en": "👥 You are a part of this community: {{community_name}}\n\nWhat would you like to do?",
-            "hi": "👥 आप इस समुदाय के सदस्य हैं: {{community_name}}\n\nआप क्या करना चाहते हैं?",
-            "default": "👥 You are a part of this community: {{community_name}}"
+            "hi": "🎉 आपके समुदाय में आपका स्वागत है!\n\nआप निम्नलिखित सेवाओं का लाभ उठा सकते हैं:",
+            "en": "🎉 Welcome to your community!\n\nYou can access the following services:",
+            "default": "🎉 Welcome to your community!\n\nYou can access the following services:"
           }
         ]
       },
       {
         "menu": [
           {
-            "label": "Continue with this community",
-            "value": "continue_community",
-            "description": "Access community features"
+            "label": "कार्य मांग दर्ज करें",
+            "value": "work_demand",
+            "description": "नई कार्य मांग का अनुरोध जमा करें",
+            "caption": "आप क्या करना चाहते हैं:"
           },
           {
-            "label": "Join a new community",
-            "value": "join_new_community",
-            "description": "Add another community"
+            "label": "शिकायत दर्ज करें",
+            "value": "grievance",
+            "description": "शिकायत या प्रभाव जमा करें"
           }
-        ],
-        "caption": "Select an option:"
+        ]
       }
     ],
     "postAction": [],
     "transition": [
       {
-        "CommunityActionsMenu": [
-          "continue_community"
+        "JumpToWorkDemandSMJ": [
+          "work_demand"
         ]
       },
       {
-        "JoinNewCommunity": [
+        "JumpToGrievanceSMJ": [
+          "grievance"
+        ]
+      },
+      {
+        "ServiceMenuNew": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ServiceMenu",
+    "preAction": [
+      {
+        "function": "display_service_menu_message"
+      },
+      {
+        "menu": [
+          {
+            "label": "कार्य मांग दर्ज करें",
+            "value": "work_demand",
+            "description": "नई कार्य मांग का अनुरोध जमा करें",
+            "caption": "आप क्या करना चाहते हैं:"
+          },
+          {
+            "label": "शिकायत दर्ज करें",
+            "value": "grievance",
+            "description": "शिकायत या प्रभाव जमा करें"
+          },
+          {
+            "label": "नया समुदाय जॉइन करें",
+            "value": "join_new_community",
+            "description": "एक अतिरिक्त समुदाय में शामिल हों"
+          },
+          {
+            "label": "पिछले मेनू पर वापस जाएं",
+            "value": "back_to_community",
+            "description": "समुदाय चयन पर वापस जाएं"
+          }
+        ]
+      }
+    ],
+    "postAction": [
+      {
+        "function": "handle_service_selection"
+      }
+    ],
+    "transition": [
+      {
+        "JumpToWorkDemandSMJ": [
+          "work_demand"
+        ]
+      },
+      {
+        "JumpToGrievanceSMJ": [
+          "grievance"
+        ]
+      },
+      {
+        "JumpToOnboarding": [
           "join_new_community"
         ]
       },
       {
-        "SingleCommunityMenu": [
+        "SingleCommunityWelcome": [
+          "back_from_single"
+        ]
+      },
+      {
+        "MultipleCommunityWelcome": [
+          "back_from_multiple"
+        ]
+      },
+      {
+        "CommunitySelectionMenu": [
+          "back_from_selection"
+        ]
+      },
+      {
+        "ServiceMenu": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "MultipleCommunityMenu",
+    "name": "JumpToOnboarding",
     "preAction": [
       {
         "text": [
           {
-            "en": "👥 You accessed community '{{last_community_name}}' last time.\n\nWhat would you like to do?",
-            "hi": "👥 आपने पिछली बार '{{last_community_name}}' समुदाय तक पहुंच बनाई थी।\n\nआप क्या करना चाहते हैं?",
-            "default": "👥 You accessed community '{{last_community_name}}' last time."
+            "en": "🔄 Redirecting to community onboarding...",
+            "hi": "🔄 समुदाय ऑनबोर्डिंग में रीडायरेक्ट कर रहे हैं...",
+            "default": "Redirecting to onboarding..."
           }
         ]
       },
       {
-        "menu": [
+        "data": [
           {
-            "label": "Continue with last community",
-            "value": "continue_last_community",
-            "description": "Access {{last_community_name}}"
-          },
-          {
-            "label": "Choose other community",
-            "value": "choose_other_community",
-            "description": "Select from your communities"
-          },
-          {
-            "label": "Join a new community",
-            "value": "join_new_community",
-            "description": "Add another community"
+            "smjName": "onboarding",
+            "initState": "Welcome"
           }
         ],
-        "caption": "Select an option:"
+        "function": "jumpToSmj"
       }
     ],
     "postAction": [],
     "transition": [
       {
-        "CommunityActionsMenu": [
-          "continue_last_community"
-        ]
-      },
-      {
-        "SelectCommunityMenu": [
-          "choose_other_community"
-        ]
-      },
-      {
-        "JoinNewCommunity": [
-          "join_new_community"
-        ]
-      },
-      {
-        "MultipleCommunityMenu": [
+        "JumpToOnboarding": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "SelectCommunityMenu",
+    "name": "JumpToWorkDemandSMJ",
     "preAction": [
       {
         "text": [
           {
-            "en": "👥 Select a community to access:",
-            "hi": "👥 पहुंच के लिए एक समुदाय चुनें:",
-            "default": "👥 Select a community to access:"
+            "en": "📋 Opening work demand registration...",
+            "hi": "📋 कार्य मांग पंजीकरण खोल रहे हैं...",
+            "default": "Opening work demand registration..."
           }
         ]
       },
       {
-        "function": "generate_community_list_menu"
-      }
-    ],
-    "postAction": [
-      {
-        "function": "set_selected_community"
-      }
-    ],
-    "transition": [
-      {
-        "CommunityActionsMenu": [
-          "success"
-        ]
-      },
-      {
-        "MultipleCommunityMenu": [
-          "back"
-        ]
-      },
-      {
-        "SelectCommunityMenu": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "CommunityActionsMenu",
-    "preAction": [
-      {
-        "text": [
+        "data": [
           {
-            "en": "🏠 {{selected_community_name}} - Main Menu\n\nWhat do you want to do?",
-            "hi": "🏠 {{selected_community_name}} - मुख्य मेनू\n\nआप क्या करना चाहते हैं?",
-            "default": "🏠 {{selected_community_name}} - Main Menu"
-          }
-        ]
-      },
-      {
-        "menu": [
-          {
-            "label": "Register a work demand",
-            "value": "register_work_demand",
-            "description": "Submit a new work request"
-          },
-          {
-            "label": "Register a Grievance",
-            "value": "register_grievance",
-            "description": "Report an issue or complaint"
-          },
-          {
-            "label": "Back to previous menu",
-            "value": "back_to_previous",
-            "description": "Go back to community selection"
+            "smjName": "work_demand",
+            "initState": "WorkDemandWelcome"
           }
         ],
-        "caption": "Select an option:"
+        "function": "jumpToSmj"
       }
     ],
     "postAction": [],
     "transition": [
       {
-        "RegisterWorkDemand": [
-          "register_work_demand"
-        ]
-      },
-      {
-        "RegisterGrievance": [
-          "register_grievance"
-        ]
-      },
-      {
-        "CheckCommunityStatus": [
-          "back_to_previous"
-        ]
-      },
-      {
-        "CommunityActionsMenu": [
+        "JumpToWorkDemandSMJ": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "CommunityInfo",
+    "name": "JumpToGrievanceSMJ",
     "preAction": [
       {
         "text": [
           {
-            "en": "📋 Community Information\n\nThis feature is under development. Coming soon!",
-            "hi": "📋 समुदाय की जानकारी\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
-            "default": "📋 Community Information - Under Development"
+            "en": "📝 Opening grievance registration...",
+            "hi": "📝 शिकायत पंजीकरण खोल रहे हैं...",
+            "default": "Opening grievance registration..."
           }
-        ]
-      }
-    ],
-    "postAction": [
-      {
-        "function": "move_forward"
-      }
-    ],
-    "transition": [
-      {
-        "MainMenu": [
-          "success"
         ]
       },
       {
-        "CommunityInfo": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "Updates",
-    "preAction": [
-      {
-        "text": [
+        "data": [
           {
-            "en": "📢 Community Updates\n\nThis feature is under development. Coming soon!",
-            "hi": "📢 समुदाय अपडेट\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
-            "default": "📢 Community Updates - Under Development"
+            "smjName": "grievance",
+            "initState": "GrievanceStart"
           }
-        ]
+        ],
+        "function": "jumpToSmj"
       }
     ],
-    "postAction": [
-      {
-        "function": "move_forward"
-      }
-    ],
+    "postAction": [],
     "transition": [
       {
-        "MainMenu": [
-          "success"
-        ]
-      },
-      {
-        "Updates": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "Settings",
-    "preAction": [
-      {
-        "text": [
-          {
-            "en": "⚙️ Settings\n\nThis feature is under development. Coming soon!",
-            "hi": "⚙️ सेटिंग्स\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
-            "default": "⚙️ Settings - Under Development"
-          }
-        ]
-      }
-    ],
-    "postAction": [
-      {
-        "function": "move_forward"
-      }
-    ],
-    "transition": [
-      {
-        "MainMenu": [
-          "success"
-        ]
-      },
-      {
-        "Settings": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "Help",
-    "preAction": [
-      {
-        "text": [
-          {
-            "en": "❓ Help & Support\n\nThis feature is under development. Coming soon!",
-            "hi": "❓ सहायता और समर्थन\n\nयह सुविधा विकास के अधीन है। जल्द आ रहा है!",
-            "default": "❓ Help & Support - Under Development"
-          }
-        ]
-      }
-    ],
-    "postAction": [
-      {
-        "function": "move_forward"
-      }
-    ],
-    "transition": [
-      {
-        "MainMenu": [
-          "success"
-        ]
-      },
-      {
-        "Help": [
+        "JumpToGrievanceSMJ": [
           "failure"
         ]
       }

@@ -3,6 +3,15 @@
     "name": "Welcome",
     "preAction": [
       {
+        "text": [
+          {
+            "en": ":folded_hands: Hello. Welcome to Community engagement Platform bot.",
+            "hi": "नमस्कार। सामुदायिक सहभागिता प्लेटफ़ॉर्म बॉट में आपका स्वागत है।",
+            "default": "Hello. Welcome to Community engagement Platform bot."
+          }
+        ]
+      },
+      {
         "menu": [
           {
             "label": "सूची से चुनें",
@@ -169,10 +178,12 @@
         }
       }
     ],
-    "postAction": [],
+    "postAction": [
+      
+    ],
     "transition": [
       {
-        "WelcomeToCommunity": [
+        "PostOnboardingMenu": [
           "success"
         ]
       },
@@ -184,33 +195,62 @@
     ]
   },
   {
-    "name": "WelcomeToCommunity",
+    "name": "PostOnboardingMenu",
     "preAction": [
       {
         "text": [
           {
-            "en": ":folded_hands: Hello. Welcome to Community engagement Platform bot.",
-            "hi": "उपयोगकर्ता को समुदाय में सफलतापूर्वक जोड़ा गया। सामुदायिक सहभागिता प्लेटफ़ॉर्म बॉट में आपका स्वागत है।",
-            "default": "User successfully added to the community. Welcome to the Community engagement Platform bot."
+            "hi": "बधाई हो! आप सफलतापूर्वक समुदाय में शामिल हो गए हैं।",
+            "en": "Congratulations! You have successfully joined the community.",
+            "default": "Congratulations! You have successfully joined the community."
           }
         ]
       },
       {
-        "function": "move_forward"
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "Welcome": [
-          "success"
+        "text": [
+          {
+            "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",
+            "en": "Redirecting you to community services...",
+            "default": "Redirecting you to community services..."
+          }
         ]
       },
       {
-        "WelcomeToCommunity": [
-          "failure"
-        ]
+        "data": [
+          {
+            "smjName": "community_features",
+            "initState": "ServiceMenuNew"
+          }
+        ],
+        "function": "jumpToSmj"
       }
-    ]
+    ],
+    "postAction": [],
+    "transition": []
+  },
+  {
+    "name": "ExploreServices",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",
+            "en": "Redirecting you to community services...",
+            "default": "Redirecting you to community services..."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "community_features",
+            "initState": "CheckCommunityCount"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": []
   }
 ]

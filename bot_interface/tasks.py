@@ -64,11 +64,24 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
             
             if is_in_community:
                 logger.info("User %s is in community, proceeding with session", user_number)
-                # User is in community, pass "community_member" event to parent SMJ
+                
+                # Check and create user, ensure BotUser entry exists for community members too
+                bot_user_id, is_new_user = bot_interface.utils.check_and_create_user(user_number, bot_instance)
+                
+                # For button presses, use the button data as event, otherwise use "community_member"
+                current_event = event_packet.get("data") if event_packet.get("type") == "button" else "community_member"
+                current_state = event_packet.get("state") or bot_instance.init_state  # Preserve current state
+                current_smj_id = event_packet.get("smj_id") or bot_instance.smj.id  # Preserve SMJ context
+                
+                print(f"Community user button event - Event: {current_event}, State: {current_state}, SMJ: {current_smj_id}")
+                
+                # User is in community, handle appropriately based on event type
                 event_packet.update({
-                    "event": "community_member",
-                    "smj_id": bot_instance.smj.id,  # Start with parent SMJ
-                    "state": bot_instance.init_state
+                    "event": current_event,  # Use button data for button presses
+                    "smj_id": current_smj_id,  # Preserve SMJ context
+                    "state": current_state,  # Preserve current state, don't reset to init
+                    "user_id": bot_user_id,
+                    "is_new_user": is_new_user
                 })
                 _load_or_create_user_session(event_packet, bot_instance, response_data)
             else:
@@ -128,7 +141,7 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                             
                             # Only set event to "start" if this is truly a new conversation
                             # For button/interactive events, preserve the original event type
-                            if event_packet.get("type") in ["button", "interactive", "location"] and event_packet.get("event"):
+                            if event_packet.get("type") in ["button", "interactive", "location", "audio", "voice"] and event_packet.get("event"):
                                 # This is an existing interaction, don't force start
                                 event_to_set = event_packet.get("event")
                                 print(f"Preserving existing interaction event: {event_to_set}")
@@ -170,6 +183,35 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                             print("Current session in existing session:", current_session)
                             current_session[-1].update({current_state: event_packet}
                                            ) if current_session else current_session.append({current_state: event_packet})
+                            
+                            # Append location or audio data to session if present
+                            event_type = event_packet.get("type")
+                            if event_type == "location":
+                                location_key = f"{current_state}_location"
+                                location_data = {
+                                    "data": event_packet.get("data", ""),
+                                    "misc": event_packet.get("misc", {}),
+                                    "latitude": event_packet.get("misc", {}).get("latitude", ""),
+                                    "longitude": event_packet.get("misc", {}).get("longitude", ""),
+                                    "address": event_packet.get("misc", {}).get("address", ""),
+                                    "name": event_packet.get("misc", {}).get("name", "")
+                                }
+                                current_session[-1][location_key] = location_data
+                                print(f"Appended location data to session: {location_key} = {location_data}")
+                            elif event_type in ["audio", "voice"]:
+                                audio_key = f"{current_state}_audio"
+                                audio_data = {
+                                    "data": event_packet.get("data", ""),
+                                    "media_id": event_packet.get("media_id", ""),
+                                    "file_path": event_packet.get("data", "")
+                                }
+                                current_session[-1][audio_key] = audio_data
+                                print(f"Appended audio data to session: {audio_key} = {audio_data}")
+                            
+                            # Save updated session
+                            user_session.current_session = current_session
+                            user_session.save()
+                            print(f"Updated session saved for user: {user_session}")
                             # assert False
                     except bot_interface.models.UserSessions.DoesNotExist:
                         logger.info("No existing UserSession found for user, creating new one")
@@ -369,25 +411,28 @@ def _handle_user_onboarding(event_packet: Dict[str, Any], bot_instance, smj_stat
         return
 
 def _load_or_create_user_session(event_packet, bot_instance, response_data):
-    """Create user session for community users."""
+    """Create user session for community users and run state machine."""
     user_id = event_packet.get("user_id")
     if not user_id:
         logger.error("User ID not found in event packet")
         return
-    #fetch botuser_id from user_id
+    #fetch botuser by id (user_id in event_packet is actually bot_user.id)
     try:
-        bot_user = bot_interface.models.BotUsers.objects.get(user_id=user_id)  # type: ignore
+        bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)  # type: ignore
         user_id = str(bot_user.id)
     except bot_interface.models.BotUsers.DoesNotExist:
         logger.error("BotUser entry not found for user ID %s", user_id)
         return
+    
     # Load existing user session or create a new one
     user_session, created = bot_interface.models.UserSessions.objects.get_or_create(
-        user=bot_user.id,
+        user=bot_user,
+        bot=bot_instance,
         defaults={
-            "bot_id": event_packet.get("bot_id"),
-            "language": event_packet.get("language"),
-            "state": event_packet.get("state"),
+            "app_type": "WA",
+            "phone": bot_user.user.contact_number,
+            "current_state": event_packet.get("state", ""),
+            "user_config": {"language": event_packet.get("language", "hi")},
         }
     )
 
@@ -396,4 +441,52 @@ def _load_or_create_user_session(event_packet, bot_instance, response_data):
     else:
         logger.info("Loaded existing user session for user_id: %s", user_id)
 
+    # Get SMJ information
+    smj_id = event_packet.get("smj_id", bot_instance.smj.id)
+    event_state = event_packet.get("state", bot_instance.init_state)
+    
+    print(f"Community user SMJ execution - SMJ ID: {smj_id}, State: {event_state}")
+    
+    # Load SMJ states and run state machine (similar to non-community user flow)
+    try:
+        smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+        smj_states = smj.smj_json
+        # Handle Django JSONField - can be string or already parsed
+        if isinstance(smj_states, str):
+            smj_states = json.loads(smj_states)
+    except json.JSONDecodeError as json_err:
+        logger.error("Error parsing SMJ JSON for community user: %s", json_err)
+        return
+    except bot_interface.models.SMJ.DoesNotExist as obj_err:
+        logger.error("SMJ object not found for community user: %s", obj_err)
+        return
+    
+    print("SMJ states loaded for community user:", len(smj_states) if isinstance(smj_states, list) else "not a list")
+    
+    # Update user session context
+    try:
+        current_smj_obj = bot_interface.models.SMJ.objects.get(id=smj_id)
+        user_session.current_smj = current_smj_obj
+        user_session.current_state = event_state
+        user_session.save()
+        print(f"Updated community user session context: SMJ ID {smj_id}, State: {event_state}")
+    except bot_interface.models.SMJ.DoesNotExist:
+        print(f"Warning: SMJ with ID {smj_id} not found for community user context preservation")
+    
+    # Create and run SmjController
+    print(f"Creating SmjController for community user - smj_id: {smj_id}, user_id: {user_id}, state: {event_state}")
+    smj_controller = bot_interface.statemachine.SmjController(
+        states=smj_states,
+        smj_id=smj_id,
+        app_type=bot_instance.app_type,
+        bot_id=bot_instance.id,  # type: ignore
+        user_id=user_id,
+        language=bot_instance.language,
+        current_state=event_state,
+        current_session=user_session.current_session if hasattr(user_session, 'current_session') else None
+    )
+    
+    print("Running SMJ for community user with event packet:", event_packet)
+    smj_controller.runSmj(event_packet)
+    
     return user_session

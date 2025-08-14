@@ -23,7 +23,7 @@ from requests.exceptions import RequestException
 processed_message_ids = set()
 
 # Define WhatsApp media path
-WHATSAPP_MEDIA_PATH = "/tmp/whatsapp_media/"
+WHATSAPP_MEDIA_PATH = "/home/sohan/community-stack/core-stack-backend/bot_interface/media/"
 
 # Create the directory if it doesn't exist
 os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)
@@ -664,21 +664,37 @@ def download_image(app_instance_config_id, mime_type, media_id):
 
 
 def download_audio(app_instance_config_id, mime_type, media_id):
-    """This function downloads audio message and voice message"""
-    BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        bot_instance_id=app_instance_config_id
-    )
-    filepath = WHATSAPP_MEDIA_PATH + media_id + ".mp3"
-
-    url = BSP_URL + media_id
-    print("url :: ", url)
-    r = requests.get(url, headers=HEADERS)
-    print("r :: ", r,r.json())
-    filepath, success = download_media_from_url(app_instance_config_id, media_response =r.json())
-    print("filepath :: ", filepath)
-    with open(filepath, "wb") as f:
-        f.write(r.content)
-    return r, filepath
+    """Downloads audio message and voice message using proper WhatsApp API flow"""
+    try:
+        # Step 1: Get media metadata from WhatsApp API
+        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+            bot_instance_id=app_instance_config_id
+        )
+        
+        # Get media info using proper endpoint
+        media_info_url = f"{BSP_URL.rstrip('/')}/{media_id}"
+        print(f"Getting media info from: {media_info_url}")
+        r = requests.get(media_info_url, headers=HEADERS, timeout=30)
+        print(f"Media info response: {r.status_code}, {r.json() if r.status_code == 200 else r.text}")
+        
+        if r.status_code != 200:
+            print(f"Failed to get media info: {r.status_code}")
+            return r, None
+        
+        # Step 2: Use existing download_media_from_url function to download actual file
+        filepath, success = download_media_from_url(app_instance_config_id, media_response=r.json())
+        print(f"Audio download result - filepath: {filepath}, success: {success}")
+        
+        if success and filepath:
+            print(f"Successfully downloaded audio to: {filepath}")
+            return r, filepath
+        else:
+            print("Audio download failed in download_media_from_url")
+            return r, None
+            
+    except Exception as e:
+        print(f"Error in download_audio: {e}")
+        return None, None
 
 def is_audio_file(mime_type):
     """Check if mime type is audio"""
@@ -690,6 +706,18 @@ def is_audio_file(mime_type):
         'audio/ogg': '.opus'
     }
     return mime_type in AUDIO_MIME_TYPES
+
+def get_audio_extension(mime_type: str) -> str:
+    """Get proper file extension based on audio mime type"""
+    AUDIO_EXTENSIONS = {
+        'audio/aac': '.aac',
+        'audio/amr': '.amr',
+        'audio/mpeg': '.mp3',
+        'audio/mp4': '.m4a',
+        'audio/ogg': '.ogg',
+        'audio/opus': '.opus'
+    }
+    return AUDIO_EXTENSIONS.get(mime_type, '.mp3')  # Default to .mp3
 
 def convert_wav_to_mp3(input_path, bitrate="192k"):
     """
@@ -761,6 +789,7 @@ def convert_ogg_to_wav(input_path):
         ogg_to_wav_output = ogg_to_wav_result.stdout + "\n" + ogg_to_wav_result.stderr
 
         # Execute the second command (WAV to MP3) if the first step succeeds
+        wav_to_mp3_result = input_path  # Default fallback
         if ogg_to_wav_result.returncode == 0:
             wav_to_mp3_result = convert_wav_to_mp3(wav_path)
             # wav_to_mp3_output = wav_to_mp3_result.stdout + "\n" + wav_to_mp3_result.stderr
@@ -805,7 +834,7 @@ def download_media_from_url(app_instance_config_id, media_response):
         print("filepath in download_media_from_url function :: ", filepath)
         
         # Download file
-        response = requests.get(download_url, headers=HEADERS, stream=True)
+        response = requests.get(download_url, headers=HEADERS, stream=True, timeout=60)
         response.raise_for_status()
         
         # Save file
