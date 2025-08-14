@@ -6,9 +6,25 @@ import pandas as pd
 import numpy as np
 import os
 
+import ee
+from utilities.gee_utils import (
+    ee_initialize,
+    valid_gee_text,
+    get_gee_asset_path,
+    is_gee_asset_exists,
+)
+
 #from .utils import *
-from utilities.auth_utils import auth_free
-from .views import fetch_generated_layer_urls, get_mws_id_by_lat_lon, get_mws_json_from_stats_excel, get_mws_json_from_kyl_indicator, get_location_info_by_lat_lon
+from .views import ( 
+    fetch_generated_layer_urls, 
+    get_mws_id_by_lat_lon, 
+    get_mws_json_from_stats_excel, 
+    get_mws_json_from_kyl_indicator, 
+    get_location_info_by_lat_lon,
+    is_valid_string,
+    is_valid_mws_id,
+    excel_file_exists,
+    )
 from utilities.auth_check_decorator import api_security_check
 from django.http import HttpResponse
 from drf_yasg.utils import swagger_auto_schema
@@ -47,23 +63,37 @@ file_type_param = openapi.Parameter('file_type',openapi.IN_QUERY,description="Ou
     }
 )
 
+
 @api_security_check(auth_type="API_key")
 def get_admin_details_by_lat_lon(request):
     """
         Retrieve admin data based on given latitude and longitude coordinates.
     """
     try:
-        lat = float(request.query_params.get("latitude"))
-        lon = float(request.query_params.get("longitude"))
+        lat_param = request.query_params.get("latitude")
+        lon_param = request.query_params.get("longitude")
+    
+        if lat_param is None or lon_param is None:
+            return Response({"error": "Both 'latitude' and 'longitude' parameters are required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            lat = float(lat_param)
+            lon = float(lon_param)
+        except (ValueError, TypeError):
+            return Response({"error": "Latitude and longitude must be valid numbers(float)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # To Validate the coordinate
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            return Response({"error": "Latitude or longitude out of bounds."}, status=400)
-        properties_list = get_location_info_by_lat_lon(lat, lon)            
+            return Response({"error": "Latitude must be between -90 and 90, longitude must be between -180 and 180."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        properties_list = get_location_info_by_lat_lon(lat, lon)
         return properties_list
+        
     except Exception as e:
-        print(f"error occurred as {e}")
+        print(f"Error occurred: {e}")
         return Response({
             "status": "error",
-            "message": str("SOI does not contain the given lat lon")
+            "message": "Unable to retrieve location data for the given coordinates"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -96,11 +126,20 @@ def get_mws_by_lat_lon(request):
     """
     print("Inside Get mws id by lat lon layer API")
     try:
-        lat = float(request.query_params.get("latitude"))
-        lon = float(request.query_params.get("longitude"))
+        lat_param = request.query_params.get("latitude")
+        lon_param = request.query_params.get("longitude")
+
+        if lat_param is None or lon_param is None:
+            return Response({"error": "Both 'latitude' and 'longitude' parameters are required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            lat = float(lat_param)
+            lon = float(lon_param)
+        except (ValueError, TypeError):
+            return Response({"error": "Latitude and longitude must be valid numbers(float)."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            return Response({"error": "Latitude or longitude out of bounds."}, status=400)
+            return Response({"error": "Latitude must be between -90 and 90, longitude must be between -180 and 180."}, status=400)
         data = get_mws_id_by_lat_lon(lon, lat)
         return data
     except Exception as e:
@@ -157,12 +196,31 @@ def get_mws_json_by_stats_excel(request):
     """
     print("Inside mws data by excel api")
     try:
-        state = request.query_params.get("state").lower()
-        district = request.query_params.get("district").lower()
-        tehsil = request.query_params.get("tehsil").lower()
+        state_param = request.query_params.get("state")
+        district_param = request.query_params.get("district")
+        tehsil_param = request.query_params.get("tehsil")
         mws_id = request.query_params.get("mws_id")
+
+        if state_param is None or district_param is None or tehsil_param is None or mws_id is None:
+            return Response({"error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
+            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_mws_id(mws_id):
+            return Response({"error": "MWS id can only contain numbers and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state_param.lower().strip().replace(" ", "_")
+        district = district_param.lower().strip().replace(" ", "_")
+        tehsil = tehsil_param.lower().strip().replace(" ", "_")
+
+        if not excel_file_exists(state, district, tehsil):
+            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+
         data = get_mws_json_from_stats_excel(state, district, tehsil, mws_id)
-        return JsonResponse(data, status=200)
+        if not data:
+            return Response({"error": "No data found for the given mws_id"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -171,7 +229,7 @@ def get_mws_json_by_stats_excel(request):
 ######### Get MWS DATA by Admin Details  ##########
 @swagger_auto_schema(
     method='get',
-    manual_parameters=[state_param, district_param, tehsil_param, file_type_param, authorization_param],
+    manual_parameters=[state_param, district_param, tehsil_param, authorization_param],
     responses={
         200: openapi.Response(
             description="Success",
@@ -213,10 +271,19 @@ def generate_tehsil_data(request):
     print("Inside generating tehsil excel data")
     try:
         # Get query parameters
-        state = request.query_params.get("state", "").lower().strip().replace(" ", "_")
-        district = request.query_params.get("district", "").lower().strip().replace(" ", "_")
-        tehsil = request.query_params.get("tehsil", "").lower().strip().replace(" ", "_")
-        file_type = request.query_params.get("file_type", "excel").lower()
+        state_param = request.query_params.get("state")
+        district_param = request.query_params.get("district")
+        tehsil_param = request.query_params.get("tehsil")
+
+        if state_param is None or district_param is None or tehsil_param is None:
+            return Response({"error": "'state', 'district', and 'tehsil' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
+            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state_param.lower().strip().replace(" ", "_")
+        district = district_param.lower().strip().replace(" ", "_")
+        tehsil = tehsil_param.lower().strip().replace(" ", "_")
 
         # Construct file path
         base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
@@ -225,26 +292,18 @@ def generate_tehsil_data(request):
         filename = f"{district}_{tehsil}.xlsx"
         file_path = os.path.join(district_path, filename)
 
-        # Generate file if not exists
         if not os.path.exists(file_path):
             print("Excel file does not exist. Generating...")
-            if not get_vector_layer_geoserver(state, district, tehsil):
-                raise ValueError("Failed to generate vector layer from GeoServer.")
-            os.makedirs(district_path, exist_ok=True)
-            file_path = download_layers_excel_file(state, district, tehsil)
-            if not file_path or not os.path.exists(file_path):
-                raise ValueError("Failed to download or locate generated Excel file.")
+            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
 
-        # If JSON is requested, return parsed content
-        if file_type == "json":
-            xls = pd.read_excel(file_path, sheet_name=None)
-            json_data = {}
-            for sheet_name, df in xls.items():
-                df.columns = [col.strip().lower() for col in df.columns]
-                df.replace([np.inf, -np.inf], np.nan, inplace=True)
-                df = df.where(pd.notnull(df), None)
-                json_data[sheet_name] = df.to_dict(orient='records')
-            return JsonResponse(json_data, status=200)
+        xls = pd.read_excel(file_path, sheet_name=None)
+        json_data = {}
+        for sheet_name, df in xls.items():
+            df.columns = [col.strip().lower() for col in df.columns]
+            df.replace([np.inf, -np.inf], np.nan, inplace=True)
+            df = df.where(pd.notnull(df), None)
+            json_data[sheet_name] = df.to_dict(orient='records')
+        return JsonResponse(json_data, status=200)
 
         # Otherwise, return Excel file
         with open(file_path, 'rb') as file:
@@ -309,12 +368,31 @@ def get_mws_json_by_kyl_indicator(request):
     """
     print("Inside Mws kyl Indicator api")
     try:
-        state = request.query_params.get("state").lower()
-        district = request.query_params.get("district").lower()
-        tehsil = request.query_params.get("tehsil").lower()
-        mws_id = request.query_params.get("mws_id").lower()
+        state_param = request.query_params.get("state")
+        district_param = request.query_params.get("district")
+        tehsil_param = request.query_params.get("tehsil")
+        mws_id = request.query_params.get("mws_id")
+
+        if state_param is None or district_param is None or tehsil_param is None or mws_id is None:
+            return Response({"error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
+            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_mws_id(mws_id):
+            return Response({"error": "MWS id can only contain numbers and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state_param.lower().strip().replace(" ", "_")
+        district = district_param.lower().strip().replace(" ", "_")
+        tehsil = tehsil_param.lower().strip().replace(" ", "_")
+
+        if not excel_file_exists(state, district, tehsil):
+            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+
         data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
-        return JsonResponse(data, status=200, safe=False)
+        if not data:
+            return Response({"error": "No data found for the given mws_id"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -355,15 +433,23 @@ def get_mws_json_by_kyl_indicator(request):
 @api_security_check(auth_type="API_key")
 def get_generated_layer_urls(request):
     """
-        Retrieve generated layer URLs for a given state, district, and block.
+        Retrieve generated layer URLs for a given state, district, and tehsil.
     """
     try:
         print("Inside Get Generated Layer Urls API.")
-        state = request.query_params.get("state", "").lower()
-        district = request.query_params.get("district", "").lower().replace(" ", "_")
-        tehsil = request.query_params.get("tehsil", "").lower().replace(" ", "_")
+        state_param = request.query_params.get("state")
+        district_param = request.query_params.get("district")
+        tehsil_param = request.query_params.get("tehsil")
 
-        layers_details_json = fetch_generated_layer_urls(state, district, tehsil)
+        if state_param is None or district_param is None or tehsil_param is None:
+            return Response({"error": "'state', 'district', and 'tehsil' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
+            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        layers_details_json = fetch_generated_layer_urls(state_param, district_param, tehsil_param)
+        if not layers_details_json:
+            return Response({"error": "No data found for the given location"}, status=status.HTTP_404_NOT_FOUND)
         return Response(layers_details_json, status=200)
 
     except Exception as e:
@@ -372,3 +458,78 @@ def get_generated_layer_urls(request):
             "status": "error",
             "message": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+#############  Get MWS Report Urls  ##################
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
+    responses={
+        200: openapi.Response(
+            description="Success",
+            examples={
+                "application/json": {
+                    "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104",
+                }
+            }
+        ),
+        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(description="Internal Server Error")
+    }
+)
+
+@api_security_check(auth_type="API_key")
+def get_mws_report_urls(request):
+    """
+        Retrieve MWS report url for a given state, district, tehsil and mws_id.
+    """
+    try:
+        print("Inside Get Generated Layer Urls API.")
+        state_param = request.query_params.get("state")
+        district_param = request.query_params.get("district")
+        tehsil_param = request.query_params.get("tehsil")
+        mws_id = request.query_params.get("mws_id")
+
+        if state_param is None or district_param is None or tehsil_param is None or mws_id is None:
+            return Response({"error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
+            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not is_valid_mws_id(mws_id):
+            return Response({"error": "MWS id can only contain numbers and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state_param.lower().strip().replace(" ", "_")
+        district = district_param.lower().strip().replace(" ", "_")
+        tehsil = tehsil_param.lower().strip().replace(" ", "_")
+
+        ee_initialize()
+        asset_path = get_gee_asset_path(state, district, tehsil)
+        mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
+        if not is_gee_asset_exists(mws_asset_id):
+            return Response({"error": f"Layer not found for the given location."}, status=status.HTTP_404_NOT_FOUND)
+
+        mws_fc = ee.FeatureCollection(mws_asset_id)
+        matching_feature = mws_fc.filter(ee.Filter.eq('uid', mws_id)).first()
+        if matching_feature is None or matching_feature.getInfo() is None:
+            return Response({"error": f"MWS ID '{mws_id}' not found for the given location."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not excel_file_exists(state, district, tehsil):
+            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+
+        base_url = request.build_absolute_uri('/')[:-1]  
+        report_url = f"{base_url}/api/v1/generate_mws_report/?state={state}&district={district}&block={tehsil}&uid={mws_id}"
+        return Response({"Mws_report_url": report_url},status=status.HTTP_200_OK)
+
+
+    except Exception as e:
+        print(f"Error in get_generated_layer_urls: {str(e)}")
+        return Response({
+            "status": "error",
+            "message": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+

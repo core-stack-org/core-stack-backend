@@ -1,5 +1,9 @@
 import ee
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -100,13 +104,17 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
     print("Task completed - ", task_status)
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
             layer_name=description,
             asset_id=asset_id,
             dataset_name="LULC",
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+            },
         )
         make_asset_public(asset_id)
 
@@ -123,13 +131,6 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
             "lulc_vector",
         )
         print(res)
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description,
-                asset_id=asset_id,
-                dataset_name="LULC",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")

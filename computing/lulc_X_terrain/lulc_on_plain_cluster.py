@@ -1,6 +1,10 @@
 import ee
 from nrm_app.celery import app
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -83,13 +87,17 @@ def lulc_on_plain_cluster(self, state, district, block, start_year, end_year):
         print("lulc_on_slope_cluster task completed - task_id_list:", task_id_list)
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"{district.title()}_{block.title()}_lulc_plain",
+            layer_name=f"{district.lower()}_{block.lower()}_lulc_plain",
             asset_id=asset_id,
             dataset_name="Terrain LULC",
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+            },
         )
         make_asset_public(asset_id)
 
@@ -105,16 +113,9 @@ def lulc_on_plain_cluster(self, state, district, block, start_year, end_year):
             "terrain_lulc",
         )
         print(res)
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"{district.title()}_{block.title()}_lulc_plain",
-                asset_id=asset_id,
-                dataset_name="Terrain LULC",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")
 
 
 def process_feature_collection(fc, landforms, area_lulc, plain_centroids):

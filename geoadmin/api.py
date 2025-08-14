@@ -1,3 +1,4 @@
+import json
 from django.http import HttpRequest
 from rest_framework import status
 from rest_framework.decorators import api_view, schema
@@ -5,7 +6,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
-from django.http import JsonResponse
 
 from .models import Block, District, State
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
@@ -54,7 +54,8 @@ def get_blocks(request, district_id):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="Auth_free")
+@api_view(["POST"])
+@auth_free
 @schema(None)
 def activate_entities(request):
     try:
@@ -238,36 +239,142 @@ def activate_location(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_security_check(auth_type="JWT", allowed_methods="POST")
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_api_key(request):
     """
-        Generate a new API key for the authenticated user
-        POST /api/v1/generate_api_key/
-        {
-            "expiry_days": 30
-        }
-
-        Response Json:
-        {
-        "prefix": "knog3H",
-        "key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2",
-        "message": "API key created successfully."
-        }
+    Single API for generating and deactivating API keys
+    POST /api/v1/generate_api_key/
+    
+    Generate new API key (default action - no params needed):
+    {} 
+    OR
+    {
+        "name": "My API Key",
+        "expiry_days": 30
+    }
+    
+    Deactivate API key:
+    {
+        "action": "deactivate",
+        "user_id": 123,
+        "api_key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2"
+    }
     """
-    print("Inside generate API Key")
     try:
-        expiry_days = request.POST.get('expiry_days', 2400)
-        if expiry_days <= 0:
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        action = data.get('action', 'generate')
+        if action == 'generate':
+            try:
+                expiry_days = int(data.get('expiry_days', 3000))
+                name = data.get('name', f"API Key {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+                
+                expires_at = timezone.now() + timedelta(days=expiry_days)
+                api_key_obj, generated_key = UserAPIKey.objects.create_key(user=request.user, name=name, expires_at=expires_at)
+                
+                api_key_obj.api_key = generated_key
+                api_key_obj.save()
+                
+                response_data = {
+                    "action": "generate",
+                    "success": True,
+                    "message": "API key generated successfully",
+                    "data": {
+                        "api_key": generated_key,
+                        "is_active": api_key_obj.is_active,
+                        "expires_at": api_key_obj.expires_at,
+                        "created_at": api_key_obj.created_at
+                    }
+                }
+                
+                return Response(response_data, status=status.HTTP_201_CREATED)
+                
+            except ValueError:
+                return Response(
+                    {"success": False, "error": "Invalid expiry_days value"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        elif action == 'deactivate':
+            user_id = data.get('user_id')
+            api_key = data.get('api_key')
+            
+            if not user_id or not api_key:
+                return Response(
+                    {"success": False, "error": "user_id and api_key are required for deactivation"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                api_key_obj = UserAPIKey.objects.get(user_id=user_id, api_key=api_key)
+                api_key_obj.is_active = False
+                api_key_obj.expires_at = timezone.now()
+                api_key_obj.save(update_fields=['is_active', 'expires_at'])
+                
+                response_data = {
+                    "action": "deactivate",
+                    "success": True,
+                    "message": "API key deactivated successfully",
+                    "data": {
+                        "api_key": api_key,
+                        "is_active": api_key_obj.is_active,
+                        "expires_at": api_key_obj.expires_at
+                    }
+                }
+                
+                return Response(response_data, status=status.HTTP_200_OK)
+                
+            except UserAPIKey.DoesNotExist:
+                return Response(
+                    {"success": False, "error": "API key not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        else:
             return Response(
-                {"error": "Expiry days must be positive"}, 
+                {"error": "Invalid action. Use: generate, deactivate"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        expires_at = timezone.now() + timedelta(days=expiry_days)
-        api_key_obj, generated_key = UserAPIKey.objects.create_key(user=request.user,expires_at=expires_at)
-        response_data = {"prefix": api_key_obj.prefix, "key": generated_key}
-        return Response(response_data, status=status.HTTP_201_CREATED)
             
     except Exception as e:
-        return JsonResponse(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"success": False, "error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_security_check()
+@schema(None)
+def get_user_api_keys(request):
+    """
+    Get all API keys for the authenticated user (Simplified version)
+    GET /api/v1/get_user_api_keys/
+    """
+    try:
+        api_keys = UserAPIKey.objects.filter(user=request.user, is_active=True, api_key__isnull=False).order_by('-created_at')
+        formatted_keys = []
+        for api_key_obj in api_keys:
+            formatted_keys.append({
+                "api_key": api_key_obj.api_key,
+                "is_active": api_key_obj.is_active,
+                "expires_at": api_key_obj.expires_at,
+                "created_at": api_key_obj.created_at
+            })
+        
+        response_data = {
+            "success": True,
+            "message": "API keys retrieved successfully",
+            "api_keys": formatted_keys
+        }
+        
+        return Response(response_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {"success": False, "error": str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

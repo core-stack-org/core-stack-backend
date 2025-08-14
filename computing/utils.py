@@ -268,9 +268,6 @@ def save_layer_info_to_db(
 ):
     print("inside the save_layer_info_to_db function ")
     dataset = Dataset.objects.get(name=dataset_name, layer_version=layer_version)
-    state = state.upper()
-    district = district.upper()
-    block = block.upper()
 
     try:
         state_obj = StateSOI.objects.get(state_name__iexact=state)
@@ -287,19 +284,41 @@ def save_layer_info_to_db(
 
     layer_obj, created = Layer.objects.update_or_create(
         dataset=dataset,
-        layer_name=layer_name.lower(),
+        layer_name=layer_name,
         state=state_obj,
         district=district_obj,
         block=block_obj,
-        gee_asset_path=asset_id,
         defaults={
             "is_sync_to_geoserver": sync_to_geoserver,
             "is_public_gee_asset": is_public,
             "is_override": is_override,
             "misc": misc,
+            "gee_asset_path": asset_id,
         },
     )
     if layer_obj:
         print("found layer object and updated")
     else:
         print("layer object not found so, created new one")
+
+    return layer_obj.id
+
+
+def update_layer_sync_status(layer_id, sync_to_geoserver=True):
+    try:
+        updated_count = Layer.objects.filter(id=layer_id).update(
+            is_sync_to_geoserver=sync_to_geoserver
+        )
+
+        if updated_count > 0:
+            print(
+                f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
+            )
+            return True
+        else:
+            print(f"Layer with ID {layer_id} not found")
+            return False
+
+    except Exception as e:
+        print(f"Error updating layer sync status: {e}")
+        return False

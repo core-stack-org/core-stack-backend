@@ -69,6 +69,7 @@ class TehsilSOI(models.Model):
 class UserAPIKey(AbstractAPIKey):
     user = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys")
     name = models.CharField(max_length=255)
+    api_key = models.CharField(max_length=255, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
