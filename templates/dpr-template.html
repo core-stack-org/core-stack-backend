@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{{ title }}</title>
+
+        <!-- OpenLayers CSS -->
+        <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/ol@v10.4.0/ol.css"
+        />
+
+        <!-- OpenLayers JS -->
+        <script src="https://cdn.jsdelivr.net/npm/ol@v10.4.0/dist/ol.js"></script>
+
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+                color: #333;
+                line-height: 1.6;
+            }
+
+            .report-container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .report-title {
+                text-align: center;
+                font-size: 28px;
+                margin-bottom: 10px;
+                color: #2c3e50;
+            }
+
+            .report-date {
+                text-align: center;
+                font-size: 14px;
+                color: #7f8c8d;
+                margin-bottom: 40px;
+            }
+
+            .section {
+                margin-bottom: 40px;
+                page-break-inside: avoid;
+            }
+
+            .section h2 {
+                color: #34495e;
+                border-bottom: 2px solid #3498db;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+            }
+
+            .section-description {
+                text-align: justify;
+                margin-bottom: 20px;
+                color: #555;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+            }
+
+            th,
+            td {
+                border: 1px solid #ddd;
+                padding: 12px;
+                text-align: left;
+            }
+
+            th {
+                background-color: #f4f4f4;
+                font-weight: bold;
+                color: #2c3e50;
+            }
+
+            tr:nth-child(even) {
+                background-color: #f9f9f9;
+            }
+
+            .table-title {
+                font-weight: bold;
+                margin: 15px 0 10px 0;
+                color: #34495e;
+            }
+
+            .info-grid {
+                display: grid;
+                grid-template-columns: 1fr 2fr;
+                gap: 10px;
+                margin: 20px 0;
+            }
+
+            .info-label {
+                font-weight: bold;
+                color: #2c3e50;
+            }
+
+            .info-value {
+                color: #555;
+            }
+
+            /* Map styles */
+            .map-container {
+                width: 100%;
+                margin: 20px 0;
+            }
+
+            .map {
+                height: 500px;
+                width: 100%;
+                border: 2px solid #ddd;
+                border-radius: 4px;
+                margin: 20px 0;
+            }
+
+            .map-caption {
+                text-align: center;
+                font-style: italic;
+                color: #666;
+                margin-top: 10px;
+                font-size: 14px;
+            }
+
+            .layer-info {
+                background-color: #f8f9fa;
+                border-left: 4px solid #3498db;
+                padding: 10px;
+                margin: 15px 0;
+            }
+
+            .layer-info h4 {
+                margin: 0 0 10px 0;
+                color: #2c3e50;
+            }
+
+            .layer-info-item {
+                margin: 5px 0;
+                font-size: 14px;
+            }
+
+            .layer-info-label {
+                font-weight: bold;
+                display: inline-block;
+                width: 120px;
+            }
+
+            @media print {
+                .section {
+                    page-break-inside: avoid;
+                }
+
+                h2 {
+                    page-break-after: avoid;
+                }
+
+                .map {
+                    height: 400px;
+                    page-break-inside: avoid;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="report-container">
+            <h1 class="report-title">{{ title }}</h1>
+            <p class="report-date">{{ date }}</p>
+
+            <!-- Section A: Team Details -->
+            <div class="section" id="section-a">
+                <h2>Section A: Team Details</h2>
+                <p class="section-description">{{ section_a.description }}</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name of the Facilitator</th>
+                            <th>Project Name</th>
+                            <th>
+                                Process involved in the preparation of the DPR
+                                PRA
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ section_a.facilitator_name }}</td>
+                            <td>{{ section_a.project_name }}</td>
+                            <td>{{ section_a.process_involved }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Section B: Brief of Village -->
+            <div class="section" id="section-b">
+                <h2>Section B: Brief of Village</h2>
+                <p class="section-description">{{ section_b.description }}</p>
+
+                <table>
+                    <tbody>
+                        <tr>
+                            <td class="info-label">Name of the Village</td>
+                            <td>{{ section_b.village_name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">
+                                Name of the Gram Panchayat
+                            </td>
+                            <td>{{ section_b.gram_panchayat }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">Tehsil</td>
+                            <td>{{ section_b.tehsil }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">District</td>
+                            <td>{{ section_b.district }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">State</td>
+                            <td>{{ section_b.state }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">
+                                Number of Settlements in the Village
+                            </td>
+                            <td>{{ section_b.total_settlements }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">
+                                Intersecting Micro Watershed IDs
+                            </td>
+                            <td>{{ section_b.intersecting_mws_ids }}</td>
+                        </tr>
+                        <tr>
+                            <td class="info-label">
+                                Latitude and Longitude of the Village
+                            </td>
+                            <td>
+                                {{ section_b.latitude }}, {{ section_b.longitude
+                                }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Map Section -->
+            <div class="section" id="map-section">
+                <h2>{{ map_section.title }}</h2>
+                <p class="section-description">{{ map_section.description }}</p>
+
+                <!-- Layer Information Box -->
+                <div class="layer-info">
+                    <h4>Layer Information</h4>
+                    <div class="layer-info-item">
+                        <span class="layer-info-label">Workspace:</span>
+                        <span>{{ map_section.layer_info.workspace }}</span>
+                    </div>
+                    <div class="layer-info-item">
+                        <span class="layer-info-label">Layer Name:</span>
+                        <span>{{ map_section.layer_info.layer_name }}</span>
+                    </div>
+                    <div class="layer-info-item">
+                        <span class="layer-info-label">GeoServer URL:</span>
+                        <span>{{ map_section.layer_info.geoserver_url }}</span>
+                    </div>
+                </div>
+
+                <!-- Map Container -->
+                <div class="map-container">
+                    <div id="settlementMap" class="map"></div>
+                    <p class="map-caption">
+                        Figure: Settlement boundaries for {{ plan_name }}
+                    </p>
+                </div>
+
+                <!-- Settlement List (if available) -->
+                {% if map_section.settlements %}
+                <div class="settlement-list">
+                    <h4>Settlement Coordinates:</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Settlement Name</th>
+                                <th>Latitude</th>
+                                <th>Longitude</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for settlement in map_section.settlements %}
+                            <tr>
+                                <td>{{ settlement.0 }}</td>
+                                <td>{{ settlement.1|floatformat:6 }}</td>
+                                <td>{{ settlement.2|floatformat:6 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Additional sections can be added here following the same pattern -->
+            <!-- Section C, D, E, F, G, H etc. -->
+        </div>
+
+        <!-- OpenLayers Map Script -->
+        <script>
+            // Initialize the map when the page loads
+            document.addEventListener('DOMContentLoaded', function() {
+                // Base layer using Google Satellite
+                const baseLayer = new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+                        maxZoom: 20,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                });
+
+                // Get settlement coordinates for centering
+                {% if map_section.settlements %}
+                const settlements = [
+                    {% for settlement in map_section.settlements %}
+                    {
+                        name: "{{ settlement.0 }}",
+                        lat: {{ settlement.1 }},
+                        lon: {{ settlement.2 }}
+                    },
+                    {% endfor %}
+                ];
+
+                // Calculate center and extent
+                let minLon = settlements[0].lon, maxLon = settlements[0].lon;
+                let minLat = settlements[0].lat, maxLat = settlements[0].lat;
+
+                settlements.forEach(s => {
+                    minLon = Math.min(minLon, s.lon);
+                    maxLon = Math.max(maxLon, s.lon);
+                    minLat = Math.min(minLat, s.lat);
+                    maxLat = Math.max(maxLat, s.lat);
+                });
+
+                const center = [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
+                const padding = 0.01; // Add some padding
+                const extent = [minLon - padding, minLat - padding, maxLon + padding, maxLat + padding];
+                {% else %}
+                // Default center (India)
+                const center = [78.9, 23.6];
+                const extent = null;
+                {% endif %}
+
+                // Create the view
+                const view = new ol.View({
+                    center: center,
+                    zoom: 12,
+                    projection: 'EPSG:4326',
+                    constrainResolution: true,
+                    smoothExtentConstraint: true,
+                    smoothResolutionConstraint: true,
+                });
+
+                // WMS layer for settlement boundaries
+                const settlementLayer = new ol.layer.Image({
+                    source: new ol.source.ImageWMS({
+                        url: '{{ map_section.layer_info.geoserver_url }}/wms',
+                        params: {
+                            'LAYERS': '{{ map_section.layer_info.workspace }}:{{ map_section.layer_info.layer_name }}',
+                            'STYLES': '',
+                            'VERSION': '1.1.0',
+                            'FORMAT': 'image/png',
+                            'TRANSPARENT': true
+                        },
+                        ratio: 1,
+                        serverType: 'geoserver',
+                    }),
+                    opacity: 0.8,
+                    visible: true,
+                    name: 'Settlement Layer'
+                });
+
+                // Create the map
+                const map = new ol.Map({
+                    target: 'settlementMap',
+                    layers: [baseLayer, settlementLayer],
+                    view: view
+                });
+
+                // Add settlement markers
+                {% if map_section.settlements %}
+                const markerSource = new ol.source.Vector();
+
+                settlements.forEach(settlement => {
+                    const marker = new ol.Feature({
+                        geometry: new ol.geom.Point([settlement.lon, settlement.lat]),
+                        name: settlement.name
+                    });
+                    markerSource.addFeature(marker);
+                });
+
+                const markerLayer = new ol.layer.Vector({
+                    source: markerSource,
+                    style: new ol.style.Style({
+                        image: new ol.style.Circle({
+                            radius: 6,
+                            fill: new ol.style.Fill({ color: 'red' }),
+                            stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+                        })
+                    })
+                });
+
+                map.addLayer(markerLayer);
+
+                // Fit view to extent if available
+                if (extent) {
+                    view.fit(extent, { padding: [50, 50, 50, 50] });
+                }
+                {% endif %}
+
+                // Add layer switcher control (optional)
+                const layerSwitcher = new ol.control.LayerSwitcher({
+                    tipLabel: 'Layers'
+                });
+                // Note: LayerSwitcher requires ol-ext library
+                // map.addControl(layerSwitcher);
+            });
+        </script>
+    </body>
+</html>

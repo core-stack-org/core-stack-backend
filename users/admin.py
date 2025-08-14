@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+
 from .models import User, UserProjectGroup
 
 
@@ -13,7 +14,9 @@ class CustomUserAdmin(UserAdmin):
         "first_name",
         "last_name",
         "organization",
+        "get_groups",
         "is_superadmin",
+        "is_superuser",
     )
     list_filter = ("is_superadmin", "is_staff", "is_active", "organization")
     search_fields = ("username", "email", "first_name", "last_name")
@@ -40,6 +43,14 @@ class CustomUserAdmin(UserAdmin):
         ("Organization", {"fields": ("organization",)}),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
+
+    def get_groups(self, obj):
+        """Return a comma-separated list of groups the user belongs to."""
+        if obj.groups.exists():
+            return ", ".join([group.name for group in obj.groups.all()])
+        return "No groups"
+
+    get_groups.short_description = "Groups"
 
 
 @admin.register(UserProjectGroup)

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.5;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 18pt;
+            font-weight: bold;
+            page-break-after: avoid;
+        }
+
+        h2 {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-top: 12pt;
+            page-break-after: avoid;
+        }
+
+        h3 {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-top: 10pt;
+        }
+
+        p {
+            text-align: justify;
+            margin: 6pt 0;
+        }
+
+        .date {
+            text-align: center;
+            font-size: 10pt;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10pt 0;
+        }
+
+        th, td {
+            border: 1pt solid black;
+            padding: 6pt;
+            text-align: left;
+        }
+
+        th {
+            background-color: #e0e0e0;
+            font-weight: bold;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <p class="date">{{ date }}</p>
+
+    <div class="page-break"></div>
+
+    <!-- Section A -->
+    <h2>Section A: Team Details</h2>
+    <p>{{ section_a.description }}</p>
+
+    <table>
+        <tr>
+            <th>Name of the Facilitator</th>
+            <th>Project Name</th>
+            <th>Process involved in the preparation of the DPR PRA</th>
+        </tr>
+        <tr>
+            <td>{{ section_a.facilitator_name }}</td>
+            <td>{{ section_a.project_name }}</td>
+            <td>{{ section_a.process_involved }}</td>
+        </tr>
+    </table>
+
+    <!-- Section B -->
+    <h2>Section B: Brief of Village</h2>
+    <p>{{ section_b.description }}</p>
+
+    <table>
+        <tr>
+            <th>Name of the Village</th>
+            <td>{{ section_b.village_name }}</td>
+        </tr>
+        <tr>
+            <th>Name of the Gram Panchayat</th>
+            <td>{{ section_b.gram_panchayat }}</td>
+        </tr>
+        <tr>
+            <th>Tehsil</th>
+            <td>{{ section_b.tehsil }}</td>
+        </tr>
+        <tr>
+            <th>District</th>
+            <td>{{ section_b.district }}</td>
+        </tr>
+        <tr>
+            <th>State</th>
+            <td>{{ section_b.state }}</td>
+        </tr>
+        <tr>
+            <th>Number of Settlements in the Village</th>
+            <td>{{ section_b.total_settlements }}</td>
+        </tr>
+        <tr>
+            <th>Intersecting Micro Watershed IDs</th>
+            <td>{{ section_b.intersecting_mws_ids }}</td>
+        </tr>
+        <tr>
+            <th>Latitude and Longitude of the Village</th>
+            <td>{{ section_b.latitude }}, {{ section_b.longitude }}</td>
+        </tr>
+    </table>
+
+    <!-- Map Section -->
+    <h2>Settlement Map</h2>
+    <p>{{ map_data.description }}</p>
+
+    <!-- Map image will be added programmatically -->
+
+    {% if settlements %}
+    <h3>Settlement Coordinates</h3>
+    <table>
+        <tr>
+            <th>Settlement Name</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+        </tr>
+        {% for settlement in settlements %}
+        <tr>
+            <td>{{ settlement.0 }}</td>
+            <td>{{ settlement.1|floatformat:6 }}</td>
+            <td>{{ settlement.2|floatformat:6 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+</body>
+</html>
