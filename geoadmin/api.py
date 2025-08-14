@@ -1,19 +1,24 @@
 from django.http import HttpRequest
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.request import Request
 from rest_framework.response import Response
+from django.utils import timezone
+from datetime import timedelta
+from django.http import JsonResponse
 
 from .models import Block, District, State
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
 from .utils import transform_data, activated_entities
 from utilities.auth_utils import auth_free
+from .models import UserAPIKey
+from utilities.auth_check_decorator import api_security_check
 
 
 # state id is the census code while the district id is the id of the district from the DB
 # block id is the id of the block from the DB
-@api_view(["GET"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
+@schema(None)
 def get_states(request):
     try:
         states = State.objects.all()
@@ -24,8 +29,9 @@ def get_states(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
-@auth_free
+
+@api_security_check(auth_type="Auth_free")
+@schema(None)
 def get_districts(request, state_id):
     try:
         districts = District.objects.filter(state_id=state_id)
@@ -36,8 +42,8 @@ def get_districts(request, state_id):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
+@schema(None)
 def get_blocks(request, district_id):
     try:
         blocks = Block.objects.filter(district=district_id)
@@ -48,8 +54,8 @@ def get_blocks(request, district_id):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["POST"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
+@schema(None)
 def activate_entities(request):
     try:
         messages = []
@@ -109,8 +115,8 @@ def activate_entities(request):
         )
 
 
-@api_view(["GET"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
+@schema(None)
 def proposed_blocks(request):
     try:
         response_data = activated_entities()
@@ -125,6 +131,7 @@ def proposed_blocks(request):
 
 @api_view(["PATCH"])
 @auth_free
+@schema(None)
 def activate_location(request):
     """
     Update activation status of a location (state/district/block).
@@ -229,3 +236,38 @@ def activate_location(request):
     except Exception as e:
         print(f"Exception in activate_location api: {e}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_security_check(auth_type="JWT", allowed_methods="POST")
+@schema(None)
+def generate_api_key(request):
+    """
+        Generate a new API key for the authenticated user
+        POST /api/v1/generate_api_key/
+        {
+            "expiry_days": 30
+        }
+
+        Response Json:
+        {
+        "prefix": "knog3H",
+        "key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2",
+        "message": "API key created successfully."
+        }
+    """
+    print("Inside generate API Key")
+    try:
+        expiry_days = request.POST.get('expiry_days', 2400)
+        if expiry_days <= 0:
+            return Response(
+                {"error": "Expiry days must be positive"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        expires_at = timezone.now() + timedelta(days=expiry_days)
+        api_key_obj, generated_key = UserAPIKey.objects.create_key(user=request.user,expires_at=expires_at)
+        response_data = {"prefix": api_key_obj.prefix, "key": generated_key}
+        return Response(response_data, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        return JsonResponse(str(e), status=status.HTTP_500_INTERNAL_SERVER_ERROR)
