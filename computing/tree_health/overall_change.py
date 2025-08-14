@@ -14,7 +14,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from computing.utils import save_layer_info_to_db
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
@@ -116,11 +116,11 @@ def tree_health_overall_change_raster(self, state, district, block):
     )
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            f"tree_health_overall_change_raster_{district.title()}_{block.title()}",
+            f"tree_health_overall_change_raster_{district.lower()}_{block.lower()}",
             asset_id,
             "Tree Overall Change Raster",
         )
@@ -136,13 +136,6 @@ def tree_health_overall_change_raster(self, state, district, block):
         res = sync_raster_gcs_to_geoserver(
             "tree_overall_ch", layer_name, layer_name, "tree_overall_ch_style"
         )
-        if res:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                f"tree_health_overall_change_raster_{district.title()}_{block.title()}",
-                asset_id,
-                "Tree Overall Change Raster",
-                sync_to_geoserver=True,
-            )
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")

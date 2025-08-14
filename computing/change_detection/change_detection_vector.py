@@ -1,5 +1,9 @@
 import ee
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -54,7 +58,7 @@ def vectorise_change_detection(self, state, district, block):
         )
         asset_id = get_gee_asset_path(state, district, block) + description
         if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
+            layer_id = save_layer_info_to_db(
                 state,
                 district,
                 block,
@@ -63,7 +67,7 @@ def vectorise_change_detection(self, state, district, block):
                 dataset_name="Change Detection Vector",
             )
             make_asset_public(asset_id)
-            sync_change_to_geoserver(block, district, state, asset_id, param)
+            sync_change_to_geoserver(block, district, state, asset_id, param, layer_id)
 
 
 def afforestation_vector(roi, state, district, block):
@@ -195,7 +199,7 @@ def generate_vector(roi, args, state, district, block, layer_name):
     return task
 
 
-def sync_change_to_geoserver(block, district, state, asset_id, param):
+def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -210,13 +214,6 @@ def sync_change_to_geoserver(block, district, state, asset_id, param):
         "change_detection",
     )
     print(res)
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"change_vector_{district}_{block}_{param}",
-            asset_id=asset_id,
-            dataset_name="Change Detection Vector",
-            sync_to_geoserver=True,
-        )
+    if res["status_code"] == 201 and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag updated")

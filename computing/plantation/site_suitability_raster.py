@@ -20,7 +20,7 @@ from utilities.gee_utils import (
 from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
 from utilities.logger import setup_logger
-from ..utils import save_layer_info_to_db
+from ..utils import save_layer_info_to_db, update_layer_sync_status
 
 logger = setup_logger(__name__)
 
@@ -388,18 +388,20 @@ def get_pss(
 
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
+            layer_id = None
             if state and district and block:
-                save_layer_info_to_db(
+                layer_id = save_layer_info_to_db(
                     state,
                     district,
                     block,
                     layer_name=description,
                     asset_id=asset_id,
                     dataset_name="Site Suitability",
+                    misc={"start_year": start_year, "end_year": end_year},
                 )
                 print("save site suitability info at the gee level...")
 
-            sync_to_gcs_geoserver(asset_id, description, scale, state, district, block)
+            sync_to_gcs_geoserver(asset_id, description, scale, layer_id)
             return asset_id, is_default_profile
 
     except Exception as e:
@@ -579,9 +581,7 @@ def create_classification(
     return sub_layer
 
 
-def sync_to_gcs_geoserver(
-    asset_id, layer_name, scale, state=None, district=None, block=None
-):
+def sync_to_gcs_geoserver(asset_id, layer_name, scale, layer_id):
     image = ee.Image(asset_id)
     task_id = sync_raster_to_gcs(image, scale, layer_name)
     task_id_list = check_task_status([task_id])
@@ -593,14 +593,6 @@ def sync_to_gcs_geoserver(
         layer_name,
         None,
     )
-    if res and state and district and block:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name,
-            asset_id,
-            dataset_name="Site Suitability",
-            sync_to_geoserver=True,
-        )
-        print("save site suitability raster layer info at the geoserver level...")
+    if res and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver falg is updated")

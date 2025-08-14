@@ -15,7 +15,7 @@ from utilities.constants import GEE_ASSET_PATH
 from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
-from computing.utils import save_layer_info_to_db
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
@@ -221,7 +221,7 @@ def clart_layer(state, district, block):
             print(f"Error occurred in running clart: {e}")
 
     if is_gee_asset_exists(final_output_assetid):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
@@ -239,13 +239,6 @@ def clart_layer(state, district, block):
         print("task_id_list sync to gcs ", task_id_list)
 
         res = sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
-        if res:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name,
-                final_output_assetid,
-                "CLART",
-                sync_to_geoserver=True,
-            )
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")

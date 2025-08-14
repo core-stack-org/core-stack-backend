@@ -1,5 +1,9 @@
 import ee
-from computing.utils import sync_fc_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_fc_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
@@ -127,14 +131,16 @@ def calculate_drought(
         check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
+        layer_id = None
         if state and district and block:
-            save_layer_info_to_db(
+            layer_id = save_layer_info_to_db(
                 state,
                 district,
                 block,
                 layer_name=description,
                 asset_id=asset_id,
                 dataset_name="Drought",
+                misc={"start_year": start_year, "end_year": end_year},
             )
 
         make_asset_public(asset_id)
@@ -143,13 +149,6 @@ def calculate_drought(
 
         res = sync_fc_to_geoserver(fc, state, description, "cropping_drought")
         print(res)
-        if res["status_code"] == 201 and state and district and block:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description,
-                asset_id=asset_id,
-                dataset_name="Drought",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")

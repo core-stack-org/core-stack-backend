@@ -1,6 +1,10 @@
 import ee
 from nrm_app.celery import app
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -57,7 +61,7 @@ def generate_stream_order_vector(self, state, district, block):
         check_task_status([task])
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
@@ -77,17 +81,9 @@ def generate_stream_order_vector(self, state, district, block):
             "stream_order",
         )
         print(res)
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=layer_name,
-                asset_id=asset_id,
-                dataset_name="Stream Order",
-                sync_to_geoserver=True,
-            )
-            print("save stream order layer info at geoserver level...")
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
 
 
 def calculate_pixel_area(class_labels, fc, raster):
