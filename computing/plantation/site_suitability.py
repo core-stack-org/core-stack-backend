@@ -29,6 +29,7 @@ from ..utils import (
     create_chunk,
     merge_chunks,
     save_layer_info_to_db,
+    update_layer_sync_status,
 )
 import geopandas as gpd
 from projects.models import Project, AppType
@@ -99,7 +100,7 @@ def site_suitability(
         roi = ee.FeatureCollection(asset_id)
 
         # Perform site suitability analysis
-        vector_asset_id, asset_name = check_site_suitability(
+        vector_asset_id, asset_name, layer_id = check_site_suitability(
             roi,
             org=organization,
             project=project,
@@ -109,7 +110,7 @@ def site_suitability(
         )
         # Sync the results to GeoServer for visualization
         sync_suitability_to_geoserver(
-            vector_asset_id, organization, asset_name, state, district, block
+            vector_asset_id, organization, asset_name, layer_id
         )
     else:
         roi = ee.FeatureCollection(
@@ -120,7 +121,7 @@ def site_suitability(
             + valid_gee_text(block.lower())
             + "_uid"
         )
-        vector_asset_id, asset_name = check_site_suitability(
+        vector_asset_id, asset_name, layer_id = check_site_suitability(
             roi,
             state=state,
             district=district,
@@ -130,9 +131,7 @@ def site_suitability(
         )
 
         # Sync the results to GeoServer for visualization
-        sync_suitability_to_geoserver(
-            vector_asset_id, state, asset_name, state, district, block
-        )
+        sync_suitability_to_geoserver(vector_asset_id, state, asset_name, layer_id)
 
 
 def merge_new_kmls(
@@ -335,21 +334,22 @@ def check_site_suitability(
         )
         if task_id:
             check_task_status([task_id], 120)
-
+    layer_id = None
     if is_gee_asset_exists(asset_id):
         if state and district and block:
-            save_layer_info_to_db(
+            layer_id = save_layer_info_to_db(
                 state,
                 district,
                 block,
                 layer_name=project_name,
                 asset_id=asset_id,
                 dataset_name="Site Suitability Vector",
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save site suitability info at the gee level...")
         make_asset_public(asset_id)
 
-    return asset_id, asset_name
+    return asset_id, asset_name, layer_id
 
 
 def generate_vector(
@@ -429,9 +429,7 @@ def generate_vector(
         return None
 
 
-def sync_suitability_to_geoserver(
-    asset_id, shp_folder, layer_name, state=None, district=None, block=None
-):
+def sync_suitability_to_geoserver(asset_id, shp_folder, layer_name, layer_id):
     """
     Synchronize suitability analysis results to GeoServer.
     """
@@ -448,16 +446,8 @@ def sync_suitability_to_geoserver(
             workspace="plantation",
         )
         logger.info("Suitability vector synced to geoserver: %s", res)
-        if res["status_code"] == 201 and state and district and block:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=layer_name,
-                asset_id=asset_id,
-                dataset_name="Site Suitability Vector",
-                sync_to_geoserver=True,
-            )
-            print("save site suitability vector info at the geoserver level...")
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
     except Exception as e:
         logger.exception("Exception in syncing suitability vector to geoserver", e)

@@ -11,7 +11,11 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     make_asset_public,
 )
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from computing.utils import sync_fc_to_geoserver
 from utilities.constants import GEE_DATASET_PATH
 
@@ -124,11 +128,11 @@ def generate_soge_vector(self, state, district, block):
     check_task_status([task])
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"soge_vector_{district.title()}_{block.title()}",
+            layer_name=f"soge_vector_{district.lower()}_{block.lower()}",
             asset_id=asset_id,
             dataset_name="SOGE",
         )
@@ -137,13 +141,6 @@ def generate_soge_vector(self, state, district, block):
         print("Geoserver Sync task started")
         fc = ee.FeatureCollection(asset_id)
         res = sync_fc_to_geoserver(fc, state, description, "soge")
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"soge_vector_{district.title()}_{block.title()}",
-                asset_id=asset_id,
-                dataset_name="SOGE",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")

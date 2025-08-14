@@ -22,7 +22,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
-from computing.utils import save_layer_info_to_db
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
@@ -46,12 +46,13 @@ def generate_tehsil_shape_file_data(self, state, district, block):
         task_id_list = check_task_status([task_id]) if task_id else []
         print("task_id", task_id_list)
 
+    layer_id = None
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"{district.title()}_{block.title()}",
+            layer_name=f"{district.lower()}_{block.lower()}",
             asset_id=asset_id,
             dataset_name="Admin Boundary",
         )
@@ -59,7 +60,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
 
     # Generate shape files and sync to geoserver
     shp_path = sync_admin_boundry_to_geoserver(
-        collection, state_dir, district, block, state, asset_id
+        collection, state_dir, district, block, layer_id
     )
 
     if not is_gee_asset_exists(asset_id):
@@ -74,9 +75,7 @@ def generate_tehsil_shape_file_data(self, state, district, block):
         make_asset_public(asset_id)
 
 
-def sync_admin_boundry_to_geoserver(
-    collection, state_dir, district, block, state, asset_id
-):
+def sync_admin_boundry_to_geoserver(collection, state_dir, district, block, layer_id):
     path = os.path.join(
         str(state_dir),
         f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
@@ -89,16 +88,9 @@ def sync_admin_boundry_to_geoserver(
             print(e)
     path = generate_shape_files(path)
     res = push_shape_to_geoserver(path, workspace="panchayat_boundaries")
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{district.title()}_{block.title()}",
-            asset_id=asset_id,
-            dataset_name="Admin Boundary",
-            sync_to_geoserver=True,
-        )
+    if res["status_code"] == 201 and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag updated")
     return path
 
 

@@ -17,7 +17,7 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
-from computing.utils import save_layer_info_to_db
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
@@ -87,6 +87,7 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)
 
+    layer_ids = []
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     for i in range(0, len(l1_asset_new)):
         name_arr = final_output_filename_array_new[i].split("_20")
@@ -104,14 +105,19 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
                 + suff
             )
             if is_gee_asset_exists(final_output_assetid_array_new[i]):
-                save_layer_info_to_db(
+                layer_id = save_layer_info_to_db(
                     state,
                     district,
                     block,
                     layer_name=layer_name,
                     asset_id=final_output_assetid_array_new[i],
                     dataset_name=workspace,
+                    misc={
+                        "start_year": start_year,
+                        "end_year": end_year,
+                    },
                 )
+                layer_ids.append(layer_id)
                 print("saved info to db at the gee level...")
                 make_asset_public(final_output_assetid_array_new[i])
 
@@ -124,10 +130,8 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
     sync_lulc_to_geoserver(
         final_output_filename_array_new,
         l1_asset_new,
-        state,
-        district,
         block,
-        final_output_assetid_array_new,
+        layer_ids,
     )
 
 
@@ -151,10 +155,8 @@ def sync_lulc_to_gcs(
 def sync_lulc_to_geoserver(
     final_output_filename_array_new,
     l1_asset_new,
-    state,
-    district,
     block_name,
-    final_output_assetid_array_new,
+    layer_ids,
 ):
     print("Syncing lulc to geoserver")
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
@@ -176,17 +178,9 @@ def sync_lulc_to_geoserver(
                 + valid_gee_text(block_name.lower())
                 + suff
             )
-            asset_id = (final_output_assetid_array_new[i],)
             res = sync_raster_gcs_to_geoserver(
                 workspace, gcs_file_name, layer_name, style
             )
-            if res:
-                save_layer_info_to_db(
-                    state,
-                    district,
-                    block_name,
-                    layer_name,
-                    asset_id,
-                    workspace,
-                    sync_to_geoserver=True,
-                )
+            if res and layer_ids:
+                update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
+                print("geoserver flag is updated")

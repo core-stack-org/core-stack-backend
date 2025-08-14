@@ -9,6 +9,7 @@ from computing.utils import (
     push_shape_to_geoserver,
     save_layer_info_to_db,
     get_directory_size,
+    update_layer_sync_status,
 )
 from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
@@ -178,11 +179,11 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
             print("nrega_task_id_list", nrega_task_id_list)
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state_name,
             district_name,
             block_name,
-            layer_name=f"{district_name.title()}_{block_name.title()}",
+            layer_name=f"{district_name.lower()}_{block_name.lower()}",
             asset_id=asset_id,
             dataset_name="NREGA Assets",
         )
@@ -190,14 +191,6 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
         make_asset_public(asset_id)
 
         res = push_shape_to_geoserver(path, workspace="nrega_assets")
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state_name,
-                district_name,
-                block_name,
-                layer_name=f"{district_name.title()}_{block_name.title()}",
-                asset_id=asset_id,
-                dataset_name="NREGA Assets",
-                sync_to_geoserver=True,
-            )
-            print("save nrega_assets layer info at the geoserver level...")
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")

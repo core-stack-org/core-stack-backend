@@ -12,7 +12,11 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.constants import GEE_DATASET_PATH
 
 
@@ -66,11 +70,11 @@ def clip_raster(roi, state, district, block, description):
     check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"restoration_{district.title()}_{block.title()}_raster",
+            layer_name=f"restoration_{district.lower()}_{block.lower()}_raster",
             asset_id=asset_id,
             dataset_name="Restoration Raster",
         )
@@ -85,16 +89,9 @@ def clip_raster(roi, state, district, block, description):
             description + "_raster",
             "restoration_style",
         )
-        if res:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"restoration_{district.title()}_{block.title()}_raster",
-                asset_id=asset_id,
-                dataset_name="Restoration Raster",
-                sync_to_geoserver=True,
-            )
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
         return asset_id
     return None
 
@@ -146,11 +143,11 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
     check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"restoration_{district.title()}_{block.title()}_vector",
+            layer_name=f"restoration_{district.lower()}_{block.lower()}_vector",
             asset_id=asset_id,
             dataset_name="Restoration Vector",
         )
@@ -158,13 +155,6 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         fc = ee.FeatureCollection(fc).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
         res = sync_layer_to_geoserver(state, fc, description, "restoration")
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"restoration_{district.title()}_{block.title()}_vector",
-                asset_id=asset_id,
-                dataset_name="Restoration Vector",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
