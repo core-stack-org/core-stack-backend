@@ -1,12 +1,11 @@
 # plans/views.py
-from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, permissions, status
+from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
-from rest_framework.decorators import action, schema
-from projects.models import Project, AppType
-from users.permissions import IsOrganizationMember, HasProjectPermission
+
+from projects.models import AppType, Project
+
 from .models import PlanApp
-from .serializers import PlanSerializer, PlanCreateSerializer, PlanAppListSerializer
+from .serializers import PlanAppListSerializer, PlanCreateSerializer, PlanSerializer
 
 
 class PlanPermission(permissions.BasePermission):
@@ -16,27 +15,23 @@ class PlanPermission(permissions.BasePermission):
     - Only superadmins, org admins, administrators, and project managers can create/edit plans
     - Plans must be enabled to be visible
     """
+
     schema = None
-    
+
     def has_permission(self, request, view):
-        # Allow authenticated users only
         if not request.user or not request.user.is_authenticated:
             return False
-            
-        # For read-only actions, allow all authenticated users
+
         if request.method in permissions.SAFE_METHODS:
             return True
-            
-        # For write actions, check if user has appropriate role
-        # Super admins have full access
+
         if request.user.is_superadmin or request.user.is_superuser:
             return True
-            
-        # Organization Admins/Administrators have full access to projects in their organization
+
         project_id = view.kwargs.get("project_pk")
         if not project_id:
             return False
-            
+
         if request.user.groups.filter(
             name__in=["Organization Admin", "Org Admin", "Administrator"]
         ).exists():
@@ -45,60 +40,53 @@ class PlanPermission(permissions.BasePermission):
                 return project.organization == request.user.organization
             except Project.DoesNotExist:
                 return False
-                
-        # Project Managers (assuming they have the 'add_watershed' and 'change_watershed' permissions)
-        if request.method == 'POST':
+
+        if request.method == "POST":
             return request.user.has_project_permission(
                 project_id=project_id, codename="add_watershed"
             )
-        elif request.method in ['PUT', 'PATCH']:
+        elif request.method in ["PUT", "PATCH"]:
             return request.user.has_project_permission(
                 project_id=project_id, codename="change_watershed"
             )
-        elif request.method == 'DELETE':
+        elif request.method == "DELETE":
             return request.user.has_project_permission(
                 project_id=project_id, codename="delete_watershed"
             )
-            
+
         return False
-        
+
     def has_object_permission(self, request, view, obj):
-        # First check if the plan is enabled
         if hasattr(obj, "enabled") and not obj.enabled:
             return False
-            
-        # For read-only actions, allow all authenticated users
+
         if request.method in permissions.SAFE_METHODS:
             return True
-            
-        # Super admins have full access
+
         if request.user.is_superadmin or request.user.is_superuser:
             return True
-            
-        # Get project from the object
+
         project = None
         if hasattr(obj, "project"):
             project = obj.project
-            
+
         if not project:
             return False
-            
-        # Organization Admins have full access to projects in their organization
+
         if request.user.groups.filter(
             name__in=["Organization Admin", "Org Admin", "Administrator"]
         ).exists():
             return project.organization == request.user.organization
-            
-        # Project Managers
-        if request.method in ['PUT', 'PATCH']:
+
+        if request.method in ["PUT", "PATCH"]:
             return request.user.has_project_permission(
                 project=project, codename="change_watershed"
             )
-        elif request.method == 'DELETE':
+        elif request.method == "DELETE":
             return request.user.has_project_permission(
                 project=project, codename="delete_watershed"
             )
-            
+
         return False
 
 
@@ -110,16 +98,27 @@ class PlanViewSet(viewsets.ModelViewSet):
     serializer_class = PlanSerializer
     permission_classes = [permissions.IsAuthenticated, PlanPermission]
     schema = None
-    # For the HasProjectPermission to work correctly
     app_type = AppType.WATERSHED
 
     def get_queryset(self):
         """
         Filter plans by project
+        Superadmins: can see all the plans from all the projects from all the organizations
+        Org Admins: can see all plans from all the projects for an organization
+        App Users: can see all the plans from a project they are associated with
         """
+        if self.request.user.is_superuser or self.request.user.is_superadmin:
+            return PlanApp.objects.filter(enabled=True)
+
+        if self.request.user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists():
+            return PlanApp.objects.filter(
+                organization=self.request.user.organization, enabled=True
+            )
+
         project_id = self.kwargs.get("project_pk")
         if project_id:
-            # Get the watershed project
             try:
                 project = Project.objects.get(
                     id=project_id, app_type=AppType.WATERSHED, enabled=True
@@ -172,9 +171,9 @@ class PlanViewSet(viewsets.ModelViewSet):
         # Use the full serializer for response with success message
         response_data = {
             "plan_data": PlanAppListSerializer(plan).data,
-            "message": f"Successfully created the watershed plan,{plan.plan}"
+            "message": f"Successfully created the watershed plan,{plan.plan}",
         }
-        
+
         return Response(response_data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
