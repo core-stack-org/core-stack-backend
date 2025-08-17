@@ -123,7 +123,7 @@ class PlanViewSet(viewsets.ModelViewSet):
                 project = Project.objects.get(
                     id=project_id, app_type=AppType.WATERSHED, enabled=True
                 )
-                return PlanApp.objects.filter(project=project)
+                return PlanApp.objects.filter(project=project, enabled=True)
             except Project.DoesNotExist:
                 return PlanApp.objects.none()
         return PlanApp.objects.none()
