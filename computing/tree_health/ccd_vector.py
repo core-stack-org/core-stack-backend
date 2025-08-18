@@ -144,24 +144,24 @@ def tree_health_ccd_vector(self, state, district, block, start_year, end_year):
     print(
         f"ccd vector task completed for year {start_year}_{end_year} - task_id_list: {task_id_list}"
     )
-    layer_id = None
+    # layer_id = None
     if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=geo_filename,
-            asset_id=asset_id,
-            dataset_name="Ccd Vector",
-            misc={"star_year": start_year, "end_year": end_year},
-        )
         make_asset_public(asset_id)
+        # layer_id = save_layer_info_to_db(
+        #     state,
+        #     district,
+        #     block,
+        #     layer_name=geo_filename,
+        #     asset_id=asset_id,
+        #     dataset_name="Ccd Vector",
+        #     misc={"star_year": start_year, "end_year": end_year},
+        # )
     final_fc = {"type": "FeatureCollection", "features": final_features}
     try:
         sync_res = sync_layer_to_geoserver(state, final_fc, geo_filename, "ccd")
-        if sync_res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag is updated")
+        # if sync_res["status_code"] == 201 and layer_id:
+        #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        #     print("sync to geoserver flag is updated")
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")
         raise

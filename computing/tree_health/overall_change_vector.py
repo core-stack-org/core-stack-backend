@@ -44,18 +44,18 @@ def tree_health_overall_change_vector(self, state, district, block):
         "Tree health overall change vector task completed - task_id_list:", task_id_list
     )
     asset_id = get_gee_asset_path(state, district, block) + description
-    layer_id = None
+    # layer_id = None
     if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            f"tree_health_overall_change_vector_{district.lower()}_{block.lower()}",
-            asset_id,
-            "Tree Overall Change Vector",
-        )
         make_asset_public(asset_id)
-    sync_change_to_geoserver(block, district, state, layer_id)
+        # layer_id = save_layer_info_to_db(
+        #     state,
+        #     district,
+        #     block,
+        #     f"tree_health_overall_change_vector_{district.lower()}_{block.lower()}",
+        #     asset_id,
+        #     "Tree Overall Change Vector",
+        # )
+    sync_change_to_geoserver(block, district, state)
 
 
 def overall_vector(roi, state, district, block):
@@ -114,7 +114,7 @@ def generate_vector(roi, args, state, district, block):
     return task
 
 
-def sync_change_to_geoserver(block, district, state, layer_id):
+def sync_change_to_geoserver(block, district, state):
     asset_id = (
         get_gee_asset_path(state, district, block)
         + "tree_health_overall_change_vector_"
@@ -134,6 +134,6 @@ def sync_change_to_geoserver(block, district, state, layer_id):
         + valid_gee_text(block.lower()),
         "tree_overall_ch",
     )
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag is updated")
+    # if res["status_code"] == 201 and layer_id:
+    #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+    #     print("sync to geoserver flag is updated")
