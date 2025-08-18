@@ -1,5 +1,9 @@
 import ee
-from computing.utils import sync_fc_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_fc_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
@@ -10,7 +14,7 @@ from utilities.gee_utils import (
 )
 
 
-def crop_grids_lulc(state, district, block, asset_id):
+def crop_grids_lulc(state, district, block):
     lulc_image = ee.Image(
         get_gee_asset_path(state, district, block)
         + valid_gee_text(district.lower())
@@ -22,6 +26,15 @@ def crop_grids_lulc(state, district, block, asset_id):
     tiles_uid = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "crop_grid_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_with_uid_16ha"
+    )
+
+    asset_id = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
+        + "crop_gridXlulc_"
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
@@ -40,7 +53,8 @@ def crop_grids_lulc(state, district, block, asset_id):
         print(f"crop gridXlulc task completed  - task_id_list: {task_id_list}")
 
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        make_asset_public(asset_id)
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
@@ -48,21 +62,13 @@ def crop_grids_lulc(state, district, block, asset_id):
             asset_id=asset_id,
             dataset_name="Crop GridXlulc",
         )
-        make_asset_public(asset_id)
 
         res = sync_fc_to_geoserver(
             crop_tiles, state, layer_name, workspace="crop_grid_layers"
         )
-        if res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=layer_name,
-                asset_id=asset_id,
-                dataset_name="Crop GridXlulc",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")
         print("Successfully pushed to GeoServer!", res)
 
 

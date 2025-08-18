@@ -1,6 +1,10 @@
 import ee
 from nrm_app.celery import app
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -153,31 +157,26 @@ def tree_health_ch_vector(self, state, district, block, start_year, end_year):
         print(
             f"Change vector task completed for year {start_year}_{end_year} - task_id_list: {task_id_list}"
         )
+    # layer_id = None
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=geo_filename,
-            asset_id=asset_id,
-            dataset_name="Canopy Height Vector",
-        )
         make_asset_public(asset_id)
+        # layer_id = save_layer_info_to_db(
+        #     state,
+        #     district,
+        #     block,
+        #     layer_name=geo_filename,
+        #     asset_id=asset_id,
+        #     dataset_name="Canopy Height Vector",
+        #     misc={"start_year": start_year, "end_year": end_year},
+        # )
     final_fc = {"type": "FeatureCollection", "features": final_features}
     try:
         sync_res = sync_layer_to_geoserver(
             state, final_fc, geo_filename, "canopy_height"
         )
-        if sync_res["status_code"] == 201:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=geo_filename,
-                asset_id=asset_id,
-                dataset_name="Canopy Height Vector",
-                sync_to_geoserver=True,
-            )
+        # if sync_res["status_code"] == 201 and layer_id:
+        #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        #     print("sync to geoserver flag is updated")
 
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")

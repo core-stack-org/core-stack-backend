@@ -11,7 +11,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from computing.utils import save_layer_info_to_db
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
@@ -109,6 +109,7 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year):
         print("CH task_id_list", task_id_list)
 
         if is_gee_asset_exists(asset_id):
+            make_asset_public(asset_id)
             layer_name = (
                 "tree_health_ch_raster_"
                 + valid_gee_text(district.lower())
@@ -118,10 +119,15 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year):
                 + str(year)
             )
 
-            save_layer_info_to_db(
-                state, district, block, layer_name, asset_id, "Canopy Height Raster"
-            )
-            make_asset_public(asset_id)
+            # layer_id = save_layer_info_to_db(
+            #     state,
+            #     district,
+            #     block,
+            #     layer_name,
+            #     asset_id,
+            #     "Canopy Height Raster",
+            #     misc={"start_year": start_year, "end_year": end_year},
+            # )
 
             # Sync image to Google Cloud Storage and Geoserver
             task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
@@ -132,13 +138,6 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year):
             res = sync_raster_gcs_to_geoserver(
                 "canopy_height", layer_name, layer_name, "ch_style"
             )
-            if res:
-                save_layer_info_to_db(
-                    state,
-                    district,
-                    block,
-                    layer_name,
-                    asset_id,
-                    "Canopy Height Raster",
-                    sync_to_geoserver=True,
-                )
+            # if res and layer_id:
+            #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            #     print("sync to geoserver flag is updated")

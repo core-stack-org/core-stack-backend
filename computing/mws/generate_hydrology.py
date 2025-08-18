@@ -18,7 +18,11 @@ from utilities.gee_utils import (
 from .well_depth import well_depth
 from .calculateG import calculate_g
 import sys
-from computing.utils import save_layer_info_to_db, sync_layer_to_geoserver
+from computing.utils import (
+    save_layer_info_to_db,
+    sync_layer_to_geoserver,
+    update_layer_sync_status,
+)
 
 
 @app.task(bind=True)
@@ -109,6 +113,7 @@ def generate_hydrology(
                 layer_name=f"{district}_{block}_evapotranspiration",
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Evapotranspiration info at the gee level...")
             make_asset_public(et_asset_id)
@@ -121,6 +126,7 @@ def generate_hydrology(
                 layer_name=f"{district}_{block}_precipitation",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Precipitation info at the gee level...")
             make_asset_public(ppt_asset_id)
@@ -133,6 +139,7 @@ def generate_hydrology(
                 layer_name=f"{district}_{block}_run_off",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Run Off info at the gee level...")
             make_asset_public(ro_task_id)
@@ -190,13 +197,14 @@ def generate_hydrology(
 
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Hydrology",
+            misc={"start_year": start_year, "end_year": end_year},
         )
 
         fc = ee.FeatureCollection(asset_id).getInfo()
@@ -204,13 +212,6 @@ def generate_hydrology(
         res = sync_layer_to_geoserver(asset_suffix, fc, layer_name, "mws_layers")
         print(res)
 
-        if res["status_code"] == 201 and state and district and block:
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=layer_name,
-                asset_id=asset_id,
-                dataset_name="Hydrology",
-                sync_to_geoserver=True,
-            )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")

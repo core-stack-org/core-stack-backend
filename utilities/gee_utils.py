@@ -350,7 +350,7 @@ def is_asset_public(asset_id):
     ee_initialize()
     try:
         acl = ee.data.getAssetAcl(asset_id)
-        if acl["all_users_can_read"]:
+        if acl.get("all_users_can_read"):
             return True
         else:
             return False

@@ -3,6 +3,7 @@ from computing.utils import (
     sync_layer_to_geoserver,
     sync_fc_to_geoserver,
     save_layer_info_to_db,
+    update_layer_sync_status,
 )
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -31,7 +32,6 @@ def generate_cropping_intensity(
     end_year=None,
 ):
     ee_initialize()
-    layer_name = f"{asset_suffix}_intensity"
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
@@ -48,6 +48,7 @@ def generate_cropping_intensity(
             + valid_gee_text(block.lower())
             + "_uid"
         )
+    layer_name = f"{asset_suffix}_intensity"
 
     task_id, asset_id = generate_gee_asset(
         roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
@@ -56,16 +57,21 @@ def generate_cropping_intensity(
         task_id_list = check_task_status([task_id])
         print("Cropping intensity task completed - task_id_list:", task_id_list)
 
+    layer_id = None
     if (
         state and district and block and is_gee_asset_exists(asset_id)
     ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Cropping Intensity",
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+            },
         )
     make_asset_public(asset_id)
 
@@ -74,17 +80,10 @@ def generate_cropping_intensity(
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "crop_intensity")
     print(res)
     if (
-        res["status_code"] == 201 and state and district and block
+        res["status_code"] == 201 and layer_id
     ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=layer_name,
-            asset_id=asset_id,
-            dataset_name="Cropping Intensity",
-            sync_to_geoserver=True,
-        )
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag updated")
 
 
 def generate_gee_asset(

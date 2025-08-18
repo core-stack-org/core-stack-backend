@@ -13,7 +13,7 @@ from utilities.gee_utils import (
 )
 from nrm_app.settings import BASE_DIR
 from nrm_app.celery import app
-from computing.utils import save_layer_info_to_db
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
@@ -30,7 +30,7 @@ def generate_fes_clart_layer(self, state, district, block, file_path, clart_file
             check_task_status([task_id])
 
         if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
+            layer_id = save_layer_info_to_db(
                 state,
                 district,
                 block,

@@ -1,5 +1,4 @@
 from django.urls import path
-
 from . import api
 
 urlpatterns = [
@@ -9,4 +8,5 @@ urlpatterns = [
     path("get_mws_data/", api.get_mws_json_by_stats_excel, name="get-mws-data-by-excel"),
     path("get_mws_kyl_indicators/", api.get_mws_json_by_kyl_indicator, name="get-mws-kyl-indicator"),
     path("get_generated_layer_urls/", api.get_generated_layer_urls, name="get-generated-layer-urls"),
+    path("get_mws_report/", api.get_mws_report_urls, name="get-mws-report-urls"),
 ]

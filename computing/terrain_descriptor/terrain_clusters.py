@@ -1,5 +1,9 @@
 import ee
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -24,11 +28,11 @@ def generate_terrain_clusters(self, state, district, block):
     )
 
     asset_id = get_gee_asset_path(state, district, block) + asset_name
-
+    layer_id = None
     if not is_gee_asset_exists(asset_id):
-        compute_on_gee(state, district, block, asset_id, asset_name)
+        layer_id = compute_on_gee(state, district, block, asset_id, asset_name)
 
-    sync_to_geoserver(state, district, block, asset_id, asset_name)
+    sync_to_geoserver(state, district, block, asset_id, layer_id)
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
@@ -356,8 +360,9 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
     task = export_vector_asset_to_gee(fc, asset_name, asset_id)
     check_task_status([task])
 
+    layer_id = None
     if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
@@ -366,9 +371,10 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
             dataset_name="Terrain Vector",
         )
         make_asset_public(asset_id)
+    return layer_id
 
 
-def sync_to_geoserver(state, district, block, asset_id, asset_name):
+def sync_to_geoserver(state, district, block, asset_id, layer_id):
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -381,13 +387,6 @@ def sync_to_geoserver(state, district, block, asset_id, asset_name):
         "terrain",
     )
     print(res)
-    if res["status_code"] == 201:
-        save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=asset_name,
-            asset_id=asset_id,
-            dataset_name="Terrain Vector",
-            sync_to_geoserver=True,
-        )
+    if res["status_code"] == 201 and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag is updated")
