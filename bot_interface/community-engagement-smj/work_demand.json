@@ -1,0 +1,240 @@
+[
+  {
+    "name": "WorkDemandWelcome",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📋 कार्य मांग पंजीकरण\n\nकृपया अपनी कार्य मांग दर्ज करने के लिए निम्नलिखित चरणों का पालन करें।",
+            "en": "📋 Work Demand Registration\n\nPlease follow the steps below to register your work demand.",
+            "default": "📋 Work Demand Registration\n\nPlease follow the steps below to register your work demand."
+          }
+        ]
+      },
+      {
+        "function": "move_forward"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "SendLocationRequest": [
+          "success"
+        ]
+      },
+      {
+        "WorkDemandWelcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendLocationRequest",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📍 कृपया कार्यस्थल की लोकेशन भेजें",
+            "en": "📍 Please send the location of the work site",
+            "default": "📍 Please send the location of the work site"
+          }
+        ]
+      },
+      {
+        "function": "send_location_request"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_location_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestAudio": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RequestAudio",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "🎤 कृपया अपने कार्य मांग की जानकारी के लिए एक ऑडियो रिकॉर्ड करें।\n\nऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• अपनी कार्य मांग का विस्तृत विवरण",
+            "en": "🎤 Please record an audio for your work demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your work demand",
+            "default": "🎤 Please record an audio for your work demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your work demand"
+          }
+        ]
+      },
+      {
+        "function": "pick_audio"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_audio_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestPhotos": [
+          "success"
+        ]
+      },
+      {
+        "RequestAudio": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RequestPhotos",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📷 कृपया कार्यस्थल की फोटो अपलोड करें",
+            "en": "📷 Please upload photos of the worksite",
+            "default": "📷 Please upload photos of the worksite"
+          }
+        ]
+      },
+      {
+        "function": "pick_img"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_photo_data"
+      }
+    ],
+    "transition": [
+      {
+        "ThankYou": [
+          "success"
+        ]
+      },
+      {
+        "RequestPhotos": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ThankYou",
+    "preAction": [
+      {
+        "function": "log_work_demand_completion"
+      },
+      {
+        "text": [
+          {
+            "hi": "✅ धन्यवाद! आपकी कार्य मांग सफलतापूर्वक दर्ज कर दी गई है।",
+            "en": "✅ Thank you! Your work demand has been successfully registered.",
+            "default": "✅ Thank you! Your work demand has been successfully registered."
+          }
+        ]
+      },
+      {
+        "menu": [
+          {
+            "label": "सेवा मेनू पर वापस जाएं",
+            "value": "back_to_service",
+            "description": "Return to community services",
+            "caption": "आगे क्या करना चाहेंगे:"
+          },
+          {
+            "label": "बाहर निकलें",
+            "value": "exit_session",
+            "description": "End the session"
+          }
+        ]
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "BackToServiceMenu": [
+          "back_to_service"
+        ]
+      },
+      {
+        "EndSession": [
+          "exit_session"
+        ]
+      },
+      {
+        "ThankYou": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "BackToServiceMenu",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "🔄 सेवा मेनू पर वापस जा रहे हैं...",
+            "en": "🔄 Returning to service menu...",
+            "default": "🔄 Returning to service menu..."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "community_features",
+            "initState": "ServiceMenu"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "BackToServiceMenu": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "EndSession",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "🙏 धन्यवाद! आपका सत्र समाप्त हो रहा है।",
+            "en": "🙏 Thank you! Your session is ending.",
+            "default": "🙏 Thank you! Your session is ending."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "EndSession": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]

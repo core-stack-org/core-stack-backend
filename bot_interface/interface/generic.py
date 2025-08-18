@@ -17,7 +17,7 @@ class GenericInterface:
         user_session.expected_response_type = "text"
         user_session.current_state = datadict.get("state")
         user_session.current_smj = bot_interface.models.SMJ.objects.get(
-            id=datadict.get("smjid"))
+            id=datadict.get("smj_id"))
         user_session.save()
 
     @staticmethod
@@ -26,7 +26,7 @@ class GenericInterface:
         user_session.expected_response_type = "image"
         user_session.current_state = data_dict.get("state")
         user_session.current_smj = bot_interface.models.SMJ.objects.get(
-            id=data_dict.get("smjid"))
+            id=data_dict.get("smj_id"))
         user_session.save()
 
     @staticmethod
@@ -35,7 +35,7 @@ class GenericInterface:
         user_session.expected_response_type = "audio"
         user_session.current_state = data_dict.get("state")
         user_session.current_smj = bot_interface.models.SMJ.objects.get(
-            id=data_dict.get("smjid"))
+            id=data_dict.get("smj_id"))
         user_session.save()
 
     @staticmethod
@@ -44,7 +44,7 @@ class GenericInterface:
         user_session.expected_response_type = "audio_text"
         user_session.current_state = data_dict.get("state")
         user_session.current_smj = bot_interface.models.SMJ.objects.get(
-            id=data_dict.get("smjid"))
+            id=data_dict.get("smj_id"))
         user_session.save()
 
     @staticmethod
@@ -53,8 +53,39 @@ class GenericInterface:
         user_session.current_state = data_dict.get("state")
         user_session.current_smj = bot_interface.models.SMJ.objects.get(
             id=data_dict.get("smj_id"))
-        user_session.save()
+        
         print("DATA DICT IN moveForward : ", data_dict)
+        
+        # Store button selection data in session for later retrieval
+        current_state = data_dict.get("state")
+        event_data = data_dict.get("event_data", {})
+        
+        # Initialize session structure if needed
+        current_session = user_session.current_session
+        if not current_session:
+            current_session = [{}]
+        elif not isinstance(current_session, list):
+            current_session = [{}]
+        elif len(current_session) == 0:
+            current_session = [{}]
+            
+        # Store state data including button selections
+        if current_state and event_data:
+            if current_state not in current_session[0]:
+                current_session[0][current_state] = {}
+            
+            # Store relevant event data - especially misc field for button values
+            current_session[0][current_state].update({
+                "data": event_data.get("data", ""),
+                "misc": event_data.get("misc", ""),
+                "type": event_data.get("type", ""),
+                "timestamp": event_data.get("timestamp", "")
+            })
+            
+            print(f"Stored session data for state '{current_state}': {current_session[0][current_state]}")
+        
+        user_session.current_session = current_session
+        user_session.save()
         
         # Instead of creating a new Celery task, prepare internal transition data
         event = data_dict["event"] if data_dict.get("event") else "success"
