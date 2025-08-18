@@ -59,16 +59,16 @@ def mws_layer(self, state, district, block):
         print("mws_task_id_list", mws_task_id_list)
 
     if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
         save_layer_info_to_db(
             state,
             district,
             block,
             layer_name=f"mws_{district}_{block}",
             asset_id=asset_id,
-            dataset_name="MWS",
+            dataset_name="MWS v2",
             layer_version=2.0,
         )
-        make_asset_public(asset_id)
 
 
 # @app.task(bind=True)
