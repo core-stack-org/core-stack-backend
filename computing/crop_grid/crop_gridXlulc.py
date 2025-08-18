@@ -14,7 +14,7 @@ from utilities.gee_utils import (
 )
 
 
-def crop_grids_lulc(state, district, block, asset_id):
+def crop_grids_lulc(state, district, block):
     lulc_image = ee.Image(
         get_gee_asset_path(state, district, block)
         + valid_gee_text(district.lower())
@@ -26,6 +26,15 @@ def crop_grids_lulc(state, district, block, asset_id):
     tiles_uid = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "crop_grid_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_with_uid_16ha"
+    )
+
+    asset_id = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
+        + "crop_gridXlulc_"
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
@@ -44,6 +53,7 @@ def crop_grids_lulc(state, district, block, asset_id):
         print(f"crop gridXlulc task completed  - task_id_list: {task_id_list}")
 
     if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
             state,
             district,
@@ -52,7 +62,6 @@ def crop_grids_lulc(state, district, block, asset_id):
             asset_id=asset_id,
             dataset_name="Crop GridXlulc",
         )
-        make_asset_public(asset_id)
 
         res = sync_fc_to_geoserver(
             crop_tiles, state, layer_name, workspace="crop_grid_layers"
