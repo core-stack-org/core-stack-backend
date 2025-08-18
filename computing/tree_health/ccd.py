@@ -101,16 +101,16 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             + str(year)
         )
         if is_gee_asset_exists(asset_id):
-            layer_id = save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name,
-                asset_id,
-                "Ccd Raster",
-                misc={"start_year": start_year, "end_year": end_year},
-            )
             make_asset_public(asset_id)
+            # layer_id = save_layer_info_to_db(
+            #     state,
+            #     district,
+            #     block,
+            #     layer_name,
+            #     asset_id,
+            #     "Ccd Raster",
+            #     misc={"start_year": start_year, "end_year": end_year},
+            # )
             task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, layer_name)
 
             task_id_list = check_task_status([task_id])
@@ -119,6 +119,6 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
             res = sync_raster_gcs_to_geoserver(
                 "ccd", layer_name, layer_name, "ccd_style"
             )
-            if res and layer_id:
-                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-                print("sync to geoserver flag is updated")
+            # if res and layer_id:
+            #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            #     print("sync to geoserver flag is updated")

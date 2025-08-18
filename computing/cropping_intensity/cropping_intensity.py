@@ -32,7 +32,6 @@ def generate_cropping_intensity(
     end_year=None,
 ):
     ee_initialize()
-    layer_name = f"{asset_suffix}_intensity"
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
@@ -49,6 +48,7 @@ def generate_cropping_intensity(
             + valid_gee_text(block.lower())
             + "_uid"
         )
+    layer_name = f"{asset_suffix}_intensity"
 
     task_id, asset_id = generate_gee_asset(
         roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
