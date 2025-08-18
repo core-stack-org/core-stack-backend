@@ -140,87 +140,9 @@
       {
         "text": [
           {
-            "hi": "✅ धन्यवाद! आपकी कार्य मांग सफलतापूर्वक दर्ज कर दी गई है।",
-            "en": "✅ Thank you! Your work demand has been successfully registered.",
-            "default": "✅ Thank you! Your work demand has been successfully registered."
-          }
-        ]
-      },
-      {
-        "menu": [
-          {
-            "label": "सेवा मेनू पर वापस जाएं",
-            "value": "back_to_service",
-            "description": "Return to community services",
-            "caption": "आगे क्या करना चाहेंगे:"
-          },
-          {
-            "label": "बाहर निकलें",
-            "value": "exit_session",
-            "description": "End the session"
-          }
-        ]
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "BackToServiceMenu": [
-          "back_to_service"
-        ]
-      },
-      {
-        "EndSession": [
-          "exit_session"
-        ]
-      },
-      {
-        "ThankYou": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "BackToServiceMenu",
-    "preAction": [
-      {
-        "text": [
-          {
-            "hi": "🔄 सेवा मेनू पर वापस जा रहे हैं...",
-            "en": "🔄 Returning to service menu...",
-            "default": "🔄 Returning to service menu..."
-          }
-        ]
-      },
-      {
-        "data": [
-          {
-            "smjName": "community_features",
-            "initState": "ServiceMenu"
-          }
-        ],
-        "function": "jumpToSmj"
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "BackToServiceMenu": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "EndSession",
-    "preAction": [
-      {
-        "text": [
-          {
-            "hi": "🙏 धन्यवाद! आपका सत्र समाप्त हो रहा है।",
-            "en": "🙏 Thank you! Your session is ending.",
-            "default": "🙏 Thank you! Your session is ending."
+            "hi": "✅ धन्यवाद! आपकी कार्य मांग सफलतापूर्वक दर्ज कर दी गई है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you! Your work demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you! Your work demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat."
           }
         ]
       },
@@ -231,7 +153,7 @@
     "postAction": [],
     "transition": [
       {
-        "EndSession": [
+        "ThankYou": [
           "failure"
         ]
       }

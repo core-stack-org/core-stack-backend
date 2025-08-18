@@ -278,16 +278,16 @@
       {
         "text": [
           {
-            "en": "🔄 Redirecting to community onboarding...",
-            "hi": "🔄 समुदाय ऑनबोर्डिंग में रीडायरेक्ट कर रहे हैं...",
-            "default": "Redirecting to onboarding..."
+            "en": "🔄 Let's help you join a new community...",
+            "hi": "🔄 आइए आपको एक नया समुदाय ज्वाइन करने में मदद करते हैं...",
+            "default": "Let's help you join a new community..."
           }
         ]
       },
       {
         "data": [
           {
-            "smjName": "onboarding",
+            "smjName": "join_community",
             "initState": "Welcome"
           }
         ],
