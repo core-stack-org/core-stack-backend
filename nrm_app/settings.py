@@ -51,6 +51,7 @@ ALLOWED_HOSTS = [
     "e697-2001-df4-e000-3fc4-e2e1-373c-2498-b87c.ngrok-free.app",
     "74f2-2001-df4-e000-3fc4-bb09-a94e-b440-7621.ngrok-free.app",
     ".ngrok-free.app",
+    "192.168.0.108",
 ]
 
 # Application definition
@@ -82,7 +83,7 @@ INSTALLED_APPS = [
     "bot_interface"
 ]
 
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = True
 
 # CORS_ALLOWED_ORIGINS = [
 #     "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",

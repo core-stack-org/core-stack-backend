@@ -96,13 +96,10 @@ class Item_state(models.TextChoices):
     UNMODERATED = "UNMODERATED", "UNMODERATED"
     PUBLISHED = "PUBLISHED", "PUBLISHED"
     REJECTED = "REJECTED", "REJECTED"
-    ASSIGNED = "ASSIGNED", "ASSIGNED"
     INPROGRESS = "INPROGRESS", "INPROGRESS"
     RESOLVED = "RESOLVED", "RESOLVED"
     ACCEPTED_STAGE_1 = "ACCEPTED_STAGE_1", "ACCEPTED_STAGE_1"
-    ACCEPTED_STAGE_2 = "ACCEPTED_STAGE_2", "ACCEPTED_STAGE_2"
     REJECTED_STAGE_1 = "REJECTED_STAGE_1", "REJECTED_STAGE_1"
-    REJECTED_STAGE_2 = "REJECTED_STAGE_2", "REJECTED_STAGE_2"
 
 
 ITEM_TYPE_STATE_MAP = {
@@ -144,5 +141,6 @@ class Item(models.Model):
     state = models.CharField(max_length=255, choices=Item_state.choices)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     community = models.ForeignKey(Community, on_delete=models.CASCADE)
+    misc = models.JSONField(blank=True, null=True, default=dict)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

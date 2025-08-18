@@ -3,91 +3,253 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
+import ast
 import boto3
 import uuid
 import json
+import traceback
 import pandas as pd
 from collections import defaultdict
 
 from .models import Community, Item, Community_user_mapping, Media, Media_type, Location, Item_type, Item_state, ITEM_TYPE_STATE_MAP
-from .utils import get_media_type, get_community_summary_data, get_communities
+from .utils import get_media_type, get_community_summary_data, get_communities, generate_item_title
 from geoadmin.models import State, District, Block
 from projects.models import Project, AppType
 from users.models import User
+from bot_interface.models import Bot
 from utilities.auth_utils import auth_free
 from nrm_app.settings import S3_BUCKET, S3_REGION
 
 
+
+def attach_media_files(files, item, user, source, bot=None):
+    s3_client = boto3.client("s3")
+
+    bot_instance = None
+    if bot:
+        bot_instance = Bot.objects.filter(id=bot).first()
+
+    media_dict = defaultdict(list)
+    for key in files:
+        for file in files.getlist(key):
+            media_dict[key].append(file)
+
+    for media_key, media_files in media_dict.items():
+        media_type = get_media_type(media_key)
+        if not media_type:
+            print(f"Skipping unknown media key: {media_key}")
+            continue
+
+        s3_folder = f"{media_type.lower()}s"
+        for media_file in media_files:
+            extension = media_file.name.split(".")[-1]
+            s3_key = f"{s3_folder}/{uuid.uuid4()}.{extension}"
+
+            try:
+                s3_client.upload_fileobj(media_file, S3_BUCKET, s3_key)
+            except Exception as e:
+                print(f"Failed to upload {media_file.name} to S3:", e)
+                continue
+
+            media_path = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{s3_key}"
+            media_obj = Media.objects.create(
+                user=user,
+                media_type=media_type,
+                media_path=media_path,
+                source=source,
+                bot=bot_instance
+            )
+            item.media.add(media_obj)
+
+
+def handle_media_upload(request, item, user, source, bot_id=None):
+    if not request.FILES:
+        return
+
+    if not source:
+        raise ValueError("Missing source for media upload.")
+
+    attach_media_files(request.FILES, item, user, source, bot_id)
+
+
 @api_view(["POST"])
 @auth_free
-def create_item(request):
+def upsert_item(request):
     try:
-        title = request.data.get("title")
-        transcript = request.data.get("transcript")
+        item_id = request.data.get("item_id")
+        title = request.data.get("title", "")
+        transcript = request.data.get("transcript", "")
         category_id = request.data.get("category_id")
         rating = request.data.get("rating")
+        rating = int(rating) if rating is not None else 0
         item_type = request.data.get("item_type")
         coordinates = request.data.get("coordinates")
-        state = request.data.get("state")
-        user_id = request.data.get("user_id")
         community_id = request.data.get("community_id")
+        number = request.data.get("number")
+        source = request.data.get("source")
+        bot_id = request.data.get("bot_id")
+        misc_data = request.data.get("misc", {})
 
-        item = Item(title=title, transcript=transcript, category_id=category_id, rating=rating, item_type=item_type, coordinates=coordinates, state=state, user_id=user_id, community_id=community_id)
-        item.save()
+        if source == "BOT" and not bot_id:
+            return Response(
+                {"success": False, "message": "bot_id is required when source is BOT"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        return Response({"success": True, "item_id": item.id}, status=status.HTTP_201_CREATED)
-    except Exception as e:
-        print("Exception in create_item api :: ", e)
-        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        user = User.objects.filter(contact_number=number).first()
+        if not user:
+            return Response(
+                {"success": False, "message": f"User with number {number} not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if category_id and not Item_category.objects.filter(id=category_id).exists():
+            return Response(
+                {"success": False, "message": "Invalid category_id"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if item_id:
+            try:
+                item = Item.objects.get(id=item_id)
+            except Item.DoesNotExist:
+                return Response(
+                    {"success": False, "message": "Item not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if title:
+                item.title = title
+            if transcript:
+                item.transcript = transcript
+            if category_id:
+                item.category_id = category_id
+            if rating is not None:
+                item.rating = rating
+            if item_type:
+                item.item_type = item_type
+            if coordinates:
+                item.coordinates = coordinates
+            if misc_data:
+                current_misc = item.misc if isinstance(item.misc, dict) else {}
+                item.misc = {**current_misc, **misc_data}
+            if request.data.get("state"):
+                item.state = request.data["state"]
+
+            item.save()
+
+            try:
+                handle_media_upload(request, item, user, source, bot_id)
+            except ValueError as e:
+                return Response({"success": False, "message": str(e)},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            return Response(
+                {"success": True, "message": "Item updated", "item_id": item.id},
+                status=status.HTTP_200_OK,
+            )
+
+        mandatory_fields = [item_type, coordinates, number, community_id]
+        if not all(mandatory_fields):
+            return Response(
+                {"success": False, "message": "Missing required fields for item creation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not Community.objects.filter(id=community_id).exists():
+            return Response(
+                {"success": False, "message": "Invalid community_id"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not title.strip():
+            title = generate_item_title(item_type)
+
+        item = Item.objects.create(
+            title=title,
+            transcript=transcript,
+            category_id=category_id,
+            rating=rating,
+            item_type=item_type,
+            coordinates=coordinates,
+            state=Item_state.UNMODERATED,
+            user=user,
+            community_id=community_id,
+            misc=misc_data if isinstance(misc_data, dict) else {},
+        )
+
+        try:
+            handle_media_upload(request, item, user, source, bot_id)
+        except ValueError as e:
+            return Response({"success": False, "message": str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"success": True, "message": "Item created", "item_id": item.id},
+            status=status.HTTP_201_CREATED,
+        )
+
+    except Exception:
+        print("Exception in upsert_item API:", traceback.format_exc())
+        return Response(
+            {"success": False, "message": "Internal Server Error"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["POST"])
 @auth_free
 def attach_media_to_item(request):
     try:
-        s3_client = boto3.client('s3')
+        item_id = request.data.get("item_id")
+        number = request.data.get("number")
+        source = request.data.get("source")
+        bot_id = request.data.get("bot_id")
 
-        item_id = request.data.get('item_id')
-        user_id = request.data.get('user_id')
+        if not item_id or not number:
+            return Response(
+                {"success": False, "message": "Missing item_id or number"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if not item_id or not user_id:
-            return Response({"success": False, "error": "Missing item_id or user_id"}, status=status.HTTP_400_BAD_REQUEST)
+        if source == "BOT" and not bot_id:
+            return Response(
+                {"success": False, "message": "bot_id is required when source is BOT"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(contact_number=number).first()
+        if not user:
+            return Response(
+                {"success": False, "message": f"User with number {number} not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             item = Item.objects.get(id=item_id)
         except Item.DoesNotExist:
-            return Response({"success": False, "error": "Item not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"success": False, "message": "Item not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
-        media_dict = defaultdict(list)
-        for key in request.FILES:
-            for file in request.FILES.getlist(key):
-                media_dict[key].append(file)
+        try:
+            handle_media_upload(request, item, user, source, bot_id)
+        except ValueError as e:
+            return Response({"success": False, "message": str(e)},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        for media_key, media_files in media_dict.items():
-            media_type = get_media_type(media_key)
-            s3_folder = media_type.lower() + "s"  # images/, audios/, etc.
+        return Response(
+            {"success": True, "message": "Media attached successfully"},
+            status=status.HTTP_200_OK,
+        )
 
-            if not media_type:
-                continue
-
-            for media_file in media_files:
-                extension = media_file.name.split(".")[-1]
-                s3_key = f"{s3_folder}/{uuid.uuid4()}.{extension}"
-                print("Key:", s3_key)
-
-                s3_client.upload_fileobj(media_file, S3_BUCKET, s3_key)
-
-                media_path = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{s3_key}"
-                media_obj = Media.objects.create(
-                    user_id=user_id,
-                    media_type=media_type,
-                    media_path=media_path
-                )
-                item.media.add(media_obj)
-        return Response({"success": True}, status=status.HTTP_201_CREATED)
-    except Exception as e:
-        print("Exception in attach_media_to_item:", str(e))
-        return Response({"success": False, "error": "Internal server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception:
+        print("Exception in attach_media_to_item:", traceback.format_exc())
+        return Response(
+            {"success": False, "message": "Internal server error"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["GET"])
@@ -410,12 +572,22 @@ def get_items_by_community(request):
         data = []
         for item in paginated_items:
             lat, lon = None, None
-            try:
-                coord = json.loads(item.coordinates or '{}')
-                lat = float(coord.get('lat')) if coord.get('lat') else None
-                lon = float(coord.get('lon')) if coord.get('lon') else None
-            except Exception:
-                pass
+
+            if item.coordinates:
+                try:
+                    # First try JSON
+                    coord = json.loads(item.coordinates)
+                except json.JSONDecodeError:
+                    try:
+                        # Fallback to Python dict string
+                        coord = ast.literal_eval(item.coordinates)
+                    except Exception as e:
+                        print(f"Error parsing coordinates for item {item.id}: {e}")
+                        coord = {}
+
+                if isinstance(coord, dict):
+                    lat = float(coord['lat']) if 'lat' in coord and coord['lat'] is not None else None
+                    lon = float(coord['lon']) if 'lon' in coord and coord['lon'] is not None else None
 
             images = list(item.media.filter(media_type=Media_type.IMAGE).values_list('media_path', flat=True))
             audios = list(item.media.filter(media_type=Media_type.AUDIO).values_list('media_path', flat=True))
@@ -450,3 +622,60 @@ def get_items_by_community(request):
         )
 
 
+@api_view(["GET"])
+@auth_free
+def get_items_status(request):
+    try:
+        contact_number = request.query_params.get("number")
+        bot_id = request.query_params.get("bot_id")
+        community_id = request.query_params.get("community_id")
+        work_demand_only = request.query_params.get("work_demand_only", "false").lower() == "true"
+
+        if not contact_number:
+            return Response(
+                {"success": False, "message": "'contact_number' is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not bot_id and not community_id:
+            return Response(
+                {"success": False, "message": "Either 'bot_id' or 'community_id' must be provided."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(contact_number=contact_number).first()
+        if not user:
+            return Response(
+                {"success": False, "message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        items_qs = Item.objects.filter(user=user)
+
+        if work_demand_only:
+            items_qs = items_qs.filter(item_type=Item_type.WORK_DEMAND)
+
+        if community_id:
+            items_qs = items_qs.filter(community_id=community_id)
+
+        if bot_id:
+            items_qs = items_qs.filter(community__bot_id=bot_id)
+
+        data = [
+            {
+                "id": item.id,
+                "title": item.title,
+                "transcription": item.transcript,
+                "status": item.state
+            }
+            for item in items_qs
+        ]
+
+        return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("Exception in get_items_status API ::", e)
+        return Response(
+            {"success": False, "message": "Internal server error."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

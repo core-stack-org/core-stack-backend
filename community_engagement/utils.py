@@ -1,6 +1,7 @@
 from .models import Media_type, Community, Location, LocationLevel
 from geoadmin.models import State, District, Block
 from django.db.models import Q
+from django.utils.timezone import now, localtime
 
 
 
@@ -75,3 +76,11 @@ def create_community_for_project(project):
     community = Community.objects.create(project=project)
     community.locations.add(location)
     return community
+
+
+def generate_item_title(item_type):
+    display_type = item_type.replace("_", " ").title()
+    current_time = localtime(now())
+    date_str = current_time.strftime("%d %b %Y")
+    time_str = current_time.strftime("%I:%M %p").lstrip("0")
+    return f"{display_type} - {date_str}, {time_str}"
