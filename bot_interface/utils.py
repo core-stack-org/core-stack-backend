@@ -1616,4 +1616,12 @@ def callFunctionByName(funct_name, app_type, data_dict):
         print(f"calling archive_and_end_session with data_dict: {data_dict}")
         event = whatsappInterface.archive_and_end_session(bot_instance_id=bot_id, data_dict=data_dict)
         print(f"archive_and_end_session returned: {event}")
+    elif funct_name == 'add_user_to_selected_community_join_flow':
+        print(f"calling add_user_to_selected_community_join_flow with data_dict: {data_dict}")
+        event = whatsappInterface.add_user_to_selected_community_join_flow(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"add_user_to_selected_community_join_flow returned: {event}")
+    elif funct_name == 'send_join_success_message':
+        print(f"calling send_join_success_message with data_dict: {data_dict}")
+        event = whatsappInterface.send_join_success_message(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"send_join_success_message returned: {event}")
     return event

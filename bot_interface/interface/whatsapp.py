@@ -1,5 +1,6 @@
 import json
 from typing import Dict, Any
+from django.utils import timezone
 
 import bot_interface.interface.generic
 import bot_interface.models
@@ -1333,8 +1334,22 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
             
             if len(current_communities) > 0:
-                # Use first community as "last accessed" for now
-                last_community_name = current_communities[0].get('community_name', 'Unknown Community')
+                # Get fresh community data with last accessed info
+                success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
+                if success and api_response.get('success'):
+                    community_data = api_response.get('data', {})
+                    last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                    
+                    # Find the last accessed community name
+                    communities_list = community_data.get('data', [])
+                    last_community_name = "Unknown Community"
+                    for community in communities_list:
+                        if community.get('community_id') == last_accessed_id:
+                            last_community_name = community.get('name', 'Unknown Community')
+                            break
+                else:
+                    # Fallback to first community
+                    last_community_name = current_communities[0].get('community_name', 'Unknown Community')
                 
                 # Create welcome message
                 welcome_text = f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।\n\nआप कैसे आगे बढ़ना चाहते हैं:"
@@ -1390,26 +1405,44 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
             
             if len(current_communities) > 0:
-                # Create dynamic menu with unique values for each community
-                communities_list = []
-                for community in current_communities:
-                    community_id = community.get('community_id')
-                    community_name = community.get('community_name', 'Unknown Community')
+                # Get fresh community data with last accessed info
+                success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
+                if success and api_response.get('success'):
+                    community_data = api_response.get('data', {})
+                    last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                    communities_list = community_data.get('data', [])
                     
-                    communities_list.append({
-                        "value": f"community_{community_id}",
-                        "label": community_name,
-                        "description": f"Select {community_name}"
-                    })
+                    # Create menu excluding the last accessed community
+                    communities_menu_list = []
+                    for community in communities_list:
+                        community_id = community.get('community_id')
+                        if community_id != last_accessed_id:  # Exclude last accessed
+                            communities_menu_list.append({
+                                "value": f"community_{community_id}",
+                                "label": community.get('name', 'Unknown Community'),
+                                "description": f"Select {community.get('name', 'Unknown Community')}"
+                            })
+                else:
+                    # Fallback to existing logic (show all communities)
+                    communities_menu_list = []
+                    for community in current_communities:
+                        community_id = community.get('community_id')
+                        community_name = community.get('community_name', 'Unknown Community')
+                        
+                        communities_menu_list.append({
+                            "value": f"community_{community_id}",
+                            "label": community_name,
+                            "description": f"Select {community_name}"
+                        })
                 
-                print(f"Generated community menu: {communities_list}")
+                print(f"Generated community menu: {communities_menu_list}")
                 
                 # Send community selection menu
                 response = bot_interface.api.send_list_msg(
                     bot_instance_id=bot_instance_id,
                     contact_number=user.phone,
                     text="कृपया अपना समुदाय चुनें:",
-                    menu_list=communities_list,
+                    menu_list=communities_menu_list,
                     button_label="समुदाय चुनें"
                 )
                 
@@ -1470,13 +1503,25 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     return "failure"
                     
             elif event == "continue_last":
-                # Multiple communities - store first as "last accessed"
-                if len(current_communities) > 0:
-                    community_id = current_communities[0].get('community_id')
-                    context = "multiple_community"
+                # Multiple communities - store the actual last accessed community
+                success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
+                if success and api_response.get('success'):
+                    community_data = api_response.get('data', {})
+                    last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                    if last_accessed_id:
+                        community_id = str(last_accessed_id)
+                        context = "multiple_community"
+                    else:
+                        print("No last accessed community ID found in API response")
+                        return "failure"
                 else:
-                    print("No communities found for multiple community user")
-                    return "failure"
+                    # Fallback to first community if API fails
+                    if len(current_communities) > 0:
+                        community_id = current_communities[0].get('community_id')
+                        context = "multiple_community"
+                    else:
+                        print("No communities found for multiple community user")
+                        return "failure"
                     
             elif event == "join_new":
                 # User wants to join a new community - return original event for proper transition
@@ -1502,7 +1547,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user.save()
             
             print(f"Stored active community {community_id} with context {context}")
-            return "success"
+            # Return the original event for proper state transitions
+            return event
                 
         except Exception as e:
             print(f"Error in store_active_community_and_context: {e}")
@@ -2365,4 +2411,204 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 
         except Exception as e:
             print(f"Error in log_grievance_completion: {e}")
+            return "failure"
+
+    def add_user_to_selected_community_join_flow(self, bot_instance_id, data_dict):
+        """
+        Add user to selected community in join community flow.
+        Extracts community ID from session data (CommunityByLocation or CommunityByStateDistrict).
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        import json
+        print(f"DEBUG: add_user_to_selected_community_join_flow called with bot_instance_id={bot_instance_id}")
+        print(f"DEBUG: data_dict keys: {list(data_dict.keys())}")
+        
+        try:
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            user_id = data_dict.get("user_id")
+            
+            # Get user session
+            user_session = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            bot_user = user_session.user
+            
+            # Extract community ID from session data (from either CommunityByLocation or CommunityByStateDistrict)
+            community_id = None
+            
+            # Parse current session data - handle both string and object formats
+            try:
+                if isinstance(user_session.current_session, str):
+                    current_session = json.loads(user_session.current_session or "[]")
+                elif isinstance(user_session.current_session, (list, dict)):
+                    current_session = user_session.current_session
+                else:
+                    current_session = []
+                print(f"DEBUG: current_session data: {current_session}")
+                
+                # Look for community selection in either state
+                for session_entry in current_session:
+                    if isinstance(session_entry, dict):
+                        # Check CommunityByStateDistrict first
+                        if 'CommunityByStateDistrict' in session_entry:
+                            community_id = session_entry['CommunityByStateDistrict'].get('misc')
+                            print(f"DEBUG: Found community ID from CommunityByStateDistrict: {community_id}")
+                            break
+                        # Check CommunityByLocation second
+                        elif 'CommunityByLocation' in session_entry:
+                            community_id = session_entry['CommunityByLocation'].get('misc')
+                            print(f"DEBUG: Found community ID from CommunityByLocation: {community_id}")
+                            break
+                            
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f"DEBUG: Error handling session data: {e}")
+                current_session = []
+                
+            # Fallback: try to get from event_data if not found in session
+            if not community_id:
+                event_data = data_dict.get("event_data", {})
+                print(f"DEBUG: Fallback - checking event_data: {event_data}")
+                
+                if event_data.get("type") == "button":
+                    # For button events, extract community ID from button value (misc field)
+                    button_value = event_data.get("misc") or event_data.get("data")
+                    print(f"DEBUG: Button event detected - button_value: {button_value}")
+                    if button_value:
+                        community_id = button_value
+                        print(f"DEBUG: Extracted community ID from button: {community_id}")
+            
+            if community_id:
+                # Add user to selected community using existing API pattern
+                user_phone = bot_user.user.contact_number
+                print(f"DEBUG: Adding user {user_phone} to community {community_id}")
+                
+                try:
+                    # Use similar pattern as existing addUserToCommunity function
+                    response = requests.post(
+                            url="http://localhost:8000/api/v1/add_user_to_community/",
+                            data={
+                                "community_id": community_id,
+                                "number": int(user_phone)
+                            },
+                            timeout=30
+                        )
+                    response.raise_for_status()
+                    api_response = response.json()
+                    print("Add user to community API response:", api_response)
+                    
+                    if api_response.get("success", False):
+                        # Store community context in user session
+                        if not user_session.misc_data:
+                            user_session.misc_data = {}
+                        
+                        user_session.misc_data['active_community_id'] = community_id
+                        user_session.misc_data['navigation_context'] = "join_community"
+                        user_session.misc_data['join_timestamp'] = str(timezone.now())
+                        user_session.save()
+                        
+                        print(f"DEBUG: Successfully added user to community {community_id}")
+                        return "success"
+                    else:
+                        print(f"DEBUG: Failed to add user to community: {api_response}")
+                        return "failure"
+                        
+                except Exception as api_error:
+                    print(f"DEBUG: API call failed: {api_error}")
+                    return "failure"
+            else:
+                print(f"DEBUG: Could not extract community ID from session or event data")
+                return "failure"
+                
+        except Exception as e:
+            print(f"DEBUG: Exception in add_user_to_selected_community_join_flow: {e}")
+            import traceback
+            traceback.print_exc()
+            return "failure"
+
+    def send_join_success_message(self, bot_instance_id, data_dict):
+        """
+        Send success message after joining new community.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        print(f"DEBUG: send_join_success_message called")
+        
+        try:
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            user_id = data_dict.get("user_id")
+            
+            # Get user session
+            user_session = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            bot_user = user_session.user
+            
+            # Get community name from misc_data
+            community_id = user_session.misc_data.get('active_community_id') if user_session.misc_data else None
+            community_name = "the community"
+            
+            if community_id:
+                try:
+                    # Try to get community name from existing patterns
+                    from community_engagement.models import Community
+                    community = Community.objects.get(id=community_id)
+                    community_name = community.project
+                except:
+                    pass
+            
+            # Prepare success message
+            success_text = f"✅ बहुत बढ़िया! आप सफलतापूर्वक {community_name} में शामिल हो गए हैं। अब आप समुदायिक सेवाओं का उपयोग कर सकते हैं।"
+            
+            # Send the message using bot_interface.api.send_text directly
+            user_phone = bot_user.user.contact_number
+            response = bot_interface.api.send_text(
+                bot_instance_id=bot_instance_id,
+                contact_number=user_phone,
+                text=success_text
+            )
+            
+            print(f"DEBUG: Join success message sent: {response}")
+            return "success"
+            
+        except Exception as e:
+            print(f"DEBUG: Exception in send_join_success_message: {e}")
+            import traceback
+            traceback.print_exc()
+            return "failure"
+
+    def return_to_community_services(self, bot_instance_id, data_dict):
+        """
+        Prepare return to community services menu after joining new community.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        print(f"DEBUG: return_to_community_services called")
+        
+        try:
+            # Prepare SMJ jump back to community features
+            jump_data = {
+                "_smj_jump": {
+                    "smj_name": "community_features",
+                    "smj_id": 6,  # Assuming community features SMJ ID is 6
+                    "init_state": "ServiceMenu",
+                    "states": []  # Will be loaded from SMJ
+                }
+            }
+            
+            # Add jump data to data_dict for postAction processing
+            data_dict.update(jump_data)
+            
+            print(f"DEBUG: Prepared return to community services: {jump_data}")
+            return "success"
+            
+        except Exception as e:
+            print(f"DEBUG: Exception in return_to_community_services: {e}")
+            import traceback
+            traceback.print_exc()
             return "failure"
