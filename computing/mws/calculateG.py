@@ -2,24 +2,29 @@ import ee
 import datetime
 from dateutil.relativedelta import relativedelta
 import json
-
-from utilities.constants import GEE_PATHS
+import os
+from utilities.constants import GEE_PATHS, MERGE_MWS_PATH
 from utilities.gee_utils import (
     get_gee_dir_path,
-    export_vector_asset_to_gee,
     is_gee_asset_exists,
+    upload_shp_to_gee,
+    check_task_status,
 )
+import geopandas as gpd
 
 
 def calculate_g(
     delta_g_asset_id,
     asset_folder_list,
-    layer_name,
+    asset_suffix,
     app_type,
     start_date,
     end_date,
     is_annual,
 ):
+    layer_name = (
+        "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
+    ) + asset_suffix
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -84,10 +89,43 @@ def calculate_g(
 
         f["properties"] = properties
 
-    # Rewrap into ee.FeatureCollection with valid geometry
-    ee_features = [
-        ee.Feature(ee.Geometry(f["geometry"]), f["properties"]) for f in features
-    ]
-    fc = ee.FeatureCollection(ee_features)
-    task_id = export_vector_asset_to_gee(fc, layer_name, asset_id)
-    return asset_id, task_id
+    try:
+        # Rewrap into ee.FeatureCollection with valid geometry
+        ee_features = [
+            ee.Feature(ee.Geometry(f["geometry"]), f["properties"]) for f in features
+        ]
+        # task_id = export_vector_asset_to_gee(fc, layer_name, asset_id)
+        task = ee.batch.Export.table.toAsset(
+            collection=ee.FeatureCollection(ee_features),
+            description=layer_name,
+            assetId=asset_id,
+        )
+
+        task.start()
+        if task.status()["id"]:
+            task_id_list = check_task_status([task.status()["id"]])
+            print("task_id_list", task_id_list)
+    except Exception as e:
+        print("Error in exporting deltaG:", e)
+
+        if "Request payload size exceeds the limit" in str(e):
+            print("Uploading asset with shp file using CLI command.")
+
+            fc["features"] = features
+            gdf = gpd.GeoDataFrame.from_features(fc)
+            gdf.crs = "EPSG:4326"
+
+            path = os.path.join(MERGE_MWS_PATH, asset_folder_list[0])
+            if not os.path.exists(path):
+                os.mkdir(path)
+
+            path = os.path.join(str(path), asset_suffix)
+            if not os.path.exists(path):
+                os.mkdir(path)
+
+            path = f"{path}/{layer_name}.shp"
+            gdf.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
+            print("path", path)
+            upload_shp_to_gee(path, layer_name, asset_id)
+
+    return asset_id
