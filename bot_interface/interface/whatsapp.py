@@ -1,6 +1,7 @@
 import json
 from typing import Dict, Any
 from django.utils import timezone
+from django.conf import settings
 
 import bot_interface.interface.generic
 import bot_interface.models
@@ -733,7 +734,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # get districts based on the selected state
             try:
                 response = requests.get(
-                    url="http://localhost:8000/api/v1/get_districts_with_community/",
+                    url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_districts_with_community/",
                     params={"state_id": state_id},
                     timeout=30
                 )
@@ -857,7 +858,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Call the API to get communities by location
             try:
                 response = requests.get(
-                    url="http://localhost:8000/api/v1/get_communities_by_location/",
+                    url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_communities_by_location/",
                     params={
                         "state_id": state_id,
                         "district_id": district_id
@@ -1008,7 +1009,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"Adding user {user.phone} to community {community_id}")
                     try:
                         response = requests.post(
-                            url="http://localhost:8000/api/v1/add_user_to_community/",
+                            url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
                             data={
                                 "community_id": community_id,
                                 "number": user.phone
@@ -1164,7 +1165,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         """
         try:
             print(f"Trying API approach for phone number: {phone_number}")
-            base_url = "http://localhost:8000/api/v1"
+            base_url = settings.COMMUNITY_ENGAGEMENT_API_URL.rstrip('/')
             response = requests.get(
                 f"{base_url}/get_community_by_user/", 
                 params={"number": phone_number},
@@ -2269,6 +2270,30 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if "photos" in work_demand_data:
                 print(f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}")
             
+            # Process and submit work demand to Community Engagement API
+            try:
+                import threading
+                def async_submit():
+                    try:
+                        # Check if already processed (avoid duplicate processing from signal)
+                        user_log.refresh_from_db()
+                        if user_log.value2:  # If value2 is not empty, it's already been processed
+                            print(f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission")
+                            return
+                            
+                        self.process_and_submit_work_demand(user_log.id)
+                        print(f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}")
+                    except Exception as e:
+                        print(f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}")
+                
+                # Run in background thread to avoid blocking SMJ flow
+                thread = threading.Thread(target=async_submit, daemon=True)
+                thread.start()
+                print(f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}")
+                
+            except Exception as e:
+                print(f"❌ Failed to start work demand processing: {e}")
+            
             return "success"
                 
         except Exception as e:
@@ -2487,7 +2512,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 try:
                     # Use similar pattern as existing addUserToCommunity function
                     response = requests.post(
-                            url="http://localhost:8000/api/v1/add_user_to_community/",
+                            url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
                             data={
                                 "community_id": community_id,
                                 "number": int(user_phone)
@@ -2612,3 +2637,463 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             import traceback
             traceback.print_exc()
             return "failure"
+
+    def process_and_submit_work_demand(self, user_log_id):
+        """
+        Processes work demand data from UserLogs and submits to Community Engagement API.
+        
+        Args:
+            user_log_id (int): ID of the UserLogs record containing work demand data
+            
+        Returns:
+            dict: API response from upsert_item endpoint or error dict
+        """
+        import requests
+        import json
+        import os
+        from django.conf import settings
+        from bot_interface.models import UserLogs
+        
+        try:
+            # Get the UserLogs record
+            try:
+                user_log = UserLogs.objects.get(id=user_log_id)
+            except UserLogs.DoesNotExist:
+                return {"success": False, "message": f"UserLogs record with id {user_log_id} not found"}
+            
+            # Extract work demand data from misc field
+            work_demand_data = user_log.misc.get("work_demand_data", {})
+            if not work_demand_data:
+                # Try alternative key structure
+                work_demand_data = user_log.misc.get("work_demand", {})
+                
+            if not work_demand_data:
+                return {"success": False, "message": "No work demand data found in UserLogs.misc"}
+            
+            print(f"Processing work demand data: {work_demand_data}")
+            
+            # Get user's community context from UserLogs misc data
+            community_id = None
+            try:
+                # Get community_id from community_context in the UserLogs misc field
+                if "community_context" in user_log.misc:
+                    community_context = user_log.misc["community_context"]
+                    community_id = community_context.get("community_id")
+                    print(f"Found community_id in UserLogs: {community_id}")
+                
+                if not community_id:
+                    return {"success": False, "message": "Could not find community_id in UserLogs data"}
+                    
+            except Exception as e:
+                print(f"Error getting community context from UserLogs: {e}")
+                return {"success": False, "message": f"Error getting community context: {e}"}
+            
+            # Prepare files for upload from local filesystem
+            files = {}
+            
+            # Handle audio file - use "audios" key for API
+            if "audio" in work_demand_data:
+                audio_path = work_demand_data["audio"]
+                if audio_path and os.path.exists(audio_path):
+                    try:
+                        with open(audio_path, 'rb') as audio_file:
+                            audio_content = audio_file.read()
+                            # Determine file extension
+                            file_ext = os.path.splitext(audio_path)[1] or '.ogg'
+                            mime_type = 'audio/ogg' if file_ext == '.ogg' else 'audio/mpeg'
+                            files['audios'] = (f'audio{file_ext}', audio_content, mime_type)
+                            print(f"Added audio file: {audio_path}")
+                    except Exception as e:
+                        print(f"Error reading audio file {audio_path}: {e}")
+                else:
+                    print(f"Audio file not found or invalid path: {audio_path}")
+            
+            # Handle photo files - use indexed keys for multiple images
+            if "photos" in work_demand_data and isinstance(work_demand_data["photos"], list):
+                for i, photo_path in enumerate(work_demand_data["photos"]):
+                    if photo_path and os.path.exists(photo_path):
+                        try:
+                            with open(photo_path, 'rb') as photo_file:
+                                photo_content = photo_file.read()
+                                # Determine file extension
+                                file_ext = os.path.splitext(photo_path)[1] or '.jpg'
+                                mime_type = 'image/jpeg' if file_ext.lower() in ['.jpg', '.jpeg'] else 'image/png'
+                                files[f'images_{i}'] = (f'photo_{i}{file_ext}', photo_content, mime_type)
+                                print(f"Added photo file {i}: {photo_path}")
+                        except Exception as e:
+                            print(f"Error reading photo file {photo_path}: {e}")
+                    else:
+                        print(f"Photo file not found or invalid path: {photo_path}")
+            
+            # Prepare coordinates from location data - use lat/lon format
+            coordinates = {}
+            if "location" in work_demand_data:
+                location = work_demand_data["location"]
+                if isinstance(location, dict):
+                    coordinates = {
+                        "lat": location.get("latitude"),
+                        "lon": location.get("longitude")
+                    }
+                    # Only include if both lat and lon are available
+                    if not (coordinates["lat"] and coordinates["lon"]):
+                        coordinates = {}
+            
+            # Get user contact number through proper relationship chain
+            try:
+                # UserLogs.user_id -> BotUsers.id -> BotUsers.user_id -> Users.id -> Users.contact_number
+                bot_user = user_log.user  # This is BotUsers instance
+                actual_user = bot_user.user  # This is Users instance
+                contact_number = actual_user.contact_number
+                    
+                if not contact_number:
+                    return {"success": False, "message": "Could not get user contact number"}
+                    
+            except AttributeError as e:
+                return {"success": False, "message": f"Could not get user contact number from relationship chain: {e}"}
+            
+            # Prepare API payload
+            payload = {
+                'item_type': 'WORK_DEMAND',
+                'coordinates': json.dumps(coordinates) if coordinates else '',
+                'number': contact_number,
+                'community_id': community_id,
+                'source': 'BOT',
+                'bot_id': user_log.bot.id,
+                'title': 'Work Demand Request',  # Auto-generated if not provided
+                'transcript': work_demand_data.get('description', ''),  # If any description exists
+            }
+            
+            print(f"API Payload: {payload}")
+            print(f"Files to upload: {list(files.keys())}")
+            
+            # Submit to Community Engagement API
+            api_url = f"{settings.COMMUNITY_ENGAGEMENT_API_URL}upsert_item/"
+            
+            try:
+                response = requests.post(
+                    api_url,
+                    data=payload,
+                    files=files,
+                    timeout=30  # 30 second timeout
+                )
+                
+                print(f"API Response Status: {response.status_code}")
+                print(f"API Response: {response.text}")
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    result = response.json()
+                    if result.get("success"):
+                        print(f"Successfully submitted work demand. Item ID: {result.get('item_id')}")
+                        
+                        # Update UserLogs with success status
+                        user_log.value2 = "success"
+                        user_log.value3 = "0"  # No retries needed
+                        user_log.key4 = "response"
+                        user_log.value4 = response.text
+                        user_log.save()
+                        print(f"Updated UserLogs ID {user_log.id} with success status")
+                        
+                        return result
+                    else:
+                        print(f"API returned success=False: {result}")
+                        
+                        # Update UserLogs with API failure status
+                        user_log.value2 = "failure"
+                        user_log.value3 = "0"
+                        user_log.key4 = "response"  
+                        user_log.value4 = response.text
+                        user_log.save()
+                        print(f"Updated UserLogs ID {user_log.id} with API failure status")
+                        
+                        return result
+                else:
+                    # Update UserLogs with HTTP error status
+                    user_log.value2 = "failure"
+                    user_log.value3 = "0"
+                    user_log.key4 = "error"
+                    user_log.value4 = f"HTTP {response.status_code}: {response.text}"
+                    user_log.save()
+                    print(f"Updated UserLogs ID {user_log.id} with HTTP error status")
+                    
+                    return {
+                        "success": False, 
+                        "message": f"API call failed with status {response.status_code}: {response.text}"
+                    }
+                    
+            except requests.exceptions.RequestException as e:
+                print(f"Request error: {e}")
+                
+                # Update UserLogs with request error status
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = f"Request error: {e}"
+                user_log.save()
+                print(f"Updated UserLogs ID {user_log.id} with request error status")
+                
+                return {"success": False, "message": f"Request error: {e}"}
+            
+        except Exception as e:
+            print(f"Error in process_and_submit_work_demand: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Update UserLogs with internal error status
+            try:
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = f"Internal error: {e}"
+                user_log.save()
+                print(f"Updated UserLogs ID {user_log.id} with internal error status")
+            except Exception as save_error:
+                print(f"Failed to update UserLogs: {save_error}")
+            
+            return {"success": False, "message": f"Internal error: {e}"}
+    
+    def fetch_work_demand_status(self, bot_instance_id, data_dict):
+        """
+        Fetches work demand status for the current user from Community Engagement API.
+        
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Contains user_id, bot_id, and other session data
+            
+        Returns:
+            str: "has_work_demands" if user has work demands, "no_work_demands" if none found, "failure" on error
+        """
+        print(f"Fetching work demand status for bot_instance_id: {bot_instance_id} and data_dict: {data_dict}")
+        try:
+            import requests
+            from django.conf import settings
+            from bot_interface.models import BotUsers
+            from community_engagement.models import Community_user_mapping
+            
+            # Get user information
+            user_id = data_dict.get('user_id')
+            bot_id = data_dict.get('bot_id', 1)
+            
+            if not user_id:
+                print("No user_id found in data_dict")
+                return "failure"
+            
+            # Get user's contact number
+            try:
+                bot_user = BotUsers.objects.get(pk=user_id)
+                contact_number = bot_user.user.contact_number
+            except BotUsers.DoesNotExist:
+                print(f"BotUsers with id {user_id} not found")
+                return "failure"
+            
+            # Get user's active community
+            try:
+                community_mapping = Community_user_mapping.objects.filter(
+                    user=bot_user.user,
+                    is_last_accessed_community=True
+                ).first()
+                
+                if not community_mapping:
+                    print(f"No active community found for user {contact_number}")
+                    return "failure"
+                
+                community_id = community_mapping.community.id
+            except Exception as e:
+                print(f"Error getting community for user {contact_number}: {e}")
+                return "failure"
+            
+            # Call Community Engagement API
+            api_url = f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_items_status/"
+            params = {
+                'number': contact_number,
+                'bot_id': bot_instance_id,
+                # 'community_id': str(community_id),
+                'work_demand_only': 'true'
+            }
+            
+            print(f"Fetching work demand status for user {contact_number} in community {community_id} and bot_id {bot_instance_id}")
+            response = requests.get(api_url, params=params, timeout=30)
+            print("response from GET request of get_items_status/ :", response)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    work_demands = result.get('data', [])
+                    print(f"Found {len(work_demands)} work demands for user {contact_number}")
+                    
+                    # Store work demands in user session for persistence between states
+                    try:
+                        from bot_interface.models import UserSessions
+                        session_data = {
+                            'work_demands': work_demands,
+                            'community_id': community_id
+                        }
+                        UserSessions.objects.filter(user_id=user_id).update(misc_data=session_data)
+                        print(f"Stored {len(work_demands)} work demands in session for user {user_id}")
+                    except Exception as session_error:
+                        print(f"Error storing work demands in session: {session_error}")
+                    
+                    if work_demands:
+                        return "has_work_demands"
+                    else:
+                        return "no_work_demands"
+                else:
+                    print(f"API returned error: {result.get('message', 'Unknown error')}")
+                    return "failure"
+            else:
+                print(f"API request failed with status {response.status_code}: {response.text}")
+                return "failure"
+                
+        except Exception as e:
+            print(f"Error in fetch_work_demand_status: {e}")
+            return "failure"
+    
+    def display_work_demands_text(self, bot_instance_id, data_dict):
+        """
+        Displays work demands as WhatsApp text message with Hindi format and character limit handling.
+        
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Contains user_id, bot_id, and other session data
+            
+        Returns:
+            str: "success" if message sent successfully, "failure" otherwise
+        """
+        try:
+            from bot_interface.models import UserSessions, BotUsers
+            
+            # Get user information
+            user_id = data_dict.get('user_id')
+            bot_id = data_dict.get('bot_id', 1)
+            
+            if not user_id:
+                print("No user_id found in data_dict")
+                return "failure"
+            
+            # Retrieve work demands from user session
+            try:
+                user_session = UserSessions.objects.filter(user_id=user_id).first()
+                if not user_session or not user_session.misc_data:
+                    print(f"No session data found for user {user_id}")
+                    return "failure"
+                
+                session_data = user_session.misc_data
+                work_demands = session_data.get('work_demands', [])
+                
+                if not work_demands:
+                    print(f"No work demands found in session for user {user_id}")
+                    return "failure"
+                    
+            except Exception as session_error:
+                print(f"Error retrieving session data: {session_error}")
+                return "failure"
+            
+            # Get user's contact number for WhatsApp
+            try:
+                bot_user = BotUsers.objects.get(pk=user_id)
+                contact_number = bot_user.user.contact_number
+            except BotUsers.DoesNotExist:
+                print(f"BotUsers with id {user_id} not found")
+                return "failure"
+            
+            # Send work demands with character limit handling
+            try:
+                success = self._send_work_demands_with_limit(work_demands, contact_number, bot_instance_id)
+                if success:
+                    print(f"Asset demands text sent successfully to {contact_number}")
+                    return "success"
+                else:
+                    print(f"Failed to send asset demands text to {contact_number}")
+                    return "failure"
+            except Exception as send_error:
+                print(f"Error sending WhatsApp message: {send_error}")
+                return "failure"
+            
+        except Exception as e:
+            print(f"Error in display_work_demands_text: {e}")
+            return "failure"
+    
+    def _send_work_demands_with_limit(self, work_demands, contact_number, bot_instance_id, max_length=4000):
+        """
+        Send work demands with character limit handling, splitting into multiple messages if needed.
+        
+        Args:
+            work_demands (list): List of work demand objects
+            contact_number (str): User's contact number
+            bot_instance_id (int): Bot instance ID
+            max_length (int): Maximum characters per message
+            
+        Returns:
+            bool: True if all messages sent successfully, False otherwise
+        """
+        try:
+            # Create base header
+            header = "📋 आपके संसाधन की मांग की स्थिति:\n\n"
+            
+            # Calculate approximate length per work demand entry
+            sample_entry = "1. संसाधन मांग ID: 123\n   शीर्षक: Asset Demand Request\n   स्थिति: UNMODERATED\n\n"
+            entry_length = len(sample_entry)
+            
+            # Calculate how many entries can fit in one message
+            available_space = max_length - len(header) - 50  # 50 chars buffer for part indicator
+            entries_per_message = max(1, available_space // entry_length)
+            
+            total_messages = (len(work_demands) + entries_per_message - 1) // entries_per_message
+            
+            # Send messages
+            for msg_num in range(total_messages):
+                start_idx = msg_num * entries_per_message
+                end_idx = min(start_idx + entries_per_message, len(work_demands))
+                
+                # Create message text
+                if total_messages == 1:
+                    text = header
+                else:
+                    if msg_num == 0:
+                        text = header
+                    else:
+                        text = f"📋 आपके संसाधन की मांग की स्थिति (जारी):\n\n"
+                
+                # Add work demand entries
+                for i in range(start_idx, end_idx):
+                    demand = work_demands[i]
+                    demand_id = demand.get('id', 'N/A')
+                    title = demand.get('title', 'Asset Demand Request')
+                    status = demand.get('status', 'UNMODERATED')
+                    transcription = demand.get('transcription', '')
+                    
+                    text += f"{i + 1}. संसाधन मांग ID: {demand_id}\n"
+                    text += f"   शीर्षक: {title}\n"
+                    text += f"   स्थिति: {status}\n"
+                    
+                    # Add transcription if available and not empty
+                    if transcription and transcription.strip():
+                        # Truncate long transcriptions
+                        if len(transcription) > 50:
+                            transcription = transcription[:50] + "..."
+                        text += f"   विवरण: {transcription}\n"
+                    
+                    text += "\n"
+                
+                # Add part indicator for multiple messages
+                if total_messages > 1:
+                    text += f"(भाग {msg_num + 1}/{total_messages})"
+                
+                # Send message
+                response = bot_interface.api.send_text(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=contact_number,
+                    text=text
+                )
+                
+                if not response or not response.get('messages'):
+                    print(f"Failed to send message part {msg_num + 1}/{total_messages}")
+                    return False
+                
+                print(f"Sent message part {msg_num + 1}/{total_messages} successfully")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error in _send_work_demands_with_limit: {e}")
+            return False
+

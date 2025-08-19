@@ -5,9 +5,9 @@
       {
         "text": [
           {
-            "hi": "📋 कार्य मांग पंजीकरण\n\nकृपया अपनी कार्य मांग दर्ज करने के लिए निम्नलिखित चरणों का पालन करें।",
-            "en": "📋 Work Demand Registration\n\nPlease follow the steps below to register your work demand.",
-            "default": "📋 Work Demand Registration\n\nPlease follow the steps below to register your work demand."
+            "hi": "📋 संसाधन मांग पंजीकरण\n\nकृपया अपनी संसाधन मांग दर्ज करने के लिए निम्नलिखित चरणों का पालन करें।",
+            "en": "📋 Asset Demand Registration\n\nPlease follow the steps below to register your asset demand.",
+            "default": "📋 Asset Demand Registration\n\nPlease follow the steps below to register your asset demand."
           }
         ]
       },
@@ -69,9 +69,9 @@
       {
         "text": [
           {
-            "hi": "🎤 कृपया अपने कार्य मांग की जानकारी के लिए एक ऑडियो रिकॉर्ड करें।\n\nऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• अपनी कार्य मांग का विस्तृत विवरण",
-            "en": "🎤 Please record an audio for your work demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your work demand",
-            "default": "🎤 Please record an audio for your work demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your work demand"
+            "hi": "🎤 कृपया अपने संसाधन मांग की जानकारी के लिए एक ऑडियो रिकॉर्ड करें।\n\nऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• अपनी संसाधन मांग का विस्तृत विवरण",
+            "en": "🎤 Please record an audio for your asset demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your asset demand",
+            "default": "🎤 Please record an audio for your asset demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your asset demand"
           }
         ]
       },
@@ -140,9 +140,9 @@
       {
         "text": [
           {
-            "hi": "✅ धन्यवाद! आपकी कार्य मांग सफलतापूर्वक दर्ज कर दी गई है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
-            "en": "✅ Thank you! Your work demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat.",
-            "default": "✅ Thank you! Your work demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat."
+            "hi": "✅ धन्यवाद! आपकी संसाधन मांग सफलतापूर्वक दर्ज कर दी गई है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you! Your asset demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you! Your asset demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat."
           }
         ]
       },

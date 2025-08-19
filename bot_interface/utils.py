@@ -1624,4 +1624,12 @@ def callFunctionByName(funct_name, app_type, data_dict):
         print(f"calling send_join_success_message with data_dict: {data_dict}")
         event = whatsappInterface.send_join_success_message(bot_instance_id=bot_id, data_dict=data_dict)
         print(f"send_join_success_message returned: {event}")
+    elif funct_name == 'fetch_work_demand_status':
+        print(f"calling fetch_work_demand_status with data_dict: {data_dict}")
+        event = whatsappInterface.fetch_work_demand_status(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"fetch_work_demand_status returned: {event}")
+    elif funct_name == 'display_work_demands_text':
+        print(f"calling display_work_demands_text with data_dict: {data_dict}")
+        event = whatsappInterface.display_work_demands_text(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"display_work_demands_text returned: {event}")
     return event
