@@ -41,6 +41,8 @@ def evapotranspiration(
             layer_name=f"{asset_suffix}_evapotranspiration",
         )
         db_end_year = layer_obj.misc["end_year"]
+        print("db_end_year", db_end_year)
+        print("end_year", end_year)
         if db_end_year < end_year:
             new_start_year = db_end_year
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"

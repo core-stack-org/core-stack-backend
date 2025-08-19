@@ -48,7 +48,8 @@ def run_off(
 
         db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-
+        print("db_end_date", db_end_date)
+        print("end_date", end_date)
         if db_end_date < end_date:
             new_start_date = db_end_date + relativedelta(months=1, day=1)
             new_start_date = new_start_date.strftime("%Y-%m-%d")
