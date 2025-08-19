@@ -16,6 +16,8 @@ import time
 from datetime import datetime, timedelta
 import subprocess
 from requests.exceptions import RequestException
+
+from django.conf import settings
 # from pydub import AudioSegment
 # from pydub.utils import which
 
@@ -23,7 +25,7 @@ from requests.exceptions import RequestException
 processed_message_ids = set()
 
 # Define WhatsApp media path
-WHATSAPP_MEDIA_PATH = "/home/dibyendu/media/"
+WHATSAPP_MEDIA_PATH = "{settings.WHATSAPP_MEDIA_PATH}"
 
 # Create the directory if it doesn't exist
 os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)
