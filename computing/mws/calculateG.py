@@ -49,7 +49,7 @@ def calculate_g(
             end_date = end_date.strftime("%Y-%m-%d")
             ee.data.deleteAsset(asset_id)
         else:
-            return None, asset_id
+            return asset_id
 
     fc = ee.FeatureCollection(delta_g_asset_id).getInfo()
     features = fc["features"]
