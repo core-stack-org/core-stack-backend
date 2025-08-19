@@ -62,7 +62,7 @@ response_param = openapi.Parameter('X-API-Key', openapi.IN_HEADER, description="
     manual_parameters=[latitude_param, longitude_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON data having admin details.",
             examples={
                 "application/json": {
                     "State": "UTTAR PRADESH",
@@ -132,7 +132,7 @@ def get_admin_details_by_lat_lon(request):
     manual_parameters=[latitude_param, longitude_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON data having admin detail with mws_id.",
             examples={
                 "application/json": {
                     "uid": "12_234647",
@@ -206,7 +206,7 @@ def get_mws_by_lat_lon(request):
     manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON data for the mws_id.",
             examples={
                 "application/json": {
                     "hydrological_annual": [
@@ -305,7 +305,7 @@ def get_mws_json_by_stats_excel(request):
     manual_parameters=[state_param, district_param, tehsil_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON data for the tehsil.",
             examples={
                 "application/json": {
                     "aquifer_vector": [
@@ -426,7 +426,7 @@ def generate_tehsil_data(request):
     manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON data of the KYL Indicator for the mws_id.",
             examples={
                 "application/json": [
                     {
@@ -512,7 +512,7 @@ def get_mws_json_by_kyl_indicator(request):
     manual_parameters=[state_param, district_param, tehsil_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON data for the generated layers.",
             examples={
                 "application/json": [
                 {
@@ -586,7 +586,7 @@ def get_generated_layer_urls(request):
     manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
     responses={
         200: openapi.Response(
-            description="Success",
+            description="Success - It will return JSON having mws report url.",
             examples={
                 "application/json": {
                     "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104",
