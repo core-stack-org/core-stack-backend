@@ -88,7 +88,7 @@ class Item_category(models.Model):
 class Item_type(models.TextChoices):
     STORY = "STORY", "STORY"
     GRIEVANCE = "GRIEVANCE", "GRIEVANCE"
-    WORK_DEMAND = "WORK_DEMAND", "WORK_DEMAND"
+    ASSET_DEMAND = "ASSET_DEMAND", "ASSET_DEMAND"
     CONTENT = "CONTENT", "CONTENT"
 
 
@@ -114,7 +114,7 @@ ITEM_TYPE_STATE_MAP = {
         Item_state.RESOLVED,
         Item_state.REJECTED
     ],
-    Item_type.WORK_DEMAND: [
+    Item_type.ASSET_DEMAND: [
         Item_state.UNMODERATED,
         Item_state.ACCEPTED_STAGE_1,
         Item_state.REJECTED_STAGE_1,
