@@ -1353,7 +1353,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     last_community_name = current_communities[0].get('community_name', 'Unknown Community')
                 
                 # Create welcome message
-                welcome_text = f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।\n\nआप कैसे आगे बढ़ना चाहते हैं:"
+                welcome_text = f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।"
                 
                 # Send text message
                 response = bot_interface.api.send_text(
@@ -1435,6 +1435,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             "label": community_name,
                             "description": f"Select {community_name}"
                         })
+                
+                # Add option to continue with last accessed community
+                communities_menu_list.append({
+                    "value": "continue_last_accessed",
+                    "label": "पिछला समुदाय चुनें",
+                    "description": "अपने पिछले समुदाय के साथ वापस जाएं"
+                })
                 
                 print(f"Generated community menu: {communities_menu_list}")
                 
@@ -1587,7 +1594,22 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 # For button events, extract community ID from button value (misc field)
                 button_value = event_data.get("misc") or event_data.get("data")
                 print(f"DEBUG: Button event detected - button_value: {button_value}")
-                if button_value and button_value.startswith("community_"):
+                
+                if button_value == "continue_last_accessed":
+                    # User wants to continue with last accessed community
+                    print(f"DEBUG: User chose to continue with last accessed community")
+                    # Get last accessed community from API or user data
+                    bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+                    success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
+                    if success and api_response.get('success'):
+                        community_data = api_response.get('data', {})
+                        community_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                        print(f"DEBUG: Got last accessed community ID from API: {community_id}")
+                    else:
+                        # Fallback to stored data
+                        community_id = bot_user.user_misc.get('community_membership', {}).get('last_accessed_community_id')
+                        print(f"DEBUG: Got last accessed community ID from stored data: {community_id}")
+                elif button_value and button_value.startswith("community_"):
                     community_id = button_value.split("_")[1]
                     print(f"DEBUG: Extracted community ID from button: {community_id}")
                 else:
@@ -1596,7 +1618,21 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 # For non-button events, extract from event field
                 event = data_dict.get("event", "")
                 print(f"DEBUG: Non-button event - processing event: {event}")
-                if event.startswith("community_"):
+                
+                if event == "continue_last_accessed":
+                    # User wants to continue with last accessed community
+                    print(f"DEBUG: User chose to continue with last accessed community (event)")
+                    bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+                    success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
+                    if success and api_response.get('success'):
+                        community_data = api_response.get('data', {})
+                        community_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                        print(f"DEBUG: Got last accessed community ID from API: {community_id}")
+                    else:
+                        # Fallback to stored data
+                        community_id = bot_user.user_misc.get('community_membership', {}).get('last_accessed_community_id')
+                        print(f"DEBUG: Got last accessed community ID from stored data: {community_id}")
+                elif event.startswith("community_"):
                     community_id = event.split("_")[1]
                     print(f"DEBUG: Extracted community ID from event: {community_id}")
             
@@ -1704,25 +1740,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             event = data_dict.get("event", "")
             print(f"Handling service selection for event: {event}")
             
-            # If this is a back navigation request, determine correct back event
-            if event == "back_to_community":
-                # Get navigation context from misc_data
-                navigation_context = user.misc_data.get('navigation_context') if user.misc_data else None
-                
-                print(f"Navigation context: {navigation_context}")
-                
-                if navigation_context == "single_community":
-                    return "back_from_single"
-                elif navigation_context == "multiple_community":
-                    return "back_from_multiple"
-                elif navigation_context == "community_selection":
-                    return "back_from_selection"
-                else:
-                    print(f"Unknown navigation context: {navigation_context}")
-                    return "failure"
-            else:
-                # For non-back events (work_demand, grievance), pass through the event
-                return event
+            # For all events (work_demand, grievance, exit_session, etc.), pass through the event
+            return event
                 
         except Exception as e:
             print(f"Error in handle_service_selection: {e}")

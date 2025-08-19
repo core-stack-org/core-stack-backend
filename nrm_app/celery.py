@@ -31,6 +31,6 @@ def setup_django_signals(sender=None, **kwargs):
     try:
         # Import signals to register them in worker process
         import bot_interface.signals
-        logger.info("✅ Django signals registered in Celery worker process")
+        # logger.info("✅ Django signals registered in Celery worker process")
     except Exception as e:
         logger.error(f"❌ Failed to register Django signals in worker: {e}")

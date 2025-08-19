@@ -213,14 +213,22 @@ class StateMapData(object):
                     transition_dict = self.findTransitiondict(current_state)
                     
                     if transition_dict and self._is_valid_transition_event(function_result, transition_dict):
-                        # Function result matches a valid transition event
-                        print(f"Function '{pre_action.get('function')}' returned '{function_result}' - valid transition event for state '{current_state}'")
-                        print(f"Available transitions for state '{current_state}': {[list(t.keys())[0] + ': ' + str(list(t.values())[0]) for t in transition_dict]}")
-                        return {
-                            "event": function_result,
-                            "action": "state_transition",
-                            "state": current_state
-                        }
+                        # Check if this is the last function in preAction
+                        current_function_index = pre_action_list.index(pre_action)
+                        is_last_function = current_function_index == len(pre_action_list) - 1
+                        
+                        if is_last_function:
+                            # Only return early for the last function
+                            print(f"Last function '{pre_action.get('function')}' returned '{function_result}' - valid transition event for state '{current_state}'")
+                            print(f"Available transitions for state '{current_state}': {[list(t.keys())[0] + ': ' + str(list(t.values())[0]) for t in transition_dict]}")
+                            return {
+                                "event": function_result,
+                                "action": "state_transition",
+                                "state": current_state
+                            }
+                        else:
+                            # For intermediate functions, just log and continue
+                            print(f"Intermediate function '{pre_action.get('function')}' returned '{function_result}' - valid transition event but continuing to next function")
                     else:
                         # Function result doesn't match any valid transition
                         if transition_dict:

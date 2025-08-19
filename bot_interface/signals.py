@@ -12,7 +12,7 @@ from .interface.whatsapp import WhatsAppInterface
 logger = logging.getLogger(__name__)
 
 # Add debug print to confirm signal registration
-print("📡 bot_interface.signals module loaded - registering post_save signal")
+# print("bot_interface.signals module loaded - registering post_save signal")
 
 
 def async_process_work_demand(user_log_id):

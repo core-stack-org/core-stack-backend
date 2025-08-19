@@ -25,7 +25,7 @@ from django.conf import settings
 processed_message_ids = set()
 
 # Define WhatsApp media path
-WHATSAPP_MEDIA_PATH = "{settings.WHATSAPP_MEDIA_PATH}"
+WHATSAPP_MEDIA_PATH = settings.WHATSAPP_MEDIA_PATH
 
 # Create the directory if it doesn't exist
 os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)

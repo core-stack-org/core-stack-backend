@@ -209,9 +209,7 @@
     "preAction": [
       {
         "function": "send_join_success_message"
-      }
-    ],
-    "postAction": [
+      },
       {
         "data": [
           {
@@ -222,6 +220,7 @@
         "function": "jumpToSmj"
       }
     ],
+    "postAction": [],
     "transition": [
         {
             "COMPLETE": ["success"]
