@@ -105,6 +105,7 @@ def generate_hydrology(
 
     if state and district and block:
         if is_gee_asset_exists(et_asset_id):
+            make_asset_public(et_asset_id)
             save_layer_info_to_db(
                 state,
                 district,
@@ -115,9 +116,9 @@ def generate_hydrology(
                 misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Evapotranspiration info at the gee level...")
-            make_asset_public(et_asset_id)
 
         if is_gee_asset_exists(ppt_asset_id):
+            make_asset_public(ppt_asset_id)
             save_layer_info_to_db(
                 state,
                 district,
@@ -128,9 +129,9 @@ def generate_hydrology(
                 misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Precipitation info at the gee level...")
-            make_asset_public(ppt_asset_id)
 
         if is_gee_asset_exists(ro_asset_id):
+            make_asset_public(ro_asset_id)
             save_layer_info_to_db(
                 state,
                 district,
@@ -141,7 +142,6 @@ def generate_hydrology(
                 misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Run Off info at the gee level...")
-            make_asset_public(ro_task_id)
 
     dg_task_id, delta_g_asset_id = delta_g(
         roi=roi,
