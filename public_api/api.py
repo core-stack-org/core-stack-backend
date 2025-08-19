@@ -122,7 +122,7 @@ def get_admin_details_by_lat_lon(request):
     **Response dataset details:**
     ```
         [
-            "uid": "mws_id"
+            "uid": "MWS_id"
             "State": "State name",
             "District": "District name",
             "Tehsil": "Tehsil name"
@@ -190,7 +190,7 @@ def get_mws_by_lat_lon(request):
             {
                     "hydrological_annual": [
                         {
-                            "uid": "mws_id",
+                            "uid": "MWS_id",
                             "et_in_mm_2017-2018": "Evapotranspiration for year in mm",
                             "runoff_in_mm_2017-2018": "Runoff for year in mm",
                             "g_in_mm_2017-2018": "Groundwater for year in mm",
@@ -292,9 +292,9 @@ def get_mws_json_by_stats_excel(request):
         [
            "aquifer_vector": [
                 {
-                    "uid": "Mws_id",
+                    "uid": "MWS_id",
                     "area_in_ha": "Area for the mws",
-                    "aquifer_class": "class for the aquifer",
+                    "aquifer_class": "Class for the aquifer",
                     "principle_aq_alluvium_percent": "Total percentage area under aquifer class",
                     "principle_aq_banded gneissic complex_percent": "Total percentage area under aquifer class"
                 }
@@ -407,18 +407,18 @@ def generate_tehsil_data(request):
     ```
         [
             {
-                "mws_id": "Mws id",
-                "terraincluster_id": "cluster id",
-                "avg_precipitation": "average precipitation in mm",
-                "cropping_intensity_trend": "Cropping Intensity trend value",
+                "mws_id": "MWS id",
+                "terraincluster_id": "Cluster id",
+                "avg_precipitation": "Average precipitation in mm",
+                "cropping_intensity_trend": "Cropping intensity trend value",
                 "cropping_intensity_avg": "Average cropping Intensity",
                 "avg_single_cropped": "Average Single cropped area",
                 "avg_double_cropped": "Average Double cropped area",
                 "avg_triple_cropped": "Average Triple cropped area",
                 ".................": ".................",
-                "avg_number_dry_spell": ""average number of dry spell,
-                "avg_runoff": "average runoff",
-                "total_nrega_assets": "total nrega assets"
+                "avg_number_dry_spell": "Average number of dry spell",
+                "avg_runoff": "Average runoff",
+                "total_nrega_assets": "Total nrega assets"
             }
         ]
     ```
@@ -500,10 +500,10 @@ def get_mws_json_by_kyl_indicator(request):
     **Example Response:**
     ```
         [
-                "layer_name": "name of the layer",
-                "layer_type": "vector/ raster",
-                "layer_url": "geoserver url for the layer",
-                "layer_version": "1.0",
+                "layer_name": "Name of the layer",
+                "layer_type": "Vector/ Raster",
+                "layer_url": "Geoserver url for the layer",
+                "layer_version": "Version of the layer",
                 "style_url": "Url for the style",
                 "gee_asset_path": "GEE Asset path for the layer"
         ]
