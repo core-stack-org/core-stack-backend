@@ -85,7 +85,7 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
             "layer_type": layer_type,
             "layer_url": layer_url,
             "layer_version": dataset.layer_version,
-            "style_url": style_url,
+            "style_url": '',
             "gee_asset_path": gee_asset_path
         })
 
@@ -102,7 +102,7 @@ def get_location_info_by_lat_lon(lat, lon):
         intersected = feature_collection.filterBounds(point)
         collection_size = intersected.size().getInfo()
         if collection_size == 0:
-            return Response({"error": "Latitude and longitude in not in SOI."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Latitude and longitude is not in SOI boundary."}, status=status.HTTP_404_NOT_FOUND)
         features = intersected.toList(intersected.size())
         for i in range(intersected.size().getInfo()):
             feature = ee.Feature(features.get(i))
@@ -120,7 +120,7 @@ def get_mws_id_by_lat_lon(lon, lat):
     print("Data dict for the lat lon", data_dict)
     if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
         return Response(
-            {"error": "Latitude and longitude are not in SOI."},status=status.HTTP_404_NOT_FOUND)
+            {"error": "Latitude and longitude is not in SOI boundary."},status=status.HTTP_404_NOT_FOUND)
     state = data_dict.get('State')
     district = data_dict.get('District')
     tehsil = data_dict.get('Tehsil')
@@ -136,7 +136,7 @@ def get_mws_id_by_lat_lon(lon, lat):
             data_dict["uid"] = uid
             return data_dict
         else:
-            return Response({"error": "Layer is not generated for the given lat lon location."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Mws Layer is not generated for the given lat lon location."}, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
         print("Exception while getting mws_id using lat lon", str(e))
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
