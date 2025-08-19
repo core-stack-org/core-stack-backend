@@ -78,4 +78,5 @@ def precipitation(
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
-    return task_id, asset_id
+    layer_name_suffix = "annual" if is_annual else "fortnight"
+    return task_id, asset_id, layer_name_suffix

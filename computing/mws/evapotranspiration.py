@@ -63,14 +63,17 @@ def evapotranspiration(
 
         task_list = check_task_status(task_ids)
         print("Task list ", task_list)
+        layer_name_suffix = "fortnight"
         return (
             merge_assets_chunked_on_year(chunk_assets, description, asset_id),
             asset_id,
+            layer_name_suffix,
         )
     else:
         print("In else")
         start_date = f"{start_year}-07-01"
         end_date = f"{end_year}-06-30"
+        layer_name_suffix = "annual"
         return (
             calculate_et(
                 roi,
@@ -81,6 +84,7 @@ def evapotranspiration(
                 is_annual,
             ),
             asset_id,
+            layer_name_suffix,
         )
 
 

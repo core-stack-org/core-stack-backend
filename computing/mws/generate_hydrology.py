@@ -66,7 +66,7 @@ def generate_hydrology(
             + "_uid"
         )
 
-    ppt_task_id, ppt_asset_id = precipitation(
+    ppt_task_id, ppt_asset_id, ppt_layer_name_suffix = precipitation(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -78,7 +78,7 @@ def generate_hydrology(
     if ppt_task_id:
         task_list.append(ppt_task_id)
 
-    et_task_id, et_asset_id = evapotranspiration(
+    et_task_id, et_asset_id, et_layer_name_suffix = evapotranspiration(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -90,7 +90,7 @@ def generate_hydrology(
     if et_task_id:
         task_list.append(et_task_id)
 
-    ro_task_id, ro_asset_id = run_off(
+    ro_task_id, ro_asset_id, ro_layer_name_suffix = run_off(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -111,7 +111,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name=f"{district}_{block}_evapotranspiration",
+                layer_name=f"{district}_{block}_evapotranspiration_{et_layer_name_suffix}",
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
                 misc={"start_year": start_year, "end_year": end_year},
@@ -124,7 +124,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name=f"{district}_{block}_precipitation",
+                layer_name=f"{district}_{block}_precipitation_{ppt_layer_name_suffix}",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
                 misc={"start_year": start_year, "end_year": end_year},
@@ -137,7 +137,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name=f"{district}_{block}_run_off",
+                layer_name=f"{district}_{block}_run_off_{ro_layer_name_suffix}",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
                 misc={"start_year": start_year, "end_year": end_year},

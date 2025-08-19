@@ -87,7 +87,8 @@ def run_off(
         runoff_task_id = generate_run_off(
             roi, description, asset_id, start_date, end_date, is_annual
         )
-    return runoff_task_id, asset_id
+    layer_name_suffix = "annual" if is_annual else "fortnight"
+    return runoff_task_id, asset_id, layer_name_suffix
 
 
 def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual):
