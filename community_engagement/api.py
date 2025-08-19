@@ -629,7 +629,7 @@ def get_items_status(request):
         contact_number = request.query_params.get("number")
         bot_id = request.query_params.get("bot_id")
         community_id = request.query_params.get("community_id")
-        work_demand_only = request.query_params.get("work_demand_only", "false").lower() == "true"
+        asset_demand_only = request.query_params.get("asset_demand_only", "false").lower() == "true"
 
         if not contact_number:
             return Response(
@@ -652,8 +652,8 @@ def get_items_status(request):
 
         items_qs = Item.objects.filter(user=user)
 
-        if work_demand_only:
-            items_qs = items_qs.filter(item_type=Item_type.WORK_DEMAND)
+        if asset_demand_only:
+            items_qs = items_qs.filter(item_type=Item_type.ASSET_DEMAND)
 
         if community_id:
             items_qs = items_qs.filter(community_id=community_id)

@@ -23,7 +23,7 @@ from requests.exceptions import RequestException
 processed_message_ids = set()
 
 # Define WhatsApp media path
-WHATSAPP_MEDIA_PATH = "/home/sohan/community-stack/core-stack-backend/bot_interface/media/"
+WHATSAPP_MEDIA_PATH = "/home/dibyendu/media/"
 
 # Create the directory if it doesn't exist
 os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)
