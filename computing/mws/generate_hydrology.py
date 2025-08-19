@@ -113,7 +113,7 @@ def generate_hydrology(
                 layer_name=f"{district}_{block}_evapotranspiration",
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
-                misc={"start_year": start_year, "end_year": end_year - 1},
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Evapotranspiration info at the gee level...")
 
@@ -126,7 +126,7 @@ def generate_hydrology(
                 layer_name=f"{district}_{block}_precipitation",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
-                misc={"start_year": start_year, "end_year": end_year - 1},
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Precipitation info at the gee level...")
 
@@ -139,7 +139,7 @@ def generate_hydrology(
                 layer_name=f"{district}_{block}_run_off",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
-                misc={"start_year": start_year, "end_year": end_year - 1},
+                misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Run Off info at the gee level...")
 
