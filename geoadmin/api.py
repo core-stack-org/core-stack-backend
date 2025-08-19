@@ -17,22 +17,20 @@ from utilities.auth_check_decorator import api_security_check
 
 # state id is the census code while the district id is the id of the district from the DB
 # block id is the id of the block from the DB
-@api_view(["GET"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
 @schema(None)
-@api_security_check(auth_type="Auth_free", allowed_methods=["GET"])
 def get_states(request):
     try:
         states = State.objects.all()
         serializer = StateSerializer(states, many=True)
-        return Response(serializer.data)
+        return Response({"states": serializer.data}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_states api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
-@auth_free
+
+@api_security_check(auth_type="Auth_free")
 @schema(None)
 def get_districts(request, state_id):
     try:
@@ -44,8 +42,7 @@ def get_districts(request, state_id):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
 @schema(None)
 def get_blocks(request, district_id):
     try:
@@ -119,8 +116,7 @@ def activate_entities(request):
         )
 
 
-@api_view(["GET"])
-@auth_free
+@api_security_check(auth_type="Auth_free")
 @schema(None)
 def proposed_blocks(request):
     try:
@@ -241,7 +237,6 @@ def activate_location(request):
     except Exception as e:
         print(f"Exception in activate_location api: {e}")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 @api_security_check(allowed_methods="POST")
@@ -383,4 +378,3 @@ def get_user_api_keys(request):
             {"success": False, "error": str(e)}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-

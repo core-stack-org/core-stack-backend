@@ -1,23 +1,48 @@
 import ee
+import os
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
+    is_gee_asset_exists,
 )
 from datetime import datetime
+from rest_framework.response import Response
+from rest_framework import status
 from nrm_app.settings import EXCEL_PATH
 import json
 import pandas as pd
 import numpy as np
 from stats_generator.mws_indicators import get_generate_filter_mws_data
 import json
-
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 from stats_generator.models import LayerInfo
+from computing.models import Layer, Dataset, LayerType
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 
 # Create your views here.
+
+def is_valid_string(value):
+    if not value:
+        return True
+    cleaned = value.replace(" ", "").replace("_", "")
+    return cleaned.isalpha()
+
+def is_valid_mws_id(value):
+    if not value:
+        return True
+    return all(c.isdigit() or c == '_' for c in value)
+
+def excel_file_exists(state, district, tehsil):
+    base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
+    state_path = os.path.join(base_path, state.upper())
+    district_path = os.path.join(state_path, district.upper())
+    filename = f"{district}_{tehsil}.xlsx"
+    file_path = os.path.join(district_path, filename)
+    return os.path.exists(file_path)
+
 
 def raster_tiff_download_url(workspace, layer_name):
     geotiff_url = f"{GEOSERVER_URL}/{workspace}/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId={workspace}:{layer_name}&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
@@ -25,49 +50,16 @@ def raster_tiff_download_url(workspace, layer_name):
     return geotiff_url
 
 
-# def fetch_generated_layer_urls(district, block):
-#     """
-#     Fetch all vector and raster layers and return their metadata as JSON.
-#     """
-#     all_layers = LayerInfo.objects.all()
-#     layer_data = []
-
-#     for layer in all_layers:
-#         workspace = layer.workspace
-#         layer_type = layer.layer_type
-#         layer_desc = layer.layer_desc
-#         style_name = layer.style_name
-#         layer_name = layer.layer_name.format(district=district, block=block)
-
-#         if layer_type == "vector":
-#             layer_url = get_url(workspace, layer_name)
-#         elif layer_type == "raster":
-#             layer_url = raster_tiff_download_url(workspace, layer_name)
-#         else:
-#             continue  # skip unknown layer types
-
-#         layer_data.append({
-#             "layer_desc": layer_desc,
-#             "layer_type": layer_type,
-#             "layer_url": layer_url,
-#             "style_name": style_name
-#         })
-
-#     return layer_data
-
-
 def fetch_generated_layer_urls(state_name, district_name, block_name):
     """
     Fetch all vector and raster layers for given state, district, and block,
     and return their metadata as JSON.
     """
-    # Get all layers matching the state, district, and block
-    layers = Layer.objects.filter(
-        state__name__iexact=state_name,
-        district__name__iexact=district_name,
-        block__name__iexact=block_name
-    ).select_related('dataset', 'state', 'district', 'block')
+    state = StateSOI.objects.get(state_name__iexact=state_name)
+    district = DistrictSOI.objects.get(district_name__iexact=district_name, state=state)
+    tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
     
+    layers = Layer.objects.filter(state=state, district=district, block=tehsil)
     layer_data = []
 
     for layer in layers:
@@ -75,25 +67,30 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         workspace = dataset.workspace
         layer_type = dataset.layer_type
         layer_name = layer.layer_name
-        
-        # Get layer description from misc if available, otherwise use dataset name
-        layer_desc = dataset.misc.get('description', dataset.name) if dataset.misc else dataset.name
-        
-        if layer_type == "vector":
+        gee_asset_path = layer.gee_asset_path
+
+        # Safely get misc data
+        misc = dataset.misc or {}
+        style_url = dataset.style_name
+
+        if layer_type in [LayerType.VECTOR, LayerType.POINT]:
             layer_url = get_url(workspace, layer_name)
-        elif layer_type == "raster":
+        elif layer_type == LayerType.RASTER:
             layer_url = raster_tiff_download_url(workspace, layer_name)
         else:
-            continue  # skip unknown layer types
+            continue  # Skip unknown types
 
         layer_data.append({
-            "layer_desc": layer_desc,
+            "layer_name": dataset.name,
             "layer_type": layer_type,
             "layer_url": layer_url,
-            "style_name": dataset.style_name
+            "layer_version": dataset.layer_version,
+            "style_url": '',
+            "gee_asset_path": gee_asset_path
         })
 
     return layer_data
+        
 
 
 
@@ -101,31 +98,48 @@ def get_location_info_by_lat_lon(lat, lon):
     ee_initialize()
     point = ee.Geometry.Point([lon, lat])
     feature_collection = ee.FeatureCollection("projects/corestack-datasets/assets/datasets/SOI_tehsil")
-    intersected = feature_collection.filterBounds(point)
-
-    features = intersected.toList(intersected.size())
-    for i in range(intersected.size().getInfo()):
-        feature = ee.Feature(features.get(i))
-        feature_loc = feature.getInfo()['properties']
-        locat_details = {"State": feature_loc.get('STATE'), "District": feature_loc.get('District'), "Tehsil": feature_loc.get('TEHSIL')}
-        return locat_details
+    try:
+        intersected = feature_collection.filterBounds(point)
+        collection_size = intersected.size().getInfo()
+        if collection_size == 0:
+            return Response({"error": "Latitude and longitude is not in SOI boundary."}, status=status.HTTP_404_NOT_FOUND)
+        features = intersected.toList(intersected.size())
+        for i in range(intersected.size().getInfo()):
+            feature = ee.Feature(features.get(i))
+            feature_loc = feature.getInfo()['properties']
+            locat_details = {"State": feature_loc.get('STATE'), "District": feature_loc.get('District'), "Tehsil": feature_loc.get('TEHSIL')}
+            return locat_details
+    except Exception as e:
+        print("Exception while getting admin details", str(e))
+        return {"State": "", "District": "", "Tehsil": ""}
 
 
 
 def get_mws_id_by_lat_lon(lon, lat):
     data_dict = get_location_info_by_lat_lon(lat, lon)
+    print("Data dict for the lat lon", data_dict)
+    if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
+        return Response(
+            {"error": "Latitude and longitude is not in SOI boundary."},status=status.HTTP_404_NOT_FOUND)
     state = data_dict.get('State')
     district = data_dict.get('District')
     tehsil = data_dict.get('Tehsil')
 
-    asset_path = get_gee_asset_path(state, district, tehsil)
-    mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
-    mws_fc = ee.FeatureCollection(mws_asset_id)
-    point = ee.Geometry.Point([lon, lat])
-    matching_feature = mws_fc.filterBounds(point).first()
-    uid = ee.String(matching_feature.get('uid')).getInfo()
-    data_dict["uid"] = uid
-    return data_dict
+    try:
+        asset_path = get_gee_asset_path(state, district, tehsil)
+        mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
+        if is_gee_asset_exists(mws_asset_id):
+            mws_fc = ee.FeatureCollection(mws_asset_id)
+            point = ee.Geometry.Point([lon, lat])
+            matching_feature = mws_fc.filterBounds(point).first()
+            uid = ee.String(matching_feature.get('uid')).getInfo()
+            data_dict["uid"] = uid
+            return data_dict
+        else:
+            return Response({"error": "Mws Layer is not generated for the given lat lon location."}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        print("Exception while getting mws_id using lat lon", str(e))
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -212,4 +226,5 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
 
     except Exception as e:
         return {"error": f"Error reading or processing file: {str(e)}"}
+
 
