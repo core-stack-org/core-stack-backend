@@ -33,3 +33,6 @@ dashboard/
 
 # bot_interface
 bot_interface/migrations/
+
+# community_engagement
+community_engagement/migrations/
