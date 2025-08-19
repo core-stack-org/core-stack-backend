@@ -42,7 +42,7 @@ def evapotranspiration(
         )
         db_end_year = layer_obj.misc["end_year"]
         if db_end_year < end_year:
-            new_start_year = db_end_year + 1
+            new_start_year = db_end_year
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
             new_description = f"{description}_{new_start_year}_{end_year}"
             if not is_gee_asset_exists(new_asset_id):
