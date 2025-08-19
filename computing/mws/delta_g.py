@@ -55,7 +55,7 @@ def delta_g(
         if db_end_date < end_date:
             new_start_date = db_end_date + relativedelta(months=1, day=1)
             new_start_date = new_start_date.strftime("%Y-%m-%d")
-
+            end_date = end_date.strftime("%Y-%m-%d")
             new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
             new_description = f"{description}_{new_start_date}_{end_date}"
             if not is_gee_asset_exists(new_asset_id):
@@ -66,7 +66,7 @@ def delta_g(
                     asset_suffix,
                     new_description,
                     new_start_date,
-                    end_date.strftime("%Y-%m-%d"),
+                    end_date,
                     is_annual,
                 )
                 check_task_status([task_id])

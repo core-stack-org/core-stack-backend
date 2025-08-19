@@ -46,6 +46,7 @@ def calculate_g(
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
         if db_end_date < end_date:
+            end_date = end_date.strftime("%Y-%m-%d")
             ee.data.deleteAsset(asset_id)
         else:
             return None, asset_id
