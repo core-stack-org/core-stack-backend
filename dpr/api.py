@@ -22,20 +22,11 @@ from .gen_multi_mws_report import ( get_mws_data, get_terrain_mws_data, get_lulc
 from .utils import validate_email
 from utilities.logger import setup_logger
 from utilities.auth_utils import auth_free
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 from utilities.auth_check_decorator import api_security_check
-
 
 
 logger = setup_logger(__name__)
 
-
-state_param = openapi.Parameter('state',openapi.IN_QUERY,description="Name of the state (e.g. 'Uttar Pradesh')",type=openapi.TYPE_STRING,required=True)
-district_param = openapi.Parameter('district',openapi.IN_QUERY,description="Name of the district (e.g. 'Jaunpur')",type=openapi.TYPE_STRING,required=True)
-tehsil_param = openapi.Parameter('tehsil',openapi.IN_QUERY,description="Name of the tehsil (e.g. 'Badlapur')",type=openapi.TYPE_STRING,required=True)
-mws_id_param = openapi.Parameter('mws_id',openapi.IN_QUERY,description="Unique MWS identifier (e.g. '12_234647')",type=openapi.TYPE_STRING,required=True)
-authorization_param = openapi.Parameter('x-api-key', openapi.IN_HEADER, description="API Key in format: <your-api-key>", type=openapi.TYPE_STRING,required=True)
 
 @api_view(["POST"])
 @auth_free
@@ -78,29 +69,9 @@ def generate_dpr(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-########## Generate MWS Report   ###########
-@swagger_auto_schema(
-    method='get',
-    manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
-    respDataonses={
-        200: openapi.Response(
-            description="Success",
-            examples={
-                "application/json": {
-                    "Data": "MWs Report page will be rendered"
-                }
-            }
-        ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
-        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
-        500: openapi.Response(description="Internal Server Error")
-    }
-)
-
-
-
 @api_view(["GET"])
 @api_security_check(auth_type="API_key")
+@schema(None)
 def generate_mws_report(request):
     """
         Render MWS report based on given state, district, tehsil and MWS ID.
