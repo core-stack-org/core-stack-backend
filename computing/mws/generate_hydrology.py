@@ -98,14 +98,15 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
-
     if ro_task_id:
         task_list.append(ro_task_id)
+
     task_id_list = check_task_status(task_list) if len(task_list) > 0 else []
     print("task_id_list", task_id_list)
 
     if state and district and block:
         if is_gee_asset_exists(et_asset_id):
+            make_asset_public(et_asset_id)
             save_layer_info_to_db(
                 state,
                 district,
@@ -116,9 +117,9 @@ def generate_hydrology(
                 misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Evapotranspiration info at the gee level...")
-            make_asset_public(et_asset_id)
 
         if is_gee_asset_exists(ppt_asset_id):
+            make_asset_public(ppt_asset_id)
             save_layer_info_to_db(
                 state,
                 district,
@@ -129,9 +130,9 @@ def generate_hydrology(
                 misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Precipitation info at the gee level...")
-            make_asset_public(ppt_asset_id)
 
         if is_gee_asset_exists(ro_asset_id):
+            make_asset_public(ro_asset_id)
             save_layer_info_to_db(
                 state,
                 district,
@@ -142,7 +143,6 @@ def generate_hydrology(
                 misc={"start_year": start_year, "end_year": end_year},
             )
             print("save Run Off info at the gee level...")
-            make_asset_public(ro_task_id)
 
     dg_task_id, delta_g_asset_id = delta_g(
         roi=roi,
@@ -181,19 +181,15 @@ def generate_hydrology(
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    asset_id, task_id = calculate_g(
+    asset_id = calculate_g(
         delta_g_asset_id,
         asset_folder_list,
-        layer_name,
+        asset_suffix,
         app_type,
         start_date,
         end_date,
         is_annual,
     )
-
-    if task_id:
-        task_id_list = check_task_status([task_id])
-        print("task_id_list", task_id_list)
 
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)

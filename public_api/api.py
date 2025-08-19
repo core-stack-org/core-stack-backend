@@ -43,8 +43,22 @@ file_type_param = openapi.Parameter('file_type',openapi.IN_QUERY,description="Ou
 
 
 ########## Admin Details by lat lon ##########
+response_param = openapi.Parameter('X-API-Key', openapi.IN_HEADER, description="API Key in format: <your-api-key>", type=openapi.TYPE_STRING,required=True)
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve admin data based on given latitude and longitude coordinates.
+    
+    **Response dataset details:**
+    ```
+        [
+            "State": "State name",
+            "District": "District name",
+            "Tehsil": "Tehsil name"
+        ]
+    ```
+    """,
     manual_parameters=[latitude_param, longitude_param, authorization_param],
     responses={
         200: openapi.Response(
@@ -57,8 +71,9 @@ file_type_param = openapi.Parameter('file_type',openapi.IN_QUERY,description="Ou
                 }
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - Both 'latitude' and 'longitude' parameters are required. OR Latitude and longitude must be valid numbers(float)."),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Latitude and longitude is not in SOI boundary."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
@@ -100,6 +115,20 @@ def get_admin_details_by_lat_lon(request):
 ######### Get Mws Id by lat lon #########
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve MWS ID data based on given latitude and longitude coordinates.
+    
+    **Response dataset details:**
+    ```
+        [
+            "uid": "MWS_id"
+            "State": "State name",
+            "District": "District name",
+            "Tehsil": "Tehsil name"
+        ]
+    ```
+    """,
     manual_parameters=[latitude_param, longitude_param, authorization_param],
     responses={
         200: openapi.Response(
@@ -113,8 +142,9 @@ def get_admin_details_by_lat_lon(request):
                 }
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - Both 'latitude' and 'longitude' parameters are required. OR Latitude and longitude must be valid numbers(float)."),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Latitude and longitude is not in SOI boundary. OR Mws Layer is not generated for the given lat lon location."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
@@ -122,7 +152,7 @@ def get_admin_details_by_lat_lon(request):
 @api_security_check(auth_type="Auth_free")
 def get_mws_by_lat_lon(request):
     """
-        Retrieve MWS ID data based on given latitude and longitude coordinates.
+        Retrieve MWS ID based on given latitude and longitude coordinates.
     """
     print("Inside Get mws id by lat lon layer API")
     try:
@@ -150,6 +180,29 @@ def get_mws_by_lat_lon(request):
 ########## Get MWS Data by MWS ID  ##########
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve MWS data for a given state, district, tehsil, and MWS ID.
+    
+    **Response dataset details:**
+    ```
+        [
+            {
+                    "hydrological_annual": [
+                        {
+                            "uid": "MWS_id",
+                            "et_in_mm_2017-2018": "Evapotranspiration for year in mm",
+                            "runoff_in_mm_2017-2018": "Runoff for year in mm",
+                            "g_in_mm_2017-2018": "Groundwater for year in mm",
+                            "deltag_in_mm_2017-2018": "Change in groundwater for year in mm",
+                            "precipitation_in_mm_2017-2018": "Precipitation for year in mm",
+                            "welldepth_in_m_2017-2018": "Well Depth for year in m"
+                        }
+                    ]
+                }
+        ]
+    ```
+    """,
     manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
     responses={
         200: openapi.Response(
@@ -183,8 +236,9 @@ def get_mws_by_lat_lon(request):
                 }
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores. OR MWS id can only contain numbers and underscores."),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil. OR Data not found for the given mws_id."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
@@ -205,7 +259,7 @@ def get_mws_json_by_stats_excel(request):
             return Response({"error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
-            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "State/District/Tehsil must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_mws_id(mws_id):
             return Response({"error": "MWS id can only contain numbers and underscores"}, status=status.HTTP_400_BAD_REQUEST)
@@ -215,11 +269,11 @@ def get_mws_json_by_stats_excel(request):
         tehsil = tehsil_param.lower().strip().replace(" ", "_")
 
         if not excel_file_exists(state, district, tehsil):
-            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"Message": "Data not found for this state, district, tehsil"}, status=status.HTTP_404_NOT_FOUND)
 
         data = get_mws_json_from_stats_excel(state, district, tehsil, mws_id)
         if not data:
-            return Response({"error": "No data found for the given mws_id"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Data not found for the given mws_id"}, status=status.HTTP_404_NOT_FOUND)
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -229,6 +283,25 @@ def get_mws_json_by_stats_excel(request):
 ######### Get MWS DATA by Admin Details  ##########
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve tehsil-level JSON data for a given state, district, and tehsil.
+    
+    **Response dataset details:**
+    ```
+        [
+           "aquifer_vector": [
+                {
+                    "uid": "MWS_id",
+                    "area_in_ha": "Area for the mws",
+                    "aquifer_class": "Class for the aquifer",
+                    "principle_aq_alluvium_percent": "Total percentage area under aquifer class",
+                    "principle_aq_banded gneissic complex_percent": "Total percentage area under aquifer class"
+                }
+              ]  
+        ]
+    ```
+    """,
     manual_parameters=[state_param, district_param, tehsil_param, authorization_param],
     responses={
         200: openapi.Response(
@@ -257,8 +330,9 @@ def get_mws_json_by_stats_excel(request):
                 }
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - 'state', 'district', and 'tehsil' are required. OR State/District/Tehsil must contain only letters, spaces, and underscores"),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
@@ -266,7 +340,7 @@ def get_mws_json_by_stats_excel(request):
 @api_security_check(auth_type="API_key")
 def generate_tehsil_data(request):
     """
-        Retrieve Tehsil-level Excel or JSON data for a given state, district, and tehsil.
+        Retrieve Tehsil-level JSON data for a given state, district, and tehsil.
     """
     print("Inside generating tehsil excel data")
     try:
@@ -279,7 +353,7 @@ def generate_tehsil_data(request):
             return Response({"error": "'state', 'district', and 'tehsil' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
-            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "State/District/Tehsil must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
 
         state = state_param.lower().strip().replace(" ", "_")
         district = district_param.lower().strip().replace(" ", "_")
@@ -294,7 +368,7 @@ def generate_tehsil_data(request):
 
         if not os.path.exists(file_path):
             print("Excel file does not exist. Generating...")
-            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"Message": "Data not found for this state, district, tehsil"}, status=status.HTTP_404_NOT_FOUND)
 
         xls = pd.read_excel(file_path, sheet_name=None)
         json_data = {}
@@ -325,6 +399,30 @@ def generate_tehsil_data(request):
 ########### Get KYL Data based on MWS ID  ###############
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.
+    
+    **Example Response:**
+    ```
+        [
+            {
+                "mws_id": "MWS id",
+                "terraincluster_id": "Cluster id",
+                "avg_precipitation": "Average precipitation in mm",
+                "cropping_intensity_trend": "Cropping intensity trend value",
+                "cropping_intensity_avg": "Average cropping Intensity",
+                "avg_single_cropped": "Average Single cropped area",
+                "avg_double_cropped": "Average Double cropped area",
+                "avg_triple_cropped": "Average Triple cropped area",
+                ".................": ".................",
+                "avg_number_dry_spell": "Average number of dry spell",
+                "avg_runoff": "Average runoff",
+                "total_nrega_assets": "Total nrega assets"
+            }
+        ]
+    ```
+    """,
     manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
     responses={
         200: openapi.Response(
@@ -340,14 +438,7 @@ def generate_tehsil_data(request):
                         "avg_single_cropped": 8.2647,
                         "avg_double_cropped": 80.1709,
                         "avg_triple_cropped": 1.8198,
-                        "avg_wsr_ratio_kharif": 0.0262,
-                        "avg_wsr_ratio_rabi": 0.028,
-                        "avg_wsr_ratio_zaid": 0.43,
-                        "avg_kharif_surface_water_mws": 28.2033,
-                        "avg_rabi_surface_water_mws": 27.7095,
-                        "avg_zaid_surface_water_mws": 9.381,
-                        "trend_g": -1,
-                        "drought_category": 2,
+                        "..................": ".......",
                         "avg_number_dry_spell": 2.1667,
                         "avg_runoff": 167.7886,
                         "total_nrega_assets": 550
@@ -355,8 +446,9 @@ def generate_tehsil_data(request):
                 ]
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores OR MWS id can only contain numbers and underscores"),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil. OR Not Found - Data not found for the given mws_id."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
@@ -377,7 +469,7 @@ def get_mws_json_by_kyl_indicator(request):
             return Response({"error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
-            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "State/District/Tehsil must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_mws_id(mws_id):
             return Response({"error": "MWS id can only contain numbers and underscores"}, status=status.HTTP_400_BAD_REQUEST)
@@ -387,11 +479,11 @@ def get_mws_json_by_kyl_indicator(request):
         tehsil = tehsil_param.lower().strip().replace(" ", "_")
 
         if not excel_file_exists(state, district, tehsil):
-            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"Message": "Data not found for this state, district, tehsil."}, status=status.HTTP_404_NOT_FOUND)
 
         data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
         if not data:
-            return Response({"error": "No data found for the given mws_id"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Data not found for the given mws_id."}, status=status.HTTP_404_NOT_FOUND)
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -401,40 +493,56 @@ def get_mws_json_by_kyl_indicator(request):
 #############  Get Generated Layers Urls  ##################
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve generated layer URLs for a given state, district, and tehsil.
+    
+    **Example Response:**
+    ```
+        [
+                "layer_name": "Name of the layer",
+                "layer_type": "Vector/ Raster",
+                "layer_url": "Geoserver url for the layer",
+                "layer_version": "Version of the layer",
+                "style_url": "Url for the style",
+                "gee_asset_path": "GEE Asset path for the layer"
+        ]
+    ```
+    """,
     manual_parameters=[state_param, district_param, tehsil_param, authorization_param],
     responses={
         200: openapi.Response(
             description="Success",
             examples={
                 "application/json": [
-                    {
-                        "layer_desc": "Change Detection Afforestation",
-                        "layer_type": "raster",
-                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?...",
-                        "layer_version": "v1",
-                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Restoration/Afforestation_climate_change.qml"
+                {
+                        "layer_name": "SOGE",
+                        "layer_type": "vector",
+                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_nalanda_hilsa&outputFormat=application/json",
+                        "layer_version": "1.0",
+                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/SOGE_style.qml",
+                        "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/soge_vector_nalanda_hilsa"
                     },
                     {
-                        "layer_desc": "Aquifer layer data",
+                        "layer_name": "Drainage",
                         "layer_type": "vector",
-                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/aquifer/ows?...",
-                        "layer_version": "v1",
-                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/Aquifer_style.qml"
+                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/drainage/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=drainage:nalanda_hilsa&outputFormat=application/json",
+                        "layer_version": "1.0",
+                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/Drainage-Layer-Style.qml",
+                        "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/drainage_lines_nalanda_hilsa"
                     }
                 ]
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - 'state', 'district', and 'tehsil' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores"),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
 
 @api_security_check(auth_type="API_key")
 def get_generated_layer_urls(request):
-    """
-        Retrieve generated layer URLs for a given state, district, and tehsil.
-    """
     try:
         print("Inside Get Generated Layer Urls API.")
         state_param = request.query_params.get("state")
@@ -445,11 +553,11 @@ def get_generated_layer_urls(request):
             return Response({"error": "'state', 'district', and 'tehsil' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
-            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "State/District/Tehsil must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
 
         layers_details_json = fetch_generated_layer_urls(state_param, district_param, tehsil_param)
         if not layers_details_json:
-            return Response({"error": "No data found for the given location"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Data not found for this state, district, tehsil."}, status=status.HTTP_404_NOT_FOUND)
         return Response(layers_details_json, status=200)
 
     except Exception as e:
@@ -464,6 +572,17 @@ def get_generated_layer_urls(request):
 #############  Get MWS Report Urls  ##################
 @swagger_auto_schema(
     method='get',
+    operation_id='Requirements', 
+    operation_description="""
+    Retrieve MWS report url for a given state, district, tehsil and mws_id.
+    
+    **Response dataset details:**
+    ```
+        [
+            "Mws_report_url": "Url for the MWS report"
+        ]
+    ```
+    """,
     manual_parameters=[state_param, district_param, tehsil_param, mws_id_param, authorization_param],
     responses={
         200: openapi.Response(
@@ -474,17 +593,15 @@ def get_generated_layer_urls(request):
                 }
             }
         ),
-        400: openapi.Response(description="Bad Request - Invalid parameters"),
+        400: openapi.Response(description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores OR MWS id can only contain numbers and underscores"),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - Data not found for the given mws_id OR Data not found for this state, district, tehsil. OR Mws Layer not found for the given location."),
         500: openapi.Response(description="Internal Server Error")
     }
 )
 
 @api_security_check(auth_type="API_key")
 def get_mws_report_urls(request):
-    """
-        Retrieve MWS report url for a given state, district, tehsil and mws_id.
-    """
     try:
         print("Inside Get Generated Layer Urls API.")
         state_param = request.query_params.get("state")
@@ -496,7 +613,7 @@ def get_mws_report_urls(request):
             return Response({"error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."},status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_string(state_param) or not is_valid_string(district_param) or not is_valid_string(tehsil_param):
-            return Response({"error": "State must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "State/District/Tehsil must contain only letters, spaces, and underscores"}, status=status.HTTP_400_BAD_REQUEST)
 
         if not is_valid_mws_id(mws_id):
             return Response({"error": "MWS id can only contain numbers and underscores"}, status=status.HTTP_400_BAD_REQUEST)
@@ -509,15 +626,15 @@ def get_mws_report_urls(request):
         asset_path = get_gee_asset_path(state, district, tehsil)
         mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
         if not is_gee_asset_exists(mws_asset_id):
-            return Response({"error": f"Layer not found for the given location."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Mws Layer not found for the given location."}, status=status.HTTP_404_NOT_FOUND)
 
         mws_fc = ee.FeatureCollection(mws_asset_id)
         matching_feature = mws_fc.filter(ee.Filter.eq('uid', mws_id)).first()
         if matching_feature is None or matching_feature.getInfo() is None:
-            return Response({"error": f"MWS ID '{mws_id}' not found for the given location."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Data not found for the given mws_id"}, status=status.HTTP_404_NOT_FOUND)
 
         if not excel_file_exists(state, district, tehsil):
-            return Response({"Message": "Data not found for this location"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"Message": "Data not found for this state, district, tehsil."}, status=status.HTTP_404_NOT_FOUND)
 
         base_url = request.build_absolute_uri('/')[:-1]  
         report_url = f"{base_url}/api/v1/generate_mws_report/?state={state}&district={district}&block={tehsil}&uid={mws_id}"
