@@ -347,7 +347,6 @@ def make_asset_public(asset_id):
 
 
 def is_asset_public(asset_id):
-    ee_initialize()
     try:
         acl = ee.data.getAssetAcl(asset_id)
         if acl.get("all_users_can_read"):
@@ -615,3 +614,33 @@ def upload_shp_to_gee(shapefile_path, file_name, asset_id):
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id)
     if task_id:
         check_task_status([task_id], 100)
+
+
+def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
+    # Join on 'id'
+    joined = ee.Join.inner().apply(
+        primary=ee.FeatureCollection(asset_id),
+        secondary=ee.FeatureCollection(new_asset_id),
+        condition=ee.Filter.equals(leftField="id", rightField="id"),
+    )
+
+    # Merge properties from both collections
+    def merge_properties(f):
+        f1 = ee.Feature(f.get("primary"))
+        f2 = ee.Feature(f.get("secondary"))
+        return f1.copyProperties(f2)
+
+    merged = joined.map(merge_properties)
+    task_id = export_vector_asset_to_gee(
+        merged, f"{description}_merge", f"{asset_id}_merge"
+    )
+    task_list = check_task_status([task_id])
+    print("merge task completed.", task_list)
+
+    # Delete existing asset
+    ee.data.deleteAsset(asset_id)
+    ee.data.deleteAsset(new_asset_id)
+    # Rename new asset with existing asset's name
+    ee.data.copyAsset(f"{asset_id}_merge", asset_id)
+    # Delete new asset
+    ee.data.deleteAsset(f"{asset_id}_merge")
