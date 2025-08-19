@@ -32,19 +32,16 @@ def crop_grids_lulc(state, district, block):
         + "_with_uid_16ha"
     )
 
-    asset_id = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "crop_gridXlulc_"
+    # Generate crop tiles
+    description = (
+        "crop_gridXlulc_"
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
         + "_with_uid_16ha"
     )
 
-    # Generate crop tiles
-    description = (
-        "crop_gridXlulc_" + valid_gee_text(district) + "_" + valid_gee_text(block)
-    )
+    asset_id = get_gee_asset_path(state, district, block) + description
     crop_tiles = lulc_crop_tiles(tiles_uid, lulc_image)
     layer_name = f"{valid_gee_text(district)}_{valid_gee_text(block.lower())}_grid"
     task = export_vector_asset_to_gee(crop_tiles, description, asset_id)
