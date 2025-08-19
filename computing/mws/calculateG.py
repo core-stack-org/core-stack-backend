@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     check_task_status,
 )
 import geopandas as gpd
+from computing.models import Layer, Dataset
 
 
 def calculate_g(
@@ -22,19 +23,34 @@ def calculate_g(
     end_date,
     is_annual,
 ):
-
     layer_name = (
         "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
     ) + asset_suffix
-
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + layer_name
     )
+
     if is_gee_asset_exists(asset_id):
-        return None, asset_id
+        dataset = Dataset.objects.get(name="Hydrology")
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=layer_name,
+        )
+        db_end_date = layer_obj.misc["end_year"]
+        db_end_date = f"{db_end_date}-06-30"
+
+        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+
+        if db_end_date < end_date:
+            end_date = end_date.strftime("%Y-%m-%d")
+            ee.data.deleteAsset(asset_id)
+        else:
+            return None, asset_id
+
     fc = ee.FeatureCollection(delta_g_asset_id).getInfo()
     features = fc["features"]
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
@@ -84,6 +100,7 @@ def calculate_g(
             n_start_date = f_start_date.strftime("%Y-%m-%d")
 
         f["properties"] = properties
+
     try:
         # Rewrap into ee.FeatureCollection with valid geometry
         ee_features = [

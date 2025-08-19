@@ -8,7 +8,10 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    check_task_status,
+    merge_fc_into_existing_fc,
 )
+from computing.models import Layer, Dataset
 
 
 def precipitation(
@@ -29,15 +32,51 @@ def precipitation(
         )
         + description
     )
-    if is_gee_asset_exists(asset_id):
-        return None, asset_id
 
+    if is_gee_asset_exists(asset_id):
+        dataset = Dataset.objects.get(name="Hydrology Precipitation")
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=f"{asset_suffix}_precipitation",
+        )
+        db_end_date = layer_obj.misc["end_year"]
+        db_end_date = f"{db_end_date}-06-30"
+        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+        print("db_end_date", db_end_date)
+        print("end_date", end_date)
+        if db_end_date < end_date:
+            new_start_date = db_end_date + relativedelta(months=1, day=1)
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
+            end_date = end_date.strftime("%Y-%m-%d")
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_data(
+                    roi,
+                    new_asset_id,
+                    new_description,
+                    new_start_date,
+                    end_date,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("Prec new year data generated.")
+
+            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+        return None, asset_id
+    else:
+        return _generate_data(
+            roi, asset_id, description, start_date, end_date, is_annual
+        )
+
+
+def _generate_data(roi, asset_id, description, start_date, end_date, is_annual):
     size = ee.Number(roi.size())
     size1 = size.subtract(ee.Number(1))
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     fn_index = 0
-
     while f_start_date <= end_date:
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)
@@ -75,7 +114,6 @@ def precipitation(
         roi = ee.FeatureCollection(l)
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
-
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id, asset_id

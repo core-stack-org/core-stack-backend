@@ -1,9 +1,7 @@
 import ee
-
-import geopandas as gpd
 from nrm_app.celery import app
 
-from utilities.constants import MERGE_MWS_PATH, GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -12,17 +10,17 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     make_asset_public,
     export_vector_asset_to_gee,
-    earthdata_auth,
-    gdf_to_ee_fc,
-    upload_shp_to_gee,
+    # earthdata_auth,
+    # gdf_to_ee_fc,
+    # upload_shp_to_gee,
 )
 
-import zipfile
-import pandas as pd
-from osgeo import gdal
-from shapely.geometry import box
-from pcraster import *
-import os
+# import zipfile
+# import pandas as pd
+# from osgeo import gdal
+# from shapely.geometry import box
+# from pcraster import *
+# import os
 from computing.utils import save_layer_info_to_db
 
 
