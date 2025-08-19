@@ -12,6 +12,7 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
 )
 import calendar
+from computing.models import Layer, Dataset
 
 
 def evapotranspiration(
@@ -32,8 +33,14 @@ def evapotranspiration(
         )
         + description
     )
-    db_end_year = 2024
+
     if is_gee_asset_exists(asset_id):
+        dataset = Dataset.objects.get(name="Hydrology Evapotranspiration")
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=f"{asset_suffix}_evapotranspiration",
+        )
+        db_end_year = layer_obj.misc["end_year"]
         if db_end_year < end_year:
             new_start_year = db_end_year + 1
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"

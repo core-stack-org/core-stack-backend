@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     check_task_status,
     merge_fc_into_existing_fc,
 )
+from computing.models import Layer, Dataset
 
 
 def delta_g(
@@ -33,9 +34,20 @@ def delta_g(
         asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
     )
     asset_id = asset_path + description
-    db_end_date = "2023-06-30"
+
     if is_gee_asset_exists(asset_id):
         print("DeltaG asset already exists")
+        dataset = Dataset.objects.get(name="Hydrology")
+        # TODO instead of here, pass in arguments from main file
+        layer_name = (
+            "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
+        ) + asset_suffix
+
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=layer_name,
+        )
+        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
         if db_end_date < end_date:
             new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
             new_start_date = new_start_date + relativedelta(months=1, day=1)

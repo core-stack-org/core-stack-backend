@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     check_task_status,
 )
 import geopandas as gpd
+from computing.models import Layer, Dataset
 
 
 def calculate_g(
@@ -32,8 +33,14 @@ def calculate_g(
         + layer_name
     )
 
-    db_end_date = "2023-06-30"
     if is_gee_asset_exists(asset_id):
+        dataset = Dataset.objects.get(name="Hydrology")
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=layer_name,
+        )
+        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
+
         if db_end_date < end_date:
             ee.data.deleteAsset(asset_id)
         else:

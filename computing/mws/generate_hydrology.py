@@ -1,5 +1,4 @@
 import ee
-import geopandas as gpd
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS
 from .precipitation import precipitation

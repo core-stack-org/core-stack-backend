@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     check_task_status,
     merge_fc_into_existing_fc,
 )
+from computing.models import Layer, Dataset
 
 
 def precipitation(
@@ -31,9 +32,14 @@ def precipitation(
         )
         + description
     )
-    db_end_date = "2024-06-30"
 
     if is_gee_asset_exists(asset_id):
+        dataset = Dataset.objects.get(name="Hydrology Precipitation")
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=f"{asset_suffix}_precipitation",
+        )
+        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
         if db_end_date < end_date:
             new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
             new_start_date = new_start_date + relativedelta(months=1, day=1)

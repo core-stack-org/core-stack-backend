@@ -8,9 +8,8 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
-    check_task_status,
-    merge_fc_into_existing_fc,
 )
+from computing.models import Layer, Dataset
 
 
 def well_depth(
@@ -27,9 +26,14 @@ def well_depth(
     )
     asset_id = asset_path + description
 
-    db_end_date = "2023-06-30"
     if is_gee_asset_exists(asset_id):
         print("Well depth asset already exists")
+        dataset = Dataset.objects.get(name="Hydrology")
+        layer_obj = Layer.objects.get(
+            dataset=dataset,
+            layer_name=f"deltaG_well_depth_{asset_suffix}",
+        )
+        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
         if db_end_date < end_date:
             ee.data.deleteAsset(asset_id)
         else:
