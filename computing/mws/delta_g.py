@@ -47,7 +47,8 @@ def delta_g(
             dataset=dataset,
             layer_name=layer_name,
         )
-        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
+        db_end_date = layer_obj.misc["end_year"]
+        db_end_date = f"{db_end_date}-06-30"
         if db_end_date < end_date:
             new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
             new_start_date = new_start_date + relativedelta(months=1, day=1)

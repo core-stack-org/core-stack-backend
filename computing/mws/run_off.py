@@ -43,7 +43,8 @@ def run_off(
             dataset=dataset,
             layer_name=f"{asset_suffix}_run_off",
         )
-        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
+        db_end_date = layer_obj.misc["end_year"]
+        db_end_date = f"{db_end_date}-06-30"
 
         if db_end_date < end_date:
             new_start_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")

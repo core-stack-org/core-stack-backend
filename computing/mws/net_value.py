@@ -32,7 +32,8 @@ def net_value(
             dataset=dataset,
             layer_name=f"deltaG_well_depth_{asset_suffix}",
         )
-        db_end_date = f"{layer_obj.misc["end_year"]}-06-30"
+        db_end_date = layer_obj.misc["end_year"]
+        db_end_date = f"{db_end_date}-06-30"
 
         if db_end_date < end_date:
             ee.data.deleteAsset(asset_id)
