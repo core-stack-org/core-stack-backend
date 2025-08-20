@@ -10,15 +10,15 @@ class CustomUserAdmin(UserAdmin):
 
     list_display = (
         "username",
-        "email",
         "first_name",
         "last_name",
+        "email",
         "organization",
         "get_groups",
         "is_superadmin",
         "is_superuser",
     )
-    list_filter = ("is_superadmin", "is_staff", "is_active", "organization")
+    list_filter = ("is_superadmin", "is_staff", "is_active", "groups", "organization")
     search_fields = ("username", "email", "first_name", "last_name")
 
     fieldsets = (

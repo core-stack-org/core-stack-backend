@@ -1,5 +1,6 @@
 # projects/admin.py
 from django.contrib import admin
+
 from .models import Project
 
 
@@ -8,6 +9,7 @@ class ProjectAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "organization",
+        "district",
         "app_type",
         "enabled",
         "created_at",
@@ -15,21 +17,40 @@ class ProjectAdmin(admin.ModelAdmin):
         "created_by",
         "updated_by",
     )
-    list_filter = ("organization", "app_type", "enabled", "created_at")
+    list_filter = ("organization", "app_type", "enabled", "state", "created_at")
     search_fields = ("name", "description", "organization__name")
 
     fieldsets = (
         (
-            None,
+            "Basic Information",
             {
                 "fields": (
                     "name",
                     "organization",
                     "description",
-                    "geojson_path",
-                    "state",
                     "app_type",
                     "enabled",
+                )
+            },
+        ),
+        (
+            "Geographical Information",
+            {
+                "fields": (
+                    "state",
+                    "district",
+                    "block",
+                    "state_soi",
+                    "district_soi",
+                    "tehsil_soi",
+                    "geojson_path",
+                )
+            },
+        ),
+        (
+            "User Information",
+            {
+                "fields": (
                     "created_by",
                     "updated_by",
                 )

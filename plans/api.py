@@ -7,6 +7,7 @@ from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 
 from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
+from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.constants import (
     ODK_SYNC_URL_AGRI_FEEDBACK,
@@ -29,7 +30,6 @@ from .build_layer import build_layer
 from .models import Plan
 from .serializers import PlanSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
-from utilities.auth_check_decorator import api_security_check
 
 
 # MARK: Get Plans API
@@ -170,8 +170,6 @@ def add_works(request):
 
 
 # MARK: SYNC OFFLINE DATA HELPER FUNCTIONS
-
-
 def _get_resource_config() -> Dict[str, Dict[str, Any]]:
     """Configuration mapping for different resource types."""
     return {
