@@ -443,30 +443,128 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 
 ## Watershed Planning Endpoints
 
-### List Watershed Plans
+### List Watershed Plans (Project Level)
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/`
 - **Method**: GET
-- **Description**: List watershed plans for a project
+- **Description**: List watershed plans for a specific project
 - **Authentication**: Required
-- **Permissions**: User must have access to the project
+- **Permissions**: 
+  - Superadmins: Can access any project
+  - Org Admins: Can access projects in their organization
+  - App Users: Can access assigned projects only
+
+### List Watershed Plans (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/`
+- **Method**: GET
+- **Description**: List all watershed plans for a specific organization
+- **Authentication**: Required
+- **Permissions**: Superadmins only
+
+### List Watershed Plans (Global Level)
+- **URL**: `/api/v1/watershed/plans/`
+- **Method**: GET
+- **Description**: List all watershed plans across all organizations and projects
+- **Authentication**: Required
+- **Permissions**: Superadmins only
+- **Query Parameters**:
+  - `block`: Filter plans by block ID (e.g., `?block=311011`)
+  - `district`: Filter plans by district ID (e.g., `?district=3110101`)
+  - `state`: Filter plans by state ID (e.g., `?state=69`)
 
 ### Create Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/`
 - **Method**: POST
-- **Description**: Create a new watershed plan
-- **Request Body**:
-  ```json
-  {
-    "plan": "Plan Name",
-    "state": "state-id",
-    "district": "district-id",
-    "block": "block-id",
-    "village_name": "Village Name",
-    "gram_panchayat": "Gram Panchayat Name",
-    "facilitator_name": "Facilitator Name"
-  }
-  ```
+- **Description**: Create a new watershed plan for a specific project
 - **Authentication**: Required
+- **Permissions**: 
+  - Superadmins: Can create plans in any project
+  - Org Admins: Can create plans in their organization's projects
+  - Project Users: Must have 'add_watershed' permission for the project
+
+#### Required Fields:
+- `plan` (string): Name of the watershed plan
+- `state` (integer): State ID from geoadmin
+- `district` (integer): District ID from geoadmin  
+- `block` (integer): Block ID from geoadmin
+- `village_name` (string): Name of the village
+- `gram_panchayat` (string): Name of the gram panchayat
+
+#### Optional Fields:
+- `facilitator_name` (string): Name of the plan facilitator
+- `enabled` (boolean): Whether the plan is enabled (default: true)
+- `is_completed` (boolean): Whether the plan is completed (default: false)
+- `is_dpr_generated` (boolean): Whether DPR is generated (default: false)
+- `is_dpr_reviewed` (boolean): Whether DPR is reviewed (default: false)
+- `is_dpr_approved` (boolean): Whether DPR is approved (default: false)
+
+#### Auto-set Fields:
+- `project`: Set automatically from URL parameter
+- `organization`: Set automatically from project's organization
+- `created_by`: Set automatically from authenticated user
+- `created_at`, `updated_at`: Set automatically by system
+
+#### Request Examples:
+
+**Minimal Plan Creation:**
+```json
+{
+  "plan": "Basic Watershed Plan 2025",
+  "state": 69,
+  "district": 3110101,
+  "block": 311011,
+  "village_name": "Example Village",
+  "gram_panchayat": "Example GP"
+}
+```
+
+**Complete Plan Creation:**
+```json
+{
+  "plan": "Comprehensive Watershed Management Plan 2025",
+  "state": 69,
+  "district": 3110101,
+  "block": 311011,
+  "village_name": "Hauz Khas Village",
+  "gram_panchayat": "Hauz Khas Gram Panchayat",
+  "facilitator_name": "Dr. Rajesh Kumar",
+  "enabled": true,
+  "is_completed": false,
+  "is_dpr_generated": false,
+  "is_dpr_reviewed": false,
+  "is_dpr_approved": false
+}
+```
+
+#### Response:
+```json
+{
+  "plan_data": {
+    "id": 296,
+    "plan": "Comprehensive Watershed Management Plan 2025",
+    "facilitator_name": "Dr. Rajesh Kumar",
+    "village_name": "Hauz Khas Village",
+    "gram_panchayat": "Hauz Khas Gram Panchayat",
+    "created_at": "2025-01-18T10:30:00.000000+05:30",
+    "updated_at": "2025-01-18T10:30:00.000000+05:30",
+    "enabled": true,
+    "is_completed": false,
+    "is_dpr_generated": false,
+    "is_dpr_reviewed": false,
+    "is_dpr_approved": false,
+    "project": 10,
+    "project_name": "Delhi Watershed Project",
+    "organization": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6",
+    "organization_name": "Delhi Development Authority",
+    "state": 69,
+    "district": 3110101,
+    "block": 311011,
+    "created_by": 1,
+    "created_by_name": "John Doe",
+    "updated_by": null
+  },
+  "message": "Successfully created the watershed plan, Comprehensive Watershed Management Plan 2025"
+}
+```
 - **Permissions**: User must have create permission for the project
 
 ### Get Watershed Plan Details
@@ -479,9 +577,92 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 ### Update Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/{plan_id}/`
 - **Method**: PUT/PATCH
-- **Description**: Update a watershed plan
+- **Description**: Update an existing watershed plan
 - **Authentication**: Required
-- **Permissions**: User must have update permission for the project
+- **Permissions**: 
+  - Superadmins: Can update any plan in any project
+  - Org Admins: Can update plans in their organization's projects
+  - Project Users: Must have 'change_watershed' permission for the project
+
+#### Updatable Fields:
+- `plan` (string): Name of the watershed plan
+- `state` (integer): State ID from geoadmin
+- `district` (integer): District ID from geoadmin  
+- `block` (integer): Block ID from geoadmin
+- `village_name` (string): Name of the village
+- `gram_panchayat` (string): Name of the gram panchayat
+- `facilitator_name` (string): Name of the plan facilitator
+- `enabled` (boolean): Whether the plan is enabled
+- `is_completed` (boolean): Whether the plan is completed
+- `is_dpr_generated` (boolean): Whether DPR is generated
+- `is_dpr_reviewed` (boolean): Whether DPR is reviewed
+- `is_dpr_approved` (boolean): Whether DPR is approved
+
+#### Non-updatable Fields:
+- `project`: Cannot be changed after creation
+- `organization`: Cannot be changed after creation
+- `created_by`, `created_at`: Cannot be modified
+- `updated_by`, `updated_at`: Set automatically by system
+
+#### Update Methods:
+
+**PATCH (Partial Update)** - Update only specific fields:
+```json
+{
+  "is_completed": true,
+  "is_dpr_generated": true,
+  "facilitator_name": "Updated Facilitator Name"
+}
+```
+
+**PUT (Full Update)** - Provide all required fields:
+```json
+{
+  "plan": "Updated Watershed Management Plan 2025",
+  "state": 69,
+  "district": 3110101,
+  "block": 311011,
+  "village_name": "Updated Village Name",
+  "gram_panchayat": "Updated GP Name",
+  "facilitator_name": "Dr. Updated Facilitator",
+  "enabled": true,
+  "is_completed": true,
+  "is_dpr_generated": true,
+  "is_dpr_reviewed": false,
+  "is_dpr_approved": false
+}
+```
+
+#### Response:
+```json
+{
+  "plan_data": {
+    "id": 295,
+    "plan": "Updated Watershed Management Plan 2025",
+    "facilitator_name": "Dr. Updated Facilitator",
+    "village_name": "Updated Village Name",
+    "gram_panchayat": "Updated GP Name",
+    "created_at": "2025-01-18T00:52:51.479180+05:30",
+    "updated_at": "2025-01-18T15:30:00.000000+05:30",
+    "enabled": true,
+    "is_completed": true,
+    "is_dpr_generated": true,
+    "is_dpr_reviewed": false,
+    "is_dpr_approved": false,
+    "project": 10,
+    "project_name": "Delhi Watershed Project",
+    "organization": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6",
+    "organization_name": "Delhi Development Authority",
+    "state": 69,
+    "district": 3110101,
+    "block": 311011,
+    "created_by": 1,
+    "created_by_name": "John Doe",
+    "updated_by": 2
+  },
+  "message": "Successfully updated the watershed plan: Updated Watershed Management Plan 2025"
+}
+```
 
 ### Delete Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/{plan_id}/`
@@ -601,25 +782,125 @@ These endpoints are maintained for backward compatibility:
    ```
 
 3. Create a watershed plan:
-   ```bash
-   curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
-     -H "Authorization: Bearer {access_token}" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "plan": "Watershed Plan 2023",
-       "state": "state-id",
-       "district": "district-id",
-       "block": "block-id",
-       "village_name": "Example Village",
-       "gram_panchayat": "Example GP"
-     }'
-   ```
+   3. Create a watershed plan for the project:
+      ```bash
+      # Minimal required fields
+      curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
+        -H "Authorization: Bearer {access_token}" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "plan": "Basic Watershed Plan 2025",
+          "state": 69,
+          "district": 3110101,
+          "block": 311011,
+          "village_name": "Example Village",
+          "gram_panchayat": "Example GP"
+        }'
+   
+      # Complete plan with all optional fields
+      curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
+        -H "Authorization: Bearer {access_token}" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "plan": "Comprehensive Watershed Management Plan 2025",
+          "state": 69,
+          "district": 3110101,
+          "block": 311011,
+          "village_name": "Hauz Khas Village",
+          "gram_panchayat": "Hauz Khas Gram Panchayat",
+          "facilitator_name": "Dr. Rajesh Kumar",
+          "enabled": true,
+          "is_completed": false,
+          "is_dpr_generated": false,
+          "is_dpr_reviewed": false,
+          "is_dpr_approved": false
+        }'
+      ```
 
 4. View the created watershed plans:
    ```bash
+   # View plans for a specific project
    curl -X GET http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
      -H "Authorization: Bearer {access_token}"
+   
+   # View all plans for an organization (superadmin only)
+   curl -X GET http://api.example.com/api/v1/organizations/{organization_id}/watershed/plans/ \
+     -H "Authorization: Bearer {access_token}"
+   
+   # View all plans globally (superadmin only)
+   curl -X GET http://api.example.com/api/v1/watershed/plans/ \
+     -H "Authorization: Bearer {access_token}"
+   
+   # View plans filtered by block (superadmin only)
+   curl -X GET http://api.example.com/api/v1/watershed/plans/?block=311011 \
+     -H "Authorization: Bearer {access_token}"
    ```
+
+5. Update a watershed plan:
+   ```bash
+   # Partial update - only update specific fields
+   curl -X PATCH http://api.example.com/api/v1/projects/{project_id}/watershed/plans/{plan_id}/ \
+     -H "Authorization: Bearer {access_token}" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "is_completed": true,
+       "is_dpr_generated": true,
+       "facilitator_name": "Updated Facilitator"
+     }'
+   
+   # Full update - provide all fields
+   curl -X PUT http://api.example.com/api/v1/projects/{project_id}/watershed/plans/{plan_id}/ \
+     -H "Authorization: Bearer {access_token}" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "plan": "Updated Watershed Plan 2025",
+       "state": 69,
+       "district": 3110101,
+       "block": 311011,
+       "village_name": "Updated Village",
+       "gram_panchayat": "Updated GP",
+       "facilitator_name": "New Facilitator",
+       "enabled": true,
+       "is_completed": true,
+       "is_dpr_generated": true,
+       "is_dpr_reviewed": false,
+       "is_dpr_approved": false
+     }'
+   ```
+
+## Superadmin Watershed Plan Access Patterns
+
+Superadmins have multiple ways to access watershed plans depending on their context and needs:
+
+### Use Cases
+
+1. **Global Overview**: Get all plans across all organizations
+   ```
+   GET /api/v1/watershed/plans/
+   ```
+
+2. **Organization Focus**: Get all plans for a specific organization
+   ```
+   GET /api/v1/organizations/{organization_id}/watershed/plans/
+   ```
+
+3. **Project Specific**: Get plans for a specific project
+   ```
+   GET /api/v1/projects/{project_id}/watershed/plans/
+   ```
+
+4. **Geographical Filtering**: Filter plans by location (useful when working from partner locations)
+   ```
+   GET /api/v1/watershed/plans/?block=311011
+   GET /api/v1/watershed/plans/?district=3110101
+   GET /api/v1/watershed/plans/?state=69
+   ```
+
+### Superadmin vs Organization Admin Access
+
+- **Superadmins**: Can access any endpoint and see plans from any organization/project
+- **Organization Admins**: Limited to their organization's plans through existing project-level endpoints
+- **Regular Users**: Limited to plans from projects they're assigned to
 
 ## API Security
 
@@ -689,3 +970,6 @@ Below are ASCII diagrams showing the permission hierarchy and capabilities for d
 | Assign superadmin role        | ✓          | ✗         | ✗              | ✗        |
 | Assign org admin role         | ✓          | ✗         | ✗              | ✗        |
 | Assign project roles          | ✓          | ✓         | ✓              | ✗        |
+| View global watershed plans   | ✓          | ✗         | ✗              | ✗        |
+| View org watershed plans      | ✓          | ✗         | ✗              | ✗        |
+| Filter plans by geography     | ✓          | ✗         | ✗              | ✗        |

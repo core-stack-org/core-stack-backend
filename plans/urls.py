@@ -1,15 +1,26 @@
 from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
 
+from organization.urls import router as organizations_router
 from projects.urls import router as projects_router
 
 from . import api
-from .views import PlanViewSet
+from .views import GlobalPlanViewSet, OrganizationPlanViewSet, PlanViewSet
 
 watershed_router = routers.NestedSimpleRouter(
     projects_router, r"projects", lookup="project"
 )
 watershed_router.register(r"watershed/plans", PlanViewSet, basename="project-plan")
+
+org_watershed_router = routers.NestedSimpleRouter(
+    organizations_router, r"organizations", lookup="organization"
+)
+org_watershed_router.register(
+    r"watershed/plans", OrganizationPlanViewSet, basename="organization-plan"
+)
+global_router = DefaultRouter()
+global_router.register(r"watershed/plans", GlobalPlanViewSet, basename="global-plan")
 
 urlpatterns = [
     path("get_plans/", api.get_plans, name="get_plans"),
@@ -32,4 +43,6 @@ urlpatterns = [
         name="sync_offline_data",
     ),
     path("", include(watershed_router.urls)),
+    path("", include(org_watershed_router.urls)),
+    path("", include(global_router.urls)),
 ]
