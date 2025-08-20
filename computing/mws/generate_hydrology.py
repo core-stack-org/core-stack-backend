@@ -63,7 +63,7 @@ def generate_hydrology(
             + valid_gee_text(block.lower())
             + "_uid"
         )
-
+    layer_name_suffix = "annual" if is_annual else "fortnight"
     ppt_task_id, ppt_asset_id = precipitation(
         roi=roi,
         asset_suffix=asset_suffix,
@@ -110,7 +110,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name=f"{asset_suffix}_evapotranspiration",
+                layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
                 misc={"start_year": start_year, "end_year": end_year},
@@ -123,7 +123,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name=f"{asset_suffix}_precipitation",
+                layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
                 misc={"start_year": start_year, "end_year": end_year},
@@ -136,7 +136,7 @@ def generate_hydrology(
                 state,
                 district,
                 block,
-                layer_name=f"{asset_suffix}_run_off",
+                layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
                 misc={"start_year": start_year, "end_year": end_year},
