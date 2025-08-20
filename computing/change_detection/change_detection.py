@@ -97,7 +97,7 @@ def get_change_detection(self, state, district, block, start_year, end_year):
                 state,
                 district,
                 block,
-                layer_name=f"change_{district}_{block}_{param}",
+                layer_name=f"change_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{param}",
                 asset_id=asset_id,
                 dataset_name="Change Detection Raster",
                 misc={

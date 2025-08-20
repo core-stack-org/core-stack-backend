@@ -96,7 +96,10 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
     fc = ee.FeatureCollection(fc)
 
     description = (
-        "lulc_vector_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
     asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(fc, description, asset_id)

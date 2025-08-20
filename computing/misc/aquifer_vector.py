@@ -157,7 +157,7 @@ def generate_aquifer_vector(self, state, district, block):
             state,
             district,
             block,
-            layer_name=f"aquifer_vector_{district.lower()}_{block.lower()}",
+            layer_name=f"aquifer_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
             asset_id=asset_id,
             dataset_name="Aquifer",
         )
