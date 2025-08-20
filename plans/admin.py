@@ -63,6 +63,8 @@ class PlanAppAdmin(admin.ModelAdmin):
                     "village_name",
                     "gram_panchayat",
                     "facilitator_name",
+                    "latitude",
+                    "longitude",
                 )
             },
         ),
