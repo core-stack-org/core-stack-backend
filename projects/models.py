@@ -1,8 +1,7 @@
-from email.policy import default
-import uuid
 from django.db import models
+
+from geoadmin.models import Block, District, DistrictSOI, State, StateSOI, TehsilSOI
 from organization.models import Organization
-from geoadmin.models import State
 
 
 class AppType(models.TextChoices):
@@ -21,6 +20,19 @@ class Project(models.Model):
     description = models.TextField(blank=True, null=True)
     geojson_path = models.CharField(max_length=512, blank=True, null=True)
     state = models.ForeignKey(State, on_delete=models.CASCADE, null=True)
+    district = models.ForeignKey(
+        District, on_delete=models.CASCADE, null=True, blank=True
+    )
+    block = models.ForeignKey(Block, on_delete=models.CASCADE, null=True, blank=True)
+    state_soi = models.ForeignKey(
+        StateSOI, on_delete=models.CASCADE, null=True, blank=True
+    )
+    district_soi = models.ForeignKey(
+        DistrictSOI, on_delete=models.CASCADE, null=True, blank=True
+    )
+    tehsil_soi = models.ForeignKey(
+        TehsilSOI, on_delete=models.CASCADE, null=True, blank=True
+    )
     app_type = models.CharField(max_length=255, choices=AppType.choices)
     enabled = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

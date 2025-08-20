@@ -101,6 +101,8 @@ class SuperAdminPlanPermission(permissions.BasePermission):
     Custom permission for superadmin only plan endpoints
     """
 
+    schema = None
+
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
@@ -120,6 +122,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
     Allows superadmin to view all plans across all organizations and projects
     URL: /api/v1/watershed/plans/
     """
+
+    schema = None
 
     serializer_class = PlanAppSerializer
     permission_classes = [permissions.IsAuthenticated, SuperAdminPlanPermission]
@@ -151,6 +155,8 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
     Allows superadmins to view plans for a specific organization
     URL: /api/v1/organization/{organization_id}/watershed/plans/
     """
+
+    schema = None
 
     serializer_class = PlanAppSerializer
     permissions_classes = [permissions.IsAuthenticated, SuperAdminPlanPermission]
