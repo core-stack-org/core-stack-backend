@@ -35,10 +35,11 @@ def evapotranspiration(
     )
 
     if is_gee_asset_exists(asset_id):
+        layer_name_suffix = "annual" if is_annual else "fortnight"
         dataset = Dataset.objects.get(name="Hydrology Evapotranspiration")
         layer_obj = Layer.objects.get(
             dataset=dataset,
-            layer_name=f"{asset_suffix}_evapotranspiration",
+            layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
         )
         db_end_year = layer_obj.misc["end_year"]
         print("db_end_year", db_end_year)

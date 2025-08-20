@@ -38,10 +38,11 @@ def run_off(
     )
 
     if is_gee_asset_exists(asset_id):
+        layer_name_suffix = "annual" if is_annual else "fortnight"
         dataset = Dataset.objects.get(name="Hydrology Run Off")
         layer_obj = Layer.objects.get(
             dataset=dataset,
-            layer_name=f"{asset_suffix}_run_off",
+            layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
         )
         db_end_date = layer_obj.misc["end_year"]
         db_end_date = f"{db_end_date}-06-30"
