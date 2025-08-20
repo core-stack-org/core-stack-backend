@@ -53,7 +53,7 @@ def clip_drainage_lines(
             state,
             district,
             block,
-            layer_name=f"{district.lower()}_{block.lower()}",
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
             asset_id=asset_id,
             dataset_name="Drainage",
         )
