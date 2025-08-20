@@ -74,7 +74,7 @@ def clip_raster(roi, state, district, block, description):
             state,
             district,
             block,
-            layer_name=f"restoration_{district.lower()}_{block.lower()}_raster",
+            layer_name=f"restoration_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster",
             asset_id=asset_id,
             dataset_name="Restoration Raster",
         )
@@ -147,7 +147,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
             state,
             district,
             block,
-            layer_name=f"restoration_{district.lower()}_{block.lower()}_vector",
+            layer_name=f"restoration_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector",
             asset_id=asset_id,
             dataset_name="Restoration Vector",
         )

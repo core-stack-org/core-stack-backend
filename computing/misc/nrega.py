@@ -183,7 +183,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
             state_name,
             district_name,
             block_name,
-            layer_name=f"{district_name.lower()}_{block_name.lower()}",
+            layer_name=f"{valid_gee_text(district_name.lower())}_{valid_gee_text(block_name.lower())}",
             asset_id=asset_id,
             dataset_name="NREGA Assets",
         )

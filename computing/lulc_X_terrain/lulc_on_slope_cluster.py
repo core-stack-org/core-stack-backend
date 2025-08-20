@@ -94,7 +94,7 @@ def lulc_on_slope_cluster(self, state, district, block, start_year, end_year):
             state,
             district,
             block,
-            layer_name=f"{district.lower()}_{block.lower()}_lulc_slope",
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_slope",
             asset_id=asset_id,
             dataset_name="Terrain LULC",
             misc={

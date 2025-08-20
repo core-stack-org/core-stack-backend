@@ -43,7 +43,9 @@ def crop_grids_lulc(state, district, block):
 
     asset_id = get_gee_asset_path(state, district, block) + description
     crop_tiles = lulc_crop_tiles(tiles_uid, lulc_image)
-    layer_name = f"{valid_gee_text(district)}_{valid_gee_text(block.lower())}_grid"
+    layer_name = (
+        f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_grid"
+    )
     task = export_vector_asset_to_gee(crop_tiles, description, asset_id)
     if task:
         task_id_list = check_task_status([task])
