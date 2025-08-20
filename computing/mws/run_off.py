@@ -71,7 +71,9 @@ def run_off(
                 check_task_status([task_id])
                 print("Runoff new year data generated.")
 
-            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+            # Check if data for new year is generated, if yes then merge it in existing asset
+            if is_gee_asset_exists(new_asset_id):
+                merge_fc_into_existing_fc(asset_id, description, new_asset_id)
         return None, asset_id
     else:
         return _generate_layer(

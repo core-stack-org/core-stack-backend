@@ -41,7 +41,7 @@ def evapotranspiration(
             dataset=dataset,
             layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
         )
-        db_end_year = layer_obj.misc["end_year"]
+        db_end_year = int(layer_obj.misc["end_year"])
         print("db_end_year", db_end_year)
         print("end_year", end_year)
         if db_end_year < end_year:
@@ -60,7 +60,9 @@ def evapotranspiration(
                 check_task_status([task_id])
                 print("ET new year data generated.")
 
-            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+            # Check if data for new year is generated, if yes then merge it in existing asset
+            if is_gee_asset_exists(new_asset_id):
+                merge_fc_into_existing_fc(asset_id, description, new_asset_id)
         return None, asset_id
 
     return _generate_data(roi, asset_id, description, start_year, end_year, is_annual)
