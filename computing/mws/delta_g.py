@@ -50,7 +50,9 @@ def delta_g(
                 layer_name=layer_name,
             )
         except Exception as e:
-            print("layer not found for deltaG. So, reading the column name from asset_id")
+            print(
+                "layer not found for deltaG. So, reading the column name from asset_id"
+            )
         if layer_obj:
             existing_end_date = layer_obj.misc["end_year"]
         else:
@@ -58,7 +60,7 @@ def delta_g(
             col_names = fc.first().propertyNames().getInfo()
             filtered_col = [col for col in col_names if col.startswith("20")]
             filtered_col.sort()
-            existing_end_date = filtered_col[-1].split("-")[0]
+            existing_end_date = int(filtered_col[-1].split("-")[0]) + 1
         existing_end_date = f"{existing_end_date}-06-30"
         existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")

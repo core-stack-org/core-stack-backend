@@ -54,7 +54,7 @@ def evapotranspiration(
             col_names = fc.first().propertyNames().getInfo()
             filtered_col = [col for col in col_names if col.startswith("20")]
             filtered_col.sort()
-            existing_end_date = int(filtered_col[-1].split("-")[0])
+            existing_end_date = int(filtered_col[-1].split("-")[0]) + 1
         print("existing_end_date", existing_end_date)
         print("end_year", end_year)
         if existing_end_date < end_year:
