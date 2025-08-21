@@ -35,17 +35,30 @@ def evapotranspiration(
     )
 
     if is_gee_asset_exists(asset_id):
-        layer_name_suffix = "annual" if is_annual else "fortnight"
-        dataset = Dataset.objects.get(name="Hydrology Evapotranspiration")
-        layer_obj = Layer.objects.get(
-            dataset=dataset,
-            layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
-        )
-        db_end_year = int(layer_obj.misc["end_year"])
-        print("db_end_year", db_end_year)
+        layer_obj = None
+        try:
+            layer_name_suffix = "annual" if is_annual else "fortnight"
+            dataset = Dataset.objects.get(name="Hydrology Evapotranspiration")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
+            )
+        except Exception as e:
+            print(
+                "layer not found for evapotranspiration. So, reading the column name from asset_id."
+            )
+        if layer_obj:
+            existing_end_date = int(layer_obj.misc["end_year"])
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            existing_end_date = int(filtered_col[-1].split("-")[0])
+        print("existing_end_date", existing_end_date)
         print("end_year", end_year)
-        if db_end_year < end_year:
-            new_start_year = db_end_year
+        if existing_end_date < end_year:
+            new_start_year = existing_end_date
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
             new_description = f"{description}_{new_start_year}_{end_year}"
             if not is_gee_asset_exists(new_asset_id):

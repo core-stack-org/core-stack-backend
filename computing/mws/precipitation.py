@@ -33,20 +33,33 @@ def precipitation(
         + description
     )
     if is_gee_asset_exists(asset_id):
-        layer_name_suffix = "annual" if is_annual else "fortnight"
-        dataset = Dataset.objects.get(name="Hydrology Precipitation")
-        layer_obj = Layer.objects.get(
-            dataset=dataset,
-            layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
-        )
-        db_end_date = layer_obj.misc["end_year"]
-        db_end_date = f"{db_end_date}-06-30"
-        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+        layer_obj = None
+        try:
+            layer_name_suffix = "annual" if is_annual else "fortnight"
+            dataset = Dataset.objects.get(name="Hydrology Precipitation")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
+            )
+        except Exception as e:
+            print(
+                f"layer not found for precipitation. So, reading the column name from asset_id."
+            )
+        if layer_obj:
+            existing_end_date = layer_obj.misc["end_year"]
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            existing_end_date = filtered_col[-1].split("-")[0]
+        existing_end_date = f"{existing_end_date}-06-30"
+        existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-        print("db_end_date", db_end_date)
+        print("existing_end_date", existing_end_date)
         print("end_date", end_date)
-        if db_end_date < end_date:
-            new_start_date = db_end_date + relativedelta(months=1, day=1)
+        if existing_end_date < end_date:
+            new_start_date = existing_end_date + relativedelta(months=1, day=1)
             new_start_date = new_start_date.strftime("%Y-%m-%d")
             end_date = end_date.strftime("%Y-%m-%d")
             new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
