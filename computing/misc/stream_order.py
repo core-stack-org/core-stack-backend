@@ -39,7 +39,9 @@ def generate_stream_order_vector(self, state, district, block):
             + "_uid"
         )
 
-        raster = ee.Image("projects/ee-ankit-mcs/assets/Stream_Order_Raster_India")
+        raster = ee.Image(
+            "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
+        )
         raster = raster.clip(roi.geometry())
 
         args = [
