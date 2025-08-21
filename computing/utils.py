@@ -311,7 +311,8 @@ def get_agri_year_key(season_key):
     else:
         return None
 
-def calculate_precipitation_season(geojson_filepath, start_year=2017, end_year=2024):
+def calculate_precipitation_season(geojson_filepath, draught_asset_id, proj_id, start_year=2017, end_year=2024):
+    proj_obj = Project.objects.get(pk = proj_id)
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
         feature_collection = json.load(f)
@@ -357,15 +358,39 @@ def calculate_precipitation_season(geojson_filepath, start_year=2017, end_year=2
             new_props[f"precipitation_{agri_key}"] = total
 
         # Optional debug
-        # print(new_props)
+        print(new_props)
 
         # Create Earth Engine Feature
         geom_ee = ee.Geometry(feature["geometry"])
         feature_ee = ee.Feature(geom_ee, new_props)
         features_ee.append(feature_ee)
+    mws_fc = ee.FeatureCollection(features_ee)
+    draught_fc = ee.FeatureCollection(draught_asset_id)
 
-    # Return as FeatureCollection
-    return ee.FeatureCollection(features_ee)
+    # Define spatial filter (intersects)
+    spatial_filter = ee.Filter.intersects(
+        leftField=".geo",  # geometry field of left collection
+        rightField=".geo",
+        maxError=1
+    )
+
+    # Define the join
+    join = ee.Join.inner()
+
+    # Apply the join
+    joined = join.apply(mws_fc, draught_fc, spatial_filter)
+
+    # Convert joined result into a proper FeatureCollection
+    # by merging properties from both
+    def merge_features(feature):
+        left = ee.Feature(feature.get("primary"))
+        right = ee.Feature(feature.get("secondary"))
+        return left.copyProperties(right)
+
+    final_fc = ee.FeatureCollection(joined.map(merge_features))
+    layer_name = 'WaterRejapp_mws_' + str(proj_obj.name) + '_' + str(proj_obj.id)
+    sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, 'waterrej')
+
 
 
 def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
@@ -378,7 +403,7 @@ def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     ) + ci_asset
 
     asset_path_ndvi = get_gee_dir_path(
-        [proj_obj.name], asset_path=GEE_PATHS['NDVI']["GEE_ASSET_PATH"]
+        [proj_obj.name], asset_path=GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]
     ) + ndvi_asset
 
     # Load FeatureCollections

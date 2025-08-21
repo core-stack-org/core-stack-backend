@@ -57,5 +57,5 @@ def compute_max_stream_order_and_catchment_for_swb(swb_layer_asset,  proj_id):
     )
     task.start()
     wait_for_task_completion(task)
-    #sync_project_fc_to_geoserver(swb_with_max, proj_obj.name, geoserver_layer_name, 'waterrej')
+    sync_project_fc_to_geoserver(swb_with_max, proj_obj.name, geoserver_layer_name, 'waterrej')
     return asset_name

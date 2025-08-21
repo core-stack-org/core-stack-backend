@@ -63,7 +63,7 @@ class WaterbodiesFileUploadLog(models.Model):
 
         super().save(*args, **kwargs)
         Upload_Desilting_Points.delay(self.id,  self.is_closest_wp, is_lulc_required =
-                            False)
+                            True)
 
     class Meta:
         ordering = ["-created_at"]

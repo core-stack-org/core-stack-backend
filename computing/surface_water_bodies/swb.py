@@ -29,9 +29,9 @@ def generate_swb_layer(
     app_type="MWS",
     start_year=None,
     end_year=None,
-    is_all_classes=False,
+    is_all_classes=False
 ):
-    ee_initialize()
+    ee_initialize('test')
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())

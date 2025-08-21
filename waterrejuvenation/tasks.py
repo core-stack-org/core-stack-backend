@@ -18,7 +18,7 @@ from utilities.constants import SITE_DATA_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long, get_gee_asset_path, check_task_status, gdf_to_ee_fc, get_gee_dir_path,
-    make_asset_public
+    make_asset_public, ee_initialize_update
 )
 import ee
 import logging
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 @shared_task
 def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required = True):
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
-    ee_initialize()
+    project_id = ee_initialize()
     merged_features = []
 
     #Initialize objects for given parameters
@@ -50,7 +50,7 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
     # Generating mws layer name
-    mws_asset_id = get_filtered_mws_layer_name(proj_obj.name, 'filtered_mws')
+    mws_asset_id = get_filtered_mws_layer_name(proj_obj.name, 'filtered_mws', project_id = project_id)
 
     #Since we wanted to build all the layer new everytime some one upload We are deleting asset first
     delete_asset_on_GEE(mws_asset_id)
@@ -115,7 +115,7 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
             logger.info("MWS task completed")
             make_asset_public(mws_asset_id)
             if is_lulc_required:
-                clip_lulc_output(mws_asset_id, proj_obj.id)
+                clip_lulc_output(mws_asset_id, proj_obj.id, project_id)
                 logger.info("luc Task finished for lulc")
         except Exception as e:
             logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
@@ -137,31 +137,52 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
                                       asset_folder_list=asset_folder_lulc, app_type="WATER_REJ", start_year='2017', end_year='2023', is_all_classes=True)
     result_task = result.get()
     logger.info("SWB layer Generation successfull")
-
+    make_asset_public(asset_id_swb2)
     asset_suffix_prec = 'clipped_precipitation_filtered_mws_' + str(proj_obj.name.lower())
     asset_folder_prec = [str(proj_obj.name)]
     asset_id_prec = get_gee_dir_path(
         asset_folder_prec, asset_path=GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]
     ) + f"Prec_fortnight_{asset_suffix_prec}"
-    # hydrology = generate_hydrology.delay(roi=mws_asset_id,\
-    #                                      asset_suffix=asset_suffix_prec,\
-    #                                      asset_folder_list=asset_folder_prec, \
-    #                                      app_type="WATER_REJ",\
-    #                                      start_year='2017',\
-    #                                      end_year='2023',\
-    #                                      is_annual=False,\
-    #                                      )
-    # result_hydrology = hydrology.get()
+    hydrology = generate_hydrology.delay(roi=mws_asset_id,\
+                                         asset_suffix=asset_suffix_prec,\
+                                         asset_folder_list=asset_folder_prec, \
+                                         app_type="WATER_REJ",\
+                                         start_year='2017',\
+                                         end_year='2023',\
+                                         is_annual=False,\
+                                         )
+    make_asset_public(asset_id_prec)
+    result_hydrology = hydrology.get()
+    asset_suffix_draught = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
+    result_d = calculate_drought.delay(roi_path=mws_asset_id, asset_suffix=asset_suffix_draught,
+                                       asset_folder_list=asset_folder_prec, app_type="WATER_REJ", start_year=2017,
+                                       end_year=2022)
+    dst_filename = (
+            "drought_"
+            + asset_suffix_draught
+            + "_"
+            + str(2017)
+            + "_"
+            + str(2022)
+    )
+    draught_asset_id = (
+            get_gee_dir_path(
+                asset_folder_prec, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            )
+            + dst_filename
+    )
+
+
     description = "Prec_fortnight_" + asset_suffix_prec
     layer_name = 'WaterRejapp_mws_' + str(proj_obj.name) + '_' + str(proj_obj.id)
     precip = ee.FeatureCollection(asset_id_prec)
     gdf = geemap.ee_to_gdf(precip)
     mws_geojson_op = 'data/fc_to_shape/' + str(proj_obj.name) + "/" + layer_name
     gdf.to_file(mws_geojson_op, driver='GeoJSON')
-    season_fc = calculate_precipitation_season(mws_geojson_op)
+    season_fc = calculate_precipitation_season(mws_geojson_op, draught_asset_id, proj_obj.id)
     sync_project_fc_to_geoserver(season_fc, proj_obj.name, layer_name, 'waterrej')
     asset_id_swb_with_catchement = compute_max_stream_order_and_catchment_for_swb(asset_id_swb2, proj_obj.id)
-
+    make_asset_public(asset_id_swb_with_catchement)
     #mapping_result = get_waterbody_id_for_lat_long(wb_obj.excel_hash, asset_id_swb2)
     desilting_layer_task = BuildDesiltingLayer.delay(proj_obj.id)
     logger.info("Desilting point layer is generated")
@@ -173,25 +194,15 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
     logger.info("Waterbody Geojson Generated and pushed to geoserver")
 
 
-
-    asset_suffix_draught = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
-    result_d = calculate_drought.delay(roi_path=mws_asset_id, asset_suffix = asset_suffix_draught, asset_folder_list = asset_folder_prec, app_type="WATER_REJ",start_year=2017, end_year = 2022)
-    result_op = result_d.get()
-    dst_filename = (
-             "drought_"
-             + asset_suffix_draught
-             + "_"
-             + str('2017')
-             + "_"
-             + str('2022')
-     )
+    logger.info("Zoi Geojson generation started")
 
     asset_id_zoi = process_waterrej_zoi(asset_id_desilt, proj_obj.id)
     task_id, zoi_asset_id = generate_cropping_intensity(roi= asset_id_zoi , asset_suffix=asset_suffix_lulc, asset_folder_list=asset_folder_lulc,\
                                   app_type="WATER_REJ", start_year=2017, end_year = 2023)
-    asset_id_ci = f"cropping_intensity_{asset_suffix_lulc}"
+
+    asset_id_ci = f"cropping_intensity_{asset_suffix_lulc}_2017-23"
     ndvi_asset = get_ndvi_for_zoi(zoi_asset_id)
-    generate_geojson_with_ci_and_ndvi(asset_id_zoi, asset_id_ci, ndvi_asset, proj_obj.id)
+
     drainage_line_task  =  clip_drainage_lines.delay(roi_path=mws_asset_id, asset_suffix = asset_suffix_draught, asset_folder_list = asset_folder_prec, app_type="WATER_REJ", workspace_name = "waterrej", proj_id = proj_obj.id)
 
 @shared_task()
@@ -278,7 +289,7 @@ def BuildGeojson(swb2_asset, desilting_point_asset, layer_name, project_name):
     wait_for_task_completion(point_tasks)
 
 
-    sync_project_fc_to_geoserver(matched_polygons, project_name, layer_name, 'waterrej')
+    #sync_project_fc_to_geoserver(matched_polygons, project_name, layer_name, 'waterrej')
     return  asset_id_desilt
 
 

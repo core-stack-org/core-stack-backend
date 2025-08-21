@@ -255,7 +255,7 @@ def classify_checkdams(ndmi_list, poly_degree=2, threshold=0):
             if zoi_dist:
                 res_dict['zoi'] = zoi_dist
             else:
-                res_dict['zoi'] = 0
+                res_dict['zoi'] = 400
             res_dict['impactful'] = impactful
             cum_score_dict = {f"score_{i}": val for i, val in enumerate(cum_scores)}
 

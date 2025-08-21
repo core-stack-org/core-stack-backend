@@ -1,11 +1,17 @@
 from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+from computing.utils import sync_project_fc_to_geoserver
 from projects.models import Project
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long, get_gee_asset_path, check_task_status, gdf_to_ee_fc, sync_raster_to_gcs,
-    sync_raster_gcs_to_geoserver, sync_multiple_raster_gcs_to_geoserver, make_asset_public, is_gee_asset_exists
+    sync_raster_gcs_to_geoserver, sync_multiple_raster_gcs_to_geoserver, make_asset_public, is_gee_asset_exists,
+    get_gee_dir_path
 )
+
+
 WATER_REJ_GEE_ASSET='projects/ee-corestackdev/assets/apps/waterbody/'
+WATER_REJ_TEST_GEE_ASSET='projects/ee-kapil-test/assets/apps/waterbody/'
 import time
 import ee
 import logging
@@ -15,9 +21,10 @@ from nrm_app.settings import  lulc_years, water_classes
 import pandas as pd
 import math
 
-years = ['2017_2018','2018_2019','2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
+years = ['2017_2018', '2018_2019','2019_2020', '2020_2021', '2021_2022', '2022_2023', '2023_2024']
 
-def get_filtered_mws_layer_name(project_name, layer_name):
+def get_filtered_mws_layer_name(project_name, layer_name, project_id = 'ee-corestackdev'):
+    WATER_REJ_GEE_ASSET = f"projects/{project_id}/assets/apps/waterbody/"
     return  WATER_REJ_GEE_ASSET+str(project_name.lower())+'/'+str(layer_name)+'_'+str(project_name.lower())
 
 def gen_proj_roi(project_name):
@@ -112,7 +119,7 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
             'distance_m': float (if success)
         }
     """
-    ee_initialize()
+
     print ("Given lat long")
     print (lat,lon)
     point = ee.Geometry.Point([lon, lat])
@@ -191,8 +198,8 @@ def generate_water_mask_lulc(years):
     return final_water_mask
 
 
-def clip_lulc_output(mws_asset_id,  proj_id):
-    ee_initialize()
+def clip_lulc_output(mws_asset_id,  proj_id, gee_project_id):
+
     mws = ee.FeatureCollection(mws_asset_id)
     try:
 
@@ -204,14 +211,14 @@ def clip_lulc_output(mws_asset_id,  proj_id):
         print(f"Using buffered bounding box with buffer {100} meters.")
 
     proj_obj = Project.objects.get(pk = proj_id)
-    lulc_asset_id_base = get_filtered_mws_layer_name(proj_obj.name, 'clipped_lulc_filtered_mws')
+    lulc_asset_id_base = get_filtered_mws_layer_name(proj_obj.name, 'clipped_lulc_filtered_mws', gee_project_id)
     PAN_INDIA_LULC_BASE_PATH = "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
     for year in years:
         start, end = year.split('_')[0], year.split('_')[1]
         start_date = f"{start}-07-01"
         end_date = f"{end}-06-30"
         asset_id = f"{lulc_asset_id_base}_{start_date}_{end_date}_LULCmap_10m"
-        #delete_asset_on_GEE(asset_id)
+        delete_asset_on_GEE(asset_id)
         lulc_path = f'{PAN_INDIA_LULC_BASE_PATH}_{year}'  # Adjust this according to your naming convention
         lulc = ee.Image(lulc_path)
 
@@ -246,7 +253,6 @@ def clip_lulc_output(mws_asset_id,  proj_id):
 
 
 def delete_asset_on_GEE(asset_id):
-    ee_initialize()
     try:
         ee.data.deleteAsset(asset_id)
         logger.info(f"Deleted existing asset: {asset_id}")
@@ -257,6 +263,7 @@ def create_ring(feature):
         point = feature.geometry()
         zoi = ee.Number(feature.get('zoi'))
         waterbody_name = feature.get('waterbody_name')
+        impactfull = feature.get('impactful')
         uid = feature.get('UID')
         outer = point.buffer(zoi)
         inner = point.buffer(0)  # Optional, but keeps the logic clear
@@ -266,6 +273,7 @@ def create_ring(feature):
         return ee.Feature(ring).set({
             'zoi': zoi,
             'waterbody_name':waterbody_name,
+            'impactfull':impactfull,
             'UID':uid,
             'lon': point.coordinates().get(0),
             'lat': point.coordinates().get(1),
@@ -349,7 +357,7 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
 
         # Define export task details
         ndvi_description = f"ndvi_{start_year}_{description}"
-        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"
+        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"[:100]
 
         # Remove previous asset if it exists to avoid overwrite issues
         if is_gee_asset_exists(ndvi_asset_id):
@@ -469,9 +477,13 @@ def merge_assets_chunked_on_year(chunk_assets):
     return merged_fc
 
 
-def get_ndvi_for_zoi(zoi_asset_path):
+def get_ndvi_for_zoi(zoi_asset_path, asset_suffix, asset_folder, app_type='WATER_REJ'):
+    ndvi_asset_path = get_gee_dir_path(
+        asset_folder, asset_path=GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]) + "ndmi"
+
     zoi_collections = ee.FeatureCollection(zoi_asset_path)
-    ndvi_asset_path = f"{zoi_asset_path}_with_ndvi"
+
+
     fc = get_ndvi_data(zoi_collections, 2017, 2024, 'ndmi', ndvi_asset_path)
     task = ee.batch.Export.table.toAsset(collection = fc, description = 'export_ndvi_waterrej_task',
             assetId = ndvi_asset_path)
@@ -479,3 +491,37 @@ def get_ndvi_for_zoi(zoi_asset_path):
     wait_for_task_completion(task)
     return ndvi_asset_path
 
+
+
+def generate_draught_with_mws(draught_asset_id, mws_fc, proj_id):
+    proj_obj = Project.objects.get(pk = proj_id)
+    ee_initialize('')
+
+
+    # Load FeatureCollections
+    mw_fc = ee.FeatureCollection(mws_asset_id)
+    draught_fc = ee.FeatureCollection(draught_asset_id)
+
+    # Define spatial filter (intersects)
+    spatial_filter = ee.Filter.intersects(
+        leftField=".geo",  # geometry field of left collection
+        rightField=".geo",
+        maxError=1
+    )
+
+    # Define the join
+    join = ee.Join.inner()
+
+    # Apply the join
+    joined = join.apply(mw_fc, draught_fc, spatial_filter)
+
+    # Convert joined result into a proper FeatureCollection
+    # by merging properties from both
+    def merge_features(feature):
+        left = ee.Feature(feature.get("primary"))
+        right = ee.Feature(feature.get("secondary"))
+        return left.copyProperties(right)
+
+    final_fc = ee.FeatureCollection(joined.map(merge_features))
+    layer_name = 'WaterRejapp_mws_' + str(proj_obj.name) + '_' + str(proj_obj.id)
+    sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, 'waterrej')

@@ -316,6 +316,13 @@ def get_farthest_point(feature):
     return ee.Feature(farthest_point).copyProperties(feature).set('farthest_distance', max_coord.get('distance'))
 
 
+def get_centroid_point(feature):
+    geometry = feature.geometry()
+    centroid = geometry.centroid()
+
+    # Return centroid as feature, copying properties
+    return ee.Feature(centroid).copyProperties(feature).set('type', 'centroid')
+
 def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
     ee_initialize()
     proj_obj = Project.objects.get(pk = proj_id)
@@ -481,8 +488,8 @@ def process_waterrej_zoi(swb_asset_id, proj_id):
         .map(mask_landsat_clouds)
     elevation, cropping_mask, ndmi_img = calculate_elevation(landsat, lulc_asset_id)
 
-    # Step 3: NDMI Computation at Farthest Points of SWBs
-    swb_centroids = swb_fc.map(get_farthest_point)
+    # Step 3: NDMI Computation at Centroid of waterbody
+    swb_centroids = swb_fc.map(get_centroid_point)
     ndmi_asset = get_filtered_mws_layer_name(proj_obj.name, 'ndmi_layer')
     try:
         delete_asset_on_GEE(ndmi_asset)
@@ -498,12 +505,17 @@ def process_waterrej_zoi(swb_asset_id, proj_id):
     ndmi_list, lat_list, lon_list, uid_list, name_list = extract_feature_info(ndmi_fc)
 
 
-
+    #
     # Step 5: Filter Valid Features
+    # filtered = [
+    #     (i, ndmis, lat_list[i], lon_list[i], uid_list[i], name_list[i])
+    #     for i, ndmis in enumerate(ndmi_list)
+    #     if not any(val == -1 for val in ndmis)
+    # ]
+
     filtered = [
         (i, ndmis, lat_list[i], lon_list[i], uid_list[i], name_list[i])
         for i, ndmis in enumerate(ndmi_list)
-        if not any(val == -1 for val in ndmis)
     ]
 
     ndmis_all, lats_all, lons_all, uids_all, names_all = zip(*[
@@ -575,7 +587,8 @@ def process_waterrej_zoi(swb_asset_id, proj_id):
     final_fc = ee.FeatureCollection(joined.map(merge_ndmi_zoi_features))
     # Step 9: Sync to GeoServer
     layer_name = f'WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}'
-    asset_id_zoi = zoi_ring_asset = get_filtered_mws_layer_name(proj_obj.name, layer_name)
+    asset_id_zoi = get_filtered_mws_layer_name(proj_obj.name, layer_name)
+    delete_asset_on_GEE(asset_id_zoi)
     task = ee.batch.Export.table.toAsset(collection = final_fc,
                                          description = 'export zoi with ci',
                                          assetId = asset_id_zoi)
@@ -583,7 +596,7 @@ def process_waterrej_zoi(swb_asset_id, proj_id):
     wait_for_task_completion(task)
     sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, 'waterrej')
 
-    return zoi_asset
+    return asset_id_zoi
 
 
 def export_and_wait(collection, description, asset_id):
