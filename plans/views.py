@@ -248,7 +248,7 @@ class PlanViewSet(viewsets.ModelViewSet):
             else:
                 return PlanApp.objects.none()
 
-        block_id = self.request.query_params.get("block_id", None)
+        block_id = self.request.query_params.get("block", None)
         if block_id:
             base_queryset = base_queryset.filter(block=block_id)
 
