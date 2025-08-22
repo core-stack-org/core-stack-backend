@@ -366,7 +366,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
             state,
             district,
             block,
-            layer_name=asset_name,
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_cluster",
             asset_id=asset_id,
             dataset_name="Terrain Vector",
         )

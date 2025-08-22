@@ -77,7 +77,9 @@ def generate_cropping_intensity(
 
     # Export asset to Geoserver
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "crop_intensity")
+    res = sync_fc_to_geoserver(
+        fc, asset_suffix, layer_name, "crop_intensity", "croppingintensity"
+    )
     print(res)
     if (
         res["status_code"] == 201 and layer_id
