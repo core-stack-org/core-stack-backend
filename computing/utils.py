@@ -130,7 +130,7 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
     return push_shape_to_geoserver(path, workspace=workspace)
 
 
-def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
+def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None):
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -157,7 +157,14 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace):
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
 
-        return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        if style_name:
+            geo = Geoserver()
+            style_res = geo.publish_style(
+                layer_name=layer_name, style_name=style_name, workspace=workspace
+            )
+            print("Style response:", style_res)
+        return res
     else:
         return "No features in FeatureCollection"
         # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
