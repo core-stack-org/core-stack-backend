@@ -341,7 +341,7 @@ def check_site_suitability(
                 state,
                 district,
                 block,
-                layer_name=project_name,
+                layer_name=asset_name,
                 asset_id=asset_id,
                 dataset_name="Site Suitability Vector",
                 misc={"start_year": start_year, "end_year": end_year},
