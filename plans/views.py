@@ -206,13 +206,15 @@ class PlanViewSet(viewsets.ModelViewSet):
                     project = Project.objects.get(
                         id=project_id, app_type=AppType.WATERSHED, enabled=True
                     )
-                    return PlanApp.objects.filter(project=project, enabled=True)
+                    base_queryset = PlanApp.objects.filter(
+                        project=project, enabled=True
+                    )
                 except Project.DoesNotExist:
                     return PlanApp.objects.none()
+            else:
+                base_queryset = PlanApp.objects.filter(enabled=True)
 
-            return PlanApp.objects.filter(enabled=True)
-
-        if self.request.user.groups.filter(
+        elif self.request.user.groups.filter(
             name__in=["Organization Admin", "Org Admin", "Administrator"]
         ).exists():
             base_queryset = PlanApp.objects.filter(
@@ -231,18 +233,26 @@ class PlanViewSet(viewsets.ModelViewSet):
                 except Project.DoesNotExist:
                     return PlanApp.objects.none()
 
-            return base_queryset
-
-        # regular user
-        if project_id:
-            try:
-                project = Project.objects.get(
-                    id=project_id, app_type=AppType.WATERSHED, enabled=True
-                )
-                return PlanApp.objects.filter(project=project, enabled=True)
-            except Project.DoesNotExist:
+        else:
+            # regular user
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
+                    base_queryset = PlanApp.objects.filter(
+                        project=project, enabled=True
+                    )
+                except Project.DoesNotExist:
+                    return PlanApp.objects.none()
+            else:
                 return PlanApp.objects.none()
-        return PlanApp.objects.none()
+
+        block_id = self.request.query_params.get("block", None)
+        if block_id:
+            base_queryset = base_queryset.filter(block=block_id)
+
+        return base_queryset
 
     def get_serializer_class(self):
         """
