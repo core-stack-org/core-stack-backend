@@ -16,7 +16,7 @@ class LocationAdmin(admin.ModelAdmin):
     """Make it easy to see — and filter by — the scope of each Location row."""
 
     list_display  = ("id", "level", "state", "district", "block")
-    list_filter   = ("level", "state")            # quick dropdowns on right sidebar
+    list_filter   = ("level", "state")
     search_fields = (
         "state__name",
         "district__name",
@@ -30,7 +30,7 @@ class CommunityAdmin(admin.ModelAdmin):
         "id",
         "project",
         "bot",
-        "locations_display",            # ← new column
+        "locations_display",
     )
     inlines        = [LocationInline]
     exclude        = ("locations",)

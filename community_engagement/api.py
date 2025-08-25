@@ -17,6 +17,7 @@ from geoadmin.models import State, District, Block
 from projects.models import Project, AppType
 from users.models import User
 from bot_interface.models import Bot
+from public_api.views import get_location_info_by_lat_lon
 from utilities.auth_utils import auth_free
 from nrm_app.settings import S3_BUCKET, S3_REGION
 
@@ -296,7 +297,6 @@ def get_communities_by_location(request):
 @auth_free
 def get_communities_by_lat_lon(request):
     try:
-        from public_api.views import get_location_info_by_lat_lon
         lat = float(request.query_params.get("latitude"))
         lon = float(request.query_params.get("longitude"))
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
@@ -342,7 +342,6 @@ def map_users_to_community(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get project and check if it's a community_engagement project and enabled
         try:
             project = Project.objects.get(
                 id=project_id, app_type=AppType.COMMUNITY_ENGAGEMENT, enabled=True
@@ -353,14 +352,11 @@ def map_users_to_community(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if we have files in the request
         files = []
 
-        # Handle single file upload case
         if "file" in request.FILES:
             files.append(request.FILES["file"])
 
-        # Handle multiple files upload case
         if "files[]" in request.FILES:
             print("Found multiple files with 'files[]'")
             file_list = request.FILES.getlist("files[]")
@@ -575,11 +571,9 @@ def get_items_by_community(request):
 
             if item.coordinates:
                 try:
-                    # First try JSON
                     coord = json.loads(item.coordinates)
                 except json.JSONDecodeError:
                     try:
-                        # Fallback to Python dict string
                         coord = ast.literal_eval(item.coordinates)
                     except Exception as e:
                         print(f"Error parsing coordinates for item {item.id}: {e}")
