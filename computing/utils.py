@@ -287,6 +287,7 @@ def save_layer_info_to_db(
     except Exception as e:
         print("Error fetching in state district block:", e)
         return
+
     is_public = is_asset_public(asset_id)
 
     layer_obj, created = Layer.objects.update_or_create(
