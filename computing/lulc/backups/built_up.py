@@ -1,5 +1,5 @@
 import ee
-from .misc import mask_s2cloud
+from computing.lulc.misc import mask_s2cloud
 
 
 def ndwi_based_builtup_cleaning(

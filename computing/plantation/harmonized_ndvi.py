@@ -257,9 +257,9 @@ def Combine_LS_Modis(LSC, roi_boundary):
         ["NDVI_modis", "NDVI_lsc"]
     ).reduce(ee.Reducer.linearFit())
 
-    corr_NDVI = get_Pearson_Correlation_Coefficients(
-        LSC_modis_paired_ic, roi_boundary, ["NDVI_modis", "NDVI_lsc"]
-    )
+    # corr_NDVI = get_Pearson_Correlation_Coefficients(
+    #     LSC_modis_paired_ic, roi_boundary, ["NDVI_modis", "NDVI_lsc"]
+    # )
     LSMC_NDVI = LSC_modis_paired_ic.map(
         gapfillLSM(LSC_modis_regression_model_NDVI, "NDVI_lsc", "NDVI_modis")
     )
@@ -349,7 +349,6 @@ def interpolate_timeseries(S1_TS):
 
 
 # Function to get padded NDVI LSMC time series image for a given ROI
-# exports.getNDVI = function(startDate, endDate, roi_boundary) {
 def Get_Padded_NDVI_TS_Image(startDate, endDate, roi_boundary):
     L7, L8, S2 = Get_L7_L8_S2_ImageCollections(startDate, endDate, roi_boundary)
 
@@ -363,8 +362,7 @@ def Get_Padded_NDVI_TS_Image(startDate, endDate, roi_boundary):
 
     Interpolated_LSMC_NDVI = interpolate_timeseries(LSMC_NDVI)
 
-    def clip_ndvi(image):
-        return image.clip(roi_boundary)
-
-    Interpolated_LSMC_NDVI_clipped = Interpolated_LSMC_NDVI.map(clip_ndvi)
+    Interpolated_LSMC_NDVI_clipped = Interpolated_LSMC_NDVI.map(
+        lambda image: image.clip(roi_boundary)
+    )
     return Interpolated_LSMC_NDVI_clipped

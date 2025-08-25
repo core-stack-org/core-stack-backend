@@ -8,7 +8,7 @@ import requests
 from datetime import datetime, timezone
 import dateutil.parser
 
-from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
+from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from utilities.constants import (
     ODK_URL_agri,
     ODK_URL_gw,
@@ -17,6 +17,7 @@ from utilities.constants import (
     ODK_URL_swb,
     ODK_URL_waterbody,
     ODK_URL_well,
+    ODK_URL_SESSION,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,9 +70,6 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
     request_obj_odk = requests.get(ODK_url, auth=(ODK_USERNAME, ODK_PASSWORD))
     response_dict = json.loads(request_obj_odk.content)
     response_list = response_dict["value"]
-    print("INCOMING ODK DATA")
-    print(response_list[0:1])
-    print("DONE")
     logger.info(f"Fetched data from the ODK: {ODK_url}")
     all_keys = set()
 
@@ -212,9 +210,7 @@ def modify_response_list_settlement(res, block, plan_id):
 
 # MARK: Modify ODK Well Data
 def modify_response_list_well(res, block, plan_id):
-    print(f"block name: {block} and plan id: {plan_id}")
     res_list = []
-
     for result in res:
         if result is None:
             continue
@@ -532,7 +528,6 @@ def extract_keys(d, parent_key="", sep="_"):
 
 # MARK: Bearer Token
 def fetch_bearer_token(email: str, password: str) -> str:
-    ODK_SESSION_URL = "https://odk.gramvaani.org/v1/sessions"
     try:
         if _token_cache["token"] and _token_cache["expires_at"]:
             now = datetime.now(timezone.utc)
@@ -540,7 +535,7 @@ def fetch_bearer_token(email: str, password: str) -> str:
                 return _token_cache["token"]
 
         response = requests.post(
-            ODK_SESSION_URL, json={"email": email, "password": password}
+            ODK_URL_SESSION, json={"email": email, "password": password}
         )
         print("Response: ", response)
         if response.status_code == 200:

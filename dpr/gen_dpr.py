@@ -2,11 +2,12 @@ import io
 import json
 import os
 import tempfile
-import threading
 from collections import defaultdict
 from datetime import date, datetime
 from io import BytesIO
 from multiprocessing import Process
+
+from selenium import webdriver
 from nrm_app.settings import (
     EMAIL_HOST_USER,
     EMAIL_HOST_PASSWORD,
@@ -51,13 +52,8 @@ from .models import (
 from dpr.mapping import populate_maintenance_from_waterbody
 from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
 from utilities.logger import setup_logger
-import environ
-
-env = environ.Env()
-environ.Env.read_env()  # reading .env file
 
 logger = setup_logger(__name__)
-
 
 def get_plan(plan_id):
     try:
@@ -69,7 +65,7 @@ def get_plan(plan_id):
 def create_dpr_document(plan):
     doc = initialize_document()
     logger.info("Generating DPR for plan ID: %s", plan.plan_id)
-    logger.info("Syncing ODK database")
+    logger.info("Syncing ODK data with database")
 
     sync_db_odk()
     logger.info("Database sync complete")
@@ -102,7 +98,7 @@ def create_dpr_document(plan):
 
     add_section_e(doc, plan)
 
-    add_section_f(doc, plan, mws_fortnight)
+    add_section_f(doc, plan, mws_fortnight) # generates maps as well
 
     add_section_g(doc, plan, mws_fortnight)
 
@@ -170,15 +166,15 @@ def send_dpr_email(doc, email_id, plan_name):
 
 
 def get_data_for_settlement(planid):
-    return ODK_settlement.objects.filter(plan_id=planid)
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected")
 
 
 def get_settlement_count_for_plan(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).count()
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").count()
 
 
 def get_settlement_coordinates_for_plan(planid):
-    settlements = ODK_settlement.objects.filter(plan_id=planid).values(
+    settlements = ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").values(
         "settlement_name", "latitude", "longitude"
     )
     return [
@@ -239,7 +235,7 @@ def create_team_details_table(doc, plan):
 
     row_cells = table.add_row().cells
     row_cells[0].text = plan.facilitator_name
-    row_cells[1].text = plan.plan
+    row_cells[1].text = plan.plan.replace('_', ' ').title()
     row_cells[2].text = "PRA, Gram Sabha, Transect Walk, GIS Mapping"
 
     for cell in hdr_cells:
@@ -300,14 +296,14 @@ def create_village_brief_table(
     headers_data = [
         ("Name of the Village", plan.village_name),
         ("Name of the Gram Panchayat", plan.gram_panchayat),
-        ("Block", plan.block.block_name),
+        ("Tehsil", plan.block.block_name),
         ("District", plan.district.district_name),
         ("State", plan.state.state_name),
         ("Number of Settlements in the Village", str(total_settlements)),
         ("Intersecting Micro Watershed IDs", intersecting_mws_ids),
         (
             "Latitude and Longitude of the Village",
-            f"{centroid.y:.6f}, {centroid.x:.6f}",
+            f"{centroid.y:.8f}, {centroid.x:.8f}",
         ),
     ]
 
@@ -413,7 +409,7 @@ def create_socio_eco_table(doc, plan):
 def create_livelihood_table(doc, plan):
     # Crop Info section remains the same
     doc.add_heading("Crop Info", level=4)
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id)
+    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     headers_cropping_pattern = [
         "Name of the Settlement",
         "Irrigation Source",
@@ -522,7 +518,7 @@ def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf):
         matching_feature = mws_gdf[mws_gdf["uid"] == mws_id]
         if not matching_feature.empty:
             centroid = matching_feature.geometry.centroid.iloc[0]
-            row_cells[1].text = f"{centroid.y:.2f}, {centroid.x:.2f}"
+            row_cells[1].text = f"{centroid.y:.8f}, {centroid.x:.8f}"
         else:
             row_cells[1].text = "Not found"
 
@@ -625,7 +621,7 @@ def create_land_use_table(doc, specific_mws_row):
     return table_cropping_intensity
 
 
-def plot_graph_ci(table_cropping_intensity, doc):
+def plot_graph_ci(table_ci, doc):
     years = list(range(2017, 2023))
     single_cropping_values = []
     double_cropping_values = []
@@ -633,7 +629,7 @@ def plot_graph_ci(table_cropping_intensity, doc):
     uncropped_land_values = []
 
     for i, year in enumerate(years):
-        row_cells = table_cropping_intensity.rows[i + 1].cells
+        row_cells = table_ci.rows[i + 1].cells
         single_cropping_values.append(float(row_cells[1].text))
         double_cropping_values.append(float(row_cells[2].text))
         triple_cropping_values.append(float(row_cells[3].text))
@@ -691,7 +687,7 @@ def populate_water_structures(doc, plan, mws_id, mws_gdf):
 
 def populate_well(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id)
+    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
 
     wells_in_mws = []
     for well in wells_in_plan:
@@ -724,7 +720,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
 
     doc.add_heading(f"Well Information for MWS: {mws_id}", level=2)
     headers_well_info = [
-        "Name of Beneficiary Settlement",
+        "Name of Beneficiary's Settlement",
         "Number of Wells",
         "Total Number of Household Benefitted",
     ]
@@ -751,12 +747,12 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         "Which Caste uses the well?",
         "Functional or Non-functional",
         "Need Maintenance",
+        "Type of Well",
         "Latitude",
         "Longitude",
     ]
     table_well = doc.add_table(rows=1, cols=len(headers_well))
     table_well.style = "Table Grid"
-
     hdr_cells = table_well.rows[0].cells
     for i, header in enumerate(headers_well):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
@@ -769,13 +765,15 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[3].text = well.caste_uses
         row_cells[4].text = well.is_functional
         row_cells[5].text = well.need_maintenance
-        row_cells[6].text = str(well.latitude)
-        row_cells[7].text = str(well.longitude)
+        row_cells[6].text = well.data_well.get("select_one_well_type") or "No Data"
+        row_cells[7].text = str(well.latitude)
+        row_cells[8].text = str(well.longitude)
 
 
 def populate_waterbody(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    # basically water structures
+    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
     waterbody_in_mws = []
     for waterbody in waterbodies_in_plan:
         waterbody_point = Point(waterbody.longitude, waterbody.latitude)
@@ -818,7 +816,7 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
 
     doc.add_heading(f"Waterbody Information for MWS: {mws_id}", level=2)
     headers_waterstructure = [
-        "Name of the Beneficiary Settlement",
+        "Name of the Beneficiary's Settlement",
         "Who manages?",
         "Who owns the water structure?",
         "Which Caste uses the water structure?",
@@ -1035,7 +1033,7 @@ def create_surface_wb_table(doc, plan):
 
     swb = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
-        workspace="water_bodies",
+        workspace="swb", # Surface Water Bodies Workspace
         layer_name="surface_waterbodies_"
         + str(plan.district.district_name).lower().replace(" ", "_")
         + "_"
@@ -1104,7 +1102,7 @@ def create_surface_wb_table(doc, plan):
             else "N/A"
         )
 
-        total_area = f"{float(total_area):.2f}" if total_area != "N/A" else "N/A"
+        total_area = f"{float(total_area/10000):.2f}" if total_area != "N/A" else "N/A"
 
         kharif_value = f"{float(kharif_value):.2f}" if kharif_value != "N/A" else "N/A"
         rabi_value = f"{float(rabi_value):.2f}" if rabi_value != "N/A" else "N/A"
@@ -1127,6 +1125,7 @@ def create_surface_wb_table(doc, plan):
 
 
 # MARK: - Section F
+# Works and Maps Section
 def add_section_f(doc, plan, mws):
     doc.add_heading("Section F: Proposed New NRM works on basis through Gram Sabha")
     para = doc.add_paragraph()
@@ -1138,11 +1137,11 @@ def add_section_f(doc, plan, mws):
 
 
 def create_nrm_works_table(doc, plan, mws):
-    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id)
-    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id)
-    settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
-    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id)
-    waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id)
+    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
 
     mws_uids = list(set([feature["properties"]["uid"] for feature in mws["features"]]))
 
@@ -1261,30 +1260,30 @@ def create_nrm_works_table(doc, plan, mws):
                     2
                 ].text = (
                     structure.beneficiary_settlement
-                )  # Name of Beneficiary's Settlement
+                )
                 row_cells[3].text = structure.data_groundwater.get(
                     "Beneficiary_Name"
-                )  # Beneficiary Name
-                row_cells[4].text = structure.work_type  # Type of work
-                row_cells[5].text = structure.recharge_structure_id  # Work ID
-                row_cells[6].text = str(structure.latitude)  # Latitude
-                row_cells[7].text = str(structure.longitude)  # Longitude
+                ) or "No Data Provided"
+                row_cells[4].text = structure.work_type
+                row_cells[5].text = structure.recharge_structure_id
+                row_cells[6].text = str(structure.latitude)
+                row_cells[7].text = str(structure.longitude)
                 row_cells[8].text = format_work_dimensions(
                     structure.work_dimensions, structure.work_type.lower()
-                )  # Work Dimension
+                )
 
             # Add rows for irrigation works
             offset = len(recharge_works) + 1
             for i, work in enumerate(irrigation_works, start=offset):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
-                row_cells[1].text = "Irrigation Work"  # Work Category
+                row_cells[1].text = "Irrigation Work"  
                 row_cells[
                     2
-                ].text = work.beneficiary_settlement  # Name of Beneficiary's Settlement
+                ].text = work.beneficiary_settlement  
                 row_cells[3].text = (
-                    work.data_agri.get("Beneficiary_Name") or "No Data"
-                )  # Beneficiary Name
+                    work.data_agri.get("Beneficiary_Name") or "No Data Provided"
+                )  
 
                 if (
                     work.work_type.lower() == "other"
@@ -1328,110 +1327,7 @@ def format_work_dimensions(work_dimensions, work_type):
     return dimensions_str.rstrip(", ")
 
 
-# MARK: - Section G
-def add_section_g(doc, plan, mws):
-    doc.add_heading("Section G: Propose New Livelihood Works", level=1)
-
-    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id)
-    headers = [
-        "Livelihood Works",
-        "Name of Beneficiary Settlement",
-        "Name of Beneficiary",
-        "Beneficiary Father's Name",
-        "Type of Work Demand",
-        "Area",
-        "Latitude",
-        "Longitude",
-    ]
-    table = doc.add_table(rows=1, cols=len(headers))
-    table.style = "Table Grid"
-    hdr_cells = table.rows[0].cells
-    for i, header in enumerate(headers):
-        hdr_cells[i].paragraphs[0].add_run(header).bold = True
-
-    for record in livelihood_records:
-        # Handle Livestock category
-        if record.data_livelihood.get("select_one_demand_promoting_livestock") == "Yes":
-            row_cells = table.add_row().cells
-            row_cells[0].text = "Livestock"
-            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
-            row_cells[2].text = record.data_livelihood.get(
-                "beneficiary_name", "No Data Provided"
-            )
-            row_cells[3].text = "No Data"  # Father's name not specified
-
-            # Get livestock demand type
-            livestock_demand = record.data_livelihood.get(
-                "select_one_promoting_livestock"
-            )
-            if livestock_demand == "other":
-                livestock_demand = record.data_livelihood.get(
-                    "select_one_promoting_livestock_other", "No Data Provided"
-                )
-            row_cells[4].text = livestock_demand or "No Data Provided"
-
-            row_cells[5].text = "No Data"  # Area not specified for livestock
-            row_cells[6].text = (
-                str(record.latitude) if record.latitude else "No Data Provided"
-            )
-            row_cells[7].text = (
-                str(record.longitude) if record.longitude else "No Data Provided"
-            )
-
-        # Handle Fisheries category
-        if record.data_livelihood.get("select_one_demand_promoting_fisheries") == "Yes":
-            row_cells = table.add_row().cells
-            row_cells[0].text = "Fisheries"
-            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
-            row_cells[2].text = record.data_livelihood.get(
-                "beneficiary_name", "No Data Provided"
-            )
-            row_cells[3].text = "No Data Provided"  # Father's name not specified
-
-            # Get fisheries demand type
-            fisheries_demand = record.data_livelihood.get(
-                "select_one_promoting_fisheries"
-            )
-            if fisheries_demand == "other":
-                fisheries_demand = record.data_livelihood.get(
-                    "select_one_promoting_fisheries_other", "No Data Provided"
-                )
-            row_cells[4].text = fisheries_demand or "No Data Provided"
-
-            row_cells[5].text = "No Data Provided"  # Area not specified for fisheries
-            row_cells[6].text = (
-                str(record.latitude) if record.latitude else "No Data Provided"
-            )
-            row_cells[7].text = (
-                str(record.longitude) if record.longitude else "No Data Provided"
-            )
-
-        # Handle Plantation category
-        if record.data_livelihood.get("select_one_demand_plantation") == "Yes":
-            row_cells = table.add_row().cells
-            row_cells[0].text = "Plantations"
-            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
-            row_cells[2].text = record.data_livelihood.get(
-                "beneficiary_name", "No Data Provided"
-            )
-            row_cells[3].text = "No Data Provided"  # Father's name not specified
-
-            # Get plantation type
-            plantation_type = record.data_livelihood.get("Plantation")
-            row_cells[4].text = plantation_type or "No Data Provided"
-
-            # Get plantation area/crop
-            plantation_area = record.data_livelihood.get("Plantation_crop")
-            row_cells[5].text = plantation_area or "No Data Provided"
-
-            row_cells[6].text = (
-                str(record.latitude) if record.latitude else "No Data Provided"
-            )
-            row_cells[7].text = (
-                str(record.longitude) if record.longitude else "No Data Provided"
-            )
-
-
+# TODO: fix the marked works selenium webdriver issue
 def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     logger.info(f"\nDEBUG: Starting show_marked_works for MWS: {uid}")
     logger.info(f"DEBUG: Polygon bounds: {polygon.bounds}")
@@ -1478,7 +1374,6 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     map_center = [centroid.y, centroid.x]
     fol_map = folium.Map(location=map_center, zoom_start=14)
 
-    # Add MWS boundary
     folium.GeoJson(
         mws_filtered,
         name="MWS boundary",
@@ -1498,7 +1393,6 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
     has_features = False
 
-    # Add resources first
     for key in ["settlement", "well", "waterbody"]:
         if resources[key]:
             has_features = True
@@ -1521,7 +1415,6 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
             {layers[key]["legend_name"]}<br>
             """
 
-    # Now process works layers
     for key in ["recharge", "irrigation"]:
         try:
             layer = get_vector_layer_geoserver(
@@ -1576,7 +1469,6 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
 
     folium.LayerControl().add_to(fol_map)
 
-    # Create a temporary directory for saving files
     with tempfile.TemporaryDirectory() as temp_dir:
         map_filename = os.path.join(temp_dir, f"marked_works_{uid}.html")
         fol_map.save(map_filename)
@@ -1586,8 +1478,6 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
         img.save(img_filename)
 
         doc.add_picture(img_filename, width=Inches(6))
-
-
 def show_all_mws(doc, plan, mws):
     """
     Creates a map showing all MWS polygons with resources and proposed works,
@@ -1599,7 +1489,6 @@ def show_all_mws(doc, plan, mws):
         mws: GeoJSON object containing MWS features
     """
 
-    # Define layer configurations
     layers = {
         "settlement": {
             "workspace": "resources",
@@ -1638,15 +1527,12 @@ def show_all_mws(doc, plan, mws):
         },
     }
 
-    # Calculate the centroid of all MWS features for map center
     all_polygons = [shape(feature["geometry"]) for feature in mws["features"]]
     combined_polygon = unary_union(all_polygons)
     map_center = [combined_polygon.centroid.y, combined_polygon.centroid.x]
 
-    # Create the map
     fol_map = folium.Map(location=map_center, zoom_start=11)
 
-    # Add MWS boundaries with different colors and labels
     for feature in mws["features"]:
         uid = feature["properties"]["uid"]
         folium.GeoJson(
@@ -1661,7 +1547,6 @@ def show_all_mws(doc, plan, mws):
             popup=folium.Popup(f"MWS UID: {uid}", max_width=300),
         ).add_to(fol_map)
 
-    # Fetch and add all resources and proposed works
     features = {}
     for key, layer_info in layers.items():
         try:
@@ -1675,14 +1560,12 @@ def show_all_mws(doc, plan, mws):
             logger.error(f"Error retrieving {key} layer: {str(e)}")
             features[key] = []
 
-    # Create legend
     legend_html = """
     <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; 
     border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
     ">&nbsp;<b>Legend:</b><br>
     """
 
-    # Add all features to the map
     for key, feature_list in features.items():
         if len(feature_list) > 0:
             feature_group = folium.FeatureGroup(name=layers[key]["legend_name"])
@@ -1701,13 +1584,11 @@ def show_all_mws(doc, plan, mws):
                 ).add_to(feature_group)
             feature_group.add_to(fol_map)
 
-            # Add to legend
             legend_html += f"""
             <img src="{layers[key]["icon_url"]}" alt="{layers[key]["legend_name"]}" width="15" height="25">
             {layers[key]["legend_name"]}<br>
             """
 
-    # Add MWS boundary to legend
     legend_html += """
     <div style="background-color:blue;opacity:0.3;border:1px solid black;width:15px;height:15px;display:inline-block;"></div>
     MWS Boundary<br>
@@ -1717,9 +1598,7 @@ def show_all_mws(doc, plan, mws):
     fol_map.get_root().html.add_child(folium.Element(legend_html))
     folium.LayerControl().add_to(fol_map)
 
-    # Create a temporary directory for saving files
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Save map and convert to image
         map_filename = os.path.join(temp_dir, "all_mws_map.html")
         fol_map.save(map_filename)
 
@@ -1728,14 +1607,140 @@ def show_all_mws(doc, plan, mws):
         img_filename = os.path.join(temp_dir, "all_mws_map.png")
         img.save(img_filename)
 
-        # Add heading and map to document
         doc.add_heading("Overview Map of All MWS", level=1)
         doc.add_picture(img_filename, width=Inches(6))
         doc.add_page_break()
 
+# MARK: - Section G -- Plantations and Livelihood Works
+def add_section_g(doc, plan, mws):
+    doc.add_heading("Section G: Propose New Livelihood Works", level=1)
+
+    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    
+    # Table for Livestock and Fisheries
+    doc.add_heading("G.1 Livestock and Fisheries", level=2)
+    headers = [
+        "Livelihood Works",
+        "Name of Beneficiary Settlement",
+        "Name of Beneficiary",
+        "Beneficiary Father's Name",
+        "Type of Work Demand",
+        "Latitude",
+        "Longitude",
+    ]
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Table Grid"
+    hdr_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
+        hdr_cells[i].paragraphs[0].add_run(header).bold = True
+
+    for record in livelihood_records:
+        # Handle Livestock category
+        if record.data_livelihood.get("select_one_demand_promoting_livestock") == "Yes":
+            row_cells = table.add_row().cells
+            row_cells[0].text = "Livestock"
+            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
+            row_cells[3].text = "No Data"  # Father's name not specified
+
+            # Get livestock demand type
+            livestock_demand = record.data_livelihood.get(
+                "select_one_promoting_livestock"
+            )
+            if livestock_demand == "other":
+                livestock_demand = record.data_livelihood.get(
+                    "select_one_promoting_livestock_other", "No Data Provided"
+                )
+            row_cells[4].text = format_text(livestock_demand) or "No Data Provided"
+
+            row_cells[5].text = (
+                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+            )
+            row_cells[6].text = (
+                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+            )
+
+        # Handle Fisheries category
+        if record.data_livelihood.get("select_one_demand_promoting_fisheries") == "Yes":
+            row_cells = table.add_row().cells
+            row_cells[0].text = "Fisheries"
+            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
+            row_cells[3].text = "No Data"  # Father's name not specified
+
+            # Get fisheries demand type
+            fisheries_demand = record.data_livelihood.get(
+                "select_one_promoting_fisheries"
+            )
+            if fisheries_demand == "other":
+                fisheries_demand = record.data_livelihood.get(
+                    "select_one_promoting_fisheries_other", "No Data Provided"
+                )
+            row_cells[4].text = format_text(fisheries_demand) or "No Data Provided"
+
+            row_cells[5].text = (
+                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+            )
+            row_cells[6].text = (
+                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+            )
+
+    # Table for Plantation
+    doc.add_heading("G.2 Plantations", level=2)
+    plantation_headers = [
+        "Livelihood Works",
+        "Name of Beneficiary Settlement",
+        "Name of Beneficiary",
+        "Beneficiary Father's Name",
+        "Name of Plantation Crop",
+        "Total Acres",
+        "Latitude",
+        "Longitude",
+    ]
+    plantation_table = doc.add_table(rows=1, cols=len(plantation_headers))
+    plantation_table.style = "Table Grid"
+    plantation_hdr_cells = plantation_table.rows[0].cells
+    for i, header in enumerate(plantation_headers):
+        plantation_hdr_cells[i].paragraphs[0].add_run(header).bold = True
+
+    for record in livelihood_records:
+        # Handle Plantation category
+        if record.data_livelihood.get("select_one_demand_plantation") == "Yes":
+            row_cells = plantation_table.add_row().cells
+            row_cells[0].text = "Plantations"
+            row_cells[1].text = record.beneficiary_settlement or "No Data Provided"
+            row_cells[2].text = record.data_livelihood.get(
+                "beneficiary_name", "No Data Provided"
+            )
+            row_cells[3].text = "No Data"  # Father's name not specified
+
+            # Get plantation type
+            plantation_type = record.data_livelihood.get("Plantation")
+            row_cells[4].text = plantation_type or "No Data Provided"
+
+            # Get plantation area/crop
+            plantation_area = record.data_livelihood.get("Plantation_crop")
+            row_cells[5].text = plantation_area or "No Data Provided"
+
+            row_cells[6].text = (
+                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+            )
+            row_cells[7].text = (
+                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+            )
+
 
 # MARK: - Section H
+# TODO: Fix the sync between the settlements marked for maintenance in resource mapping that 
+# they are also treated as first class citizens and added to the maintenance tables
+
 def add_section_h(doc, plan, mws):
+
+    # populater the database with the records from resource mapping
     populate_maintenance_from_waterbody(plan)
 
     doc.add_heading(
@@ -1789,7 +1794,7 @@ def maintenance_gw_table(doc, plan, mws):
         "Work ID",
         "Corresponding Work ID",
         "Type of Recharge Structure",
-        "Previous Maintenance Activity",
+        "Repair Activity",
         "Latitude",
         "Longitude",
     ]
@@ -1806,7 +1811,7 @@ def maintenance_gw_table(doc, plan, mws):
         row_cells = table.add_row().cells
         row_cells[0].text = maintenance.data_gw_maintenance.get(
             "beneficiary_settlement"
-        )
+        ) or "No Data"
         row_cells[1].text = (
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "No Data"
         )
@@ -1828,9 +1833,8 @@ def maintenance_agri_table(doc, plan, mws):
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
         "Work ID",
-        "Corresponding Work ID",
         "Type of Irrigation Structure",
-        "Previous Maintenance Activity",
+        "Repair Activity",
         "Latitude",
         "Longitude",
     ]
@@ -1853,15 +1857,14 @@ def maintenance_agri_table(doc, plan, mws):
             or "No Data Provided"
         )
         row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_agri_maintenance.get(
+        row_cells[3].text = maintenance.data_agri_maintenance.get(
             "select_one_irrigation_structure"
-        )
-        row_cells[5].text = maintenance.data_agri_maintenance.get(
+        ) or "No Data"
+        row_cells[4].text = maintenance.data_agri_maintenance.get(
             "select_one_activities"
-        )
-        row_cells[6].text = str(maintenance.latitude)
-        row_cells[7].text = str(maintenance.longitude)
+        ) or "No Data"
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
 
 
 def maintenance_waterstructures_table(doc, plan, mws):
@@ -1887,11 +1890,11 @@ def maintenance_waterstructures_table(doc, plan, mws):
         row_cells = table.add_row().cells
         row_cells[0].text = maintenance.data_swb_maintenance.get(
             "beneficiary_settlement"
-        )
-        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name")
+        ) or "No Data"
+        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name") or "No Data"
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
+        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "No Data"
         row_cells[5].text = str(maintenance.latitude)
         row_cells[6].text = str(maintenance.longitude)
 
@@ -1918,10 +1921,10 @@ def maintenance_rs_waterstructures_table(doc, plan, mws):
         row_cells = table.add_row().cells
         row_cells[0].text = maintenance.data_swb_rs_maintenance.get(
             "beneficiary_settlement"
-        )
-        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name")
+        ) or "No Data"
+        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "No Data"
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK")
-        row_cells[5].text = str(maintenance.latitude)
-        row_cells[6].text = str(maintenance.longitude)
+        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "No Data"
+        row_cells[5].text = str(maintenance.latitude) 
+        row_cells[6].text = str(maintenance.longitude) 

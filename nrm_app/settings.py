@@ -11,9 +11,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
-from pathlib import Path
-import environ
 from datetime import timedelta
+from pathlib import Path
+
+import environ
 from corsheaders.defaults import default_headers
 
 env = environ.Env()
@@ -33,9 +34,15 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
+# MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
 
+# MARK: ODK Sync Creds
+ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
+ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
+
+# MARK: DB settings
 DB_NAME = env("DB_NAME")
 DB_USER = env("DB_USER")
 DB_PASSWORD = env("DB_PASSWORD")
@@ -43,18 +50,17 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
+
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "e697-2001-df4-e000-3fc4-e2e1-373c-2498-b87c.ngrok-free.app",
-    "74f2-2001-df4-e000-3fc4-bb09-a94e-b440-7621.ngrok-free.app",
-    ".ngrok-free.app",
-    "192.168.0.108",
+    "2e532e910e5a.ngrok-free.app",
 ]
 
-# Application definition
+# MARK: Django Apps
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -73,82 +79,80 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    "rest_framework_api_key",
     # project applications
     "users",
     "organization",
     "projects",
     "plantations",
     "plans",
+    "public_api",
     "community_engagement",
     "bot_interface"
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
+# MARK: CORS Settings
 
-# CORS_ALLOWED_ORIGINS = [
-#     "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
-#     "https://nrm.core-stack.org",
-#     "https://nrm.gramvaanidev.org",
-#     "https://dashboard.core-stack.org",
-#     "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com/dashboard",
-#     "https://uat.dashboard.core-stack.org/",
-#     "https://www.explorer.core-stack.org/",
-#     "https://www.explorer.core-stack.org/landscape_explorer",
-#     "https://development.d2s4eeyazvtd2g.amplifyapp.com/kyl_dashboard",
-#
-#     "http://127.0.0.1:8000",
-#     "http://192.168.222.27:8000",
-#     "http://192.168.222.23:3000",
-#     "http://192.168.20.236:3000",
-#     "http://localhost:3000",
-#     "http://localhost:3001",
-# ]  # TODO Add extra URLs if required
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
+        "https://nrm.core-stack.org",
+        "https://nrm.gramvaanidev.org",
+        "https://dashboard.core-stack.org",
+        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
+        "https://uat.dashboard.core-stack.org",
+        "https://www.explorer.core-stack.org",
+        "https://www.explorer.core-stack.org/landscape_explorer",
+        "https://development.d2s4eeyazvtd2g.amplifyapp.com",
+        "http://127.0.0.1:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
-    "https://nrm.core-stack.org",
-    "https://nrm.gramvaanidev.org",
-    "https://dashboard.core-stack.org",
-    "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
-    "https://uat.dashboard.core-stack.org",
-    "https://www.explorer.core-stack.org",
-    "https://development.d2s4eeyazvtd2g.amplifyapp.com",
-
-    "http://127.0.0.1:8000",
-    "http://192.168.222.27:8000",
-    "http://192.168.222.23:3000",
-    "http://192.168.20.236:3000",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    'http://localhost:5173',
-]  # TODO Add extra URLs if required
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
+]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
-    "content-type",
+    "content-disposition",  # Important for file uploads in form data
 ]
 
 CORS_ALLOW_METHODS = [
+    "DELETE",
     "GET",
+    "OPTIONS",
+    "PATCH",
     "POST",
     "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
 ]
 
-# REST Framework settings
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
+
+# MARK: REST Framework
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
 }
 
-# JWT settings
+# MARK: JWT settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=90),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
@@ -181,6 +185,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "nrm_app.urls"
 
+# MARK: Templates
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -201,7 +206,7 @@ WSGI_APPLICATION = "nrm_app.wsgi.application"
 
 DATA_UPLOAD_MAX_NUMBER_FILES = 1000
 
-# Database
+# MARK: Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 DATABASES = {
@@ -212,9 +217,6 @@ DATABASES = {
         "PASSWORD": DB_PASSWORD,
         "HOST": "127.0.0.1",
         "PORT": "",
-        # "OPTIONS": {
-        #     "unix_socket": "/tmp/mysql.sock",
-        # },
     }
 }
 
@@ -251,7 +253,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+
+# Media files (User uploaded content)
+MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
+MEDIA_URL = "/media/"
+
 EXCEL_PATH = env("EXCEL_PATH")
 
 # Default primary key field type
@@ -259,7 +267,7 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ODK settings
+# MARK: ODK settings
 # https://odk.gramvaani.org/#/projects/9/forms/Add_Settlements_form%20_V1.0.1
 OD_DATA_URL_hemlet = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Hamlet_form%20_V1.0.1.svc/Submissions"
 OD_DATA_URL_well = (
@@ -280,10 +288,11 @@ OD_DATA_URL_plan = {
         "gps_point": "GPS_point_recharge_structure",
     },
 }
-# Report requirements
+
+# MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
 
-# EMAIL Settings
+# MARK: Email Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtpout.secureserver.net"
 EMAIL_PORT = 465
@@ -301,9 +310,17 @@ EARTH_DATA_USER = env("EARTH_DATA_USER")
 EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
-
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
+GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH")
 
+LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
+
+# NREGA settings
+NREGA_BUCKET = env("NREGA_BUCKET")
+NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
+NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+
+# S3 settings
 S3_BUCKET = env("S3_BUCKET")
 S3_REGION = env("S3_REGION")
 
@@ -315,3 +332,4 @@ CALL_PATCH_API_KEY= env("CALL_PATCH_API_KEY")
 # Community Engagement API Configuration
 COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
 WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+

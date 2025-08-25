@@ -1,14 +1,13 @@
 import ee
-
-from utilities.constants import GEE_HELPER_PATH
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
-    valid_gee_text,
-    get_gee_asset_path,
     is_gee_asset_exists,
     ee_initialize,
     check_task_status,
     make_asset_public,
-    create_gee_directory,
+    create_gee_dir,
+    get_gee_dir_path,
+    export_vector_asset_to_gee,
 )
 
 
@@ -79,9 +78,9 @@ def sqm2sqkm(args):
 
 def generate_drought_layers(
     aoi,
-    state,
-    district_name,
-    block_name,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
     current_year,
     start_year,
     end_year,
@@ -95,14 +94,14 @@ def generate_drought_layers(
     parts = size // chunk_size
     print("parts=", parts)
     ee_initialize("helper")
-    create_gee_directory(state, district_name, block_name, GEE_HELPER_PATH)
+    create_gee_dir(
+        asset_folder_list, gee_project_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+    )
     for part in range(parts + 1):
         start = part * chunk_size
         end = start + chunk_size
         block_name_for_parts = (
-            valid_gee_text(district_name.lower())
-            + "_"
-            + valid_gee_text(block_name.lower())
+            asset_suffix
             + "_drought_"
             + str(start)
             + "-"
@@ -114,15 +113,15 @@ def generate_drought_layers(
         if chunk.size().getInfo() > 0:
             drought_chunk(
                 chunk,
-                state,
-                block_name,
                 block_name_for_parts,
                 current_year,
-                district_name,
                 end_year,
                 start_year,
                 task_ids,
                 asset_ids,
+                asset_suffix,
+                asset_folder_list,
+                app_type,
             )
 
     print("Done iterating")
@@ -135,18 +134,20 @@ def generate_drought_layers(
 
 def drought_chunk(
     aoi,
-    state,
-    block_name,
     block_name_for_parts,
     current_year,
-    district_name,
     end_year,
     start_year,
     task_ids,
     asset_ids,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
 ):
     asset_id = (
-        get_gee_asset_path(state, district_name, block_name, GEE_HELPER_PATH)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+        )
         + block_name_for_parts
     )
 
@@ -166,10 +167,10 @@ def drought_chunk(
     modis_scale = 500
     # modis_available_from_year = 2000  # it is available from 2000-01-01
     lulc_path = (
-        get_gee_asset_path(state, district_name, block_name)
-        + valid_gee_text(district_name.lower())
-        + "_"
-        + valid_gee_text(block_name.lower())
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + asset_suffix
         + "_"
         + str(current_year)
         + "-07-01_"
@@ -184,10 +185,10 @@ def drought_chunk(
     while lulc_y <= end_year:
         lulc_images.append(
             ee.Image(
-                get_gee_asset_path(state, district_name, block_name)
-                + valid_gee_text(district_name.lower())
-                + "_"
-                + valid_gee_text(block_name.lower())
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + asset_suffix
                 + "_"
                 + str(lulc_y)
                 + "-07-01_"
@@ -320,7 +321,7 @@ def drought_chunk(
         threshold = thresholds.get(region)
 
         current_year = year
-        startYear = 1981  # TODO Do we need to change it?
+        startYear = 1981
 
         def on_set(roi_, dataset, duration, s_year, band_name, threshold_):
             start_days = ee.List.sequence(0, 365, duration)
@@ -459,7 +460,10 @@ def drought_chunk(
         roi = rainfall_deviation.reduceRegions(roi, ee.Reducer.mean(), 5566)
         roi = roi.map(
             lambda feature: feature.set(
-                "mean", ee.Number(feature.get("mean")).multiply(100)
+                "mean",
+                ee.Algorithms.If(
+                    feature.get("mean"), ee.Number(feature.get("mean")).multiply(100), 0
+                ),
             )
         )
 
@@ -511,7 +515,10 @@ def drought_chunk(
         roi = rainfall_deviation.reduceRegions(roi, ee.Reducer.mean(), 5566)
         roi = roi.map(
             lambda feature: feature.set(
-                "mean", ee.Number(feature.get("mean")).multiply(100)
+                "mean",
+                ee.Algorithms.If(
+                    feature.get("mean"), ee.Number(feature.get("mean")).multiply(100), 0
+                ),
             )
         )
 
@@ -670,10 +677,10 @@ def drought_chunk(
             )
         ).reduce(ee.Reducer.mean())
 
-        spi = current_year_value.select("precipitation_mean").subtract(
-            longterm_mean.select("precipitation_mean")
+        spi = current_year_value.select(["precipitation_mean"]).subtract(
+            longterm_mean.select(["precipitation_mean"])
         )
-        spi = spi.divide(longterm_stddev.select("precipitation_stdDev")).rename("spi")
+        spi = spi.divide(longterm_stddev.select(["precipitation_stdDev"])).rename("spi")
 
         roi = spi.reduceRegions(roi, ee.Reducer.mean(), 5566)
         roi = rename_column("mean", concat("spi_", date2str(start_date)), roi)
@@ -689,22 +696,22 @@ def drought_chunk(
         year = current_year
         single_kharif = single_kharif.Or(
             ee.Image(lulc.get(year - lulc_available_from_year))
-            .select("predicted_label")
+            .select(["predicted_label"])
             .eq(8)
         )
         single_non_kharif = single_non_kharif.Or(
             ee.Image(lulc.get(year - lulc_available_from_year))
-            .select("predicted_label")
+            .select(["predicted_label"])
             .eq(9)
         )
         double = double.Or(
             ee.Image(lulc.get(year - lulc_available_from_year))
-            .select("predicted_label")
+            .select(["predicted_label"])
             .eq(10)
         )
         triple = triple.Or(
             ee.Image(lulc.get(year - lulc_available_from_year))
-            .select("predicted_label")
+            .select(["predicted_label"])
             .eq(11)
         )
 
@@ -722,33 +729,33 @@ def drought_chunk(
         for year in range(lulc_available_from_year, current_year + 1):
             single_kharif = single_kharif.Or(
                 ee.Image(lulc.get(year - lulc_available_from_year))
-                .select("predicted_label")
+                .select(["predicted_label"])
                 .eq(8)
             )
             single_non_kharif = single_non_kharif.Or(
                 ee.Image(lulc.get(year - lulc_available_from_year))
-                .select("predicted_label")
+                .select(["predicted_label"])
                 .eq(9)
             )
             double = double.Or(
                 ee.Image(lulc.get(year - lulc_available_from_year))
-                .select("predicted_label")
+                .select(["predicted_label"])
                 .eq(10)
             )
             triple = triple.Or(
                 ee.Image(lulc.get(year - lulc_available_from_year))
-                .select("predicted_label")
+                .select(["predicted_label"])
                 .eq(11)
             )
 
         kharif_cropable = single_kharif.Or(double).Or(triple)
 
-        current_year_single_kharif = cur_year_crop_img.select("predicted_label").eq(8)
-        current_year_single_non_kharif = cur_year_crop_img.select("predicted_label").eq(
-            9
-        )
-        current_year_double = cur_year_crop_img.select("predicted_label").eq(10)
-        current_year_triple = cur_year_crop_img.select("predicted_label").eq(11)
+        current_year_single_kharif = cur_year_crop_img.select(["predicted_label"]).eq(8)
+        current_year_single_non_kharif = cur_year_crop_img.select(
+            ["predicted_label"]
+        ).eq(9)
+        current_year_double = cur_year_crop_img.select(["predicted_label"]).eq(10)
+        current_year_triple = cur_year_crop_img.select(["predicted_label"]).eq(11)
 
         kharif_cropped = current_year_single_kharif.Or(current_year_double).Or(
             current_year_triple
@@ -831,25 +838,25 @@ def drought_chunk(
         ndvi_max = ndvis.reduce(ee.Reducer.max())
 
         vci_ndvi_numerator = ndvi_cur.select("NDVI").subtract(
-            ndvi_min.select("NDVI_min")
+            ndvi_min.select(["NDVI_min"])
         )
-        vci_ndvi_denomenator = ndvi_max.select("NDVI_max").subtract(
-            ndvi_min.select("NDVI_min")
+        vci_ndvi_denomenator = ndvi_max.select(["NDVI_max"]).subtract(
+            ndvi_min.select(["NDVI_min"])
         )
         vci_ndvi = (vci_ndvi_numerator.select("NDVI")).divide(
-            vci_ndvi_denomenator.select("NDVI_max")
+            vci_ndvi_denomenator.select(["NDVI_max"])
         )
 
         ndwi_min = ndwis.reduce(ee.Reducer.min())
         ndwi_max = ndwis.reduce(ee.Reducer.max())
         vci_ndwi_numerator = ndwi_cur.select("NDWI").subtract(
-            ndwi_min.select("NDWI_min")
+            ndwi_min.select(["NDWI_min"])
         )
-        vci_ndwi_denomenator = ndwi_max.select("NDWI_max").subtract(
-            ndwi_min.select("NDWI_min")
+        vci_ndwi_denomenator = ndwi_max.select(["NDWI_max"]).subtract(
+            ndwi_min.select(["NDWI_min"])
         )
         vci_ndwi = (vci_ndwi_numerator.select("NDWI")).divide(
-            vci_ndwi_denomenator.select("NDWI_max")
+            vci_ndwi_denomenator.select(["NDWI_max"])
         )
 
         vci = vci_ndvi.min(vci_ndwi)
@@ -1127,6 +1134,8 @@ def drought_chunk(
             dryspell_value = feature.get(dryspell_col)
             rfdev_value = feature.get(rfdev_col)
             spi_value = ee.Number(feature.get(spi_col))
+            spi_value = ee.Algorithms.If(spi_value, spi_value, 0)
+            spi_value = ee.Number(spi_value)
 
             # if normal rf:
             #     if dryspell:
@@ -1488,19 +1497,9 @@ def drought_chunk(
     aoi = get_drought_freq_intensity(aoi, 1)
     aoi = get_drought_freq_intensity(aoi, 2)
     aoi = get_drought_freq_intensity(aoi, 3)
-    try:
-        # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": aoi,
-                "description": block_name_for_parts,
-                "assetId": asset_id,
-            }
-        )
 
-        task.start()
-        print("Successfully started the generate drought chunk task", task.status())
-        task_ids.append(task.status()["id"])
+    # Export fecture collection to GEE
+    task_id = export_vector_asset_to_gee(aoi, block_name_for_parts, asset_id)
+    if task_id:
+        task_ids.append(task_id)
         asset_ids.append(asset_id)
-    except Exception as e:
-        print(f"Error occurred in running generate drought chunk task: {e}")

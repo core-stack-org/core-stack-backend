@@ -173,7 +173,16 @@ def sync_settlement():
         settlement.nrega_past_work = mgnrega_info.get("work_demands", "") or "0"
         settlement.nrega_raise_demand = mgnrega_info.get("select_one_Y_N", "") or "0"
         settlement.nrega_demand = mgnrega_info.get("select_one_demands", "") or "0"
-        settlement.nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
+        # Get NREGA issues and handle "other" option
+        nrega_issues = mgnrega_info.get("select_multiple_issues", "") or "0"
+        if isinstance(nrega_issues, str) and "other" in nrega_issues.lower():
+            other_text = mgnrega_info.get("select_multiple_issues_other", "")
+            if other_text:
+                if nrega_issues.lower() == "other":
+                    nrega_issues = other_text
+                else:
+                    nrega_issues = f"{nrega_issues}"
+        settlement.nrega_issues = nrega_issues
         settlement.nrega_community = (
             mgnrega_info.get("select_one_contributions", "") or "0"
         )
@@ -192,19 +201,16 @@ def sync_well():
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
         submission_date = timezone.make_aware(submission_date, pytz.UTC)
-        latest_submission_time = ODK_settlement.objects.aggregate(
-            Max("submission_time")
-        )["submission_time__max"]
-
-        # if latest_submission_time and submission_date <= latest_submission_time:
-        #     print("The DB is already synced with the latest submissions")
-        #     return
 
         well.well_id = record.get("well_id", "")
         well.uuid = record.get("__id", "") or "0"
         well.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
+        )
+
+        well.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
         well.beneficiary_settlement = record.get("beneficiary_settlement", "") or "0"
         well.block_name = record.get("block_name", "") or "0"
@@ -223,9 +229,6 @@ def sync_well():
         )
         well.plan_id = record.get("plan_id", "") or "0"
         well.plan_name = record.get("plan_name", "") or "0"
-        well.status_re = (
-            record.get("__system", {}).get("reviewState", "") or "in progress"
-        )
         try:
             coordinates = (
                 record.get("GPS_point", {})
@@ -235,8 +238,8 @@ def sync_well():
         except AttributeError:
             coordinates = []
         if len(coordinates) >= 2:
-            well.latitude = round(coordinates[1], 2)
-            well.longitude = round(coordinates[0], 2)
+            well.latitude = round(coordinates[1], 8)
+            well.longitude = round(coordinates[0], 8)
         else:
             well.latitude = 0.0
             well.longitude = 0.0
@@ -258,13 +261,10 @@ def sync_waterbody():
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
         submission_date = timezone.make_aware(submission_date, pytz.UTC)
-        latest_submission_time = ODK_settlement.objects.aggregate(
-            Max("submission_time")
-        )["submission_time__max"]
-
-        # if latest_submission_time and submission_date <= latest_submission_time:
-        #     print("The DB is already synced with the latest submissions")
-        #     return
+        
+        waterbody.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        ) 
 
         waterbody.waterbody_id = record.get("waterbodies_id", "")
         waterbody.uuid = record.get("__id", "") or "0"
@@ -305,15 +305,12 @@ def sync_waterbody():
         except AttributeError:
             coordinates = []
         if len(coordinates) >= 2:
-            waterbody.latitude = round(coordinates[1], 2)
-            waterbody.longitude = round(coordinates[0], 2)
+            waterbody.latitude = round(coordinates[1], 8)
+            waterbody.longitude = round(coordinates[0], 8)
         else:
             waterbody.latitude = 0.0
             waterbody.longitude = 0.0
 
-        waterbody.status_re = (
-            record.get("__system", {}).get("reviewState", "") or "in progress"
-        )
         waterbody.system = record.get("__system", {})
         waterbody.gps_point = record.get("GPS_point", {})
         waterbody.data_waterbody = record
@@ -331,6 +328,11 @@ def sync_groundwater():
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
+
+        recharge_st.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        ) 
+        
         recharge_st.beneficiary_settlement = (
             record.get("beneficiary_settlement", "") or "0"
         )
@@ -365,7 +367,6 @@ def sync_groundwater():
                 )
         recharge_st.data_groundwater = record
         if recharge_st.status_re.lower() != "rejected":
-            print("SAVING RECHARGE STRUCTURE")
             recharge_st.save()
 
 
@@ -377,6 +378,11 @@ def sync_agri():
     for record in odk_resp_list:
         irrigation.irrigation_work_id = record.get("work_id", "")
         irrigation.uuid = record.get("__id", "") or "0"
+
+        irrigation.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        ) 
+
         irrigation.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -402,9 +408,7 @@ def sync_agri():
         else:
             irrigation.latitude = "0"
             irrigation.longitude = "0"
-        irrigation.status_re = (
-            record.get("__system", {}).get("reviewState", "") or "in progress"
-        )
+        
         irrigation.system = record.get("__system", {})
         irrigation.gps_point = record.get("GPS_point", {})
         work_types = ["new_well", "Land_leveling", "Farm_pond"]
@@ -494,6 +498,10 @@ def sync_cropping_pattern():
             "submission_time__max"
         ]
 
+        cropping_pattern.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        ) 
+
         # if latest_submission_time and submission_date <= latest_submission_time:
         #     print("The DB is already synced with the latest submissions")
         #     return
@@ -574,6 +582,10 @@ def sync_agri_maintenance():
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
 
+        agri_maintenance.status_re = (
+            record.get("__system", {}).get("reviewState", "") or "in progress"
+        ) 
+
         agri_maintenance.uuid = record.get("__id", "") or "0"
         agri_maintenance.work_id = record.get("work_id", "") or "0"
         agri_maintenance.corresponding_work_id = (
@@ -581,9 +593,6 @@ def sync_agri_maintenance():
         )
         agri_maintenance.plan_id = record.get("plan_id", "") or "0"
         agri_maintenance.plan_name = record.get("plan_name", "") or "0"
-        agri_maintenance.status_re = (
-            record.get("__system", {}).get("reviewState", "") or "in progress"
-        )
         try:
             coordinates = (
                 record.get("GPS_point", {})

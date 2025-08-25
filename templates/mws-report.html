@@ -125,6 +125,26 @@
             margin-right: 5px;
         }
         
+        .doc-button {
+            position: absolute;
+            top: 20px;
+            right: 140px; /* shift left of the PDF button */
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .doc-button:hover { background-color: #005a9e; }
+        
+        @media print { .doc-button { display: none; } }
+
         /* Hide print button when printing */
         @media print {
             .print-button {
@@ -195,6 +215,8 @@
                 Save as PDF
             </button>
         </div>
+
+
     </header>
 
     <div class="container">
@@ -284,11 +306,11 @@
             <h4>Land use on slopes and plains</h4>
             <p>{{terrain_land_use}}</p>
 
-            <div class="chart-container">
+            <div class="chart-container" id="slopeChartContainer">
                 <canvas id="barChart-terrain-lulc-slope"></canvas>
             </div>
 
-            <div class="chart-container">
+            <div class="chart-container" id="plainChartContainer">
                 <canvas id="barChart-terrain-lulc-plain"></canvas>
             </div>
 
@@ -365,6 +387,12 @@
             <section class="section">
                 <h4>Urbanization</h4>
                 <p>{{urbanization}}</p>
+
+                <div class="map-group">
+                    <div id="urbanMap" class="map"></div>
+                    <div id="compMap5" class="map"></div>
+                </div>
+
             </section>
         {% endif %}
 
@@ -409,7 +437,7 @@
                     <span>Triple Cropping</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <div class="legend-color" style="background-color: #4c4ef5;"></div>
                     <span>Shrubs and Scrubs</span>
                 </div>
             </div>
@@ -423,24 +451,24 @@
 
             <p>{{final_desc}}</p>
 
-            {% if not trend_desc %}
-                <p>No surface water body descriptions available.</p>
-            {% endif %}
-
             <div class="chart-container">
                 <canvas id="barChart-swb"></canvas>
             </div>
+
+            <div id="swbMap" class="map"></div>
 
             <p>{{swb_season_desc}}</p>
         </section>
 
         <section class="section">
             <h4>Water Balance</h4>
-            <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominently through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
+            <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominantly through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
 
             <p>{{wb_desc}}</p>
             <p>{{good_rainfall}}</p>
             <p>{{bad_rainfall}}</p>
+
+            <p>Do note that currently we only consider the vertical flux in the microwatershed. We are working on how to model incoming runoff into the microwatershed, as well as sub-surface flow from adjacent areas.</p>
             <div class="chart-container">
                 <canvas id="lineChart-water"></canvas>
             </div>
@@ -460,12 +488,17 @@
                 four weeks incurring a rainfall deviation of less than 50%. Prolonged dry spells can lead to
                 significant reduction in crop sown area.</p>
 
-            <div class="chart-container">
+            <!-- <div class="chart-container">
                 <canvas id="Chart-drought"></canvas>
+            </div> -->
+
+            <div class="chart-container">
+                <canvas id="Chart-drought-weeks"></canvas>
             </div>
         </section>
-
+        
         <section class="section">
+            <div class="village-section">
             <h2>Village Profile</h2>
             <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
             <ul id="village-names"></ul>
@@ -491,13 +524,18 @@
                 </thead>
                 <tbody></tbody>
             </table>
-
+            </div>
         </section>
+
     </div>
 
     <footer>
         <div class="container">
-            <p>Report generated on <span id="report-date"></span> | CoREStack Team</p>
+            <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>
+                Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
+                <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
+            </p>
         </div>
     </footer>
 
@@ -546,7 +584,7 @@
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params : {
                     'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
-                    'STYLES' : "change_detection_degradation"
+                    'STYLES' : "degradation"
                 },
                 ratio : 1,
                 serverType: 'geoserver',
@@ -569,12 +607,26 @@
             name : 'lulc_raster'
         })
 
+        const urbanRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
+                    'STYLES' : "urbanization"
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'tree_raster'
+        })
+
         const treeReduceRaster = new ol.layer.Image({
             source : new ol.source.ImageWMS({
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params : {
                     'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
-                    'STYLES' : "change_detection_deforestation"
+                    'STYLES' : "deforestation"
                 },
                 ratio : 1,
                 serverType: 'geoserver',
@@ -684,6 +736,28 @@
             })
         })
 
+        const ComparisonMap5 = new ol.Map({
+            target: 'compMap5',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
         const lulcMap = new ol.Map({
             target: 'lulcMap',
             layers: [lulcRaster],
@@ -713,6 +787,41 @@
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [treeReduceRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const swbMap = new ol.Map({
+            target: 'swbMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const urbanMap = new ol.Map({
+            target: 'urbanMap',
+            layers: [urbanRaster],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -765,7 +874,7 @@
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Fetch GeoJSON data and extract a feature by UID
-        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1) => {
+        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1) => {
             await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
                 .then(response => response.json())
                 .then(data => {
@@ -787,6 +896,7 @@
                         degradRaster1.addFilter(crop);
                         lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
+                        urbanRaster1.addFilter(crop);
                     }
 
                     const styleFunctionComp = feature => {
@@ -812,6 +922,8 @@
                     ComparisonMap2.addLayer(vectorLayerComp)
                     ComparisonMap3.addLayer(vectorLayerComp)
                     ComparisonMap4.addLayer(vectorLayerComp)
+                    ComparisonMap5.addLayer(vectorLayerComp)
+                    swbMap.addLayer(vectorLayerComp)
 
                     const arr = vectorSource.getExtent();
                     const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
@@ -839,12 +951,45 @@
 
                     ComparisonMap4.getView().setCenter(mapcenter);
                     ComparisonMap4.getView().setZoom(13);
+                    
+                    ComparisonMap5.getView().setCenter(mapcenter);
+                    ComparisonMap5.getView().setZoom(13);
+
+                    urbanMap.getView().setCenter(mapcenter);
+                    urbanMap.getView().setZoom(13);
+
+                    swbMap.getView().setCenter(mapcenter);
+                    swbMap.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
 
+        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'rgb(0, 150, 255)',
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(137, 207, 240, 0.4)',
+                    }),
+                })
+            });
+
+            swbMap.addLayer(vectorLayer);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
         // Extract Feature
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster);
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
@@ -886,81 +1031,93 @@
 
         const lulc_mws_plain = JSON.parse('{{lulc_mws_plain|safe}}')
         const lulc_block_plain = JSON.parse('{{lulc_block_plain|safe}}')
+        
+        const slopeContainer = document.getElementById('slopeChartContainer');
+        const plainContainer = document.getElementById('plainChartContainer');
 
-
-        const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Slope',
-                    data: lulc_block_slope,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Slope',
-                    data: lulc_mws_slope,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
-                        }
-                    }
+        if(lulc_mws_slope.some(v => v > 0)){
+            const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Block Terrain Area under Slope',
+                        data: lulc_block_slope,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Slope',
+                        data: lulc_mws_slope,
+                        backgroundColor: '#2ecc71'
+                    }]
                 },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
-
-        const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Plain',
-                    data: lulc_block_plain,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Plain',
-                    data: lulc_mws_plain,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
                         }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
                     }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
                 }
-            }
-        });
+            });
+        } else {
+            slopeContainer.style.display = 'none';
+          }
+        
+
+        if(lulc_mws_plain.some(v => v > 0)){
+            const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Block Terrain Area under Plain',
+                        data: lulc_block_plain,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Plain',
+                        data: lulc_mws_plain,
+                        backgroundColor: '#2ecc71'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
+                    }
+                }
+            });
+        } else {
+            plainContainer.style.display = 'none';
+          }
 
         // Waterbody Graphs
         const kharifData = JSON.parse('{{kharif_data|safe}}')
         const rabiData = JSON.parse('{{rabi_data|safe}}')
         const zaidData = JSON.parse('{{zaid_data|safe}}')
+        const waterYears = JSON.parse('{{water_years|safe}}')
 
         const barChart_swb = new Chart(document.getElementById('barChart-swb'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                labels: waterYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
                 datasets: [
                 {
                     label: 'Kharif-Rabi-Zaid',
@@ -1018,34 +1175,35 @@
         const double = JSON.parse('{{double|safe}}')
         const triple = JSON.parse('{{triple|safe}}')
         const uncrop = JSON.parse('{{uncrop|safe}}')
+        const cropYears = JSON.parse('{{crop_years|safe}}')
 
         const barChart_cropping = new Chart(document.getElementById('barChart-intensity'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                labels: cropYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
                 datasets: [
                 {
                     label: 'Single-Cropping',
                     data: single,
-                    backgroundColor: '#ffc413',
+                    backgroundColor: '#57ad2b',
 
                 },
                 {
                     label: 'Double-Cropping',
                     data: double,
-                    backgroundColor: '#fe8200'
+                    backgroundColor: '#e68600'
 
                 },
                 {
                     label: 'Triple-Cropping',
                     data: triple,
-                    backgroundColor: '#f44336'
+                    backgroundColor: '#b3561d'
 
                 },
                 {
                     label: 'Uncropped',
                     data: uncrop,
-                    backgroundColor: '#999999'
+                    backgroundColor: '#A9A9A9'
 
                 },
                 ]
@@ -1086,11 +1244,12 @@
         const runoffData = JSON.parse('{{runoff_data|safe}}')
         const etData = JSON.parse('{{et_data|safe}}')
         const dgData = JSON.parse('{{dg_data|safe}}')
+        const wbYears = JSON.parse('{{wb_years|safe}}')
 
         const lineChart = new Chart(document.getElementById('lineChart-water'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [
                 {
                     label: 'Runoff',
@@ -1121,7 +1280,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Value'
+                            text: 'Precipitation & Runoff(mm)'
                         }
                     },
                     x : {
@@ -1140,7 +1299,7 @@
         const areaChartEvp = new Chart(document.getElementById('lineChart-evp'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [{
                     label: 'Evapotranspiration',
                     data: etData,
@@ -1163,7 +1322,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Evapotranspiration'
+                            text: 'Evapotranspiration(mm)'
                         }
                     },
                     x : {
@@ -1182,7 +1341,7 @@
         const areaChartGW = new Chart(document.getElementById('lineChart-gw'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [{
                     label: 'Groundwater',
                     data: dgData,
@@ -1205,7 +1364,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Groundwater'
+                            text: 'Groundwater(m)'
                         }
                     },
                     x : {
@@ -1222,51 +1381,64 @@
         });
 
         // Drought Graphs
-        const droughtData = JSON.parse('{{drought_weeks|safe}}')
+        const mod_weeks = JSON.parse('{{mod_drought|safe}}')
+        const sev_weeks = JSON.parse('{{sev_drought|safe}}')
+        const drysp_all = JSON.parse('{{drysp_all|safe}}')
+        const dg_years = JSON.parse('{{dg_years|safe}}')
 
-        const droughtChart = new Chart(document.getElementById('Chart-drought'), {
+       const barChart_weeks = new Chart(
+        document.getElementById('Chart-drought-weeks'),
+        {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
-                datasets: [{
-                    label: 'Drought Index(in Weeks)',
-                    data: droughtData,
-                    type: 'line',
-                    fill: false,
-                    borderColor: '#e67300',
-                    borderWidth: 2,
-                    pointRadius: 5,
-                    order: 1 // Lower order means it's drawn last (in front)
-                }
-                ]
+            labels: dg_years,
+            datasets: [
+                {
+                label: 'Moderate Weeks',
+                data: mod_weeks,
+                backgroundColor: '#EB984E',
+                stack: 'ms',           // <-- stack group A (Moderate+Severe)
+                },
+                {
+                label: 'Severe Weeks',
+                data: sev_weeks,
+                backgroundColor: '#E74C3C',
+                stack: 'ms',           // <-- same stack as Moderate
+                },
+                {
+                label: 'Dryspell Weeks',
+                data: drysp_all,
+                backgroundColor: '#8884d8',
+                stack: 'dry',          // <-- separate stack = separate bar
+                },
+            ],
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Drought Index(in Weeks)'
-                        }
-                    },
-                    x : {
-                        title : {
-                            display: true,
-                            text: 'Year'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true },    // allow multiple stacks side-by-side
+                y: { stacked: true,      // stack within each stack group
+                    title: { display: true, text: 'No. of Weeks' } },
+            },
+            animation: { duration: 0 },
+            plugins: {
+                title: { display: true, text: 'Drought Data over the years' },
+                legend: { display: true },
+            },
+            },
+        }
+        );
+
 
         //Village Profile section
         const villageNames = JSON.parse('{{ villages_name|safe }}')
         var ulElement = document.getElementById("village-names");
+
+        if(villageNames.length === 0){
+            const section = document.querySelector('.village-section');
+            if (section) section.style.display = 'none';
+        }
 
         const swc_works = JSON.parse('{{ swc_works|safe }}')
         const lr_works = JSON.parse('{{ lr_works|safe }}')

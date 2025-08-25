@@ -11,29 +11,32 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
+    export_raster_asset_to_gee,
+    is_gee_asset_exists,
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def lulc_river_basin(self, state_name, district_name, block_name, start_year, end_year):
+def lulc_river_basin(self, state, district, block, start_year, end_year):
     ee_initialize()
     print("Inside lulc_river_basin")
-    roi_boundary = ee.FeatureCollection(
-        get_gee_asset_path(state_name, district_name, block_name)
+    roi = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
         + "filtered_mws_"
-        + valid_gee_text(district_name.lower())
+        + valid_gee_text(district.lower())
         + "_"
-        + valid_gee_text(block_name.lower())
+        + valid_gee_text(block.lower())
         + "_uid"
-    )
+    ).union()
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
     filename_prefix = (
-        valid_gee_text(district_name.lower()) + "_" + valid_gee_text(block_name.lower())
+        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
 
     loop_start = start_date
@@ -57,36 +60,66 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
 
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
-            get_gee_asset_path(state_name, district_name, block_name)
-            + final_output_filename
+            get_gee_asset_path(state, district, block) + final_output_filename
         )
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         river_basin = ee.FeatureCollection("projects/ee-ankit-mcs/assets/CGWB_basin")
         l1_asset_new.append(
             clip_lulc_from_river_basin(
-                river_basin, roi_boundary, scale, curr_start_date, curr_end_date
+                river_basin, roi, scale, curr_start_date, curr_end_date
             )
         )
 
     task_list = []
-    geometry = roi_boundary.geometry()
+    geometry = roi.geometry()
     for i in range(0, len(l1_asset_new)):
-        image_export_task = ee.batch.Export.image.toAsset(
+        task_id = export_raster_asset_to_gee(
             image=l1_asset_new[i].clip(geometry),
             description=final_output_filename_array_new[i],
-            assetId=final_output_assetid_array_new[i],
-            pyramidingPolicy={"predicted_label": "mode"},
+            asset_id=final_output_assetid_array_new[i],
             scale=scale,
-            maxPixels=1e13,
-            crs="EPSG:4326",
+            region=geometry,
+            pyramiding_policy={"predicted_label": "mode"},
         )
-        image_export_task.start()
-        print("Successfully started the LULC v3", image_export_task.status())
-        task_list.append(image_export_task.status()["id"])
+        task_list.append(task_id)
 
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)
+
+    layer_ids = []
+    lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
+    for i in range(0, len(l1_asset_new)):
+        name_arr = final_output_filename_array_new[i].split("_20")
+        s_year = name_arr[1][:2]
+        e_year = name_arr[2][:2]
+        for workspace in lulc_workspaces:
+            suff = workspace.replace("LULC", "")
+            layer_name = (
+                "LULC_"
+                + s_year
+                + "_"
+                + e_year
+                + "_"
+                + valid_gee_text(block.lower())
+                + suff
+            )
+            if is_gee_asset_exists(final_output_assetid_array_new[i]):
+                layer_id = save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=layer_name,
+                    asset_id=final_output_assetid_array_new[i],
+                    dataset_name=workspace,
+                    misc={
+                        "start_year": start_year,
+                        "end_year": end_year,
+                    },
+                )
+                layer_ids.append(layer_id)
+                print("saved info to db at the gee level...")
+                make_asset_public(final_output_assetid_array_new[i])
 
     sync_lulc_to_gcs(
         final_output_filename_array_new,
@@ -94,7 +127,12 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         scale,
     )
 
-    sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_name)
+    sync_lulc_to_geoserver(
+        final_output_filename_array_new,
+        l1_asset_new,
+        block,
+        layer_ids,
+    )
 
 
 def sync_lulc_to_gcs(
@@ -114,7 +152,12 @@ def sync_lulc_to_gcs(
     print("task_ids sync to gcs ", task_id_list)
 
 
-def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_name):
+def sync_lulc_to_geoserver(
+    final_output_filename_array_new,
+    l1_asset_new,
+    block_name,
+    layer_ids,
+):
     print("Syncing lulc to geoserver")
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     for i in range(0, len(l1_asset_new)):
@@ -135,4 +178,9 @@ def sync_lulc_to_geoserver(final_output_filename_array_new, l1_asset_new, block_
                 + valid_gee_text(block_name.lower())
                 + suff
             )
-            sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style)
+            res = sync_raster_gcs_to_geoserver(
+                workspace, gcs_file_name, layer_name, style
+            )
+            if res and layer_ids:
+                update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
+                print("geoserver flag is updated")

@@ -2,34 +2,176 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    check_task_status,
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    merge_fc_into_existing_fc,
+)
 import calendar
+from computing.models import Layer, Dataset
 
 
-def evapotranspiration(state, district, block, start_date, end_date, is_annual):
-    description = (
-        ("ET_annual_" if is_annual else "ET_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+def evapotranspiration(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_year=None,
+    end_year=None,
+    is_annual=False,
+):
+
+    description = ("ET_annual_" if is_annual else "ET_fortnight_") + asset_suffix
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
 
-    asset_id = get_gee_asset_path(state, district, block) + description
     if is_gee_asset_exists(asset_id):
-        return
+        layer_obj = None
+        try:
+            layer_name_suffix = "annual" if is_annual else "fortnight"
+            dataset = Dataset.objects.get(name="Hydrology Evapotranspiration")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
+            )
+        except Exception as e:
+            print(
+                "layer not found for evapotranspiration. So, reading the column name from asset_id."
+            )
+        if layer_obj:
+            existing_end_date = int(layer_obj.misc["end_year"])
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            existing_end_date = (
+                int(filtered_col[-1].split("-")[0]) + 1
+                if is_annual
+                else filtered_col[-1].split("-")[0]
+            )
+        print("existing_end_date", existing_end_date)
+        print("end_year", end_year)
+        if existing_end_date < end_year:
+            new_start_year = existing_end_date
+            new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
+            new_description = f"{description}_{new_start_year}_{end_year}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_data(
+                    roi,
+                    new_asset_id,
+                    new_description,
+                    new_start_year,
+                    end_year,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("ET new year data generated.")
 
+            # Check if data for new year is generated, if yes then merge it in existing asset
+            if is_gee_asset_exists(new_asset_id):
+                merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+        return None, asset_id
+
+    return _generate_data(roi, asset_id, description, start_year, end_year, is_annual)
+
+
+def _generate_data(roi, asset_id, description, start_year, end_year, is_annual):
+    if not is_annual and (end_year - start_year > 5):
+        print("In chunking")
+        chunk_assets = []
+        s_year = start_year
+        task_ids = []
+        while s_year <= end_year:
+            start_date = f"{s_year}-07-01"
+
+            e_year = end_year if s_year + 5 > end_year else s_year + 5
+            end_date = f"{e_year}-06-30"
+
+            print(start_date, end_date)
+
+            chunk_asset_id = asset_id + "_" + str(s_year) + "_" + str(e_year)
+            chunk_assets.append(chunk_asset_id)
+
+            task_id = calculate_et(
+                roi,
+                chunk_asset_id,
+                description + "_" + str(s_year) + "_" + str(e_year),
+                start_date,
+                end_date,
+                is_annual,
+            )
+            task_ids.append(task_id)
+            s_year += 5
+
+        task_list = check_task_status(task_ids)
+        print("Task list ", task_list)
+        return (
+            merge_assets_chunked_on_year(chunk_assets, description, asset_id),
+            asset_id,
+        )
+    else:
+        print("In else")
+        start_date = f"{start_year}-07-01"
+        end_date = f"{end_year}-06-30"
+        return (
+            calculate_et(
+                roi,
+                asset_id,
+                description,
+                start_date,
+                end_date,
+                is_annual,
+            ),
+            asset_id,
+        )
+
+
+def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
+    def merge_features(feature):
+        # Get the unique ID of the current feature
+        uid = feature.get("uid")
+        matched_features = []
+        for i in range(1, len(chunk_assets)):
+            # Find the matching feature in the second collection
+            matched_feature = ee.Feature(
+                ee.FeatureCollection(chunk_assets[i])
+                .filter(ee.Filter.eq("uid", uid))
+                .first()
+            )
+            matched_features.append(matched_feature)
+
+        merged_properties = feature.toDictionary()
+        for f in matched_features:
+            # Combine properties from both features
+            merged_properties = merged_properties.combine(
+                f.toDictionary(), overwrite=False
+            )
+
+        # Return a new feature with merged properties
+        return ee.Feature(feature.geometry(), merged_properties)
+
+    # Map the merge function over the first feature collection
+    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(merged_fc, description, asset_id)
+    return task_id
+
+
+def calculate_et(roi, asset_id, description, start_date, end_date, is_annual):
     bounding_box = ee.Image("projects/ee-dharmisha-siddharth/assets/Hydro_2020_2021_4")
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
     bbox_geometry = bounding_box.geometry()
     is_within = bbox_geometry.contains(roi.geometry(), ee.ErrorMargin(1))
-
     if is_within.getInfo():
         return et_fldas(
             roi,
@@ -146,19 +288,10 @@ def et_fldas(
         shape = ee.FeatureCollection(mws.map(res))
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the task evapotranspiration", task.status())
-        return task.status()
-    except Exception as e:
-        print(f"Error occurred in running evapotranspiration task: {e}")
+
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
+    return task_id
 
 
 def et_global_fldas(
@@ -274,19 +407,9 @@ def et_global_fldas(
         shape = ee.FeatureCollection(mws.map(res))
         f_start_date = f_end_date
 
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the task evapotranspiration", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running evapotranspiration task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
+    return task_id
 
 
 def filter_dataset(f_start_date, number_of_days, fldas_dataset):

@@ -24,35 +24,22 @@ Install PostgreSQL
 
 # Installation of the libraries
 If you want to install directly from a conda snap of environment.yml
-> conda env create -f environment.yml
+> conda env create -f environment.yml --verbose
 
-If you want to install using the install.sh script
-1. chmod +x install.sh
-2. ./install.sh
-
-*Provide a name of your virtual environment when prompted: 
-> example: corestack
-
-*Provide a path to your environment when prompted: 
-> default: /home/user/miniconda/envs/corestack
-> example: /home/user/virtualenvs/corestack
-
-Let the script run and install all the dependencies.
+This will create a new conda environment called *black* with all the dependencies specified in the environment.yml file.
 
 # Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:
-1. conda activate corestack (or whatever is the name of your virtual environment)
+1. conda activate black (or whatever is the name of your virtual environment)
 2. python manage.py runserver 
 
 *Make Migrations*
-1. Make sure the environment is active. Otherwise, run `conda activate corestack`
-2. Run `python manage.py migrate`
-For any migration related queries, please send an email to contact@core-stack.org
+1. Make sure the environment is active. Otherwise, run `conda activate black`
 2. Run `python manage.py migrate`
 For any migration related queries, please send an email to contact@core-stack.org
 
 *Run the server*
-1. Make sure the environment is active. Otherwise, run `conda activate corestack`
+1. Make sure the environment is active. Otherwise, run `conda activate black`
 2. Run `python manage.py runserver`
 > Tip: To make local hits to your server, use `python manage.py runserver 0.0.0.0:8080`
 

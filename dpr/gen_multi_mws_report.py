@@ -1056,8 +1056,8 @@ def get_drought_mws_data(state, district, block, mwsList):
         for year, occurrence in drought_years.items():
             if occurrence >= threshold:
                 drought_year_mws.append(year)
-            else:
-                drought_year_mws.append(year)
+            # else:
+            #     drought_year_mws.append(year)
 
         #? DrySpell Calculation
         selected_columns_drysp = [col for col in df_drought.columns if col.startswith("drysp_")]

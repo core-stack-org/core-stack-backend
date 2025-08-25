@@ -64,10 +64,12 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         'change_detection_afforestation': -1,
         'change_detection_deforestation': -1,
         'change_detection_urbanization': -1,
+        'change_detection_cropintensity': -1,
         'terrain_lulc_slope': -1,
         'terrain_lulc_plain': -1,
         'restoration_vector': -1,
         'aquifer_vector': -1,
+        'soge_vector': -1,
     }
 
     try:
@@ -103,7 +105,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
 
         try:
             terrain_vector_mws_data = sheets['terrain'][sheets['terrain']['UID'] == specific_mws_id]
-            terrainCluster_ID = terrain_vector_mws_data.get('terrainCluster_ID', None).iloc[0]        # terrain
+            terrainCluster_ID = terrain_vector_mws_data.get('terrain_cluster_id', None).iloc[0]        # terrain
         except:
             terrainCluster_ID = ''
 
@@ -111,13 +113,13 @@ def get_generate_filter_mws_data(state, district, block, file_type):
             df_crp_intensity_mws_data = sheets['croppingIntensity_annual'][sheets['croppingIntensity_annual']['UID'] == specific_mws_id]
             df_crp_intensity_mws_data = df_crp_intensity_mws_data.fillna(0)
 
-            crp_Intensity_columns = df_crp_intensity_mws_data.filter(like='cropping_intensity')  # cropping_intensity_avg
+            crp_Intensity_columns = df_crp_intensity_mws_data.filter(like='cropping_intensity_unit_less')  # cropping_intensity_avg
             total_crp_Intensity_column = crp_Intensity_columns.shape[1]
             sum_crp_Intensity = crp_Intensity_columns.sum(axis=1).sum()
             cropping_intensity_avg = round(sum_crp_Intensity / total_crp_Intensity_column if total_crp_Intensity_column > 0 else 0, 4)
 
             ######### Cropping Intensity Trend  #################
-            crp_intensity_T = df_crp_intensity_mws_data.filter(like='cropping_intensity').dropna()  # Drop rows with NaN for trend calculation
+            crp_intensity_T = df_crp_intensity_mws_data.filter(like='cropping_intensity_unit_less').dropna()  # Drop rows with NaN for trend calculation
             crp_intensity_T = crp_intensity_T.squeeze().tolist()[:-3]
             result = mk.original_test(crp_intensity_T)
 
@@ -139,7 +141,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
                 cropping_intensity_trend = '-1'
 
             # Total cropped area, replace NaN with 0 for these columns as well
-            total_cropped_area = df_crp_intensity_mws_data.iloc[0]['sum']
+            total_cropped_area = df_crp_intensity_mws_data.iloc[0]['sum_area_in_ha']
 
             # Handle single-cropped area calculation
             single_crop_columns = df_crp_intensity_mws_data.filter(like='single_cropped_area')  # avg_single_cropped
@@ -225,7 +227,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         avg_zaid_surface_water_mws = 0
         df_swb_annual_mws_data = sheets['surfaceWaterBodies_annual'][sheets['surfaceWaterBodies_annual']['UID'] == specific_mws_id]
         if not df_swb_annual_mws_data.empty:
-            total_swb_area = df_swb_annual_mws_data.iloc[0]['total_swb_area']
+            total_swb_area = df_swb_annual_mws_data.iloc[0]['total_swb_area_in_ha']
             
             if total_swb_area != 0:  # Check if total_swb_area is not zero
                 swb_area_kharif_columns = df_swb_annual_mws_data.filter(like='kharif_area')
@@ -275,7 +277,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         try:
             df_crpDrought_mws_data = sheets['croppingDrought_kharif'][sheets['croppingDrought_kharif']['UID'] == specific_mws_id]
             years = ['2017', '2018', '2019', '2020', '2021', '2022']
-            sum_moderate_severe = {year: 1 if (df_crpDrought_mws_data.iloc[0][f'Moderate_{year}'] + df_crpDrought_mws_data.iloc[0][f'Severe_{year}']) > 5 else 0 for year in years}
+            sum_moderate_severe = {year: 1 if (df_crpDrought_mws_data.iloc[0][f'Moderate_in_weeks_{year}'] + df_crpDrought_mws_data.iloc[0][f'Severe_in_weeks_{year}']) > 5 else 0 for year in years}
             sum_of_values = sum(sum_moderate_severe.values())
             drought_category = None
             if sum_of_values>=2:
@@ -285,7 +287,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
 
 
             ########   avg_dry_spell_in_weeks 
-            dryspell_columns = df_crpDrought_mws_data.filter(like='drysp')   #avg_dry_spell_in_weeks
+            dryspell_columns = df_crpDrought_mws_data.filter(like='drysp_unit_4_weeks')   #avg_dry_spell_in_weeks
             total_dryspell_column = dryspell_columns.shape[1]
             sum_dryspell = dryspell_columns.sum(axis=1).sum()
             avg_dry_spell_in_weeks = round(sum_dryspell / total_dryspell_column if total_dryspell_column > 0 else 0, 4)
@@ -321,8 +323,10 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         ############  Change Detection Degradation  ###################
         try:
             df_change_degr_detection_mws_data = sheets['change_detection_degradation'][sheets['change_detection_degradation']['UID'] == specific_mws_id]
-            degradation_column = ['Farm-Barren', 'Farm-Built_Up', 'Farm-Scrub_Land']
-            degradation_land_area = df_change_degr_detection_mws_data.get('Total_degradation', None).iloc[0]
+            degr_sum = df_change_degr_detection_mws_data[['farm_to_barren_area_in_ha', 'farm_to_scrub_land_area_in_ha']].sum(axis=1).iloc[0]
+            df_change_crp_detection_mws_data = sheets['change_detection_cropintensity'][sheets['change_detection_cropintensity']['UID'] == specific_mws_id]
+            crp_sum = df_change_crp_detection_mws_data[['double_to_single_area_in_ha', 'triple_to_double_area_in_ha', 'triple_to_single_area_in_ha']].sum(axis=1).iloc[0]
+            degradation_land_area = degr_sum + crp_sum
         except:
             degradation_land_area = 0
 
@@ -330,8 +334,8 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         ############  Change Detection Afforestation  ###################
         try:
             df_change_affo_detection_mws_data = sheets['change_detection_afforestation'][sheets['change_detection_afforestation']['UID'] == specific_mws_id]
-            afforestation_column = ['Barren-Forest', 'Farm-Forest']
-            afforestation_land_area = df_change_affo_detection_mws_data.get('Total_afforestation', None).iloc[0]
+            afforestation_column = ['barren_to_forest_area_in_ha', 'farm_to_forest_area_in_ha']
+            afforestation_land_area = df_change_affo_detection_mws_data.get('total_afforestation_area_in_ha', None).iloc[0]
         except:
             afforestation_land_area = 0
 
@@ -339,8 +343,8 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         ############  Change Detection Deforestation  ###################
         try:
             df_change_defo_detection_mws_data = sheets['change_detection_deforestation'][sheets['change_detection_deforestation']['UID'] == specific_mws_id]
-            deforestation_column = ['Forest-Scrub_land', 'Forest-Barren', 'Forest-Built_Up', 'Forest-Farm']
-            deforestation_land_area = df_change_defo_detection_mws_data.get('total_deforestation', None).iloc[0]
+            deforestation_column = ['forest_to_scrub_land_area_in_ha', 'forest_to_barren_area_in_ha', 'forest_to_built_up_area_in_ha', 'forest_to_farm_area_in_ha']
+            deforestation_land_area = df_change_defo_detection_mws_data.get('total_deforestation_area_in_ha', None).iloc[0]
         except:
             deforestation_land_area = 0
 
@@ -348,8 +352,8 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         ############  Change Detection Urbanization  ###################
         try:
             df_change_urba_detection_mws_data = sheets['change_detection_urbanization'][sheets['change_detection_urbanization']['UID'] == specific_mws_id]
-            urbanization_column = ['Barren/Shrub-Built_Up', 'Built_Up-Built_Up', 'Tree/Farm-Built_Up', 'Water-Built_Up']
-            urbanization_land_area = df_change_urba_detection_mws_data.get('Total_urbanization', None).iloc[0]
+            urbanization_column = ['barren_shrub_to_built_up_area_in_ha', 'built_up_to_built_up_area_in_ha', 'tree_farm_to_built_up_area_in_ha', 'water_to_built_up_area_in_ha']
+            urbanization_land_area = df_change_urba_detection_mws_data.get('total_urbanization_area_in_ha', None).iloc[0]
         except:
             urbanization_land_area = 0
 
@@ -371,19 +375,46 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         ################# Restoration Vector  #########################
         try:
             df_restoration_vector_mws_data = sheets['restoration_vector'][sheets['restoration_vector']['UID'] == specific_mws_id]
-            wide_scale_restoration = df_restoration_vector_mws_data.get('Wide-scale Restoration', None).iloc[0]
-            area_protection = df_restoration_vector_mws_data.get('Protection', None).iloc[0]
+            wide_scale_restoration = df_restoration_vector_mws_data.get('wide_scale_restoration_area_in_ha', None).iloc[0]
+            area_protection = df_restoration_vector_mws_data.get('protection_area_in_ha', None).iloc[0]
         except:
             wide_scale_restoration = 0
             area_protection = 0
 
 
         ################# Aquifer Vector  #########################
+        aquifer_class_map = {
+            0: "Hard Rock",
+            1: "Alluvial"
+        }
+
+        class_to_id = {v: k for k, v in aquifer_class_map.items()}
         try:
             df_aquifer_vector_mws_data = sheets['aquifer_vector'][sheets['aquifer_vector']['UID'] == specific_mws_id]
-            aquifer_class = df_aquifer_vector_mws_data.get('aquifer_class', None).iloc[0]
-        except:
+            aquifer_class_name = df_aquifer_vector_mws_data.get('aquifer_class', None).iloc[0]
+            if aquifer_class_name == 'Alluvium':
+                aquifer_class_name = 'Alluvial'
+            aquifer_class = int(class_to_id.get(aquifer_class_name, ''))
+        except Exception:
             aquifer_class = ''
+
+
+        ################# SOGE Vector  #########################
+        Soge_class = {
+            0: "Safe",
+            1: "Semi-Critical",
+            2: "Critical",
+            3: "Over Exploited",
+            4: "Saline"
+        }
+
+        class_to_id = {v: k for k, v in Soge_class.items()}
+        try:
+            df_soge_vector_mws_data = sheets['soge_vector'][sheets['soge_vector']['UID'] == specific_mws_id]
+            soge_class_name = df_soge_vector_mws_data.get('class_name', None).iloc[0]
+            soge_class = int(class_to_id.get(soge_class_name, '')) # Returns None if not found
+        except Exception:
+            soge_class = ''
 
 
         results.append({
@@ -415,7 +446,8 @@ def get_generate_filter_mws_data(state, district, block, file_type):
             'lulc_plain_category': lulc_plain_category,
             'area_wide_scale_restoration': round(wide_scale_restoration,4),
             'area_protection': round(area_protection,4),
-            'aquifer_class': aquifer_class
+            'aquifer_class': aquifer_class,
+            'soge_class': soge_class
 
         })
 
@@ -455,8 +487,8 @@ def download_KYL_filter_data(state, district, block, file_type):
     elif file_type=='geojson':
         file_path = os.path.join(file_xl_path + '_KYL_filter_data.geojson')
 
-    print("file_path", )
     if os.path.exists(file_path):
         return file_path
     else:
         return None
+

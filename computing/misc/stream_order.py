@@ -2,6 +2,8 @@ import ee
 from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -9,6 +11,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 
 
@@ -18,10 +22,14 @@ def generate_stream_order_vector(self, state, district, block):
     description = (
         "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
-
-    if not is_gee_asset_exists(
-        get_gee_asset_path(state, district, block) + description
-    ):
+    layer_name = (
+        "stream_order_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
+    if not is_gee_asset_exists(asset_id):
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
@@ -31,7 +39,9 @@ def generate_stream_order_vector(self, state, district, block):
             + "_uid"
         )
 
-        raster = ee.Image("projects/ee-ankit-mcs/assets/Stream_Order_Raster_India")
+        raster = ee.Image(
+            "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
+        )
         raster = raster.clip(roi.geometry())
 
         args = [
@@ -49,32 +59,33 @@ def generate_stream_order_vector(self, state, district, block):
         ]
 
         fc = calculate_pixel_area(args, roi, raster)
+        task = export_vector_asset_to_gee(fc, description, asset_id)
+        check_task_status([task])
 
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": fc,
-                "description": description,
-                "assetId": get_gee_asset_path(state, district, block) + description,
-            }
+    if is_gee_asset_exists(asset_id):
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Stream Order",
         )
-        task.start()
-        check_task_status([task.status()["id"]])
+        make_asset_public(asset_id)
 
-    # Sync to geoserver
-    fc = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block) + description
-    ).getInfo()
-    fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
-        "stream_order_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-        "stream_order",
-    )
-    print(res)
+        # Sync to geoserver
+        fc = ee.FeatureCollection(asset_id).getInfo()
+        fc = {"features": fc["features"], "type": fc["type"]}
+        res = sync_layer_to_geoserver(
+            state,
+            fc,
+            layer_name,
+            "stream_order",
+        )
+        print(res)
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
 
 
 def calculate_pixel_area(class_labels, fc, raster):

@@ -10,10 +10,15 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     upload_tif_to_gcs,
     upload_tif_from_gcs_to_gee,
+    sync_vector_to_gcs,
+    get_geojson_from_gcs,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
@@ -51,6 +56,17 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name="",
+                asset_id=asset_id,
+                dataset_name="Drainage Density",
+            )
+            print("saved drainage density info at the gee level...")
+            make_asset_public(asset_id)
 
 
 def generate_vector(state, district, block):
@@ -70,10 +86,31 @@ def generate_vector(state, district, block):
     watersheds = gpd.GeoDataFrame.from_features(mws)
     watersheds.set_crs("EPSG:4326", inplace=True)
 
-    drainage_line_path = os.path.join(
-        DRAINAGE_LINES_OUTPUT,
-        f"""{'_'.join(state.split())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}.shp""",
+    drainage_lines = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
+        + f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
+
+    try:
+        drainage_lines = drainage_lines.getInfo()
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        layer_name = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        task_id = sync_vector_to_gcs(drainage_lines, layer_name, "GeoJSON")
+        check_task_status([task_id])
+
+        drainage_lines = get_geojson_from_gcs(layer_name)
+
+    if isinstance(drainage_lines, str):
+        drainage_lines = json.loads(drainage_lines)
+
+    drainage_lines = gpd.GeoDataFrame.from_features(drainage_lines)
+    drainage_lines.set_crs("EPSG:4326", inplace=True)
+
+    # drainage_line_path = os.path.join(
+    #     DRAINAGE_LINES_OUTPUT,
+    #     f"""{'_'.join(state.split())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}/{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}.shp""",
+    # )
 
     # Define influence factors for stream orders 1 to 11
     influence_factors = [
@@ -91,7 +128,7 @@ def generate_vector(state, district, block):
     ]
 
     # Load drainage lines shapefile
-    drainage_lines = gpd.read_file(drainage_line_path)
+    # drainage_lines = gpd.read_file(drainage_line_path)
 
     # changing CRS for length calculation
     drainage_lines = drainage_lines.to_crs(crs=7755)
@@ -159,23 +196,20 @@ def generate_vector(state, district, block):
     #
     # try:
     #     # Export an ee.FeatureCollection as an Earth Engine asset.
-    #     mws_task = ee.batch.Export.table.toAsset(
-    #         **{
-    #             "collection": fc,
-    #             "description": "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #             "assetId": get_gee_asset_path(state, district, block)
-    #             + "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #         }
+    #     mws_task = export_vector_asset_to_gee(
+    #         fc,
+    #         "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower()),
+    #         get_gee_asset_path(state, district, block)
+    #         + "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower())
     #     )
-    #     mws_task.start()
-    #     print("Successfully started the drainage_density", mws_task.status())
-    #     # return [mws_task.status()["id"]]
+    #     print("Successfully started the drainage_density")
+    #     # return [mws_task]
     # except Exception as e:
     #     print(f"Error occurred in running drainage_density task: {e}")
     return output_path

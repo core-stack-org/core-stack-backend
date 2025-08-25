@@ -2,62 +2,136 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    check_task_status,
+    merge_fc_into_existing_fc,
+)
+from computing.models import Layer, Dataset
 
 
-def delta_g(state, district, block, start_date, end_date, is_annual):
+def delta_g(
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
+):
     description = (
         "filtered_delta_g_"
         + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
         + "_uid"
     )
-    asset_id = get_gee_asset_path(state, district, block) + description
+
+    asset_path = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    asset_id = asset_path + description
 
     if is_gee_asset_exists(asset_id):
+        print("DeltaG asset already exists")
+        layer_obj = None
+        try:
+            dataset = Dataset.objects.get(name="Hydrology")
+            # TODO instead of here, pass in arguments from main file
+            layer_name = (
+                "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
+            ) + asset_suffix
+
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=layer_name,
+            )
+        except Exception as e:
+            print(
+                "layer not found for deltaG. So, reading the column name from asset_id"
+            )
+        if layer_obj:
+            existing_end_date = layer_obj.misc["end_year"]
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            existing_end_date = (
+                int(filtered_col[-1].split("-")[0]) + 1
+                if is_annual
+                else filtered_col[-1].split("-")[0]
+            )
+        existing_end_date = f"{existing_end_date}-06-30"
+        existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+
+        if existing_end_date < end_date:
+            new_start_date = existing_end_date + relativedelta(months=1, day=1)
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
+            end_date = end_date.strftime("%Y-%m-%d")
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_data(
+                    roi,
+                    new_asset_id,
+                    asset_path,
+                    asset_suffix,
+                    new_description,
+                    new_start_date,
+                    end_date,
+                    is_annual,
+                )
+                check_task_status([task_id])
+                print("DeltaG new year data generated.")
+
+            # Check if data for new year is generated, if yes then merge it in existing asset
+            if is_gee_asset_exists(new_asset_id):
+                merge_fc_into_existing_fc(asset_id, description, new_asset_id)
         return None, asset_id
 
+    return _generate_data(
+        roi,
+        asset_id,
+        asset_path,
+        asset_suffix,
+        description,
+        start_date,
+        end_date,
+        is_annual,
+    )
+
+
+def _generate_data(
+    roi,
+    asset_id,
+    asset_path,
+    asset_suffix,
+    description,
+    start_date,
+    end_date,
+    is_annual,
+):
     prec = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "Prec_"
-        + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )  # Prec feature collection
+        asset_path + "Prec_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
+    )  # Precipitation feature collection
     runoff = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+        asset_path
         + "Runoff_"
         + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        + asset_suffix
     )  # RO feature collection
     et = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "ET_"
-        + ("annual_" if is_annual else "fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        asset_path + "ET_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # et feature collection
-    shape = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )  # mws feature collection
-
     keys = ["Precipitation", "RunOff", "ET", "DeltaG"]
-
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     fn_index = 0
-
     while f_start_date <= end_date:
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)
@@ -90,22 +164,9 @@ def delta_g(state, district, block, start_date, end_date, is_annual):
             feat = feat.set(ee.String(col_date), ee.String.encodeJSON(d))
             return feat
 
-        shape = shape.map(res)
+        roi = roi.map(res)
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
-
-    try:
-
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-        task.start()
-        print("Successfully started the task deltaG", task.status())
-
-        return task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running delta_G task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
+    return task_id, asset_id
