@@ -1,0 +1,211 @@
+[
+  {
+    "name": "Welcome",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "Welcome! Let's help you join a new community.",
+            "hi": "स्वागत है! आइए आपको एक नए समुदाय में शामिल होने में मदद करते हैं।",
+            "default": "Welcome! Let's help you join a new community."
+          }
+        ]
+      },
+      {
+        "menu": [
+          {
+            "label": "सूची से चुनें",
+            "value": "state_district",
+            "caption": "आपकी बेहतर सेवा के लिए, हमें आपकी लोकेशन की आवश्यकता है। आप अपनी लोकेशन कैसे भेजना चाहते हैं? \n1. आप राज्य और ज़िले की सूची में से अपनी लोकेशन चुन सकते हैं। \n2. बस अपनी लोकेशन भेजें।"
+          },
+          {
+            "label": "स्थान भेज देंगे",
+            "value": "location_pin"
+          }
+        ]
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "SendState": [
+          "state_district"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "location_pin"
+        ]
+      },
+      {
+        "Welcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendState",
+    "preAction": [
+      {
+        "function": "sendStates"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "SendDistrict": [
+          "success"
+        ]
+      },
+      {
+        "SendState": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendDistrict",
+    "preAction": [
+      {
+        "function": "sendDistricts",
+        "data": {
+          "getDataFrom": {
+            "state": "SendState",
+            "field": "misc"
+          }
+        }
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityByStateDistrict": [
+          "success"
+        ]
+      },
+      {
+        "SendDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendLocationRequest",
+    "preAction": [
+      {
+        "function": "sendLocationRequest"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "CommunityByLocation": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunityByLocation",
+    "preAction": [
+      {
+        "function": "sendCommunityByLocation"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "AddUserToCommunity": [
+          "success"
+        ]
+      },
+      {
+        "CommunityByLocation": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "CommunityByStateDistrict",
+    "preAction": [
+      {
+        "function": "sendCommunityByStateDistrict",
+        "data": {
+          "getDataFrom": [
+            {
+              "state": "SendState",
+              "field": "misc"
+            },
+            {
+              "state": "SendDistrict", 
+              "field": "misc"
+            }
+          ]
+        }
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "AddUserToCommunity": [
+          "success"
+        ]
+      },
+      {
+        "CommunityByStateDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "AddUserToCommunity",
+    "preAction": [],
+    "postAction": [
+      {
+        "function": "add_user_to_selected_community_join_flow"
+      }
+    ],
+    "transition": [
+      {
+        "JoinSuccess": [
+          "success"
+        ]
+      },
+      {
+        "AddUserToCommunity": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JoinSuccess",
+    "preAction": [
+      {
+        "function": "send_join_success_message"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "return_to_community_services"
+      }
+    ],
+    "transition": [
+      {
+        "COMPLETE": [
+          "success"
+        ]
+      }
+    ]
+  }
+]

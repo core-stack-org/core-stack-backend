@@ -1,0 +1,90 @@
+[
+  {
+    "name": "WorkDemandStatusWelcome",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📋 संसाधन मांग की स्थिति जांचें\n\nआपकी पिछली संसाधन मांगों की स्थिति जांची जा रही है...",
+            "en": "📋 Check Asset Demand Status\n\nChecking the status of your previous asset demands...",
+            "default": "📋 Check Asset Demand Status\n\nChecking the status of your previous asset demands..."
+          }
+        ]
+      },
+      {
+        "function": "fetch_work_demand_status"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "DisplayWorkDemands": [
+          "has_work_demands"
+        ]
+      },
+      {
+        "NoWorkDemandsFound": [
+          "no_work_demands"
+        ]
+      },
+      {
+        "WorkDemandStatusWelcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "DisplayWorkDemands",
+    "preAction": [
+      {
+        "function": "display_work_demands_text"
+      },
+      {
+        "text": [
+          {
+            "hi": "✅ धन्यवाद! आपकी संसाधन मांग की स्थिति की जांच पूर्ण हो गई है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you! Your asset demand status check is complete.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you! Your asset demand status check is complete.\n\n🙏 Send \"Hi\" to restart the chat."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "DisplayWorkDemands": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "NoWorkDemandsFound",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📝 कोई संसाधन मांग नहीं मिली\n\nआपने अभी तक कोई संसाधन मांग दर्ज नहीं की है।\n\n💡 नई संसाधन मांग दर्ज करने के लिए \"Hi\" भेजकर मुख्य मेनू से 'संसाधन मांग दर्ज करें' का चयन करें।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "📝 No Asset Demands Found\n\nYou have not submitted any asset demands yet.\n\n💡 To submit a new asset demand, send \"Hi\" and select 'Submit Asset Demand' from the main menu.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "📝 No Asset Demands Found\n\nYou have not submitted any asset demands yet.\n\n💡 To submit a new asset demand, send \"Hi\" and select 'Submit Asset Demand' from the main menu.\n\n🙏 Send \"Hi\" to restart the chat."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "NoWorkDemandsFound": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]
