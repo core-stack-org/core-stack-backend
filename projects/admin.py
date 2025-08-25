@@ -35,10 +35,6 @@ class ProjectAdmin(admin.ModelAdmin):
                     "description",
                     "app_type",
                     "enabled",
-                    "geojson_path",
-                    "state",
-                    'district',
-                    'block',
                 )
             },
         ),
