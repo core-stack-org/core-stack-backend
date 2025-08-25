@@ -17,9 +17,6 @@ class Dataset(models.Model):
     layer_type = models.CharField(
         max_length=50, choices=LayerType.choices, null=True, blank=True
     )
-    layer_version = models.CharField(max_length=255, blank=True, null=True)
-    algorithm = models.CharField(max_length=511, blank=True, null=True)
-    algorithm_version = models.CharField(max_length=255, blank=True, null=True)
     workspace = models.CharField(max_length=255, blank=True, null=True)
     style_name = models.CharField(max_length=255, blank=True, null=True)
     misc = models.JSONField(blank=True, null=True)
