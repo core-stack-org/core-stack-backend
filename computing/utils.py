@@ -274,7 +274,7 @@ def save_layer_info_to_db(
     is_override=False,
 ):
     print("inside the save_layer_info_to_db function ")
-    dataset = Dataset.objects.get(name=dataset_name, layer_version=layer_version)
+    dataset = Dataset.objects.get(name=dataset_name)
 
     try:
         state_obj = StateSOI.objects.get(state_name__iexact=state)
@@ -295,6 +295,7 @@ def save_layer_info_to_db(
         state=state_obj,
         district=district_obj,
         block=block_obj,
+        layer_version=layer_version,
         defaults={
             "is_sync_to_geoserver": sync_to_geoserver,
             "is_public_gee_asset": is_public,
