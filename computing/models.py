@@ -17,9 +17,6 @@ class Dataset(models.Model):
     layer_type = models.CharField(
         max_length=50, choices=LayerType.choices, null=True, blank=True
     )
-    layer_version = models.CharField(max_length=255, blank=True, null=True)
-    algorithm = models.CharField(max_length=511, blank=True, null=True)
-    algorithm_version = models.CharField(max_length=255, blank=True, null=True)
     workspace = models.CharField(max_length=255, blank=True, null=True)
     style_name = models.CharField(max_length=255, blank=True, null=True)
     misc = models.JSONField(blank=True, null=True)
@@ -40,6 +37,9 @@ class Layer(models.Model):
     id = models.AutoField(primary_key=True)
     dataset = models.ForeignKey(Dataset, on_delete=models.CASCADE)
     layer_name = models.CharField(max_length=511, blank=True, null=True)
+    layer_version = models.CharField(max_length=255, blank=True, null=True)
+    algorithm = models.CharField(max_length=511, blank=True, null=True)
+    algorithm_version = models.CharField(max_length=255, blank=True, null=True)
     state = models.ForeignKey(StateSOI, on_delete=models.CASCADE)
     district = models.ForeignKey(DistrictSOI, on_delete=models.CASCADE)
     block = models.ForeignKey(TehsilSOI, on_delete=models.CASCADE)
@@ -59,7 +59,14 @@ class Layer(models.Model):
     class Meta:
         verbose_name = "Layer"
         verbose_name_plural = "Layers"
-        unique_together = ("dataset", "layer_name", "state", "district", "block")
+        unique_together = (
+            "dataset",
+            "layer_name",
+            "state",
+            "district",
+            "block",
+            "layer_version",
+        )
 
     def __str__(self):
         return str(self.layer_name)
