@@ -57,7 +57,7 @@ def evapotranspiration(
             existing_end_date = (
                 int(filtered_col[-1].split("-")[0]) + 1
                 if is_annual
-                else filtered_col[-1].split("-")[0]
+                else int(filtered_col[-1].split("-")[0])
             )
         print("existing_end_date", existing_end_date)
         print("end_year", end_year)
