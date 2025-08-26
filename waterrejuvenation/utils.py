@@ -1,5 +1,6 @@
 from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from computing.utils import sync_project_fc_to_geoserver
+
 from projects.models import Project
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -8,6 +9,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver, sync_multiple_raster_gcs_to_geoserver, make_asset_public, is_gee_asset_exists,
     get_gee_dir_path
 )
+import numpy as np
 
 
 WATER_REJ_GEE_ASSET='projects/ee-corestackdev/assets/apps/waterbody/'
@@ -260,26 +262,26 @@ def delete_asset_on_GEE(asset_id):
         logger.info(f"No existing asset to delete or error occurred: {e}")
 
 def create_ring(feature):
-        point = feature.geometry()
-        zoi = ee.Number(feature.get('zoi'))
-        waterbody_name = feature.get('waterbody_name')
-        impactfull = feature.get('impactful')
-        uid = feature.get('UID')
-        outer = point.buffer(zoi)
-        inner = point.buffer(0)  # Optional, but keeps the logic clear
-        ring = outer.difference(inner, 1)
-        zoi_area = calculate_zoi_area(zoi)
+    geom = feature.geometry()  # can be point or polygon
+    zoi = ee.Number(feature.get('zoi_wb'))
+    waterbody_name = feature.get('waterbody_name')
+    impactfull = feature.get('impactful')
+    uid = feature.get('UID')
 
-        return ee.Feature(ring).set({
-            'zoi': zoi,
-            'waterbody_name':waterbody_name,
-            'impactfull':impactfull,
-            'UID':uid,
-            'lon': point.coordinates().get(0),
-            'lat': point.coordinates().get(1),
-            'zoi_area': zoi_area
+    # Make circle buffer from centroid
+    centroid = geom.centroid()
+    circle = centroid.buffer(zoi)
 
-        })
+    zoi_area = calculate_zoi_area(zoi)
+
+    return ee.Feature(circle).set({
+        'zoi': zoi,
+        'waterbody_name': waterbody_name,
+        'impactfull': impactfull,
+        'UID': uid,
+        'zoi_area': zoi_area
+    })
+
 
 
 def get_all_asset_name(project_id):
@@ -525,3 +527,48 @@ def generate_draught_with_mws(draught_asset_id, mws_fc, proj_id):
     final_fc = ee.FeatureCollection(joined.map(merge_features))
     layer_name = 'WaterRejapp_mws_' + str(proj_obj.name) + '_' + str(proj_obj.id)
     sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, 'waterrej')
+
+def compute_zoi(feature):
+
+    area_of_wb = ee.Number(feature.get("area_ored"))  # assumes area field exists
+
+    # logistic_weight
+    def logistic_weight(x, x0=0.2, k=50):
+        return ee.Number(1).divide(
+            ee.Number(1).add((ee.Number(-k).multiply(x.subtract(x0))).exp())
+        )
+
+    # y_small_bodies
+    def y_small_bodies(area):
+        return ee.Number(126.84).multiply(area.add(0.05).log()).add(383.57)
+
+    # y_large_bodies
+    def y_large_bodies(area):
+        return ee.Number(140).multiply(area.add(0.05).log()).add(500)
+
+    s = logistic_weight(area_of_wb)
+
+    zoi = (ee.Number(1).subtract(s)).multiply(y_small_bodies(area_of_wb)) \
+          .add(s.multiply(y_large_bodies(area_of_wb)) .round())
+
+    return feature.set("zoi_wb", zoi)
+
+def generate_zoi_ring_layer(zoi_fc, proj_id):
+    from computing.water_rejuvenation.water_rejuventation import export_and_wait
+    proj_obj = Project.objects.get(pk = proj_id)
+    zoi_fc = ee.FeatureCollection(zoi_fc)
+    zoi_asset = get_filtered_mws_layer_name(proj_obj.name, 'zoi_layer')
+    try:
+        delete_asset_on_GEE(zoi_asset)
+    except Exception:
+        print("ZOI asset not present, skipping delete.")
+    export_and_wait(zoi_fc, 'zoi_ndmi_export', zoi_asset)
+
+    # Step 7: Create ZOI Rings
+    zoi_rings = ee.FeatureCollection(zoi_asset).filter(ee.Filter.gt('zoi_wb', 0)).map(create_ring)
+    zoi_ring_asset = get_filtered_mws_layer_name(proj_obj.name, 'swb_zoi_ring')
+    delete_asset_on_GEE(zoi_ring_asset)
+    export_and_wait(zoi_rings, 'zoi_single_ring_export', zoi_ring_asset)
+    return zoi_ring_asset
+
+

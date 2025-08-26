@@ -10,7 +10,7 @@ from computing.mws.generate_hydrology import generate_hydrology
 from computing.utils import sync_project_fc_to_geoserver, calculate_precipitation_season, \
     generate_geojson_with_ci_and_ndvi
 from computing.water_rejuvenation.water_rejuventation import get_lulc_class, find_closest_water_pixel, \
-    find_watersheds_for_point_with_buffer, generate_zoi_asset_on_gee, process_waterrej_zoi
+    find_watersheds_for_point_with_buffer, generate_zoi_asset_on_gee, generate_ndmi_layer
 from nrm_app.settings import PAN_INDIA_LULC_PATH
 from projects.models import Project
 from projects.serializers import ProjectSerializer
@@ -18,15 +18,14 @@ from utilities.constants import SITE_DATA_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long, get_gee_asset_path, check_task_status, gdf_to_ee_fc, get_gee_dir_path,
-    make_asset_public, ee_initialize_update
-)
+    make_asset_public)
 import ee
 import logging
 from datetime import  datetime
 import geemap
 from waterrejuvenation.utils import get_filtered_mws_layer_name, gen_proj_roi, wait_for_task_completion, \
     get_waterbody_id_for_lat_long, WATER_REJ_GEE_ASSET, clip_lulc_output, delete_asset_on_GEE, find_nearest_water_pixel, \
-    get_ndvi_for_zoi
+    get_ndvi_for_zoi, compute_zoi, generate_zoi_ring_layer
 from computing.surface_water_bodies.swb import generate_swb_layer
 from computing.mws.precipitation import  precipitation
 from shapely.geometry import Point
@@ -119,8 +118,14 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
                 logger.info("luc Task finished for lulc")
         except Exception as e:
             logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
+    watar_balance_task = Generate_water_balance_indicator.delay(mws_asset_id, project_id)
+    water_balance_task_result = watar_balance_task.get()
+    zoi_task = Genereate_zoi_and_zoi_indicator.delay(water_balance_task_result. project_id)
+    zoi_task_result = zoi_task.get()
 
 
+def Generate_water_balance_indicator(mws_asset_id, proj_id):
+    proj_obj = Project.objects.get(pk = proj_id)
     logger.info("Generating SWB layer for given lat long")
     asset_suffix_lulc = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
     asset_folder_lulc = [str(proj_obj.name)]
@@ -190,20 +195,32 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
     #logger.info(result)
     geoserver_layer_name='WaterRejapp-'+str(proj_obj.name)+'_'+str(proj_obj.id)
     asset_id_result = BuildGeojson.delay(asset_id_swb_with_catchement, result, geoserver_layer_name, proj_obj.name)
-    asset_id_desilt = asset_id_result.get()
+    asset_id_with_wb_indicator = asset_id_result.get()
     logger.info("Waterbody Geojson Generated and pushed to geoserver")
+    drainage_line_task = clip_drainage_lines.delay(roi_path=mws_asset_id, asset_suffix=asset_suffix_draught,
+                                                   asset_folder_list=asset_folder_prec, app_type="WATER_REJ",
+                                                   workspace_name="waterrej", proj_id=proj_obj.id)
+    return asset_id_with_wb_indicator
 
 
+@shared_task()
+def Genereate_zoi_and_zoi_indicator(asset_id_with_wb_indicator, proj_id):
+    ee_initialize()
+    proj_obj = Project.objects.get(pk = proj_id)
+    wb_indicator_fc = ee.FeatureCollection(asset_id_with_wb_indicator)
+    asset_suffix = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
+    asset_folder = [str(proj_obj.name)]
+    zoi_fc = wb_indicator_fc.map(compute_zoi)
     logger.info("Zoi Geojson generation started")
-
-    asset_id_zoi = process_waterrej_zoi(asset_id_desilt, proj_obj.id)
-    task_id, zoi_asset_id = generate_cropping_intensity(roi= asset_id_zoi , asset_suffix=asset_suffix_lulc, asset_folder_list=asset_folder_lulc,\
+    zoi_asset_id = generate_zoi_ring_layer(zoi_fc, proj_id)
+    ndmi_asset_id = generate_ndmi_layer(asset_id_with_wb_indicator, proj_obj.id)
+    ndvi_asset = get_ndvi_for_zoi(zoi_asset_id, asset_suffix, asset_folder)
+    task_id = generate_cropping_intensity(roi= zoi_asset_id , asset_suffix=asset_suffix, asset_folder_list=asset_folder,\
                                   app_type="WATER_REJ", start_year=2017, end_year = 2023)
+    asset_id_ci = f"cropping_intensity_{asset_suffix}_2017-23"
+    generate_geojson_with_ci_and_ndvi(zoi_asset_id, asset_id_ci, 'ndmi', proj_obj.id)
 
-    asset_id_ci = f"cropping_intensity_{asset_suffix_lulc}_2017-23"
-    ndvi_asset = get_ndvi_for_zoi(zoi_asset_id)
 
-    drainage_line_task  =  clip_drainage_lines.delay(roi_path=mws_asset_id, asset_suffix = asset_suffix_draught, asset_folder_list = asset_folder_prec, app_type="WATER_REJ", workspace_name = "waterrej", proj_id = proj_obj.id)
 
 @shared_task()
 def BuildDesiltingLayer(project_id):

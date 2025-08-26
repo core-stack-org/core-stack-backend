@@ -471,7 +471,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
     layer_name = 'WaterRejapp_zoi_' + str(proj_obj.name) + '_' + str(proj_obj.id)
     return asset_id_zoi
 
-def process_waterrej_zoi(swb_asset_id, proj_id):
+def generate_ndmi_layer(swb_asset_id, proj_id):
     ee_initialize()
     proj_obj = Project.objects.get(pk=proj_id)
 
@@ -498,105 +498,7 @@ def process_waterrej_zoi(swb_asset_id, proj_id):
 
     ndmi_computed_fc = swb_centroids.map(wrap_compute_metrics(elevation, ndmi_img, cropping_mask))
     export_and_wait(ndmi_computed_fc, 'waterej_ndmi_calc', ndmi_asset)
-
-    # Step 4: Extract NDMI Data and Filter Invalid Entries
-    ndmi_fc = ee.FeatureCollection(ndmi_asset)
-
-    ndmi_list, lat_list, lon_list, uid_list, name_list = extract_feature_info(ndmi_fc)
-
-
-    #
-    # Step 5: Filter Valid Features
-    # filtered = [
-    #     (i, ndmis, lat_list[i], lon_list[i], uid_list[i], name_list[i])
-    #     for i, ndmis in enumerate(ndmi_list)
-    #     if not any(val == -1 for val in ndmis)
-    # ]
-
-    filtered = [
-        (i, ndmis, lat_list[i], lon_list[i], uid_list[i], name_list[i])
-        for i, ndmis in enumerate(ndmi_list)
-    ]
-
-    ndmis_all, lats_all, lons_all, uids_all, names_all = zip(*[
-        (np.array(n), lat, lon, uid, name)
-        for _, n, lat, lon, uid, name in filtered
-    ])
-
-    # Step 6: Classify Check Dams by ZOI
-    impactful, non_impactful, zoi_res = classify_checkdams(ndmis_all, poly_degree=8, threshold=0.010)
-    features = []
-
-    for i, (lon, lat, uid, name) in enumerate(zip(lons_all, lats_all, uids_all, names_all)):
-        if i in zoi_res:
-            point = ee.Geometry.Point([lon, lat])
-            is_impactful = i not in non_impactful
-            feature = ee.Feature(point, {
-                'zoi': zoi_res[i]['zoi'],
-                'UID': uid,
-                'waterbody_name': name,
-                'impactful': zoi_res[i]['impactful'],
-                **zoi_res[i]['cumlative_score_array']
-            })
-            features.append(feature)
-
-    zoi_fc = ee.FeatureCollection(features)
-    zoi_asset = get_filtered_mws_layer_name(proj_obj.name, 'zoi_layer')
-    try:
-        delete_asset_on_GEE(zoi_asset)
-    except Exception:
-        print("ZOI asset not present, skipping delete.")
-    export_and_wait(zoi_fc, 'zoi_ndmi_export', zoi_asset)
-
-    # Step 7: Create ZOI Rings
-    zoi_rings = ee.FeatureCollection(zoi_asset).filter(ee.Filter.gt('zoi', 0)).map(create_ring)
-    zoi_ring_asset = get_filtered_mws_layer_name(proj_obj.name, 'swb_zoi_ring')
-    delete_asset_on_GEE(zoi_ring_asset)
-    export_and_wait(zoi_rings, 'zoi_single_ring_export', zoi_ring_asset)
-
-    # Step 8: Join ZOI with SWB Properties
-    spatial_filter = ee.Filter.intersects(leftField='.geo', rightField='.geo')
-    joined = ee.Join.inner().apply(swb_fc, ee.FeatureCollection(zoi_ring_asset), spatial_filter)
-
-    def merge_features(pair):
-        primary = ee.Feature(pair.get('primary'))
-        secondary = ee.Feature(pair.get('secondary'))
-        combined = primary.toDictionary().combine(secondary.toDictionary(), True)
-        return ee.Feature(secondary.geometry(), combined)
-
-    merged_fc = ee.FeatureCollection(joined.map(merge_features))
-    # Define the filter to match features where UID is equal
-    join_filter = ee.Filter.equals(leftField='UID', rightField='UID')
-
-    # Perform inner join
-    inner_join = ee.Join.inner()
-    joined = inner_join.apply(ndmi_fc, merged_fc, join_filter)
-
-    # Merge properties and use geometry from merged_fc (secondary)
-    def merge_ndmi_zoi_features(f):
-        primary = ee.Feature(f.get('primary'))  # from ndmi_fc
-        secondary = ee.Feature(f.get('secondary'))  # from merged_fc
-
-        # Merge all properties from both features (primary first, then overwrite with secondary)
-        merged_props = primary.toDictionary().combine(secondary.toDictionary(), overwrite=True)
-
-        # Return a new feature with geometry from merged_fc (secondary)
-        return ee.Feature(secondary.geometry(), merged_props)
-
-    # Final merged FeatureCollection
-    final_fc = ee.FeatureCollection(joined.map(merge_ndmi_zoi_features))
-    # Step 9: Sync to GeoServer
-    layer_name = f'WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}'
-    asset_id_zoi = get_filtered_mws_layer_name(proj_obj.name, layer_name)
-    delete_asset_on_GEE(asset_id_zoi)
-    task = ee.batch.Export.table.toAsset(collection = final_fc,
-                                         description = 'export zoi with ci',
-                                         assetId = asset_id_zoi)
-    task.start()
-    wait_for_task_completion(task)
-    sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, 'waterrej')
-
-    return asset_id_zoi
+    return ndmi_asset
 
 
 def export_and_wait(collection, description, asset_id):
