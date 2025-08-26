@@ -14,6 +14,16 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='project',
+            name='block',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='geoadmin.block'),
+        ),
+        migrations.AddField(
+            model_name='project',
+            name='district',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='geoadmin.district'),
+        ),
+        migrations.AddField(
+            model_name='project',
             name='district_soi',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='geoadmin.districtsoi'),
         ),
