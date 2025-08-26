@@ -87,6 +87,8 @@ INSTALLED_APPS = [
     "plantations",
     "plans",
     "public_api",
+    "community_engagement",
+    "bot_interface"
 ]
 
 # MARK: CORS Settings
@@ -110,7 +112,6 @@ else:
         "http://localhost:3000",
         "http://localhost:3001",
     ]
-
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -318,3 +319,17 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 NREGA_BUCKET = env("NREGA_BUCKET")
 NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
 NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+
+# S3 settings
+S3_BUCKET = env("S3_BUCKET")
+S3_REGION = env("S3_REGION")
+
+# bot_interface settings
+AUTH_TOKEN_360= env("AUTH_TOKEN_360")
+ES_AUTH= env("ES_AUTH")
+CALL_PATCH_API_KEY= env("CALL_PATCH_API_KEY")
+
+# Community Engagement API Configuration
+COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
+WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+
