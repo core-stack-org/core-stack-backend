@@ -33,9 +33,35 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
     @action(detail=False, methods=["get"])
     def available_organizations(self, request):
         """Get list of organizations that users can register for."""
+        app_type = request.query_params.get("app_type", None)
+        # Get all organizations
+        if not app_type:
+            organizations = Organization.objects.all()
+        else:
+            organizations = Organization.objects.filter(
+                projects__app_type=app_type  # assuming Project has an app_type field
+            ).distinct()
+
+        # Return organization name and ID
+        organization_data = [
+            {"id": str(org.id), "name": org.name} for org in organizations
+        ]
+
+        return Response(organization_data)
+
+    @action(detail=False, methods=["get"])
+    def available_organizations_by_app_type(self, request):
+        """Get list of organizations that users can register for."""
+
+        # Get query param (example: ?app_type=education)
+        app_type = request.query_params.get("app_type")
 
         # Get all organizations
         organizations = Organization.objects.all()
+
+        # Apply filter if query param is provided
+        if app_type:
+            organizations = organizations.filter(app_type=app_type)
 
         # Return organization name and ID
         organization_data = [
