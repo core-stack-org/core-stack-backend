@@ -57,6 +57,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "0.0.0.0",
     "2e532e910e5a.ngrok-free.app",
+    "api-doc.core-stack.org",
 ]
 
 # MARK: Django Apps
@@ -332,4 +333,3 @@ CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 
 # Community Engagement API Configuration
 COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
-WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
