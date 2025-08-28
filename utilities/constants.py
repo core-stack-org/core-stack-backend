@@ -183,3 +183,5 @@ GEE_PATHS = {
         "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/waterbody/",
     },
 }
+
+WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
