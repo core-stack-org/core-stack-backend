@@ -318,7 +318,7 @@ class UserViewSet(viewsets.ModelViewSet):
             )
 
         # TODO: add other types as well
-        if group.name == "Organization Admin":
+        if group.name in ["Organization Admin", "Org Admin", "Administrator"]:
             if not user.organization:
                 return Response(
                     {
