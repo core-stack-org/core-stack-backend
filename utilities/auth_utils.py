@@ -1,7 +1,8 @@
 from functools import wraps
-from rest_framework.permissions import AllowAny
+
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
 
 
 class NoAuthentication(BaseAuthentication):
@@ -33,33 +34,26 @@ def auth_free(view_func):
             ...
     """
 
-    # For function-based views, apply DRF's built-in decorators
     view_func = authentication_classes([])(view_func)
     view_func = permission_classes([AllowAny])(view_func)
 
     @wraps(view_func)
     def wrapper(*args, **kwargs):
         if len(args) > 0 and hasattr(args[0], "authentication_classes"):
-            # This is a class-based view (self is the first argument)
             self = args[0]
 
-            # Save original authentication and permission classes
             original_authentication_classes = self.authentication_classes
             original_permission_classes = self.permission_classes
 
-            # Set authentication-free classes
             self.authentication_classes = []
             self.permission_classes = [AllowAny]
 
             try:
-                # Call the original view function
                 return view_func(*args, **kwargs)
             finally:
-                # Restore original authentication and permission classes
                 self.authentication_classes = original_authentication_classes
                 self.permission_classes = original_permission_classes
         else:
-            # This is a function-based view, already decorated above
             return view_func(*args, **kwargs)
 
     return wrapper
