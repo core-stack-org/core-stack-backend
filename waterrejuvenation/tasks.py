@@ -5,10 +5,10 @@ from celery import shared_task
 import pandas as pd
 
 from computing.catchment_area.catchmentarea import compute_max_stream_order_and_catchment_for_swb
-from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
+from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity, generate_gee_asset
 from computing.mws.generate_hydrology import generate_hydrology
 from computing.utils import sync_project_fc_to_geoserver, calculate_precipitation_season, \
-    generate_geojson_with_ci_and_ndvi
+    generate_geojson_with_ci_and_ndvi, generate_geojson_with_ci_ndvi_ndmi
 from computing.water_rejuvenation.water_rejuventation import get_lulc_class, find_closest_water_pixel, \
     find_watersheds_for_point_with_buffer, generate_zoi_asset_on_gee, generate_ndmi_layer
 from nrm_app.settings import PAN_INDIA_LULC_PATH
@@ -204,8 +204,8 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id):
 
 
 @shared_task()
-def Genereate_zoi_and_zoi_indicator(asset_id_with_wb_indicator, proj_id):
-    ee_initialize()
+def Genereate_zoi_and_zoi_indicator(asset_id_with_wb_indicator, proj_id, ee_project = ''):
+    ee_initialize(ee_project)
     proj_obj = Project.objects.get(pk = proj_id)
     wb_indicator_fc = ee.FeatureCollection(asset_id_with_wb_indicator)
     asset_suffix = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
@@ -215,10 +215,11 @@ def Genereate_zoi_and_zoi_indicator(asset_id_with_wb_indicator, proj_id):
     zoi_asset_id = generate_zoi_ring_layer(zoi_fc, proj_id)
     ndmi_asset_id = generate_ndmi_layer(asset_id_with_wb_indicator, proj_obj.id)
     ndvi_asset = get_ndvi_for_zoi(zoi_asset_id, asset_suffix, asset_folder)
+
     task_id = generate_cropping_intensity(roi= zoi_asset_id , asset_suffix=asset_suffix, asset_folder_list=asset_folder,\
                                   app_type="WATER_REJ", start_year=2017, end_year = 2023)
     asset_id_ci = f"cropping_intensity_{asset_suffix}_2017-23"
-    generate_geojson_with_ci_and_ndvi(zoi_asset_id, asset_id_ci, 'ndmi', proj_obj.id)
+    generate_geojson_with_ci_ndvi_ndmi(zoi_asset_id, asset_id_ci,'ndmi', ndmi_asset_id,  proj_obj.id)
 
 
 

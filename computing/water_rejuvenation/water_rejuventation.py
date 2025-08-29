@@ -472,7 +472,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
     return asset_id_zoi
 
 def generate_ndmi_layer(swb_asset_id, proj_id):
-    ee_initialize()
+   
     proj_obj = Project.objects.get(pk=proj_id)
 
     # Step 1: Load SWB Features and Compute Water Score

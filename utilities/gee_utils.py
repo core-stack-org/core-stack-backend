@@ -7,7 +7,7 @@ from nrm_app.settings import (
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
+    GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH, GEE_TEST_SERVICE_ACCOUNT_KEY_PATH,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -32,6 +32,12 @@ def ee_initialize(project=None):
             service_account = "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
             credentials = ee.ServiceAccountCredentials(
                 service_account, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH
+            )
+        elif project == "ee-kapil-test":
+            print ("self account")
+            service_account = "ee-kapil-test@ee-kapil-test.iam.gserviceaccount.com"
+            credentials = ee.ServiceAccountCredentials(
+                service_account, GEE_TEST_SERVICE_ACCOUNT_KEY_PATH
             )
         else:
             service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
