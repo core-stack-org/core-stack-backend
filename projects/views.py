@@ -1,4 +1,4 @@
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -35,8 +35,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return ProjectSerializer
 
     def perform_create(self, serializer):
-        organization = self.request.user.organization
-        serializer.save(organization=organization)
+        user = self.request.user
+
+        if user.is_superadmin or user.is_superuser:
+            if (
+                "organization" not in serializer.validated_data
+                or not serializer.validated_data["organization"]
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "organization": "Organization ID is required for superadmin users."
+                    }
+                )
+            serializer.save()
+        else:
+            organization = user.organization
+            serializer.save(organization=organization)
 
     @action(detail=True, methods=["patch"])
     def update_app_type(self, request, pk=None):
