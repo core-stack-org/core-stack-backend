@@ -22,6 +22,7 @@ from computing.utils import (
     sync_layer_to_geoserver,
     update_layer_sync_status,
 )
+from utilities.geoserver_utils import Geoserver
 
 
 @app.task(bind=True)
@@ -204,6 +205,11 @@ def generate_hydrology(
 
         fc = ee.FeatureCollection(asset_id).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
+        geo = Geoserver()
+        layers = geo.get_layers("mws_layers")
+        layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+        if layer_name in layer_names:
+            geo.delete_layer(layer_name)
         res = sync_layer_to_geoserver(asset_suffix, fc, layer_name, "mws_layers")
         print(res)
 
