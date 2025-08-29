@@ -14,8 +14,13 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     make_asset_public,
     export_vector_asset_to_gee,
+    merge_fc_into_existing_fc,
 )
 from nrm_app.celery import app
+from computing.models import *
+from utilities.geoserver_utils import Geoserver
+
+geo = Geoserver()
 
 
 @app.task(bind=True)
@@ -49,6 +54,76 @@ def generate_cropping_intensity(
             + "_uid"
         )
     layer_name = f"{asset_suffix}_intensity"
+    description = "cropping_intensity_" + asset_suffix
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
+    if is_gee_asset_exists(asset_id):
+        dataset = Dataset.objects.get(name="Cropping Intensity")
+        layer_obj = Layer.objects.get(
+            dataset=dataset, layer_name=f"{asset_suffix}_intensity"
+        )
+        existing_end_date = int(layer_obj.misc["end_year"])
+        print("existing_end_date", existing_end_date)
+        print("end_year", end_year)
+        if existing_end_date < end_year:
+            new_start_year = existing_end_date
+            new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = generate_gee_asset(
+                    roi,
+                    asset_suffix,
+                    asset_folder_list,
+                    app_type,
+                    new_start_year,
+                    end_year,
+                )
+                if task_id:
+                    check_task_status([task_id])
+                    print("Cropping Intensity new year data generated.")
+
+                # Check if data for new year is generated, if yes then merge it in existing asset
+                if is_gee_asset_exists(new_asset_id):
+                    merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+
+                layer_id = None
+                if state and district and block and is_gee_asset_exists(asset_id):
+                    layer_id = save_layer_info_to_db(
+                        state,
+                        district,
+                        block,
+                        layer_name=layer_name,
+                        asset_id=asset_id,
+                        dataset_name="Cropping Intensity",
+                        misc={
+                            "start_year": start_year,
+                            "end_year": end_year,
+                        },
+                    )
+                make_asset_public(asset_id)
+
+                # Export asset to Geoserver
+                fc = ee.FeatureCollection(asset_id)
+                geo = Geoserver()
+                layers = geo.get_layers("crop_intensity")
+                layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+                if layer_name in layer_names:
+                    geo.delete_layer(layer_name)
+                    print("deleted layer name from geoserver")
+                res = sync_fc_to_geoserver(
+                    fc, asset_suffix, layer_name, "crop_intensity", "croppingintensity"
+                )
+                print(res)
+                if res["status_code"] == 201 and layer_id:
+                    update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+                    print("sync to geoserver flag updated")
+                return
+        else:
+            print("already upto date...")
+            return
 
     task_id, asset_id = generate_gee_asset(
         roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
