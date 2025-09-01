@@ -61,7 +61,7 @@ def drainage_density(self, state, district, block):
                 state,
                 district,
                 block,
-                layer_name=f"drainage_density_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower)}",
+                layer_name=f"drainage_density_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
                 asset_id=asset_id,
                 dataset_name="Drainage Density",
             )

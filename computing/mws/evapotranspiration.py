@@ -212,7 +212,7 @@ def et_fldas(
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)
             image_path = (
-                "projects/ee-dharmisha-siddharth/assets/ET_Hydroyear/ET_"
+                "projects/corestack-datasets/assets/datasets/ET_FLDAS/ET_Hydroyear/ET_"
                 + str(s_year)
                 + "_"
                 + str(s_year + 1)
@@ -221,7 +221,7 @@ def et_fldas(
             s_year += 1
         else:
             image_path = (
-                "projects/ee-dharmisha-siddharth/assets/Hydro_"
+                "projects/corestack-datasets/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
                 + str(s_year)
                 + "_"
                 + str(s_year + 1)
@@ -239,7 +239,7 @@ def et_fldas(
 
         total = ee.Image(image_path)  # downloaded image for ET Hydro_2017_2018_25
         mws = ee.List.sequence(0, size1)
-        total = total.select("b1")
+        total = total.select(["b1"])
 
         # Total pixels
         pixel_count = total.reduceRegions(
@@ -265,7 +265,7 @@ def et_fldas(
 
         total_pix = ee.FeatureCollection(mws.map(ll))
 
-        total = total.expression("ET>0?86400*ET:0", {"ET": total.select("b1")})
+        total = total.expression("ET>0?86400*ET:0", {"ET": total.select(["b1"])})
 
         stats2 = total.reduceRegions(
             reducer=ee.Reducer.sum(),
@@ -323,37 +323,13 @@ def et_global_fldas(
             for n in range(12):
                 s = annual_start_date
                 e = s + relativedelta(months=1) - relativedelta(days=1)
-                numberOfDaysInMonth = ee.Date(str(e.date())).get("day")
+                number_of_days_in_month = ee.Date(str(e.date())).get("day")
                 image = filter_dataset(
-                    annual_start_date, numberOfDaysInMonth, fldas_dataset
+                    annual_start_date, number_of_days_in_month, fldas_dataset
                 )
 
                 img = img.add(ee.Image(image))
                 annual_start_date = annual_start_date + relativedelta(months=1)
-            # for n in range(12):
-            #     s = annual_start_date  # start_dates.get(n)
-            #     e = (
-            #         s + relativedelta(months=1) - relativedelta(days=1)
-            #     )  # end_dates.get(n)
-            #     startDateObj = ee.Date(str(s.date()))
-            #     endDateObj = ee.Date(str(e.date()))
-            #
-            #     dataset = ee.ImageCollection("NASA/FLDAS/NOAH01/C/GL/M/V001").filter(
-            #         ee.Filter.date(startDateObj, endDateObj)
-            #     )
-            #
-            #     image = ee.Image(dataset.select("Evap_tavg").first())
-            #
-            #     numberOfDaysInMonth = endDateObj.get("day")
-            #
-            #     image = ee.Image(image.multiply(numberOfDaysInMonth.getInfo()))
-            #
-            #     image = image.expression(
-            #         "ET>0?86400*ET:0", {"ET": image.select("Evap_tavg")}
-            #     )
-            #
-            #     img = img.add(ee.Image(image))
-            #     annual_start_date = annual_start_date + relativedelta(months=1)
 
             sd = str(f_start_date.year) + "-07-01"
         else:
@@ -424,6 +400,6 @@ def filter_dataset(f_start_date, number_of_days, fldas_dataset):
     dataset = fldas_dataset.filter(ee.Filter.date(ee.Date(s), ee.Date(e)))
     image = ee.Image(dataset.select("Evap_tavg").first())
     image = ee.Image(image.multiply(number_of_days))
-    image = image.expression("ET>0?86400*ET:0", {"ET": image.select("Evap_tavg")})
+    image = image.expression("ET>0?86400*ET:0", {"ET": image.select(["Evap_tavg"])})
 
     return ee.Image(image)
