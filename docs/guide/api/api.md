@@ -300,24 +300,52 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **URL**: `/api/v1/projects/`
 - **Method**: POST
 - **Description**: Create a new project
-- **Request Body**:
-  ```json
-  {
-    "name": "Project Name",
-    "description": "Project Description",
-    "state": "state-id",
-    "app_type": "plantation",
-    "enabled": true,
-    "created_by": "user-id",
-    "updated_by": "user-id"
-  }
-  ```
 - **Authentication**: Required
 - **Permissions**: Super admin or organization admin
-- **Notes**: 
-  - The organization is automatically set to the user's organization
-  - Valid app_type values include 'plantation', 'watershed', etc. (as defined in AppType choices)
-  - The enabled field defaults to true if not specified
+
+#### For Regular Users (Organization Members)
+Regular users create projects under their own organization automatically.
+
+**Request Body**:
+```json
+{
+  "name": "Project Name",
+  "description": "Project Description",
+  "state": "state-id",
+  "district": "district-id",
+  "block": "block-id",
+  "app_type": "plantation",
+  "enabled": true,
+  "created_by": "user-id",
+  "updated_by": "user-id"
+}
+```
+
+#### For Superadmins
+Superadmins must specify the organization ID since they can create projects for any organization.
+
+**Request Body**:
+```json
+{
+  "name": "Project Name",
+  "description": "Project Description",
+  "organization": "org-id",
+  "state": "state-id",
+  "district": "district-id",
+  "block": "block-id",
+  "app_type": "plantation",
+  "enabled": true,
+  "created_by": "user-id",
+  "updated_by": "user-id"
+}
+```
+
+**Notes**: 
+- For regular users, the organization is automatically set to the user's organization
+- For superadmins, the organization field is required and must be provided
+- `district` and `block` fields are optional for both user types
+- Valid app_type values include 'plantation', 'watershed', etc. (as defined in AppType choices)
+- The enabled field defaults to true if not specified
 
 ### Get Project Details
 - **URL**: `/api/v1/projects/{project_id}/`
@@ -734,11 +762,36 @@ These endpoints are maintained for backward compatibility:
 ### KML File Upload Process
 
 1. Create a project (if not already created):
+   
+   **For Regular Users:**
    ```bash
    curl -X POST http://api.example.com/api/v1/projects/ \
      -H "Authorization: Bearer {access_token}" \
      -H "Content-Type: application/json" \
-     -d '{"name": "Plantation Project", "description": "A new plantation project", "organization": "organization-id"}'
+     -d '{
+       "name": "Plantation Project", 
+       "description": "A new plantation project", 
+       "state": "state-id",
+       "district": "district-id",
+       "block": "block-id",
+       "app_type": "plantation"
+     }'
+   ```
+
+   **For Superadmins:**
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/ \
+     -H "Authorization: Bearer {access_token}" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Plantation Project", 
+       "description": "A new plantation project", 
+       "organization": "organization-id",
+       "state": "state-id",
+       "district": "district-id", 
+       "block": "block-id",
+       "app_type": "plantation"
+     }'
    ```
 
 2. Enable the plantation app for the project:
@@ -766,11 +819,32 @@ These endpoints are maintained for backward compatibility:
 ### Creating a Watershed Plan
 
 1. Create a project (if not already created):
+   
+   **For Regular Users:**
    ```bash
    curl -X POST http://api.example.com/api/v1/projects/ \
      -H "Authorization: Bearer {access_token}" \
      -H "Content-Type: application/json" \
-     -d '{"name": "Watershed Project", "description": "A new watershed project", "organization": "organization-id"}'
+     -d '{
+       "name": "Watershed Project", 
+       "description": "A new watershed project", 
+       "state": "state-id",
+       "app_type": "watershed"
+     }'
+   ```
+
+   **For Superadmins:**
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/ \
+     -H "Authorization: Bearer {access_token}" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Watershed Project", 
+       "description": "A new watershed project", 
+       "organization": "organization-id",
+       "state": "state-id",
+       "app_type": "watershed"
+     }'
    ```
 
 2. Enable the watershed app for the project:

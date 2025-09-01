@@ -1,23 +1,24 @@
-from rest_framework import status, viewsets, mixins, generics, permissions
-from rest_framework.decorators import action, schema
-from rest_framework.response import Response
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
+import logging
+
 from django.contrib.auth.models import Group
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+from organization.models import Organization
+from projects.models import Project
+
 from .models import User, UserProjectGroup
 from .serializers import (
-    UserSerializer,
-    UserRegistrationSerializer,
     GroupSerializer,
-    UserProjectGroupSerializer,
     PasswordChangeSerializer,
+    UserProjectGroupSerializer,
+    UserRegistrationSerializer,
+    UserSerializer,
 )
-from projects.models import Project
-from projects.serializers import ProjectSerializer
-from organization.models import Organization
-from organization.serializers import OrganizationSerializer
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +35,13 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
     def available_organizations(self, request):
         """Get list of organizations that users can register for."""
         app_type = request.query_params.get("app_type", None)
-        # Get all organizations
         if not app_type:
             organizations = Organization.objects.all()
         else:
             organizations = Organization.objects.filter(
-                projects__app_type=app_type  # assuming Project has an app_type field
+                projects__app_type=app_type
             ).distinct()
 
-        # Return organization name and ID
         organization_data = [
             {"id": str(org.id), "name": org.name} for org in organizations
         ]
@@ -53,17 +52,13 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
     def available_organizations_by_app_type(self, request):
         """Get list of organizations that users can register for."""
 
-        # Get query param (example: ?app_type=education)
         app_type = request.query_params.get("app_type")
 
-        # Get all organizations
         organizations = Organization.objects.all()
 
-        # Apply filter if query param is provided
         if app_type:
             organizations = organizations.filter(app_type=app_type)
 
-        # Return organization name and ID
         organization_data = [
             {"id": str(org.id), "name": org.name} for org in organizations
         ]
@@ -75,10 +70,8 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Generate tokens for the new user
         refresh = RefreshToken.for_user(user)
 
-        # Return user info and tokens
         return Response(
             {
                 "user": UserSerializer(user).data,
@@ -94,19 +87,18 @@ class LoginView(TokenObtainPairView):
     API endpoint for user login.
     Extends SimpleJWT's TokenObtainPairView to customize the response.
     """
+
     schema = None
 
     def post(self, request, *args, **kwargs):
         # Call parent class method to validate credentials and get tokens
         response = super().post(request, *args, **kwargs)
 
-        # Get the user from the validated data
         token = response.data.get("access")
         jwt_auth = JWTAuthentication()
         validated_token = jwt_auth.get_validated_token(token)
         user = jwt_auth.get_user(validated_token)
 
-        # Add user info to response
         response.data["user"] = UserSerializer(user).data
 
         return response
@@ -120,10 +112,8 @@ class LogoutView(generics.GenericAPIView):
 
     def post(self, request):
         try:
-            # Get the refresh token from request
             refresh_token = request.data.get("refresh_token")
 
-            # Blacklist the token
             token = RefreshToken(refresh_token)
             token.blacklist()
 
@@ -136,6 +126,7 @@ class LogoutView(generics.GenericAPIView):
 
 class IsSuperAdminOrOrgAdmin(permissions.BasePermission):
     """Permission to allow only superadmins or organization admins."""
+
     schema = None
 
     def has_permission(self, request, view):
@@ -159,7 +150,6 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "create"]:
             permission_classes = [IsSuperAdminOrOrgAdmin]
         elif self.action in ["retrieve", "update", "partial_update", "my_projects"]:
-            # Users can view/edit their own profile and see their projects
             permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [IsSuperAdminOrOrgAdmin]
@@ -169,11 +159,9 @@ class UserViewSet(viewsets.ModelViewSet):
         """Filter users based on permissions."""
         user = self.request.user
 
-        # Superadmins can see all users
         if user.is_superadmin:
             return User.objects.all()
 
-        # Organization admins can see users in their organization
         if (
             user.organization
             and user.groups.filter(
@@ -182,14 +170,12 @@ class UserViewSet(viewsets.ModelViewSet):
         ):
             return User.objects.filter(organization=user.organization)
 
-        # Regular users can only see themselves
         return User.objects.filter(id=user.id)
 
     def retrieve(self, request, *args, **kwargs):
         """Get user details."""
         instance = self.get_object()
 
-        # Allow users to view their own details
         if request.user.id != instance.id and not (
             request.user.is_superadmin
             or (
@@ -209,7 +195,6 @@ class UserViewSet(viewsets.ModelViewSet):
         """Update user profile."""
         instance = self.get_object()
 
-        # Allow users to update their own profile
         if request.user.id != instance.id and not (
             request.user.is_superadmin
             or (
@@ -222,7 +207,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Prevent changing specific fields unless superadmin
         if not request.user.is_superadmin:
             # Remove is_superadmin and is_staff from the data if present
             mutable_data = request.data.copy()
@@ -289,9 +273,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Update user's organization
-        from organization.models import Organization
-
         try:
             organization = Organization.objects.get(id=organization_id)
             user.organization = organization
@@ -309,7 +290,6 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         group_id = request.data.get("group_id")
 
-        # Check if the requester is a superadmin or an organization admin
         is_superadmin = request.user.is_superadmin
         is_org_admin = request.user.groups.filter(
             name__in=["Organization Admin", "Org Admin", "Administrator"]
@@ -321,9 +301,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Organization admins can only assign users from their own organization
         if is_org_admin and not is_superadmin:
-            # Check if the user belongs to the same organization as the requester
             if user.organization != request.user.organization:
                 return Response(
                     {
@@ -332,7 +310,6 @@ class UserViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-        # Get the group
         try:
             group = Group.objects.get(id=group_id)
         except Group.DoesNotExist:
@@ -340,9 +317,8 @@ class UserViewSet(viewsets.ModelViewSet):
                 {"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Special handling for Organization Admin group
-        if group.name == "Organization Admin":
-            # Ensure the user has an organization assigned
+        # TODO: add other types as well
+        if group.name in ["Organization Admin", "Org Admin", "Administrator"]:
             if not user.organization:
                 return Response(
                     {
@@ -351,8 +327,6 @@ class UserViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # If the user is being assigned to an organization different from the requester's
-            # organization, only superadmins can do this
             if (
                 request.user.organization != user.organization
                 and not request.user.is_superadmin
@@ -364,7 +338,6 @@ class UserViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-        # Add the user to the group
         user.groups.add(group)
 
         return Response(
@@ -387,7 +360,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Get the group
         try:
             group = Group.objects.get(id=group_id)
         except Group.DoesNotExist:
@@ -395,7 +367,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 {"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Remove the user from the group
         user.groups.remove(group)
 
         return Response(
@@ -472,11 +443,9 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Add project_id to request data
         mutable_data = request.data.copy()
         mutable_data["project_id"] = project_id
 
-        # Handle both user/user_id and group/group_id field names
         user_id = mutable_data.get("user_id") or mutable_data.get("user")
         group_id = mutable_data.get("group_id") or mutable_data.get("group")
 
@@ -492,7 +461,6 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Ensure the data has the fields the serializer expects
         mutable_data["user_id"] = user_id
         mutable_data["group_id"] = group_id
 
