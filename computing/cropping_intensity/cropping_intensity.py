@@ -73,7 +73,8 @@ def generate_cropping_intensity(
             new_start_year = existing_end_date
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
             if not is_gee_asset_exists(new_asset_id):
-                task_id, new_asset_id = generate_gee_asset(
+                print(f"{new_asset_id} doesn't exist")
+                new_task_id, new_asset_id = generate_gee_asset(
                     roi,
                     asset_suffix,
                     asset_folder_list,
@@ -81,9 +82,11 @@ def generate_cropping_intensity(
                     new_start_year,
                     end_year,
                 )
-                if task_id:
-                    check_task_status([task_id])
+                if new_task_id:
+                    check_task_status([new_task_id])
                     print("Cropping Intensity new year data generated.")
+                else:
+                    print("task id not found")
 
                 # Check if data for new year is generated, if yes then merge it in existing asset
                 if is_gee_asset_exists(new_asset_id):
@@ -135,7 +138,15 @@ def generate_cropping_intensity(
 def generate_gee_asset(
     roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
 ):
-    filename = "cropping_intensity_" + asset_suffix
+    print("inside generate_gee_asset function ")
+    filename = (
+        "cropping_intensity_"
+        + asset_suffix
+        + "_"
+        + str(start_year)
+        + "-"
+        + str(end_year % 100)
+    )
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -355,7 +366,7 @@ def save_to_db_and_sync_to_geoserver(config: LayerConfig):
             },
         )
 
-    # make_asset_public(config.asset_id)
+    make_asset_public(config.asset_id)
 
     fc = ee.FeatureCollection(config.asset_id)
     res = sync_fc_to_geoserver(
