@@ -125,7 +125,13 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-
+    # delete layer if already exist
+    geo = Geoserver()
+    layers = geo.get_layers(workspace)
+    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+    if layer_name in layer_names:
+        geo.delete_layer(layer_name)
+        print(f"deleted {layer_name} from geoserver")
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
