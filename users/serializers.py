@@ -1,8 +1,10 @@
-from rest_framework import serializers
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
-from .models import User, UserProjectGroup
+from rest_framework import serializers
+
 from projects.models import Project
+
+from .models import User, UserProjectGroup
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -62,6 +64,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
+            "id",
             "username",
             "email",
             "password",
@@ -71,6 +74,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "contact_number",
             "organization",
         ]
+        read_only_fields = ["id"]
 
     def validate(self, attrs):
         # Check that passwords match
