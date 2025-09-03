@@ -200,6 +200,7 @@
             page-break-inside: avoid;
             break-inside: avoid;
             margin-top: 1em;
+            margin-bottom: 4em;
         }
 
         .legend-color {
@@ -213,6 +214,8 @@
             height: auto !important;
             max-width: auto !important;
         }
+
+
       }
       
     </style>
@@ -334,6 +337,7 @@
                 <canvas id="barChart-terrain-lulc-plain"></canvas>
             </div>
 
+            <p class="legend-note">Note: Data remotely sensed from satellites including LandSat-7, LandSat-8, Sentinel-2, Sentinel-1, MODIS and Dynamic World.</p>
         </section>
 
         {% if land_degrad %}
@@ -364,6 +368,8 @@
                         <span>Farm - Scrub Land</span>
                     </div>
                 </div>
+
+                <p class="legend-note">Note: The degradation in cropping is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from farmland to barren land, shrubs, human settlements (built-up) are computed</p>
             </section>
         {% endif %}
 
@@ -399,9 +405,9 @@
                         <span>Tree Cover - Scrub land</span>
                     </div>
                 </div>
+                <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
 
                 <p>{{restore_desc}}</p>
-
             </section>
         {% endif %}
 
@@ -414,6 +420,7 @@
                     <div id="urbanMap" class="map"></div>
                     <div id="compMap5" class="map"></div>
                 </div>
+                <p class="legend-note">Note: Urbanization is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover, farmland, and barren land to human settlements (built-up) are computed.</p>
 
             </section>
         {% endif %}
@@ -483,6 +490,10 @@
 
             <div id="swbMap" class="map"></div>
 
+            <p class="legend-note">
+                Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif season and Dynamic World to detect water pixels in Rabi and Zaid seasons.
+            </p>
+
             <p>{{swb_season_desc}}</p>
         </section>
 
@@ -500,9 +511,7 @@
             </div>
             <p class="legend-note">
                 Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP) dataset available on Google Earth Engine’s data catalogue. GSMaP provides a global precipitation in mm/hr at spatial resolution of approximately 11km.
-            </p>
-            <p class="legend-note">
-                Note: Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m resolution). For further information on the computation, refer our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a>.
+                Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m resolution). For further information on the computation, refer our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a>.
             </p>
             <div class="chart-container">
                 <canvas id="lineChart-evp"></canvas>
@@ -543,6 +552,8 @@
             <div class="chart-container">
                 <canvas id="Chart-drought-weeks"></canvas>
             </div>
+
+            <p class="legend-note">Note: Drought is defined as per the Government of India's Drought Manual and considered moderate or severe if the number of weeks of drought is five or more. Drought weeks are identified based on whether meteorological drought occurred in that week (i.e. the rains were less than usual in that week as compared to previous years, possibly intensified by dry spells defined as consecutive weeks of low rainfall) and/or agricultural drought occurred in that week (i.e. cropped area or crop health were lower than usual in that week as compared to previous years). Severe drought weeks are those when meteorological and agricultural drought are both coincident.</p>
         </section>
         
         <section class="section">
