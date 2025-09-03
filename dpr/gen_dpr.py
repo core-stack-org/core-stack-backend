@@ -104,9 +104,9 @@ def create_dpr_document(plan):
 
     add_section_h(doc, plan, mws_fortnight)
 
-    # MARK: local save /tmp/dpr/
-    # operations on the document
-    # file_path = "/tmp/dpr/"
+    #MARK: local save /tmp/dpr/
+    #operations on the document
+    #file_path = "/tmp/dpr/"
 
     # if not os.path.exists(file_path):
     #     os.makedirs(file_path)
@@ -114,7 +114,7 @@ def create_dpr_document(plan):
     return doc
 
 
-def send_dpr_email(doc, email_id, plan_name):
+def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
     try:
         buffer = BytesIO()
         doc.save(buffer)
@@ -151,6 +151,25 @@ def send_dpr_email(doc, email_id, plan_name):
             doc_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
+
+        # Attach each PDF from mws_reports
+        for i, item in enumerate(mws_reports, start=1):
+            filename = f"MWS_Report_{mws_Ids[i-1]}.pdf"
+            content = item
+
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                filename, content = (item[0] or filename), item[1]
+            elif isinstance(item, dict):
+                filename = item.get("filename") or item.get("name") or filename
+                content = item.get("data") or item.get("content") or item.get("bytes")
+
+            if isinstance(content, str):
+                content = base64.b64decode(content)
+
+            if not isinstance(content, (bytes, bytearray)):
+                raise TypeError("Each mws_reports entry must be PDF bytes or base64 string.")
+
+            email.attach(filename, content, "application/pdf")
 
         logger.info("Sending DPR email to %s", email_id)
         email.send(fail_silently=False)
@@ -206,6 +225,29 @@ def initialize_document():
         date.today().strftime("%B %d, %Y")
     ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     return doc
+
+
+def get_mws_ids_for_report(plan):
+    
+    mws_ids = set()
+    settlement_coordinates = get_settlement_coordinates_for_plan(plan.plan_id)
+
+    mws_fortnight = get_vector_layer_geoserver(
+        geoserver_url=GEOSERVER_URL,
+        workspace="mws_layers",
+        layer_name="deltaG_fortnight_"
+        + str(plan.district.district_name).lower().replace(" ", "_")
+        + "_"
+        + str(plan.block.block_name).lower().replace(" ", "_"),
+    )
+    mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
+
+    for settlement_name, latitude, longitude in settlement_coordinates:
+        mws_uid = get_mws_uid_for_settlement_gdf(mws_gdf, latitude, longitude)
+        if mws_uid:
+            mws_ids.add(mws_uid)
+    
+    return sorted(mws_ids)
 
 
 # MARK: - Section A

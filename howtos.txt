@@ -43,3 +43,32 @@ NREGA work categories:
 - Household Livelihood -> Off-farm livelihood assets
 - Others - HH, Community -> Community assets
 
+
+
+Setup Headless Firefox for Selenium:
+
+- Install firefox-esr
+    sudo apt-get update
+    sudo apt-get install -y firefox-esr
+
+- Install webdriver manager
+    python -m pip install webdriver-manager==4.0.2
+
+- Smoke test
+    - This command will "start geckodriver and point it at Firefox ESR"
+            "$HOME/.wdm/drivers/geckodriver/linux64/v0.36.0/geckodriver" \
+        --log trace \
+        --binary /usr/bin/firefox-esr
+
+    - Use this code to test
+        python
+        >>> from selenium.webdriver import Remote
+        >>> from selenium.webdriver.firefox.options import Options
+        >>> opts = Options(); opts.headless = True
+        >>> driver = Remote(command_executor="http://127.0.0.1:4444", options=opts)
+        >>> driver.get("https://example.com")
+        >>> print(driver.title)   # "Example Domain"
+        >>> driver.quit()
+
+
+
