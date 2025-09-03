@@ -21,8 +21,8 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def lulc_river_basin(self, state, district, block, start_year, end_year):
-    ee_initialize()
+def lulc_river_basin(self, state, district, block, start_year, end_year, gee_account_id):
+    ee_initialize(gee_account_id)
     print("Inside lulc_river_basin")
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)

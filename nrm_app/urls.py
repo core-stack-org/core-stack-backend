@@ -46,6 +46,7 @@ urlpatterns = [
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
     path("api/v1/", include("public_api.urls")),
+    path("api/v1/", include("gee_computing.urls")),
     # Swagger Doc
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"

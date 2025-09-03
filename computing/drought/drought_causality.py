@@ -503,8 +503,8 @@ def convert_to_dict(causality_str):
 
 
 @app.task(bind=True)
-def drought_causality(self, state, district, block, start_year, end_year):
-    ee_initialize()
+def drought_causality(self, state, district, block, start_year, end_year, gee_account_id):
+    ee_initialize(gee_account_id)
     mws_feature_collection = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"

@@ -36,9 +36,9 @@ def get_column_name(base_name, year):
 
 
 @app.task(bind=True)
-def tree_health_ch_vector(self, state, district, block, start_year, end_year):
+def tree_health_ch_vector(self, state, district, block, start_year, end_year, gee_account_id):
     """Process canopy height data for multiple years and combine into a single GeoServer layer."""
-    ee_initialize()
+    ee_initialize(gee_account_id)
     # Get the reference MWS features
     mws_features = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)

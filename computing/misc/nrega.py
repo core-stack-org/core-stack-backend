@@ -46,8 +46,8 @@ def export_shp_to_gee(district, block, layer_path, asset_id):
 
 
 @app.task(bind=True)
-def clip_nrega_district_block(self, state_name, district_name, block_name):
-    ee_initialize()
+def clip_nrega_district_block(self, state_name, district_name, block_name, gee_account_id):
+    ee_initialize(gee_account_id)
     print("inside clip")
     s3 = boto3.resource(
         service_name="s3",

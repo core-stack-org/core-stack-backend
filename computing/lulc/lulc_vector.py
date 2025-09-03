@@ -17,8 +17,8 @@ from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def vectorise_lulc(self, state, district, block, start_year, end_year):
-    ee_initialize()
+def vectorise_lulc(self, state, district, block, start_year, end_year, gee_account_id):
+    ee_initialize(gee_account_id)
     fc = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"

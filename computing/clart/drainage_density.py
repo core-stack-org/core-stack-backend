@@ -22,7 +22,7 @@ from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
-def drainage_density(self, state, district, block):
+def drainage_density(self, state, district, block, gee_account_id):
     asset_id = (
         get_gee_asset_path(state, district, block)
         + "drainage_density_"
