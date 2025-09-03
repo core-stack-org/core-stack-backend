@@ -33,6 +33,11 @@ class ODK_settlement(models.Model):
     nrega_community = models.TextField()
     data_settlement = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Settlement"
+        verbose_name_plural = "Settlements"
+        db_table = "odk_settlement"
+
     def __str__(self) -> str:
         return self.settlement_name
 
@@ -56,6 +61,11 @@ class ODK_well(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_well = models.JSONField(default=dict, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Well"
+        verbose_name_plural = "Wells"
+        db_table = "odk_well"
 
     def __str__(self) -> str:
         return self.well_id
@@ -87,6 +97,11 @@ class ODK_waterbody(models.Model):
     gps_point = models.JSONField(default=dict)
     data_waterbody = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Waterbody Structure"
+        verbose_name_plural = "Waterbody Structures"
+        db_table = "odk_waterbody"
+
     def __str__(self) -> str:
         return self.waterbody_id
 
@@ -107,6 +122,11 @@ class ODK_groundwater(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_groundwater = models.JSONField(default=dict, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Groundwater Structure"
+        verbose_name_plural = "Groundwater Structures"
+        db_table = "odk_groundwater"
 
     def __str__(self) -> str:
         return self.recharge_structure_id
@@ -135,6 +155,11 @@ class ODK_agri(models.Model):
     work_dimensions = models.JSONField(default=dict)
     data_agri = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Irrigation Structure"
+        verbose_name_plural = "Irrigation Structures"
+        db_table = "odk_irrigation"
+
     def __str__(self) -> str:
         return self.irrigation_work_id
 
@@ -162,6 +187,11 @@ class ODK_crop(models.Model):
     system = models.JSONField()
     data_crop = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Cropping Pattern"
+        verbose_name_plural = "Cropping Patterns"
+        db_table = "odk_crop"
+
     def __str__(self) -> str:
         return self.crop_grid_id
 
@@ -185,6 +215,11 @@ class ODK_livelihood(models.Model):
     gps_point = models.JSONField()
     data_livelihood = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Livelihood"
+        verbose_name_plural = "Livelihoods"
+        db_table = "odk_livelihood"
+
     def __str__(self) -> str:
         return self.livelihood_id
 
@@ -201,6 +236,11 @@ class GW_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "Groundwater Maintenance"
+        verbose_name_plural = "Groundwater Maintenance"
+        db_table = "odk_gw_maintenance"
+
 
 class SWB_RS_maintenance(models.Model):
     swb_rs_maintenance_id = models.AutoField(primary_key=True)
@@ -213,6 +253,11 @@ class SWB_RS_maintenance(models.Model):
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
     data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "SWB-RS Maintenance"
+        verbose_name_plural = "SWB-RS Maintenance"
+        db_table = "odk_swb_rs_maintenance"
 
 
 class SWB_maintenance(models.Model):
@@ -227,6 +272,11 @@ class SWB_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
 
+    class Meta:
+        verbose_name = "SWB Maintenance"
+        verbose_name_plural = "SWB Maintenance"
+        db_table = "odk_swb_maintenance"
+
 
 class Agri_maintenance(models.Model):
     agri_maintenance_id = models.AutoField(primary_key=True)
@@ -239,3 +289,8 @@ class Agri_maintenance(models.Model):
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
     data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Agri Maintenance"
+        verbose_name_plural = "Agri Maintenance"
+        db_table = "odk_agri_maintenance"
