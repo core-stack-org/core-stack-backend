@@ -12,8 +12,10 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     make_asset_public,
+    merge_fc_into_existing_fc,
 )
 from nrm_app.celery import app
+from computing.models import *
 
 
 @app.task(bind=True)
@@ -27,7 +29,91 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
         + valid_gee_text(block.lower())
         + "_uid"
     )
+    description = (
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
+    if is_gee_asset_exists(asset_id):
+        layer_obj = None
+        try:
+            dataset = Dataset.objects.get(name="LULC")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=description,
+            )
+        except Exception as e:
+            print(
+                "layer not found for lulc vector. So, reading the column name from asset_id."
+            )
+        if layer_obj:
+            existing_end_date = int(layer_obj.misc["end_year"])
+        else:
+            roi = ee.FeatureCollection(asset_id)
+            col_names = roi.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("tree")]
+            filtered_col.sort()
+            existing_end_date = int(filtered_col[-1].split("_")[-1])
+        print("existing_end_date", existing_end_date)
+        print("end_year", end_year)
+        if existing_end_date < end_year:
+            new_start_year = existing_end_date
+            new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
+            new_description = f"{description}_{new_start_year}_{end_year}"
+            if not is_gee_asset_exists(new_asset_id):
+                append_new_to_existing(
+                    start_year=new_start_year,
+                    end_year=end_year,
+                    state=state,
+                    district=district,
+                    block=block,
+                    description=new_description,
+                    asset_id=new_asset_id,
+                    fc=fc,
+                )
 
+                if is_gee_asset_exists(new_asset_id):
+                    merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+
+                sync_to_db_and_geoserver(
+                    asset_id=asset_id,
+                    state=state,
+                    district=district,
+                    block=block,
+                    description=description,
+                    start_year=start_year,
+                    end_year=end_year,
+                )
+                return "merging completed..."
+        return "already upto date "
+    else:
+        append_new_to_existing(
+            start_year=start_year,
+            end_year=end_year,
+            state=state,
+            district=district,
+            block=block,
+            description=description,
+            asset_id=asset_id,
+            fc=fc,
+        )
+        sync_to_db_and_geoserver(
+            asset_id=asset_id,
+            state=state,
+            district=district,
+            block=block,
+            description=description,
+            start_year=start_year,
+            end_year=end_year,
+        )
+        return "generated new layer"
+
+
+def append_new_to_existing(
+    start_year, end_year, state, district, block, description, asset_id, fc
+):
     lulc_list = []
     s_year = start_year  # START_YEAR
     while s_year <= end_year:
@@ -94,19 +180,17 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
             fc = fc.map(res)
 
     fc = ee.FeatureCollection(fc)
-
-    description = (
-        "lulc_vector_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(fc, description, asset_id)
     task_status = check_task_status([task])
     print("Task completed - ", task_status)
 
+
+def sync_to_db_and_geoserver(
+    asset_id, state, district, block, description, start_year, end_year
+):
     if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
+
         layer_id = save_layer_info_to_db(
             state,
             district,
@@ -119,7 +203,6 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
                 "end_year": end_year,
             },
         )
-        make_asset_public(asset_id)
 
         fc = ee.FeatureCollection(asset_id).getInfo()
 
