@@ -36,11 +36,13 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
         """Get list of organizations that users can register for."""
         app_type = request.query_params.get("app_type", None)
         if not app_type:
-            organizations = Organization.objects.all()
+            organizations = Organization.objects.all().order_by("name")
         else:
-            organizations = Organization.objects.filter(
-                projects__app_type=app_type
-            ).distinct()
+            organizations = (
+                Organization.objects.filter(projects__app_type=app_type)
+                .distinct()
+                .order_by("name")
+            )
 
         organization_data = [
             {"id": str(org.id), "name": org.name} for org in organizations
