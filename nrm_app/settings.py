@@ -124,6 +124,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
     "content-disposition",  # Important for file uploads in form data
+    "X-API-Key"
 ]
 
 CORS_ALLOW_METHODS = [
