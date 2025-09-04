@@ -8,10 +8,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
 )
-from computing.lulc.backups.built_up import *
-from computing.lulc.backups.cropland import *
+from computing.lulc.utils.built_up import *
+from computing.lulc.utils.cropland import *
 from computing.lulc.cropping_frequency import *
-from computing.lulc.backups.water_body import *
+from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from nrm_app.celery import app
 

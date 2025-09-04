@@ -6,34 +6,27 @@ from dateutil.relativedelta import relativedelta
 from utilities.gee_utils import (
     ee_initialize,
 )
-from computing.lulc.backups.built_up import *
-from computing.lulc.backups.cropland import *
+from computing.lulc.utils.built_up import *
+from computing.lulc.utils.cropland import *
 from computing.lulc.cropping_frequency import *
-from computing.lulc.backups.water_body import *
+from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def generate_lulc_layer_v2(
-    self, state_name, district_name, block_name, start_year, end_year
-):
-    generate_layers_v2(state_name, district_name, block_name, start_year, end_year)
-
-
-def generate_layers_v2(state_name, district_name, block_name, start_year, end_year):
-    ee_initialize()
+def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
+    ee_initialize("datasets")
     print("Inside generate lulc")
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
-    objectid = 2
     roi_boundary_geom = ee.FeatureCollection(
-        "projects/ee-ankit-mcs/assets/CGWB_basin"
-    ).filter(ee.Filter.eq("objectid", objectid))
+        "projects/corestack-datasets/assets/datasets/CGWB_basin"
+    ).filter(ee.Filter.eq("objectid", basin_object_id))
 
     filename_prefix = (
-        str(objectid) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
+        str(basin_object_id) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
     )
 
     loop_start = start_date
@@ -138,7 +131,10 @@ def generate_layers_v2(state_name, district_name, block_name, start_year, end_ye
 
         scale = 10
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m_v2"
-        final_output_assetid = "projects/nrm-work/assets/" + final_output_filename
+        final_output_assetid = (
+            "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
+            + final_output_filename
+        )
 
         # Setup the task
         image_export_task = ee.batch.Export.image.toAsset(

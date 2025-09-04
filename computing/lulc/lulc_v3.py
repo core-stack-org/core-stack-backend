@@ -21,7 +21,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def lulc_river_basin(self, state, district, block, start_year, end_year):
+def clip_lulc_v3(self, state, district, block, start_year, end_year):
     ee_initialize()
     print("Inside lulc_river_basin")
     roi = ee.FeatureCollection(
@@ -64,7 +64,9 @@ def lulc_river_basin(self, state, district, block, start_year, end_year):
         )
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
-        river_basin = ee.FeatureCollection("projects/ee-ankit-mcs/assets/CGWB_basin")
+        river_basin = ee.FeatureCollection(
+            "projects/corestack-datasets/assets/datasets/CGWB_basin"
+        )
         l1_asset_new.append(
             clip_lulc_from_river_basin(
                 river_basin, roi, scale, curr_start_date, curr_end_date

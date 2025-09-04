@@ -17,7 +17,9 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
-    path("lulc_v3/", api.lulc_v3_river_basin, name="lulc_v3"),
+    path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
+    path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
+    path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
     path("lulc_vector/", api.lulc_vector, name="lulc_vector"),
     path("lulc_farm_boundary/", api.lulc_farm_boundary, name="lulc_farm_boundary"),
     path("lulc_v4/", api.lulc_v4, name="lulc_v4"),
@@ -99,5 +101,5 @@ urlpatterns = [
         "merge_swb_ponds/",
         api.swb_pond_merging,
         name="merge_swb_ponds",
-    )
+    ),
 ]
