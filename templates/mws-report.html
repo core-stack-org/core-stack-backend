@@ -100,6 +100,14 @@
         th {
             background-color: #f2f2f2;
         }
+        .legend-note {
+            color: #6c757d;       /* gray */
+            text-align: center;
+            font-size: 0.9rem;
+            font-style: italic;
+            margin: 6px 0 0;      /* tight spacing under legend */
+        }
+
         /* Print Button Styles */
         .print-button {
             position: absolute;
@@ -143,7 +151,14 @@
 
         .doc-button:hover { background-color: #005a9e; }
         
-        @media print { .doc-button { display: none; } }
+        @media print { 
+            .doc-button { display: none; }   
+            .legend-note {
+                margin-top: 3em;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            } 
+        }
 
         /* Hide print button when printing */
         @media print {
@@ -184,6 +199,8 @@
             width: 80vw !important;
             page-break-inside: avoid;
             break-inside: avoid;
+            margin-top: 1em;
+            margin-bottom: 4em;
         }
 
         .legend-color {
@@ -197,6 +214,8 @@
             height: auto !important;
             max-width: auto !important;
         }
+
+
       }
       
     </style>
@@ -221,7 +240,7 @@
 
     <div class="container">
         <section class="section">
-            <h2>Overview of block characteristics</h2>
+            <h2>Overview of Tehsil characteristics</h2>
             <p>{{block_osm}}</p>
         </section>
 
@@ -287,6 +306,10 @@
                     <span>Mountain tops, high ridges</span>
                 </div>
             </div>
+
+            <p class="legend-note">
+                Note: We used NASA’s SRTM Digital Elevation Model at 30m resolution to generate landform classification.
+            </p>
         </section>
 
         <section class="section">
@@ -314,6 +337,7 @@
                 <canvas id="barChart-terrain-lulc-plain"></canvas>
             </div>
 
+            <p class="legend-note">Note: Data remotely sensed from satellites including LandSat-7, LandSat-8, Sentinel-2, Sentinel-1, MODIS and Dynamic World.</p>
         </section>
 
         {% if land_degrad %}
@@ -344,6 +368,8 @@
                         <span>Farm - Scrub Land</span>
                     </div>
                 </div>
+
+                <p class="legend-note">Note: The degradation in cropping is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from farmland to barren land, shrubs, human settlements (built-up) are computed</p>
             </section>
         {% endif %}
 
@@ -360,26 +386,28 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #73bb53;"></div>
-                        <span>Forest - Forest</span>
+                        <span>Tree Cover - Tree Cover</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Forest - Built Up</span>
+                        <span>Tree Cover - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Forest - Farm</span>
+                        <span>Tree Cover - Farm</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Forest - Barren</span>
+                        <span>Tree Cover - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Forest - Scrub land</span>
+                        <span>Tree Cover - Scrub land</span>
                     </div>
                 </div>
+                <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
 
+                <p>{{restore_desc}}</p>
             </section>
         {% endif %}
 
@@ -392,6 +420,7 @@
                     <div id="urbanMap" class="map"></div>
                     <div id="compMap5" class="map"></div>
                 </div>
+                <p class="legend-note">Note: Urbanization is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover, farmland, and barren land to human settlements (built-up) are computed.</p>
 
             </section>
         {% endif %}
@@ -405,6 +434,7 @@
                 <canvas id="barChart-intensity"></canvas>
             </div>
 
+            <p class="legend-note">Note: We use annual land use land cover (LULC), to identify areas under single cropping, double cropping and triple cropping using pixels which are classified as single kharif, single non-kharif, double and triple classes of LULC classifier to determine cropping intensity.</p>
         </section>
 
         <section class="section">
@@ -441,6 +471,9 @@
                     <span>Shrubs and Scrubs</span>
                 </div>
             </div>
+            <p class="legend-note">
+                Note: The Resolution of LULC image is 10 meter.
+            </p>
         </section>
 
         <section class="section">
@@ -457,6 +490,10 @@
 
             <div id="swbMap" class="map"></div>
 
+            <p class="legend-note">
+                Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif season and Dynamic World to detect water pixels in Rabi and Zaid seasons.
+            </p>
+
             <p>{{swb_season_desc}}</p>
         </section>
 
@@ -472,17 +509,37 @@
             <div class="chart-container">
                 <canvas id="lineChart-water"></canvas>
             </div>
+            <p class="legend-note">
+                Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP) dataset available on Google Earth Engine’s data catalogue. GSMaP provides a global precipitation in mm/hr at spatial resolution of approximately 11km.
+                Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m resolution). For further information on the computation, refer our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a>.
+            </p>
             <div class="chart-container">
                 <canvas id="lineChart-evp"></canvas>
             </div>
             <div class="chart-container">
                 <canvas id="lineChart-gw"></canvas>
             </div>
+            <p class="legend-note">
+                Note: Computed by subtracting outgoing fluxes (runoff and evaporatranspiration) from incoming water (precipitation).
+            </p>
         </section>
+
+        {% if soge_desc %}
+        <section class="section">
+            <h4>State of groundwater extraction</h4>
+
+            <p>The state of groundwater extraction refers to the current level or intensity at which groundwater is being withdrawn from aquifers compared to its natural replenishment rate. Based on this ratio, agencies like the Central Ground Water Board (CGWB) in India classify areas into categories indicating the extent of extraction.</p>
+            
+            <p>{{soge_desc}}</p>
+
+        </section>
+        {% endif %}
 
         <section class="section">
             <h4>Drought Analysis</h4>
             <p>{{drought_desc}}</p>
+
+            <p>A Drought year is declared if the total number of weeks under severe intensity drought and moderate intensity drought exceed 5, which means that the rainfall deficit was more than 25% for more than 5 weeks during the monsoon of that year.</p>
 
             <p>The occurrence of dry spell is defined across four consecutive weeks with each week of these
                 four weeks incurring a rainfall deviation of less than 50%. Prolonged dry spells can lead to
@@ -495,6 +552,8 @@
             <div class="chart-container">
                 <canvas id="Chart-drought-weeks"></canvas>
             </div>
+
+            <p class="legend-note">Note: Drought is defined as per the Government of India's Drought Manual and considered moderate or severe if the number of weeks of drought is five or more. Drought weeks are identified based on whether meteorological drought occurred in that week (i.e. the rains were less than usual in that week as compared to previous years, possibly intensified by dry spells defined as consecutive weeks of low rainfall) and/or agricultural drought occurred in that week (i.e. cropped area or crop health were lower than usual in that week as compared to previous years). Severe drought weeks are those when meteorological and agricultural drought are both coincident.</p>
         </section>
         
         <section class="section">
@@ -532,6 +591,7 @@
     <footer>
         <div class="container">
             <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>Refer to our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a> for more details on how data was collected and processed.</p>
             <p>
                 Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
                 <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
@@ -635,17 +695,19 @@
             name : 'tree_raster'
         })
 
+        const tempView1 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
         const TerrainMap = new ol.Map({
             target: 'terrainMap',
             layers: [wmsLayer],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView1
         })
 
         const ComparisonMap1 = new ol.Map({
@@ -660,7 +722,10 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
+            view: tempView1
+        })
+
+        const tempView2 = new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
                 projection: "EPSG:4326",
@@ -668,7 +733,6 @@
                 smoothExtentConstraint: true,
                 smoothResolutionConstraint: true,
             })
-        })
 
         const ComparisonMap2 = new ol.Map({
             target: 'compMap2',
@@ -682,14 +746,16 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView2
+        })
+
+        const tempView3 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
         })
 
         const ComparisonMap3 = new ol.Map({
@@ -704,14 +770,16 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView3
+        })
+
+        const tempView4 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
         })
 
         const ComparisonMap4 = new ol.Map({
@@ -726,14 +794,16 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView4
+        })
+
+        const tempView5 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
         })
 
         const ComparisonMap5 = new ol.Map({
@@ -748,53 +818,25 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView5
         })
 
         const lulcMap = new ol.Map({
             target: 'lulcMap',
             layers: [lulcRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView2
         })
 
         const DegradMap = new ol.Map({
             target: 'degradLandMap',
             layers: [degradRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView3
         })
         
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [treeReduceRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView4
         })
 
         const swbMap = new ol.Map({
@@ -822,14 +864,7 @@
         const urbanMap = new ol.Map({
             target: 'urbanMap',
             layers: [urbanRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView5
         })
 
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
@@ -1041,7 +1076,7 @@
                 data: {
                     labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
                     datasets: [{
-                        label: '% Block Terrain Area under Slope',
+                        label: '% Tehsil Terrain Area under Slope',
                         data: lulc_block_slope,
                         backgroundColor: '#3498db'
                     }, {
@@ -1078,7 +1113,7 @@
                 data: {
                     labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
                     datasets: [{
-                        label: '% Block Terrain Area under Plain',
+                        label: '% Tehsil Terrain Area under Plain',
                         data: lulc_block_plain,
                         backgroundColor: '#3498db'
                     }, {
@@ -1115,59 +1150,55 @@
         const waterYears = JSON.parse('{{water_years|safe}}')
 
         const barChart_swb = new Chart(document.getElementById('barChart-swb'), {
-            type: 'bar',
-            data: {
-                labels: waterYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
-                datasets: [
-                {
-                    label: 'Kharif-Rabi-Zaid',
-                    data: zaidData,
-                    backgroundColor: '#0000FF',
-
-                },
-                {
-                    label: 'Kharif-Rabi',
-                    data: rabiData,
-                    backgroundColor: '#6495ED'
-
-                },
-                {
-                    label: 'Kharif',
-                    data: kharifData,
-                    backgroundColor: '#ADD8E6'
-
-                },
-                ]
+        type: 'bar',
+        data: {
+            labels: waterYears,
+            datasets: [
+            {
+                label: 'Kharif',
+                data: kharifData,
+                backgroundColor: '#ADD8E6',
+                categoryPercentage: 0.6,
+                barPercentage: 0.9
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x : {
-                        stacked : true,
-                        title : {
-                            display: true,
-                            text: 'Year'
-                        }
-                    },
-                    y: {
-                        stacked : true,
-                        title : {
-                            display: true,
-                            text: 'Hectare'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
+            {
+                label: 'Kharif-Rabi',
+                data: rabiData,
+                backgroundColor: '#6495ED',
+                categoryPercentage: 0.6,
+                barPercentage: 0.9
             },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Surface water availability during Kharif, Rabi, and Zaid (2017-2022)',
-                },
+            {
+                label: 'Kharif-Rabi-Zaid',
+                data: zaidData,
+                backgroundColor: '#0000FF',
+                categoryPercentage: 0.6, // optional: tweak spacing
+                barPercentage: 0.9
+            },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+            x: {
+                stacked: false,
+                title: { display: true, text: 'Year' }
+            },
+            y: {
+                stacked: false,
+                title: { display: true, text: 'Hectare' }
             }
+            },
+            animation: { duration: 0 },
+            plugins: {
+            title: {
+                display: true,
+                text: 'Surface water availability during Kharif, Rabi, and Zaid (2017-2022)'
+            },
+            legend: { position: 'top' }
+            }
+        }
         });
         
         //? Cropping Intensity
@@ -1343,7 +1374,7 @@
             data: {
                 labels: wbYears,
                 datasets: [{
-                    label: 'Groundwater',
+                    label: 'Water Balance',
                     data: dgData,
                     type: 'line',
                     fill: true,
@@ -1364,7 +1395,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Groundwater(m)'
+                            text: 'Water Balance(mm)'
                         }
                     },
                     x : {
