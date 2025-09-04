@@ -125,7 +125,13 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-
+    # delete layer if already exist
+    geo = Geoserver()
+    layers = geo.get_layers(workspace)
+    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+    if layer_name in layer_names:
+        geo.delete_layer(layer_name)
+        print(f"deleted {layer_name} from geoserver")
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
@@ -139,6 +145,14 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         check_task_status([task_id])
 
         geojson_fc = get_geojson_from_gcs(layer_name)
+
+    # delete layer if already exist
+    geo = Geoserver()
+    layers = geo.get_layers(workspace)
+    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+    if layer_name in layer_names:
+        geo.delete_layer(layer_name)
+        print(f"deleted {layer_name} from geoserver")
 
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", shp_folder)
@@ -330,3 +344,12 @@ def update_layer_sync_status(layer_id, sync_to_geoserver=True):
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
         return False
+
+
+def get_existing_end_year(dataset_name, layer_name):
+    """fetch objects from db on the basis of dataset name and layer_name"""
+    dataset = Dataset.objects.get(name=dataset_name)
+    layer_obj = Layer.objects.get(dataset=dataset, layer_name=layer_name)
+    existing_end_date = layer_obj.misc["end_year"]
+    print("existing_end_date", existing_end_date)
+    return existing_end_date
