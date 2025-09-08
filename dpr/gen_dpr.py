@@ -50,7 +50,12 @@ from .models import (
     SWB_maintenance,
     SWB_RS_maintenance,
 )
-from .utils import format_text, get_vector_layer_geoserver, sync_db_odk
+from .utils import (
+    format_text,
+    format_text_demands,
+    get_vector_layer_geoserver,
+    sync_db_odk,
+)
 
 logger = setup_logger(__name__)
 
@@ -92,7 +97,7 @@ def create_dpr_document(plan):
         doc, plan, total_settlements, mws_fortnight
     )
 
-    # add_section_c(doc, plan)
+    add_section_c(doc, plan)
 
     # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
 
@@ -391,14 +396,20 @@ def add_section_c(doc, plan):
         "This section provides an overview of the settlement's social, economic, and ecological characteristics. It includes information on vulnerabilities, NREGA details, livelihoods, and crop and livestock profiles. The specific details on caste groups, economic conditions, NREGA works, and infrastructure, as well as previous NRM demands, contribute to a comprehensive understanding of the settlement's dynamics. \n\n"
     )
 
-    create_socio_eco_table(doc, plan)
+    settlement_data = get_data_for_settlement(plan.id)
+    create_table_socio_eco(doc, plan, settlement_data)
 
-    doc.add_heading("Livelihood Profile", level=3)
+    doc.add_heading("MGNREGA Info", level=3)
+    create_table_mgnrega_info(doc, plan, settlement_data)
 
-    create_livelihood_table(doc, plan)
+    doc.add_heading("Crop Info", level=4)
+    create_table_crop_info(doc, plan)
+
+    # doc.add_heading("Livelihood Profile", level=3)
+    # create_livelihood_table(doc, plan)
 
 
-def create_socio_eco_table(doc, plan):
+def create_table_socio_eco(doc, plan, settlement_data):
     headers_socio = [
         "Name of the Settlement",
         "Total Number of Households",
@@ -407,7 +418,6 @@ def create_socio_eco_table(doc, plan):
         "Total marginal farmers (<2 acres)",
     ]
 
-    data_settlement = get_data_for_settlement(plan.plan_id)
     table_socio = doc.add_table(rows=1, cols=len(headers_socio))
     table_socio.style = "Table Grid"
 
@@ -415,7 +425,7 @@ def create_socio_eco_table(doc, plan):
     for i, header in enumerate(headers_socio):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for item in data_settlement:
+    for item in settlement_data:
         row_cells = table_socio.add_row().cells
         row_cells[0].text = item.settlement_name
         row_cells[1].text = str(item.number_of_households)
@@ -431,16 +441,16 @@ def create_socio_eco_table(doc, plan):
 
         row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
+
+def create_table_mgnrega_info(doc, plan, settlement_data):
     headers_nrega = [
         "Settlement's Name",
-        "Households - applied \n- having NREGA job cards",
-        "NREGA work days in previous year",
-        "Previous NRM demands made in the settlement",
-        "Were demands raised by you, and were you involved in the new NRM planning?",
+        "Total Households - applied \n- have NREGA job cards in previous year",
+        "Total work days in previous year",
+        "Work demands made in previous year",
+        "Were you involved in the village level planning?",
         "Issues",
     ]
-
-    doc.add_heading("NREGA Info", level=3)
 
     table_nrega = doc.add_table(rows=1, cols=len(headers_nrega))
     table_nrega.style = "Table Grid"
@@ -448,37 +458,50 @@ def create_socio_eco_table(doc, plan):
     for i, header in enumerate(headers_nrega):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for settlement_nrega in data_settlement:
+    for settlement_nrega in settlement_data:
         row_cells = table_nrega.add_row().cells
         row_cells[0].text = settlement_nrega.settlement_name
         row_cells[1].text = (
             "applied: "
-            + str(settlement_nrega.nrega_job_applied)
+            + (
+                "NA"
+                if settlement_nrega.nrega_job_applied == 0
+                else str(settlement_nrega.nrega_job_applied)
+            )
             + "\n"
             + "having: "
-            + str(settlement_nrega.nrega_job_card)
+            + (
+                "NA"
+                if settlement_nrega.nrega_job_card == 0
+                else str(settlement_nrega.nrega_job_card)
+            )
         )
-        row_cells[2].text = str(settlement_nrega.nrega_work_days)
-        row_cells[3].text = format_text(settlement_nrega.nrega_past_work)
-        row_cells[4].text = settlement_nrega.nrega_demand
+        row_cells[2].text = (
+            "NA"
+            if settlement_nrega.nrega_work_days == 0
+            else str(settlement_nrega.nrega_work_days)
+        )
+        row_cells[3].text = format_text_demands(settlement_nrega.nrega_past_work)
+        row_cells[4].text = format_text(settlement_nrega.nrega_demand)
         row_cells[5].text = format_text(settlement_nrega.nrega_issues)
 
 
-def create_livelihood_table(doc, plan):
-    # Crop Info section remains the same
-    doc.add_heading("Crop Info", level=4)
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(
+def create_table_crop_info(doc, plan):
+    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
     )
+
     headers_cropping_pattern = [
         "Name of the Settlement",
         "Irrigation Source",
-        "Land Classification",
-        "Type of Grid (Uncropped/Barren)",
-        "Cropping Pattern (Kharif)",
-        "Cropping Pattern (Rabi)",
-        "Cropping Pattern (Zaid)",
+        "Crops grown in Kharif",
+        "Kharif acreage (acres)",
+        "Crops grown in Rabi",
+        "Rabi acreage (acres)",
+        "Crops grown in Zaid",
+        "Zaid acreage (acres)",
         "Cropping Intensity",
+        "Land Classification",
     ]
     table_cropping_pattern = doc.add_table(rows=1, cols=len(headers_cropping_pattern))
     table_cropping_pattern.style = "Table Grid"
@@ -486,18 +509,58 @@ def create_livelihood_table(doc, plan):
     for i, header in enumerate(headers_cropping_pattern):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for crops in crops_in_plan:
+    for crop in crops_in_plan:
         row_cells = table_cropping_pattern.add_row().cells
-        row_cells[0].text = crops.beneficiary_settlement
-        row_cells[1].text = crops.irrigation_source
-        row_cells[2].text = crops.land_classification
-        row_cells[3].text = crops.data_crop.get("Uncropped_barren_land") or "None"
-        row_cells[4].text = format_text(crops.cropping_patterns_kharif)
-        row_cells[5].text = format_text(crops.cropping_patterns_rabi)
-        row_cells[6].text = format_text(crops.cropping_patterns_zaid)
-        row_cells[7].text = crops.agri_productivity
+        row_cells[0].text = crop.beneficiary_settlement
+        row_cells[1].text = crop.irrigation_source
+        row_cells[2].text = format_text(crop.cropping_patterns_kharif)
+        # acres = hectares * 2.47105; in the form we are capturing the data in hectares
+        kharif_area = (
+            crop.data_crop.get("total_area_cultivation_kharif", "NA")
+            if crop.data_crop
+            else "NA"
+        )
+        if kharif_area != "NA" and kharif_area is not None:
+            try:
+                kharif_acres = float(kharif_area) * 2.47105
+                row_cells[3].text = str(round(kharif_acres, 4))
+            except (ValueError, TypeError):
+                row_cells[3].text = "NA"
+        else:
+            row_cells[3].text = "NA"
+        row_cells[4].text = format_text(crop.cropping_patterns_rabi)
+        rabi_area = (
+            crop.data_crop.get("total_area_cultivation_Rabi", "NA")
+            if crop.data_crop
+            else "NA"
+        )
+        if rabi_area != "NA" and rabi_area is not None:
+            try:
+                rabi_acres = float(rabi_area) * 2.47105
+                row_cells[5].text = str(round(rabi_acres, 4))
+            except (ValueError, TypeError):
+                row_cells[5].text = "NA"
+        else:
+            row_cells[5].text = "NA"
+        row_cells[6].text = format_text(crop.cropping_patterns_zaid)
+        zaid_area = (
+            crop.data_crop.get("total_area_cultivation_Zaid", "NA")
+            if crop.data_crop
+            else "NA"
+        )
+        if zaid_area != "NA" and zaid_area is not None:
+            try:
+                zaid_acres = float(zaid_area) * 2.47105
+                row_cells[7].text = str(round(zaid_acres, 4))
+            except (ValueError, TypeError):
+                row_cells[7].text = "NA"
+        else:
+            row_cells[7].text = "NA"
+        row_cells[8].text = crop.agri_productivity
+        row_cells[9].text = crop.land_classification
 
-    # Livestock Info section with modified value handling
+
+def create_livelihood_table(doc, plan):
     doc.add_heading("Livestock Info", level=4)
     livelihood_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
     headers_livelihood = [

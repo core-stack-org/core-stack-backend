@@ -887,6 +887,27 @@ def extract_coordinates(record):
         return None, None
 
 
+def format_text_demands(text):
+    """
+    Helps in converting demands in proper text
+    """
+    if not text:
+        return ""
+
+    items = text.split()
+    formatted_items = []
+
+    for item in items:
+        item_with_spaces = item.replace("_", " ")
+        formatted_item = " ".join(
+            word.capitalize() for word in item_with_spaces.split()
+        )
+        formatted_items.append(formatted_item)
+
+    formatted_text = "\n".join(formatted_items)
+    return formatted_text
+
+
 def format_text(text):
     """
     Converts text with underscores to properly formatted text.
@@ -896,4 +917,4 @@ def format_text(text):
         return ""
 
     formatted_text = text.replace("_", " ")
-    return formatted_text + "\n"
+    return formatted_text.capitalize() + "\n\n"
