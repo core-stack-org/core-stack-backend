@@ -1,21 +1,13 @@
 import io
 import json
 import os
+import socket
+import ssl
 import tempfile
 from collections import defaultdict
 from datetime import date, datetime
 from io import BytesIO
 from multiprocessing import Process
-
-from selenium import webdriver
-from nrm_app.settings import (
-    EMAIL_HOST_USER,
-    EMAIL_HOST_PASSWORD,
-    EMAIL_USE_SSL,
-    EMAIL_TIMEOUT,
-    EMAIL_PORT,
-    EMAIL_HOST,
-)
 
 import folium
 import geopandas as gpd
@@ -23,58 +15,66 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from django.core.mail import EmailMessage
 from django.core.mail.backends.smtp import EmailBackend
-import socket
-import ssl
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.shared import Inches
 from PIL import Image
+from selenium import webdriver
 from shapely.geometry import MultiPolygon, Point, shape
 from shapely.ops import unary_union
 
-from plans.models import Plan
-from nrm_app.settings import GEOSERVER_URL
+from dpr.mapping import populate_maintenance_from_waterbody
+from nrm_app.settings import (
+    EMAIL_HOST,
+    EMAIL_HOST_PASSWORD,
+    EMAIL_HOST_USER,
+    EMAIL_PORT,
+    EMAIL_TIMEOUT,
+    EMAIL_USE_SSL,
+    GEOSERVER_URL,
+)
+from plans.models import Plan, PlanApp
+from utilities.logger import setup_logger
 
 from .models import (
+    Agri_maintenance,
+    GW_maintenance,
     ODK_agri,
+    ODK_crop,
     ODK_groundwater,
+    ODK_livelihood,
     ODK_settlement,
     ODK_waterbody,
     ODK_well,
-    ODK_crop,
-    ODK_livelihood,
-    GW_maintenance,
     SWB_maintenance,
     SWB_RS_maintenance,
-    Agri_maintenance,
 )
-from dpr.mapping import populate_maintenance_from_waterbody
-from .utils import get_vector_layer_geoserver, sync_db_odk, format_text
-from utilities.logger import setup_logger
+from .utils import format_text, get_vector_layer_geoserver, sync_db_odk
 
 logger = setup_logger(__name__)
 
-def get_plan(plan_id):
+
+def get_plan_details(plan_id):
     try:
-        return Plan.objects.get(plan_id=plan_id)
+        return PlanApp.objects.get(id=plan_id)
     except Plan.DoesNotExist:
         return None
 
 
 def create_dpr_document(plan):
     doc = initialize_document()
-    logger.info("Generating DPR for plan ID: %s", plan.plan_id)
+    logger.info("Generating DPR for plan ID: %s", plan.id)
     logger.info("Syncing ODK data with database")
 
-    sync_db_odk()
+    # sync_db_odk()
     logger.info("Database sync complete")
     logger.info("Details of the plan")
     logger.info(plan)
     logger.info(str(plan.district.district_name).lower())
     logger.info(str(plan.block.block_name).lower())
 
-    total_settlements = get_settlement_count_for_plan(plan.plan_id)
+    total_settlements = get_settlement_count_for_plan(plan.id)
     logger.info("1. MWS Fortnight")
 
     mws_fortnight = get_vector_layer_geoserver(
@@ -92,25 +92,25 @@ def create_dpr_document(plan):
         doc, plan, total_settlements, mws_fortnight
     )
 
-    add_section_c(doc, plan)
+    # add_section_c(doc, plan)
 
-    add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
 
-    add_section_e(doc, plan)
+    # add_section_e(doc, plan)
 
-    add_section_f(doc, plan, mws_fortnight) # generates maps as well
+    # add_section_f(doc, plan, mws_fortnight) # generates maps as well
 
-    add_section_g(doc, plan, mws_fortnight)
+    # add_section_g(doc, plan, mws_fortnight)
 
-    add_section_h(doc, plan, mws_fortnight)
+    # add_section_h(doc, plan, mws_fortnight)
 
-    #MARK: local save /tmp/dpr/
-    #operations on the document
-    #file_path = "/tmp/dpr/"
+    # MARK: local save /tmp/dpr/
+    # operations on the document
+    file_path = "/tmp/dpr/"
 
-    # if not os.path.exists(file_path):
-    #     os.makedirs(file_path)
-    # doc.save(file_path + plan.plan + ".docx")
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
@@ -154,7 +154,7 @@ def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
 
         # Attach each PDF from mws_reports
         for i, item in enumerate(mws_reports, start=1):
-            filename = f"MWS_Report_{mws_Ids[i-1]}.pdf"
+            filename = f"MWS_Report_{mws_Ids[i - 1]}.pdf"
             content = item
 
             if isinstance(item, (list, tuple)) and len(item) >= 2:
@@ -167,7 +167,9 @@ def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
                 content = base64.b64decode(content)
 
             if not isinstance(content, (bytes, bytearray)):
-                raise TypeError("Each mws_reports entry must be PDF bytes or base64 string.")
+                raise TypeError(
+                    "Each mws_reports entry must be PDF bytes or base64 string."
+                )
 
             email.attach(filename, content, "application/pdf")
 
@@ -189,12 +191,18 @@ def get_data_for_settlement(planid):
 
 
 def get_settlement_count_for_plan(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").count()
+    return (
+        ODK_settlement.objects.filter(plan_id=planid)
+        .exclude(status_re="rejected")
+        .count()
+    )
 
 
 def get_settlement_coordinates_for_plan(planid):
-    settlements = ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").values(
-        "settlement_name", "latitude", "longitude"
+    settlements = (
+        ODK_settlement.objects.filter(plan_id=planid)
+        .exclude(status_re="rejected")
+        .values("settlement_name", "latitude", "longitude")
     )
     return [
         (
@@ -228,7 +236,6 @@ def initialize_document():
 
 
 def get_mws_ids_for_report(plan):
-    
     mws_ids = set()
     settlement_coordinates = get_settlement_coordinates_for_plan(plan.plan_id)
 
@@ -246,7 +253,7 @@ def get_mws_ids_for_report(plan):
         mws_uid = get_mws_uid_for_settlement_gdf(mws_gdf, latitude, longitude)
         if mws_uid:
             mws_ids.add(mws_uid)
-    
+
     return sorted(mws_ids)
 
 
@@ -268,20 +275,31 @@ def add_section_a(doc, plan):
 
 
 def create_team_details_table(doc, plan):
-    table = doc.add_table(rows=1, cols=3)
+    table = doc.add_table(rows=5, cols=2)
     table.style = "Table Grid"
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = "Name of the Facilitator"
-    hdr_cells[1].text = "Project Name"
-    hdr_cells[2].text = "Process involved in the preparation of the DPR PRA"
 
-    row_cells = table.add_row().cells
-    row_cells[0].text = plan.facilitator_name
-    row_cells[1].text = plan.plan.replace('_', ' ').title()
-    row_cells[2].text = "PRA, Gram Sabha, Transect Walk, GIS Mapping"
+    row1_cells = table.rows[0].cells
+    row1_cells[0].text = "Organization"
+    row1_cells[1].text = plan.organization.name if plan.organization else "NA"
 
-    for cell in hdr_cells:
-        for paragraph in cell.paragraphs:
+    row2_cells = table.rows[1].cells
+    row2_cells[0].text = "Project"
+    row2_cells[1].text = plan.project.name if plan.project else "NA"
+
+    row3_cells = table.rows[2].cells
+    row3_cells[0].text = "Plan"
+    row3_cells[1].text = plan.plan
+
+    row4_cells = table.rows[3].cells
+    row4_cells[0].text = "Facilitator"
+    row4_cells[1].text = plan.facilitator_name
+
+    row5_cells = table.rows[4].cells
+    row5_cells[0].text = "Process involved in the preparation of DPR PRA"
+    row5_cells[1].text = "PRA, Gram Sabha, Transect Walk, GIS Mapping"
+
+    for row in table.rows:
+        for paragraph in row.cells[0].paragraphs:
             for run in paragraph.runs:
                 run.font.bold = True
 
@@ -304,7 +322,7 @@ def add_section_b(doc, plan, total_settlements, mws_fortnight):
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
 
     settlement_mws_ids = []
-    settlement_coordinates = get_settlement_coordinates_for_plan(plan.plan_id)
+    settlement_coordinates = get_settlement_coordinates_for_plan(plan.id)
 
     for settlement_name, latitude, longitude in settlement_coordinates:
         mws_uid = get_mws_uid_for_settlement_gdf(mws_gdf, latitude, longitude)
@@ -351,15 +369,13 @@ def create_village_brief_table(
 
     for i, (key, value) in enumerate(headers_data):
         row_cells = table.rows[i].cells
-        cell_0_paragraphs = row_cells[0].paragraphs
-        if cell_0_paragraphs:
-            cell_0_paragraphs[0].clear()
-        paragraph = (
-            cell_0_paragraphs[0] if cell_0_paragraphs else row_cells[0].add_paragraph()
-        )
-        run = paragraph.add_run(key)
-        run.bold = True
+        row_cells[0].text = key
         row_cells[1].text = value
+
+    for row in table.rows:
+        for paragraph in row.cells[0].paragraphs:
+            for run in paragraph.runs:
+                run.font.bold = True
 
 
 # MARK: - Section C
@@ -451,7 +467,9 @@ def create_socio_eco_table(doc, plan):
 def create_livelihood_table(doc, plan):
     # Crop Info section remains the same
     doc.add_heading("Crop Info", level=4)
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
     headers_cropping_pattern = [
         "Name of the Settlement",
         "Irrigation Source",
@@ -729,7 +747,9 @@ def populate_water_structures(doc, plan, mws_id, mws_gdf):
 
 def populate_well(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
 
     wells_in_mws = []
     for well in wells_in_plan:
@@ -815,7 +835,9 @@ def populate_well(doc, plan, mws_id, mws_gdf):
 def populate_waterbody(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
     # basically water structures
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
     waterbody_in_mws = []
     for waterbody in waterbodies_in_plan:
         waterbody_point = Point(waterbody.longitude, waterbody.latitude)
@@ -1075,7 +1097,7 @@ def create_surface_wb_table(doc, plan):
 
     swb = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
-        workspace="swb", # Surface Water Bodies Workspace
+        workspace="swb",  # Surface Water Bodies Workspace
         layer_name="surface_waterbodies_"
         + str(plan.district.district_name).lower().replace(" ", "_")
         + "_"
@@ -1144,7 +1166,9 @@ def create_surface_wb_table(doc, plan):
             else "N/A"
         )
 
-        total_area = f"{float(total_area/10000):.2f}" if total_area != "N/A" else "N/A"
+        total_area = (
+            f"{float(total_area / 10000):.2f}" if total_area != "N/A" else "N/A"
+        )
 
         kharif_value = f"{float(kharif_value):.2f}" if kharif_value != "N/A" else "N/A"
         rabi_value = f"{float(rabi_value):.2f}" if rabi_value != "N/A" else "N/A"
@@ -1179,11 +1203,21 @@ def add_section_f(doc, plan, mws):
 
 
 def create_nrm_works_table(doc, plan, mws):
-    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    settlement_resources_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    waterbody_resources_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
+    recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+    irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+    settlement_resources_in_plan = ODK_settlement.objects.filter(
+        plan_id=plan.plan_id
+    ).exclude(status_re="rejected")
+    well_resources_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+    waterbody_resources_in_plan = ODK_waterbody.objects.filter(
+        plan_id=plan.plan_id
+    ).exclude(status_re="rejected")
 
     mws_uids = list(set([feature["properties"]["uid"] for feature in mws["features"]]))
 
@@ -1298,14 +1332,11 @@ def create_nrm_works_table(doc, plan, mws):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
                 row_cells[1].text = "Recharge Structure"  # Work Category
-                row_cells[
-                    2
-                ].text = (
-                    structure.beneficiary_settlement
+                row_cells[2].text = structure.beneficiary_settlement
+                row_cells[3].text = (
+                    structure.data_groundwater.get("Beneficiary_Name")
+                    or "No Data Provided"
                 )
-                row_cells[3].text = structure.data_groundwater.get(
-                    "Beneficiary_Name"
-                ) or "No Data Provided"
                 row_cells[4].text = structure.work_type
                 row_cells[5].text = structure.recharge_structure_id
                 row_cells[6].text = str(structure.latitude)
@@ -1319,13 +1350,11 @@ def create_nrm_works_table(doc, plan, mws):
             for i, work in enumerate(irrigation_works, start=offset):
                 row_cells = table.rows[i].cells
                 row_cells[0].text = str(i)  # S.No
-                row_cells[1].text = "Irrigation Work"  
-                row_cells[
-                    2
-                ].text = work.beneficiary_settlement  
+                row_cells[1].text = "Irrigation Work"
+                row_cells[2].text = work.beneficiary_settlement
                 row_cells[3].text = (
                     work.data_agri.get("Beneficiary_Name") or "No Data Provided"
-                )  
+                )
 
                 if (
                     work.work_type.lower() == "other"
@@ -1428,7 +1457,7 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
     ).add_to(fol_map)
 
     legend_html = """
-    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; height: 180px; 
+    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; height: 180px;
     border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
     ">&nbsp;<b>Legend:</b><br>
     """
@@ -1520,6 +1549,8 @@ def show_marked_works(doc, plan, uid, mws_filtered, polygon, resources):
         img.save(img_filename)
 
         doc.add_picture(img_filename, width=Inches(6))
+
+
 def show_all_mws(doc, plan, mws):
     """
     Creates a map showing all MWS polygons with resources and proposed works,
@@ -1603,7 +1634,7 @@ def show_all_mws(doc, plan, mws):
             features[key] = []
 
     legend_html = """
-    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px; 
+    <div style="position: fixed; bottom: 50px; left: 50px; width: 220px;
     border:2px solid grey; z-index:9999; font-size:14px; background-color:white;
     ">&nbsp;<b>Legend:</b><br>
     """
@@ -1653,12 +1684,15 @@ def show_all_mws(doc, plan, mws):
         doc.add_picture(img_filename, width=Inches(6))
         doc.add_page_break()
 
+
 # MARK: - Section G -- Plantations and Livelihood Works
 def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Propose New Livelihood Works", level=1)
 
-    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id).exclude(status_re="rejected")
-    
+    livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.plan_id).exclude(
+        status_re="rejected"
+    )
+
     # Table for Livestock and Fisheries
     doc.add_heading("G.1 Livestock and Fisheries", level=2)
     headers = [
@@ -1698,10 +1732,14 @@ def add_section_g(doc, plan, mws):
             row_cells[4].text = format_text(livestock_demand) or "No Data Provided"
 
             row_cells[5].text = (
-                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude)
+                if record.latitude
+                else "No Data Provided"
             )
             row_cells[6].text = (
-                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude)
+                if record.longitude
+                else "No Data Provided"
             )
 
         # Handle Fisheries category
@@ -1725,10 +1763,14 @@ def add_section_g(doc, plan, mws):
             row_cells[4].text = format_text(fisheries_demand) or "No Data Provided"
 
             row_cells[5].text = (
-                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude)
+                if record.latitude
+                else "No Data Provided"
             )
             row_cells[6].text = (
-                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude)
+                if record.longitude
+                else "No Data Provided"
             )
 
     # Table for Plantation
@@ -1769,19 +1811,23 @@ def add_section_g(doc, plan, mws):
             row_cells[5].text = plantation_area or "No Data Provided"
 
             row_cells[6].text = (
-                "{:.2f}".format(record.latitude) if record.latitude else "No Data Provided"
+                "{:.2f}".format(record.latitude)
+                if record.latitude
+                else "No Data Provided"
             )
             row_cells[7].text = (
-                "{:.2f}".format(record.longitude) if record.longitude else "No Data Provided"
+                "{:.2f}".format(record.longitude)
+                if record.longitude
+                else "No Data Provided"
             )
 
 
 # MARK: - Section H
-# TODO: Fix the sync between the settlements marked for maintenance in resource mapping that 
+# TODO: Fix the sync between the settlements marked for maintenance in resource mapping that
 # they are also treated as first class citizens and added to the maintenance tables
 
-def add_section_h(doc, plan, mws):
 
+def add_section_h(doc, plan, mws):
     # populater the database with the records from resource mapping
     populate_maintenance_from_waterbody(plan)
 
@@ -1851,9 +1897,9 @@ def maintenance_gw_table(doc, plan, mws):
     # Add data rows
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.plan_id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_gw_maintenance.get(
-            "beneficiary_settlement"
-        ) or "No Data"
+        row_cells[0].text = (
+            maintenance.data_gw_maintenance.get("beneficiary_settlement") or "No Data"
+        )
         row_cells[1].text = (
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "No Data"
         )
@@ -1899,12 +1945,13 @@ def maintenance_agri_table(doc, plan, mws):
             or "No Data Provided"
         )
         row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.data_agri_maintenance.get(
-            "select_one_irrigation_structure"
-        ) or "No Data"
-        row_cells[4].text = maintenance.data_agri_maintenance.get(
-            "select_one_activities"
-        ) or "No Data"
+        row_cells[3].text = (
+            maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
+            or "No Data"
+        )
+        row_cells[4].text = (
+            maintenance.data_agri_maintenance.get("select_one_activities") or "No Data"
+        )
         row_cells[5].text = str(maintenance.latitude)
         row_cells[6].text = str(maintenance.longitude)
 
@@ -1930,13 +1977,17 @@ def maintenance_waterstructures_table(doc, plan, mws):
     # Add data rows
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.plan_id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_maintenance.get(
-            "beneficiary_settlement"
-        ) or "No Data"
-        row_cells[1].text = maintenance.data_swb_maintenance.get("Beneficiary_Name") or "No Data"
+        row_cells[0].text = (
+            maintenance.data_swb_maintenance.get("beneficiary_settlement") or "No Data"
+        )
+        row_cells[1].text = (
+            maintenance.data_swb_maintenance.get("Beneficiary_Name") or "No Data"
+        )
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "No Data"
+        row_cells[4].text = (
+            maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "No Data"
+        )
         row_cells[5].text = str(maintenance.latitude)
         row_cells[6].text = str(maintenance.longitude)
 
@@ -1961,12 +2012,17 @@ def maintenance_rs_waterstructures_table(doc, plan, mws):
     # Add data rows
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.plan_id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_rs_maintenance.get(
-            "beneficiary_settlement"
-        ) or "No Data"
-        row_cells[1].text = maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "No Data"
+        row_cells[0].text = (
+            maintenance.data_swb_rs_maintenance.get("beneficiary_settlement")
+            or "No Data"
+        )
+        row_cells[1].text = (
+            maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "No Data"
+        )
         row_cells[2].text = maintenance.work_id
         row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "No Data"
-        row_cells[5].text = str(maintenance.latitude) 
-        row_cells[6].text = str(maintenance.longitude) 
+        row_cells[4].text = (
+            maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "No Data"
+        )
+        row_cells[5].text = str(maintenance.latitude)
+        row_cells[6].text = str(maintenance.longitude)
