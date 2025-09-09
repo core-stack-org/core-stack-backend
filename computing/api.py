@@ -277,7 +277,6 @@ def generate_annual_hydrology(request):
 
 @api_view(["POST"])
 @schema(None)
-@auth_free
 def lulc_v2_river_basin(request):
     """
         To generate LULC v2 layers on river basin.
