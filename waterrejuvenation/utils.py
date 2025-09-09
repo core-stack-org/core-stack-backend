@@ -19,7 +19,7 @@ import ee
 import logging
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from nrm_app.settings import  lulc_years, water_classes
+from nrm_app.settings import lulc_years, water_classes, PAN_INDIA_LULC_PATH
 import pandas as pd
 import math
 
@@ -214,7 +214,7 @@ def clip_lulc_output(mws_asset_id,  proj_id, gee_project_id):
 
     proj_obj = Project.objects.get(pk = proj_id)
     lulc_asset_id_base = get_filtered_mws_layer_name(proj_obj.name, 'clipped_lulc_filtered_mws', gee_project_id)
-    PAN_INDIA_LULC_BASE_PATH = "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+    PAN_INDIA_LULC_BASE_PATH = f"{PAN_INDIA_LULC_PATH}pan_india_lulc_v3"
     for year in years:
         start, end = year.split('_')[0], year.split('_')[1]
         start_date = f"{start}-07-01"

@@ -26,7 +26,7 @@ import rasterio
 from rasterio.merge import merge
 
 
-def ee_initialize(project=None):
+def ee_initialize(project='ee-corestack-dev'):
     try:
         if project == "helper":
             service_account = "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
@@ -40,6 +40,7 @@ def ee_initialize(project=None):
                 service_account, GEE_TEST_SERVICE_ACCOUNT_KEY_PATH
             )
         else:
+            print ("core-stack")
             service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
             credentials = ee.ServiceAccountCredentials(
                 service_account, GEE_SERVICE_ACCOUNT_KEY_PATH

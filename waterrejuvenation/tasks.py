@@ -7,6 +7,7 @@ import pandas as pd
 from computing.catchment_area.catchmentarea import compute_max_stream_order_and_catchment_for_swb
 from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity, generate_gee_asset
 from computing.mws.generate_hydrology import generate_hydrology
+from computing.terrain_descriptor import terrain_raster
 from computing.utils import sync_project_fc_to_geoserver, calculate_precipitation_season, \
     generate_geojson_with_ci_and_ndvi, generate_geojson_with_ci_ndvi_ndmi
 from computing.water_rejuvenation.water_rejuventation import get_lulc_class, find_closest_water_pixel, \
@@ -18,7 +19,7 @@ from utilities.constants import SITE_DATA_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long, get_gee_asset_path, check_task_status, gdf_to_ee_fc, get_gee_dir_path,
-    make_asset_public)
+    make_asset_public, sync_raster_gcs_to_geoserver, sync_raster_to_gcs)
 import ee
 import logging
 from datetime import  datetime
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task
 def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required = True):
+    print ('is closed' +str(is_closest_wp))
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
     project_id = ee_initialize()
     merged_features = []
@@ -49,8 +51,8 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
     # Generating mws layer name
-    mws_asset_id = get_filtered_mws_layer_name(proj_obj.name, 'filtered_mws', project_id = project_id)
-
+    mws_asset_id = get_filtered_mws_layer_name(proj_obj.name, 'filtered_mws', project_id = 'ee-corestackdev')
+    print (mws_asset_id)
     #Since we wanted to build all the layer new everytime some one upload We are deleting asset first
     delete_asset_on_GEE(mws_asset_id)
 
@@ -79,6 +81,7 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
              if is_closest_wp:
                 result_dict= find_nearest_water_pixel(dsilting_obj_log.lat, dsilting_obj_log.lon,  1500)
              else:
+                 print ("inside false")
                  result_dict = {'success': True, 'latitude': dsilting_obj_log.lat, 'longitude': dsilting_obj_log.lon,'distance_m': 0}
 
              if not result_dict['success']:
@@ -102,11 +105,12 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
                      merged_features.append(watershed_fc)
 
         intersecting_mws_asset = ee.FeatureCollection(merged_features).flatten().distinct('uid')
+        print ("mws_asset_id")
         filter_mws_task = ee.batch.Export.table.toAsset(
-                 collection=intersecting_mws_asset,
-                 description='water_rej_app_mws_tasks',
-                 assetId=mws_asset_id
-             )
+                  collection=intersecting_mws_asset,
+                  description='water_rej_app_mws_tasks',
+                  assetId=mws_asset_id
+              )
         try:
             filter_mws_task.start()
             logger.info("MWS task started for given lat long")
@@ -114,17 +118,18 @@ def Upload_Desilting_Points(file_obj_id, is_closest_wp = True, is_lulc_required 
             logger.info("MWS task completed")
             make_asset_public(mws_asset_id)
             if is_lulc_required:
-                clip_lulc_output(mws_asset_id, proj_obj.id, project_id)
+                clip_lulc_output(mws_asset_id, proj_obj.id, 'ee-corestackdev')
                 logger.info("luc Task finished for lulc")
         except Exception as e:
             logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
-    watar_balance_task = Generate_water_balance_indicator.delay(mws_asset_id, project_id)
+    watar_balance_task = Generate_water_balance_indicator.delay(mws_asset_id, proj_obj.id)
     water_balance_task_result = watar_balance_task.get()
-    zoi_task = Genereate_zoi_and_zoi_indicator.delay(water_balance_task_result. project_id)
+    zoi_task = Genereate_zoi_and_zoi_indicator.delay(water_balance_task_result. proj_obj.id)
     zoi_task_result = zoi_task.get()
 
-
+@shared_task()
 def Generate_water_balance_indicator(mws_asset_id, proj_id):
+    ee_initialize()
     proj_obj = Project.objects.get(pk = proj_id)
     logger.info("Generating SWB layer for given lat long")
     asset_suffix_lulc = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
@@ -157,7 +162,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id):
                                          is_annual=False,\
                                          )
     make_asset_public(asset_id_prec)
-    result_hydrology = hydrology.get()
+    # result_hydrology = hydrology.get()
     asset_suffix_draught = 'clipped_lulc_filtered_mws_' + str(proj_obj.name.lower())
     result_d = calculate_drought.delay(roi_path=mws_asset_id, asset_suffix=asset_suffix_draught,
                                        asset_folder_list=asset_folder_prec, app_type="WATER_REJ", start_year=2017,
@@ -200,6 +205,21 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id):
     drainage_line_task = clip_drainage_lines.delay(roi_path=mws_asset_id, asset_suffix=asset_suffix_draught,
                                                    asset_folder_list=asset_folder_prec, app_type="WATER_REJ",
                                                    workspace_name="waterrej", proj_id=proj_obj.id)
+    description_terrain = "terrain_raster_" + asset_suffix_prec
+
+    asset_id_terrain_raster = (
+            get_gee_dir_path(
+                asset_folder_prec,
+                asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            )
+            + description_terrain
+    )
+    delete_asset_on_GEE(asset_id_terrain_raster)
+    terrain_raster.delay(roi_path=asset_id_terrain_raster, asset_suffix=asset_suffix_lulc,asset_folder_list=asset_folder_lulc, app_type = "WATER_REJ")
+    layer_name = f"WATER_REJ_terrain_{proj_obj.name}_{proj_id}"
+    sync_raster_to_gcs(ee.Image(asset_id_terrain_raster), 30, layer_name)
+    sync_raster_gcs_to_geoserver("waterrej", layer_name, layer_name, "terrain_raster")
+
     return asset_id_with_wb_indicator
 
 

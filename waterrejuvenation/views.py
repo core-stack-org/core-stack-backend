@@ -48,6 +48,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         """Create new excel files - supports both single and multiple file uploads"""
         project_id = self.kwargs.get("project_pk")
         is_closest_wp = request.POST.get('is_closest_wp')
+        print ("is closed " +str(is_closest_wp))
         print ("Project: " +str(project_id))
         if not project_id:
             return Response(

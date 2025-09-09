@@ -174,6 +174,7 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
         # path = generate_shape_files(path)
         # return push_shape_to_geoserver(path, workspace=workspace)
 def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
+    print ('inside')
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -199,8 +200,11 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
 
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
-
+        print ('pushed to geoserver')
         return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+    else:
+        print ("no features found")
+        return
 
 def to_camelcase(text):
     words = text.split()
@@ -443,4 +447,73 @@ def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     # STEP 3: Export or Push to GeoServer
     # -------------------------
     layer_name = f'WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}'
+    sync_project_fc_to_geoserver(final_merged, proj_obj.name, layer_name, 'waterrej')
+
+def generate_geojson_with_ci_ndvi_ndmi(zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id):
+    # Load project
+    proj_obj = Project.objects.get(pk=proj_id)
+
+    # Build asset paths
+    asset_path_ci = get_gee_dir_path([proj_obj.name], GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]) + ci_asset
+    asset_path_ndvi = get_gee_dir_path([proj_obj.name], GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]) + ndvi_asset
+    #asset_path_ndmi = get_gee_dir_path([proj_obj.name], GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]) + ndmi_asset
+
+    # Load FeatureCollections
+
+    zoi  = ee.FeatureCollection(zoi_asset)
+    print("Number of features zoi:", zoi.size().getInfo())
+
+    ci   = ee.FeatureCollection(asset_path_ci)
+    print("Number of features zoi:", ci.size().getInfo())
+    ndvi = ee.FeatureCollection(asset_path_ndvi)
+    print("Number of features zoi:", ndvi.size().getInfo())
+    ndmi = ee.FeatureCollection(ndmi_asset)
+    print("Number of features zoi:", ndmi.size().getInfo())
+
+    # -------------------------
+    # STEP 1: Join ZOI with CI
+    # -------------------------
+    join = ee.Join.inner()
+    filter = ee.Filter.intersects(leftField='.geo', rightField='.geo')
+    zoi_ci_joined = join.apply(zoi, ci, filter)
+
+    def merge_zoi_ci(pair):
+        zoi_feat = ee.Feature(pair.get('primary'))
+        ci_feat = ee.Feature(pair.get('secondary'))
+        merged_props = zoi_feat.toDictionary().combine(ci_feat.toDictionary(), True)
+        return ee.Feature(zoi_feat.geometry(), merged_props)   # ✅ keep ZOI geom
+
+    zoi_with_ci = ee.FeatureCollection(zoi_ci_joined.map(merge_zoi_ci))
+
+    # -------------------------
+    # STEP 2: Join with NDVI
+    # -------------------------
+    zoi_ndvi_joined = join.apply(zoi_with_ci, ndvi, filter)
+
+    def merge_zoi_ci_ndvi(pair):
+        prev_feat = ee.Feature(pair.get('primary'))
+        ndvi_feat = ee.Feature(pair.get('secondary'))
+        merged_props = prev_feat.toDictionary().combine(ndvi_feat.toDictionary(), True)
+        return ee.Feature(prev_feat.geometry(), merged_props)   # ✅ still ZOI geom
+
+    zoi_ci_ndvi = ee.FeatureCollection(zoi_ndvi_joined.map(merge_zoi_ci_ndvi))
+
+    # -------------------------
+    # STEP 3: Join with NDMI
+    # -------------------------
+    zoi_ndmi_joined = join.apply(zoi_ci_ndvi, ndmi, filter)
+
+    def merge_zoi_ci_ndvi_ndmi(pair):
+        prev_feat = ee.Feature(pair.get('primary'))
+        ndmi_feat = ee.Feature(pair.get('secondary'))
+        merged_props = prev_feat.toDictionary().combine(ndmi_feat.toDictionary(), True)
+        return ee.Feature(prev_feat.geometry(), merged_props)   # ✅ keep ZOI geom
+
+    final_merged = ee.FeatureCollection(zoi_ndmi_joined.map(merge_zoi_ci_ndvi_ndmi))
+
+    # -------------------------
+    # STEP 4: Export or Push to GeoServer
+    # -------------------------
+    layer_name = f'WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}'
+    print(layer_name)
     sync_project_fc_to_geoserver(final_merged, proj_obj.name, layer_name, 'waterrej')

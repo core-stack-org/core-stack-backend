@@ -17,6 +17,7 @@ class ExcelFileSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "file",
+            "is_closest_wp",
             "uploaded_by",
             "uploaded_by_username",
             "created_at",
