@@ -351,12 +351,18 @@ def create_table_village_brief(
     table.style = "Table Grid"
 
     # Calculate the centroid of the intersecting MWS
-    intersecting_mws = mws_gdf[
-        mws_gdf["uid"].isin(
-            [mws_id.split(": ")[1] for mws_id in intersecting_mws_ids.split("; ")]
-        )
-    ]
-    centroid = intersecting_mws.geometry.unary_union.centroid
+    if intersecting_mws_ids:
+        intersecting_mws = mws_gdf[
+            mws_gdf["uid"].isin(
+                [mws_id.split(": ")[1] for mws_id in intersecting_mws_ids.split("; ")]
+            )
+        ]
+        if not intersecting_mws.empty:
+            centroid = intersecting_mws.geometry.unary_union.centroid
+        else:
+            centroid = None
+    else:
+        centroid = None
 
     headers_data = [
         ("Name of the Village", plan.village_name),
@@ -365,17 +371,49 @@ def create_table_village_brief(
         ("District", plan.district.district_name),
         ("State", plan.state.state_name),
         ("Number of Settlements in the Village", str(total_settlements)),
-        ("Intersecting Micro Watershed IDs", intersecting_mws_ids),
+        ("Intersecting Micro Watershed IDs", None),  # Will be handled separately
         (
             "Latitude and Longitude of the Village",
-            f"{centroid.y:.8f}, {centroid.x:.8f}",
+            f"{centroid.y:.8f}, {centroid.x:.8f}" if centroid else "Not available",
         ),
     ]
 
     for i, (key, value) in enumerate(headers_data):
         row_cells = table.rows[i].cells
         row_cells[0].text = key
-        row_cells[1].text = value
+
+        if key == "Intersecting Micro Watershed IDs":
+            settlement_mws_pairs = []
+            if intersecting_mws_ids:
+                pairs = intersecting_mws_ids.split("; ")
+                for pair in pairs:
+                    if ": " in pair:
+                        settlement, mws_id = pair.split(": ", 1)
+                        settlement_mws_pairs.append((settlement, mws_id))
+
+            if settlement_mws_pairs:
+                nested_table = row_cells[1].add_table(
+                    rows=len(settlement_mws_pairs) + 1, cols=2
+                )
+                nested_table.style = "Table Grid"
+
+                header_cells = nested_table.rows[0].cells
+                header_cells[0].text = "Settlement"
+                header_cells[1].text = "MWS ID"
+
+                for cell in header_cells:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            run.font.bold = True
+
+                for idx, (settlement, mws_id) in enumerate(settlement_mws_pairs, 1):
+                    data_cells = nested_table.rows[idx].cells
+                    data_cells[0].text = settlement
+                    data_cells[1].text = mws_id
+            else:
+                row_cells[1].text = "No intersecting watersheds"
+        else:
+            row_cells[1].text = value
 
     for row in table.rows:
         for paragraph in row.cells[0].paragraphs:
