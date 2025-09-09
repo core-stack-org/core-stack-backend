@@ -61,12 +61,20 @@ def combine_kmls(kml_files_obj):
     for kml_file in kml_files_obj:
         try:
             gdf = gpd.read_file(kml_file.file, driver="KML")
+            # Set the correct original CRS (lat/lon)
+            gdf.set_crs(epsg=4326, inplace=True)
+
             # Convert geometries to 2D
             gdf["geometry"] = gdf["geometry"].apply(convert_to_2d)
+
             # kml_hash = create_hash_using_geometry(gdf["geometry"])
             # Add filename as source column
             gdf["source"] = kml_file.name
             gdf["uid"] = kml_file.kml_hash
+
+            # Reproject to a projected CRS for accurate area (preferably local UTM)
+            gdf_proj = gdf.to_crs(epsg=6933)
+            gdf["area_ha"] = gdf_proj.geometry.area / 10000
             gdfs.append(gdf)
         except Exception as e:
             print(f"Error reading {kml_file}: {e}")
