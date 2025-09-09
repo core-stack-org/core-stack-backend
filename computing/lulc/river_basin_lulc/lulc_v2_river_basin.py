@@ -16,6 +16,13 @@ from nrm_app.celery import app
 
 @app.task(bind=True)
 def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
+    """
+    Args:
+        self:
+        basin_object_id: object id of river basin (from "projects/corestack-datasets/assets/datasets/CGWB_basin" dataset)
+        start_year: start year for layer generation
+        end_year: end year for layer generation
+    """
     ee_initialize("datasets")
     print("Inside generate lulc")
 

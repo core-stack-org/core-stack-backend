@@ -11,6 +11,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
+    is_gee_asset_exists,
 )
 from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
@@ -18,6 +19,13 @@ from computing.lulc.cropping_frequency import *
 
 @app.task(bind=True)
 def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
+    """
+    Args:
+        self:
+        basin_object_id: object id of river basin (from "projects/corestack-datasets/assets/datasets/CGWB_basin" dataset)
+        start_year: start year for layer generation
+        end_year: end year for layer generation
+    """
     ee_initialize("aman")
     print("Inside lulc_river_basin")
 
@@ -28,7 +36,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
     filename_prefix = (
         str(basin_object_id) + "_" + roi_boundary.first().get("ba_name").getInfo()
     )
-
+    start_year = int(start_year) - 2  # TODO Check this
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
     loop_start = start_date
@@ -55,7 +63,6 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         )
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
-            # get_gee_asset_path(state_name, district_name, block_name)
             "projects/corestack-datasets/assets/datasets/LULC_v2_river_basin/"
             + final_output_filename
         )
@@ -77,6 +84,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         temporal correction for background pixels
     """
     length = len(l1_asset_new)
+
     # intermediate years
     for i in range(1, length - 1):
 
@@ -438,13 +446,15 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
     l1_asset_new[0] = first_year_image
     geometry = roi_boundary.geometry()
     for i in range(0, len(l1_asset_new)):
-        image_export_task = ee.batch.Export.image.toAsset(
-            image=l1_asset_new[i].clip(geometry),
-            description=final_output_filename_array_new[i],
-            assetId=final_output_assetid_array_new[i],
-            pyramidingPolicy={"predicted_label": "mode"},
-            scale=scale,
-            maxPixels=1e13,
-            crs="EPSG:4326",
-        )
-        image_export_task.start()
+        asset_id = final_output_assetid_array_new[i]
+        if not is_gee_asset_exists(asset_id):
+            image_export_task = ee.batch.Export.image.toAsset(
+                image=l1_asset_new[i].clip(geometry),
+                description=final_output_filename_array_new[i],
+                assetId=asset_id,
+                pyramidingPolicy={"predicted_label": "mode"},
+                scale=scale,
+                maxPixels=1e13,
+                crs="EPSG:4326",
+            )
+            image_export_task.start()
