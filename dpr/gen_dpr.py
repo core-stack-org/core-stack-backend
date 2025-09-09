@@ -633,24 +633,28 @@ def create_table_livestock(doc, plan):
 # MARK: - Section D
 def add_section_d(doc, plan, settlement_mws_ids, mws_gdf):
     doc.add_heading(
-        "Section D: Information of all Micro Watersheds intersecting the village",
+        "Section D: Wells and Water Structures Details",
         level=1,
     )
     para = doc.add_paragraph()
     para.add_run(
-        "This section provides an overview of all micro watersheds intersecting the village, detailing completed NRM works on individual and common lands, non-NRM works, changes in land use over the last 5 years, and information on wells, water structures, and household beneficiaries."
+        "This section provides details on wells, water structures and household beneficiaries"
     )
 
     unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
     create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids)
 
-    for mws_id in unique_mws_ids:
-        populate_mws(doc, plan, mws_id, mws_gdf)
+    populate_consolidated_water_structures(doc, plan, unique_mws_ids, mws_gdf)
 
 
-def populate_mws(doc, plan, mws_id, mws_gdf):
-    doc.add_heading("MWS: " + mws_id, level=1)
-    populate_water_structures(doc, plan, mws_id, mws_gdf)  # Water Structures
+def populate_consolidated_water_structures(doc, plan, unique_mws_ids, mws_gdf):
+    all_wells_with_mws = get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf)
+    all_waterbodies_with_mws = get_all_waterbodies_with_mws(
+        plan, unique_mws_ids, mws_gdf
+    )
+
+    populate_consolidated_well_tables(doc, all_wells_with_mws)
+    populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws)
 
 
 def create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids):
@@ -674,40 +678,71 @@ def create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids):
             row_cells[1].text = "NA"
 
 
-def populate_water_structures(doc, plan, mws_id, mws_gdf):
-    doc.add_heading("Information on Water Structures", level=2)
-
-    populate_well(doc, plan, mws_id, mws_gdf)
-    populate_waterbody(doc, plan, mws_id, mws_gdf)
-
-
-def populate_well(doc, plan, mws_id, mws_gdf):
-    mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
+def get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf):
+    """Get all wells across all MWS IDs with their corresponding MWS assignment"""
     wells_in_plan = ODK_well.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
     )
+    all_wells_with_mws = []
 
-    wells_in_mws = []
     for well in wells_in_plan:
         well_point = Point(well.longitude, well.latitude)
-        well_found = False
+        well_mws_id = None
 
-        for current_mws_id, current_mws_polygon in zip(
-            mws_gdf["uid"], mws_gdf["geometry"]
-        ):
-            if well_point.within(current_mws_polygon):
-                well_found = True
-                wells_in_mws.append(well)
-                break  # Stop checking other MWS if found in one
+        for mws_id, mws_polygon in zip(mws_gdf["uid"], mws_gdf["geometry"]):
+            if mws_id in unique_mws_ids and well_point.within(mws_polygon):
+                well_mws_id = mws_id
+                break
 
-        if not well_found:
+        if well_mws_id:
+            all_wells_with_mws.append((well, well_mws_id))
+        else:
+            all_wells_with_mws.append((well, "N/A"))
             logger.info(
                 f"Well at ({well.latitude}, {well.longitude}) does not belong to any MWS"
             )
 
+    return all_wells_with_mws
+
+
+def get_all_waterbodies_with_mws(plan, unique_mws_ids, mws_gdf):
+    """Get all waterbodies across all MWS IDs with their corresponding MWS assignment"""
+    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
+        status_re="rejected"
+    )
+    all_waterbodies_with_mws = []
+
+    for waterbody in waterbodies_in_plan:
+        waterbody_point = Point(waterbody.longitude, waterbody.latitude)
+        waterbody_mws_id = None
+
+        for mws_id, mws_polygon in zip(mws_gdf["uid"], mws_gdf["geometry"]):
+            if mws_id in unique_mws_ids and waterbody_point.within(mws_polygon):
+                waterbody_mws_id = mws_id
+                break
+
+        if waterbody_mws_id:
+            all_waterbodies_with_mws.append((waterbody, waterbody_mws_id))
+        else:
+            all_waterbodies_with_mws.append((waterbody, "N/A"))
+            logger.info(
+                f"Waterbody at ({waterbody.latitude}, {waterbody.longitude}) does not belong to any MWS"
+            )
+
+    return all_waterbodies_with_mws
+
+
+def populate_consolidated_well_tables(doc, all_wells_with_mws):
+    """Create consolidated well summary and detail tables for all MWS IDs"""
+    if not all_wells_with_mws:
+        doc.add_heading("Well Information", level=3)
+        doc.add_paragraph("No wells found in any of the MWS areas.")
+        return
+
     wells_count = defaultdict(int)
     households_count = defaultdict(int)
-    for well in wells_in_mws:
+
+    for well, mws_id in all_wells_with_mws:
         wells_count[well.beneficiary_settlement] += 1
         households_count[well.beneficiary_settlement] += int(well.households_benefitted)
 
@@ -716,7 +751,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         for settlement in wells_count
     ]
 
-    doc.add_heading(f"Well Information for MWS: {mws_id}", level=2)
+    doc.add_heading("Well Summary Information", level=3)
     headers_well_info = [
         "Name of Beneficiary's Settlement",
         "Number of Wells",
@@ -737,15 +772,21 @@ def populate_well(doc, plan, mws_id, mws_gdf):
         row_cells[1].text = str(num_wells)
         row_cells[2].text = str(num_households)
 
-    doc.add_heading("Well Info", level=3)
+    doc.add_heading("Detailed Well Information and their Maintenance Demands", level=3)
     headers_well = [
+        "MWS ID",
         "Name of Beneficiary Settlement",
+        "Type of Well",
         "Who owns the Well",
+        "Beneficiary Name",
+        "Benficiary's Father's Name",
+        "Water Availability",
         "Households Benefitted",
         "Which Caste uses the well?",
-        "Functional or Non-functional",
-        "Need Maintenance",
-        "Type of Well",
+        "Well is Functional or Non-functional",
+        "Well Usage",
+        "Need Maintenance?",
+        "Repair Activities",
         "Latitude",
         "Longitude",
     ]
@@ -755,54 +796,83 @@ def populate_well(doc, plan, mws_id, mws_gdf):
     for i, header in enumerate(headers_well):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for well in wells_in_mws:
+    for well, mws_id in all_wells_with_mws:
         row_cells = table_well.add_row().cells
-        row_cells[0].text = well.beneficiary_settlement
-        row_cells[1].text = well.owner
-        row_cells[2].text = str(well.households_benefitted)
-        row_cells[3].text = well.caste_uses
-        row_cells[4].text = well.is_functional
-        row_cells[5].text = well.need_maintenance
-        row_cells[6].text = well.data_well.get("select_one_well_type") or "No Data"
-        row_cells[7].text = str(well.latitude)
-        row_cells[8].text = str(well.longitude)
-
-
-def populate_waterbody(doc, plan, mws_id, mws_gdf):
-    mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
-        status_re="rejected"
-    )
-    waterbody_in_mws = []
-    for waterbody in waterbodies_in_plan:
-        waterbody_point = Point(waterbody.longitude, waterbody.latitude)
-        waterbody_found = False
-
-        for current_mws_id, current_mws_polygon in zip(
-            mws_gdf["uid"], mws_gdf["geometry"]
-        ):
-            if waterbody_point.within(current_mws_polygon):
-                waterbody_found = True
-                waterbody_in_mws.append(waterbody)
-                break  # Stop checking other MWS if found in one
-
-        if not waterbody_found:
-            logger.info(
-                f"Waterbody at ({waterbody.latitude}, {waterbody.longitude}) does not belong to any MWS"
+        row_cells[0].text = mws_id
+        row_cells[1].text = well.beneficiary_settlement
+        row_cells[2].text = well.data_well.get("select_one_well_type") or "NA"
+        row_cells[3].text = well.owner
+        row_cells[4].text = well.data_well.get("Beneficiary_name") or "NA"
+        row_cells[5].text = well.data_well.get("ben_father") or "NA"
+        row_cells[6].text = well.data_well.get("select_one_year") or "NA"
+        row_cells[7].text = str(well.households_benefitted)
+        row_cells[8].text = well.caste_uses
+        row_cells[9].text = well.is_functional
+        well_usage = None
+        if well.data_well and "Well_usage" in well.data_well:
+            well_usage_data = well.data_well["Well_usage"]
+            select_one_well_used = well_usage_data.get("select_one_well_used")
+            select_one_well_used_other = well_usage_data.get(
+                "select_one_well_used_other"
+            )
+            if (
+                select_one_well_used
+                and select_one_well_used.lower() == "other"
+                and select_one_well_used_other
+            ):
+                well_usage = f"Other: {select_one_well_used_other}"
+            elif select_one_well_used:
+                well_usage = select_one_well_used
+            else:
+                well_usage = "NA"
+        else:
+            well_usage = "NA"
+        row_cells[10].text = well_usage
+        row_cells[11].text = well.need_maintenance
+        repair_activities = "NA"
+        if well.data_well and "Well_condition" in well.data_well:
+            well_condition_data = well.data_well["Well_condition"]
+            select_one_repairs_well = well_condition_data.get("select_one_repairs_well")
+            select_one_repairs_well_other = well_condition_data.get(
+                "select_one_repairs_well_other"
             )
 
-    # Count the waterbodies and households benefitted for each settlement
+            if (
+                select_one_repairs_well
+                and select_one_repairs_well.lower() == "other"
+                and select_one_repairs_well_other
+            ):
+                repair_activities = f"Other: {select_one_repairs_well_other}"
+            elif select_one_repairs_well:
+                repair_activities = select_one_repairs_well.replace("_", " ")
+            else:
+                repair_activities = "NA"
+        row_cells[12].text = repair_activities
+        row_cells[13].text = str(well.latitude)
+        row_cells[14].text = str(well.longitude)
+
+
+def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
+    """Create consolidated waterbody summary and detail tables for all MWS IDs"""
+    if not all_waterbodies_with_mws:
+        doc.add_heading("Water Structure Information", level=3)
+        doc.add_paragraph("No water structures found in any of the MWS areas.")
+        return
+
     waterbody_count = defaultdict(int)
     households_count = defaultdict(int)
-    for waterbody in waterbody_in_mws:
-        waterbody_count[
-            (waterbody.beneficiary_settlement, waterbody.water_structure_type)
-        ] += 1
-        households_count[
-            (waterbody.beneficiary_settlement, waterbody.water_structure_type)
-        ] += int(waterbody.household_benefitted)
 
-    # Convert the counts to a list of tuples for table population
+    for waterbody, mws_id in all_waterbodies_with_mws:
+        if waterbody.water_structure_type.lower() == "other":
+            structure_type = "Other: " + waterbody.water_structure_other
+        else:
+            structure_type = waterbody.water_structure_type
+
+        waterbody_count[(waterbody.beneficiary_settlement, structure_type)] += 1
+        households_count[(waterbody.beneficiary_settlement, structure_type)] += int(
+            waterbody.household_benefitted
+        )
+
     waterbody_info = [
         (
             settlement,
@@ -813,8 +883,34 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         for (settlement, waterbody_type) in waterbody_count
     ]
 
-    doc.add_heading(f"Waterbody Information for MWS: {mws_id}", level=2)
+    doc.add_heading("Water Structures Summary Information", level=3)
+    headers_waterbody_summary = [
+        "Name of Beneficiary's Settlement",
+        "Type of Water Structure",
+        "Number of Waterbodies",
+        "Total Number of Household Benefitted",
+    ]
+    table_waterbody_summary = doc.add_table(
+        rows=len(waterbody_info) + 1, cols=len(headers_waterbody_summary)
+    )
+    table_waterbody_summary.style = "Table Grid"
+
+    hdr_cells = table_waterbody_summary.rows[0].cells
+    for i, header in enumerate(headers_waterbody_summary):
+        hdr_cells[i].paragraphs[0].add_run(header).bold = True
+
+    for i, (settlement, waterbody_type, num_waterbodies, num_households) in enumerate(
+        waterbody_info, start=1
+    ):
+        row_cells = table_waterbody_summary.rows[i].cells
+        row_cells[0].text = settlement
+        row_cells[1].text = waterbody_type
+        row_cells[2].text = str(num_waterbodies)
+        row_cells[3].text = str(num_households)
+
+    doc.add_heading("Detailed Water Structures Information", level=3)
     headers_waterstructure = [
+        "MWS ID",
         "Name of the Beneficiary's Settlement",
         "Who manages?",
         "Who owns the water structure?",
@@ -833,24 +929,25 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
     for i, header in enumerate(headers_waterstructure):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for water_st in waterbody_in_mws:
+    for waterbody, mws_id in all_waterbodies_with_mws:
         row_cells = table_water_structure.add_row().cells
-        row_cells[0].text = water_st.beneficiary_settlement
-        if water_st.who_manages.lower() == "other":
-            row_cells[1].text = "Other: " + water_st.specify_other_manager
+        row_cells[0].text = mws_id
+        row_cells[1].text = waterbody.beneficiary_settlement
+        if waterbody.who_manages.lower() == "other":
+            row_cells[2].text = "Other: " + waterbody.specify_other_manager
         else:
-            row_cells[1].text = water_st.who_manages
-        row_cells[2].text = water_st.owner
-        row_cells[3].text = water_st.caste_who_uses
-        row_cells[4].text = str(water_st.household_benefitted)
-        if water_st.water_structure_type.lower() == "other":
-            row_cells[5].text = "Other: " + water_st.water_structure_other
+            row_cells[2].text = waterbody.who_manages
+        row_cells[3].text = waterbody.owner
+        row_cells[4].text = waterbody.caste_who_uses
+        row_cells[5].text = str(waterbody.household_benefitted)
+        if waterbody.water_structure_type.lower() == "other":
+            row_cells[6].text = "Other: " + waterbody.water_structure_other
         else:
-            row_cells[5].text = water_st.water_structure_type
-        row_cells[6].text = water_st.identified_by
-        row_cells[7].text = water_st.need_maintenance
-        row_cells[8].text = str(water_st.latitude)
-        row_cells[9].text = str(water_st.longitude)
+            row_cells[6].text = waterbody.water_structure_type
+        row_cells[7].text = waterbody.identified_by
+        row_cells[8].text = waterbody.need_maintenance
+        row_cells[9].text = str(waterbody.latitude)
+        row_cells[10].text = str(waterbody.longitude)
 
 
 # MARK: - Section E

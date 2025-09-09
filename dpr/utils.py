@@ -310,7 +310,7 @@ def sync_well():
         submission_date = timezone.make_aware(submission_date, pytz.UTC)
 
         well.well_id = record.get("well_id", "")
-        well.uuid = record.get("__id", "") or "0"
+        well.uuid = record.get("__id", "") or "NA"
         well.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
@@ -319,23 +319,20 @@ def sync_well():
         well.status_re = (
             record.get("__system", {}).get("reviewState", "") or "in progress"
         )
-        well.beneficiary_settlement = record.get("beneficiary_settlement", "") or "0"
-        well.block_name = record.get("block_name", "") or "0"
-        well.owner = record.get("select_one_owns", "") or "0"
+        well.beneficiary_settlement = record.get("beneficiary_settlement", "") or "NA"
+        well.block_name = record.get("block_name", "") or "NA"
+        well.owner = record.get("select_one_owns", "") or "NA"
         well.households_benefitted = record.get("households_benefited", "") or 0
-        well.caste_uses = record.get("select_multiple_caste_use", "") or "0"
+        well.caste_uses = record.get("select_multiple_caste_use", "") or "NA"
 
         well_usage = record.get("Well_usage", {})
         well_condition = record.get("Well_condition", {})
         well.is_functional = (
-            well_usage.get("select_one_Functional_Non_functional", "")
-            or "No Data Provided"
+            well_usage.get("select_one_Functional_Non_functional", "") or "NA"
         )
-        well.need_maintenance = (
-            well_condition.get("select_one_maintenance", "") or "No Data Provided"
-        )
-        well.plan_id = record.get("plan_id", "") or "0"
-        well.plan_name = record.get("plan_name", "") or "0"
+        well.need_maintenance = well_condition.get("select_one_maintenance", "") or "NA"
+        well.plan_id = record.get("plan_id", "") or "NA"
+        well.plan_name = record.get("plan_name", "") or "NA"
         try:
             coordinates = (
                 record.get("GPS_point", {})
