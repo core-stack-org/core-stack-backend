@@ -99,7 +99,7 @@ def create_dpr_document(plan):
 
     add_section_c(doc, plan)
 
-    # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
 
     # add_section_e(doc, plan)
 
@@ -641,8 +641,8 @@ def add_section_d(doc, plan, settlement_mws_ids, mws_gdf):
         "This section provides an overview of all micro watersheds intersecting the village, detailing completed NRM works on individual and common lands, non-NRM works, changes in land use over the last 5 years, and information on wells, water structures, and household beneficiaries."
     )
 
-    create_mws_table(doc, plan, settlement_mws_ids, mws_gdf)
     unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
+    create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids)
 
     for mws_id in unique_mws_ids:
         populate_mws(doc, plan, mws_id, mws_gdf)
@@ -650,15 +650,10 @@ def add_section_d(doc, plan, settlement_mws_ids, mws_gdf):
 
 def populate_mws(doc, plan, mws_id, mws_gdf):
     doc.add_heading("MWS: " + mws_id, level=1)
-
-    populate_land_use(doc, plan, mws_id, mws_gdf)  # Land Use Section
     populate_water_structures(doc, plan, mws_id, mws_gdf)  # Water Structures
-    populate_water_budgeting(doc, plan, mws_id, mws_gdf)
 
 
-def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf):
-    unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
-
+def create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids):
     headers_mws = ["Microwatershed ID", "Latitude and Longitude (Centroid)"]
     table_mws = doc.add_table(rows=len(unique_mws_ids) + 1, cols=len(headers_mws))
     table_mws.style = "Table Grid"
@@ -676,162 +671,7 @@ def create_mws_table(doc, plan, settlement_mws_ids, mws_gdf):
             centroid = matching_feature.geometry.centroid.iloc[0]
             row_cells[1].text = f"{centroid.y:.8f}, {centroid.x:.8f}"
         else:
-            row_cells[1].text = "Not found"
-
-
-def populate_land_use(doc, plan, mws_id, mws_gdf):
-    doc.add_heading("Information on Land Use", level=2)
-    doc.add_heading("Change in cropping area over last 5 years", level=3)
-
-    logger.info("2. Cropping Intensity Layer")
-
-    try:
-        ci_layer_name = (
-            str(plan.district.district_name).lower().replace(" ", "_")
-            + "_"
-            + str(plan.block.block_name).lower().replace(" ", "_")
-            + "_"
-            + "intensity"
-        )
-        logger.debug("Attempting to fetch layer: %s", ci_layer_name)
-
-        cropping_intensity_layer = get_vector_layer_geoserver(
-            geoserver_url=GEOSERVER_URL,
-            workspace="cropping_intensity",
-            layer_name=ci_layer_name,
-        )
-
-        if not cropping_intensity_layer or "features" not in cropping_intensity_layer:
-            logger.error(
-                "Failed to fetch cropping intensity layer or layer has no features"
-            )
-            return
-
-        logger.debug(
-            "Successfully fetched cropping intensity layer with %d features",
-            len(cropping_intensity_layer["features"]),
-        )
-
-        ci_gdf = gpd.GeoDataFrame.from_features(cropping_intensity_layer["features"])
-        joined_gdf = gpd.sjoin(mws_gdf, ci_gdf, how="left", predicate="intersects")
-
-    except Exception as e:
-        logger.exception("Error processing cropping intensity layer: %s", str(e))
-        return
-
-    specific_mws_row = joined_gdf[joined_gdf["uid_left"] == mws_id]
-    table_ci = create_land_use_table(doc, specific_mws_row)
-    plot_graph_ci(table_ci, doc)
-
-
-def create_land_use_table(doc, specific_mws_row):
-    headers_cropping_intensity = [
-        "Year",
-        "Area under Single Crop (in ha)",
-        "Area under Double Crop (in ha)",
-        "Area under Triple Crop (in ha)",
-        "Uncropped Area (in ha)",
-    ]
-    table_cropping_intensity = doc.add_table(
-        rows=8, cols=len(headers_cropping_intensity)
-    )
-    table_cropping_intensity.style = "Table Grid"
-
-    hdr_cells = table_cropping_intensity.rows[0].cells
-    for i, header in enumerate(headers_cropping_intensity):
-        hdr_cells[i].paragraphs[0].add_run(header).bold = True
-
-    for i, year in enumerate(range(2017, 2023)):
-        total_crop = specific_mws_row["total_crop"].iloc[0]
-        single_kharif_cropping = (
-            (specific_mws_row[f"single_k_{i}"].iloc[0] / total_crop) * 100
-            if i > 0
-            else (specific_mws_row["single_kha"].iloc[0] / total_crop) * 100
-        )
-        single_non_kharif_cropping = (
-            (specific_mws_row[f"single_n_{i}"].iloc[0] / total_crop) * 100
-            if i > 0
-            else (specific_mws_row["single_non"].iloc[0] / total_crop) * 100
-        )
-        single_cropping = single_kharif_cropping + single_non_kharif_cropping
-        double_cropping = (
-            (specific_mws_row[f"doubly_c_{i}"].iloc[0] / total_crop) * 100
-            if i > 0
-            else (specific_mws_row["doubly_cro"].iloc[0] / total_crop) * 100
-        )
-        triple_cropping = (
-            (specific_mws_row[f"triply_c_{i}"].iloc[0] / total_crop) * 100
-            if i > 0
-            else (specific_mws_row["triply_cro"].iloc[0] / total_crop) * 100
-        )
-        uncropped_area = 100 - (single_cropping + double_cropping + triple_cropping)
-
-        # +1 to skip the header row
-        row_cells = table_cropping_intensity.rows[i + 1].cells
-        row_cells[0].text = str(year)
-        row_cells[1].text = str(round(single_cropping, 2))
-        row_cells[2].text = str(round(double_cropping, 2))
-        row_cells[3].text = str(round(triple_cropping, 2))
-        row_cells[4].text = str(round(uncropped_area, 2))
-
-    return table_cropping_intensity
-
-
-def plot_graph_ci(table_ci, doc):
-    years = list(range(2017, 2023))
-    single_cropping_values = []
-    double_cropping_values = []
-    triple_cropping_values = []
-    uncropped_land_values = []
-
-    for i, year in enumerate(years):
-        row_cells = table_ci.rows[i + 1].cells
-        single_cropping_values.append(float(row_cells[1].text))
-        double_cropping_values.append(float(row_cells[2].text))
-        triple_cropping_values.append(float(row_cells[3].text))
-        uncropped_land_values.append(float(row_cells[4].text))
-
-    plt.bar(years, single_cropping_values, color="#eee05d", label="Single Cropping")
-    plt.bar(
-        years,
-        double_cropping_values,
-        bottom=single_cropping_values,
-        color="#f9b249",
-        label="Double Cropping",
-    )
-    plt.bar(
-        years,
-        triple_cropping_values,
-        bottom=[i + j for i, j in zip(single_cropping_values, double_cropping_values)],
-        color="#fb5139",
-        label="Triple Cropping",
-    )
-    plt.bar(
-        years,
-        uncropped_land_values,
-        bottom=[
-            i + j + k
-            for i, j, k in zip(
-                single_cropping_values, double_cropping_values, triple_cropping_values
-            )
-        ],
-        color="#a9a9a9",
-        label="Uncropped Area",
-    )
-
-    # Add labels and title
-    plt.xlabel("Year")
-    plt.ylabel("Percentage of area")
-    plt.title("Land use")
-    plt.legend()
-
-    image_stream = BytesIO()
-    plt.savefig(image_stream, format="png")
-    plt.close()
-
-    image_stream.seek(0)
-
-    doc.add_picture(image_stream)
+            row_cells[1].text = "NA"
 
 
 def populate_water_structures(doc, plan, mws_id, mws_gdf):
@@ -843,7 +683,7 @@ def populate_water_structures(doc, plan, mws_id, mws_gdf):
 
 def populate_well(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    wells_in_plan = ODK_well.objects.filter(plan_id=plan.plan_id).exclude(
+    wells_in_plan = ODK_well.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
     )
 
@@ -930,8 +770,7 @@ def populate_well(doc, plan, mws_id, mws_gdf):
 
 def populate_waterbody(doc, plan, mws_id, mws_gdf):
     mws_polygon = mws_gdf[mws_gdf["uid"] == mws_id].geometry.iloc[0]
-    # basically water structures
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.plan_id).exclude(
+    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
     )
     waterbody_in_mws = []
@@ -1012,141 +851,6 @@ def populate_waterbody(doc, plan, mws_id, mws_gdf):
         row_cells[7].text = water_st.need_maintenance
         row_cells[8].text = str(water_st.latitude)
         row_cells[9].text = str(water_st.longitude)
-
-
-def populate_water_budgeting(doc, plan, mws_id, mws_gdf):
-    doc.add_heading("Water Budgeting at Micro Watershed level", level=2)
-    para = doc.add_paragraph()
-    para.add_run(
-        "This table below provides year wise information on water budgeting at the micro watershed level, "
-        "including details on precipitation, runoff, ET, change in groundwater, and well depth.\n\n"
-    )
-
-    mws_well_depth_layer = get_vector_layer_geoserver(
-        geoserver_url=GEOSERVER_URL,
-        workspace="mws_layers",
-        layer_name="deltaG_well_depth_"
-        + str(plan.district.district_name).lower().replace(" ", "_")
-        + "_"
-        + str(plan.block.block_name).lower().replace(" ", "_"),
-    )
-
-    filtered_features = [
-        feature
-        for feature in mws_well_depth_layer["features"]
-        if "properties" in feature and feature["properties"].get("uid") == mws_id
-    ]
-
-    for feature in filtered_features:
-        properties = feature["properties"]
-        properties = properties.items()  # Convert to list of tuples
-        yearly_data = extract_yearly_data(properties)
-        fill_yearly_table(doc, yearly_data)
-
-
-def extract_yearly_data(properties):
-    data = {}
-    for year_range, values_str in properties:
-        if not (year_range.startswith("20") and "_" in year_range):
-            continue
-
-        year = int(year_range.split("_")[0])
-        values = json.loads(values_str)
-
-        data[year] = {
-            "Precipitation": values["Precipitation"],
-            "RunOff": values["RunOff"],
-            "ET": values["ET"],
-            "G": values["G"],
-            "WellDepth": values["WellDepth"],
-        }
-
-    return data
-
-
-def fill_yearly_table(doc, yearly_data):
-    headers = [
-        "Year",
-        "Precipitation (in mm)",
-        "Run-off (in mm)",
-        "ET (in mm)",
-        "Change in Groundwater (G in mm)",
-        "Well Depth (in m)",
-    ]
-    years = sorted(yearly_data.keys())
-
-    table = doc.add_table(rows=len(years) + 1, cols=len(headers))
-    table.style = "Table Grid"
-
-    # Fill headers
-    for i, header in enumerate(headers):
-        cell = table.cell(0, i)
-        cell.text = header
-        cell.paragraphs[0].runs[0].font.bold = True
-
-    # Fill data
-    for i, year in enumerate(years):
-        row = yearly_data[year]
-        row_cells = table.rows[i + 1].cells
-        row_cells[0].text = str(year)
-        row_cells[1].text = f"{row['Precipitation']:.2f}"
-        row_cells[2].text = f"{row['RunOff']:.2f}"
-        row_cells[3].text = f"{row['ET']:.2f}"
-        row_cells[4].text = f"{row['G']:.2f}"
-        row_cells[5].text = f"{row['WellDepth']:.2f}"
-
-    # Create and add the graph
-    create_and_add_graph(doc, yearly_data)
-
-
-def create_and_add_graph(doc, yearly_data):
-    years = sorted(yearly_data.keys())
-    precipitation = [yearly_data[year]["Precipitation"] for year in years]
-    runoff = [yearly_data[year]["RunOff"] for year in years]
-    et = [yearly_data[year]["ET"] for year in years]
-    g = [yearly_data[year]["G"] for year in years]
-
-    # Set the style
-    sns.set_style("darkgrid")
-
-    # Create individual figures for each metric
-    metrics = [
-        ("Precipitation", precipitation, "blue"),
-        ("Run-off", runoff, "pink"),
-        ("ET", et, "green"),
-        ("Change in Groundwater", g, "brown"),
-    ]
-
-    for title, data, color in metrics:
-        # Create new figure for each plot
-        plt.figure(figsize=(6, 4))
-
-        # Create bar plot
-        sns.barplot(x=years, y=data, color=color)
-
-        # Customize plot
-        plt.title(f"Yearly {title}", fontsize=10, pad=10)
-        plt.xlabel("Year", fontsize=10)
-        plt.ylabel(f"{title} (mm)", fontsize=8)
-        plt.xticks(rotation=45)
-
-        # Adjust layout
-        plt.tight_layout()
-
-        # Save to stream and add to document
-        image_stream = BytesIO()
-        plt.savefig(image_stream, format="png", dpi=300, bbox_inches="tight")
-        plt.close()
-
-        # Add to document
-        image_stream.seek(0)
-        doc.add_picture(image_stream)
-
-        # Add small spacing between graphs
-        doc.add_paragraph().add_run().add_break()
-
-    # Add final spacing after all graphs
-    doc.add_paragraph()
 
 
 # MARK: - Section E
