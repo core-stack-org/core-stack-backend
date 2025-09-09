@@ -915,3 +915,83 @@ def format_text(text):
 
     formatted_text = text.replace("_", " ")
     return formatted_text.capitalize() + "\n\n"
+
+
+def get_waterbody_repair_activities(data_waterbody, water_structure_type):
+    """
+    Extract repair activities based on water structure type from data_waterbody.
+    Handles 'other' cases where the specific repair activity is in a separate field.
+
+    Args:
+        data_waterbody (dict): The nested waterbody data dictionary
+        water_structure_type (str): The type of water structure
+
+    Returns:
+        str: The repair activities or "NA" if none found
+    """
+    if not data_waterbody or not water_structure_type:
+        return "NA"
+
+    structure_type_mapping = {
+        "canal": "Repair_of_canal",
+        "bunding": "Repair_of_bunding",
+        "check dam": "Repair_of_check_dam",
+        "farm bund": "Repair_of_farm_bund",
+        "farm pond": "Repair_of_farm_ponds",
+        "soakage pits": "Repair_of_soakage_pits",
+        "recharge pits": "Repair_of_recharge_pits",
+        "rock fill dam": "Repair_of_rock_fill_dam",
+        "stone bunding": "Repair_of_stone_bunding",
+        "community pond": "Repair_of_community_pond",
+        "diversion drains": "Repair_of_diversion_drains",
+        "large water body": "Repair_of_large_water_body",
+        "model5 structure": "Repair_of_model5_structure",
+        "percolation tank": "Repair_of_percolation_tank",
+        "earthen gully plug": "Repair_of_earthen_gully_plug",
+        "30-40 model structure": "Repair_of_30_40_model_structure",
+        "loose boulder structure": "Repair_of_loose_boulder_structure",
+        "trench cum bund network": "Repair_of_trench_cum_bund_network",
+        "water absorption trenches": "Repair_of_Water_absorption_trenches",
+        "drainage soakage channels": "Repair_of_drainage_soakage_channels",
+        "staggered contour trenches": "Repair_of_Staggered_contour_trenches",
+        "continuous contour trenches": "Repair_of_Continuous_contour_trenches",
+    }
+
+    structure_type_lower = water_structure_type.lower().strip()
+    if structure_type_lower.startswith("other:"):
+        repair_fields = [
+            key for key in data_waterbody.keys() if key.startswith("Repair_of_")
+        ]
+        for field in repair_fields:
+            if data_waterbody.get(field):
+                repair_value = data_waterbody.get(field)
+                other_field = field + "_other"
+                if (
+                    repair_value
+                    and repair_value.lower() == "other"
+                    and data_waterbody.get(other_field)
+                ):
+                    return f"Other: {data_waterbody.get(other_field)}"
+                elif repair_value:
+                    return repair_value.replace("_", " ").title()
+        return "NA"
+
+    repair_field = structure_type_mapping.get(structure_type_lower)
+
+    if not repair_field:
+        return "NA"
+
+    repair_activity = data_waterbody.get(repair_field)
+
+    if not repair_activity:
+        return "NA"
+
+    if repair_activity.lower() == "other":
+        other_field = repair_field + "_other"
+        other_value = data_waterbody.get(other_field)
+        if other_value:
+            return f"Other: {other_value}"
+        else:
+            return "Other"
+
+    return repair_activity.replace("_", " ").title()

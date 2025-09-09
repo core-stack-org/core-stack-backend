@@ -25,6 +25,7 @@ from shapely.geometry import MultiPolygon, Point, shape
 from shapely.ops import unary_union
 
 from dpr.mapping import populate_maintenance_from_waterbody
+from dpr.utils import get_waterbody_repair_activities
 from nrm_app.settings import (
     EMAIL_HOST,
     EMAIL_HOST_PASSWORD,
@@ -101,7 +102,7 @@ def create_dpr_document(plan):
 
     add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
 
-    # add_section_e(doc, plan)
+    add_section_e(doc, plan)
 
     # add_section_f(doc, plan, mws_fortnight) # generates maps as well
 
@@ -775,7 +776,9 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
     doc.add_heading("Detailed Well Information and their Maintenance Demands", level=3)
 
     for i, (well, mws_id) in enumerate(all_wells_with_mws, 1):
-        doc.add_heading(f"{well.beneficiary_settlement}", level=4)
+        doc.add_heading(
+            f"Beneficiary's Settlement: {well.beneficiary_settlement}", level=4
+        )
 
         table_well = doc.add_table(rows=15, cols=2)
         table_well.style = "Table Grid"
@@ -836,7 +839,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         )
         add_well_data(7, "Households Benefitted", well.households_benefitted)
         add_well_data(8, "Which Caste uses the well?", well.caste_uses)
-        add_well_data(9, "Well is Functional or Non-functional", well.is_functional)
+        add_well_data(9, "Well, is Functional or Non-functional?", well.is_functional)
         add_well_data(10, "Well Usage", well_usage)
         add_well_data(11, "Need Maintenance?", well.need_maintenance)
         add_well_data(12, "Repair Activities", repair_activities)
@@ -901,49 +904,67 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
         row_cells[3].text = str(num_households)
 
     doc.add_heading("Detailed Water Structures Information", level=3)
-    headers_waterstructure = [
-        "MWS ID",
-        "Name of the Beneficiary's Settlement",
-        "Who manages?",
-        "Who owns the water structure?",
-        "Which Caste uses the water structure?",
-        "Households Benefitted",
-        "Type of Water Structure",
-        "Identified By",
-        "Need Maintenance",
-        "Latitude",
-        "Longitude",
-    ]
-    table_water_structure = doc.add_table(rows=1, cols=len(headers_waterstructure))
-    table_water_structure.style = "Table Grid"
 
-    hdr_cells = table_water_structure.rows[0].cells
-    for i, header in enumerate(headers_waterstructure):
-        hdr_cells[i].paragraphs[0].add_run(header).bold = True
+    for i, (waterbody, mws_id) in enumerate(all_waterbodies_with_mws, 1):
+        doc.add_heading(
+            f"Beneficiary's Settlement: {waterbody.beneficiary_settlement}", level=4
+        )
 
-    for waterbody, mws_id in all_waterbodies_with_mws:
-        row_cells = table_water_structure.add_row().cells
-        row_cells[0].text = mws_id
-        row_cells[1].text = waterbody.beneficiary_settlement
+        table_water_structure = doc.add_table(rows=14, cols=2)
+        table_water_structure.style = "Table Grid"
+
+        def add_waterbody_data(row_idx, label, value):
+            row_cells = table_water_structure.rows[row_idx].cells
+            row_cells[0].paragraphs[0].add_run(label).bold = True
+            row_cells[1].text = str(value) if value is not None else "NA"
+
+        who_manages = waterbody.who_manages
         if waterbody.who_manages.lower() == "other":
-            row_cells[2].text = "Other: " + waterbody.specify_other_manager
-        else:
-            row_cells[2].text = waterbody.who_manages
-        row_cells[3].text = waterbody.owner
-        row_cells[4].text = waterbody.caste_who_uses
-        row_cells[5].text = str(waterbody.household_benefitted)
+            who_manages = "Other: " + waterbody.specify_other_manager
+
+        water_structure_type = waterbody.water_structure_type
         if waterbody.water_structure_type.lower() == "other":
-            row_cells[6].text = "Other: " + waterbody.water_structure_other
-        else:
-            row_cells[6].text = waterbody.water_structure_type
-        row_cells[7].text = waterbody.identified_by
-        row_cells[8].text = waterbody.need_maintenance
-        row_cells[9].text = str(waterbody.latitude)
-        row_cells[10].text = str(waterbody.longitude)
+            water_structure_type = "Other: " + waterbody.water_structure_other
+
+        repair_activities = get_waterbody_repair_activities(
+            waterbody.data_waterbody, water_structure_type
+        )
+
+        add_waterbody_data(0, "MWS ID", mws_id)
+        add_waterbody_data(
+            1, "Name of the Beneficiary's Settlement", waterbody.beneficiary_settlement
+        )
+        add_waterbody_data(2, "Who owns the water structure?", waterbody.owner)
+        add_waterbody_data(
+            3,
+            "Beneficiary Name",
+            waterbody.data_waterbody.get("Beneficiary_name") or "NA",
+        )
+        add_waterbody_data(
+            4,
+            "Beneficiary's Father's Name",
+            waterbody.data_waterbody.get("ben_father") or "NA",
+        )
+        add_waterbody_data(5, "Who manages?", who_manages)
+        add_waterbody_data(
+            6, "Which Caste uses the water structure?", waterbody.caste_who_uses
+        )
+        add_waterbody_data(7, "Households Benefitted", waterbody.household_benefitted)
+        add_waterbody_data(8, "Type of Water Structure", water_structure_type)
+        add_waterbody_data(
+            9,
+            "Usage of Water Structure",
+            format_text(waterbody.data_waterbody.get("select_multiple_uses_structure"))
+            or "NA",
+        )
+        add_waterbody_data(10, "Need Maintenance?", waterbody.need_maintenance)
+        add_waterbody_data(11, "Repair Activities", repair_activities)
+        add_waterbody_data(12, "Latitude", waterbody.latitude)
+        add_waterbody_data(13, "Longitude", waterbody.longitude)
 
 
 # MARK: - Section E
-def add_section_e(doc, plan):
+def add_section_(doc, plan):
     doc.add_heading(
         "Section E: Remote sensing data- Total Area under Surface Water Structures",
         level=1,
@@ -1080,7 +1101,7 @@ def create_surface_wb_table(doc, plan):
 
 
 # MARK: - Section F
-# Works and Maps Section
+# New Works and Maps Section
 def add_section_f(doc, plan, mws):
     doc.add_heading("Section F: Proposed New NRM works on basis through Gram Sabha")
     para = doc.add_paragraph()
