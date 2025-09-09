@@ -18,7 +18,7 @@ from django.core.mail.backends.smtp import EmailBackend
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.shared import Inches
+from docx.shared import Inches, RGBColor
 from PIL import Image
 from selenium import webdriver
 from shapely.geometry import MultiPolygon, Point, shape
@@ -773,48 +773,26 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         row_cells[2].text = str(num_households)
 
     doc.add_heading("Detailed Well Information and their Maintenance Demands", level=3)
-    headers_well = [
-        "MWS ID",
-        "Name of Beneficiary Settlement",
-        "Type of Well",
-        "Who owns the Well",
-        "Beneficiary Name",
-        "Benficiary's Father's Name",
-        "Water Availability",
-        "Households Benefitted",
-        "Which Caste uses the well?",
-        "Well is Functional or Non-functional",
-        "Well Usage",
-        "Need Maintenance?",
-        "Repair Activities",
-        "Latitude",
-        "Longitude",
-    ]
-    table_well = doc.add_table(rows=1, cols=len(headers_well))
-    table_well.style = "Table Grid"
-    hdr_cells = table_well.rows[0].cells
-    for i, header in enumerate(headers_well):
-        hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    for well, mws_id in all_wells_with_mws:
-        row_cells = table_well.add_row().cells
-        row_cells[0].text = mws_id
-        row_cells[1].text = well.beneficiary_settlement
-        row_cells[2].text = well.data_well.get("select_one_well_type") or "NA"
-        row_cells[3].text = well.owner
-        row_cells[4].text = well.data_well.get("Beneficiary_name") or "NA"
-        row_cells[5].text = well.data_well.get("ben_father") or "NA"
-        row_cells[6].text = well.data_well.get("select_one_year") or "NA"
-        row_cells[7].text = str(well.households_benefitted)
-        row_cells[8].text = well.caste_uses
-        row_cells[9].text = well.is_functional
-        well_usage = None
+    for i, (well, mws_id) in enumerate(all_wells_with_mws, 1):
+        doc.add_heading(f"{well.beneficiary_settlement}", level=4)
+
+        table_well = doc.add_table(rows=15, cols=2)
+        table_well.style = "Table Grid"
+
+        def add_well_data(row_idx, label, value):
+            row_cells = table_well.rows[row_idx].cells
+            row_cells[0].paragraphs[0].add_run(label).bold = True
+            row_cells[1].text = str(value) if value is not None else "NA"
+
+        well_usage = "NA"
         if well.data_well and "Well_usage" in well.data_well:
             well_usage_data = well.data_well["Well_usage"]
             select_one_well_used = well_usage_data.get("select_one_well_used")
             select_one_well_used_other = well_usage_data.get(
                 "select_one_well_used_other"
             )
+
             if (
                 select_one_well_used
                 and select_one_well_used.lower() == "other"
@@ -823,12 +801,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
                 well_usage = f"Other: {select_one_well_used_other}"
             elif select_one_well_used:
                 well_usage = select_one_well_used
-            else:
-                well_usage = "NA"
-        else:
-            well_usage = "NA"
-        row_cells[10].text = well_usage
-        row_cells[11].text = well.need_maintenance
+
         repair_activities = "NA"
         if well.data_well and "Well_condition" in well.data_well:
             well_condition_data = well.data_well["Well_condition"]
@@ -845,11 +818,30 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
                 repair_activities = f"Other: {select_one_repairs_well_other}"
             elif select_one_repairs_well:
                 repair_activities = select_one_repairs_well.replace("_", " ")
-            else:
-                repair_activities = "NA"
-        row_cells[12].text = repair_activities
-        row_cells[13].text = str(well.latitude)
-        row_cells[14].text = str(well.longitude)
+
+        add_well_data(0, "MWS ID", mws_id)
+        add_well_data(1, "Name of Beneficiary Settlement", well.beneficiary_settlement)
+        add_well_data(
+            2, "Type of Well", well.data_well.get("select_one_well_type") or "NA"
+        )
+        add_well_data(3, "Who owns the Well", well.owner)
+        add_well_data(
+            4, "Beneficiary Name", well.data_well.get("Beneficiary_name") or "NA"
+        )
+        add_well_data(
+            5, "Beneficiary's Father's Name", well.data_well.get("ben_father") or "NA"
+        )
+        add_well_data(
+            6, "Water Availability", well.data_well.get("select_one_year") or "NA"
+        )
+        add_well_data(7, "Households Benefitted", well.households_benefitted)
+        add_well_data(8, "Which Caste uses the well?", well.caste_uses)
+        add_well_data(9, "Well is Functional or Non-functional", well.is_functional)
+        add_well_data(10, "Well Usage", well_usage)
+        add_well_data(11, "Need Maintenance?", well.need_maintenance)
+        add_well_data(12, "Repair Activities", repair_activities)
+        add_well_data(13, "Latitude", well.latitude)
+        add_well_data(14, "Longitude", well.longitude)
 
 
 def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
