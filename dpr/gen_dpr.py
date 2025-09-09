@@ -276,10 +276,10 @@ def add_section_a(doc, plan):
         "involving active engagement with community members "
         "to identify their needs and resources.\n\n"
     )
-    create_team_details_table(doc, plan)
+    create_table_team_details(doc, plan)
 
 
-def create_team_details_table(doc, plan):
+def create_table_team_details(doc, plan):
     table = doc.add_table(rows=5, cols=2)
     table.style = "Table Grid"
 
@@ -337,14 +337,14 @@ def add_section_b(doc, plan, total_settlements, mws_fortnight):
     intersecting_mws_ids = "; ".join(
         [f"{name}: {mws_id}" for name, mws_id in settlement_mws_ids]
     )
-    create_village_brief_table(
+    create_table_village_brief(
         intersecting_mws_ids, doc, plan, total_settlements, mws_gdf
     )
 
     return settlement_mws_ids, mws_gdf
 
 
-def create_village_brief_table(
+def create_table_village_brief(
     intersecting_mws_ids, doc, plan, total_settlements, mws_gdf
 ):
     table = doc.add_table(rows=8, cols=2)
@@ -399,14 +399,14 @@ def add_section_c(doc, plan):
     settlement_data = get_data_for_settlement(plan.id)
     create_table_socio_eco(doc, plan, settlement_data)
 
-    doc.add_heading("MGNREGA Info", level=3)
+    doc.add_heading("MGNREGA Info", level=4)
     create_table_mgnrega_info(doc, plan, settlement_data)
 
     doc.add_heading("Crop Info", level=4)
     create_table_crop_info(doc, plan)
 
-    # doc.add_heading("Livelihood Profile", level=3)
-    # create_livelihood_table(doc, plan)
+    doc.add_heading("Livestock Info", level=4)
+    create_table_livestock(doc, plan)
 
 
 def create_table_socio_eco(doc, plan, settlement_data):
@@ -431,7 +431,6 @@ def create_table_socio_eco(doc, plan, settlement_data):
         row_cells[1].text = str(item.number_of_households)
         row_cells[2].text = item.largest_caste
 
-        # Determine the caste group based on settlement type
         if item.largest_caste.lower() == "single caste group":
             row_cells[3].text = item.smallest_caste
         elif item.largest_caste.lower() == "mixed caste group":
@@ -560,9 +559,8 @@ def create_table_crop_info(doc, plan):
         row_cells[9].text = crop.land_classification
 
 
-def create_livelihood_table(doc, plan):
-    doc.add_heading("Livestock Info", level=4)
-    livelihood_in_plan = ODK_settlement.objects.filter(plan_id=plan.plan_id)
+def create_table_livestock(doc, plan):
+    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id)
     headers_livelihood = [
         "Name of the Settlement",
         "Goats",
@@ -571,26 +569,23 @@ def create_livelihood_table(doc, plan):
         "Piggery",
         "Poultry",
     ]
-    table_livelihood = doc.add_table(rows=1, cols=len(headers_livelihood))
-    table_livelihood.style = "Table Grid"
-    hdr_cells = table_livelihood.rows[0].cells
+    livestock_table = doc.add_table(rows=1, cols=len(headers_livelihood))
+    livestock_table.style = "Table Grid"
+    hdr_cells = livestock_table.rows[0].cells
     for i, header in enumerate(headers_livelihood):
         hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
     def format_livestock_value(value):
         """Helper function to format livestock values"""
         if value in [None, "", "0", 0, "None"]:
-            return "None"
+            return "NA"
         return str(value)
 
-    for livelihood in livelihood_in_plan:
-        row_cells = table_livelihood.add_row().cells
+    for livelihood in livestock_in_plan:
+        row_cells = livestock_table.add_row().cells
         row_cells[0].text = livelihood.settlement_name
 
-        # Get livestock census data with proper handling of None/empty values
         livestock_data = livelihood.livestock_census or {}
-
-        # Set values for each livestock type
         livestock_types = ["Goats", "Sheep", "Cattle", "Piggery", "Poultry"]
         for i, livestock_type in enumerate(livestock_types, start=1):
             value = livestock_data.get(livestock_type, "")

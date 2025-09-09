@@ -617,15 +617,15 @@ def sync_cropping_pattern():
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
-        cropping_pattern.uuid = record.get("__id", "") or "None"
+        cropping_pattern.uuid = record.get("__id", "") or "NA"
         cropping_pattern.beneficiary_settlement = (
-            record.get("beneficiary_settlement", "") or "None"
+            record.get("beneficiary_settlement", "") or "NA"
         )
         cropping_pattern.irrigation_source = (
-            record.get("select_multiple_widgets", "") or "None"
+            record.get("select_multiple_widgets", "") or "NA"
         )
         cropping_pattern.land_classification = (
-            record.get("select_one_classified", "") or "None"
+            record.get("select_one_classified", "") or "NA"
         )
 
         # For Kharif season, check if 'other' is selected and use the _other field if it is
@@ -639,7 +639,7 @@ def sync_cropping_pattern():
             else:
                 cropping_pattern.cropping_patterns_kharif = kharif_crops
         else:
-            cropping_pattern.cropping_patterns_kharif = kharif_crops or "None"
+            cropping_pattern.cropping_patterns_kharif = kharif_crops or "NA"
 
         # For Rabi season, check if 'other' is selected and use the _other field if it is
         rabi_crops = record.get("select_multiple_cropping_Rabi", "")
@@ -650,7 +650,7 @@ def sync_cropping_pattern():
             else:
                 cropping_pattern.cropping_patterns_rabi = rabi_crops
         else:
-            cropping_pattern.cropping_patterns_rabi = rabi_crops or "None"
+            cropping_pattern.cropping_patterns_rabi = rabi_crops or "NA"
 
         # For Zaid season, check if 'other' is selected and use the _other field if it is
         zaid_crops = record.get("select_multiple_cropping_Zaid", "")
@@ -661,13 +661,13 @@ def sync_cropping_pattern():
             else:
                 cropping_pattern.cropping_patterns_zaid = zaid_crops
         else:
-            cropping_pattern.cropping_patterns_zaid = zaid_crops or "None"
+            cropping_pattern.cropping_patterns_zaid = zaid_crops or "NA"
 
         cropping_pattern.agri_productivity = (
-            record.get("select_one_productivity", "") or "None"
+            record.get("select_one_productivity", "") or "NA"
         )
-        cropping_pattern.plan_id = record.get("plan_id", "") or "0"
-        cropping_pattern.plan_name = record.get("plan_name", "") or "0"
+        cropping_pattern.plan_id = record.get("plan_id", "") or "NA"
+        cropping_pattern.plan_name = record.get("plan_name", "") or "NA"
         cropping_pattern.status_re = (
             record.get("__system", {}).get("reviewState", "") or "in progress"
         )
