@@ -1,6 +1,6 @@
 from django.http import HttpRequest
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 import ast
@@ -75,6 +75,7 @@ def handle_media_upload(request, item, user, source, bot_id=None):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def upsert_item(request):
     try:
         item_id = request.data.get("item_id")
@@ -200,6 +201,7 @@ def upsert_item(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def attach_media_to_item(request):
     try:
         item_id = request.data.get("item_id")
@@ -255,6 +257,7 @@ def attach_media_to_item(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_community_details(request):
     try:
         data = get_community_summary_data(request.data.get('community_id'))
@@ -266,6 +269,7 @@ def get_community_details(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_communities_by_location(request):
     try:
         state_id = request.query_params.get("state_id")
@@ -295,6 +299,7 @@ def get_communities_by_location(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_communities_by_lat_lon(request):
     try:
         lat = float(request.query_params.get("latitude"))
@@ -314,6 +319,7 @@ def get_communities_by_lat_lon(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_community_by_user(request):
     try:
         data = []
@@ -333,6 +339,7 @@ def get_community_by_user(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def map_users_to_community(request):
     try:
         project_id = request.data.get("project_id")
@@ -393,6 +400,7 @@ def map_users_to_community(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def add_user_to_community(request):
     try:
         community_id = request.data.get("community_id")
@@ -413,6 +421,7 @@ def add_user_to_community(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def is_user_in_community(request):
     try:
         number = request.data.get("number")
@@ -460,6 +469,7 @@ def is_user_in_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_districts_with_community(request):
     try:
         state_id = request.query_params.get("state_id").strip()
@@ -480,6 +490,7 @@ def get_districts_with_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_blocks_with_community(request):
     try:
         district_id = request.query_params.get("district_id").strip()
@@ -500,6 +511,7 @@ def get_blocks_with_community(request):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def update_last_accessed_community(request):
     try:
         user_id = request.data.get("user_id")
@@ -526,6 +538,7 @@ def update_last_accessed_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_items_by_community(request):
     try:
         community_id = request.query_params.get("community_id")
@@ -618,6 +631,7 @@ def get_items_by_community(request):
 
 @api_view(["GET"])
 @auth_free
+@schema(None)
 def get_items_status(request):
     try:
         contact_number = request.query_params.get("number")
