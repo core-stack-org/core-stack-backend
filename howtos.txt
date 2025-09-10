@@ -1,21 +1,21 @@
 how to add a new state data in the DB?
 - add the state csv: https://drive.google.com/drive/folders/1TXlGS9T3FVrmCh2BIyP-0Hs1l-iolOPT
 - run data to db from geoadmin: from the django shell
-- make an api for this too 
+- make an api for this too
 - download csv from ictd datasets [panchayat csv's]
 
 
 how to make a default plan for a block?
 - activate the blocks
-{   
-    "state_id": 23,  
-    "district_id": 229,  
-    "block_id": 2394 
+{
+    "state_id": 23,
+    "district_id": 229,
+    "block_id": 2394
 }
 - make a default plan
 
 how to push files to the server?
-- scp -i ~/gramvaani/server/nrm-vm.pem -r /pathtofolder/data/lulc_resolution_18mar24 ubuntu@geoserver.gramvaani.org:shapefiles/ 
+- scp -i ~/gramvaani/server/nrm-vm.pem -r /pathtofolder/data/lulc_resolution_18mar24 ubuntu@geoserver.gramvaani.org:shapefiles/
 - /var/lib/tomcat9/webapps/geoserver/data/data
 
 
@@ -26,11 +26,6 @@ MWSs STEPS:
 4. Calculate ET, P, R, deltaG and G
 
 https://dwtkns.com/srtm30m/
-
-
-PROPOSED BLOCKS
-pre transformation activated blocks:  [{'state_name': 'Bihar', 'state_id': '10', 'districts': [{'district_name': 'Patna', 'district_id': 48, 'blocks': [{'block_name': 'Maner', 'block_id': 525}]}, {'district_name': 'Gaya', 'district_id': 54, 'blocks': [{'block_name': 'Mohanpur', 'block_id': 636}]}]}, {'state_name': 'Jharkhand', 'state_id': '20', 'districts': [{'district_name': 'Dumka', 'district_id': 75, 'blocks': [{'block_name': 'Masalia', 'block_id': 856}]}]}, {'state_name': 'Odisha', 'state_id': '21', 'districts': [{'district_name': 'Anugul', 'district_id': 126, 'blocks': [{'block_name': 'Anugul', 'block_id': 1415}]}, {'district_name': 'Koraput', 'district_id': 139, 'blocks': [{'block_name': 'Lakshmipur', 'block_id': 1590}, {'block_name': 'Narayanpatana', 'block_id': 1591}, {'block_name': 'Koraput', 'block_id': 1594}, {'block_name': 'Kundura', 'block_id': 1597}, {'block_name': 'Boipariguda', 'block_id': 1598}, {'block_name': 'Nandapur', 'block_id': 1601}, {'block_name': 'Similiguda', 'block_id': 1602}]}]}, {'state_name': 'Madhya pradesh', 'state_id': '23', 'districts': [{'district_name': 'Chhindwara', 'district_id': 229, 'blocks': [{'block_name': 'Sausar', 'block_id': 2394}]}, {'district_name': 'Guna', 'district_id': 232, 'blocks': [{'block_name': 'Bamori', 'block_id': 2419}]}, {'district_name': 'Khandwa (east nimar)', 'district_id': 240, 'blocks': [{'block_name': 'Khalwa', 'block_id': 2468}]}]}, {'state_name': 'Rajasthan', 'state_id': '8', 'districts': [{'district_name': 'Sirohi', 'district_id': 177, 'blocks': [{'block_name': 'Pindwara', 'block_id': 1909}]}, {'district_name': 'Bhilwara', 'district_id': 182, 'blocks': [{'block_name': 'Mandalgarh', 'block_id': 1965}]}]}]
-transformed data [{'label': 'Bihar', 'value': '1234', 'state_id': '10', 'district': [{'label': 'Patna', 'value': '1', 'district_id': '48', 'blocks': [{'label': 'Maner', 'value': '1', 'block_id': '525'}]}, {'label': 'Gaya', 'value': '2', 'district_id': '54', 'blocks': [{'label': 'Mohanpur', 'value': '1', 'block_id': '636'}]}]}, {'label': 'Jharkhand', 'value': '1235', 'state_id': '20', 'district': [{'label': 'Dumka', 'value': '1', 'district_id': '75', 'blocks': [{'label': 'Masalia', 'value': '1', 'block_id': '856'}]}]}, {'label': 'Odisha', 'value': '1236', 'state_id': '21', 'district': [{'label': 'Anugul', 'value': '1', 'district_id': '126', 'blocks': [{'label': 'Anugul', 'value': '1', 'block_id': '1415'}]}, {'label': 'Koraput', 'value': '2', 'district_id': '139', 'blocks': [{'label': 'Lakshmipur', 'value': '1', 'block_id': '1590'}, {'label': 'Narayanpatana', 'value': '2', 'block_id': '1591'}, {'label': 'Koraput', 'value': '3', 'block_id': '1594'}, {'label': 'Kundura', 'value': '4', 'block_id': '1597'}, {'label': 'Boipariguda', 'value': '5', 'block_id': '1598'}, {'label': 'Nandapur', 'value': '6', 'block_id': '1601'}, {'label': 'Similiguda', 'value': '7', 'block_id': '1602'}]}]}, {'label': 'Madhya pradesh', 'value': '1237', 'state_id': '23', 'district': [{'label': 'Chhindwara', 'value': '1', 'district_id': '229', 'blocks': [{'label': 'Sausar', 'value': '1', 'block_id': '2394'}]}, {'label': 'Guna', 'value': '2', 'district_id': '232', 'blocks': [{'label': 'Bamori', 'value': '1', 'block_id': '2419'}]}, {'label': 'Khandwa (east nimar)', 'value': '3', 'district_id': '240', 'blocks': [{'label': 'Khalwa', 'value': '1', 'block_id': '2468'}]}]}, {'label': 'Rajasthan', 'value': '1238', 'state_id': '8', 'district': [{'label': 'Sirohi', 'value': '1', 'district_id': '177', 'blocks': [{'label': 'Pindwara', 'value': '1', 'block_id': '1909'}]}, {'label': 'Bhilwara', 'value': '2', 'district_id': '182', 'blocks': [{'label': 'Mandalgarh', 'value': '1', 'block_id': '1965'}]}]}]
 
 
 NREGA work categories:
@@ -51,6 +46,9 @@ Setup Headless Firefox for Selenium:
     sudo apt-get update
     sudo apt-get install -y firefox-esr
 
+- check for headless run
+/usr/bin/firefox-esr --headless --screenshot /tmp/ff_test.png https://example.com/
+
 - Install webdriver manager
     python -m pip install webdriver-manager==4.0.2
 
@@ -69,6 +67,3 @@ Setup Headless Firefox for Selenium:
         >>> driver.get("https://example.com")
         >>> print(driver.title)   # "Example Domain"
         >>> driver.quit()
-
-
-
