@@ -1,19 +1,23 @@
-import base64, os, tempfile
+import base64
+import os
+import tempfile
 
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service as FirefoxService
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.print_page_options import PrintOptions
-
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.firefox import GeckoDriverManager
+
 from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-FIREFOX_BIN = os.environ.get("FIREFOX_BIN")  # e.g. /home/ksheetiz/miniforge3/envs/corestack-backend/bin/FirefoxApp
+FIREFOX_BIN = os.environ.get(
+    "FIREFOX_BIN"
+)  # e.g. /home/ksheetiz/miniforge3/envs/corestack-backend/bin/FirefoxApp
 GECKODRIVER_LOG = os.environ.get("GECKODRIVER_LOG", "geckodriver.log")
 
 
@@ -33,13 +37,19 @@ def render_pdf_with_firefox(url: str) -> bytes:
     elif os.path.exists("/usr/local/bin/firefox"):
         chosen = "/usr/local/bin/firefox"
     else:
-        raise RuntimeError("No Firefox binary found. Set FIREFOX_BIN or install firefox-esr.")
+        raise RuntimeError(
+            "No Firefox binary found. Set FIREFOX_BIN or install firefox-esr."
+        )
     opts.binary_location = chosen
     logger.info("PDF: using Firefox binary at %s", chosen)
 
     # ---- geckodriver path (cache or baked) ----
     geckopath = os.environ.get("GECKODRIVER_PATH") or GeckoDriverManager().install()
-    log_path = os.environ.get("GECKODRIVER_LOG", "geckodriver.log")
+
+    logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+    log_path = os.environ.get(
+        "GECKODRIVER_LOG", os.path.join(logs_dir, "geckodriver.log")
+    )
     log_file = open(log_path, "a", buffering=1)
     logger.info("PDF: using geckodriver at %s (logs -> %s)", geckopath, log_path)
 
@@ -47,14 +57,21 @@ def render_pdf_with_firefox(url: str) -> bytes:
 
     # ---- sanitize environment to avoid Conda/GTK/NSS conflicts ----
     # Conda often sets LD_LIBRARY_PATH etc. that break system Firefox.
-    for var in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "GTK_PATH", "GTK_DATA_PREFIX", "MOZ_GMP_PATH"):
+    for var in (
+        "LD_LIBRARY_PATH",
+        "DYLD_LIBRARY_PATH",
+        "GTK_PATH",
+        "GTK_DATA_PREFIX",
+        "MOZ_GMP_PATH",
+    ):
         if os.environ.get(var):
             logger.warning("PDF: unsetting %s to avoid binary/lib conflicts", var)
             os.environ.pop(var, None)
-    os.environ.setdefault("XDG_RUNTIME_DIR", "/tmp")  # avoids Wayland/runtime dir complaints
+    os.environ.setdefault(
+        "XDG_RUNTIME_DIR", "/tmp"
+    )  # avoids Wayland/runtime dir complaints
 
     # ---- optionally force a fresh, writable profile to /tmp ----
-    import tempfile
     profile_dir = tempfile.mkdtemp(prefix="ffprof_")
     opts.add_argument("-profile")
     opts.add_argument(profile_dir)
@@ -81,7 +98,7 @@ def render_pdf_with_firefox(url: str) -> bytes:
 
         p = PrintOptions()
         try:
-            p.orientation = "landscape"   # newer Selenium expects lowercase
+            p.orientation = "landscape"  # newer Selenium expects lowercase
         except ValueError:
             # Fall back to defaults (portrait)
             pass
