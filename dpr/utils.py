@@ -438,12 +438,12 @@ def sync_groundwater():
         )
 
         recharge_st.beneficiary_settlement = (
-            record.get("beneficiary_settlement", "") or "0"
+            record.get("beneficiary_settlement", "") or "NA"
         )
-        recharge_st.block_name = record.get("block_name", "") or ""
-        recharge_st.work_type = record.get("TYPE_OF_WORK_ID", "") or ""
-        recharge_st.plan_id = record.get("plan_id", "") or "0"
-        recharge_st.plan_name = record.get("plan_name", "") or "0"
+        recharge_st.block_name = record.get("block_name", "") or "NA"
+        recharge_st.work_type = record.get("TYPE_OF_WORK_ID", "") or "NA"
+        recharge_st.plan_id = record.get("plan_id", "") or "NA"
+        recharge_st.plan_name = record.get("plan_name", "") or "NA"
         try:
             coordinates = (
                 record.get("GPS_point", {})
@@ -456,8 +456,8 @@ def sync_groundwater():
             recharge_st.latitude = coordinates[1]
             recharge_st.longitude = coordinates[0]
         else:
-            recharge_st.latitude = "0"
-            recharge_st.longitude = "0"
+            recharge_st.latitude = "NA"
+            recharge_st.longitude = "NA"
         recharge_st.status_re = (
             record.get("__system", {}).get("reviewState", "") or "in progress"
         )
