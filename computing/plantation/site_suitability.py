@@ -219,6 +219,7 @@ def check_site_suitability(
     Returns:
         Asset ID of the suitability vector
     """
+    layer_id = None
 
     # Create a unique asset name for the suitability analysis
     if project:
@@ -260,7 +261,7 @@ def check_site_suitability(
         if have_new_sites:
             ee.data.deleteAsset(asset_id)
         else:
-            return asset_id, asset_name
+            return asset_id, asset_name, layer_id
 
     pss_rasters = ee.Image(pss_rasters_asset)
 
@@ -319,7 +320,6 @@ def check_site_suitability(
         )
         if task_id:
             check_task_status([task_id], 120)
-    layer_id = None
     if is_gee_asset_exists(asset_id):
         if state and district and block:
             layer_id = save_layer_info_to_db(
