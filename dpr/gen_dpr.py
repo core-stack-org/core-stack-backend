@@ -110,11 +110,11 @@ def create_dpr_document(plan):
 
     # MARK: local save /tmp/dpr/
     # operations on the document
-    file_path = "/tmp/dpr/"
+    # file_path = "/tmp/dpr/"
 
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    doc.save(file_path + plan.plan + ".docx")
+    # if not os.path.exists(file_path):
+    #     os.makedirs(file_path)
+    # doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
