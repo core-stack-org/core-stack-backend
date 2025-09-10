@@ -128,8 +128,10 @@ def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
 
         email_body = f"""
         Hi,
-        Find attached the Detailed Project Report for {plan_name}.
-        Thanks.
+        Find attached the Detailed Project Report for {plan_name} and MWS Report for MWSs: {", ".join(mws_Ids)}.
+
+        Thanks and Regards,
+        CoRE Stack Team
         """
 
         backend = EmailBackend(
@@ -241,7 +243,7 @@ def initialize_document():
 
 def get_mws_ids_for_report(plan):
     mws_ids = set()
-    settlement_coordinates = get_settlement_coordinates_for_plan(plan.plan_id)
+    settlement_coordinates = get_settlement_coordinates_for_plan(plan.id)
 
     mws_fortnight = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
@@ -259,6 +261,9 @@ def get_mws_ids_for_report(plan):
             mws_ids.add(mws_uid)
 
     return sorted(mws_ids)
+
+
+############################## Sections #######################################
 
 
 # MARK: - Section A
