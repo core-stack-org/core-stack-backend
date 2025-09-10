@@ -1,5 +1,5 @@
 import json
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 from rest_framework import status
 import bot_interface.models
@@ -59,6 +59,7 @@ def mark_message_as_read(bot_instance_id, message_id):
 
 @api_view(["POST"])
 @auth_free
+@schema(None)
 def whatsapp_webhook(request):
     print("Webhook start")
     print("START TIME = ", datetime.now())
