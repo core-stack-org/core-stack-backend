@@ -261,6 +261,15 @@ def check_site_suitability(
         if have_new_sites:
             ee.data.deleteAsset(asset_id)
         else:
+            if state and district and block:
+                layer_id = save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=asset_name,
+                    asset_id=asset_id,
+                    dataset_name="Site Suitability Vector"
+                )
             return asset_id, asset_name, layer_id
 
     pss_rasters = ee.Image(pss_rasters_asset)
