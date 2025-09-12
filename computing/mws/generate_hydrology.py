@@ -22,7 +22,6 @@ from computing.utils import (
     sync_layer_to_geoserver,
     update_layer_sync_status,
 )
-from utilities.geoserver_utils import Geoserver
 
 
 @app.task(bind=True)
