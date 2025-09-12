@@ -144,8 +144,7 @@ def fetch_odk_data_sync(ODK_URL):
 
 def sync_settlement():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_settlement)
-    print("ODK data settlement", odk_resp_list[:3])
-    # settlement = ODK_settlement()  # settlement obj for the db model
+    # print("ODK data settlement", odk_resp_list[:3])
 
     for record in odk_resp_list:
         submission_date = timezone.datetime.strptime(
@@ -445,8 +444,8 @@ def sync_groundwater():
             recharge_st.latitude = coordinates[1]
             recharge_st.longitude = coordinates[0]
         else:
-            recharge_st.latitude = "NA"
-            recharge_st.longitude = "NA"
+            recharge_st.latitude = 0.0
+            recharge_st.longitude = 0.0
         recharge_st.status_re = (
             record.get("__system", {}).get("reviewState", "") or "in progress"
         )
@@ -499,8 +498,8 @@ def sync_agri():
             irrigation.latitude = coordinates[1]
             irrigation.longitude = coordinates[0]
         else:
-            irrigation.latitude = "0"
-            irrigation.longitude = "0"
+            irrigation.latitude = 0.0
+            irrigation.longitude = 0.0
 
         irrigation.system = record.get("__system", {})
         irrigation.gps_point = record.get("GPS_point", {})
@@ -564,8 +563,8 @@ def sync_livelihood():
             livelihood.latitude = coordinates[1]
             livelihood.longitude = coordinates[0]
         else:
-            livelihood.latitude = "0"
-            livelihood.longitude = "0"
+            livelihood.latitude = 0.0
+            livelihood.longitude = 0.0
 
         livelihood.status_re = (
             record.get("__system", {}).get("reviewState", "") or "in progress"
