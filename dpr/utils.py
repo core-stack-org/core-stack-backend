@@ -21,6 +21,7 @@ from utilities.constants import (
     ODK_URL_waterbody,
     ODK_URL_well,
 )
+from utilities.logger import setup_logger
 
 from .models import (
     Agri_maintenance,
@@ -37,6 +38,8 @@ from .models import (
 )
 
 warnings.filterwarnings("ignore")
+
+logger = setup_logger(__name__)
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -69,32 +72,18 @@ def get_vector_layer_geoserver(geoserver_url, workspace, layer_name):
 
 
 def sync_db_odk():
-    print("sync settlement")
-    sync_settlement()
-
-    print("sync well")
-    sync_well()
-
-    print("sync waterbody")
+    # sync_settlement()
+    # sync_well()
     sync_waterbody()
-
-    print("sync groundwater")
-    sync_groundwater()
-
-    print("sync agri")
-    sync_agri()
-
-    print("sync livelihood")
-    sync_livelihood()
-
-    print("sync cropping patterns")
-    sync_cropping_pattern()
-
-    print("sync maintenance data")
-    sync_agri_maintenance()
-    sync_gw_maintenance()
-    sync_swb_maintenance()
-    sync_swb_rs_maintenance()
+    # sync_groundwater()
+    # sync_agri()
+    # sync_livelihood()
+    # sync_cropping_pattern()
+    # sync_agri_maintenance()
+    # sync_gw_maintenance()
+    # sync_swb_maintenance()
+    # sync_swb_rs_maintenance()
+    logger.info("ODK data synced successfully")
 
 
 def determine_caste_fields(record):
@@ -330,7 +319,7 @@ def sync_well():
         well.is_functional = (
             well_usage.get("select_one_Functional_Non_functional", "") or "NA"
         )
-        well.need_maintenance = well_condition.get("select_one_maintenance", "") or "NA"
+        well.need_maintenance = well_usage.get("select_one_maintenance", "") or "NA"
         well.plan_id = record.get("plan_id", "") or "NA"
         well.plan_name = record.get("plan_name", "") or "NA"
         try:
@@ -356,7 +345,7 @@ def sync_well():
 
 def sync_waterbody():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_waterbody)
-    # print("ODK data waterbody", odk_resp_list[:1])
+    print("ODK data waterbody", odk_resp_list[:1])
     waterbody = ODK_waterbody()
 
     for record in odk_resp_list:
@@ -371,25 +360,25 @@ def sync_waterbody():
         )
 
         waterbody.waterbody_id = record.get("waterbodies_id", "")
-        waterbody.uuid = record.get("__id", "") or "0"
+        waterbody.uuid = record.get("__id", "") or "NA"
         waterbody.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
         waterbody.beneficiary_settlement = (
-            record.get("beneficiary_settlement", "") or "0"
+            record.get("beneficiary_settlement", "") or "NA"
         )
-        waterbody.block_name = record.get("block_name", "") or ""
-        waterbody.who_manages = record.get("select_one_manages", "") or "0"
-        waterbody.specify_other_manager = record.get("text_one_manages", "") or "0"
-        waterbody.owner = record.get("select_one_owns", "") or "0"
-        waterbody.caste_who_uses = record.get("select_multiple_caste_use", "") or "0"
+        waterbody.block_name = record.get("block_name", "") or "NA"
+        waterbody.who_manages = record.get("select_one_manages", "") or "NA"
+        waterbody.specify_other_manager = record.get("text_one_manages", "") or "NA"
+        waterbody.owner = record.get("select_one_owns", "") or "NA"
+        waterbody.caste_who_uses = record.get("select_multiple_caste_use", "") or "NA"
         waterbody.household_benefitted = record.get("households_benefited", "") or 0
         waterbody.water_structure_type = (
-            record.get("select_one_water_structure", "") or "0"
+            record.get("select_one_water_structure", "") or "NA"
         )
         waterbody.water_structure_other = (
-            record.get("select_one_water_structure_other", "") or "0"
+            record.get("select_one_water_structure_other", "") or "NA"
         )
 
         waterbody.identified_by = (

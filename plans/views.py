@@ -109,7 +109,6 @@ class APIKeyOrJWTAuth(BaseAuthentication):
         jwt_auth = JWTAuthentication()
         try:
             jwt_result = jwt_auth.authenticate(request)
-            print("Karan", jwt_result)
             if jwt_result:
                 return jwt_result
         except Exception as e:
