@@ -72,17 +72,17 @@ def get_vector_layer_geoserver(geoserver_url, workspace, layer_name):
 
 
 def sync_db_odk():
-    # sync_settlement()
-    # sync_well()
+    sync_settlement()
+    sync_well()
     sync_waterbody()
-    # sync_groundwater()
-    # sync_agri()
-    # sync_livelihood()
-    # sync_cropping_pattern()
-    # sync_agri_maintenance()
-    # sync_gw_maintenance()
-    # sync_swb_maintenance()
-    # sync_swb_rs_maintenance()
+    sync_groundwater()
+    sync_agri()
+    sync_livelihood()
+    sync_cropping_pattern()
+    sync_agri_maintenance()
+    sync_gw_maintenance()
+    sync_swb_maintenance()
+    sync_swb_rs_maintenance()
     logger.info("ODK data synced successfully")
 
 

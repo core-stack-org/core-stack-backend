@@ -81,20 +81,34 @@ def create_dpr_document(plan):
     )
 
     add_section_a(doc, plan)
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     settlement_mws_ids, mws_gdf = add_section_b(
         doc, plan, total_settlements, mws_fortnight
     )
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     add_section_c(doc, plan)
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     add_section_e(doc, plan)
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     add_section_f(doc, plan, mws_fortnight)
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     add_section_g(doc, plan, mws_fortnight)
+    para = doc.add_paragraph("***")
+    para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
 
     # MARK: local save /tmp/dpr/
     # operations on the document
