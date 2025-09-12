@@ -1,28 +1,16 @@
-import io
-import json
-import os
 import socket
 import ssl
-import tempfile
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date
 from io import BytesIO
-from multiprocessing import Process
 
-import folium
 import geopandas as gpd
-import matplotlib.pyplot as plt
-import seaborn as sns
 from django.core.mail import EmailMessage
 from django.core.mail.backends.smtp import EmailBackend
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
-from docx.shared import Inches, RGBColor
-from PIL import Image
-from selenium import webdriver
-from shapely.geometry import MultiPolygon, Point, shape
-from shapely.ops import unary_union
+from shapely.geometry import Point
 
 from dpr.mapping import populate_maintenance_from_waterbody
 from dpr.utils import get_waterbody_repair_activities
@@ -73,7 +61,7 @@ def create_dpr_document(plan):
     logger.info("Generating DPR for plan ID: %s", plan.id)
     logger.info("Syncing ODK data with database")
 
-    # sync_db_odk()
+    sync_db_odk()
     logger.info("Database sync complete")
     logger.info("Details of the plan")
     logger.info(plan)
@@ -809,7 +797,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
                 well_usage = select_one_well_used
 
         repair_activities = "NA"
-        if well.data_well and "Well_condition" in well.data_well:
+        if well.data_well and "Well_usage" in well.data_well:
             well_condition_data = well.data_well["Well_condition"]
             select_one_repairs_well = well_condition_data.get("select_one_repairs_well")
             select_one_repairs_well_other = well_condition_data.get(
@@ -861,11 +849,7 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
     households_count = defaultdict(int)
 
     for waterbody, mws_id in all_waterbodies_with_mws:
-        if waterbody.water_structure_type.lower() == "other":
-            structure_type = "Other: " + waterbody.water_structure_other
-        else:
-            structure_type = waterbody.water_structure_type
-
+        structure_type = waterbody.water_structure_type
         waterbody_count[(waterbody.beneficiary_settlement, structure_type)] += 1
         households_count[(waterbody.beneficiary_settlement, structure_type)] += int(
             waterbody.household_benefitted
