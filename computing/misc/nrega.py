@@ -189,6 +189,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
                 nrega_task_id_list = check_task_status([task_id])
                 print("nrega_task_id_list", nrega_task_id_list)
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
             state_name,
@@ -204,4 +205,6 @@ def clip_nrega_district_block(self, state_name, district_name, block_name):
         res = push_shape_to_geoserver(path, workspace="nrega_assets")
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            layer_at_geoserver = True
             print("sync to geoserver flag is updated")
+    return layer_at_geoserver
