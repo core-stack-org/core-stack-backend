@@ -63,7 +63,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
             new_description = f"{description}_{new_start_year}_{end_year}"
             if not is_gee_asset_exists(new_asset_id):
-                append_new_to_existing(
+                generate_vector(
                     start_year=new_start_year,
                     end_year=end_year,
                     state=state,
@@ -89,7 +89,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
                 return "merging completed..."
         return "already upto date "
     else:
-        append_new_to_existing(
+        generate_vector(
             start_year=start_year,
             end_year=end_year,
             state=state,
@@ -111,7 +111,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
         return "generated new layer"
 
 
-def append_new_to_existing(
+def generate_vector(
     start_year, end_year, state, district, block, description, asset_id, fc
 ):
     lulc_list = []
