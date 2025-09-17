@@ -83,7 +83,7 @@ INSTALLED_APPS = [
     "rest_framework_api_key",
     # project applications
     "users",
-    "organization",
+    "organization.apps.OrganizationConfig",
     "projects",
     "plantations",
     "plans",
@@ -335,3 +335,5 @@ CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 # Community Engagement API Configuration
 COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
 WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+
+BASE_URL='https://127.0.0.1:8000/'

@@ -1,5 +1,8 @@
 from django.db import models
 import uuid
+from django.contrib.auth.models import User
+
+from nrm_app import settings
 
 
 class Organization(models.Model):
@@ -8,7 +11,12 @@ class Organization(models.Model):
     description = models.TextField(blank=True, null=True)
     odk_project = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.CharField(max_length=255, blank=True, null=True)
+    created_by = models.ForeignKey(
+            settings.AUTH_USER_MODEL,
+            null=True,
+            on_delete=models.CASCADE,
+            related_name="organizations_created")
+
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.CharField(max_length=255, blank=True, null=True)
 
