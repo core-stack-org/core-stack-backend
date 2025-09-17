@@ -1,4 +1,7 @@
 import ee
+from utilities.constants import (
+    GEE_DATASET_PATH
+)
 
 
 def mask_s2cloud(image):
@@ -94,11 +97,11 @@ def clip_lulc_from_river_basin(
 
             # Get the image first
             image = ee.Image(
-                "projects/ee-corestackdev/assets/datasets/"
+                GEE_DATASET_PATH
                 + (
-                    "LULC_v2_river_basin/"
+                    "/LULC_v2_river_basin/"
                     if version == "v2"
-                    else "LULC_v3_river_basin/"
+                    else "/LULC_v3_river_basin/"
                 )
                 + lulc_name
             )
@@ -127,8 +130,8 @@ def clip_lulc_from_river_basin(
         )
         # Clipping river basin lulc for a particular geometry
         lulc = ee.Image(
-            "projects/ee-corestackdev/assets/datasets/"
-            + ("LULC_v2_river_basin/" if version == "v2" else "LULC_v3_river_basin/")
+            GEE_DATASET_PATH
+            + ("/LULC_v2_river_basin/" if version == "v2" else "/LULC_v3_river_basin/")
             + lulc_name
         ).clip(roi.geometry())
     return lulc

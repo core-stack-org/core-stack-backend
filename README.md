@@ -1,57 +1,45 @@
 # CoRE Stack Backend Setup
 
-# DB Setup
-Install PostgreSQL
-1. sudo apt-get update
-2. sudo apt-get install postgresql postgresql-contrib
+## 🚀 Automated Installation
 
-*Start PostgreSQL*
-1. sudo service postgresql start
+We provide a single installation script that handles everything:  
+- Installs **Miniconda** and sets up the Python environment  
+- Installs & configures **PostgreSQL**  
+- Installs & configures **Apache with mod_wsgi**  
+- Clones the backend repo and applies Django **migrations**  
+- Collects **static files**  
+- Sets up **logs** and **Apache config**  
 
-*Check PostgreSQL status*
-1. sudo systemctl status postgresql
+## 📝 Requirements
 
-*Create a new database*
-1. sudo -u postgres psql
-2. CREATE DATABASE corestack;
+Before starting, make sure you have the following installed on your system:
 
-*Create a new user*
-1. sudo -u postgres psql
-2. create user corestack_user with password 'your_password';
-3. GRANT USAGE, CREATE ON SCHEMA public TO corestack_user;
-4. ALTER DATABASE corestack OWNER TO corestack_user;
-5. ALTER USER corestack_user WITH SUPERUSER; (Optional, only if you want superuser rights)
+- A **Linux-based operating system** (Ubuntu 20.04+ recommended)  
+- **Git** (to clone the repository)  
+- **Bash** (usually preinstalled on Linux)  
 
-# Installation of the libraries
-If you want to install directly from a conda snap of environment.yml
-> conda env create -f environment.yml --verbose
+The installation script will handle the rest (Conda, PostgreSQL, Apache, etc.).
 
-This will create a new conda environment called *black* with all the dependencies specified in the environment.yml file.
 
-# Running the server
-After the successfull installation of all the packages, run the following commands to start the Django server:
-1. conda activate black (or whatever is the name of your virtual environment)
-2. python manage.py runserver 
+### 1. Clone the repository
+```bash
+git clone https://github.com/core-stack-org/core-stack-backend.git
+cd core-stack-backend/installation
+```
 
-*Make Migrations*
-1. Make sure the environment is active. Otherwise, run `conda activate black`
-2. Run `python manage.py migrate`
-For any migration related queries, please send an email to contact@core-stack.org
+### 2. Run the installation script
+```bash
+chmod +x install.sh
+./install.sh
+```
 
-*Run the server*
-1. Make sure the environment is active. Otherwise, run `conda activate black`
-2. Run `python manage.py runserver`
-> Tip: To make local hits to your server, use `python manage.py runserver 0.0.0.0:8080`
+> The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run migrations, and configure Apache.
 
-*Running celery*
-If you are running some tasks, you need to run `celery -A tasks worker -l info`
-> example: `celery -A nrm_app worker -l info -Q nrm &` 
-nrm queue is running in this example.
 
-# Env and config setup
-1. Use .env.example as a template to create .env file inside nrm_app/ directory
-2. Update the environment variables
-3. Add *JSON* files inside the data/ directory
+### 3. Open in Browser
+- API Docs: [http://localhost](http://localhost)  
+- Django Admin: [http://localhost/admin/](http://localhost/admin/)
+---
 
 # Layers script path mapping
 |    | Theme                    | Variable                            | Script path                                                                                                                                    |

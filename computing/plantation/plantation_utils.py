@@ -29,15 +29,31 @@ dataset_paths = {
 }
 
 
+def fix_invalid_geometries(gdf):
+    def clean_geometry(geom):
+        if geom is None:
+            return None
+        if not geom.is_valid:
+            # buffer(0) tries to clean the geometry (fixes self-intersections)
+            fixed = geom.buffer(0)
+            abc = fixed if fixed.is_valid else None
+            return abc
+        return geom
+
+    # Apply cleaning
+    gdf["geometry"] = gdf["geometry"].apply(clean_geometry)
+
+    # Drop any geometries that could not be fixed
+    gdf = gdf.dropna(subset=["geometry"])
+    gdf = gdf[gdf.is_valid]
+    gdf = gdf[~gdf.is_empty]
+
+    return gdf
+
+
 def combine_kmls(kml_files_obj):
     # Enable KML driver
     fiona.drvsupport.supported_drivers["KML"] = "rw"
-
-    # # Get all KML files in directory
-    # kml_files = list(Path(input_dir).glob("*.kml"))
-    #
-    # if not kml_files:
-    #     raise ValueError(f"No KML files found in {input_dir}")
 
     # Read and combine all KML files
     gdfs = []
@@ -45,19 +61,27 @@ def combine_kmls(kml_files_obj):
     for kml_file in kml_files_obj:
         try:
             gdf = gpd.read_file(kml_file.file, driver="KML")
+            # Set the correct original CRS (lat/lon)
+            gdf.set_crs(epsg=4326, inplace=True)
+
             # Convert geometries to 2D
             gdf["geometry"] = gdf["geometry"].apply(convert_to_2d)
+
             # kml_hash = create_hash_using_geometry(gdf["geometry"])
             # Add filename as source column
             gdf["source"] = kml_file.name
             gdf["uid"] = kml_file.kml_hash
+
+            # Reproject to a projected CRS for accurate area (preferably local UTM)
+            gdf_proj = gdf.to_crs(epsg=6933)
+            gdf["area_ha"] = gdf_proj.geometry.area / 10000
             gdfs.append(gdf)
         except Exception as e:
             print(f"Error reading {kml_file}: {e}")
 
     # Combine all geodataframes
     combined_gdf = gpd.GeoDataFrame(pd.concat(gdfs, ignore_index=True))
-
+    combined_gdf = combined_gdf.dropna(axis=1, how="any")
     return combined_gdf
 
 

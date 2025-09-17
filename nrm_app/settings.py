@@ -11,10 +11,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
-import re
-from pathlib import Path
-import environ
 from datetime import timedelta
+from pathlib import Path
+
+import environ
 from corsheaders.defaults import default_headers
 
 env = environ.Env()
@@ -56,6 +56,8 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
+    "5cbf08250f1c.ngrok-free.app",
+    "api-doc.core-stack.org",
 ]
 
 # MARK: Django Apps
@@ -78,12 +80,16 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_yasg",
+    "rest_framework_api_key",
     # project applications
     "users",
     "organization",
     "projects",
     "plantations",
     "plans",
+    "public_api",
+    "community_engagement",
+    "bot_interface",
 ]
 
 # MARK: CORS Settings
@@ -101,11 +107,9 @@ else:
         "https://www.explorer.core-stack.org",
         "https://www.explorer.core-stack.org/landscape_explorer",
         "https://development.d2s4eeyazvtd2g.amplifyapp.com",
-
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1",
-
         "http://localhost:3000",
         "http://localhost:3001",
     ]
@@ -114,12 +118,13 @@ else:
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
     r"^http://127\.0\.0\.1:\d+$",
-    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"
+    r"^http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
     "content-disposition",  # Important for file uploads in form data
+    "X-API-Key"
 ]
 
 CORS_ALLOW_METHODS = [
@@ -142,12 +147,15 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
 }
 
 # MARK: JWT settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=90),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
@@ -248,7 +256,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+
+# Media files (User uploaded content)
+MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
+MEDIA_URL = "/media/"
 
 EXCEL_PATH = env("EXCEL_PATH")
 
@@ -300,5 +313,25 @@ EARTH_DATA_USER = env("EARTH_DATA_USER")
 EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
-
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
+GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH")
+
+LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
+
+# NREGA settings
+NREGA_BUCKET = env("NREGA_BUCKET")
+NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
+NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+
+# S3 settings
+S3_BUCKET = env("S3_BUCKET")
+S3_REGION = env("S3_REGION")
+
+# bot_interface settings
+AUTH_TOKEN_360 = env("AUTH_TOKEN_360")
+ES_AUTH = env("ES_AUTH")
+CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
+
+# Community Engagement API Configuration
+COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
+WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")

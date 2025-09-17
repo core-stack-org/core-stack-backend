@@ -7,6 +7,8 @@ from nrm_app.settings import (
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
     GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
+    GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH,
+    BASE_DIR,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -28,14 +30,18 @@ def ee_initialize(project=None):
             service_account = (
                 "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
             )
-            credentials = ee.ServiceAccountCredentials(
-                service_account, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH
+            conf_path = os.path.join(BASE_DIR, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH)
+            credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
+        elif project == "datasets":
+            service_account = (
+                "corestack-datasets@corestack-datasets.iam.gserviceaccount.com"
             )
+            conf_path = os.path.join(BASE_DIR, GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH)
+            credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
         else:
             service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
-            credentials = ee.ServiceAccountCredentials(
-                service_account, GEE_SERVICE_ACCOUNT_KEY_PATH
-            )
+            conf_path = os.path.join(BASE_DIR, GEE_SERVICE_ACCOUNT_KEY_PATH)
+            credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
         ee.Initialize(credentials)
         print("ee initialized", project)
     except Exception as e:
@@ -94,6 +100,7 @@ def check_gee_task_status(task_id):
 
 
 def check_task_status(task_id_list, sleep_time=60):
+    task_id_list = list(filter(None, task_id_list))
     if len(task_id_list) > 0:
         time.sleep(sleep_time)
         tasks = ee.data.listOperations()
@@ -202,6 +209,59 @@ def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
     return gee_path
 
 
+def export_vector_asset_to_gee(fc, description, asset_id):
+    try:
+        task = ee.batch.Export.table.toAsset(
+            collection=fc,
+            description=description,
+            assetId=asset_id,
+        )
+
+        task.start()
+        print(
+            f"Successfully started the task for {description}, task id:{task.status()}"
+        )
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running {description} task: {e}")
+        return None
+
+
+def export_raster_asset_to_gee(
+    image,
+    description,
+    asset_id,
+    scale,
+    region,
+    pyramiding_policy=None,
+    max_pixel=1e13,
+    crs="EPSG:4326",
+):
+    try:
+        export_params = {
+            "image": image,
+            "description": description,
+            "assetId": asset_id,
+            "scale": scale,
+            "region": region,
+            "maxPixels": max_pixel,
+            "crs": crs,
+        }
+        if pyramiding_policy:
+            export_params["pyramidingPolicy"] = pyramiding_policy
+
+        task = ee.batch.Export.image.toAsset(**export_params)
+
+        task.start()
+        print(
+            f"Successfully started the task for {description}, task id:{task.status()}"
+        )
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running {description} task: {e}")
+        return None
+
+
 def geojson_to_ee_featurecollection(geojson_data):
     """
     Convert a GeoJSON FeatureCollection to an Earth Engine FeatureCollection
@@ -286,6 +346,18 @@ def make_asset_public(asset_id):
         return False
 
 
+def is_asset_public(asset_id):
+    try:
+        acl = ee.data.getAssetAcl(asset_id)
+        if acl.get("all_users_can_read"):
+            return True
+        else:
+            return False
+    except Exception as e:
+        print(f"Error in checking asset public : {e}")
+        return False
+
+
 def sync_raster_to_gcs(image, scale, layer_name):
     print("inside sync_raster_to_gcs")
     export_task = ee.batch.Export.image.toCloudStorage(
@@ -319,6 +391,7 @@ def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_nam
             layer_name=layer_name, style_name=style_name, workspace=workspace
         )
         print("Style response:", style_res)
+    return f"File response: {file_upload_res}"
 
 
 def upload_tif_to_gcs(gcs_file_name, local_file_path):
@@ -395,6 +468,25 @@ def get_geojson_from_gcs(gcs_file_name):
     geojson_data = json.loads(geojson_str)
 
     return geojson_data
+
+
+def download_csv_from_gcs(bucket_name, blob_name, destination_file_name):
+    try:
+        bucket = gcs_config()
+        blob = bucket.blob(bucket_name + "/" + blob_name)
+        if blob.exists():
+            blob.download_to_filename(destination_file_name)
+            print(
+                f"Downloaded {blob_name} from bucket {bucket_name} to {destination_file_name}"
+            )
+        else:
+            print(
+                f"Blob '{blob_name}' does not exist in bucket '{bucket_name}'. No file downloaded."
+            )
+    except Exception as e:
+        print(
+            f"Exception in downloading csv {blob_name} from GCS bucket {bucket_name}", e
+        )
 
 
 def harmonize_band_types(image, target_type="Float"):
@@ -478,7 +570,6 @@ def extract_task_id(command_output):
 
 def gcs_to_gee_asset_cli(gcs_uri, asset_id):
     """Use earthengine CLI to upload from GCS to GEE asset"""
-    ee_initialize()
     command = [
         "earthengine",
         f"--service_account_file={GEE_SERVICE_ACCOUNT_KEY_PATH}",
@@ -497,12 +588,15 @@ def gcs_to_gee_asset_cli(gcs_uri, asset_id):
         return None
     except subprocess.CalledProcessError as e:
         print("An error occurred during the upload.")
-        print("Error Output:", e)
+        print("Command:", " ".join(command))
+        print("Return Code:", e.returncode)
+        print("STDOUT:", e.stdout)
+        print("STDERR:", e.stderr)
         return None
 
 
 def upload_shp_to_gee(shapefile_path, file_name, asset_id):
-    gcs_blob_name = f"{GCS_BUCKET_NAME}/{file_name}/{file_name}.shp"
+    gcs_blob_name = f"shapefiles/{file_name}/{file_name}.shp"
 
     # Make sure all shapefile components (.shp, .dbf, .shx, .prj) are uploaded
     components = [".shp", ".dbf", ".shx", ".prj"]
@@ -519,4 +613,34 @@ def upload_shp_to_gee(shapefile_path, file_name, asset_id):
     # Upload from GCS to GEE
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id)
     if task_id:
-        check_task_status([task_id], 600)
+        check_task_status([task_id], 100)
+
+
+def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
+    # Join on 'id'
+    joined = ee.Join.inner().apply(
+        primary=ee.FeatureCollection(asset_id),
+        secondary=ee.FeatureCollection(new_asset_id),
+        condition=ee.Filter.equals(leftField="id", rightField="id"),
+    )
+
+    # Merge properties from both collections
+    def merge_properties(f):
+        f1 = ee.Feature(f.get("primary"))
+        f2 = ee.Feature(f.get("secondary"))
+        return f1.copyProperties(f2)
+
+    merged = joined.map(merge_properties)
+    task_id = export_vector_asset_to_gee(
+        merged, f"{description}_merge", f"{asset_id}_merge"
+    )
+    task_list = check_task_status([task_id])
+    print("merge task completed.", task_list)
+
+    # Delete existing asset
+    ee.data.deleteAsset(asset_id)
+    ee.data.deleteAsset(new_asset_id)
+    # Rename new asset with existing asset's name
+    ee.data.copyAsset(f"{asset_id}_merge", asset_id)
+    # Delete new asset
+    ee.data.deleteAsset(f"{asset_id}_merge")

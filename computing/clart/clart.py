@@ -8,18 +8,21 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
+    export_raster_asset_to_gee,
+    make_asset_public,
 )
 from utilities.constants import GEE_ASSET_PATH
 from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
 def generate_clart_layer(self, state, district, block):
     ee_initialize()
     drainage_density(state, district, block)
-    generate_lithology_layer(state, district)
+    generate_lithology_layer(state)
     clart_layer(state, district, block)
 
 
@@ -31,7 +34,12 @@ def clart_layer(state, district, block):
         + valid_gee_text(block.lower())
     )
     final_output_assetid = get_gee_asset_path(state, district, block) + description
-
+    layer_name = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_clart"
+    )
     if not is_gee_asset_exists(final_output_assetid):
         srtm = ee.Image("USGS/SRTMGL1_003")
         india_lin = ee.Image("projects/ee-harshita-om/assets/india_lineaments")
@@ -199,35 +207,38 @@ def clart_layer(state, district, block):
         tc = tc.where(class5, 5)
 
         try:
-            scale = 30
-            image_export_task = ee.batch.Export.image.toAsset(
+            task_id = export_raster_asset_to_gee(
                 image=tc,
                 description=description,
-                assetId=final_output_assetid,
-                pyramidingPolicy={"predicted_label": "mode"},
-                scale=scale,
+                asset_id=final_output_assetid,
+                scale=30,
                 region=geometry,
-                maxPixels=1e13,
-                crs="EPSG:4326",
             )
-            image_export_task.start()
-            print("Successfully started the mws_task", image_export_task.status())
-
-            clart_task_id_list = check_task_status([image_export_task.status()["id"]])
+            clart_task_id_list = check_task_status([task_id])
             print("clart_task_id_list", clart_task_id_list)
+
         except Exception as e:
             print(f"Error occurred in running clart: {e}")
+
+    if is_gee_asset_exists(final_output_assetid):
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=final_output_assetid,
+            dataset_name="CLART",
+        )
+        make_asset_public(final_output_assetid)
+
         """ Sync image to google cloud storage and then to geoserver"""
-    layer_name = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_clart"
-    )
-    image = ee.Image(final_output_assetid)
-    task_id = sync_raster_to_gcs(image, 30, layer_name)
+        image = ee.Image(final_output_assetid)
+        task_id = sync_raster_to_gcs(image, 30, layer_name)
 
-    task_id_list = check_task_status([task_id])
-    print("task_id_list sync to gcs ", task_id_list)
+        task_id_list = check_task_status([task_id])
+        print("task_id_list sync to gcs ", task_id_list)
 
-    sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
+        res = sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")

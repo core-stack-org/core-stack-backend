@@ -4,30 +4,45 @@ import hashlib
 from django.db import models
 from projects.models import Project, AppType
 from users.models import User
-from utilities.constants import SITE_DATA_PATH
 from utilities.logger import setup_logger
+from utilities.gee_utils import valid_gee_text
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+
 
 logger = setup_logger(__name__)
+
+overwrite_storage = FileSystemStorage(   
+    allow_overwrite=True            
+)
 
 def kml_file_path(instance, filename):
     """
     Generates the file path for a KML file.
     Format: saytrees/kml_files/project_{project_id}/{filename}
+    
+    This function creates the directory if it doesn't exist and uses the original filename.
     """
-    logger.info("Generating KML file path for project: %s", instance.project.name)
+    
+    logger.info(f"Generating KML file path for project: {instance.project.name}")
+    
     project_id = instance.project.id
     org_name = instance.project.organization.name
     app_type = instance.project.app_type
     project_name = instance.project.name
-
-    # Create directory if it doesn't exist
-    directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
-    full_path = os.path.join(SITE_DATA_PATH, directory)
-    logger.info("KML file path: %s", full_path)
-    os.makedirs(full_path, exist_ok=True)
-
-    return f"{full_path}/{filename}"
-
+    
+    relative_directory = f"site_data/{org_name}/{app_type}/{project_id}_{valid_gee_text(project_name)}"
+    
+    full_path = os.path.join(settings.MEDIA_ROOT, relative_directory)
+    
+    logger.info(f"Ensuring directory exists: {full_path}")
+    try:
+        os.makedirs(full_path, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Error creating directory: {e}")
+    
+    logger.info(f"Returning path: {relative_directory}/{filename}")
+    return f"{relative_directory}/{filename}"
 
 class KMLFile(models.Model):
     id = models.AutoField(primary_key=True)
@@ -39,7 +54,7 @@ class KMLFile(models.Model):
         null=True,
     )
     name = models.CharField(max_length=255)
-    file = models.FileField(upload_to=kml_file_path)
+    file = models.FileField(upload_to=kml_file_path, storage=overwrite_storage, max_length=511)
     kml_hash = models.CharField(max_length=64, unique=True)  # md5 hash of file
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

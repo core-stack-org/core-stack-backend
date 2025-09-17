@@ -1,7 +1,11 @@
 import ee
 
 from plantations.models import PlantationProfile
-from utilities.constants import GEE_PATH_PLANTATION, GEE_ASSET_PATH
+from utilities.constants import (
+    GEE_PATH_PLANTATION,
+    GEE_ASSET_PATH,
+    GEE_DATASET_PATH,
+)
 from utilities.gee_utils import (
     is_gee_asset_exists,
     harmonize_band_types,
@@ -11,10 +15,12 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
+    export_raster_asset_to_gee,
 )
 from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from .plantation_utils import dataset_paths
 from utilities.logger import setup_logger
+from ..utils import save_layer_info_to_db, update_layer_sync_status
 
 logger = setup_logger(__name__)
 
@@ -350,7 +356,10 @@ def get_pss(
     # 7 (Barren lands), 8 (Single Kharif Cropping), 9 (Single Non Kharif Cropping),
     # 10 (Double Cropping), 11 (Triple Cropping), 12 (Shrub and Scrub)
     lulc = get_dataset("LULC", state, roi, start_year, end_year)
-    lulc_mask = lulc.gte(5)
+    if is_default_profile:
+        lulc_mask = lulc.eq(5).Or(lulc.gte(7))
+    else:
+        lulc_mask = lulc.gte(5)
 
     # Final score with LULC masking and clipping to ROI
     final_plantation_score = (
@@ -368,27 +377,32 @@ def get_pss(
     # Export to GEE asset
     try:
         scale = 30
-        export_params = {
-            "image": all_layers.clip(roi.geometry()),
-            "description": description,
-            "assetId": asset_id,
-            "pyramidingPolicy": {"predicted_label": "mode"},
-            "scale": scale,
-            "maxPixels": 1e13,
-            "crs": "EPSG:4326",
-            "region": roi.geometry(),
-        }
+        task_id = export_raster_asset_to_gee(
+            image=all_layers.clip(roi.geometry()),
+            description=description,
+            asset_id=asset_id,
+            scale=scale,
+            region=roi.geometry(),
+        )
+        check_task_status([task_id])
 
-        export_task = ee.batch.Export.image.toAsset(**export_params)
-        export_task.start()
+        if is_gee_asset_exists(asset_id):
+            make_asset_public(asset_id)
+            layer_id = None
+            if state and district and block:
+                layer_id = save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=description,
+                    asset_id=asset_id,
+                    dataset_name="Site Suitability",
+                    misc={"start_year": start_year, "end_year": end_year},
+                )
+                print("save site suitability info at the gee level...")
 
-        logger.info(f"Export task started with ID: {export_task.status()['id']}")
-        check_task_status([export_task.status()["id"]])
-
-        make_asset_public(asset_id)
-
-        sync_to_gcs_geoserver(asset_id, description, scale)
-        return asset_id, is_default_profile
+            sync_to_gcs_geoserver(asset_id, description, scale, layer_id)
+            return asset_id, is_default_profile
 
     except Exception as e:
         logger.exception(f"Export failed: {str(e)}")
@@ -443,7 +457,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
         s_year = start_year
         lulc_years = []
         while s_year <= end_year:
-            asset_id = f"projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year+1)}"
+            asset_id = f"{GEE_DATASET_PATH}/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year+1)}"
             lulc_img = (
                 ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
             )
@@ -485,7 +499,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
         s_year = start_year
         lulc_years = []
         while s_year <= end_year:
-            asset_id = f"projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year + 1)}"
+            asset_id = f"{GEE_DATASET_PATH}/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year + 1)}"
             lulc_img = (
                 ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
             )
@@ -567,15 +581,18 @@ def create_classification(
     return sub_layer
 
 
-def sync_to_gcs_geoserver(asset_id, layer_name, scale):
+def sync_to_gcs_geoserver(asset_id, layer_name, scale, layer_id):
     image = ee.Image(asset_id)
     task_id = sync_raster_to_gcs(image, scale, layer_name)
     task_id_list = check_task_status([task_id])
     print("task_id sync to gcs ", task_id_list)
 
-    sync_raster_gcs_to_geoserver(
+    res = sync_raster_gcs_to_geoserver(
         "plantation",
         layer_name,
         layer_name,
         None,
     )
+    if res and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver falg is updated")
