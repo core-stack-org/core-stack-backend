@@ -53,6 +53,37 @@ nrm queue is running in this example.
 2. Update the environment variables
 3. Add *JSON* files inside the data/ directory
 
+# Layers script path mapping
+|    | Theme                    | Variable                            | Script path                                                                                                                                    |
+| -- | ------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | Hydrology                | Microwatersheds                     | /computing/mws/mws.py                                                                                                                          |
+| 2  | Hydrology                | Upstream Downstream Microwatersheds |                                                                                                                                                |
+| 3  | Hydrology                | Precipitation                       | /computing/mws/precipitation.py                                                                                                                |
+| 4  | Hydrology                | Runoff                              | /computing/mws/run_off.py                                                                                                                      |
+| 5  | Hydrology                | Evapotranspiration                  | /computing/mws/evapotranspiration.py                                                                                                           |
+| 6  | Hydrology                | Change in groundwater               | /computing/mws/delta_g.py                                                                                                                      |
+| 7  | Hydrology                | Change in well depth                | /computing/mws/well_depth.py                                                                                                                   |
+| 8  | Hydrology                | Aquifers                            | /computing/misc/aquifer_vector.py                                                                                                              |
+| 9  | Hydrology                | Stage of Groundwater Extraction     | /computing/misc/soge_vector.py                                                                                                                 |
+| 10 | Climate                  | Drought frequency and intensity     | /computing/drought/drought.py                                                                                                                  |
+| 11 | Climate                  | Drought causality                   | /computing/drought/drought_causality.py                                                                                                        |
+| 12 | Terrain                  | Terrain classification              | /computing/terrain_descriptor/terrain_raster.py                                                                                                |
+| 13 | Terrain                  | Terrain cluster                     | /computing/terrain_descriptor/terrain_clusters.py                                                                                              |
+| 14 | Land use                 | Land use land cover                 | /computing/lulc/lulc_v3.py                                                                                                                     |
+| 15 | Land use                 | Land use on terrain                 | Land use on Plain: /computing/lulc_X_terrain/lulc_on_plain_cluster.py<br>Land use on Slope: /computing/lulc_X_terrain/lulc_on_slope_cluster.py |
+| 16 | Land use                 | Land use changes                    | /computing/change_detection/change_detection.py                                                                                                |
+| 17 | Land use                 | Cropping intensity                  | /computing/cropping_intensity/cropping_intensity.py                                                                                            |
+| 18 | Land use                 | Water bodies                        | /computing/surface_water_bodies/swb.py                                                                                                         |
+| 19 | Land use                 | First census of water bodies        | /computing/surface_water_bodies/swb3.py'                                                                                                       |
+| 20 | Tree health              | Tree canopy cover density           | /computing/tree_health/ccd.py                                                                                                                  |
+| 21 | Tree health              | Tree canopy height                  | /computing/tree_health/canopy_height.py                                                                                                        |
+| 22 | Tree health              | Tree cover change                   | /computing/tree_health/overall_change.py                                                                                                       |
+| 23 | Welfare                  | NREGA assets categorization         | /computing/misc/nrega.py                                                                                                                       |
+| 24 | Administrative           | Village                             | /computing/misc/admin_boundary.py                                                                                                              |
+| 25 | Water structure planning | Lithology                           | /computing/clart/lithology.py                                                                                                                  |
+| 26 | Water structure planning | Drainage lines                      | /computing/misc/drainage_lines.py                                                                                                              |
+| 27 | Water structure planning | Stream order raster                 | /computing/misc/stream_order.py                                                                                                                |
+| 28 | Water structure planning | CLART                               | /computing/clart/clart.py                                                                                                                      |
 # More
 - [DB Design](https://github.com/core-stack-org/core-stack-backend/wiki/DB-Design) 
 - [API Doc](https://github.com/core-stack-org/core-stack-backend/wiki/Project-API-Doc)
