@@ -1,6 +1,6 @@
-## CoRE Stack Backend Setup
+## CoRE Stack Backend 
 
-### 🚀 Automated Installation
+### Installation
 
 We provide a single installation script that handles everything:  
 - Installs **Miniconda** and sets up the Python environment  
@@ -10,7 +10,7 @@ We provide a single installation script that handles everything:
 - Collects **static files**  
 - Sets up **logs** and **Apache config**  
 
-### 📝 Requirements
+#### Requirements
 
 Before starting, make sure you have the following installed on your system:
 
@@ -42,7 +42,7 @@ chmod +x install.sh
 
 ---
 
-## Script path 
+### Script path 
 |    | Theme                    | Variable                        | Script path                                                           |
 | -- | ------------------------ | ------------------------------- | --------------------------------------------------------------------- |
 | 1  | Hydrology                | Microwatersheds                 | /computing/mws/mws.py                                                 |
@@ -76,6 +76,9 @@ chmod +x install.sh
 | 28 | Water structure planning | Drainage lines                  | /computing/misc/drainage_lines.py                                     |
 | 29 | Water structure planning | Stream order raster             | /computing/misc/stream_order.py                                       |
 | 30 | Water structure planning | CLART                           | /computing/clart/clart.py                                             |                                                                                                                    |
+
+### How to integrate custom pipelines on CoREStack 
+We have prepared a [detailed guide](https://docs.google.com/document/d/1lfx2hJKndmzVp55ZHIIFYqRTz-8fZCWc9QikUDQpTN0/edit?usp=sharing) on how to integrate custom pipelines on the CoREStack backend. 
 
 ### Further references
 - [DB Design](https://github.com/core-stack-org/core-stack-backend/wiki/DB-Design) 
