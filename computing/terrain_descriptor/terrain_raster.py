@@ -1,4 +1,5 @@
 from nrm_app.celery import app
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -8,7 +9,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
-    make_asset_public,
+    make_asset_public, get_gee_dir_path,
 )
 import ee
 
@@ -17,26 +18,44 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def terrain_raster(self, state, district, block):
-    print("Inside terrain_raster")
-    ee_initialize()
-    description = (
-        "terrain_raster_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
+def terrain_raster(self,
+    roi_path,
+    gee_account_id,
+    state=None,
+    district=None,
+    block=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type="MWS",
+   ):
 
-    if not is_gee_asset_exists(asset_id):
-        roi_boundary = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
-            + "filtered_mws_"
+    print("Inside terrain_raster")
+    ee_initialize(gee_account_id)
+    if state and district and block:
+        description = (
+            "terrain_raster_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-            + "_uid"
         )
+        asset_id = get_gee_asset_path(state, district, block) + description
+    else:
+        description = (
+                "terrain_raster_" + asset_suffix
+        )
+
+        asset_id = (
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + description
+        )
+
+
+
+        if not is_gee_asset_exists(asset_id):
+            roi_boundary = ee.FeatureCollection(roi_path)
+
 
         mwsheds_lf_rasters = ee.ImageCollection(
             roi_boundary.map(generate_terrain_classified_raster)

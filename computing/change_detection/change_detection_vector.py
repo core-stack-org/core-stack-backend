@@ -17,8 +17,8 @@ from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def vectorise_change_detection(self, state, district, block):
-    ee_initialize()
+def vectorise_change_detection(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"

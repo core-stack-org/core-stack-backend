@@ -50,7 +50,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
-
+GEE_HELPER_ACCOUNT_ID = 4
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "public_api",
     "community_engagement",
     "bot_interface",
+    "gee_computing"
 ]
 
 # MARK: CORS Settings

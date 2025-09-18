@@ -18,9 +18,9 @@ from computing.utils import (
 
 
 @app.task(bind=True)
-def generate_aquifer_vector(self, state, district, block):
+def generate_aquifer_vector(self, state, district, block, gee_account_id):
     """Aquifer vector layer generation."""
-    ee_initialize()
+    ee_initialize(gee_account_id)
 
     description = f"aquifer_vector_{valid_gee_text(district)}_{valid_gee_text(block)}"
     input_asset_id = (
