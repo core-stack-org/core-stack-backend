@@ -1296,28 +1296,51 @@ def add_section_g(doc, plan, mws):
         # Livestock
         livestock_group = record.data_livelihood.get("Livestock")
         if (
-            livestock_group.get("select_one_demand_promoting_livestock").lower()
+            livestock_group.get("is_demand_livestock")
+            and livestock_group.get("is_demand_livestock").lower() == "yes"
+        ) or (
+            record.data_livelihood.get("select_one_demand_promoting_livestock")
+            and record.data_livelihood.get(
+                "select_one_demand_promoting_livestock"
+            ).lower()
             == "yes"
         ):
             row_cells = table.add_row().cells
             row_cells[0].text = "Livestock"
             row_cells[1].text = livestock_group.get("livestock_demand") or "NA"
             demands_promoting_livestock = livestock_group.get(
-                "select_one_promoting_livestock"
+                "demands_promoting_livestock"
             )
-            if demands_promoting_livestock == "other":
+            if (
+                demands_promoting_livestock
+                and demands_promoting_livestock.lower() == "other"
+            ):
                 demands_promoting_livestock = livestock_group.get(
-                    "select_one_promoting_livestock_other", "NA"
+                    "demands_promoting_livestock_other", "NA"
                 )
+
+            # check old keys
+            if not demands_promoting_livestock or demands_promoting_livestock == "NA":
+                demands_promoting_livestock = record.data_livelihood.get(
+                    "select_one_promoting_livestock"
+                )
+                if (
+                    demands_promoting_livestock
+                    and demands_promoting_livestock.lower() == "other"
+                ):
+                    demands_promoting_livestock = record.data_livelihood.get(
+                        "select_one_promoting_livestock_other", "NA"
+                    )
+
             row_cells[2].text = format_text(demands_promoting_livestock) or "NA"
             row_cells[3].text = record.beneficiary_settlement or "NA"
             row_cells[4].text = (
                 record.data_livelihood.get("beneficiary_name")
-                or livestock_group.get("ben_plantation")
+                or livestock_group.get("ben_livestock")
                 or "NA"
             )
             row_cells[5].text = livestock_group.get("gender_livestock") or "NA"
-            row_cells[6].text = livelihood_records.get("ben_father_livestock") or "NA"
+            row_cells[6].text = livestock_group.get("ben_father_livestock") or "NA"
             row_cells[7].text = (
                 "{:.6f}".format(record.latitude) if record.latitude else "NA"
             )
@@ -1328,7 +1351,12 @@ def add_section_g(doc, plan, mws):
         # Fisheries category
         fisheries_group = record.data_livelihood.get("fisheries")
         if (
-            fisheries_group.get("select_one_demand_promoting_fisheries").lower()
+            fisheries_group.get("is_demand_fisheris")
+            and fisheries_group.get("is_demand_fisheris").lower() == "yes"
+            or record.data_livelihood.get("select_one_demand_promoting_fisheries")
+            and record.data_livelihood.get(
+                "select_one_demand_promoting_fisheries"
+            ).lower()
             == "yes"
         ):
             row_cells = table.add_row().cells
@@ -1337,10 +1365,24 @@ def add_section_g(doc, plan, mws):
             demands_promoting_fisheries = fisheries_group.get(
                 "select_one_promoting_fisheries"
             )
-            if demands_promoting_fisheries == "other":
+            if demands_promoting_fisheries or demands_promoting_fisheries == "other":
                 demands_promoting_fisheries = fisheries_group.get(
                     "select_one_promoting_fisheries_other", "NA"
                 )
+
+            # check old keys
+            if not demands_promoting_fisheries or demands_promoting_fisheries == "NA":
+                demands_promoting_fisheries = record.data_livelihood.get(
+                    "select_one_promoting_fisheries"
+                )
+                if (
+                    demands_promoting_fisheries
+                    and demands_promoting_fisheries.lower() == "other"
+                ):
+                    demands_promoting_fisheries = record.data_livelihood.get(
+                        "select_one_promoting_fisheries_other", "NA"
+                    )
+
             row_cells[2].text = format_text(demands_promoting_fisheries) or "NA"
             row_cells[3].text = record.beneficiary_settlement or "NA"
             row_cells[4].text = (
@@ -1357,46 +1399,101 @@ def add_section_g(doc, plan, mws):
                 "{:.6}".format(record.longitude) if record.longitude else "NA"
             )
 
-    # TODO: Table for Plantation and Kitchen Gardens
-    # doc.add_heading("G.2 Plantations and Kitchen Gardens", level=2)
-    # plantation_headers = [
-    #     "Livelihood Works",
-    #     "Type of demand",
-    #     "Name of Beneficiary Settlement",
-    #     "Name of Beneficiary",
-    #     "Gender",
-    #     "Beneficiary's Father's Name",
-    #     "Name of Plantation Crop",
-    #     "Total Acres",
-    #     "Latitude",
-    #     "Longitude",
-    # ]
-    # plantation_table = doc.add_table(rows=1, cols=len(plantation_headers))
-    # plantation_table.style = "Table Grid"
-    # plantation_hdr_cells = plantation_table.rows[0].cells
-    # for i, header in enumerate(plantation_headers):
-    #     plantation_hdr_cells[i].paragraphs[0].add_run(header).bold = True
+    # Plantation and Kitchen Gardens
+    doc.add_heading("G.2 Plantations and Kitchen Gardens", level=2)
+    plantation_headers = [
+        "Livelihood Works",
+        "Type of demand",
+        "Name of Beneficiary Settlement",
+        "Name of Beneficiary",
+        "Gender",
+        "Beneficiary's Father's Name",
+        "Name of Plantation Crop",
+        "Total Acres",
+        "Latitude",
+        "Longitude",
+    ]
+    plantation_table = doc.add_table(rows=1, cols=len(plantation_headers))
+    plantation_table.style = "Table Grid"
+    plantation_hdr_cells = plantation_table.rows[0].cells
+    for i, header in enumerate(plantation_headers):
+        plantation_hdr_cells[i].paragraphs[0].add_run(header).bold = True
 
-    # for record in livelihood_records:
-    #     if record.data_livelihood.get("select_one_demand_plantation").lower() == "yes":
-    #         row_cells = plantation_table.add_row().cells
-    #         row_cells[0].text = "Plantations"
-    #         row_cells[1].text = (
-    #             record.data_livelihood.get("demand_type_plantations") or "NA"
-    #         )
-    #         row_cells[2].text = record.beneficiary_settlement or "NA"
-    #         row_cells[3].text = record.data_livelihood.get(
-    #             "beneficiary_name", "No Data Provided"
-    #         )
-    #         row_cells[4].text = record.data_livelihood.get("gender_plantations") or "NA"
-    #         row_cells[5].text = record.data_livelihood.get("ben_father") or "NA"
-    #         plantation_type = record.data_livelihood.get("Plantation")
-    #         row_cells[6].text = plantation_type or "NA"
-    #         plantation_area = record.data_livelihood.get("Plantation_crop")
-    #         row_cells[7].text = plantation_area or "NA"
-    #         row_cells[8].text = (
-    #             "{:.6}".format(record.latitude) if record.latitude else "NA"
-    #         )
-    #         row_cells[7].text = (
-    #             "{:.6f}".format(record.longitude) if record.longitude else "NA"
-    #         )
+    for record in livelihood_records:
+        plantation_group = record.data_livelihood.get("plantations")
+        kitchen_garden_group = record.data_livelihood.get("kitchen_gardens")
+        if (
+            record.data_livelihood.get("select_one_demand_plantation")
+            and record.data_livelihood.get("select_one_demand_plantation").lower()
+            == "yes"
+            or plantation_group.get("select_plantation_demands")
+            and plantation_group.get("select_plantation_demands").lower() == "yes"
+        ):
+            row_cells = plantation_table.add_row().cells
+            row_cells[0].text = "Plantations"
+            row_cells[1].text = plantation_group.get("demand_type_plantations") or "NA"
+            row_cells[2].text = record.beneficiary_settlement or "NA"
+            row_cells[3].text = (
+                record.data_livelihood.get("beneficiary_name")
+                or plantation_group.get("ben_plantation")
+                or "NA"
+            )
+            row_cells[4].text = plantation_group.get("gender") or "NA"
+            row_cells[5].text = plantation_group.get("ben_father") or "NA"
+            plantation_crop_type = (
+                record.data_livelihood.get("Plantation")
+                or plantation_group.get("crop_name")
+                or "NA"
+            )
+            row_cells[6].text = plantation_crop_type
+            plantation_crop_area = (
+                record.data_livelihood.get("Plantation_crop")
+                or plantation_group.get("crop_area")
+                or "NA"
+            )
+            row_cells[7].text = plantation_crop_area
+            row_cells[8].text = (
+                "{:.6}".format(record.latitude) if record.latitude else "NA"
+            )
+            row_cells[7].text = (
+                "{:.6f}".format(record.longitude) if record.longitude else "NA"
+            )
+
+        # kitchen garden
+        if (
+            record.data_livelihood.get("indi_assets")
+            and record.data_livelihood.get("indi_assets").lower() == "yes"
+            or kitchen_garden_group.get("assets_kg")
+            and kitchen_garden_group.get("assets_kg").lower() == "yes"
+        ):
+            row_cells = plantation_table.add_row().cells
+            row_cells[0].text = "Kitchen Garden"
+            row_cells[1].text = (
+                kitchen_garden_group.get("demand_type_kitchen_garden") or "NA"
+            )
+            row_cells[2].text = record.beneficiary_settlement or "NA"
+            row_cells[3].text = (
+                record.data_livelihood.get("beneficiary_name")
+                or kitchen_garden_group.get("ben_kitchen_gardens")
+                or "NA"
+            )
+            row_cells[4].text = (
+                kitchen_garden_group.get("gender_kitchen_gardens") or "NA"
+            )
+            row_cells[5].text = (
+                kitchen_garden_group.get("ben_father_kitchen_gardens") or "NA"
+            )
+            kg_type = record.data_livelihood.get("Plantation") or "NA"
+            row_cells[6].text = kg_type
+            kg_area = (
+                record.data_livelihood.get("area_didi_badi")
+                or kitchen_garden_group.get("area_kg")
+                or "NA"
+            )
+            row_cells[7].text = kg_area
+            row_cells[8].text = (
+                "{:.6}".format(record.latitude) if record.latitude else "NA"
+            )
+            row_cells[7].text = (
+                "{:.6f}".format(record.longitude) if record.longitude else "NA"
+            )
