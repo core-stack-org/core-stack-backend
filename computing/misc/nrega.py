@@ -32,6 +32,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 import ee
+import numpy as np
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id):
@@ -158,6 +159,15 @@ def clip_nrega_district_block(self, state_name, district_name, block_name, gee_a
 
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
 
+    block_metadata_df = block_metadata_df.loc[
+        :, ~block_metadata_df.columns.str.contains("^Unnamed")
+    ]
+    block_metadata_df.columns = [
+        col.strip().replace(" ", "_").replace(".", "_")
+        for col in block_metadata_df.columns
+    ]
+    block_metadata_df = block_metadata_df.replace({np.nan: None})
+
     description = (
         "nrega_"
         + valid_gee_text(district_name.lower())
@@ -169,14 +179,15 @@ def clip_nrega_district_block(self, state_name, district_name, block_name, gee_a
     file_size_bytes = get_directory_size(path)
     file_size_mb = file_size_bytes / (1024 * 1024)
 
-    if file_size_mb > 10:
-        export_shp_to_gee(district_name, block_name, path, asset_id)
-    else:
-        fc = gdf_to_ee_fc(block_metadata_df)
-        task_id = export_vector_asset_to_gee(fc, description, asset_id)
-        if task_id:
-            nrega_task_id_list = check_task_status([task_id])
-            print("nrega_task_id_list", nrega_task_id_list)
+    if not is_gee_asset_exists(asset_id):
+        if file_size_mb > 10:
+            export_shp_to_gee(district_name, block_name, path, asset_id)
+        else:
+            fc = gdf_to_ee_fc(block_metadata_df)
+            task_id = export_vector_asset_to_gee(fc, description, asset_id)
+            if task_id:
+                nrega_task_id_list = check_task_status([task_id])
+                print("nrega_task_id_list", nrega_task_id_list)
 
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(

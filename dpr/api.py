@@ -1,6 +1,9 @@
 import json
+from datetime import date, datetime
 
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
+from django.urls import reverse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -11,7 +14,12 @@ from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
 
-from .gen_dpr import create_dpr_document, get_plan, send_dpr_email
+from .gen_dpr import (
+    create_dpr_document,
+    get_mws_ids_for_report,
+    get_plan_details,
+    send_dpr_email,
+)
 from .gen_multi_mws_report import (
     get_cropping_mws_data,
     get_degrad_mws_data,
@@ -30,11 +38,13 @@ from .gen_mws_report import (
     get_double_cropping_area,
     get_drought_data,
     get_osm_data,
+    get_soge_data,
     get_surface_Water_bodies_data,
     get_terrain_data,
     get_village_data,
     get_water_balance_data,
 )
+from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email
 
 state_param = openapi.Parameter(
@@ -73,7 +83,6 @@ authorization_param = openapi.Parameter(
     required=True,
 )
 
-
 logger = setup_logger(__name__)
 
 
@@ -96,7 +105,7 @@ def generate_dpr(request):
                 {"error": "Invalid email address"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        plan = get_plan(plan_id)
+        plan = get_plan_details(plan_id)
         logger.info("Plan found: %s", plan)
         if plan is None:
             return Response(
@@ -104,7 +113,24 @@ def generate_dpr(request):
             )
 
         doc = create_dpr_document(plan)
-        send_dpr_email(doc, email_id, plan.plan)
+
+        mws_Ids = get_mws_ids_for_report(plan)
+
+        mws_reports = []
+
+        state = str(plan.state.state_name).lower().replace(" ", "_")
+        district = str(plan.district.district_name).lower().replace(" ", "_")
+        block = str(plan.block.block_name).lower().replace(" ", "_")
+
+        # for ids in mws_Ids:
+        #     report_html_url = (
+        #         f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+        #         f"?state={state}&district={district}&block={block}&uid={ids}"
+        #     )
+        #     mws_report = render_pdf_with_firefox(report_html_url)
+        #     mws_reports.append(mws_report)
+
+        # send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids)
 
         return Response(
             {
@@ -152,9 +178,11 @@ def generate_mws_report(request):
         for key, value in params.items():
             result[key] = value
 
+        print("Api Processing End 1", datetime.now())
+
         # ? OSM description generation
         parameter_block, parameter_mws = get_osm_data(
-            result["district"], result["block"], result["uid"]
+            result["state"], result["district"], result["block"], result["uid"]
         )
 
         # ? Terrain Description generation
@@ -173,8 +201,10 @@ def generate_mws_report(request):
         )
 
         # ? Degradation Description generation
-        land_degrad, tree_degrad, urbanization = get_change_detection_data(
-            result["state"], result["district"], result["block"], result["uid"]
+        land_degrad, tree_degrad, urbanization, restore_desc = (
+            get_change_detection_data(
+                result["state"], result["district"], result["block"], result["uid"]
+            )
         )
 
         # ? Double Cropping Description Generation
@@ -206,6 +236,11 @@ def generate_mws_report(request):
             dg_data,
             wb_years,
         ) = get_water_balance_data(
+            result["state"], result["district"], result["block"], result["uid"]
+        )
+
+        # ? SOGE Description
+        soge_desc = get_soge_data(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
@@ -252,6 +287,7 @@ def generate_mws_report(request):
             "land_degrad": land_degrad,
             "tree_degrad": tree_degrad,
             "urbanization": urbanization,
+            "restore_desc": restore_desc,
             "double_crop_des": double_crop_des,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
@@ -262,6 +298,7 @@ def generate_mws_report(request):
             "drought_desc": drought_desc,
             "inten_desc1": inten_desc1,
             "inten_desc2": inten_desc2,
+            "soge_desc": soge_desc,
             "mws_areas": json.dumps(mws_areas),
             "block_areas": json.dumps(block_areas),
             "lulc_mws_slope": json.dumps(lulc_mws_slope),
@@ -299,6 +336,8 @@ def generate_mws_report(request):
             "drysp_all": json.dumps(drysp_all),
             "dg_years": json.dumps(dg_years),
         }
+
+        print("Api Processing End 1", datetime.now())
 
         return render(request, "mws-report.html", context)
 
@@ -433,3 +472,25 @@ def generate_resource_report(request):
     except Exception as e:
         logger.exception("Exception in generate_resource_report api :: ", e)
         return render(request, "error-page.html", {})
+
+
+@api_view(["GET"])
+@auth_free
+@schema(None)
+def download_mws_report(request):
+    # Require the usual params, but render from your external domain
+    required = ("state", "district", "block", "uid")
+    missing = [k for k in required if k not in request.GET]
+    if missing:
+        return HttpResponseBadRequest(f"Missing query params: {', '.join(missing)}")
+
+    qs = request.GET.urlencode()
+    report_html_url = (
+        f"https://geoserver.core-stack.org/api/v1/generate_mws_report/?{qs}"
+    )
+    pdf_bytes = render_pdf_with_firefox(report_html_url)
+
+    filename = f"mws_report_{request.GET.get('uid')}.pdf"
+    resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp

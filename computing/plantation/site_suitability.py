@@ -83,14 +83,7 @@ def site_suitability(
         # Check if the asset already exists and handle accordingly
         if is_gee_asset_exists(asset_id):
             have_new_sites = merge_new_kmls(
-                asset_id,
-                description,
-                project_name,
-                kml_files_obj,
-                have_new_sites,
-                state,
-                district,
-                block,
+                asset_id, description, project_name, kml_files_obj, have_new_sites
             )
         else:
             have_new_sites = True
@@ -134,16 +127,7 @@ def site_suitability(
         sync_suitability_to_geoserver(vector_asset_id, state, asset_name, layer_id)
 
 
-def merge_new_kmls(
-    asset_id,
-    description,
-    project_name,
-    kml_files_obj,
-    have_new_sites,
-    state=None,
-    district=None,
-    block=None,
-):
+def merge_new_kmls(asset_id, description, project_name, kml_files_obj, have_new_sites):
     """
     Merge new KML files into an existing Google Earth Engine asset.
 
@@ -152,6 +136,7 @@ def merge_new_kmls(
         description: Project description
         project_name: Project name
         kml_files_obj: Queryset of KML_Files model
+        have_new_sites: Flag to indicate if new sites are added
     """
     # Combine KML files into a GeoDataFrame
     gdf = combine_kmls(kml_files_obj)
@@ -234,6 +219,7 @@ def check_site_suitability(
     Returns:
         Asset ID of the suitability vector
     """
+    layer_id = None
 
     # Create a unique asset name for the suitability analysis
     if project:
@@ -250,7 +236,7 @@ def check_site_suitability(
         GEE_HELPER = GEE_HELPER_PATH
 
     # Generate Plantation Site Suitability raster
-    # Here, kept start_year=end_year-2 as in this site assessment script, we are taking into account the data of latest three years only.
+    # Here, kept start_year=end_year-2 as in this site assessment script, we are taking into account the data of the latest three years only.
     pss_rasters_asset, is_default_profile = get_pss(
         roi=roi,
         start_year=end_year - 2,
@@ -275,7 +261,16 @@ def check_site_suitability(
         if have_new_sites:
             ee.data.deleteAsset(asset_id)
         else:
-            return asset_id, asset_name
+            if state and district and block:
+                layer_id = save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=asset_name,
+                    asset_id=asset_id,
+                    dataset_name="Site Suitability Vector"
+                )
+            return asset_id, asset_name, layer_id
 
     pss_rasters = ee.Image(pss_rasters_asset)
 
@@ -334,7 +329,6 @@ def check_site_suitability(
         )
         if task_id:
             check_task_status([task_id], 120)
-    layer_id = None
     if is_gee_asset_exists(asset_id):
         if state and district and block:
             layer_id = save_layer_info_to_db(

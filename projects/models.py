@@ -8,6 +8,8 @@ class AppType(models.TextChoices):
     PLANTATION = "plantation", "Plantations"
     WATERSHED = "watershed", "Watershed Planning"
     WATERBODY_REJ = "waterbody", "Waterbody Rejuvenation"
+    COMMUNITY_ENGAGEMENT = "community_engagement", "Community Engagement"
+    
     # More types as apps are added in future
 
 

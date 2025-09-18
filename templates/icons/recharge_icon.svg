@@ -1,0 +1,23 @@
+<svg width="33" height="33" viewBox="0 0 33 33" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="16.5" cy="16.5" r="16.5" fill="#4A90E2"/>
+<g stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Underground water layers -->
+  <path d="M6 22 C8 21.5 10.5 21 12 21.8 C13.5 22.6 15 22.2 16.5 22 C18 21.8 19.5 22.6 21 21.8 C22.5 21 25 21.5 27 22"/>
+  <path d="M6 25 C8 24.5 10.5 24 12 24.8 C13.5 25.6 15 25.2 16.5 25 C18 24.8 19.5 25.6 21 24.8 C22.5 24 25 24.5 27 25"/>
+  
+  <!-- Recharge well structures -->
+  <rect x="11" y="12" width="2.5" height="10" rx="1.25" fill="none"/>
+  <rect x="15.75" y="8" width="2.5" height="14" rx="1.25" fill="none"/>
+  <rect x="20.5" y="12" width="2.5" height="10" rx="1.25" fill="none"/>
+  
+  <!-- Water drops going down -->
+  <circle cx="12.25" cy="10" r="0.75" fill="white"/>
+  <circle cx="17" cy="6" r="0.75" fill="white"/>
+  <circle cx="21.75" cy="10" r="0.75" fill="white"/>
+  
+  <!-- Arrows indicating downward flow -->
+  <path d="M12.25 14 L12.25 16 M11.5 15.25 L12.25 16 L13 15.25"/>
+  <path d="M17 12 L17 14 M16.25 13.25 L17 14 L17.75 13.25"/>
+  <path d="M21.75 14 L21.75 16 M21 15.25 L21.75 16 L22.5 15.25"/>
+</g>
+</svg>

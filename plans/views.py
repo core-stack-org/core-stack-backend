@@ -1,7 +1,11 @@
 # plans/views.py
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from geoadmin.models import UserAPIKey
 from organization.models import Organization
 from projects.models import AppType, Project
 
@@ -96,6 +100,53 @@ class PlanPermission(permissions.BasePermission):
         return False
 
 
+class APIKeyOrJWTAuth(BaseAuthentication):
+    """
+    Custom authentication class that supports both JWT tokens and API keys
+    """
+
+    def authenticate(self, request):
+        jwt_auth = JWTAuthentication()
+        try:
+            jwt_result = jwt_auth.authenticate(request)
+            if jwt_result:
+                return jwt_result
+        except Exception as e:
+            raise e
+
+        api_key = request.headers.get("X-API-Key")
+        if api_key:
+            try:
+                api_key_obj = UserAPIKey.objects.get_from_key(api_key)
+                if api_key_obj and api_key_obj.is_active and not api_key_obj.is_expired:
+                    api_key_obj.last_used_at = timezone.now()
+                    api_key_obj.save()
+                    return (api_key_obj.user, api_key_obj)
+            except Exception as e:
+                raise e
+        return None
+
+
+class GlobalPlanPermission(permissions.BasePermission):
+    """
+    Custom permission that allows:
+        - Superadmin and superusers
+        - Users with API Key
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.is_superadmin or request.user.is_superuser:
+            return True
+
+        if hasattr(request, "auth") and isinstance(request.auth, UserAPIKey):
+            return True
+
+        return False
+
+
 class SuperAdminPlanPermission(permissions.BasePermission):
     """
     Custom permission for superadmin only plan endpoints
@@ -124,18 +175,17 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
     """
 
     schema = None
-
     serializer_class = PlanAppSerializer
-    permission_classes = [permissions.IsAuthenticated, SuperAdminPlanPermission]
+    authentication_classes = [APIKeyOrJWTAuth]
+    permission_classes = [GlobalPlanPermission]
 
     def get_queryset(self):
         """
-        Return all plans for superadmins
+        Return all plans for superadmins and API key users
         """
-        if not (self.request.user.is_superadmin or self.request.user.is_superuser):
-            return PlanApp.objects.none()
 
         queryset = PlanApp.objects.filter(enabled=True)
+
         block_id = self.request.query_params.get("block", None)
         district_id = self.request.query_params.get("district", None)
         state_id = self.request.query_params.get("state", None)

@@ -212,7 +212,7 @@ def get_rainfall_type(rainfall):
 
 
 # ? MAIN SECTION
-def get_osm_data(district, block, uid):
+def get_osm_data(state, district, block, uid):
     try:
         region_gdf = gpd.read_file(
             get_geojson(
@@ -271,9 +271,16 @@ def get_osm_data(district, block, uid):
         out skel qt;
         """
 
+        print("API response start time", datetime.now())
+
         response = requests.get(OVERPASS_URL, params={"data": overpass_query})
         response = response.json()
 
+        print("API response end time", datetime.now())
+
+
+        print("Data Processing", datetime.now())
+        
         # dictionary for storage
         names = {
             "Forests": [],
@@ -646,7 +653,8 @@ def get_osm_data(district, block, uid):
             final_data["river_mws"] += calculate_river_length(filtered_river_gdf)
 
         # ? Block Parameters
-        parameter_block = f"The block {block}"
+        #parameter_block = f"The Tehsil {block}"
+        parameter_block = f""
 
         if final_data["cities"]:
             city_names = [city["name"] for city in final_data["cities"]]
@@ -663,12 +671,12 @@ def get_osm_data(district, block, uid):
         if final_data["hills"] or final_data["ridges"]:
             temp = [hill["name"] for hill in final_data["hills"]]
             temp += [hill["name"] for hill in final_data["ridges"]]
-            parameter_block += f". Key natural features such as {temp} shape the block landscape and impact water flow"
+            parameter_block += f". Key natural features such as {temp} shape the Tehsil landscape and impact water flow"
 
         if final_data["forests"]:
             parameter_block += (
                 f". Part of {final_data['forests'][0]['name']}, covering roughly "
-                f"{round(final_data['forests'][0]['area_sq_m'] / 10000, 1)} hectares, lies within the block supporting local wildlife and promoting biodiversity"
+                f"{round(final_data['forests'][0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
             )
 
         if final_data["lakes"] or final_data["reservoirs"]:
@@ -696,7 +704,7 @@ def get_osm_data(district, block, uid):
                 parameter_block += " and ".join(rarea)
             else:
                 parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_block += f"  hectares  respectively within the block"
+            parameter_block += f"  hectares  respectively within the Tehsil"
 
         if final_data["river"]:
             rname = [temp["name"] for temp in final_data["river"]]
@@ -718,7 +726,7 @@ def get_osm_data(district, block, uid):
                 parameter_block += " and ".join(rarea)
             else:
                 parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_block += f"  kilometers within the block, serve"
+            parameter_block += f"  kilometers within the tehsil, serve"
             if len(rname) == 1:
                 parameter_block += "s"
             parameter_block += (
@@ -726,7 +734,8 @@ def get_osm_data(district, block, uid):
             )
 
         # ? MWS Parameters
-        parameter_mws = f"The micro-watershed is in block {block}"
+        #parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}"
+        parameter_mws = f""
 
         if final_data["cities_mws"]:
             city_names = [city["name"] for city in final_data["cities_mws"]]
@@ -804,6 +813,18 @@ def get_osm_data(district, block, uid):
             parameter_mws += (
                 f" as a crucial water source for agriculture and daily needs"
             )
+        
+        if parameter_block == "":
+            parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
+        else :
+            parameter_block = f"The Tehsil {block}" + parameter_block
+
+        if parameter_mws == "":
+            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
+        else :
+            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws
+
+        print("Data Processing End", datetime.now())
 
         return parameter_block, parameter_mws
 
@@ -930,9 +951,9 @@ def get_terrain_data(state, district, block, uid):
         mws_top2, mws_top2_pct = mws_top2[1]
 
         if js_divergence > threshold:
-            parameter_comp += f"The microwatershed profile differs from the typical microwatershed profile observed at the block level. While the block-level terrain is predominantly characterized by {round(block_top1_pct, 1)} % {block_top1} and {round(block_top2_pct, 1)} % {block_top2}, the microwatershed primarily consists of {round(mws_top1_pct, 1)} % {mws_top1} and {round(mws_top2_pct, 1)} % {mws_top2}."
+            parameter_comp += f"The microwatershed profile differs from the typical microwatershed profile observed at the Tehsil level. While the Tehsil-level terrain is predominantly characterized by {round(block_top1_pct, 1)} % {block_top1} and {round(block_top2_pct, 1)} % {block_top2}, the microwatershed primarily consists of {round(mws_top1_pct, 1)} % {mws_top1} and {round(mws_top2_pct, 1)} % {mws_top2}."
         else:
-            parameter_comp += f"The microwatershed profile is similar to the typical microwatershed profile observed at the block level."
+            parameter_comp += f"The microwatershed profile is similar to the typical microwatershed profile observed at the Tehsil level."
 
 
         #? Land use on Slopes and Plains
@@ -1015,7 +1036,7 @@ def get_terrain_data(state, district, block, uid):
         logger.info(
             "Not able to access excel for %s district, %s block", district, block, e
         )
-        return "random"
+        return "", [], [], "", "", [], [], [], []
 
 
 def get_change_detection_data(state, district, block, uid):
@@ -1056,10 +1077,23 @@ def get_change_detection_data(state, district, block, uid):
             + ".xlsx",
             sheet_name="change_detection_urbanization",
         )
+        df_restore = pd.read_excel(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            sheet_name="restoration_vector",
+        )
 
         parameter_land = f""
         parameter_tree = f""
         parameter_urban = f""
+        parameter_restore = f""
 
         # ? Land Degradation
         df_degrad["total_degradation_area_in_ha"] = df_degrad["total_degradation_area_in_ha"].apply(
@@ -1070,7 +1104,7 @@ def get_change_detection_data(state, district, block, uid):
         avg = df_degrad["total_degradation_area_in_ha"].mean()
 
         if degradation >= 20:
-            parameter_land += f"There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2022. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
+            parameter_land += f"There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2022. As compared to average degraded land area of {round(avg, 2)} hectares per microwater-shed for the entire tehsil, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
 
         # ? Tree Reduction
         df_defo["total_deforestation_area_in_ha"] = df_defo["total_deforestation_area_in_ha"].apply(
@@ -1080,8 +1114,8 @@ def get_change_detection_data(state, district, block, uid):
         reduction = filtered_df.iloc[0]
         avg = df_defo["total_deforestation_area_in_ha"].mean()
 
-        if reduction >= 50:
-            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2022, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares on average in the entire block."
+        if reduction >= 0:
+            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2022, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares on average per micro watershed in the entire tehsil."
 
         # ? Urbanization
         df_urban["total_urbanization_area_in_ha"] = df_urban["total_urbanization_area_in_ha"].apply(
@@ -1093,7 +1127,23 @@ def get_change_detection_data(state, district, block, uid):
         if built_up_area >= 40:
             parameter_urban += f"There has been a considerate level of urbanization in this micro watershed with about {round(built_up_area, 2)} hectares of land covered with settlements."
 
-        return parameter_land, parameter_tree, parameter_urban
+        # ? Wide Scale Restoration
+        df_restore["wide_scale_restoration_area_in_ha"] = df_restore["wide_scale_restoration_area_in_ha"].apply(
+            pd.to_numeric, errors="coerce"
+        )
+        filtered_df = df_restore.loc[df_restore["UID"] == uid, "wide_scale_restoration_area_in_ha"]
+        restoration_area = filtered_df.iloc[0]
+
+        if restoration_area > 0:
+            parameter_restore += f"{round(restoration_area, 2)} hectares of this microwatershed has less than 40% canopy density and requires wide scale restoration interventions."
+
+        filtered_df = df_restore.loc[df_restore["UID"] == uid, "protection_area_in_ha"]
+        protection_area = filtered_df.iloc[0]
+
+        if protection_area > 0:
+            parameter_restore += f" {round(protection_area, 2)} hectares, on the other hand, need to be protected so the canopy density doesn’t fall further."
+
+        return parameter_land, parameter_tree, parameter_urban, parameter_restore
 
     except Exception as e:
         logger.info(
@@ -1102,6 +1152,7 @@ def get_change_detection_data(state, district, block, uid):
             block,
             e,
         )
+        return "", "", "", ""
 
 
 def get_cropping_intensity(state, district, block, uid):
@@ -1114,6 +1165,10 @@ def get_cropping_intensity(state, district, block, uid):
         current_years = extract_years(selected_columns_inten)
 
         df[selected_columns_inten] = df[selected_columns_inten].apply(pd.to_numeric, errors="coerce")
+
+        df["cropping_intensity_row_avg"] = df[selected_columns_inten].mean(axis=1, skipna=True)
+
+        block_avg = df["cropping_intensity_row_avg"].mean(skipna=True)
 
         filtered_df_inten = df.loc[df["UID"] == uid, selected_columns_inten]
 
@@ -1128,15 +1183,15 @@ def get_cropping_intensity(state, district, block, uid):
             avg_inten = sum(filtered_df_inten.values[0]) / len(filtered_df_inten.values[0])
             
             if result.trend == "increasing":
-                inten_parameter_1 += f"The cropping intensity of the micro-watershed has increased over the last eight years from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])}."
+                inten_parameter_1 += f"The cropping intensity of the micro-watershed has increased over the last eight years from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
             else:
                 if result.trend == "decreasing":
-                    inten_parameter_1 += f"The cropping intensity of this area has reduced over time from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])}."
+                    inten_parameter_1 += f"The cropping intensity of this area has reduced over time from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
                 else :
-                    inten_parameter_1 += f"The cropping intensity of this area has stayed steady at {round(avg_inten, 2)}."
+                    inten_parameter_1 += f"The cropping intensity of this area has stayed steady at {round(avg_inten, 2)} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
 
                 if avg_inten < 1.5:
-                    inten_parameter_1 += f"It might be possible to improve cropping intensity through more strategic placement, while keeping equity in mind, of rainwater harvesting or groundwater recharge structures."
+                    inten_parameter_1 += f"It might be possible to improve cropping intensity through more strategic placement, while keeping equity in mind, of rainwater harvesting or groundwater recharge structures. "
             
             #? Drought Parameters
             selected_columns_moderate = [col for col in df_drought.columns if col.startswith("Moderate_")]
@@ -1242,9 +1297,9 @@ def get_cropping_intensity(state, district, block, uid):
         logger.info(
             "Not able to access excel for %s district, %s block for Cropping Intensity",
             district,
-            block,
-            e,
+            block
         )
+        return "", "", [],[],[],[],[]
 
 
 def get_double_cropping_area(state, district, block, uid):
@@ -1309,7 +1364,7 @@ def get_double_cropping_area(state, district, block, uid):
         if double_cropping_percent_avg < 30:
             parameter_double_crop += f"This microwatershed area has a low percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is less than 30% of the total agricultural land being cultivated twice a year."
         elif double_cropping_percent_avg >= 30 and double_cropping_percent_avg < 60:
-            parameter_double_crop += f"This microwatershed area has a moderate percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is about {round(double_cropping_percent_avg, 2)} of the total agricultural land being cultivated twice a year."
+            parameter_double_crop += f"This microwatershed area has a moderate percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is about {round(double_cropping_percent_avg, 2)}% of the total agricultural land being cultivated twice a year."
         else:
             parameter_double_crop += f"This microwatershed area has a high percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is more than 60% of the total agricultural land being cultivated twice a year."
 
@@ -1317,11 +1372,11 @@ def get_double_cropping_area(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for cropping",
+            "Not able to access excel for %s district, %s block for double cropping section",
             district,
-            block,
-            e,
+            block
         )
+        return ""
 
 
 def get_surface_Water_bodies_data(state, district, block, uid):
@@ -1425,15 +1480,16 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
                     total_area_nd += yearly_area[0]
                 
+                print("total_area_nd = ",total_area_nd)
+                print("total_area_d = ",total_area_d)
+                print(drought_years)
+                print(non_drought_year)
+
                 percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
 
                 if result.trend == "increasing":
                     parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
                     
-                
-                elif result.trend == "decreasing":
-                    parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
-                
                 else:
                     parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
 
@@ -1501,8 +1557,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             filtered_df_rabi = (df.loc[df["UID"] == uid, selected_columns_rabi].values[0].tolist())
             filtered_df_zaid = (df.loc[df["UID"] == uid, selected_columns_zaid].values[0].tolist())
 
-            filtered_df_kharif = [abs(kharif - rabi) for kharif, rabi in zip(filtered_df_kharif, filtered_df_rabi)]
-            filtered_df_rabi = [abs(rabi - zaid) for rabi, zaid in zip(filtered_df_rabi, filtered_df_zaid)]
+            #filtered_df_kharif = [abs(kharif - rabi) for kharif, rabi in zip(filtered_df_kharif, filtered_df_rabi)]
+            #filtered_df_rabi = [abs(rabi - zaid) for rabi, zaid in zip(filtered_df_rabi, filtered_df_zaid)]
 
         else:
             parameter_swb_1 += (
@@ -1520,7 +1576,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         )
 
     except Exception as e:
-        logger.info("Not able to access excel for %s district, %s block for Waterbodies",district,block,e)
+        logger.info("Not able to access excel for %s district, %s block for Waterbodies",district,block)
+        return "", "", "", [], [], [], []
 
 
 def get_water_balance_data(state, district, block, uid):
@@ -1669,7 +1726,12 @@ def get_water_balance_data(state, district, block, uid):
             formatted_years = format_years(non_drought_years)
             good_rainfall += original_string.replace("XXX, YYY and ZZZ", formatted_years)
 
-            good_rainfall += f"bringing an average annual rainfall of approximately {round(avg_rainfall,2)} mm  with monsoon onset between [{min_date}, {max_date}]."
+            good_rainfall += f"bringing an average annual rainfall of approximately {round(avg_rainfall,2)} mm"
+
+            if(min_date != None and max_date != None):
+                good_rainfall += f" with monsoon onset between [{min_date}, {max_date}]."
+            else:
+                good_rainfall += f"."
 
             if avg_fortnight_delg > 0:
                 good_rainfall += f"This rainfall pattern resulted in positive groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating replenishment of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
@@ -1754,9 +1816,75 @@ def get_water_balance_data(state, district, block, uid):
         logger.info(
             "Not able to access excel for %s district, %s block for Water Balance",
             district,
-            block,
-            e,
+            block
         )
+        return "", "", "", [], [], [], [], []
+
+
+def get_soge_data(state, district, block, uid):
+    try :
+        df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="aquifer_vector")
+        df_soge = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="soge_vector")
+        df_hydro = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="hydrological_annual")
+
+        parameter_soge = f""
+
+        aquifer_class = df.loc[df["UID"] == uid, "aquifer_class"].values[0]
+
+        if(aquifer_class == "Alluvium"):
+            soge_class = df_soge.loc[df_soge["UID"] == uid, "class_name"].values[0]
+
+            selected_column_g = [col for col in df_hydro.columns if col.startswith("G_")]
+            df_hydro[selected_column_g] = df_hydro[selected_column_g].apply(pd.to_numeric, errors="coerce")
+            filtered_df_g = df_hydro.loc[df_hydro["UID"] == uid, selected_column_g].values[0]
+
+            result = mk.original_test(filtered_df_g)
+
+            if(soge_class == "Safe"):
+                
+                parameter_soge += f"Extraction is within recharge limits."
+                
+                if result.trend == "increasing" :
+                    parameter_soge += f" However, the groundwater situation appears stable and annual usage is also within limits. Care should be taken that things remain the way they are."
+                else:
+                    parameter_soge += f" However, it requires close monitoring to check that the situation is not worsened."
+            
+            elif(soge_class == "Semi-Critical"):
+
+                parameter_soge += f"Extraction is 70–90% of the recharge. The signs of stress have started to appear."
+
+                if result.trend == "increasing" :
+                    parameter_soge += f" The groundwater situation appears stable and annual usage is also within limits. Care should be taken that things remain the way they are."
+                else:
+                    parameter_soge += f" It requires close monitoring to check that the situation does not worsen."
+
+            elif(soge_class == "Critical"):
+                
+                parameter_soge += f"Extraction is 90-100% of the recharge. There is a high risk of depletion of groundwater."
+
+                if result.trend == "increasing" :
+                    parameter_soge += f" Pressure to increase cropping intensity can worsen the situation. Innovative solutions of drip irrigation and strong water collectives along with canal irrigation must be considered to improve the situation."
+                else:
+                    parameter_soge += f" Policies for an immediate shift in cropping patterns might be required."
+
+            else:
+
+                parameter_soge += f"Extraction exceeds recharge; groundwater levels falling sharply."
+
+                if result.trend == "increasing" :
+                    parameter_soge += f" Pressure to increase cropping intensity can worsen the situation. Innovative solutions of drip irrigation and strong water collectives along with canal irrigation must be considered to improve the situation."
+                else:
+                    parameter_soge += f" Policies for an immediate shift in cropping patterns are required."
+
+        return parameter_soge
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Soge Data",
+            district,
+            block
+        )
+        return ""
 
 
 def get_drought_data(state, district, block, uid):
@@ -1839,8 +1967,6 @@ def get_drought_data(state, district, block, uid):
 
         current_years = extract_years_single(selected_columns_drysp_all)
 
-        print(current_years)
-
         if len(drought_years):
             # ? Dryspell Calc
             years = []
@@ -1880,11 +2006,11 @@ def get_drought_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for Water Balance",
+            "Not able to access excel for %s district, %s block for Drought Data",
             district,
-            block,
-            e,
+            block
         )
+        return "", [], [], [], [], []
 
 
 def get_village_data(state, district, block, uid):
@@ -2134,6 +2260,6 @@ def get_village_data(state, district, block, uid):
         logger.info(
             "Not able to access excel for %s district, %s block for village data",
             district,
-            block,
-            e,
+            block
         )
+        return [],[],[],[],[],[],[],[],[],[],[]

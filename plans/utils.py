@@ -2,14 +2,14 @@ import csv
 import json
 import logging
 import re
+from datetime import datetime, timezone
 
+import dateutil.parser
 import requests
 
-from datetime import datetime, timezone
-import dateutil.parser
-
-from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
+from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
 from utilities.constants import (
+    ODK_URL_SESSION,
     ODK_URL_agri,
     ODK_URL_gw,
     ODK_URL_livelihood,
@@ -17,7 +17,6 @@ from utilities.constants import (
     ODK_URL_swb,
     ODK_URL_waterbody,
     ODK_URL_well,
-    ODK_URL_SESSION,
 )
 
 logger = logging.getLogger(__name__)
@@ -248,34 +247,32 @@ def modify_response_list_well(res, block, plan_id):
 
         result["status_re"] = result["__system"]["reviewState"]
         result["well_id"] = result["well_id"]
+
+        well_usage_section = result.get("Well_usage", {})
         try:
-            result["ben_settlement"] = result.get("beneficiary_settlement", "") or "0"
-            who_owns = result["select_one_owns"]
-            if who_owns:
-                who_owns = str(who_owns).lower()
-                if who_owns == "other" or who_owns == "any other":
-                    result["owner"] = result.get("text_one_owns", "") or ""
-                else:
-                    result["owner"] = result.get("select_one_owns", "") or ""
-            else:
-                result["owner"] = "0"
-            result["hh_benefitted"] = result.get("households_benefited", "") or "0"
-            result["caste"] = result.get("select_multiple_caste_use", "") or "0"
+            result["ben_settlement"] = result.get("beneficiary_settlement", "") or "NA"
+            result["owner"] = result.get("select_one_owns", "") or "NA"
+            result["hh_benefitted"] = result.get("households_benefited", "") or "NA"
+            result["caste"] = result.get("select_multiple_caste_use", "") or "NA"
             result["functional"] = (
-                result.get("select_one_Functional_Non_functional", "") or 0
+                well_usage_section.get("select_one_Functional_Non_functional", "")
+                or "NA"
             )
-            result["need_maintenance"] = result.get("select_one_maintenance", "") or "0"
-            repair_value = result.get("select_one_repairs_well")
+            result["need_maintenance"] = (
+                well_usage_section.get("select_one_maintenance", "") or "NA"
+            )
+            repair_value = well_usage_section.get("select_one_repairs_well")
             if repair_value:
                 repair_value = str(repair_value).lower()
                 if repair_value == "other":
                     result["repair"] = (
-                        result.get("select_one_repairs_well_other", "") or "0"
+                        well_usage_section.get("select_one_repairs_well_other", "")
+                        or "NA"
                     )
                 else:
                     result["repair"] = repair_value
             else:
-                result["repair"] = "0"
+                result["repair"] = "NA"
         except Exception as e:
             print("Exception occured in adding data from ODK to well layer: ", e)
             continue

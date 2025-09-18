@@ -414,7 +414,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
             soge_class_name = df_soge_vector_mws_data.get('class_name', None).iloc[0]
             soge_class = int(class_to_id.get(soge_class_name, '')) # Returns None if not found
         except Exception:
-            soge_class = ''
+            soge_class = -1
 
 
         results.append({

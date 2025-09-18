@@ -76,6 +76,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
 
 
 def sync_admin_boundry_to_geoserver(collection, state_dir, district, block, layer_id):
+    print("sync_admin_boundry_to_geoserver")
     path = os.path.join(
         str(state_dir),
         f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
@@ -110,17 +111,25 @@ def sync_admin_boundary_to_ee(collection, description, state, district, block):
 
 
 def clip_block_from_admin_boundary(state, district, block):
-    census_2011 = gpd.read_file(
-        ADMIN_BOUNDARY_INPUT_DIR
-        + "/"
-        + state.replace(" ", "_")
-        + "/"
-        + district.replace(" ", "_")
-        + ".geojson"
-    )
-    print("census_2011", census_2011)
-    cols = list(census_2011.columns)
-    if "TEHSIL" in cols:
+    census_2011 = None
+    try:
+        census_2011 = gpd.read_file(
+            ADMIN_BOUNDARY_INPUT_DIR
+            + "/"
+            + state.replace(" ", "_")
+            + "/"
+            + district.replace(" ", "_")
+            + ".geojson"
+        )
+        print("census_2011", census_2011)
+
+    except Exception as e:
+        print(f"Error occurred: Census data not available: {e}")
+
+    admin_boundary_data = None
+    features = []
+
+    if census_2011 and "TEHSIL" in list(census_2011.columns):
         admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
     else:
         soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
@@ -133,70 +142,76 @@ def clip_block_from_admin_boundary(state, district, block):
         )
         print("soi", soi)
 
-        census_2011["area"] = census_2011.geometry.area
-        # Ensure both GeoDataFrames are in the same coordinate reference system (CRS)
-        if soi.crs != census_2011.crs:
-            census_2011 = census_2011.to_crs(soi.crs)
+        if census_2011:
+            census_2011["area"] = census_2011.geometry.area
+            # Ensure both GeoDataFrames are in the same coordinate reference system (CRS)
+            if soi.crs != census_2011.crs:
+                census_2011 = census_2011.to_crs(soi.crs)
 
-        # Perform the intersection
-        admin_boundary_data = gpd.overlay(soi, census_2011, how="intersection")
-        # # Calculate areas
-        # intersection["int_area"] = intersection.geometry.area
-        # # Calculate overlap percentage
-        # intersection["overlap_pct"] = intersection["int_area"] / intersection["area"]
-        #
-        # # Filter blocks with more than 80% overlap
-        # filtered_blocks = intersection[intersection["overlap_pct"] > 0.8]
-
-    features = []
-    for index, row in admin_boundary_data.iterrows():
-        features.append(
-            Feature(
-                geometry=mapping(row["geometry"]),
-                properties={
-                    "vill_ID": row["pc11_village_id"],
-                    "vill_name": row["NAME"],
-                    "block_cen": row["pc11_subdistrict_id"],
-                    # "block": row["subdistrict"],
-                    "tehsil": row["TEHSIL"],
-                    "dist_cen": row["pc11_district_id"],
-                    "district": row["district_name"],
-                    "state_cen": row["pc11_state_id"],
-                    "state": row["state_name"],
-                    "ADI_2001": row["ADI_2001"],
-                    "ADI_2011": row["ADI_2011"],
-                    "ADI_2019": row["ADI_2019"],
-                    "No_HH": row["No_HH"],
-                    "TOT_P": row["TOT_P"],
-                    "TOT_M": row["TOT_M"],
-                    "TOT_F": row["TOT_F"],
-                    "P_SC": row["P_SC"],
-                    "M_SC": row["M_SC"],
-                    "F_SC": row["F_SC"],
-                    "P_ST": row["P_ST"],
-                    "M_ST": row["M_ST"],
-                    "F_ST": row["F_ST"],
-                    "P_LIT": row["P_LIT"],
-                    "M_LIT": row["M_LIT"],
-                    "F_LIT": row["F_LIT"],
-                    "P_ILL": row["P_ILL"],
-                    "M_ILL": row["M_ILL"],
-                    "F_ILL": row["F_ILL"],
-                    "BF_2001": row["BF_2001"],
-                    "FC_2001": row["FC_2001"],
-                    "MSW_2001": row["MSW_2001"],
-                    "ASSET_2001": row["ASSET_2001"],
-                    "BF_2011": row["BF_2011"],
-                    "FC_2011": row["FC_2011"],
-                    "MSW_2011": row["MSW_2011"],
-                    "ASSET_2011": row["ASSET_2011"],
-                    "BF_2019": row["BF_2019"],
-                    "FC_2019": row["FC_2019"],
-                    "MSW_2019": row["MSW_2019"],
-                    "ASSET_2019": row["ASSET_2019"],
-                },
+            # Perform the intersection
+            admin_boundary_data = gpd.overlay(soi, census_2011, how="intersection")
+        else:
+            tehsil_boundary = soi.iloc[0]
+            features.append(
+                Feature(
+                    geometry=mapping(tehsil_boundary["geometry"]),
+                    properties={
+                        "tehsil": tehsil_boundary["TEHSIL"],
+                        "district": tehsil_boundary["district_name"],
+                        "state": tehsil_boundary["state_name"],
+                    },
+                )
             )
-        )
+
+    if admin_boundary_data:
+        for index, row in admin_boundary_data.iterrows():
+            features.append(
+                Feature(
+                    geometry=mapping(row["geometry"]),
+                    properties={
+                        "vill_ID": row["pc11_village_id"],
+                        "vill_name": row["NAME"],
+                        "block_cen": row["pc11_subdistrict_id"],
+                        # "block": row["subdistrict"],
+                        "tehsil": row["TEHSIL"],
+                        "dist_cen": row["pc11_district_id"],
+                        "district": row["district_name"],
+                        "state_cen": row["pc11_state_id"],
+                        "state": row["state_name"],
+                        "ADI_2001": row["ADI_2001"],
+                        "ADI_2011": row["ADI_2011"],
+                        "ADI_2019": row["ADI_2019"],
+                        "No_HH": row["No_HH"],
+                        "TOT_P": row["TOT_P"],
+                        "TOT_M": row["TOT_M"],
+                        "TOT_F": row["TOT_F"],
+                        "P_SC": row["P_SC"],
+                        "M_SC": row["M_SC"],
+                        "F_SC": row["F_SC"],
+                        "P_ST": row["P_ST"],
+                        "M_ST": row["M_ST"],
+                        "F_ST": row["F_ST"],
+                        "P_LIT": row["P_LIT"],
+                        "M_LIT": row["M_LIT"],
+                        "F_LIT": row["F_LIT"],
+                        "P_ILL": row["P_ILL"],
+                        "M_ILL": row["M_ILL"],
+                        "F_ILL": row["F_ILL"],
+                        "BF_2001": row["BF_2001"],
+                        "FC_2001": row["FC_2001"],
+                        "MSW_2001": row["MSW_2001"],
+                        "ASSET_2001": row["ASSET_2001"],
+                        "BF_2011": row["BF_2011"],
+                        "FC_2011": row["FC_2011"],
+                        "MSW_2011": row["MSW_2011"],
+                        "ASSET_2011": row["ASSET_2011"],
+                        "BF_2019": row["BF_2019"],
+                        "FC_2019": row["FC_2019"],
+                        "MSW_2019": row["MSW_2019"],
+                        "ASSET_2019": row["ASSET_2019"],
+                    },
+                )
+            )
 
     # Create the directory for state if doesn't exist already
     state_dir = os.path.join(ADMIN_BOUNDARY_OUTPUT_DIR, state.replace(" ", "_"))

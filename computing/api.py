@@ -11,6 +11,8 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
+from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
+from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.v4.lulc_v4 import generate_lulc_v4
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order_vector
@@ -37,7 +39,7 @@ from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
 from computing.change_detection.change_detection import get_change_detection
-from .lulc.lulc_v3_clip_river_basin import lulc_river_basin
+from .lulc.lulc_v3 import clip_lulc_v3
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
@@ -63,9 +65,8 @@ def generate_admin_boundary(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
         generate_tehsil_shape_file_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            args=[state, district, block], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -83,9 +84,8 @@ def generate_nrega_layer(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
         clip_nrega_district_block.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            args=[state, district, block], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -103,8 +103,7 @@ def generate_drainage_layer(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
-        clip_drainage_lines.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        clip_drainage_lines.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -121,8 +120,7 @@ def generate_drainage_density(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
-        drainage_density.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        drainage_density.apply_async(args=[state, district, block], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -138,8 +136,7 @@ def generate_lithology(request):
     try:
         state = request.data.get("state").lower()
         # district = request.data.get("district").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
-        generate_lithology_layer.apply_async(args=[state, gee_account_id], queue="nrm")
+        generate_lithology_layer.apply_async(args=[state], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -286,8 +283,62 @@ def generate_annual_hydrology(request):
 
 @api_view(["POST"])
 @schema(None)
+def lulc_v2_river_basin(request):
+    """
+        To generate LULC v2 layers on river basin.
+    Args:
+        request:
+            basin_object_id: object id of river basin (from "projects/corestack-datasets/assets/datasets/CGWB_basin" dataset)
+            start_year: start year for layer generation
+            end_year: end year for layer generation
+    Returns:
+        Response: Success/Exception
+    """
+    print("Inside lulc_v2_river_basin")
+    try:
+        basin_object_id = request.data.get("basin_object_id")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        lulc_river_basin_v2.apply_async(
+            args=[basin_object_id, start_year, end_year], queue="nrm"
+        )
+        return Response({"Success": "lulc_v2_river_basin"}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in lulc_v2_river_basin api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
 def lulc_v3_river_basin(request):
-    print("Inside generate_lulc_v3")
+    """
+        To generate LULC v3 layers on river basin.
+    Args:
+        request:
+            basin_object_id: object id of river basin (from "projects/corestack-datasets/assets/datasets/CGWB_basin" dataset)
+            start_year: start year for layer generation
+            end_year: end year for layer generation
+    Returns:
+        Response: Success/Exception
+    """
+    print("Inside lulc_v3_river_basin")
+    try:
+        basin_object_id = request.data.get("basin_object_id")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        lulc_river_basin_v3.apply_async(
+            args=[basin_object_id, start_year, end_year], queue="nrm"
+        )
+        return Response({"Success": "lulc_v3_river_basin"}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in lulc_v3_river_basin api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def lulc_v3(request):
+    print("Inside lulc_v3 api.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -295,12 +346,14 @@ def lulc_v3_river_basin(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
-        lulc_river_basin.apply_async(
+        clip_lulc_v3.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
         )
-        return Response({"Success": "LULC task initiated"}, status=status.HTTP_200_OK)
+        return Response(
+            {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        print("Exception in generate_lulc_layer api :: ", e)
+        print("Exception in lulc_v3 api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
