@@ -1,4 +1,6 @@
 import ee
+
+from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -93,7 +95,7 @@ def generate_drought_layers(
     print("size=", size)
     parts = size // chunk_size
     print("parts=", parts)
-    ee_initialize("helper")
+    ee_initialize(GEE_HELPER_ACCOUNT_ID)
     create_gee_dir(
         asset_folder_list, gee_project_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
     )
