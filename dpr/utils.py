@@ -288,7 +288,7 @@ def sync_settlement():
 def sync_well():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_well)
     # print("ODK data well", odk_resp_list[:1])
-    well = ODK_well()  # well object
+    well = ODK_well()
 
     for record in odk_resp_list:
         submission_date = timezone.datetime.strptime(
@@ -318,7 +318,9 @@ def sync_well():
         well.is_functional = (
             well_usage.get("select_one_Functional_Non_functional", "") or "NA"
         )
-        well.need_maintenance = well_usage.get("select_one_maintenance", "") or "NA"
+        well.need_maintenance = well_usage.get("is_maintenance_required", "") or "NA"
+        if well.need_maintenance == "NA":
+            well.need_maintenance = well_condition.get("select_one_maintenance") or "NA"
         well.plan_id = record.get("plan_id", "") or "NA"
         well.plan_name = record.get("plan_name", "") or "NA"
         try:
@@ -344,7 +346,7 @@ def sync_well():
 
 def sync_waterbody():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_waterbody)
-    print("ODK data waterbody", odk_resp_list[:1])
+    # print("ODK data waterbody", odk_resp_list[:1])
     waterbody = ODK_waterbody()
 
     for record in odk_resp_list:
