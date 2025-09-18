@@ -77,7 +77,7 @@ chmod +x install.sh
 | 29 | Water structure planning | Stream order raster             | /computing/misc/stream_order.py                                       |
 | 30 | Water structure planning | CLART                           | /computing/clart/clart.py                                             |                                                                                                                    |
 
-### How to integrate custom pipelines on CoREStack 
+### Integrating custom pipelines on CoREStack 
 We have prepared a [detailed guide](https://docs.google.com/document/d/1lfx2hJKndmzVp55ZHIIFYqRTz-8fZCWc9QikUDQpTN0/edit?usp=sharing) on how to integrate custom pipelines on the CoREStack backend. 
 
 ### Further references
