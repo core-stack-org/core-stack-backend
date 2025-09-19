@@ -15,15 +15,30 @@ from nrm_app.settings import (
 
 logger = logging.getLogger(__name__)
 
-def send_email(subject: str, body: str, to_emails: list, attachments: list = None):
+import ssl
+import socket
+import logging
+from django.core.mail import EmailMultiAlternatives, get_connection
+from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+def send_email(
+    subject: str,
+    text_body: str,
+    to_emails: list,
+    html_body: str = None,
+    attachments: list = None,
+):
     """
-    Send email via SMTP.
+    Send email via SMTP (supports HTML + plain text + attachments).
 
     Args:
         subject (str): Email subject
-        body (str): Email body (plain text)
+        text_body (str): Plain text body
         to_emails (list): List of recipient email addresses
-        attachments (list): Optional list of attachments, each as dict:
+        html_body (str, optional): HTML body (if provided, added as alternative)
+        attachments (list, optional): List of attachments, each dict:
             {
                 "filename": str,
                 "content": bytes,
@@ -31,36 +46,40 @@ def send_email(subject: str, body: str, to_emails: list, attachments: list = Non
             }
     """
     try:
-        backend = EmailBackend(
-            host=EMAIL_HOST,
-            port=EMAIL_PORT,
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_ssl=EMAIL_USE_SSL,
-            timeout=EMAIL_TIMEOUT,
+        backend = get_connection(
+            host=settings.EMAIL_HOST,
+            port=settings.EMAIL_PORT,
+            username=settings.EMAIL_HOST_USER,
+            password=settings.EMAIL_HOST_PASSWORD,
+            use_ssl=getattr(settings, "EMAIL_USE_SSL", False),
+            use_tls=getattr(settings, "EMAIL_USE_TLS", False),
+            timeout=getattr(settings, "EMAIL_TIMEOUT", 30),
             ssl_context=ssl.create_default_context(),
         )
 
-        email = EmailMessage(
+        msg = EmailMultiAlternatives(
             subject=subject,
-            body=body,
-            from_email=EMAIL_HOST_USER,
+            body=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
             to=to_emails,
             connection=backend,
         )
 
-        # Attach files if provided
+        # Add HTML part
+        if html_body:
+            msg.attach_alternative(html_body, "text/html")
+
+        # Attach files
         if attachments:
             for attachment in attachments:
                 filename = attachment.get("filename")
                 content = attachment.get("content")
                 mimetype = attachment.get("mimetype", "application/octet-stream")
-                email.attach(filename, content, mimetype)
+                msg.attach(filename, content, mimetype)
 
         logger.info("Sending email to %s", ", ".join(to_emails))
-        email.send(fail_silently=False)
+        msg.send(fail_silently=False)
         logger.info("Email sent successfully.")
-        backend.close()
 
     except socket.error as e:
         logger.error(f"Socket error: {e}")
