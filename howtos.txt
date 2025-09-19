@@ -67,3 +67,10 @@ Setup Headless Firefox for Selenium:
         >>> driver.get("https://example.com")
         >>> print(driver.title)   # "Example Domain"
         >>> driver.quit()
+
+FOR KSHEETIZ ONLY (For DB Dump)
+- sudo scp -i ~/Downloads/nrm-core-stack.pem -r ubuntu@geoserver.core-stack.org:/tmp/db-backups/corestack_db_19sep2.sql ~/Desktop 
+- sudo cp /home/ksheetiz/Desktop/sept-dumb.sql /tmp/
+- sudo chown postgres:postgres /tmp/sept-dumb.sql 
+- sudo chmod 644 /tmp/sept-dumb.sql 
+- Now just run the \i /tmp/sept-dumb.sql

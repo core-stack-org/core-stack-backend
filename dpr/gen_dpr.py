@@ -25,7 +25,7 @@ from nrm_app.settings import (
     EMAIL_USE_SSL,
     GEOSERVER_URL,
 )
-from plans.models import Plan, PlanApp
+from plans.models import PlanApp
 from utilities.logger import setup_logger
 
 from .models import (
@@ -54,7 +54,7 @@ logger = setup_logger(__name__)
 def get_plan_details(plan_id):
     try:
         return PlanApp.objects.get(id=plan_id)
-    except Plan.DoesNotExist:
+    except PlanApp.DoesNotExist:
         return None
 
 
