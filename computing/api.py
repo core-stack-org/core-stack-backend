@@ -15,7 +15,7 @@ from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.v4.lulc_v4 import generate_lulc_v4
 from .misc.restoration_opportunity import generate_restoration_opportunity
-from .misc.stream_order import generate_stream_order_vector
+from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
 from .utils import (
     Geoserver,
@@ -776,14 +776,14 @@ def gee_task_status(request):
 
 @api_view(["POST"])
 @schema(None)
-def stream_order_vector(request):
+def stream_order(request):
     print("Inside stream_order_vector api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        generate_stream_order_vector.apply_async(
+        generate_stream_order.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
