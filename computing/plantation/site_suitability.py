@@ -32,7 +32,7 @@ logger = setup_logger(__name__)
 
 @app.task(bind=True)
 def site_suitability(
-    self, project_id, start_year, end_year, state=None, district=None, block=None
+    self, gee_account_id, project_id, start_year, end_year, state=None, district=None, block=None
 ):
     """
     Main task for site suitability analysis using Google Earth Engine.
@@ -46,7 +46,7 @@ def site_suitability(
         end_year: End of the temporal analysis range
     """
     # Initialize Earth Engine connection for the project
-    ee_initialize()
+    ee_initialize(gee_account_id)
 
     if project_id:
         project = Project.objects.get(

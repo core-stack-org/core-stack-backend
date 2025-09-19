@@ -25,8 +25,9 @@ def clip_drainage_lines(
     state,
     district,
     block,
+    gee_account_id
 ):
-    ee_initialize()
+    ee_initialize(gee_account_id)
     pan_india_drainage = ee.FeatureCollection(
         GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )

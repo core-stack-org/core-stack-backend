@@ -47,6 +47,7 @@ urlpatterns = [
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
     path("api/v1/", include("public_api.urls")),
+    path("api/v1/", include("gee_computing.urls")),
     path("api/v1/", include("community_engagement.urls")),
     path("api/v1/", include("bot_interface.urls")),
     # Swagger Doc

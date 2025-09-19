@@ -26,8 +26,8 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def generate_tehsil_shape_file_data(self, state, district, block):
-    ee_initialize()
+def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     description = (
         "admin_boundary_"
         + valid_gee_text(district.lower())

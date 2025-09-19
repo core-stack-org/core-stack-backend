@@ -17,8 +17,8 @@ from utilities.gee_utils import (
 
 
 @app.task(bind=True)
-def generate_stream_order_vector(self, state, district, block):
-    ee_initialize()
+def generate_stream_order_vector(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     description = (
         "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )

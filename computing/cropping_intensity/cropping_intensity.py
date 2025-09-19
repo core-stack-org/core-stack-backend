@@ -27,6 +27,7 @@ geo = Geoserver()
 @app.task(bind=True)
 def generate_cropping_intensity(
     self,
+    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -37,7 +38,7 @@ def generate_cropping_intensity(
     start_year=None,
     end_year=None,
 ):
-    ee_initialize()
+    ee_initialize(gee_account_id)
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
