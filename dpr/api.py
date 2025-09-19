@@ -106,6 +106,7 @@ def generate_dpr(request):
             )
 
         plan = get_plan_details(plan_id)
+        print("type", type(plan))
         logger.info("Plan found: %s", plan)
         if plan is None:
             return Response(
@@ -130,7 +131,13 @@ def generate_dpr(request):
             mws_report = render_pdf_with_firefox(report_html_url)
             mws_reports.append(mws_report)
 
-        send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids)
+        resource_html_url = report_html_url = (
+            f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
+            f"?district={district}&block={block}&plan_id={plan_id}"
+        )
+        resource_report = render_pdf_with_firefox(report_html_url)
+
+        send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids, resource_report, resource_html_url)
 
         return Response(
             {
@@ -178,7 +185,7 @@ def generate_mws_report(request):
         for key, value in params.items():
             result[key] = value
 
-        print("Api Processing End 1", datetime.now())
+        #print("Api Processing End 1", datetime.now())
 
         # ? OSM description generation
         parameter_block, parameter_mws = get_osm_data(
@@ -337,7 +344,7 @@ def generate_mws_report(request):
             "dg_years": json.dumps(dg_years),
         }
 
-        print("Api Processing End 1", datetime.now())
+        #print("Api Processing End 1", datetime.now())
 
         return render(request, "mws-report.html", context)
 
