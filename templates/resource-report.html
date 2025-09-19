@@ -227,7 +227,7 @@
         </section>
         <div class="legend">
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <div class="legend-color" style="background-color: #A9A9A9;"></div>
                 <span>Barren Lands</span>
             </div>
             <div class="legend-item">
@@ -244,10 +244,10 @@
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background-color: #fb5139;"></div>
-                <span>Triple Cropping</span>
+                <span>Tripple/Annual/Perennial Cropping</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <div class="legend-color" style="background-color: #4c4ef5;"></div>
                 <span>Shrubs and Scrubs</span>
             </div>
         </div>
@@ -309,24 +309,48 @@
         </section>
         <div class="legend">
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #4ade80;"></div>
-                <span>Good recharge</span>
+                <div class="legend-color" style="background-color: #313695;"></div>
+                <span>V-shape river valleys, Deep narrow canyons</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #fde047;"></div>
-               <span>Moderate recharge</span>
+                <div class="legend-color" style="background-color: #4575b4;"></div>
+                <span>Lateral midslope incised drainages, Local valleys in plains</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #be185d;"></div>
-                <span>Regeneration</span>
+                <div class="legend-color" style="background-color: #a50026;"></div>
+                <span>Upland incised drainages, Stream headwaters</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #3b82f6;"></div>
-                <span>High runoff zone</span>
+                <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                <span>U-shape valleys</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #dc2626;"></div>
-                <span>Surface water harvesting</span>
+                <div class="legend-color" style="background-color: #fffc00;"></div>
+                <span>Broad Flat Areas</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #feb24c;"></div>
+                <span>Broad open slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f46d43;"></div>
+                <span>Mesa tops</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d73027;"></div>
+                <span>Upper Slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #91bfdb;"></div>
+                <span>Local ridge/hilltops within broad valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #800000;"></div>
+                <span>Lateral midslope drainage divides, Local ridges in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4d0000;"></div>
+                <span>Mountain tops, high ridges</span>
             </div>
         </div>
     </div>
@@ -476,14 +500,15 @@
                 source : new ol.source.ImageWMS({
                     url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                     params : {
-                        'LAYERS': "clart:{{district}}_{{block}}_clart",
+                        'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                        'STYLES' : "Terrain_Style_11_Classes"
                     },
                     ratio : 1,
                     serverType: 'geoserver',
                 }),
                 visible : true,
-                name : 'clart_raster',
-                opacity: 0.6
+                name : 'terrain_raster',
+                opacity: 0.7
             })
             ],
         view: new ol.View({
@@ -611,16 +636,20 @@
         mainMap.addLayer(settlementLayer);
         const arr = vectorSource.getExtent();
         const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-        mainMap.getView().setZoom(14)
+        mainMap.getView().setZoom(16)
         mainMap.getView().setCenter(mapcenter);
         villageMap.getView().setCenter(mapcenter);
-        villageMap.getView().setZoom(14)
+        villageMap.getView().setZoom(15)
     }
 
     async function addWellLayer() {
         const svgMarkup = `{% include 'icons/well_icon.svg' %}`;
         const wellIconsUrl =
             'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+
+        const maintainMarkup = `{% include 'icons/well_maintain.svg' %}`;
+        const wellMaintainUrl =
+            'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(maintainMarkup); 
 
         const url =
             "https://geoserver.core-stack.org:8443/geoserver/resources/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=resources:well_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
@@ -634,24 +663,56 @@
         const wellLayer = new ol.layer.Vector({
             source: vectorSource,
             style: (feature) => {
-            const name = (feature.get('ben_settle') || '').toString();
-            return new ol.style.Style({
-                image: new ol.style.Icon({
-                    src: wellIconsUrl,
-                    anchor: [0.5, 1],
-                    anchorXUnits: 'fraction',
-                    anchorYUnits: 'fraction',
-                    scale: 0.6
-                }),
-                text: new ol.style.Text({
-                    text: name,
-                    font: '12px sans-serif',
-                    textAlign: 'center',
-                    fill: new ol.style.Fill({ color: '#111' }),
-                    stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
-                    overflow: true
-                })
-            });
+                const name = (feature.get('ben_settle') || '').toString();
+                const status = feature.values_;
+                let wellMaintenance = false
+                if(status.Well_condi !== undefined){
+                    const m = status.Well_condi.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
+                    wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
+                }
+                else{
+                    const m = status.Well_usage.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
+                    wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
+                }
+
+                if(wellMaintenance){
+                    return new ol.style.Style({
+                        image: new ol.style.Icon({
+                            src: wellMaintainUrl,
+                            anchor: [0.5, 1],
+                            anchorXUnits: 'fraction',
+                            anchorYUnits: 'fraction',
+                            scale: 0.6
+                        }),
+                        text: new ol.style.Text({
+                            text: name,
+                            font: '12px sans-serif',
+                            textAlign: 'center',
+                            fill: new ol.style.Fill({ color: '#111' }),
+                            stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                            overflow: true
+                        })
+                    });
+                }
+                else{
+                    return new ol.style.Style({
+                        image: new ol.style.Icon({
+                            src: wellIconsUrl,
+                            anchor: [0.5, 1],
+                            anchorXUnits: 'fraction',
+                            anchorYUnits: 'fraction',
+                            scale: 0.6
+                        }),
+                        text: new ol.style.Text({
+                            text: name,
+                            font: '12px sans-serif',
+                            textAlign: 'center',
+                            fill: new ol.style.Fill({ color: '#111' }),
+                            stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                            overflow: true
+                        })
+                    });
+                }
             },
             zIndex: 20
         });
@@ -659,14 +720,18 @@
         wellMap.addLayer(wellLayer);
         const arr = vectorSource.getExtent();
         const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-        wellMap.getView().setZoom(14)
+        wellMap.getView().setZoom(16)
         wellMap.getView().setCenter(mapcenter);
     }
 
     async function addWaterLayer() {
-         const svgMarkup = `{% include 'icons/waterbodiesScreenIcon.svg' %}`;
+        const svgMarkup = `{% include 'icons/waterbodiesScreenIcon.svg' %}`;
         const waterIconsUrl =
             'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkup);
+
+        const maintainMarkup = `{% include 'icons/waterbodies_maintain.svg' %}`;
+        const waterMaintainUrl =
+            'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(maintainMarkup);
 
         const url =
             "https://geoserver.core-stack.org:8443/geoserver/resources/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=resources:waterbody_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
@@ -680,9 +745,27 @@
         const waterLayer = new ol.layer.Vector({
             source: vectorSource,
             style: (feature) => {
-                const name = (feature.get('need_maint') || '').toString();
-
-                if(name === "Yes"){
+                const maintain = (feature.get('need_maint') || '').toString();
+                if(maintain === "Yes"){
+                    const type = (feature.get('wbs_type') || '').toString();
+                    return new ol.style.Style({
+                        image: new ol.style.Icon({
+                            src: waterMaintainUrl,
+                            anchor: [0.5, 1],
+                            anchorXUnits: 'fraction',
+                            anchorYUnits: 'fraction',
+                        }),
+                        text: new ol.style.Text({
+                            text: type,
+                            font: '12px sans-serif',
+                            textAlign: 'center',
+                            fill: new ol.style.Fill({ color: '#111' }),
+                            stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                            overflow: true
+                        })
+                    });
+                }
+                else{
                     const type = (feature.get('wbs_type') || '').toString();
                     return new ol.style.Style({
                         image: new ol.style.Icon({
@@ -708,7 +791,7 @@
         waterStructureMap.addLayer(waterLayer);
         const arr = vectorSource.getExtent();
         const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-        waterStructureMap.getView().setZoom(14)
+        waterStructureMap.getView().setZoom(16)
         waterStructureMap.getView().setCenter(mapcenter);
     }
 
@@ -724,6 +807,33 @@
         
         const urlRecharge =
             "https://geoserver.core-stack.org:8443/geoserver/works/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=works:plan_gw_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
+
+
+        const urlDrainage = "https://geoserver.core-stack.org:8443/geoserver/drainage/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=drainage:{{district}}_{{block}}&outputFormat=application/json";
+
+        const resp = await fetch(urlDrainage);
+        const data = await resp.json();
+
+        const vectorSource = new ol.source.Vector({
+            features: readFeaturesFromGeoJSON(data)
+        });
+
+        const drainageColors = [
+            "03045E", "023E8A", "0077B6", "0096C7", "00B4D8", "48CAE4", "90E0EF", "ADE8F4", "CAF0F8",
+        ];
+
+        const drainageLayer = new ol.layer.Vector({
+            source: vectorSource,
+            style : (feature) => {
+                let order = feature.get('ORDER') || 1
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({ color: `#${drainageColors[order - 1] || drainageColors[0]}`, width: 2 }),
+                })
+            },
+            zIndex: 10
+        });
+
+        demandStructureMap.addLayer(drainageLayer)
 
         try {
             const respIrr = await fetch(urlIrrigation);
@@ -761,7 +871,7 @@
             demandStructureMap.addLayer(IrrigationLayer);
             const arr = vectorSourceIrr.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            demandStructureMap.getView().setZoom(14)
+            demandStructureMap.getView().setZoom(16)
             demandStructureMap.getView().setCenter(mapcenter);
         } catch (error) {
             console.log(error)
@@ -803,11 +913,13 @@
             demandStructureMap.addLayer(RechargeLayer);
             const arr = vectorSourceRechr.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            demandStructureMap.getView().setZoom(15)
+            demandStructureMap.getView().setZoom(16)
             demandStructureMap.getView().setCenter(mapcenter);
         } catch (error) {
             console.log(error)
         }
+
+
     }
 
     // Run in order
@@ -842,6 +954,81 @@
     window.addEventListener('afterprint', function() {
         setTimeout(function() { mainMap.updateSize(); }, 500);
     });
+
+    (function () {
+    const maps = [villageMap, mainMap, wellMap, waterStructureMap, demandStructureMap].filter(Boolean);
+
+    let pending = 0;
+    const renderedOnce = new Set();
+    let resolveReady;
+    const readyPromise = new Promise((res) => (resolveReady = res));
+
+    function inc() { pending++; }
+    function dec() { pending = Math.max(0, pending - 1); scheduleCheck(); }
+
+    function hookSource(src) {
+        if (!src || !src.on) return;
+
+        // Tile sources (XYZ/TileWMS/etc.)
+        src.on?.('tileloadstart', inc);
+        src.on?.('tileloadend', dec);
+        src.on?.('tileloaderror', dec);
+
+        // Single image sources (ImageWMS/etc.)
+        src.on?.('imageloadstart', inc);
+        src.on?.('imageloadend', dec);
+        src.on?.('imageloaderror', dec);
+    }
+
+    function hookLayer(lyr) {
+        try {
+        const src = lyr.getSource && lyr.getSource();
+        hookSource(src);
+        } catch (_) {}
+    }
+
+    function hookMap(map) {
+        // existing layers
+        try { map.getLayers().getArray().forEach(hookLayer); } catch (_) {}
+
+        // future layers added later by your async functions
+        map.getLayers().on?.('add', (evt) => hookLayer(evt.element));
+
+        // mark each map once it renders at least once
+        map.once('rendercomplete', () => { renderedOnce.add(map); scheduleCheck(); });
+    }
+
+    maps.forEach(hookMap);
+
+    // you’re not drawing animated charts on this page; mark charts as ready
+    window.__chartsReady = true;
+
+    let settleTimer;
+    function scheduleCheck() {
+        clearTimeout(settleTimer);
+        // small debounce to allow batches of tiles/images to settle
+        settleTimer = setTimeout(checkReady, 200);
+    }
+
+    function allMapsRendered() {
+        return maps.every((m) => renderedOnce.has(m));
+    }
+
+    function checkReady() {
+        if (pending === 0 && allMapsRendered() && window.__chartsReady) {
+        // force one last synchronous paint
+        maps.forEach((m) => { try { m.renderSync(); } catch (_) {} });
+        window.__mapsReady = true;
+        resolveReady(true);
+        }
+    }
+
+    // expose promise so Selenium can await it with execute_async_script if desired
+    window.__mapsReadyPromise = readyPromise;
+
+    // kick once in case everything is cached
+    scheduleCheck();
+    })();
 </script>
 
 </body>

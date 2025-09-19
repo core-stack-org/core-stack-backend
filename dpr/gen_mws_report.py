@@ -271,15 +271,15 @@ def get_osm_data(state, district, block, uid):
         out skel qt;
         """
 
-        print("API response start time", datetime.now())
+        #print("API response start time", datetime.now())
 
         response = requests.get(OVERPASS_URL, params={"data": overpass_query})
         response = response.json()
 
-        print("API response end time", datetime.now())
+        #print("API response end time", datetime.now())
 
 
-        print("Data Processing", datetime.now())
+        #print("Data Processing", datetime.now())
         
         # dictionary for storage
         names = {
@@ -824,7 +824,7 @@ def get_osm_data(state, district, block, uid):
         else :
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws
 
-        print("Data Processing End", datetime.now())
+        #print("Data Processing End", datetime.now())
 
         return parameter_block, parameter_mws
 
