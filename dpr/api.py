@@ -131,7 +131,7 @@ def generate_dpr(request):
             mws_reports.append(mws_report)
 
         resource_html_url = report_html_url = (
-            f"http://127.0.0.1:8000/api/v1/generate_resource_report/"
+            f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
             f"?district={district}&block={block}&plan_id={plan_id}"
         )
         resource_report = render_pdf_with_firefox(report_html_url)
