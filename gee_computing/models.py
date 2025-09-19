@@ -1,11 +1,8 @@
 from django.db import models
 from cryptography.fernet import Fernet
 import environ
+from nrm_app.settings import FERNET_KEY
 
-env = environ.Env()
-environ.Env.read_env()
-print (env("FERNET_KEY"))
-fernet = Fernet(env("FERNET_KEY"))
 # Create your models here.
 
 
@@ -25,5 +22,6 @@ class GEEAccount(models.Model):
     def get_credentials(self):
         """Decrypt and return JSON key file content"""
         if self.credentials_encrypted:
+            fernet = Fernet(FERNET_KEY)
             return fernet.decrypt(bytes(self.credentials_encrypted))  # 👈 cast to bytes
         return None
