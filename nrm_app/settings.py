@@ -391,3 +391,6 @@ WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
 
 BASE_URL='https://127.0.0.1:8000/'
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
+
+
+FERNET_KEY = env("FERNET_KEY")

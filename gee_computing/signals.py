@@ -6,12 +6,12 @@ from cryptography.fernet import Fernet
 from django.conf import settings
 import os
 import environ
-
-env = environ.Env()
-environ.Env.read_env()
+from nrm_app.settings import  FERNET_KEY
 
 
-fernet = Fernet(env("FERNET_KEY"))
+
+
+
 
 @receiver(post_save, sender=GEEAccount)
 def encrypt_credentials(sender, instance, created, **kwargs):
@@ -21,6 +21,7 @@ def encrypt_credentials(sender, instance, created, **kwargs):
             raw_data = f.read()
 
         # Encrypt and save
+        fernet = Fernet(FERNET_KEY)
         instance.credentials_encrypted = fernet.encrypt(raw_data)
         instance.save(update_fields=["credentials_encrypted"])
 
