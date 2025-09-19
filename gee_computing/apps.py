@@ -5,5 +5,5 @@ class GeeComputingConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "gee_computing"
 
-    def ready(self):
-        import  gee_computing.signals
+    # def ready(self):
+    #     import  gee_computing.signals
