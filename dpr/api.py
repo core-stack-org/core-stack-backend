@@ -122,15 +122,15 @@ def generate_dpr(request):
         district = str(plan.district.district_name).lower().replace(" ", "_")
         block = str(plan.block.block_name).lower().replace(" ", "_")
 
-        # for ids in mws_Ids:
-        #     report_html_url = (
-        #         f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
-        #         f"?state={state}&district={district}&block={block}&uid={ids}"
-        #     )
-        #     mws_report = render_pdf_with_firefox(report_html_url)
-        #     mws_reports.append(mws_report)
+        for ids in mws_Ids:
+            report_html_url = (
+                f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+                f"?state={state}&district={district}&block={block}&uid={ids}"
+            )
+            mws_report = render_pdf_with_firefox(report_html_url)
+            mws_reports.append(mws_report)
 
-        # send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids)
+        send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids)
 
         return Response(
             {

@@ -90,7 +90,7 @@ INSTALLED_APPS = [
     "public_api",
     "community_engagement",
     "bot_interface",
-    "gee_computing"
+    "gee_computing",
 ]
 
 # MARK: CORS Settings
@@ -125,7 +125,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
     "content-disposition",  # Important for file uploads in form data
-    "X-API-Key"
+    "X-API-Key",
 ]
 
 CORS_ALLOW_METHODS = [
@@ -311,7 +311,7 @@ LOGGING = {
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",   # or INFO in production
+            "level": "DEBUG",  # or INFO in production
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
@@ -389,8 +389,7 @@ CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
 WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
 
-BASE_URL='https://geoserver.core-stack.org/'
+BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
-
 
 FERNET_KEY = env("FERNET_KEY")

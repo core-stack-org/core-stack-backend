@@ -107,11 +107,11 @@ def create_dpr_document(plan):
 
     # MARK: local save /tmp/dpr/
     # operations on the document
-    file_path = "/tmp/dpr/"
-
-    if not os.path.exists(file_path):
-        os.makedirs(file_path)
-    doc.save(file_path + plan.plan + ".docx")
+    # file_path = "/tmp/dpr/"
+    #
+    # if not os.path.exists(file_path):
+    #     os.makedirs(file_path)
+    # doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
@@ -242,9 +242,9 @@ def initialize_document():
     doc = Document()
     heading = doc.add_heading("Detailed Project Report", 0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    doc.add_paragraph(
-        date.today().strftime("%B %d, %Y")
-    ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_paragraph(date.today().strftime("%B %d, %Y")).alignment = (
+        WD_PARAGRAPH_ALIGNMENT.CENTER
+    )
     return doc
 
 
