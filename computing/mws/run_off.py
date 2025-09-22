@@ -3,6 +3,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from computing.utils import create_chunk, merge_chunks
+from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -118,7 +119,7 @@ def _generate_layer(
         chunk_size = 30
         rois, descs = create_chunk(roi, description, chunk_size)
 
-        ee_initialize("helper")
+        ee_initialize(GEE_HELPER_ACCOUNT_ID)
         create_gee_dir(asset_folder_list, GEE_PATHS[app_type]["GEE_HELPER_PATH"])
 
         tasks = []
