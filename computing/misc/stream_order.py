@@ -26,11 +26,7 @@ def generate_stream_order(self, state, district, block, gee_account_id):
         "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
 
-    vector_asset_id = get_gee_asset_path(state, district, block) + description + "_vector"
-    raster_asset_id = get_gee_asset_path(state, district, block) + description + "_raster"
-
-    if not is_gee_asset_exists(raster_asset_id):
-        roi = ee.FeatureCollection(
+    roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -39,10 +35,35 @@ def generate_stream_order(self, state, district, block, gee_account_id):
             + "_uid"
         )
 
-        stream_order_raster = ee.Image(
-            "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
-        )
-        raster = stream_order_raster.clip(roi.geometry())
+    stream_order_raster = ee.Image(
+        "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
+    )
+    raster = stream_order_raster.clip(roi.geometry())
+
+    # Generate Vector Layer
+    stream_order_raster_generation(state, district, block, description, roi, raster)
+    args = [
+            {"value": 1, "label": "1"},
+            {"value": 2, "label": "2"},
+            {"value": 3, "label": "3"},
+            {"value": 4, "label": "4"},
+            {"value": 5, "label": "5"},
+            {"value": 6, "label": "6"},
+            {"value": 7, "label": "7"},
+            {"value": 8, "label": "8"},
+            {"value": 9, "label": "9"},
+            {"value": 10, "label": "10"},
+            {"value": 11, "label": "11"},
+        ]
+
+    fc = calculate_pixel_area(args, roi, raster)
+    # Generate Raster Layer
+    stream_order_vector_generation(state, district, block, description, fc)
+
+
+def stream_order_raster_generation(state, district, block, description, roi, raster):
+    raster_asset_id = get_gee_asset_path(state, district, block) + description + "_raster"
+    if not is_gee_asset_exists(raster_asset_id):
         try:
             task_id = export_raster_asset_to_gee(
                 image=raster,
@@ -61,7 +82,7 @@ def generate_stream_order(self, state, district, block, gee_account_id):
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to gcs ", task_id_list)
 
-            save_layer_info_to_db(state, district, block, layer_name=description, asset_id=raster_asset_id, dataset_name="Stream Order",)
+            save_layer_info_to_db(state, district, block, layer_name=description + "_raster", asset_id=raster_asset_id, dataset_name="Stream Order",)
             make_asset_public(raster_asset_id)
 
             res = sync_raster_gcs_to_geoserver("stream_order", description + "_raster", description + "_raster", "stream_order")
@@ -69,30 +90,17 @@ def generate_stream_order(self, state, district, block, gee_account_id):
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")
 
-        args = [
-            {"value": 1, "label": "1"},
-            {"value": 2, "label": "2"},
-            {"value": 3, "label": "3"},
-            {"value": 4, "label": "4"},
-            {"value": 5, "label": "5"},
-            {"value": 6, "label": "6"},
-            {"value": 7, "label": "7"},
-            {"value": 8, "label": "8"},
-            {"value": 9, "label": "9"},
-            {"value": 10, "label": "10"},
-            {"value": 11, "label": "11"},
-        ]
 
-        fc = calculate_pixel_area(args, roi, raster)
-        task = export_vector_asset_to_gee(fc, description  + "_vector", vector_asset_id)
-        check_task_status([task])
-
+def stream_order_vector_generation(state, district, block, description, fc):
+    vector_asset_id = get_gee_asset_path(state, district, block) + description + "_vector"
+    task = export_vector_asset_to_gee(fc, description  + "_vector", vector_asset_id)
+    check_task_status([task])
     if is_gee_asset_exists(vector_asset_id):
         layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=description,
+            layer_name=description + "_vector",
             asset_id=vector_asset_id,
             dataset_name="Stream Order",
         )
