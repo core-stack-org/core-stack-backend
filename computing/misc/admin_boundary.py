@@ -163,7 +163,7 @@ def clip_block_from_admin_boundary(state, district, block):
                 )
             )
 
-    if admin_boundary_data:
+    if admin_boundary_data is not  None:
         for index, row in admin_boundary_data.iterrows():
             features.append(
                 Feature(
