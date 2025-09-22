@@ -522,7 +522,7 @@ def generate_terrain_descriptor(request):
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id").lower()
         generate_terrain_clusters.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            args=[gee_account_id, state, district, block], queue="nrm"
         )
         return Response(
             {"Success": "generate_terrain_descriptor task initiated"},
