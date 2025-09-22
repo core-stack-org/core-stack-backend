@@ -189,7 +189,7 @@ def generate_hydrology(
         end_date,
         is_annual,
     )
-
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
@@ -210,3 +210,5 @@ def generate_hydrology(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

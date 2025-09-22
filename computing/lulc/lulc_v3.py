@@ -76,15 +76,16 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year):
     task_list = []
     geometry = roi.geometry()
     for i in range(0, len(l1_asset_new)):
-        task_id = export_raster_asset_to_gee(
-            image=l1_asset_new[i].clip(geometry),
-            description=final_output_filename_array_new[i],
-            asset_id=final_output_assetid_array_new[i],
-            scale=scale,
-            region=geometry,
-            pyramiding_policy={"predicted_label": "mode"},
-        )
-        task_list.append(task_id)
+        if not is_gee_asset_exists(final_output_assetid_array_new[i]):
+            task_id = export_raster_asset_to_gee(
+                image=l1_asset_new[i].clip(geometry),
+                description=final_output_filename_array_new[i],
+                asset_id=final_output_assetid_array_new[i],
+                scale=scale,
+                region=geometry,
+                pyramiding_policy={"predicted_label": "mode"},
+            )
+            task_list.append(task_id)
 
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)
@@ -129,12 +130,13 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year):
         scale,
     )
 
-    sync_lulc_to_geoserver(
+    layer_at_geoserver = sync_lulc_to_geoserver(
         final_output_filename_array_new,
         l1_asset_new,
         block,
         layer_ids,
     )
+    return layer_at_geoserver
 
 
 def sync_lulc_to_gcs(
@@ -183,6 +185,9 @@ def sync_lulc_to_geoserver(
             res = sync_raster_gcs_to_geoserver(
                 workspace, gcs_file_name, layer_name, style
             )
+            layer_at_geoserver = False
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
                 print("geoserver flag is updated")
+                layer_at_geoserver = True
+            return layer_at_geoserver

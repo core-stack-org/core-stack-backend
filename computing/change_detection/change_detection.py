@@ -107,9 +107,10 @@ def get_change_detection(self, state, district, block, start_year, end_year):
             )
             make_asset_public(asset_id)
 
-    sync_to_gcs_geoserver(
+    layer_at_geoserver = sync_to_gcs_geoserver(
         state, district, block, description, param_dict.keys(), layer_id
     )
+    return layer_at_geoserver
 
 
 def built_up(roi_boundary, l1_asset):
@@ -420,6 +421,7 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list, layer
     task_id_list = check_task_status(task_list)
     print("task_id sync to gcs ", task_id_list)
 
+    layer_at_geoserver = False
     for change in param_list:
         res = sync_raster_gcs_to_geoserver(
             "change_detection",
@@ -430,3 +432,5 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list, layer
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

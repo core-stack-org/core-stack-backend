@@ -220,6 +220,7 @@ def clart_layer(state, district, block):
         except Exception as e:
             print(f"Error occurred in running clart: {e}")
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(final_output_assetid):
         layer_id = save_layer_info_to_db(
             state,
@@ -242,3 +243,5 @@ def clart_layer(state, district, block):
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

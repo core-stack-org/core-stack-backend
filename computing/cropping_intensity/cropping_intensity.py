@@ -81,11 +81,14 @@ def generate_cropping_intensity(
         fc, asset_suffix, layer_name, "crop_intensity", "croppingintensity"
     )
     print(res)
+    layer_at_geoserver = False
     if (
         res["status_code"] == 201 and layer_id
     ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
+        layer_at_geoserver = True
+    return layer_at_geoserver
 
 
 def generate_gee_asset(

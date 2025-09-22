@@ -54,6 +54,7 @@ from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
+from .layer_generation_in_order import layer_generate_map
 
 
 @api_security_check(allowed_methods="POST")
@@ -1030,3 +1031,27 @@ def wells_compute(request):
         )
     except Exception as e:
         return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_layer_in_order(request):
+    print("inside generate_layer_order_first")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        map_order = request.data.get("map")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        start_year = int(start_year) if start_year is not None else None
+        end_year = int(end_year) if end_year is not None else None
+        layer_generate_map.apply_async(
+            args=[state, district, block, map_order, start_year, end_year], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_layer_order_first api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

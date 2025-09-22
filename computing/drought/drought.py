@@ -120,6 +120,7 @@ def calculate_drought(
         )
         check_task_status([task_id])
 
+    layera_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = None
         if state and district and block:
@@ -142,3 +143,5 @@ def calculate_drought(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layera_at_geoserver = True
+    return layera_at_geoserver

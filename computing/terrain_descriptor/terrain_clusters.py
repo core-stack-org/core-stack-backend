@@ -32,7 +32,8 @@ def generate_terrain_clusters(self, state, district, block):
     if not is_gee_asset_exists(asset_id):
         layer_id = compute_on_gee(state, district, block, asset_id, asset_name)
 
-    sync_to_geoserver(state, district, block, asset_id, layer_id)
+    layer_at_geoserver = sync_to_geoserver(state, district, block, asset_id, layer_id)
+    return layer_at_geoserver
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
@@ -387,6 +388,9 @@ def sync_to_geoserver(state, district, block, asset_id, layer_id):
         "terrain",
     )
     print(res)
+    layer_at_geoserver = False
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag is updated")
+        layer_at_geoserver = True
+    return layer_at_geoserver

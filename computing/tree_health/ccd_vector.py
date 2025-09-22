@@ -158,20 +158,18 @@ def tree_health_ccd_vector(self, state, district, block, start_year, end_year):
         # )
     final_fc = {"type": "FeatureCollection", "features": final_features}
     try:
+        layer_at_geoserver = False
         sync_res = sync_layer_to_geoserver(state, final_fc, geo_filename, "ccd")
         # if sync_res["status_code"] == 201 and layer_id:
         #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         #     print("sync to geoserver flag is updated")
+        if sync_res["status_code"] == 201:
+            layer_at_geoserver = True
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")
         raise
 
-    return {
-        "status": "Completed",
-        "features_processed": len(final_features),
-        "year_range": f"{start_year}-{end_year}",
-        "filename": geo_filename,
-    }
+    return layer_at_geoserver
 
 
 def overall_vector(roi, state, district, block, year):

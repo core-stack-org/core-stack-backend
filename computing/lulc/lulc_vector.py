@@ -106,6 +106,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
     task_status = check_task_status([task])
     print("Task completed - ", task_status)
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
             state,
@@ -137,3 +138,5 @@ def vectorise_lulc(self, state, district, block, start_year, end_year):
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

@@ -53,6 +53,7 @@ def terrain_raster(self, state, district, block):
         task_id_list = check_task_status([task_id])
         print("terrain_raster task_id_list", task_id_list)
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
 
@@ -78,3 +79,5 @@ def terrain_raster(self, state, district, block):
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

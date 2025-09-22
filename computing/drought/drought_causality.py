@@ -610,6 +610,7 @@ def drought_causality(self, state, district, block, start_year, end_year):
         }
         final_features.append(feature)
 
+    layer_at_geoserver = False
     try:
         geo_filename = (
             valid_gee_text(district.lower())
@@ -653,7 +654,8 @@ def drought_causality(self, state, district, block, start_year, end_year):
                 dataset_name="Drought Causality",
                 sync_to_geoserver=True,
             )
+            layer_at_geoserver = True
     except Exception as e:
         print(f"Error syncing aggregated data to GeoServer: {e}")
 
-    return {"status": "Completed"}
+    return layer_at_geoserver

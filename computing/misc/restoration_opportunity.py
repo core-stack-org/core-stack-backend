@@ -138,6 +138,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
     task_id = export_vector_asset_to_gee(fc, description, asset_id=asset_id)
     check_task_status([task_id])
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
             state,
@@ -154,3 +155,5 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver
