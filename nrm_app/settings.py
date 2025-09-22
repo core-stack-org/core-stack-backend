@@ -50,7 +50,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
-GEE_HELPER_ACCOUNT_ID = 4
+GEE_HELPER_ACCOUNT_ID = 2
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
@@ -293,9 +293,6 @@ OD_DATA_URL_plan = {
     },
 }
 
-import os
-import logging
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,  # keep Django's default loggers
@@ -391,6 +388,5 @@ WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
 
 BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
-
 
 FERNET_KEY = env("FERNET_KEY")

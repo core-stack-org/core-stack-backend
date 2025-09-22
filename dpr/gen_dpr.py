@@ -25,7 +25,7 @@ from nrm_app.settings import (
     EMAIL_USE_SSL,
     GEOSERVER_URL,
 )
-from plans.models import Plan, PlanApp
+from plans.models import PlanApp
 from utilities.logger import setup_logger
 
 from .models import (
@@ -54,7 +54,7 @@ logger = setup_logger(__name__)
 def get_plan_details(plan_id):
     try:
         return PlanApp.objects.get(id=plan_id)
-    except Plan.DoesNotExist:
+    except PlanApp.DoesNotExist:
         return None
 
 
@@ -115,7 +115,7 @@ def create_dpr_document(plan):
     return doc
 
 
-def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
+def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids, resource_report, resource_report_url):
     try:
         buffer = BytesIO()
         doc.save(buffer)
@@ -126,6 +126,7 @@ def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
         email_body = f"""
         Hi,
         Find attached the Detailed Project Report for {plan_name} and MWS Report for MWSs: {", ".join(mws_Ids)}.
+        The Link to Resource Report : {resource_report_url}.
 
         Thanks and Regards,
         CoRE Stack Team
@@ -175,6 +176,8 @@ def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids):
                 )
 
             email.attach(filename, content, "application/pdf")
+        
+        email.attach(f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf")
 
         logger.info("Sending DPR email to %s", email_id)
         email.send(fail_silently=False)
