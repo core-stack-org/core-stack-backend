@@ -293,9 +293,6 @@ OD_DATA_URL_plan = {
     },
 }
 
-import os
-import logging
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,  # keep Django's default loggers
