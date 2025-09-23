@@ -123,21 +123,21 @@ def generate_dpr(request):
         district = str(plan.district.district_name).lower().replace(" ", "_")
         block = str(plan.block.block_name).lower().replace(" ", "_")
 
-        for ids in mws_Ids:
-            report_html_url = (
-                f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
-                f"?state={state}&district={district}&block={block}&uid={ids}"
-            )
-            mws_report = render_pdf_with_firefox(report_html_url)
-            mws_reports.append(mws_report)
+        # for ids in mws_Ids:
+        #     report_html_url = (
+        #         f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+        #         f"?state={state}&district={district}&block={block}&uid={ids}"
+        #     )
+        #     mws_report = render_pdf_with_firefox(report_html_url)
+        #     mws_reports.append(mws_report)
 
-        resource_html_url = report_html_url = (
-            f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
-            f"?district={district}&block={block}&plan_id={plan_id}"
-        )
-        resource_report = render_pdf_with_firefox(report_html_url)
+        # resource_html_url = report_html_url = (
+        #     f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
+        #     f"?district={district}&block={block}&plan_id={plan_id}"
+        # )
+        # resource_report = render_pdf_with_firefox(report_html_url)
 
-        send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids, resource_report, resource_html_url)
+        # send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids, resource_report, resource_html_url)
 
         return Response(
             {
@@ -185,7 +185,7 @@ def generate_mws_report(request):
         for key, value in params.items():
             result[key] = value
 
-        #print("Api Processing End 1", datetime.now())
+        # print("Api Processing End 1", datetime.now())
 
         # ? OSM description generation
         parameter_block, parameter_mws = get_osm_data(
@@ -344,7 +344,7 @@ def generate_mws_report(request):
             "dg_years": json.dumps(dg_years),
         }
 
-        #print("Api Processing End 1", datetime.now())
+        # print("Api Processing End 1", datetime.now())
 
         return render(request, "mws-report.html", context)
 

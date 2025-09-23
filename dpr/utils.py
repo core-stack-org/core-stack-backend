@@ -985,3 +985,7 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
             return "Other"
 
     return repair_activity.replace("_", " ").title()
+
+
+def sort_key(settlement):
+    return (settlement == "NA", settlement.lower() if settlement != "NA" else "")

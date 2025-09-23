@@ -17,6 +17,7 @@ from shapely.geometry import Point
 from dpr.mapping import populate_maintenance_from_waterbody
 from dpr.utils import get_waterbody_repair_activities
 from nrm_app.settings import (
+    DEBUG,
     EMAIL_HOST,
     EMAIL_HOST_PASSWORD,
     EMAIL_HOST_USER,
@@ -45,6 +46,7 @@ from .utils import (
     format_text,
     format_text_demands,
     get_vector_layer_geoserver,
+    sort_key,
     sync_db_odk,
 )
 
@@ -107,15 +109,18 @@ def create_dpr_document(plan):
 
     # MARK: local save /tmp/dpr/
     # operations on the document
-    # file_path = "/tmp/dpr/"
-    #
-    # if not os.path.exists(file_path):
-    #     os.makedirs(file_path)
-    # doc.save(file_path + plan.plan + ".docx")
+    if DEBUG:
+        file_path = "/tmp/dpr/"
+
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+        doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
-def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids, resource_report, resource_report_url):
+def send_dpr_email(
+    doc, email_id, plan_name, mws_reports, mws_Ids, resource_report, resource_report_url
+):
     try:
         buffer = BytesIO()
         doc.save(buffer)
@@ -176,8 +181,10 @@ def send_dpr_email(doc, email_id, plan_name, mws_reports, mws_Ids, resource_repo
                 )
 
             email.attach(filename, content, "application/pdf")
-        
-        email.attach(f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf")
+
+        email.attach(
+            f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
+        )
 
         logger.info("Sending DPR email to %s", email_id)
         email.send(fail_silently=False)
@@ -245,9 +252,9 @@ def initialize_document():
     doc = Document()
     heading = doc.add_heading("Detailed Project Report", 0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    doc.add_paragraph(date.today().strftime("%B %d, %Y")).alignment = (
-        WD_PARAGRAPH_ALIGNMENT.CENTER
-    )
+    doc.add_paragraph(
+        date.today().strftime("%B %d, %Y")
+    ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     return doc
 
 
@@ -282,14 +289,6 @@ def add_section_a(doc, plan):
     Brief about team details.
     """
     doc.add_heading("Section A: Team Details", level=1)
-    para = doc.add_paragraph()
-    para.add_run(
-        "This section gives brief information about the Project Name, "
-        "facilitator details responsible for the preparation of the Detailed "
-        "Project Report (DPR). The process begins with Community Consultations, "
-        "involving active engagement with community members "
-        "to identify their needs and resources.\n\n"
-    )
     create_table_team_details(doc, plan)
 
 
@@ -329,14 +328,6 @@ def add_section_b(doc, plan, total_settlements, mws_fortnight):
     Briefs about the village
     """
     doc.add_heading("Section B: Brief of Village")
-    para = doc.add_paragraph()
-    para.add_run(
-        "This section gives a brief overview of the village, "
-        "including its name, associated Gram Panchayat, location "
-        "details (block, district, and state), the number of settlements, "
-        "intersecting micro watershed IDs, and the geographic coordinates "
-        "(latitude and longitude) of the village.\n\n"
-    )
 
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
 
@@ -445,7 +436,7 @@ def add_section_c(doc, plan):
     doc.add_heading("Section C: Social Economic Ecological Profile", level=1)
     para = doc.add_paragraph()
     para.add_run(
-        "This section provides an overview of the settlement's social, economic, and ecological characteristics. It includes information on vulnerabilities, NREGA details, livelihoods, and crop and livestock profiles. The specific details on caste groups, economic conditions, NREGA works, and infrastructure, as well as previous NRM demands, contribute to a comprehensive understanding of the settlement's dynamics. \n\n"
+        "This section includes information on vulnerabilities, NREGA details, livelihoods, crop and livestock profiles."
     )
 
     settlement_data = get_data_for_settlement(plan.id)
@@ -762,7 +753,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
 
     wells_info = [
         (settlement, wells_count[settlement], households_count[settlement])
-        for settlement in wells_count
+        for settlement in sorted(wells_count.keys(), key=sort_key)
     ]
 
     doc.add_heading("Well Summary Information", level=3)
@@ -788,7 +779,17 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
 
     doc.add_heading("Detailed Well Information and their Maintenance Demands", level=3)
 
-    for i, (well, mws_id) in enumerate(all_wells_with_mws, 1):
+    all_wells_with_mws_sorted = sorted(
+        all_wells_with_mws,
+        key=lambda x: (
+            x[0].beneficiary_settlement == "NA",
+            x[0].beneficiary_settlement.lower()
+            if x[0].beneficiary_settlement != "NA"
+            else "",
+        ),
+    )
+
+    for i, (well, mws_id) in enumerate(all_wells_with_mws_sorted, 1):
         doc.add_heading(
             f"Beneficiary's Settlement: {well.beneficiary_settlement}", level=4
         )
@@ -871,7 +872,9 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         )
         add_well_data(7, "Households Benefitted", well.households_benefitted)
         add_well_data(8, "Which Caste uses the well?", well.caste_uses)
-        add_well_data(9, "Well, is Functional or Non-functional?", well.is_functional)
+        add_well_data(
+            9, "Is the well functional or non-functional?", well.is_functional
+        )
         add_well_data(10, "Well Usage", well_usage)
         add_well_data(11, "Need Maintenance?", well.need_maintenance)
         add_well_data(12, "Repair Activities", repair_activities)
@@ -903,7 +906,9 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
             waterbody_count[(settlement, waterbody_type)],
             households_count[(settlement, waterbody_type)],
         )
-        for (settlement, waterbody_type) in waterbody_count
+        for (settlement, waterbody_type) in sorted(
+            waterbody_count.keys(), key=lambda x: sort_key(x[0])
+        )
     ]
 
     doc.add_heading("Water Structures Summary Information", level=3)
@@ -933,7 +938,11 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
 
     doc.add_heading("Detailed Water Structures Information", level=3)
 
-    for i, (waterbody, mws_id) in enumerate(all_waterbodies_with_mws, 1):
+    all_waterbodies_with_mws_sorted = sorted(
+        all_waterbodies_with_mws, key=lambda x: sort_key(x[0].beneficiary_settlement)
+    )
+
+    for i, (waterbody, mws_id) in enumerate(all_waterbodies_with_mws_sorted, 1):
         doc.add_heading(
             f"Beneficiary's Settlement: {waterbody.beneficiary_settlement}", level=4
         )
@@ -1001,7 +1010,7 @@ def add_section_e(doc, plan):
     )
     para = doc.add_paragraph()
     para.add_run(
-        "This section presents information on proposed maintenance works for existing assets based on inputs from the Gram Sabha. For each maintenance work, include details such as the beneficiary settlement, work ID, type of work, latitude, and longitude."
+        "This section presents information on proposed maintenance works for existing structures based on inputs from the Gram Sabha."
     )
     para.add_run("\n\n")
 
@@ -1014,7 +1023,7 @@ def add_section_e(doc, plan):
 
     doc.add_heading("Maintenance Works by Asset Type", level=2)
 
-    table = doc.add_table(rows=len(asset_types) + 1, cols=1)
+    table = doc.add_table(rows=len(asset_types), cols=1)
     table.style = "Table Grid"
 
     header_cells = table.rows[0].cells
@@ -1041,12 +1050,13 @@ def add_section_e(doc, plan):
 
 def maintenance_gw_table(doc, plan):
     headers = [
+        "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Work ID",
-        "Corresponding Work ID",
+        "Gender",
+        "Beneficiary's Father's Name",
         "Type of Recharge Structure",
-        "Repair Activity",
+        "Repair Activities",
         "Latitude",
         "Longitude",
     ]
@@ -1060,16 +1070,17 @@ def maintenance_gw_table(doc, plan):
 
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = (
+        row_cells[0].text = maintenance.data_gw_maintenance.get("demand_type") or "NA"
+        row_cells[1].text = (
             maintenance.data_gw_maintenance.get("beneficiary_settlement") or "NA"
         )
-        row_cells[1].text = (
+        row_cells[2].text = (
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = (
-            maintenance.data_gw_maintenance.get("select_one_water_structure") or "NA"
+        row_cells[3].text = maintenance.data_gw_maintenance.get("select_gender") or "NA"
+        row_cells[4].text = maintenance.data_gw_maintenance.get("ben_father") or "NA"
+        row_cells[5].text = (
+            maintenance.data_gw_maintenance.get("select_one_recharge_structure") or "NA"
         )
         row_cells[5].text = (
             maintenance.data_gw_maintenance.get("select_one_activities") or "NA"
