@@ -79,7 +79,7 @@ response_param = openapi.Parameter('X-API-Key', openapi.IN_HEADER, description="
 )
 
 
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="Auth_free")
 def get_admin_details_by_lat_lon(request):
     """
         Retrieve admin data based on given latitude and longitude coordinates.

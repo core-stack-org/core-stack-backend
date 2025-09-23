@@ -56,7 +56,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "5cbf08250f1c.ngrok-free.app",
+    "811f35f97225.ngrok-free.app",
     "api-doc.core-stack.org",
 ]
 
@@ -333,5 +333,4 @@ ES_AUTH = env("ES_AUTH")
 CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 
 # Community Engagement API Configuration
-COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
 WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
