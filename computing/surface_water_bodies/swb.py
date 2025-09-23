@@ -23,6 +23,7 @@ from .swb3 import waterbody_wbc_intersection
 @app.task(bind=True)
 def generate_swb_layer(
     self,
+    gee_account_id=2,
     state=None,
     district=None,
     block=None,
@@ -33,7 +34,7 @@ def generate_swb_layer(
     start_year=None,
     end_year=None,
 ):
-    ee_initialize()
+    ee_initialize(gee_account_id)
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())

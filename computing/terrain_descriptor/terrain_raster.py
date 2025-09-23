@@ -19,8 +19,8 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 def terrain_raster(self,
-    roi_path,
     gee_account_id,
+    roi_path=None,
     state=None,
     district=None,
     block=None,
@@ -30,6 +30,9 @@ def terrain_raster(self,
    ):
 
     print("Inside terrain_raster")
+    print(state)
+    print(district)
+    print(block)
     ee_initialize(gee_account_id)
     if state and district and block:
         description = (
@@ -39,6 +42,14 @@ def terrain_raster(self,
             + valid_gee_text(block.lower())
         )
         asset_id = get_gee_asset_path(state, district, block) + description
+        roi_boundary = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
     else:
         description = (
                 "terrain_raster_" + asset_suffix
@@ -50,27 +61,27 @@ def terrain_raster(self,
                 )
                 + description
         )
+        roi_boundary = ee.FeatureCollection(roi_path)
+
+
+    if not is_gee_asset_exists(asset_id):
 
 
 
-        if not is_gee_asset_exists(asset_id):
-            roi_boundary = ee.FeatureCollection(roi_path)
-
-
-        mwsheds_lf_rasters = ee.ImageCollection(
+       mwsheds_lf_rasters = ee.ImageCollection(
             roi_boundary.map(generate_terrain_classified_raster)
         )
-        mwsheds_lf_raster = mwsheds_lf_rasters.mosaic()
+       mwsheds_lf_raster = mwsheds_lf_rasters.mosaic()
 
-        task_id = export_raster_asset_to_gee(
+       task_id = export_raster_asset_to_gee(
             image=mwsheds_lf_raster.clip(roi_boundary.geometry()),
             description=description,
             asset_id=asset_id,
             scale=30,
             region=roi_boundary.geometry(),
         )
-        task_id_list = check_task_status([task_id])
-        print("terrain_raster task_id_list", task_id_list)
+       task_id_list = check_task_status([task_id])
+       print("terrain_raster task_id_list", task_id_list)
 
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
