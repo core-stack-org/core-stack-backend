@@ -16,9 +16,9 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def get_change_detection(self, state, district, block, start_year, end_year):
+def get_change_detection(self, state, district, block, start_year, end_year, gee_account_id):
     # Initialize the Earth Engine
-    ee_initialize()
+    ee_initialize(gee_account_id)
     param_dict = {
         "Urbanization": built_up,
         "Degradation": change_degradation,

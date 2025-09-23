@@ -29,7 +29,7 @@ from utilities.auth_check_decorator import api_security_check
 from django.http import HttpResponse
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
+from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
 
 # Common parameters that can be reused across endpoints
 latitude_param = openapi.Parameter('latitude', openapi.IN_QUERY, description="Latitude coordinate (-90 to 90)", type=openapi.TYPE_NUMBER,required=True)
@@ -622,7 +622,7 @@ def get_mws_report_urls(request):
         district = district_param.lower().strip().replace(" ", "_")
         tehsil = tehsil_param.lower().strip().replace(" ", "_")
 
-        ee_initialize()
+        ee_initialize(GEE_HELPER_ACCOUNT_ID)
         asset_path = get_gee_asset_path(state, district, tehsil)
         mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
         if not is_gee_asset_exists(mws_asset_id):

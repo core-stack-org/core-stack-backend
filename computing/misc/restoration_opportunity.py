@@ -21,8 +21,8 @@ from utilities.constants import GEE_DATASET_PATH
 
 
 @app.task(bind=True)
-def generate_restoration_opportunity(self, state, district, block):
-    ee_initialize()
+def generate_restoration_opportunity(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"

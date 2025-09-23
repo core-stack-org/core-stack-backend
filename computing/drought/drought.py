@@ -24,6 +24,7 @@ from nrm_app.celery import app
 @app.task(bind=True)
 def calculate_drought(
     self,
+    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -34,7 +35,8 @@ def calculate_drought(
     start_year=None,
     end_year=None,
 ):
-    ee_initialize()
+
+    ee_initialize(gee_account_id)
 
     if state and district and block:
         asset_suffix = (
@@ -63,7 +65,7 @@ def calculate_drought(
         )
         + dst_filename
     )
-
+    roi = ee.FeatureCollection(roi)
     layer_name = asset_suffix + "_drought"
 
     if not is_gee_asset_exists(asset_id):
@@ -116,7 +118,7 @@ def calculate_drought(
             make_asset_public(asset)
 
         task_id = merge_yearly_layers(
-            asset_suffix, asset_folder_list, app_type, start_year, end_year
+            asset_suffix, asset_folder_list, app_type, start_year, end_year, gee_account_id
         )
         check_task_status([task_id])
 

@@ -17,8 +17,8 @@ from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def generate_terrain_clusters(self, state, district, block):
-    ee_initialize()
+def generate_terrain_clusters(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
 
     asset_name = (
         valid_gee_text(district.lower())

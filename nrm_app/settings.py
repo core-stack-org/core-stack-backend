@@ -50,7 +50,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
-
+GEE_HELPER_ACCOUNT_ID = 2
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
@@ -83,13 +83,14 @@ INSTALLED_APPS = [
     "rest_framework_api_key",
     # project applications
     "users",
-    "organization",
+    "organization.apps.OrganizationConfig",
     "projects",
     "plantations",
     "plans",
     "public_api",
     "community_engagement",
     "bot_interface",
+    "gee_computing",
 ]
 
 # MARK: CORS Settings
@@ -124,7 +125,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "ngrok-skip-browser-warning",
     "content-disposition",  # Important for file uploads in form data
-    "X-API-Key"
+    "X-API-Key",
 ]
 
 CORS_ALLOW_METHODS = [
@@ -173,7 +174,6 @@ SIMPLE_JWT = {
     "JTI_CLAIM": "jti",
 }
 
-AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -254,6 +254,7 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
+AUTH_USER_MODEL = "users.User"
 
 STATIC_URL = "static/"
 STATIC_ROOT = "static/"
@@ -291,6 +292,55 @@ OD_DATA_URL_plan = {
         "gps_point": "GPS_point_recharge_structure",
     },
 }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,  # keep Django's default loggers
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {name} | {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": "DEBUG",  # or INFO in production
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "app.log"),
+            "formatter": "verbose",
+        },
+        "mail_admins": {
+            "class": "django.utils.log.AdminEmailHandler",
+            "level": "ERROR",
+        },
+    },
+    "root": {  # applies to everything unless overridden
+        "handlers": ["console", "file"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "geoadmin": {  # replace with your Django app name
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+}
+
 
 # MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
@@ -335,3 +385,8 @@ CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 # Community Engagement API Configuration
 COMMUNITY_ENGAGEMENT_API_URL = env("COMMUNITY_ENGAGEMENT_API_URL")
 WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+
+BASE_URL = "https://geoserver.core-stack.org/"
+DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
+
+FERNET_KEY = env("FERNET_KEY")

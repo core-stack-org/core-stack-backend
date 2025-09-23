@@ -22,30 +22,48 @@ import subprocess
 from google.cloud import storage
 from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
+from gee_computing.models import  GEEAccount
+from google.oauth2 import service_account
 
 
-def ee_initialize(project=None):
-    try:
-        if project == "helper":
-            service_account = (
-                "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
-            )
-            conf_path = os.path.join(BASE_DIR, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH)
-            credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
-        elif project == "datasets":
-            service_account = (
-                "corestack-datasets@corestack-datasets.iam.gserviceaccount.com"
-            )
-            conf_path = os.path.join(BASE_DIR, GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH)
-            credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
-        else:
-            service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
-            conf_path = os.path.join(BASE_DIR, GEE_SERVICE_ACCOUNT_KEY_PATH)
-            credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
-        ee.Initialize(credentials)
-        print("ee initialized", project)
-    except Exception as e:
-        print("Exception in gee connection", e)
+def ee_initialize(account_id):
+    account = GEEAccount.objects.get(pk=account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+    credentials = service_account.Credentials.from_service_account_info(
+        key_dict,
+        scopes=[
+            'https://www.googleapis.com/auth/earthengine',
+            'https://www.googleapis.com/auth/devstorage.full_control',
+        ]
+    )
+    ee.Initialize(credentials)
+
+    # Return both ee and the service account email for reference
+    return ee, credentials.service_account_email
+
+
+# def ee_initialize(project=None):
+#     try:
+#         if project == "helper":
+#             service_account = (
+#                 "corestack-helper@ee-corestack-helper.iam.gserviceaccount.com"
+#             )
+#             conf_path = os.path.join(BASE_DIR, GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH)
+#             credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
+#         elif project == "datasets":
+#             service_account = (
+#                 "corestack-datasets@corestack-datasets.iam.gserviceaccount.com"
+#             )
+#             conf_path = os.path.join(BASE_DIR, GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH)
+#             credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
+#         else:
+#             service_account = "core-stack-dev@ee-corestackdev.iam.gserviceaccount.com"
+#             conf_path = os.path.join(BASE_DIR, GEE_SERVICE_ACCOUNT_KEY_PATH)
+#             credentials = ee.ServiceAccountCredentials(service_account, str(conf_path))
+#         ee.Initialize(credentials)
+#         print("ee initialized", project)
+#     except Exception as e:
+#         print("Exception in gee connection", e)
 
 
 def gcs_config():

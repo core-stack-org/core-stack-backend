@@ -63,7 +63,7 @@ urlpatterns = [
     path("crop_grid/", api.crop_grid, name="crop_grid"),
     path("tree_health_raster/", api.tree_health_raster, name="tree_health_raster"),
     path("tree_health_vector/", api.tree_health_vector, name="tree_health_vector"),
-    path("stream_order_vector/", api.stream_order_vector, name="stream_order_vector"),
+    path("stream_order/", api.stream_order, name="stream_order"),
     path(
         "mws_drought_causality/",
         api.mws_drought_causality,

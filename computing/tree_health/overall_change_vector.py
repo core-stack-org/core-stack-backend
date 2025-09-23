@@ -17,8 +17,8 @@ from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def tree_health_overall_change_vector(self, state, district, block):
-    ee_initialize()
+def tree_health_overall_change_vector(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     print("Inside process tree_health_overall_change_vector")
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)

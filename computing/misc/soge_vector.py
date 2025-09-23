@@ -21,9 +21,9 @@ from utilities.constants import GEE_DATASET_PATH
 
 
 @app.task(bind=True)
-def generate_soge_vector(self, state, district, block):
+def generate_soge_vector(self, state, district, block, gee_account_id):
     """Generate vector layer for the SOGE - Stage of Ground Water Extraction"""
-    ee_initialize()
+    ee_initialize(gee_account_id)
 
     description = f"soge_vector_{valid_gee_text(district)}_{valid_gee_text(block)}"
     asset_path = get_gee_asset_path(state, district, block)

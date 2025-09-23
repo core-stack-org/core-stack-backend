@@ -25,8 +25,8 @@ from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
-def mws_layer(self, state, district, block):
-    ee_initialize()
+def mws_layer(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     description = (
         "filtered_mws_"
         + valid_gee_text(district.lower())

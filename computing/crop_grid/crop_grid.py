@@ -24,8 +24,8 @@ from utilities.constants import (
 
 
 @app.task(bind=True)
-def create_crop_grids(self, state, district, block):
-    ee_initialize()
+def create_crop_grids(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     description = (
         "crop_grid_"
         + valid_gee_text(district.lower())

@@ -18,8 +18,8 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def tree_health_overall_change_raster(self, state, district, block):
-    ee_initialize()
+def tree_health_overall_change_raster(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     print("Inside process tree_health_overall_change_raster")
     palette = [
         "FF0000",
