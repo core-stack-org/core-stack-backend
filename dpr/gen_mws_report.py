@@ -272,6 +272,7 @@ def get_osm_data(state, district, block, uid):
         """
 
         #print("API response start time", datetime.now())
+        response = {}
 
         response = {}
         try:
