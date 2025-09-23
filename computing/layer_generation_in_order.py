@@ -21,7 +21,6 @@ from computing.terrain_descriptor.terrain_clusters import generate_terrain_clust
 from computing.lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
 from computing.lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from computing.misc.soge_vector import generate_soge_vector
-from computing.misc.stream_order import generate_stream_order_vector
 from computing.misc.drainage_lines import clip_drainage_lines
 from computing.clart.clart import generate_clart_layer
 from .layer_map import *
