@@ -272,9 +272,14 @@ def get_osm_data(state, district, block, uid):
         """
 
         #print("API response start time", datetime.now())
+        response = {}
 
-        response = requests.get(OVERPASS_URL, params={"data": overpass_query})
-        response = response.json()
+        try:
+            response = requests.get(OVERPASS_URL, params={"data": overpass_query})
+            response = response.json()
+            raise RuntimeError("Simulated API failure")
+        except Exception as e:
+            logger.info("Not able to fetch the Overpass API Info", e)
 
         #print("API response end time", datetime.now())
 
@@ -1480,11 +1485,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
                     total_area_nd += yearly_area[0]
                 
-                print("total_area_nd = ",total_area_nd)
-                print("total_area_d = ",total_area_d)
-                print(drought_years)
-                print(non_drought_year)
-
                 percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
 
                 if result.trend == "increasing":
