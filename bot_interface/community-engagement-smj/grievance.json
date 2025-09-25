@@ -18,12 +18,46 @@
     "postAction": [],
     "transition": [
       {
-        "RequestAudio": [
+        "SendLocationRequest": [
           "success"
         ]
       },
       {
         "GrievanceStart": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendLocationRequest",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📍 कृपया संसाधन स्थल की लोकेशन भेजें",
+            "en": "📍 Please send the location of the work site",
+            "default": "📍 Please send the location of the work site"
+          }
+        ]
+      },
+      {
+        "function": "send_location_request"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_location_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestAudio": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
           "failure"
         ]
       }
@@ -106,87 +140,9 @@
       {
         "text": [
           {
-            "hi": "✅ धन्यवाद! आपकी शिकायत सफलतापूर्वक दर्ज कर दी गई है।\n\nआपकी शिकायत की जांच की जाएगी और आपको अपडेट दिया जाएगा।",
-            "en": "✅ Thank you! Your grievance has been successfully registered.\n\nYour grievance will be reviewed and you will be updated.",
-            "default": "✅ Thank you! Your grievance has been successfully registered.\n\nYour grievance will be reviewed and you will be updated."
-          }
-        ]
-      },
-      {
-        "menu": [
-          {
-            "label": "सेवा मेनू पर वापस जाएं",
-            "value": "back_to_service",
-            "description": "Return to community services",
-            "caption": "आगे क्या करना चाहेंगे:"
-          },
-          {
-            "label": "बाहर निकलें",
-            "value": "exit_session",
-            "description": "End the session"
-          }
-        ]
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "BackToServiceMenu": [
-          "back_to_service"
-        ]
-      },
-      {
-        "EndSession": [
-          "exit_session"
-        ]
-      },
-      {
-        "ThankYou": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "BackToServiceMenu",
-    "preAction": [
-      {
-        "text": [
-          {
-            "hi": "🔄 सेवा मेनू पर वापस जा रहे हैं...",
-            "en": "🔄 Returning to service menu...",
-            "default": "🔄 Returning to service menu..."
-          }
-        ]
-      },
-      {
-        "data": [
-          {
-            "smjName": "community_features",
-            "initState": "ServiceMenu"
-          }
-        ],
-        "function": "jumpToSmj"
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "BackToServiceMenu": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "EndSession",
-    "preAction": [
-      {
-        "text": [
-          {
-            "hi": "🙏 धन्यवाद! आपका सत्र समाप्त हो रहा है।",
-            "en": "🙏 Thank you! Your session is ending.",
-            "default": "🙏 Thank you! Your session is ending."
+            "hi": "✅ धन्यवाद! आपकी शिकायत सफलतापूर्वक दर्ज कर दी गई है।\n\nआपकी शिकायत की जांच की जाएगी और आपको अपडेट दिया जाएगा।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you! Your grievance has been successfully registered.\n\nYour grievance will be reviewed and you will be updated.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you! Your grievance has been successfully registered.\n\nYour grievance will be reviewed and you will be updated.\n\n🙏 Send \"Hi\" to restart the chat."
           }
         ]
       },
@@ -197,7 +153,7 @@
     "postAction": [],
     "transition": [
       {
-        "EndSession": [
+        "ThankYou": [
           "failure"
         ]
       }

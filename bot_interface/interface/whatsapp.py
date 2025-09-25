@@ -491,8 +491,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             user_id = data_dict.get("user_id")
             print("user in sendCommunityByLocation", user_id)
-            
-            data = data_dict.get("data", {})  
+            logger.info(data_dict)
+            # assert False
+            data = data_dict.get("data", {})
             print("data in sendCommunityByLocation:", data)
             
             # Initialize variables
@@ -523,52 +524,59 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             longitude = ""
 
             # get the data field from getDataFrom state in current session
-            if get_data_from_state and get_data_from_state in current_session:
-                data = current_session[get_data_from_state].get(get_data_from_state_field, {})
-                print("Data from current session for state:", data)
-                # lat lon is stored as a string in data seperated by comma eg (25.2048, 55.2708)
-                if isinstance(data, str):
-                    lat_lon = data.split(",")
-                    if len(lat_lon) == 2:
-                        latitude = lat_lon[0].strip()
-                        longitude = lat_lon[1].strip()
-                        print("Latitude and Longitude from string:", latitude, longitude)
-                    else:
-                        print("Invalid latitude and longitude format in string")
-                        return "failure"
-                else:
-                    print("Latitude and Longitude not found in current session data")
-                    return "failure"
-            else:
-                print(f"Required state data not found in session: {get_data_from_state}")
+            location_data_found = False
+
+            if get_data_from_state and current_session:
+                # current_session is a list of dictionaries, need to search through them
+                for session_dict in current_session:
+                    if isinstance(session_dict, dict) and get_data_from_state in session_dict:
+                        data = session_dict[get_data_from_state].get(get_data_from_state_field, {})
+                        print("Data from current session for state:", data)
+                        location_data_found = True
+                        
+                        # lat lon is stored as a string in data separated by comma eg (25.2048, 55.2708)
+                        if isinstance(data, str):
+                            lat_lon = data.split(",")
+                            if len(lat_lon) == 2:
+                                latitude = lat_lon[0].strip()
+                                longitude = lat_lon[1].strip()
+                                print("Latitude and Longitude from string:", latitude, longitude)
+                                break  # Found the data, exit the loop
+                            else:
+                                print("Invalid latitude and longitude format in string")
+                        else:
+                            print("Latitude and Longitude not found in current session data - data is not string")
+
+            if not location_data_found or not latitude or not longitude:
+                print(f"Required location data not found in session: {get_data_from_state}")
                 return "failure"
-            
-            # print("Latitude and Longitude from string:", latitude, longitude)
 
             # Handle SMJ object lookup with error handling
             smj_id = data_dict.get("smj_id")
             user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-            user.save()
 
             response = None
-            try: 
-                response = bot_interface.utils.get_community_by_lat_lon(
-                lat=latitude,
-                lon=longitude
+            # try:
+            from public_api.views import get_location_info_by_lat_lon
+            print("Fetching community by location...", latitude, longitude)
+            response = get_location_info_by_lat_lon(
+                lat=float(latitude),
+                lon=float(longitude)
             )
-            except Exception as e:
-                logger.error(f"Error fetching community using get_community_by_lat_lon: {e}")
-                # except 500 error
-                try:
-                    print("Fetching community by location...")
-                    response = requests.get(
-                        url="https://uat.core-stack.org/api/v1/get_admin_details_by_latlon/?latitude=25.1369&longitude=85.4516",
-                        # params={"latitude": latitude, "longitude": longitude},
-                        timeout=30
-                    ).json()
-                except requests.exceptions.RequestException as e:
-                    print(f"Error fetching community by location: {e}")
-                    return "failure"
+            logger.info("Location info response:", response)
+            # except Exception as e:
+            #     logger.error(f"Error fetching community using get_community_by_lat_lon: {e}")
+            #     # except 500 error
+            #     try:
+            #         print("Fetching community by location...")
+            #         response = requests.get(
+            #             url="https://uat.core-stack.org/api/v1/get_admin_details_by_latlon/?latitude=25.1369&longitude=85.4516",
+            #             # params={"latitude": latitude, "longitude": longitude},
+            #             timeout=30
+            #         ).json()
+            #     except requests.exceptions.RequestException as e:
+            #         print(f"Error fetching community by location: {e}")
+            #         return "failure"
 
             print("Community by location response:", response)
 
@@ -579,7 +587,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     # If response is a tuple (success, data), extract the data
                     success, location_data = response
                     if success and isinstance(location_data, dict):
-                        community_list = get_communities(
+                        community_data = get_communities(
                             state_name=location_data.get("State", ""), 
                             district_name=location_data.get("District", ""), 
                             block_name=location_data.get("Block", "")
@@ -588,18 +596,43 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         return "failure"
                 elif isinstance(response, dict):
                     # If response is a dict, use it directly
-                    community_list = get_communities(
+                    community_data = get_communities(
                         state_name=response.get("State", ""), 
                         district_name=response.get("District", ""), 
                         block_name=response.get("Block", "")
                     )
                 else:
                     return "failure"
+                if community_data == "no_communities":
+                    return "no_communities"   
+                print("Community list:", community_data)
+                communities_list = []
+                if community_data:
+                    for community in community_data:
+                        communities_list.append({
+                            "value": community.get("community_id"),
+                            "label": community.get("name"),
+                            "description": community.get("description", "")
+                        })
                     
-                print("Community list:", community_list)
-                
-                if community_list:
-                    return "success"
+                    print("Communities list for WhatsApp:", communities_list)
+                    
+                    # Send the communities list to user
+                    if communities_list:
+                        send_communities_response = bot_interface.api.send_list_msg(
+                            bot_instance_id=bot_instance_id,
+                            contact_number=user.phone,
+                            text="कृपया अपना समुदाय चुनें",
+                            menu_list=communities_list
+                        )
+                        
+                        print("Communities list message response:", send_communities_response)
+                    user.expected_response_type = "community"
+                    user.save()
+                    if send_communities_response and send_communities_response.get('messages'):
+                        return "success"
+                    else:
+                        return "failure"
                 else:
                     return "failure"
             else:
@@ -734,7 +767,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # get districts based on the selected state
             try:
                 response = requests.get(
-                    url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_districts_with_community/",
+                    # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_districts_with_community/",
+                    url=f"http://localhost:8000/api/v1/get_districts_with_community/",
                     params={"state_id": state_id},
                     timeout=30
                 )
@@ -858,7 +892,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Call the API to get communities by location
             try:
                 response = requests.get(
-                    url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_communities_by_location/",
+                    # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_communities_by_location/",
+                    url=f"http://localhost:8000/api/v1/get_communities_by_location/",
                     params={
                         "state_id": state_id,
                         "district_id": district_id
@@ -1003,13 +1038,26 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                                 print(f"State {state_name} not found in session")
                         else:
                             print("No current session data available")
-
+                    elif state_name == "CommunityByLocation":
+                        if current_session and len(current_session) > 0:
+                            print(f"Session structure check - type: {type(current_session[0])}")
+                            if state_name in current_session[0]:
+                                state_data = current_session[0][state_name]
+                                print(f"State data type: {type(state_data)}, content: {state_data}")
+                                
+                                if isinstance(state_data, dict):
+                                    community_id = state_data.get(field_name)
+                                    print(f"Extracted community_id: {community_id}")
+                                else:
+                                    print(f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}")
+                                    return "failure"
                 # add user to community
                 if community_id:
                     print(f"Adding user {user.phone} to community {community_id}")
                     try:
                         response = requests.post(
-                            url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
+                            # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
+                            url="http://localhost:8000/api/v1/add_user_to_community/",
                             data={
                                 "community_id": community_id,
                                 "number": user.phone
@@ -1165,9 +1213,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         """
         try:
             print(f"Trying API approach for phone number: {phone_number}")
-            base_url = settings.COMMUNITY_ENGAGEMENT_API_URL.rstrip('/')
+            # base_url = settings.COMMUNITY_ENGAGEMENT_API_URL.rstrip('/')
             response = requests.get(
-                f"{base_url}/get_community_by_user/", 
+                f"http://localhost:8000/api/v1/get_community_by_user/", 
                 params={"number": phone_number},
                 timeout=10
             )
@@ -2531,7 +2579,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 try:
                     # Use similar pattern as existing addUserToCommunity function
                     response = requests.post(
-                            url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
+                            url="http://localhost:8000/api/v1/add_user_to_community/",
                             data={
                                 "community_id": community_id,
                                 "number": int(user_phone)
@@ -2786,7 +2834,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Files to upload: {list(files.keys())}")
             
             # Submit to Community Engagement API
-            api_url = f"{settings.COMMUNITY_ENGAGEMENT_API_URL}upsert_item/"
+            api_url = f"http://localhost:8000/api/v1/upsert_item/"
             
             try:
                 response = requests.post(
@@ -2921,7 +2969,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return "failure"
             
             # Call Community Engagement API
-            api_url = f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_items_status/"
+            api_url = f"http://localhost:8000/api/v1/get_items_status/"
             params = {
                 'number': contact_number,
                 'bot_id': bot_instance_id,
