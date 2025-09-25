@@ -27,7 +27,6 @@ from computing.utils import (
 @app.task(bind=True)
 def generate_hydrology(
     self,
-    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -38,6 +37,7 @@ def generate_hydrology(
     start_year=None,
     end_year=None,
     is_annual=False,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 

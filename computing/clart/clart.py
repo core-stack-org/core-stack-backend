@@ -23,7 +23,8 @@ def generate_clart_layer(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
     drainage_density(state, district, block)
     generate_lithology_layer(state)
-    clart_layer(state, district, block)
+    layer_at_geoserver = clart_layer(state, district, block)
+    return layer_at_geoserver
 
 
 def clart_layer(state, district, block):

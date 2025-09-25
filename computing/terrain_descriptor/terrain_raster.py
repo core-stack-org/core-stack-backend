@@ -9,7 +9,8 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
-    make_asset_public, get_gee_dir_path,
+    make_asset_public,
+    get_gee_dir_path,
 )
 import ee
 
@@ -18,16 +19,17 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def terrain_raster(self,
-    roi_path,
-    gee_account_id,
+def terrain_raster(
+    self,
+    roi_path=None,
     state=None,
     district=None,
     block=None,
     asset_suffix=None,
     asset_folder_list=None,
     app_type="MWS",
-   ):
+    gee_account_id=None,
+):
 
     print("Inside terrain_raster")
     ee_initialize(gee_account_id)
@@ -40,22 +42,17 @@ def terrain_raster(self,
         )
         asset_id = get_gee_asset_path(state, district, block) + description
     else:
-        description = (
-                "terrain_raster_" + asset_suffix
-        )
+        description = "terrain_raster_" + asset_suffix
 
         asset_id = (
-                get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-                )
-                + description
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
         )
-
-
 
         if not is_gee_asset_exists(asset_id):
             roi_boundary = ee.FeatureCollection(roi_path)
-
 
         mwsheds_lf_rasters = ee.ImageCollection(
             roi_boundary.map(generate_terrain_classified_raster)

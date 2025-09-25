@@ -57,7 +57,6 @@ from utilities.auth_check_decorator import api_security_check
 from .layer_generation_in_order import layer_generate_map
 
 
-
 @api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_admin_boundary(request):
@@ -212,7 +211,9 @@ def generate_mws_layer(request):
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id").lower()
-        mws_layer.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        mws_layer.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -271,7 +272,7 @@ def generate_annual_hydrology(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "is_annual": True,
-                "gee_account_id": gee_account_id
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
@@ -349,7 +350,8 @@ def lulc_v3(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         clip_lulc_v3.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
@@ -371,7 +373,8 @@ def lulc_vector(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         vectorise_lulc.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "lulc_vector task initiated"},
@@ -394,7 +397,8 @@ def lulc_v4(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         generate_lulc_v4.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "lulc_time_series task initiated"},
@@ -439,7 +443,7 @@ def generate_ci_layer(request):
                 "block": block,
                 "start_year": start_year,
                 "end_year": end_year,
-                "gee_account_id":gee_account_id
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
@@ -470,7 +474,7 @@ def generate_swb(request):
                 "block": block,
                 "start_year": start_year,
                 "end_year": end_year,
-                "gee_account_id":gee_account_id
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
@@ -500,7 +504,7 @@ def generate_drought_layer(request):
                 "block": block,
                 "start_year": start_year,
                 "end_year": end_year,
-                "gee_account_id":gee_account_id
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
@@ -543,7 +547,9 @@ def generate_terrain_raster(request):
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id").lower()
-        terrain_raster.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        terrain_raster.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "generate_terrain_raster task initiated"},
             status=status.HTTP_200_OK,
@@ -565,7 +571,8 @@ def terrain_lulc_slope_cluster(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         lulc_on_slope_cluster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "terrain_lulc_slope_cluster task initiated"},
@@ -588,7 +595,8 @@ def terrain_lulc_plain_cluster(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         lulc_on_plain_cluster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "terrain_lulc_plain_cluster task initiated"},
@@ -608,7 +616,9 @@ def generate_clart(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        generate_clart_layer.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        generate_clart_layer.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "generate_clart task initiated"},
             status=status.HTTP_200_OK,
@@ -630,7 +640,8 @@ def change_detection(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         get_change_detection.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "change_detection task initiated"},
@@ -671,7 +682,9 @@ def crop_grid(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        create_crop_grids.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        create_crop_grids.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "crop_grid task initiated"},
             status=status.HTTP_200_OK,
@@ -693,7 +706,8 @@ def mws_drought_causality(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         drought_causality.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "Drought Causality task initiated"},
@@ -716,10 +730,12 @@ def tree_health_raster(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         tree_health_ccd_raster.apply_async(
-            args=[state, district, block, start_year, end_year,gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         tree_health_ch_raster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         tree_health_overall_change_raster.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
@@ -748,10 +764,12 @@ def tree_health_vector(request):
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         tree_health_ch_vector.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         tree_health_ccd_vector.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "Overall_change_vector task initiated"},
@@ -834,7 +852,16 @@ def plantation_site_suitability(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id").lower()
         site_suitability.apply_async(
-            args=[project_id, start_year, end_year, state, district, block, gee_account_id], queue="nrm"
+            args=[
+                project_id,
+                start_year,
+                end_year,
+                state,
+                district,
+                block,
+                gee_account_id,
+            ],
+            queue="nrm",
         )
         return Response(
             {"Success": "Plantation_site_suitability task initiated"},
@@ -854,7 +881,9 @@ def aquifer_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        generate_aquifer_vector.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        generate_aquifer_vector.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "aquifer vector task initiated"},
             status=status.HTTP_200_OK,
@@ -873,7 +902,9 @@ def soge_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        generate_soge_vector.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        generate_soge_vector.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "SOGE vector task initiated"},
             status=status.HTTP_200_OK,
@@ -912,7 +943,8 @@ def fes_clart_upload_layer(request):
             for chunk in uploaded_file.chunks():
                 destination.write(chunk)
         generate_fes_clart_layer.apply_async(
-            args=[state, district, block, file_path, clart_filename, gee_account_id], queue="nrm"
+            args=[state, district, block, file_path, clart_filename, gee_account_id],
+            queue="nrm",
         )
 
         return Response(
@@ -933,7 +965,9 @@ def swb_pond_merging(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        merge_swb_ponds.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        merge_swb_ponds.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -950,7 +984,6 @@ def lulc_farm_boundary(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-
 
         headers = {"Content-Type": "application/json"}
         payload = {"state": state, "district": district, "block": block}
@@ -1071,6 +1104,7 @@ def wells_compute(request):
 
 @api_view(["POST"])
 @schema(None)
+@auth_free
 def generate_layer_in_order(request):
     print("inside generate_layer_order_first")
     try:
@@ -1078,12 +1112,22 @@ def generate_layer_in_order(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         map_order = request.data.get("map")
+        gee_account_id = request.data.get("gee_account_id").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
         layer_generate_map.apply_async(
-            args=[state, district, block, map_order, start_year, end_year], queue="nrm"
+            args=[
+                state,
+                district,
+                block,
+                map_order,
+                gee_account_id,
+                start_year,
+                end_year,
+            ],
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK

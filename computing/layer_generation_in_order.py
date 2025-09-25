@@ -32,7 +32,14 @@ status = {}
 
 @app.task(bind=True)
 def layer_generate_map(
-    self, state, district, block, map_order, start_year=None, end_year=None
+    self,
+    state,
+    district,
+    block,
+    map_order,
+    gee_account_id,
+    start_year=None,
+    end_year=None,
 ):
     """
 
@@ -46,7 +53,7 @@ def layer_generate_map(
             if not layer:
                 return f"check mws layer for {district}_{block}"
     except Exception as e:
-        return f"exception occur while check mws for {district}_{block} as: {e}"
+        return f"exception occur while checking mws for {district}_{block} as: {e}"
 
     global_args = {}
     if start_year:
@@ -58,7 +65,9 @@ def layer_generate_map(
     for func in eval(map_order):
         parent_function = func["name"]
         parent_func = globals().get(parent_function)
-        args = get_args(iterator_name=func, global_args=global_args)
+        args = get_args(
+            iterator_name=func, global_args=global_args, gee_account_id=gee_account_id
+        )
         deps = func.get("depends_on", [])
         run_layer_with_dependency(
             deps=deps,
@@ -75,7 +84,11 @@ def layer_generate_map(
             for child in func["children"]:
                 child_function = child["name"]
                 child_func = globals().get(child_function)
-                child_args = get_args(iterator_name=child, global_args=global_args)
+                child_args = get_args(
+                    iterator_name=child,
+                    global_args=global_args,
+                    gee_account_id=gee_account_id,
+                )
                 child_deps = child.get("depends_on", [])
                 run_layer_with_dependency(
                     deps=child_deps,
@@ -93,7 +106,9 @@ def layer_generate_map(
                         sub_child_function = sub_child["name"]
                         sub_child_func = globals().get(sub_child_function)
                         sub_child_args = get_args(
-                            iterator_name=sub_child, global_args=global_args
+                            iterator_name=sub_child,
+                            global_args=global_args,
+                            gee_account_id=gee_account_id,
                         )
                         sub_child_deps = sub_child.get("depends_on", [])
                         run_layer_with_dependency(
@@ -131,32 +146,41 @@ def run_layer_with_dependency(
             status[node_func_name] = False
             break
     else:
-        print(f"{node_func_name} is running... with args={args}, depends_on={deps}")
-        try:
-            result = (
-                node_func_obj(state, district, block, **args)
-                if args
-                else node_func_obj(state, district, block)
-            )
-            if result:
-                print(f"{node_func_name} is completed...")
-                status[node_func_name] = True
-            else:
-                print(f"check the {node_func_name}")
-                status[node_func_name] = False
-        except Exception as e:
-            print(f"{node_func_name} raised an error: {e}")
+        print(
+            f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
+        )
+        # try:
+        result = (
+            node_func_obj(state, district, block, **args)
+            if args
+            else node_func_obj(state, district, block)
+        )
+        if result:
+            print(f"{node_func_name} is completed...")
+            status[node_func_name] = True
+        else:
+            print(f"check the {node_func_name}")
             status[node_func_name] = False
+        print(f"{result = }")
+        # except Exception as e:
+        #     print(f"{node_func_name} raised an error: {e}")
+        #     status[node_func_name] = False
 
 
-def get_args(iterator_name, global_args):
+def get_args(iterator_name, global_args, gee_account_id):
     """
 
     This function merge the global agrs and local args(define in json maps) return combination of both.
 
     """
     if iterator_name.get("use_global_args", False):
-        args = {**global_args, **iterator_name.get("args", {})}
+        args = {
+            **global_args,
+            "gee_account_id": gee_account_id,
+            **iterator_name.get("args", {}),
+        }
+    elif iterator_name.get("use_multiple_gee", False):
+        args = {"gee_account_id": gee_account_id, **iterator_name.get("args", {})}
     else:
         args = iterator_name.get("args", {})
     return args

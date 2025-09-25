@@ -33,7 +33,7 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
 
     if is_gee_asset_exists(asset_id):
         print(f"Asset already exists: {asset_id}")
-        return
+        return True
 
     mws_asset_id = (
         asset_path

@@ -28,7 +28,6 @@ geo = Geoserver()
 @app.task(bind=True)
 def generate_cropping_intensity(
     self,
-    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -38,6 +37,7 @@ def generate_cropping_intensity(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
     if state and district and block:

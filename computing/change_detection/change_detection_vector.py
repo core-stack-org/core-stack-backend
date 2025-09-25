@@ -71,6 +71,7 @@ def vectorise_change_detection(self, state, district, block, gee_account_id):
                 block, district, state, asset_id, param, layer_id
             )
             return layer_at_geoserver
+        return False
 
 
 def afforestation_vector(roi, state, district, block):
