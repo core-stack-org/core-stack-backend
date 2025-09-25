@@ -149,8 +149,9 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
     fc = roi.map(process_mws_feature).flatten()
 
     asset_id = get_gee_asset_path(state, district, block) + description
-    task = export_vector_asset_to_gee(fc, description, asset_id)
-    check_task_status([task])
+    if not is_gee_asset_exists(asset_id):
+        task = export_vector_asset_to_gee(fc, description, asset_id)
+        check_task_status([task])
 
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
