@@ -1,6 +1,6 @@
 [
   {
-    "name": "WorkDemandStatusWelcome",
+    "name": "AssetDemandStatusWelcome",
     "preAction": [
       {
         "text": [
@@ -12,33 +12,33 @@
         ]
       },
       {
-        "function": "fetch_work_demand_status"
+        "function": "fetch_asset_demand_status"
       }
     ],
     "postAction": [],
     "transition": [
       {
-        "DisplayWorkDemands": [
-          "has_work_demands"
+        "DisplayAssetDemands": [
+          "has_asset_demands"
         ]
       },
       {
-        "NoWorkDemandsFound": [
-          "no_work_demands"
+        "NoAssetDemandsFound": [
+          "no_asset_demands"
         ]
       },
       {
-        "WorkDemandStatusWelcome": [
+        "AssetDemandStatusWelcome": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "DisplayWorkDemands",
+    "name": "DisplayAssetDemands",
     "preAction": [
       {
-        "function": "display_work_demands_text"
+        "function": "display_asset_demands_text"
       },
       {
         "text": [
@@ -56,14 +56,14 @@
     "postAction": [],
     "transition": [
       {
-        "DisplayWorkDemands": [
+        "DisplayAssetDemands": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "NoWorkDemandsFound",
+    "name": "NoAssetDemandsFound",
     "preAction": [
       {
         "text": [
@@ -81,7 +81,7 @@
     "postAction": [],
     "transition": [
       {
-        "NoWorkDemandsFound": [
+        "NoAssetDemandsFound": [
           "failure"
         ]
       }

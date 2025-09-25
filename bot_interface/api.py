@@ -236,9 +236,9 @@ def send_text(bot_instance_id, contact_number, text, bold=False):
     return response_json
 
 
-def send_url(app_instance_config_id, contact_number, item_url):
+def send_url(bot_instance_id, contact_number, item_url):
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
-        bot_instance_id=app_instance_config_id
+        bot_instance_id=bot_instance_id
     )
     return requests.post(
         url=BSP_URL + "messages",
@@ -256,36 +256,64 @@ def send_url(app_instance_config_id, contact_number, item_url):
             },
     ).json()
 
-def send_items(app_instance_config_id, contact_number, caption, items):
+def send_audio_as_reply(bot_instance_id, contact_number, audio_path, caption=""):
+    """ This function sends an audio message to a WhatsApp user.
+    Args:
+        bot_instance_id (int): The ID of the bot instance.
+        contact_number (str): The phone number of the recipient.
+        audio_path (str): The audio file to send.
+        caption (str): The caption for the audio message.
     """
-    This function sends items sequentially.
+    print("send_audio_as_reply >>>")
+    BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+        bot_instance_id=bot_instance_id
+    )
+    response = requests.post(
+        url=BSP_URL + "messages",
+        headers=HEADERS,
+        timeout=20,
+        json={
+            "to": contact_number,
+            "type": "audio",
+            "audio": {"link": audio_path,},
+        },
+    )
+    print("response send_audio_as_reply::", response)
+    print(vars(response))
+    return response
+
+
+def send_image_as_reply(bot_instance_id, contact_number, image_url, caption):
+    """ This function sends a text message to a WhatsApp user.
+    Args:
+        bot_instance_id (int): The ID of the bot instance.
+        contact_number (str): The phone number of the recipient.
+        image_path (str): The image file to send.
+        caption (str): The caption for the image message.
     """
-    print("Sending items to:", contact_number)
-    
-    if caption:
-        send_text(app_instance_config_id, contact_number, caption)
+    BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+        bot_instance_id=bot_instance_id
+    )
+    response = requests.post(
+        url=BSP_URL + "messages",
+        headers=HEADERS,
+        timeout=20,
+        json={
+            "to": contact_number,
+            "type": "image",
+            "image": {"link": image_url, "caption": caption},
+        },
+    )
+    print(response)
 
-    for item, title, s3_audio_url, is_youtube in items:
-        if is_youtube:
-            send_url(app_instance_config_id, contact_number, s3_audio_url)
-        else:
-            item_response = send_url(app_instance_config_id, contact_number, item)
-            print("ITEM CARD SENT RESPONSE:", item_response)
-            
-            response = send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url, caption)
-            print("ITEM AUDIO FILE SENT RESPONSE:", response, response.json())
-            
-        time.sleep(2.0)
-    time.sleep(2.0)
-
-def send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url, caption, max_retries=3):
+def send_audio_with_retries(bot_instance_id, contact_number, s3_audio_url, caption, max_retries=3):
     """
     Helper function to send audio with retries.
     """
     count = 0
     while count <= max_retries:
         try:
-            response = send_audio_as_reply(app_instance_config_id, contact_number, s3_audio_url, caption)
+            response = send_audio_as_reply(bot_instance_id, contact_number, s3_audio_url, caption)
             if response.status_code == 201:
                 return response
             print(f"RETRYING SENDING ITEM TIMES: {count}; ITEM_URL: {s3_audio_url}")
@@ -295,7 +323,7 @@ def send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url
         time.sleep(1)
     return response
 
-# def send_items(app_instance_config_id, contact_number, caption, items):
+# def send_items(bot_instance_id, contact_number, caption, items):
 #     """
 #     This function sends items.
 

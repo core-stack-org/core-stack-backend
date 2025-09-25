@@ -1788,7 +1788,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             event = data_dict.get("event", "")
             print(f"Handling service selection for event: {event}")
             
-            # For all events (work_demand, grievance, exit_session, etc.), pass through the event
+            # For all events (asset_demand, grievance, exit_session, etc.), pass through the event
             return event
                 
         except Exception as e:
@@ -1913,12 +1913,21 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if not user.misc_data:
                     user.misc_data = {}
                 
-                # Initialize work_demand structure
-                if "work_demand" not in user.misc_data:
-                    user.misc_data["work_demand"] = {}
-                
+                current_smj = user.current_smj
+                if current_smj and current_smj.name == "grievance":
+                    flow_type = "grievance"
+                elif current_smj and current_smj.name == "asset_demand":
+                    flow_type = "asset_demand"
+                elif current_smj and current_smj.name == "story":
+                    flow_type = "story"
+                else:
+                    flow_type = current_smj.name  # Default to story if unknown
+                # Initialize asset_demand structure
+                if flow_type not in user.misc_data:
+                    user.misc_data[flow_type] = {}
+
                 # Store location data
-                user.misc_data["work_demand"]["location"] = location_data
+                user.misc_data[flow_type]["location"] = location_data
                 user.save()
                 
                 print(f"Successfully stored location data: {location_data}")
@@ -2005,15 +2014,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     user.misc_data = {}
                 
                 # Determine which flow we're in based on current SMJ
-                flow_type = "work_demand"  # Default
+                flow_type = "asset_demand"  # Default
                 try:
                     smj_id = data_dict.get("smj_id")
                     if smj_id:
                         smj = bot_interface.models.SMJ.objects.get(id=smj_id)
                         if smj.name == "grievance":
                             flow_type = "grievance"
-                        elif smj.name == "work_demand":
-                            flow_type = "work_demand"
+                        elif smj.name == "asset_demand":
+                            flow_type = "asset_demand"
+                        elif smj.name == "story":
+                            flow_type = "story"
                         print(f"Detected flow type: {flow_type} (SMJ: {smj.name})")
                 except Exception as e:
                     print(f"Could not determine flow type, using default: {e}")
@@ -2110,15 +2121,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     user.misc_data = {}
                 
                 # Determine which flow we're in based on current SMJ
-                flow_type = "work_demand"  # Default
+                flow_type = "asset_demand"  # Default
                 try:
                     smj_id = data_dict.get("smj_id")
                     if smj_id:
                         smj = bot_interface.models.SMJ.objects.get(id=smj_id)
                         if smj.name == "grievance":
                             flow_type = "grievance"
-                        elif smj.name == "work_demand":
-                            flow_type = "work_demand"
+                        elif smj.name == "asset_demand":
+                            flow_type = "asset_demand"
+                        elif smj.name == "story":
+                            flow_type = "story"
                         print(f"Detected flow type for photos: {flow_type} (SMJ: {smj.name})")
                 except Exception as e:
                     print(f"Could not determine flow type for photos, using default: {e}")
@@ -2176,7 +2189,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 "misc_data": user.misc_data,
                 "final_state": user.current_state,
                 "session_duration": (user.last_updated_at - user.started_at).total_seconds(),
-                "archived_reason": "work_demand_completion"
+                "archived_reason": f"{user.current_smj}_completion"
             }
             
             # Create UserArchive entry
@@ -2205,17 +2218,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Error in archive_and_end_session: {e}")
             return "failure"
 
-    def log_work_demand_completion(self, bot_instance_id, data_dict):
+    def log_asset_demand_completion(self, bot_instance_id, data_dict):
         """
-        Log complete work demand data to UserLogs when RequestPhotos transitions to ThankYou.
+        Log complete asset demand data to UserLogs when RequestPhotos transitions to ThankYou.
         Args:
             bot_instance_id (int): The ID of the bot instance.
             data_dict (dict): Dictionary containing user and session data.
         Returns:
             str: "success" or "failure"
         """
-        print("in log_work_demand_completion")
-        
+        print("in log_asset_demand_completion")
+
         try:
             # Get bot instance with better error handling
             try:
@@ -2250,23 +2263,23 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 print(f"BotUser not found for user_id: {user_id}")
                 return "failure"
             
-            # Get work_demand SMJ for reference
+            # Get asset_demand SMJ for reference
             try:
                 smj = bot_interface.models.SMJ.objects.get(id=data_dict.get("smj_id"))
             except bot_interface.models.SMJ.DoesNotExist:
                 print(f"SMJ not found for smj_id: {data_dict.get('smj_id')}")
                 smj = None
-            
-            # Collect work demand data from misc_data
-            work_demand_data = {}
-            if user.misc_data and "work_demand" in user.misc_data:
-                work_demand_data = user.misc_data["work_demand"]
-                
+
+            # Collect asset demand data from misc_data
+            asset_demand_data = {}
+            if user.misc_data and "asset_demand" in user.misc_data:
+                asset_demand_data = user.misc_data["asset_demand"]
+
                 # Log photo paths to confirm HDPI paths are captured
-                if "photos" in work_demand_data:
-                    print(f"Photo paths being logged: {work_demand_data['photos']}")
+                if "photos" in asset_demand_data:
+                    print(f"Photo paths being logged: {asset_demand_data['photos']}")
                     # Add explicit note about HDPI paths in the data
-                    work_demand_data["photos_note"] = "Photo paths are HDPI processed images from WhatsApp media"
+                    asset_demand_data["photos_note"] = "Photo paths are HDPI processed images from WhatsApp media"
             
             # Collect community context
             community_context = {}
@@ -2303,10 +2316,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Prepare comprehensive misc data
             from datetime import datetime
             comprehensive_misc_data = {
-                "work_demand_data": work_demand_data,
+                "asset_demand_data": asset_demand_data,
                 "community_context": community_context,
                 "flow_metadata": {
-                    "smj_name": "work_demand",
+                    "smj_name": "asset_demand",
                     "completion_timestamp": datetime.now().isoformat(),
                     "user_number": bot_user.user.username if bot_user.user else "unknown",
                     "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
@@ -2320,7 +2333,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 bot=bot_instance,
                 user=bot_user,
                 key1="useraction",
-                value1="work_demand",
+                value1="asset_demand",
                 key2="upload", 
                 value2="",
                 key3="retries",
@@ -2329,15 +2342,15 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 misc=comprehensive_misc_data,
                 smj=smj
             )
-            
+            print("Comprehensive misc data prepared for asset demand :", comprehensive_misc_data)
             print(f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}")
-            print(f"Work demand data logged for user {user_id} in community {active_community_id}")
-            
+            print(f"Asset demand data logged for user {user_id} in community {active_community_id}")
+
             # Additional logging for HDPI path verification
-            if "photos" in work_demand_data:
-                print(f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}")
-            
-            # Process and submit work demand to Community Engagement API
+            if "photos" in asset_demand_data:
+                print(f"HDPI photo paths captured in UserLogs: {asset_demand_data['photos']}")
+
+            # Process and submit asset demand to Community Engagement API
             try:
                 import threading
                 def async_submit():
@@ -2345,26 +2358,26 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         # Check if already processed (avoid duplicate processing from signal)
                         user_log.refresh_from_db()
                         if user_log.value2:  # If value2 is not empty, it's already been processed
-                            print(f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission")
+                            print(f"UserLogs ID {user_log.id} already processed, skipping duplicate submission")
                             return
-                            
-                        self.process_and_submit_work_demand(user_log.id)
-                        print(f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}")
+
+                        self.process_and_submit_asset_demand(user_log.id)
+                        print(f"Asset demand processing initiated for UserLogs ID: {user_log.id}")
                     except Exception as e:
-                        print(f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}")
-                
+                        print(f"Error processing asset demand for UserLogs ID {user_log.id}: {e}")
+
                 # Run in background thread to avoid blocking SMJ flow
                 thread = threading.Thread(target=async_submit, daemon=True)
                 thread.start()
-                print(f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}")
-                
+                print(f"Started background asset demand processing for UserLogs ID: {user_log.id}")
+
             except Exception as e:
-                print(f"❌ Failed to start work demand processing: {e}")
-            
+                print(f"Failed to start asset demand processing: {e}")
+
             return "success"
                 
         except Exception as e:
-            print(f"Error in log_work_demand_completion: {e}")
+            print(f"Error in log_asset_demand_completion: {e}")
             return "failure"
 
     def log_grievance_completion(self, bot_instance_id, data_dict):
@@ -2504,6 +2517,169 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         except Exception as e:
             print(f"Error in log_grievance_completion: {e}")
             return "failure"
+        
+    def log_story_completion(self, bot_instance_id, data_dict):
+        """
+        Log complete story data to UserLogs when RequestPhotos transitions to ThankYou.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        print("in log_story_completion")
+
+        try:
+            # Get bot instance with better error handling
+            try:
+                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            except bot_interface.models.Bot.DoesNotExist:
+                print(f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance")
+                bot_instance = bot_interface.models.Bot.objects.first()
+                if not bot_instance:
+                    print("No bot instances found in database")
+                    return "failure"
+            
+            user_id = data_dict.get("user_id")
+            if isinstance(user_id, str):
+                user_id = int(user_id)
+            
+            # Get user session with better error handling
+            try:
+                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            except bot_interface.models.UserSessions.DoesNotExist:
+                print(f"UserSession not found for user_id: {user_id}, bot: {bot_instance}")
+                try:
+                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
+                    print(f"Found user session for user_id: {user_id} without bot constraint")
+                except bot_interface.models.UserSessions.DoesNotExist:
+                    print(f"No user session found for user_id: {user_id}")
+                    return "failure"
+            
+            # Get BotUsers object for UserLogs
+            try:
+                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            except bot_interface.models.BotUsers.DoesNotExist:
+                print(f"BotUser not found for user_id: {user_id}")
+                return "failure"
+            
+            # Get story SMJ for reference
+            try:
+                smj = bot_interface.models.SMJ.objects.get(id=data_dict.get("smj_id"))
+            except bot_interface.models.SMJ.DoesNotExist:
+                print(f"SMJ not found for smj_id: {data_dict.get('smj_id')}")
+                smj = None
+
+            # Collect story data from misc_data
+            story_data = {}
+            if user.misc_data and "story" in user.misc_data:
+                story_data = user.misc_data["story"]
+
+                # Log photo paths to confirm HDPI paths are captured
+                if "photos" in story_data:
+                    print(f"Photo paths being logged: {story_data['photos']}")
+                    # Add explicit note about HDPI paths in the data
+                    story_data["photos_note"] = "Photo paths are HDPI processed images from WhatsApp media"
+            
+            # Collect community context
+            community_context = {}
+            active_community_id = user.misc_data.get('active_community_id') if user.misc_data else None
+            
+            if active_community_id:
+                try:
+                    from community_engagement.models import Community
+                    community = Community.objects.get(id=active_community_id)
+                    
+                    # Get community details
+                    community_context = {
+                        "community_id": active_community_id,
+                        "community_name": community.project.name if community.project else "Unknown",
+                        "organization": community.project.organization.name if community.project and community.project.organization else "Unknown"
+                    }
+                    
+                    # Get location hierarchy from community locations
+                    location_hierarchy = {}
+                    for location in community.locations.all():
+                        if location.state:
+                            location_hierarchy["state"] = location.state.state_name
+                        if location.district:
+                            location_hierarchy["district"] = location.district.district_name
+                        if location.block:
+                            location_hierarchy["block"] = location.block.block_name
+                    
+                    community_context["location_hierarchy"] = location_hierarchy
+                    
+                except Exception as e:
+                    print(f"Error getting community context: {e}")
+                    community_context = {"community_id": active_community_id, "error": "Failed to load community details"}
+            
+            # Prepare comprehensive misc data
+            from datetime import datetime
+            comprehensive_misc_data = {
+                "story_data": story_data,
+                "community_context": community_context,
+                "flow_metadata": {
+                    "smj_name": "story",
+                    "completion_timestamp": datetime.now().isoformat(),
+                    "user_number": bot_user.user.username if bot_user.user else "unknown",
+                    "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
+                    "app_type": user.app_type
+                }
+            }
+            print(f"Comprehensive misc data prepared for story: {comprehensive_misc_data}")
+            # Create UserLogs entry with specified structure
+            user_log = bot_interface.models.UserLogs.objects.create(
+                app_type=user.app_type,
+                bot=bot_instance,
+                user=bot_user,
+                key1="useraction",
+                value1="story",
+                key2="upload", 
+                value2="",
+                key3="retries",
+                value3="",
+                key4="",  # Leave empty as not specified
+                misc=comprehensive_misc_data,
+                smj=smj
+            )
+            
+            print(f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}")
+            print(f"Story data logged for user {user_id} in community {active_community_id}")
+
+            # Additional logging for HDPI path verification
+            if "photos" in story_data:
+                print(f"HDPI photo paths captured in UserLogs: {story_data['photos']}")
+
+            # Process and submit story to Community Engagement API
+            try:
+                import threading
+                def async_submit():
+                    try:
+                        # Check if already processed (avoid duplicate processing from signal)
+                        user_log.refresh_from_db()
+                        if user_log.value2:  # If value2 is not empty, it's already been processed
+                            print(f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission")
+                            return
+
+                        self.process_and_submit_story(user_log.id)
+                        print(f"✅ Story processing initiated for UserLogs ID: {user_log.id}")
+                    except Exception as e:
+                        print(f"❌ Error processing story for UserLogs ID {user_log.id}: {e}")
+
+                # Run in background thread to avoid blocking SMJ flow
+                thread = threading.Thread(target=async_submit, daemon=True)
+                thread.start()
+                print(f"🚀 Started background story processing for UserLogs ID: {user_log.id}")
+
+            except Exception as e:
+                print(f"❌ Failed to start story processing: {e}")
+
+            return "success"
+                
+        except Exception as e:
+            print(f"Error in log_story_completion: {e}")
+            return "failure"
+
 
     def add_user_to_selected_community_join_flow(self, bot_instance_id, data_dict):
         """
@@ -2705,12 +2881,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             traceback.print_exc()
             return "failure"
 
-    def process_and_submit_work_demand(self, user_log_id):
+    def process_and_submit_asset_demand(self, user_log_id):
         """
-        Processes work demand data from UserLogs and submits to Community Engagement API.
-        
+        Processes asset demand data from UserLogs and submits to Community Engagement API.
+
         Args:
-            user_log_id (int): ID of the UserLogs record containing work demand data
+            user_log_id (int): ID of the UserLogs record containing asset demand data
             
         Returns:
             dict: API response from upsert_item endpoint or error dict
@@ -2723,21 +2899,21 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         
         try:
             # Get the UserLogs record
+            logger.info(f"Processing asset demand for UserLogs ID: {user_log_id}")
             try:
                 user_log = UserLogs.objects.get(id=user_log_id)
             except UserLogs.DoesNotExist:
                 return {"success": False, "message": f"UserLogs record with id {user_log_id} not found"}
             
             # Extract work demand data from misc field
-            work_demand_data = user_log.misc.get("work_demand_data", {})
-            if not work_demand_data:
+            asset_demand_data = user_log.misc.get("asset_demand_data", {})
+            if not asset_demand_data:
                 # Try alternative key structure
-                work_demand_data = user_log.misc.get("work_demand", {})
+                asset_demand_data = user_log.misc.get("asset_demand", {})
                 
-            if not work_demand_data:
-                return {"success": False, "message": "No work demand data found in UserLogs.misc"}
-            
-            print(f"Processing work demand data: {work_demand_data}")
+            if not asset_demand_data:
+                return {"success": False, "message": "No asset demand data found in UserLogs.misc"}
+            print(f"Processing asset demand data: {asset_demand_data}")
             
             # Get user's community context from UserLogs misc data
             community_id = None
@@ -2759,8 +2935,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             files = {}
             
             # Handle audio file - use "audios" key for API
-            if "audio" in work_demand_data:
-                audio_path = work_demand_data["audio"]
+            if "audio" in asset_demand_data:
+                audio_path = asset_demand_data["audio"]
                 if audio_path and os.path.exists(audio_path):
                     try:
                         with open(audio_path, 'rb') as audio_file:
@@ -2776,8 +2952,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"Audio file not found or invalid path: {audio_path}")
             
             # Handle photo files - use indexed keys for multiple images
-            if "photos" in work_demand_data and isinstance(work_demand_data["photos"], list):
-                for i, photo_path in enumerate(work_demand_data["photos"]):
+            if "photos" in asset_demand_data and isinstance(asset_demand_data["photos"], list):
+                for i, photo_path in enumerate(asset_demand_data["photos"]):
                     if photo_path and os.path.exists(photo_path):
                         try:
                             with open(photo_path, 'rb') as photo_file:
@@ -2794,8 +2970,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             
             # Prepare coordinates from location data - use lat/lon format
             coordinates = {}
-            if "location" in work_demand_data:
-                location = work_demand_data["location"]
+            if "location" in asset_demand_data:
+                location = asset_demand_data["location"]
                 if isinstance(location, dict):
                     coordinates = {
                         "lat": location.get("latitude"),
@@ -2820,14 +2996,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             
             # Prepare API payload
             payload = {
-                'item_type': 'WORK_DEMAND',
+                'item_type': 'ASSET_DEMAND',
                 'coordinates': json.dumps(coordinates) if coordinates else '',
                 'number': contact_number,
                 'community_id': community_id,
                 'source': 'BOT',
                 'bot_id': user_log.bot.id,
-                'title': 'Work Demand Request',  # Auto-generated if not provided
-                'transcript': work_demand_data.get('description', ''),  # If any description exists
+                'title': 'Asset Demand Request',  # Auto-generated if not provided
+                'transcript': asset_demand_data.get('description', ''),  # If any description exists
             }
             
             print(f"API Payload: {payload}")
@@ -2901,7 +3077,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return {"success": False, "message": f"Request error: {e}"}
             
         except Exception as e:
-            print(f"Error in process_and_submit_work_demand: {e}")
+            print(f"Error in process_and_submit_asset_demand: {e}")
             import traceback
             traceback.print_exc()
             
@@ -2917,8 +3093,222 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 print(f"Failed to update UserLogs: {save_error}")
             
             return {"success": False, "message": f"Internal error: {e}"}
+        
+    def process_and_submit_story(self, user_log_id):
+        """
+        Processes story data from UserLogs and submits to Community Engagement API.
+
+        Args:
+            user_log_id (int): ID of the UserLogs record containing story data
+            
+        Returns:
+            dict: API response from upsert_item endpoint or error dict
+        """
+        import requests
+        import json
+        import os
+        from django.conf import settings
+        from bot_interface.models import UserLogs
+        
+        try:
+            # Get the UserLogs record
+            try:
+                user_log = UserLogs.objects.get(id=user_log_id)
+            except UserLogs.DoesNotExist:
+                return {"success": False, "message": f"UserLogs record with id {user_log_id} not found"}
+            
+            # Extract story data from misc field
+            story_data = user_log.misc.get("story_data", {})
+            if not story_data:
+                # Try alternative key structure
+                story_data = user_log.misc.get("story", {})
+                
+            if not story_data:
+                return {"success": False, "message": "No story data found in UserLogs.misc"}
+            
+            print(f"Processing story data: {story_data}")
+            
+            # Get user's community context from UserLogs misc data
+            community_id = None
+            try:
+                # Get community_id from community_context in the UserLogs misc field
+                if "community_context" in user_log.misc:
+                    community_context = user_log.misc["community_context"]
+                    community_id = community_context.get("community_id")
+                    print(f"Found community_id in UserLogs: {community_id}")
+                
+                if not community_id:
+                    return {"success": False, "message": "Could not find community_id in UserLogs data"}
+                    
+            except Exception as e:
+                print(f"Error getting community context from UserLogs: {e}")
+                return {"success": False, "message": f"Error getting community context: {e}"}
+            
+            # Prepare files for upload from local filesystem
+            files = {}
+            
+            # Handle audio file - use "audios" key for API
+            if "audio" in story_data:
+                audio_path = story_data["audio"]
+                if audio_path and os.path.exists(audio_path):
+                    try:
+                        with open(audio_path, 'rb') as audio_file:
+                            audio_content = audio_file.read()
+                            # Determine file extension
+                            file_ext = os.path.splitext(audio_path)[1] or '.ogg'
+                            mime_type = 'audio/ogg' if file_ext == '.ogg' else 'audio/mpeg'
+                            files['audios'] = (f'audio{file_ext}', audio_content, mime_type)
+                            print(f"Added audio file: {audio_path}")
+                    except Exception as e:
+                        print(f"Error reading audio file {audio_path}: {e}")
+                else:
+                    print(f"Audio file not found or invalid path: {audio_path}")
+            
+            # Handle photo files - use indexed keys for multiple images
+            if "photos" in story_data and isinstance(story_data["photos"], list):
+                for i, photo_path in enumerate(story_data["photos"]):
+                    if photo_path and os.path.exists(photo_path):
+                        try:
+                            with open(photo_path, 'rb') as photo_file:
+                                photo_content = photo_file.read()
+                                # Determine file extension
+                                file_ext = os.path.splitext(photo_path)[1] or '.jpg'
+                                mime_type = 'image/jpeg' if file_ext.lower() in ['.jpg', '.jpeg'] else 'image/png'
+                                files[f'images_{i}'] = (f'photo_{i}{file_ext}', photo_content, mime_type)
+                                print(f"Added photo file {i}: {photo_path}")
+                        except Exception as e:
+                            print(f"Error reading photo file {photo_path}: {e}")
+                    else:
+                        print(f"Photo file not found or invalid path: {photo_path}")
+            
+            # Prepare coordinates from location data - use lat/lon format
+            coordinates = {}
+            if "location" in story_data:
+                location = story_data["location"]
+                if isinstance(location, dict):
+                    coordinates = {
+                        "lat": location.get("latitude"),
+                        "lon": location.get("longitude")
+                    }
+                    # Only include if both lat and lon are available
+                    if not (coordinates["lat"] and coordinates["lon"]):
+                        coordinates = {}
+            
+            # Get user contact number through proper relationship chain
+            try:
+                # UserLogs.user_id -> BotUsers.id -> BotUsers.user_id -> Users.id -> Users.contact_number
+                bot_user = user_log.user  # This is BotUsers instance
+                actual_user = bot_user.user  # This is Users instance
+                contact_number = actual_user.contact_number
+                    
+                if not contact_number:
+                    return {"success": False, "message": "Could not get user contact number"}
+                    
+            except AttributeError as e:
+                return {"success": False, "message": f"Could not get user contact number from relationship chain: {e}"}
+            
+            # Prepare API payload
+            payload = {
+                'item_type': 'STORY',
+                'coordinates': json.dumps(coordinates) if coordinates else '',
+                'number': contact_number,
+                'community_id': community_id,
+                'source': 'BOT',
+                'bot_id': user_log.bot.id,
+                'title': 'Story Request',  # Auto-generated if not provided
+                'transcript': story_data.get('description', ''),  # If any description exists
+            }
+            
+            print(f"API Payload: {payload}")
+            print(f"Files to upload: {list(files.keys())}")
+            
+            # Submit to Community Engagement API
+            api_url = f"http://localhost:8000/api/v1/upsert_item/"
+            
+            try:
+                response = requests.post(
+                    api_url,
+                    data=payload,
+                    files=files,
+                    timeout=30  # 30 second timeout
+                )
+                
+                print(f"API Response Status: {response.status_code}")
+                print(f"API Response: {response.text}")
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    result = response.json()
+                    if result.get("success"):
+                        print(f"Successfully submitted story. Item ID: {result.get('item_id')}")
+                        
+                        # Update UserLogs with success status
+                        user_log.value2 = "success"
+                        user_log.value3 = "0"  # No retries needed
+                        user_log.key4 = "response"
+                        user_log.value4 = response.text
+                        user_log.save()
+                        print(f"Updated UserLogs ID {user_log.id} with success status")
+                        
+                        return result
+                    else:
+                        print(f"API returned success=False: {result}")
+                        
+                        # Update UserLogs with API failure status
+                        user_log.value2 = "failure"
+                        user_log.value3 = "0"
+                        user_log.key4 = "response"  
+                        user_log.value4 = response.text
+                        user_log.save()
+                        print(f"Updated UserLogs ID {user_log.id} with API failure status")
+                        
+                        return result
+                else:
+                    # Update UserLogs with HTTP error status
+                    user_log.value2 = "failure"
+                    user_log.value3 = "0"
+                    user_log.key4 = "error"
+                    user_log.value4 = f"HTTP {response.status_code}: {response.text}"
+                    user_log.save()
+                    print(f"Updated UserLogs ID {user_log.id} with HTTP error status")
+                    
+                    return {
+                        "success": False, 
+                        "message": f"API call failed with status {response.status_code}: {response.text}"
+                    }
+                    
+            except requests.exceptions.RequestException as e:
+                print(f"Request error: {e}")
+                
+                # Update UserLogs with request error status
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = f"Request error: {e}"
+                user_log.save()
+                print(f"Updated UserLogs ID {user_log.id} with request error status")
+                
+                return {"success": False, "message": f"Request error: {e}"}
+            
+        except Exception as e:
+            print(f"Error in process_and_submit_story: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Update UserLogs with internal error status
+            try:
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = f"Internal error: {e}"
+                user_log.save()
+                print(f"Updated UserLogs ID {user_log.id} with internal error status")
+            except Exception as save_error:
+                print(f"Failed to update UserLogs: {save_error}")
+            
+            return {"success": False, "message": f"Internal error: {e}"}
+
     
-    def fetch_work_demand_status(self, bot_instance_id, data_dict):
+    def fetch_asset_demand_status(self, bot_instance_id, data_dict):
         """
         Fetches work demand status for the current user from Community Engagement API.
         
@@ -2927,7 +3317,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             data_dict (dict): Contains user_id, bot_id, and other session data
             
         Returns:
-            str: "has_work_demands" if user has work demands, "no_work_demands" if none found, "failure" on error
+            str: "has_asset_demands" if user has work demands, "no_asset_demands" if none found, "failure" on error
         """
         print(f"Fetching work demand status for bot_instance_id: {bot_instance_id} and data_dict: {data_dict}")
         try:
@@ -2974,7 +3364,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 'number': contact_number,
                 'bot_id': bot_instance_id,
                 # 'community_id': str(community_id),
-                'work_demand_only': 'true'
+                'asset_demand_only': 'true'
             }
             
             print(f"Fetching work demand status for user {contact_number} in community {community_id} and bot_id {bot_instance_id}")
@@ -2984,25 +3374,25 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if response.status_code == 200:
                 result = response.json()
                 if result.get('success'):
-                    work_demands = result.get('data', [])
-                    print(f"Found {len(work_demands)} work demands for user {contact_number}")
+                    asset_demands = result.get('data', [])
+                    print(f"Found {len(asset_demands)} work demands for user {contact_number}")
                     
                     # Store work demands in user session for persistence between states
                     try:
                         from bot_interface.models import UserSessions
                         session_data = {
-                            'work_demands': work_demands,
+                            'asset_demands': asset_demands,
                             'community_id': community_id
                         }
                         UserSessions.objects.filter(user_id=user_id).update(misc_data=session_data)
-                        print(f"Stored {len(work_demands)} work demands in session for user {user_id}")
+                        print(f"Stored {len(asset_demands)} work demands in session for user {user_id}")
                     except Exception as session_error:
                         print(f"Error storing work demands in session: {session_error}")
                     
-                    if work_demands:
-                        return "has_work_demands"
+                    if asset_demands:
+                        return "has_asset_demands"
                     else:
-                        return "no_work_demands"
+                        return "no_asset_demands"
                 else:
                     print(f"API returned error: {result.get('message', 'Unknown error')}")
                     return "failure"
@@ -3011,10 +3401,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return "failure"
                 
         except Exception as e:
-            print(f"Error in fetch_work_demand_status: {e}")
+            print(f"Error in fetch_asset_demand_status: {e}")
             return "failure"
     
-    def display_work_demands_text(self, bot_instance_id, data_dict):
+    def display_asset_demands_text(self, bot_instance_id, data_dict):
         """
         Displays work demands as WhatsApp text message with Hindi format and character limit handling.
         
@@ -3044,9 +3434,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     return "failure"
                 
                 session_data = user_session.misc_data
-                work_demands = session_data.get('work_demands', [])
+                asset_demands = session_data.get('asset_demands', [])
                 
-                if not work_demands:
+                if not asset_demands:
                     print(f"No work demands found in session for user {user_id}")
                     return "failure"
                     
@@ -3064,7 +3454,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             
             # Send work demands with character limit handling
             try:
-                success = self._send_work_demands_with_limit(work_demands, contact_number, bot_instance_id)
+                success = self._send_asset_demands_with_limit(asset_demands, contact_number, bot_instance_id)
                 if success:
                     print(f"Asset demands text sent successfully to {contact_number}")
                     return "success"
@@ -3076,15 +3466,15 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return "failure"
             
         except Exception as e:
-            print(f"Error in display_work_demands_text: {e}")
+            print(f"Error in display_asset_demands_text: {e}")
             return "failure"
     
-    def _send_work_demands_with_limit(self, work_demands, contact_number, bot_instance_id, max_length=4000):
+    def _send_asset_demands_with_limit(self, asset_demands, contact_number, bot_instance_id, max_length=4000):
         """
         Send work demands with character limit handling, splitting into multiple messages if needed.
         
         Args:
-            work_demands (list): List of work demand objects
+            asset_demands (list): List of work demand objects
             contact_number (str): User's contact number
             bot_instance_id (int): Bot instance ID
             max_length (int): Maximum characters per message
@@ -3104,12 +3494,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             available_space = max_length - len(header) - 50  # 50 chars buffer for part indicator
             entries_per_message = max(1, available_space // entry_length)
             
-            total_messages = (len(work_demands) + entries_per_message - 1) // entries_per_message
+            total_messages = (len(asset_demands) + entries_per_message - 1) // entries_per_message
             
             # Send messages
             for msg_num in range(total_messages):
                 start_idx = msg_num * entries_per_message
-                end_idx = min(start_idx + entries_per_message, len(work_demands))
+                end_idx = min(start_idx + entries_per_message, len(asset_demands))
                 
                 # Create message text
                 if total_messages == 1:
@@ -3122,7 +3512,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 
                 # Add work demand entries
                 for i in range(start_idx, end_idx):
-                    demand = work_demands[i]
+                    demand = asset_demands[i]
                     demand_id = demand.get('id', 'N/A')
                     title = demand.get('title', 'Asset Demand Request')
                     status = demand.get('status', 'UNMODERATED')
@@ -3161,6 +3551,6 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             return True
             
         except Exception as e:
-            print(f"Error in _send_work_demands_with_limit: {e}")
+            print(f"Error in _send_asset_demands_with_limit: {e}")
             return False
 

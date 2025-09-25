@@ -167,13 +167,13 @@
         "menu": [
           {
             "label": "संसाधन मांग दर्ज करें",
-            "value": "work_demand",
+            "value": "asset_demand",
             "caption": "आप क्या करना चाहते हैं:",
             "description": "नई संसाधन मांग जमा करें"
           },
           {
             "label": "संसाधन मांग स्थिति",
-            "value": "work_demand_status",
+            "value": "asset_demand_status",
             "description": "अपनी पिछली संसाधन मांगों की स्थिति देखें"
           },
           {
@@ -187,13 +187,13 @@
     "postAction": [],
     "transition": [
       {
-        "JumpToWorkDemandSMJ": [
-          "work_demand"
+        "JumpToAssetDemandSMJ": [
+          "asset_demand"
         ]
       },
       {
-        "JumpToWorkDemandStatusSMJ": [
-          "work_demand_status"
+        "JumpToAssetDemandStatusSMJ": [
+          "asset_demand_status"
         ]
       },
       {
@@ -218,13 +218,13 @@
         "menu": [
           {
             "label": "संसाधन मांग दर्ज करें",
-            "value": "work_demand",
+            "value": "asset_demand",
             "caption": "आप क्या करना चाहते हैं:",
             "description": "नई संसाधन मांग जमा करें"
           },
           {
             "label": "संसाधन मांग स्थिति",
-            "value": "work_demand_status",
+            "value": "asset_demand_status",
             "description": "अपनी पिछली संसाधन मांगों की स्थिति देखें"
           },
           {
@@ -252,13 +252,13 @@
     ],
     "transition": [
       {
-        "JumpToWorkDemandSMJ": [
-          "work_demand"
+        "JumpToAssetDemandSMJ": [
+          "asset_demand"
         ]
       },
       {
-        "JumpToWorkDemandStatusSMJ": [
-          "work_demand_status"
+        "JumpToAssetDemandStatusSMJ": [
+          "asset_demand_status"
         ]
       },
       {
@@ -340,7 +340,7 @@
     ]
   },
   {
-    "name": "JumpToWorkDemandSMJ",
+    "name": "JumpToAssetDemandSMJ",
     "preAction": [
       {
         "text": [
@@ -354,8 +354,8 @@
       {
         "data": [
           {
-            "smjName": "work_demand",
-            "initState": "WorkDemandWelcome"
+            "smjName": "asset_demand",
+            "initState": "AssetDemandWelcome"
           }
         ],
         "function": "jumpToSmj"
@@ -364,14 +364,14 @@
     "postAction": [],
     "transition": [
       {
-        "JumpToWorkDemandSMJ": [
+        "JumpToAssetDemandSMJ": [
           "failure"
         ]
       }
     ]
   },
   {
-    "name": "JumpToWorkDemandStatusSMJ",
+    "name": "JumpToAssetDemandStatusSMJ",
     "preAction": [
       {
         "text": [
@@ -385,8 +385,8 @@
       {
         "data": [
           {
-            "smjName": "work_demand_status",
-            "initState": "WorkDemandStatusWelcome"
+            "smjName": "asset_demand_status",
+            "initState": "AssetDemandStatusWelcome"
           }
         ],
         "function": "jumpToSmj"
@@ -395,7 +395,7 @@
     "postAction": [],
     "transition": [
       {
-        "JumpToWorkDemandStatusSMJ": [
+        "JumpToAssetDemandStatusSMJ": [
           "failure"
         ]
       }

@@ -73,13 +73,13 @@
     "name": "SendDistrict",
     "preAction": [
       {
-        "function": "send_districts",
         "data": {
           "getDataFrom": {
-            "state": "SendState",
-            "field": "misc"
+            "field": "misc",
+            "state": "SendState"
           }
-        }
+        },
+        "function": "send_districts"
       }
     ],
     "postAction": [
@@ -107,11 +107,16 @@
         "function": "send_location_request"
       }
     ],
-    "postAction": [],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
     "transition": [
       {
         "CommunityByLocation": [
-          "success"
+          "success",
+          "community_member"
         ]
       },
       {
@@ -125,6 +130,12 @@
     "name": "CommunityByLocation",
     "preAction": [
       {
+        "data": {
+          "getDataFrom": {
+            "field": "data",
+            "state": "SendLocationRequest"
+          }
+        },
         "function": "send_community_by_location"
       }
     ],
@@ -140,6 +151,11 @@
         ]
       },
       {
+        "NoCommunitiesMsg": [
+          "no_communities"
+        ]
+      },
+      {
         "CommunityByLocation": [
           "failure"
         ]
@@ -150,19 +166,19 @@
     "name": "CommunityByStateDistrict",
     "preAction": [
       {
-        "function": "send_community_by_state_district",
         "data": {
           "getDataFrom": [
             {
-              "state": "SendState",
-              "field": "misc"
+              "field": "misc",
+              "state": "SendState"
             },
             {
-              "state": "SendDistrict", 
-              "field": "misc"
+              "field": "misc",
+              "state": "SendDistrict"
             }
           ]
-        }
+        },
+        "function": "send_community_by_state_district"
       }
     ],
     "postAction": [
@@ -222,12 +238,41 @@
     ],
     "postAction": [],
     "transition": [
-        {
-            "COMPLETE": ["success"]
-        },
-        {
-            "JoinSuccess": ["failure"]
-        }
+      {
+        "COMPLETE": [
+          "success"
+        ]
+      },
+      {
+        "JoinSuccess": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "NoCommunitiesMsg",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "Sorry we don't have any communities for you exact location.\n\nSend \"Hi\" to restart the service.",
+            "hi": "क्षमा करें, आपके सटीक स्थान के लिए हमारे पास कोई समुदाय नहीं है। \n\nदोबारा सेवा का लाभ उठाने के लिए \"Hi\" भेजें।",
+            "default": "Sorry we don't have any communities for you exact location.\n\nSend \"Hi\" to restart the service."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "NoCommunitiesMsg": [
+          "failure"
+        ]
+      }
     ]
   }
 ]

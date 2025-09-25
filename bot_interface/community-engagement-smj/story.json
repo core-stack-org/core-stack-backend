@@ -1,13 +1,13 @@
 [
   {
-    "name": "WorkDemandWelcome",
+    "name": "StoryWelcome",
     "preAction": [
       {
         "text": [
           {
-            "hi": "📋 संसाधन मांग पंजीकरण\n\nकृपया अपनी संसाधन मांग दर्ज करने के लिए निम्नलिखित चरणों का पालन करें।",
-            "en": "📋 Asset Demand Registration\n\nPlease follow the steps below to register your asset demand.",
-            "default": "📋 Asset Demand Registration\n\nPlease follow the steps below to register your asset demand."
+            "hi": "📋 अपनी कहानी साझा करें।\n\nकृपया अपनी कहानी बताने के लिए नीचे दिए गए चरणों का पालन करें।",
+            "en": "📋 Share your story.\n\nPlease follow the steps below to tell your story.",
+            "default": "📋 Share your story.\n\nPlease follow the steps below to tell your story."
           }
         ]
       },
@@ -23,7 +23,7 @@
         ]
       },
       {
-        "WorkDemandWelcome": [
+        "StoryWelcome": [
           "failure"
         ]
       }
@@ -35,9 +35,9 @@
       {
         "text": [
           {
-            "hi": "📍 कृपया संसाधन स्थल की लोकेशन भेजें",
-            "en": "📍 Please send the location of the work site",
-            "default": "📍 Please send the location of the work site"
+            "hi": "📍 कृपया संसाधन स्थल की लोकेशन भेजें।",
+            "en": "📍 Please send your location.",
+            "default": "📍 Please send your location."
           }
         ]
       },
@@ -69,7 +69,7 @@
       {
         "text": [
           {
-            "hi": "🎤 कृपया अपने संसाधन मांग की जानकारी के लिए एक ऑडियो रिकॉर्ड करें।\n\nऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• अपनी संसाधन मांग का विस्तृत विवरण",
+            "hi": "🎤 कृपया ऑडियो रिकॉर्ड करें और हमें अपनी कहानी बताएं।\n\nऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• अपनी कहानी का विस्तृत विवरण।",
             "en": "🎤 Please record an audio for your asset demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your asset demand",
             "default": "🎤 Please record an audio for your asset demand information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your asset demand"
           }
@@ -103,9 +103,9 @@
       {
         "text": [
           {
-            "hi": "📷 कृपया कार्यस्थल की फोटो अपलोड करें",
-            "en": "📷 Please upload photos of the worksite",
-            "default": "📷 Please upload photos of the worksite"
+            "hi": "📷 कृपया अपनी कहानी के लिए एक फोटो अपलोड करें।",
+            "en": "📷 Please upload a photo for your story.",
+            "default": "📷 Please upload a photo for your story."
           }
         ]
       },
@@ -135,14 +135,14 @@
     "name": "ThankYou",
     "preAction": [
       {
-        "function": "log_work_demand_completion"
+        "function": "log_story_completion"
       },
       {
         "text": [
           {
-            "hi": "✅ धन्यवाद! आपकी संसाधन मांग सफलतापूर्वक दर्ज कर दी गई है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
-            "en": "✅ Thank you! Your asset demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat.",
-            "default": "✅ Thank you! Your asset demand has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat."
+            "hi": "✅ धन्यवाद! आपकी कहानी सफलतापूर्वक दर्ज कर दी गई है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you! Your story has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you! Your story has been successfully registered.\n\n🙏 Send \"Hi\" to restart the chat."
           }
         ]
       },
