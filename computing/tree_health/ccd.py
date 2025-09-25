@@ -15,9 +15,9 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def tree_health_ccd_raster(self, state, district, block, start_year, end_year):
+def tree_health_ccd_raster(self, state, district, block, start_year, end_year, gee_account_id):
     print("Inside process Tree health ccd raster")
-    ee_initialize()
+    ee_initialize(gee_account_id)
 
     # Get the block MWS (Micro Watershed) features
     block_mws = ee.FeatureCollection(

@@ -353,19 +353,19 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Farm - Farm</span>
+                        <span>Crops - Crops</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Farm - Built Up</span>
+                        <span>Crops - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Farm - Barren</span>
+                        <span>Crops - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Farm - Scrub Land</span>
+                        <span>Crops - Shrubs and Scrubs</span>
                     </div>
                 </div>
 
@@ -386,23 +386,23 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #73bb53;"></div>
-                        <span>Tree Cover - Tree Cover</span>
+                        <span>Trees - Trees</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Tree Cover - Built Up</span>
+                        <span>Trees - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Tree Cover - Farm</span>
+                        <span>Trees - Crops</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Tree Cover - Barren</span>
+                        <span>Trees - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Tree Cover - Scrub land</span>
+                        <span>Trees - Shrubs and Scrubs</span>
                     </div>
                 </div>
                 <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
@@ -420,8 +420,26 @@
                     <div id="urbanMap" class="map"></div>
                     <div id="compMap5" class="map"></div>
                 </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff0000;"></div>
+                        <span>Built Up - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #1ca3ec;"></div>
+                        <span>Water - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #73bb53;"></div>
+                        <span>Tree/Crops - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                        <span>Barren/Shrubs and Scrubs - Built Up</span>
+                    </div>
+                </div>
                 <p class="legend-note">Note: Urbanization is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover, farmland, and barren land to human settlements (built-up) are computed.</p>
-
+                
             </section>
         {% endif %}
 
@@ -531,6 +549,30 @@
             <p>The state of groundwater extraction refers to the current level or intensity at which groundwater is being withdrawn from aquifers compared to its natural replenishment rate. Based on this ratio, agencies like the Central Ground Water Board (CGWB) in India classify areas into categories indicating the extent of extraction.</p>
             
             <p>{{soge_desc}}</p>
+
+            <div id="sogeMap" class="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffffff;"></div>
+                    <span>Safe</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                    <span>Semi - Critical</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4575b4;"></div>
+                    <span>Critical</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #313695;"></div>
+                    <span>Over - Exploited</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Not Assessed</span>
+                </div>
+            </div>
 
         </section>
         {% endif %}
@@ -861,6 +903,28 @@
             })
         })
 
+        const sogeMap = new ol.Map({
+            target: 'sogeMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
         const urbanMap = new ol.Map({
             target: 'urbanMap',
             layers: [urbanRaster],
@@ -995,6 +1059,9 @@
 
                     swbMap.getView().setCenter(mapcenter);
                     swbMap.getView().setZoom(13);
+
+                    sogeMap.getView().setCenter(mapcenter);
+                    sogeMap.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
@@ -1020,6 +1087,59 @@
             });
 
             swbMap.addLayer(vectorLayer);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=	soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                const type = feature.get('class');
+                let strokeColor = 'rgba(51, 51, 51, 0.0)'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.0)'; // Default fill color with 0.4 opacity
+
+                if (uid === '{{mws_id}}') {
+                    if (type === "Safe") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(255, 255, 255, 0.4)";
+                    } else if (type === "Semi-critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(224, 243, 248, 0.4)";
+                    } else if (type === "Critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(69, 117, 180, 0.4)";
+                    } else if (type === "Not Assessed") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(169, 169, 169, 0.4)";
+                    } else {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(49, 54, 149, 0.4)";
+                    }
+                }
+
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+
+            sogeMap.addLayer(vectorLayer);
         })
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
@@ -1548,6 +1668,77 @@
                 mainMap.updateSize();
             }, 500);
         });
+
+        (function () {
+            // layers we want to wait on
+            const layersToWatch = [
+                /* tile */
+                baseLayer,
+                /* image/WMS */
+                wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
+            ].filter(Boolean);
+
+            let pending = 0;
+            let resolveReady;
+            const readyPromise = new Promise(res => (resolveReady = res));
+
+            function hookSource(src) {
+                // Works for Tile sources
+                if (src && src.on) {
+                src.on('tileloadstart', () => pending++);
+                src.on(['tileloadend','tileloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
+                // Works for ImageWMS
+                src.on('imageloadstart', () => pending++);
+                src.on(['imageloadend','imageloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
+                }
+            }
+
+            layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
+            
+            // consider SWB vector overlay too (not critical for basemap):
+            // hookSource(vectorLayer.getSource()); // if you want to block on this as well
+
+            let renderedOnce = false;
+            function afterRender() {
+                renderedOnce = true;
+                check();
+            }
+
+            // when any map renders, note it
+            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+            ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+            .filter(Boolean)
+            .forEach(m => m.once('rendercomplete', afterRender));
+
+            // Charts: flip a flag when you finish constructing them
+            window.__chartsReady = true; // you already set animation: {duration: 0}, so they’re instant
+
+            let settleTimer;
+            function check() {
+                // resolve only when nothing is loading, at least one render happened, and charts are done
+                if (pending === 0 && renderedOnce && window.__chartsReady) {
+                // give the browser a breath to paint the final frame
+                clearTimeout(settleTimer);
+                settleTimer = setTimeout(() => {
+                    try {
+                    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+                    ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                    .filter(Boolean)
+                    .forEach(m => m.renderSync());
+                    } catch(e) {}
+                    window.__mapsReady = true;
+                    resolveReady(true);
+                }, 300);
+                }
+            }
+
+            // expose a promise Selenium can await if you prefer execute_async_script
+            window.__mapsReadyPromise = readyPromise;
+
+            // kick the check once in case nothing loads (rare)
+            setTimeout(check, 0);
+        })();
+
     </script>
 </body>
 </html>

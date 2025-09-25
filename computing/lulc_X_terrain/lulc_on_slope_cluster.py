@@ -18,8 +18,8 @@ from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_ar
 
 
 @app.task(bind=True)
-def lulc_on_slope_cluster(self, state, district, block, start_year, end_year):
-    ee_initialize()
+def lulc_on_slope_cluster(self, state, district, block, start_year, end_year, gee_account_id):
+    ee_initialize(gee_account_id)
 
     asset_description = (
         valid_gee_text(district.lower())

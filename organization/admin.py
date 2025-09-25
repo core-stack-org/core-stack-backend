@@ -3,6 +3,14 @@ from .models import Organization
 from users.models import User
 
 
+from django.contrib import admin
+from django.contrib.auth import get_user_model
+from .models import Organization
+
+User = get_user_model()
+
+
+@admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = (
         "name",
@@ -34,4 +42,7 @@ class OrganizationAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-admin.site.register(Organization, OrganizationAdmin)
+
+
+
+

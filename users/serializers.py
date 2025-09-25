@@ -83,14 +83,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 {"password": "Password fields didn't match."}
             )
 
-        # Handle organization validation and creation
         organization_input = attrs.get("organization")
-        
         if organization_input:
             from organization.models import Organization
             import uuid
 
-            # Check if the input is a valid UUID
+            # Check if input is UUID
             try:
                 uuid.UUID(organization_input)
                 is_uuid = True
@@ -98,7 +96,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 is_uuid = False
 
             if is_uuid:
-                # Handle as UUID - find existing organization
                 try:
                     organization = Organization.objects.get(id=organization_input)
                     attrs["organization_obj"] = organization
@@ -107,13 +104,17 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                         {"organization": "Organization not found."}
                     )
             else:
-                # Handle as organization name - create if doesn't exist
+                # Case-insensitive lookup for existing org
                 try:
-                    organization, created = Organization.objects.get_or_create(
-                        name__iexact=organization_input,
-                        defaults={'name': organization_input}
-                    )
-                    attrs["organization_obj"] = organization
+                    organization = Organization.objects.filter(
+                        name__iexact=organization_input
+                    ).first()
+
+                    if organization:
+                        attrs["organization_obj"] = organization
+                    else:
+                        # Defer creation to `create()` so we can assign `created_by`
+                        attrs["_new_org_name"] = organization_input
                 except Exception as e:
                     raise serializers.ValidationError(
                         {"organization": f"Failed to create/find organization: {str(e)}"}
@@ -122,26 +123,35 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        # Remove fields that aren't part of the User model
+        from organization.models import Organization
+
+        # pop custom fields
+        org_obj = validated_data.pop("organization_obj", None)
+        new_org_name = validated_data.pop("_new_org_name", None)
         validated_data.pop("password_confirm")
 
-        # Handle organization separately
-        organization = None
-        if "organization_obj" in validated_data:
-            organization = validated_data.pop("organization_obj")
-        if "organization" in validated_data:
-            validated_data.pop("organization")
+        # Create the user first
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            contact_number=validated_data.get("contact_number", ""),
+        )
 
-        # Create the user with a hashed password
-        user = User.objects.create_user(**validated_data)
+        # Assign organization
+        if org_obj:
+            user.organization = org_obj
+        elif new_org_name:
+            org_obj = Organization.objects.create(
+                name=new_org_name,
+                created_by=user  # <-- here we set created_by to the same new user
+            )
+            user.organization = org_obj
 
-        # Assign organization if provided
-        if organization:
-            user.organization = organization
-            user.save()
-
+        user.save()
         return user
-
 
 
 class GroupSerializer(serializers.ModelSerializer):

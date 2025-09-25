@@ -17,9 +17,9 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def generate_fes_clart_layer(self, state, district, block, file_path, clart_filename):
+def generate_fes_clart_layer(self, state, district, block, file_path, clart_filename, gee_account_id):
     print("Inside generate_fes_clart_layer")
-    ee_initialize()
+    ee_initialize(gee_account_id)
     try:
         description = (
             f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_clart"

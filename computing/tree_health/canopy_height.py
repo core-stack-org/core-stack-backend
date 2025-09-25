@@ -15,8 +15,8 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def tree_health_ch_raster(self, state, district, block, start_year, end_year):
-    ee_initialize()
+def tree_health_ch_raster(self, state, district, block, start_year, end_year, gee_account_id):
+    ee_initialize(gee_account_id)
     print("Inside process tree_health_ch_raster")
     # ch_palette = [
     #     "FFA500",

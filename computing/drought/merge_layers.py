@@ -51,10 +51,10 @@ def merge_drought_layers_chunks(
 
 
 def merge_yearly_layers(
-    asset_suffix, asset_folder_list, app_type, start_year, end_year
+    asset_suffix, asset_folder_list, app_type, start_year, end_year, gee_account_id
 ):
     # Create required GEE asset path components
-    ee_initialize()
+    ee_initialize(gee_account_id)
 
     # Create export asset path (must be constant for export)
     description = f"drought_{asset_suffix}_{start_year}_{end_year}"

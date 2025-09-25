@@ -26,8 +26,8 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def generate_tehsil_shape_file_data(self, state, district, block):
-    ee_initialize()
+def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     description = (
         "admin_boundary_"
         + valid_gee_text(district.lower())
@@ -129,7 +129,7 @@ def clip_block_from_admin_boundary(state, district, block):
     admin_boundary_data = None
     features = []
 
-    if census_2011 and "TEHSIL" in list(census_2011.columns):
+    if census_2011 is not None and "TEHSIL" in list(census_2011.columns):
         admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
     else:
         soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
@@ -142,7 +142,7 @@ def clip_block_from_admin_boundary(state, district, block):
         )
         print("soi", soi)
 
-        if census_2011:
+        if census_2011 is not None:
             census_2011["area"] = census_2011.geometry.area
             # Ensure both GeoDataFrames are in the same coordinate reference system (CRS)
             if soi.crs != census_2011.crs:
@@ -163,7 +163,7 @@ def clip_block_from_admin_boundary(state, district, block):
                 )
             )
 
-    if admin_boundary_data:
+    if admin_boundary_data is not  None:
         for index, row in admin_boundary_data.iterrows():
             features.append(
                 Feature(
