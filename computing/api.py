@@ -85,8 +85,9 @@ def generate_nrega_layer(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
         clip_nrega_district_block.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -104,7 +105,10 @@ def generate_drainage_layer(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        clip_drainage_lines.apply_async(args=[state, district, block], queue="nrm")
+        gee_account_id = request.data.get("gee_account_id")
+        clip_drainage_lines.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -121,7 +125,10 @@ def generate_drainage_density(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        drainage_density.apply_async(args=[state, district, block], queue="nrm")
+        gee_account_id = request.data.get("gee_account_id")
+        drainage_density.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -527,7 +534,7 @@ def generate_terrain_descriptor(request):
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id").lower()
         generate_terrain_clusters.apply_async(
-            args=[gee_account_id, state, district, block], queue="nrm"
+            args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
             {"Success": "generate_terrain_descriptor task initiated"},
@@ -544,12 +551,21 @@ def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
         state = request.data.get("state")
+        print(state)
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id").lower()
         terrain_raster.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={
+                "gee_account_id": gee_account_id,
+                "roi_path": None,
+                "state": state,
+                "district": district,
+                "block": block,
+            },
+            queue="nrm",
         )
+
         return Response(
             {"Success": "generate_terrain_raster task initiated"},
             status=status.HTTP_200_OK,
@@ -1118,15 +1134,15 @@ def generate_layer_in_order(request):
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
         layer_generate_map.apply_async(
-            args=[
-                state,
-                district,
-                block,
-                map_order,
-                gee_account_id,
-                start_year,
-                end_year,
-            ],
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "map_order": map_order,
+                "gee_account_id": gee_account_id,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
             queue="nrm",
         )
         return Response(
