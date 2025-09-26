@@ -272,8 +272,8 @@ def get_osm_data(state, district, block, uid):
         """
 
         #print("API response start time", datetime.now())
-        response = {}
 
+        response = {}
         try:
             response = requests.get(OVERPASS_URL, params={"data": overpass_query})
             response = response.json()
@@ -297,9 +297,10 @@ def get_osm_data(state, district, block, uid):
             "Rivers": [],
         }
         node_dict = {}
-        for element in response["elements"]:
-            if element["type"] == "node":
-                node_dict[element["id"]] = (element["lon"], element["lat"])
+        if response and "elements" in response and response["elements"]:
+            for element in response["elements"]:
+                if element["type"] == "node":
+                    node_dict[element["id"]] = (element["lon"], element["lat"])
 
         final_data = {
             "forests": [],
@@ -332,191 +333,191 @@ def get_osm_data(state, district, block, uid):
         reservoirs = []
         highway = []
         rivers = []
-
-        for element in response["elements"]:
-            element_name = element.get("tags", {}).get("name")
-            if element_name:
-                if element["type"] == "node":  # Point features
-                    point = Point(node_dict[element["id"]])
-                    points.append(
-                        {
-                            "geometry": point,
-                            "tags": element.get("tags", {}),
-                            "name": element_name,
-                        }
-                    )
-
-                    # city or town
-                    if element.get("tags", {}).get("place") in ["city", "town"]:
-                        cities.append(
+        if response and "elements" in response and response["elements"]:
+            for element in response["elements"]:
+                element_name = element.get("tags", {}).get("name")
+                if element_name:
+                    if element["type"] == "node":  # Point features
+                        point = Point(node_dict[element["id"]])
+                        points.append(
                             {
                                 "geometry": point,
                                 "tags": element.get("tags", {}),
                                 "name": element_name,
                             }
                         )
-                        names["Cities"].append(f"City/Town: {element_name}")
-                    # hills
-                    if element.get("tags", {}).get("natural") in ["hill"]:
-                        hills.append(
-                            {
-                                "geometry": point,
-                                "tags": element.get("tags", {}),
-                                "name": element_name,
-                            }
-                        )
-                        names["Hills"].append(f"Hills: {element_name}")
 
-                elif element["type"] == "way":  # Line or Polygon features
-                    try:
-                        coordinates = [
-                            node_dict[node_id] for node_id in element["nodes"]
-                        ]
-                        if coordinates[0] == coordinates[-1]:
-                            polygon = Polygon(coordinates)
-                            polygons.append(
+                        # city or town
+                        if element.get("tags", {}).get("place") in ["city", "town"]:
+                            cities.append(
                                 {
-                                    "geometry": polygon,
+                                    "geometry": point,
                                     "tags": element.get("tags", {}),
                                     "name": element_name,
                                 }
                             )
+                            names["Cities"].append(f"City/Town: {element_name}")
+                        # hills
+                        if element.get("tags", {}).get("natural") in ["hill"]:
+                            hills.append(
+                                {
+                                    "geometry": point,
+                                    "tags": element.get("tags", {}),
+                                    "name": element_name,
+                                }
+                            )
+                            names["Hills"].append(f"Hills: {element_name}")
 
-                            # Forests
-                            if (
-                                element.get("tags", {}).get("landuse") == "forest"
-                                or element.get("tags", {}).get("natural") == "wood"
-                                or element.get("tags", {}).get("boundary")
-                                in ["forest", "forest_compartment"]
-                            ):
-                                forests.append(
+                    elif element["type"] == "way":  # Line or Polygon features
+                        try:
+                            coordinates = [
+                                node_dict[node_id] for node_id in element["nodes"]
+                            ]
+                            if coordinates[0] == coordinates[-1]:
+                                polygon = Polygon(coordinates)
+                                polygons.append(
                                     {
                                         "geometry": polygon,
-                                        "area": polygon.area,
                                         "tags": element.get("tags", {}),
                                         "name": element_name,
                                     }
                                 )
-                                names["Forests"].append(f"Forest: {element_name}")
-                            # Lakes
-                            if (
-                                (
+
+                                # Forests
+                                if (
+                                    element.get("tags", {}).get("landuse") == "forest"
+                                    or element.get("tags", {}).get("natural") == "wood"
+                                    or element.get("tags", {}).get("boundary")
+                                    in ["forest", "forest_compartment"]
+                                ):
+                                    forests.append(
+                                        {
+                                            "geometry": polygon,
+                                            "area": polygon.area,
+                                            "tags": element.get("tags", {}),
+                                            "name": element_name,
+                                        }
+                                    )
+                                    names["Forests"].append(f"Forest: {element_name}")
+                                # Lakes
+                                if (
+                                    (
+                                        element.get("tags", {}).get("natural") == "water"
+                                        or element.get("tags", {}).get("water") == "lake"
+                                    )
+                                    and not (
+                                        element.get("tags", {}).get("landuse")
+                                        == "reservoir"
+                                    )
+                                    and not element.get("tags", {}).get("water") == "river"
+                                ):
+                                    lakes.append(
+                                        {
+                                            "geometry": polygon,
+                                            "area": polygon.area,
+                                            "tags": element.get("tags", {}),
+                                            "name": element_name,
+                                        }
+                                    )
+                                    names["Lakes"].append(f"Lake: {element_name}")
+                                # Reservoirs
+                                if element.get("tags", {}).get("landuse") == "reservoir":
+                                    reservoirs.append(
+                                        {
+                                            "geometry": polygon,
+                                            "area": polygon.area,
+                                            "tags": element.get("tags", {}),
+                                            "name": element_name,
+                                        }
+                                    )
+                                    names["Reservoirs"].append(f"Reservoir: {element_name}")
+                                # Rivers (if defined as a polygon)
+                                if (
                                     element.get("tags", {}).get("natural") == "water"
-                                    or element.get("tags", {}).get("water") == "lake"
-                                )
-                                and not (
-                                    element.get("tags", {}).get("landuse")
-                                    == "reservoir"
-                                )
-                                and not element.get("tags", {}).get("water") == "river"
-                            ):
-                                lakes.append(
-                                    {
-                                        "geometry": polygon,
-                                        "area": polygon.area,
-                                        "tags": element.get("tags", {}),
-                                        "name": element_name,
-                                    }
-                                )
-                                names["Lakes"].append(f"Lake: {element_name}")
-                            # Reservoirs
-                            if element.get("tags", {}).get("landuse") == "reservoir":
-                                reservoirs.append(
-                                    {
-                                        "geometry": polygon,
-                                        "area": polygon.area,
-                                        "tags": element.get("tags", {}),
-                                        "name": element_name,
-                                    }
-                                )
-                                names["Reservoirs"].append(f"Reservoir: {element_name}")
-                            # Rivers (if defined as a polygon)
-                            if (
-                                element.get("tags", {}).get("natural") == "water"
-                                and element.get("tags", {}).get("water") == "river"
-                            ) or element.get("tags", {}).get("waterway") == "riverbank":
-                                rivers.append(
-                                    {
-                                        "geometry": polygon,
-                                        "area": polygon.area,
-                                        "tags": element.get("tags", {}),
-                                        "name": element_name,
-                                    }
-                                )
-                                names["Rivers"].append(f"River: {element_name}")
-                        else:  # Line
-                            line = LineString(coordinates)
-                            lines.append(
-                                {
-                                    "geometry": line,
-                                    "tags": element.get("tags", {}),
-                                    "name": element_name,
-                                }
-                            )
-
-                            # ridges
-                            if element.get("tags", {}).get("natural") == "ridge":
-                                ridges.append(
+                                    and element.get("tags", {}).get("water") == "river"
+                                ) or element.get("tags", {}).get("waterway") == "riverbank":
+                                    rivers.append(
+                                        {
+                                            "geometry": polygon,
+                                            "area": polygon.area,
+                                            "tags": element.get("tags", {}),
+                                            "name": element_name,
+                                        }
+                                    )
+                                    names["Rivers"].append(f"River: {element_name}")
+                            else:  # Line
+                                line = LineString(coordinates)
+                                lines.append(
                                     {
                                         "geometry": line,
                                         "tags": element.get("tags", {}),
                                         "name": element_name,
                                     }
                                 )
-                                names["Ridges"].append(f"Ridge: {element_name}")
-                            # highways
-                            if "highway" in element.get("tags", {}):
-                                road_type = element["tags"]["highway"]
-                                if road_type in [
-                                    "motorway",
-                                    "trunk",
-                                    "primary",
-                                    "secondary",
-                                    "tertiary",
-                                    "unclassified",
-                                    "residential",
-                                    "motorway_link",
-                                    "trunk_link",
-                                    "primary_link",
-                                    "secondary_link",
-                                    "tertiary_link",
-                                    "living_street",
-                                    "track",
-                                    "road",
-                                    "proposed",
-                                    "construction",
-                                    "milestone",
-                                ]:
-                                    highway.append(
+
+                                # ridges
+                                if element.get("tags", {}).get("natural") == "ridge":
+                                    ridges.append(
                                         {
                                             "geometry": line,
                                             "tags": element.get("tags", {}),
                                             "name": element_name,
                                         }
                                     )
-                                    names["Highways"].append(
-                                        (f"Highway: {element_name}")
+                                    names["Ridges"].append(f"Ridge: {element_name}")
+                                # highways
+                                if "highway" in element.get("tags", {}):
+                                    road_type = element["tags"]["highway"]
+                                    if road_type in [
+                                        "motorway",
+                                        "trunk",
+                                        "primary",
+                                        "secondary",
+                                        "tertiary",
+                                        "unclassified",
+                                        "residential",
+                                        "motorway_link",
+                                        "trunk_link",
+                                        "primary_link",
+                                        "secondary_link",
+                                        "tertiary_link",
+                                        "living_street",
+                                        "track",
+                                        "road",
+                                        "proposed",
+                                        "construction",
+                                        "milestone",
+                                    ]:
+                                        highway.append(
+                                            {
+                                                "geometry": line,
+                                                "tags": element.get("tags", {}),
+                                                "name": element_name,
+                                            }
+                                        )
+                                        names["Highways"].append(
+                                            (f"Highway: {element_name}")
+                                        )
+                                if (
+                                    (
+                                        element.get("tags", {}).get("natural") == "water"
+                                        and element.get("tags", {}).get("water") == "river"
                                     )
-                            if (
-                                (
-                                    element.get("tags", {}).get("natural") == "water"
-                                    and element.get("tags", {}).get("water") == "river"
-                                )
-                                or element.get("tags", {}).get("waterway") == "river"
-                                or element.get("tags", {}).get("waterway")
-                                == "riverbank"
-                            ):
-                                rivers.append(
-                                    {
-                                        "geometry": line,
-                                        "tags": element.get("tags", {}),
-                                        "name": element_name,
-                                    }
-                                )
-                                names["Rivers"].append(f"River: {element_name}")
+                                    or element.get("tags", {}).get("waterway") == "river"
+                                    or element.get("tags", {}).get("waterway")
+                                    == "riverbank"
+                                ):
+                                    rivers.append(
+                                        {
+                                            "geometry": line,
+                                            "tags": element.get("tags", {}),
+                                            "name": element_name,
+                                        }
+                                    )
+                                    names["Rivers"].append(f"River: {element_name}")
 
-                    except KeyError:
-                        pass
+                        except KeyError:
+                            pass
 
         # DataFrames for plotting
         forests_df = create_gdf(forests)
