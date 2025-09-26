@@ -664,7 +664,12 @@
         const mainMap = new ol.Map({
             target: 'mainMap',
             layers: [baseLayer],
-            view: view
+            view: view,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         });
 
         const wmsLayer = new ol.layer.Image({
@@ -709,6 +714,20 @@
             name : 'lulc_raster'
         })
 
+        const waterRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "LULC_level_3:LULC_22_23_{{block}}_level_3",
+                    'STYLES' : "lulc_water_pixels"
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'water_raster'
+        })
+
         const urbanRaster = new ol.layer.Image({
             source : new ol.source.ImageWMS({
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
@@ -749,7 +768,12 @@
         const TerrainMap = new ol.Map({
             target: 'terrainMap',
             layers: [wmsLayer],
-            view: tempView1
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const ComparisonMap1 = new ol.Map({
@@ -764,7 +788,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView1
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView2 = new ol.View({
@@ -788,7 +817,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView2
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView3 = new ol.View({
@@ -812,7 +846,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView3
+            view: tempView3,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView4 = new ol.View({
@@ -836,7 +875,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView4
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView5 = new ol.View({
@@ -860,25 +904,45 @@
                     preload: 4,
                 })
             ],
-            view: tempView5
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const lulcMap = new ol.Map({
             target: 'lulcMap',
             layers: [lulcRaster],
-            view: tempView2
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const DegradMap = new ol.Map({
             target: 'degradLandMap',
             layers: [degradRaster],
-            view: tempView3
+            view: tempView3,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
         
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [treeReduceRaster],
-            view: tempView4
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const swbMap = new ol.Map({
@@ -900,7 +964,12 @@
                 constrainResolution: true,
                 smoothExtentConstraint: true,
                 smoothResolutionConstraint: true,
-            })
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const sogeMap = new ol.Map({
@@ -922,13 +991,23 @@
                 constrainResolution: true,
                 smoothExtentConstraint: true,
                 smoothResolutionConstraint: true,
-            })
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const urbanMap = new ol.Map({
             target: 'urbanMap',
             layers: [urbanRaster],
-            view: tempView5
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
@@ -973,7 +1052,7 @@
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Fetch GeoJSON data and extract a feature by UID
-        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1) => {
+        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
             await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
                 .then(response => response.json())
                 .then(data => {
@@ -996,6 +1075,7 @@
                         lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
                         urbanRaster1.addFilter(crop);
+                        //waterRaster1.addFilter(crop);
                     }
 
                     const styleFunctionComp = feature => {
@@ -1087,10 +1167,11 @@
             });
 
             swbMap.addLayer(vectorLayer);
+            swbMap.addLayer(waterRaster);
         })
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
-        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=	soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
+        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
         .then(response => response.json())
         .then(data => {
             const vectorSource = new ol.source.Vector({
@@ -1144,7 +1225,7 @@
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Extract Feature
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster);
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
@@ -1537,9 +1618,7 @@
         const drysp_all = JSON.parse('{{drysp_all|safe}}')
         const dg_years = JSON.parse('{{dg_years|safe}}')
 
-       const barChart_weeks = new Chart(
-        document.getElementById('Chart-drought-weeks'),
-        {
+       const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'),{
             type: 'bar',
             data: {
             labels: dg_years,
