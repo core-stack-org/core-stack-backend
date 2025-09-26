@@ -3,6 +3,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from computing.utils import create_chunk, merge_chunks
+from gee_computing.models import GEEAccount
 from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -14,11 +15,13 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     export_vector_asset_to_gee,
     merge_fc_into_existing_fc,
+    build_gee_helper_paths,
 )
 from computing.models import Layer, Dataset
 
 
 def run_off(
+    gee_account_id,
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
@@ -27,14 +30,13 @@ def run_off(
     end_date=None,
     is_annual=False,
 ):
-
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     description = (
         "Runoff_annual_" if is_annual else "Runoff_fortnight_"
     ) + asset_suffix
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
+        get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
         + description
     )
 
@@ -102,6 +104,7 @@ def run_off(
             start_date,
             end_date,
             is_annual,
+            gee_account_id,
         )
 
 
@@ -114,20 +117,21 @@ def _generate_layer(
     start_date,
     end_date,
     is_annual,
+    gee_account_id,
 ):
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     if roi.size().getInfo() > 50:
         chunk_size = 30
         rois, descs = create_chunk(roi, description, chunk_size)
 
-        ee_initialize(GEE_HELPER_ACCOUNT_ID)
-        create_gee_dir(asset_folder_list, GEE_PATHS[app_type]["GEE_HELPER_PATH"])
+        ee_initialize(gee_obj.helper_account.id)
+        create_gee_dir(asset_folder_list, helper_account_path)
 
         tasks = []
         for i in range(len(rois)):
             chunk_asset_id = (
-                get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
-                )
+                get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
                 + descs[i]
             )
             if not is_gee_asset_exists(chunk_asset_id):
@@ -146,9 +150,7 @@ def _generate_layer(
 
         for desc in descs:
             make_asset_public(
-                get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
-                )
+                get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
                 + desc
             )
 
@@ -157,7 +159,7 @@ def _generate_layer(
             asset_folder_list,
             description,
             chunk_size,
-            chunk_asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"],
+            chunk_asset_path=helper_account_path,
             merge_asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
     else:

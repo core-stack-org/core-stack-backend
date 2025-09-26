@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class GEEAccountView(mixins.ListModelMixin, viewsets.GenericViewSet, generics.CreateAPIView):
     """API endpoint for user registration."""
 
-    queryset = GEEAccount.objects.all()
+    queryset = GEEAccount.objects.filter(is_visible=True)
     serializer_class = GeeAccountSerializers
     permission_classes = [permissions.IsAuthenticated]
     schema = None
