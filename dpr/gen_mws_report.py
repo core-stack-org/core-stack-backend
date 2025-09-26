@@ -277,7 +277,6 @@ def get_osm_data(state, district, block, uid):
         try:
             response = requests.get(OVERPASS_URL, params={"data": overpass_query})
             response = response.json()
-            raise RuntimeError("Simulated API failure")
         except Exception as e:
             logger.info("Not able to fetch the Overpass API Info", e)
 
