@@ -1,5 +1,6 @@
 import ee
 from computing.utils import (
+    sync_layer_to_geoserver,
     sync_fc_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
@@ -27,7 +28,6 @@ geo = Geoserver()
 @app.task(bind=True)
 def generate_cropping_intensity(
     self,
-    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -37,6 +37,7 @@ def generate_cropping_intensity(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
     if state and district and block:
@@ -133,7 +134,8 @@ def generate_cropping_intensity(
         district=district,
         block=block,
     )
-    save_to_db_and_sync_to_geoserver(config)
+    layer_at_geoserver = save_to_db_and_sync_to_geoserver(config)
+    return layer_at_geoserver
 
 
 def generate_gee_asset(
@@ -378,8 +380,11 @@ def save_to_db_and_sync_to_geoserver(config: LayerConfig):
         config.style_name,
     )
     print(res)
+    layer_at_geoserver = False
     if (
         res["status_code"] == 201 and layer_id
     ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
+        layer_at_geoserver = True
+    return layer_at_geoserver

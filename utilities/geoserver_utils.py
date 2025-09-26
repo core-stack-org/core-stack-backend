@@ -430,6 +430,7 @@ class Geoserver:
         if r.status_code == 201:
             return r.json()
         else:
+            print(f"{r=}")
             raise GeoserverException(r.status_code, r.content)
 
     def publish_time_dimension_to_coveragestore(

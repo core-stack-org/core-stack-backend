@@ -35,13 +35,25 @@ def calculate_g(
 
     if is_gee_asset_exists(asset_id):
         dataset = Dataset.objects.get(name="Hydrology")
-        layer_obj = Layer.objects.get(
-            dataset=dataset,
-            layer_name=layer_name,
-        )
-        db_end_date = layer_obj.misc["end_year"]
-        db_end_date = f"{db_end_date}-06-30"
+        layer_obj = None
+        try:
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=layer_name,
+            )
+        except Exception as e:
+            print("layer not found. So, reading the column name from asset_id.")
 
+        if layer_obj:
+            db_end_date = layer_obj.misc["end_year"]
+        else:
+            roi = ee.FeatureCollection(asset_id)
+            col_names = roi.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            db_end_date = filtered_col[-1].split("-")[0].split("_")[-1]
+
+        db_end_date = f"{db_end_date}-06-30"
         db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 

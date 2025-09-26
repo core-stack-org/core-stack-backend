@@ -22,7 +22,7 @@ import subprocess
 from google.cloud import storage
 from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
-from gee_computing.models import  GEEAccount
+from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 
 
@@ -32,9 +32,9 @@ def ee_initialize(account_id):
     credentials = service_account.Credentials.from_service_account_info(
         key_dict,
         scopes=[
-            'https://www.googleapis.com/auth/earthengine',
-            'https://www.googleapis.com/auth/devstorage.full_control',
-        ]
+            "https://www.googleapis.com/auth/earthengine",
+            "https://www.googleapis.com/auth/devstorage.full_control",
+        ],
     )
     ee.Initialize(credentials)
 

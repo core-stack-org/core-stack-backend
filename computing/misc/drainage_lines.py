@@ -49,6 +49,7 @@ def clip_drainage_lines(
     task_id_list = check_task_status([task])
     print("task_id_list", task_id_list)
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
             state,
@@ -74,6 +75,8 @@ def clip_drainage_lines(
             if res["status_code"] == 201 and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("sync to geoserver flag is updated")
+                layer_at_geoserver = True
 
         except Exception as e:
             print("Exception in syncing Drainage line to geoserver", e)
+    return layer_at_geoserver

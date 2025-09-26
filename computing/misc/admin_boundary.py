@@ -59,7 +59,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
         make_asset_public(asset_id)
 
     # Generate shape files and sync to geoserver
-    shp_path = sync_admin_boundry_to_geoserver(
+    shp_path, layer_at_geoserver = sync_admin_boundry_to_geoserver(
         collection, state_dir, district, block, layer_id
     )
 
@@ -73,6 +73,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         upload_shp_to_gee(layer_path, layer_name, asset_id)
         make_asset_public(asset_id)
+    return layer_at_geoserver
 
 
 def sync_admin_boundry_to_geoserver(collection, state_dir, district, block, layer_id):
@@ -89,10 +90,12 @@ def sync_admin_boundry_to_geoserver(collection, state_dir, district, block, laye
             print(e)
     path = generate_shape_files(path)
     res = push_shape_to_geoserver(path, workspace="panchayat_boundaries")
+    layer_at_geoserver = False
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
-    return path
+        layer_at_geoserver = True
+    return path, layer_at_geoserver
 
 
 def sync_admin_boundary_to_ee(collection, description, state, district, block):

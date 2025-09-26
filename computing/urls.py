@@ -1,3 +1,5 @@
+from tkinter.font import names
+
 from django.urls import path
 from . import api
 
@@ -101,5 +103,10 @@ urlpatterns = [
         "merge_swb_ponds/",
         api.swb_pond_merging,
         name="merge_swb_ponds",
+    ),
+    path(
+        "generate_layer_in_order/",
+        api.generate_layer_in_order,
+        name="generate_layer_in_order",
     ),
 ]
