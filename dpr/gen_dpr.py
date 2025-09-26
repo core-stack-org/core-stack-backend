@@ -14,7 +14,13 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.shared import Pt
 from shapely.geometry import Point
 
-from dpr.mapping import populate_maintenance_from_waterbody
+from dpr.mapping import (
+    IRRIGATION_STRUCTURE_REVERSE_MAPPING,
+    RECHARGE_STRUCTURE_REVERSE_MAPPING,
+    RS_WATER_STRUCTIRE_REVERSE_MAPPING,
+    WATER_STRUCTURE_REVERSE_MAPPING,
+    populate_maintenance_from_waterbody,
+)
 from dpr.utils import get_waterbody_repair_activities
 from nrm_app.settings import (
     DEBUG,
@@ -790,9 +796,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
     )
 
     for i, (well, mws_id) in enumerate(all_wells_with_mws_sorted, 1):
-        doc.add_heading(
-            f"Beneficiary's Settlement: {well.beneficiary_settlement}", level=4
-        )
+        doc.add_heading(f"{well.beneficiary_settlement}", level=4)
 
         table_well = doc.add_table(rows=15, cols=2)
         table_well.style = "Table Grid"
@@ -943,9 +947,7 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
     )
 
     for i, (waterbody, mws_id) in enumerate(all_waterbodies_with_mws_sorted, 1):
-        doc.add_heading(
-            f"Beneficiary's Settlement: {waterbody.beneficiary_settlement}", level=4
-        )
+        doc.add_heading(f"{waterbody.beneficiary_settlement}", level=4)
 
         table_water_structure = doc.add_table(rows=14, cols=2)
         table_water_structure.style = "Table Grid"
@@ -1080,20 +1082,45 @@ def maintenance_gw_table(doc, plan):
         row_cells[3].text = maintenance.data_gw_maintenance.get("select_gender") or "NA"
         row_cells[4].text = maintenance.data_gw_maintenance.get("ben_father") or "NA"
         row_cells[5].text = (
+            maintenance.data_gw_maintenance.get("select_one_recharge_structure")
+            or maintenance.data_gw_maintenance.get("select_one_water_structure")
+            or "NA"
+        )
+        recharge_structure_type = (
             maintenance.data_gw_maintenance.get("select_one_recharge_structure") or "NA"
         )
-        row_cells[5].text = (
-            maintenance.data_gw_maintenance.get("select_one_activities") or "NA"
-        )
-        row_cells[6].text = str(maintenance.latitude)
-        row_cells[7].text = str(maintenance.longitude)
+
+        repair_activities = "NA"
+        if (
+            recharge_structure_type != "NA"
+            and recharge_structure_type in RECHARGE_STRUCTURE_REVERSE_MAPPING
+        ):
+            repair_key = RECHARGE_STRUCTURE_REVERSE_MAPPING[recharge_structure_type]
+            repair_key_value = maintenance.data_gw_maintenance.get(repair_key)
+
+            if repair_key_value and repair_key_value.lower() == "other":
+                repair_activities = maintenance.data_gw_maintenance.get(
+                    f"{repair_key}_other"
+                )
+            else:
+                repair_activities = repair_key_value
+
+        if not repair_activities or repair_activities == "NA":
+            repair_activities = maintenance.data_gw_maintenance.get(
+                "select_one_activities"
+            )
+        row_cells[6].text = repair_activities or "NA"
+        row_cells[7].text = str(maintenance.latitude)
+        row_cells[8].text = str(maintenance.longitude)
 
 
 def maintenance_agri_table(doc, plan):
     headers = [
+        "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Work ID",
+        "Gender",
+        "Beneficiary's Father's Name",
         "Type of Irrigation Structure",
         "Repair Activity",
         "Latitude",
@@ -1109,31 +1136,58 @@ def maintenance_agri_table(doc, plan):
 
     for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_agri_maintenance.get(
-            "beneficiary_settlement"
-        )
+        row_cells[0].text = maintenance.data_agri_maintenance.get("demand_type") or "NA"
         row_cells[1].text = (
+            maintenance.data_agri_maintenance.get("beneficiary_settlement") or "NA"
+        )
+        row_cells[2].text = (
             maintenance.data_agri_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[2].text = maintenance.work_id
-        row_cells[3].text = (
+        row_cells[3].text = maintenance.data_agri_maintenance.get("gender") or "NA"
+        row_cells[4].text = maintenance.data_agri_maintenance.get("ben_father") or "NA"
+        row_cells[5].text = (
+            maintenance.data_agri_maintenance.get("select_one_water_structure")
+            or maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
+            or "NA"
+        )
+        irr_structure_type = (
             maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
             or "NA"
         )
-        row_cells[4].text = (
-            maintenance.data_agri_maintenance.get("select_one_activities") or "NA"
-        )
-        row_cells[5].text = str(maintenance.latitude)
-        row_cells[6].text = str(maintenance.longitude)
+        repair_activities = "NA"
+        if (
+            irr_structure_type != "NA"
+            and irr_structure_type in IRRIGATION_STRUCTURE_REVERSE_MAPPING
+        ):
+            repair_key = IRRIGATION_STRUCTURE_REVERSE_MAPPING[irr_structure_type]
+            repair_key_value = maintenance.data_agri_maintenance.get(repair_key)
+
+            if repair_key_value and repair_key_value.lower() == "other":
+                repair_activities = maintenance.data_agri_maintenance.get(
+                    f"{repair_key}_other"
+                )
+            else:
+                repair_activities = repair_key_value
+
+        if not repair_activities or repair_activities == "NA":
+            repair_activities = (
+                maintenance.data_agri_maintenance.get("select_one_activities") or "NA"
+            )
+
+        row_cells[6].text = repair_activities or "NA"
+        row_cells[7].text = str(maintenance.latitude)
+        row_cells[8].text = str(maintenance.longitude)
 
 
 def maintenance_waterstructures_table(doc, plan):
     headers = [
+        "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Work ID",
-        "Corresponding Work ID",
+        "Gender",
+        "Beneficiary's Father's Name",
         "Type of Work",
+        "Repair Activities",
         "Latitude",
         "Longitude",
     ]
@@ -1147,26 +1201,53 @@ def maintenance_waterstructures_table(doc, plan):
 
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = (
+        row_cells[0].text = maintenance.data_swb_maintenance.get("demand_type") or "NA"
+        row_cells[1].text = (
             maintenance.data_swb_maintenance.get("beneficiary_settlement") or "NA"
         )
-        row_cells[1].text = (
+        row_cells[2].text = (
             maintenance.data_swb_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.corresponding_work_id
-        row_cells[4].text = maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "NA"
-        row_cells[5].text = str(maintenance.latitude)
-        row_cells[6].text = str(maintenance.longitude)
+        row_cells[3].text = (
+            maintenance.data_swb_maintenance.get("select_gender") or "NA"
+        )
+        row_cells[4].text = maintenance.data_swb_maintenance.get("ben_father") or "NA"
+        row_cells[5].text = (
+            maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
+            or maintenance.data_swb_maintenance.get("select_one_water_structure")
+            or "NA"
+        )
+        water_structure_type = (
+            maintenance.data_swb_maintenance.get("TYPE_OF_WORK") or "NA"
+        )
+        repair_activities = "NA"
+        if (
+            water_structure_type != "NA"
+            and water_structure_type in WATER_STRUCTURE_REVERSE_MAPPING
+        ):
+            repair_key = WATER_STRUCTURE_REVERSE_MAPPING[water_structure_type]
+            repair_key_value = maintenance.data_swb_maintenance.get(repair_key)
+
+            repair_activities = repair_key_value
+
+        if not repair_activities or repair_activities == "NA":
+            repair_activities = maintenance.data_swb_maintenance.get(
+                "select_one_activities"
+            )
+        row_cells[6].text = repair_activities or "NA"
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_rs_waterstructures_table(doc, plan):
     headers = [
+        "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Work ID",
-        "Corresponding Work ID",
+        "Gender",
+        "Beneficiary's Father's Name",
         "Type of Work",
+        "Repair Activities",
         "Latitude",
         "Longitude",
     ]
@@ -1180,18 +1261,35 @@ def maintenance_rs_waterstructures_table(doc, plan):
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
         row_cells[0].text = (
-            maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"
+            maintenance.data_swb_rs_maintenance.get("demand_type") or "NA"
         )
         row_cells[1].text = (
+            maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"
+        )
+        row_cells[2].text = (
             maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[2].text = maintenance.work_id
-        row_cells[3].text = maintenance.corresponding_work_id
+        row_cells[3].text = maintenance.data_swb_rs_maintenance.get("gender") or "NA"
         row_cells[4].text = (
+            maintenance.data_swb_rs_maintenance.get("ben_father") or "NA"
+        )
+        rs_structure_type = (
             maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "NA"
         )
-        row_cells[5].text = str(maintenance.latitude)
-        row_cells[6].text = str(maintenance.longitude)
+        row_cells[5].text = rs_structure_type
+        repair_activities = "NA"
+        if (
+            rs_structure_type != "NA"
+            and rs_structure_type in RS_WATER_STRUCTIRE_REVERSE_MAPPING
+        ):
+            repair_key = RS_WATER_STRUCTIRE_REVERSE_MAPPING[rs_structure_type]
+            repair_key_value = maintenance.data_swb_rs_maintenance.get(repair_key)
+
+            repair_activities = repair_key_value
+
+        row_cells[6].text = repair_activities or "NA"
+        row_cells[7].text = str(maintenance.latitude)
+        row_cells[8].text = str(maintenance.longitude)
 
 
 # MARK: - Section F

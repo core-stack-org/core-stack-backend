@@ -696,8 +696,8 @@ def sync_agri_maintenance():
         except AttributeError:
             coordinates = []
         if len(coordinates) >= 2:
-            agri_maintenance.latitude = round(coordinates[1], 2)
-            agri_maintenance.longitude = round(coordinates[0], 2)
+            agri_maintenance.latitude = round(coordinates[1], 8)
+            agri_maintenance.longitude = round(coordinates[0], 8)
         else:
             agri_maintenance.latitude = 0.0
             agri_maintenance.longitude = 0.0
@@ -737,8 +737,8 @@ def sync_gw_maintenance():
         except AttributeError:
             coordinates = []
         if len(coordinates) >= 2:
-            gw_maintenance.latitude = round(coordinates[1], 2)
-            gw_maintenance.longitude = round(coordinates[0], 2)
+            gw_maintenance.latitude = round(coordinates[1], 8)
+            gw_maintenance.longitude = round(coordinates[0], 8)
         else:
             gw_maintenance.latitude = 0.0
             gw_maintenance.longitude = 0.0
@@ -779,8 +779,8 @@ def sync_swb_maintenance():
         except AttributeError:
             coordinates = []
         if len(coordinates) >= 2:
-            swb_maintenance.latitude = round(coordinates[1], 2)
-            swb_maintenance.longitude = round(coordinates[0], 2)
+            swb_maintenance.latitude = round(coordinates[1], 8)
+            swb_maintenance.longitude = round(coordinates[0], 8)
         else:
             swb_maintenance.latitude = 0.0
             swb_maintenance.longitude = 0.0
@@ -821,8 +821,8 @@ def sync_swb_rs_maintenance():
         except AttributeError:
             coordinates = []
         if len(coordinates) >= 2:
-            swb_rs_maintenance.latitude = round(coordinates[1], 2)
-            swb_rs_maintenance.longitude = round(coordinates[0], 2)
+            swb_rs_maintenance.latitude = round(coordinates[1], 8)
+            swb_rs_maintenance.longitude = round(coordinates[0], 8)
         else:
             swb_rs_maintenance.latitude = 0.0
             swb_rs_maintenance.longitude = 0.0
