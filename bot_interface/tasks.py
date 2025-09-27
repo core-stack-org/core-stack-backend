@@ -175,17 +175,35 @@ def StartUserSession(self, event_packet: Dict[str, Any], event: str, bot_id: str
                         else:
                             print(f"UserSession current_session is not empty: {len(user_session.current_session)} items : {user_session.current_session}")
                             print("UserSession current_session is not empty: event_packet: ", event_packet)
-                            updated_event = event if event_packet.get("event") else "success"
                             
                             # Preserve current SMJ context instead of reverting to bot instance SMJ
                             current_smj_id = user_session.current_smj.id if user_session.current_smj else bot_instance.smj.id
                             current_state = user_session.current_state if user_session.current_state else bot_instance.init_state
                             
-                            event_packet.update({
-                                "event": updated_event,
-                                "smj_id": current_smj_id,  # Preserve current SMJ instead of resetting
-                                "state": current_state  # Preserve current state instead of resetting
-                            })
+                            logger.info("Event passed in check_event_type for existing user: %s", event_packet.get("event"), event)
+                            # **VALIDATE ALL RESPONSE TYPES - Return failure to re-run current state**
+                            if not bot_interface.utils.check_event_type(
+                                event_packet=event_packet,
+                                expected_response_type=user_session.expected_response_type,
+                                user_session=user_session
+                            ):
+                                logger.info("Invalid response type, sending failure event to re-run state")
+                                # Set failure event to re-run current state - DON'T return, continue processing
+                                event_packet.update({
+                                    "event": "failure",  # This will trigger state re-execution
+                                    "smj_id": current_smj_id,
+                                    "state": current_state
+                                })
+                                # Note: We continue processing with failure event instead of returning
+                            
+                            # Only update event if validation passed
+                            if event_packet.get("event") != "failure":
+                                updated_event = event if event_packet.get("event") else "success"                                
+                                event_packet.update({
+                                    "event": updated_event,
+                                    "smj_id": current_smj_id,  # Preserve current SMJ instead of resetting
+                                    "state": current_state  # Preserve current state instead of resetting
+                                })
                             print("Updated event packet for existing usersession:", event_packet)
                             print("Current state in existing session:", user_session.current_state)
                             current_session = user_session.current_session
@@ -457,6 +475,20 @@ def _load_or_create_user_session(event_packet, bot_instance, response_data):
         logger.info("Created new user session for user_id: %s", user_id)
     else:
         logger.info("Loaded existing user session for user_id: %s", user_id)
+        if len(user_session.current_session) > 0:
+            logger.info("event passed in check_event_type for community user: %s", event_packet.get("event"))
+            if not bot_interface.utils.check_event_type(
+                event_packet=event_packet,
+                expected_response_type=user_session.expected_response_type,
+                user_session=user_session
+            ):
+                logger.info("Invalid response type for community user, sending failure event to re-run state")
+                # Set failure event to re-run current state
+                event_packet.update({
+                    "event": "failure",  # This will trigger state re-execution
+                    "smj_id": user_session.current_smj.id if user_session.current_smj else bot_instance.smj.id,
+                    "state": user_session.current_state if user_session.current_state else bot_instance.init_state
+                })
 
     # Get SMJ information
     smj_id = event_packet.get("smj_id", bot_instance.smj.id)

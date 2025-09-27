@@ -618,7 +618,13 @@ class SmjController(StateMapData):
                             print(f"Button event detected - mapping button value '{button_value}' as transition event")
                             event_to_process = button_value
                 
-                updatedEvent = self.postAction(event_to_process, event_data)
+                # Skip postAction execution for failure events to prevent incorrect state transitions
+                if event_to_process == "failure":
+                    print(f"DEBUG: Skipping postAction for failure event, using failure directly for state re-execution")
+                    updatedEvent = "failure"
+                else:
+                    updatedEvent = self.postAction(event_to_process, event_data)
+                # updatedEvent = self.postAction(event_to_process, event_data)
                 
                 # Check if SMJ jump was completed - if so, skip normal transition logic
                 if updatedEvent == "smj_jump_complete":

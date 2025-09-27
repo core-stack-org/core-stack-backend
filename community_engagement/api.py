@@ -22,6 +22,20 @@ from utilities.auth_utils import auth_free
 from nrm_app.settings import S3_BUCKET, S3_REGION
 
 
+def get_content_type_from_extension(extension):
+    """Return the correct MIME type for the given file extension"""
+    mime_types = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'mp4': 'video/mp4',
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    }
+    return mime_types.get(extension)
 
 def attach_media_files(files, item, user, source, bot=None):
     s3_client = boto3.client("s3")
@@ -45,11 +59,20 @@ def attach_media_files(files, item, user, source, bot=None):
         for media_file in media_files:
             extension = media_file.name.split(".")[-1]
             s3_key = f"{s3_folder}/{uuid.uuid4()}.{extension}"
+            print(f"Uploading {media_file.name} to S3 as {s3_key} and extension {extension}")
+            
+            # Get the correct MIME type based on file extension
+            content_type = get_content_type_from_extension(extension)
 
             try:
-                s3_client.upload_fileobj(media_file, S3_BUCKET, s3_key)
+                s3_client.upload_fileobj(
+                    media_file, 
+                    S3_BUCKET, 
+                    s3_key,
+                    ExtraArgs={'ContentType': content_type}
+                )
             except Exception as e:
-                print(f"Failed to upload {media_file.name} to S3:", e)
+                print(f"Failed to upload {media_file.name} to S3: {e}")
                 continue
 
             media_path = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com/{s3_key}"

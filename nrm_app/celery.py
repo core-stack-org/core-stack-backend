@@ -1,6 +1,7 @@
 import os
 from celery import Celery
 from nrm_app.settings import INSTALLED_APPS
+from celery.signals import worker_ready
 
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
@@ -16,3 +17,19 @@ app.config_from_object("django.conf:settings")
 
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks(INSTALLED_APPS)
+
+@worker_ready.connect
+def setup_django_signals(sender=None, **kwargs):
+    """
+    Register Django signals when Celery worker starts
+    This ensures signals work in worker processes
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Import signals to register them in worker process
+        import bot_interface.signals
+        # logger.info("✅ Django signals registered in Celery worker process")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Django signals in worker: {e}")

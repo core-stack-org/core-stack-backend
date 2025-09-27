@@ -9,6 +9,7 @@ import bot_interface.utils
 import bot_interface.api
 import bot_interface.auth
 
+import time
 import requests
 
 from geoadmin.models import State, District, Block
@@ -2351,29 +2352,29 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 print(f"HDPI photo paths captured in UserLogs: {asset_demand_data['photos']}")
 
             # Process and submit asset demand to Community Engagement API
-            try:
-                import threading
-                def async_submit():
-                    try:
-                        # Check if already processed (avoid duplicate processing from signal)
-                        user_log.refresh_from_db()
-                        if user_log.value2:  # If value2 is not empty, it's already been processed
-                            print(f"UserLogs ID {user_log.id} already processed, skipping duplicate submission")
-                            return
+            # try:
+            #     import threading
+            #     def async_submit():
+            #         try:
+            #             # Check if already processed (avoid duplicate processing from signal)
+            #             user_log.refresh_from_db()
+            #             if user_log.value2:  # If value2 is not empty, it's already been processed
+            #                 print(f"UserLogs ID {user_log.id} already processed, skipping duplicate submission")
+            #                 return
 
-                        self.process_and_submit_asset_demand(user_log.id)
-                        print(f"Asset demand processing initiated for UserLogs ID: {user_log.id}")
-                    except Exception as e:
-                        print(f"Error processing asset demand for UserLogs ID {user_log.id}: {e}")
+            #             self.process_and_submit_asset_demand(user_log.id)
+            #             print(f"Asset demand processing initiated for UserLogs ID: {user_log.id}")
+            #         except Exception as e:
+            #             print(f"Error processing asset demand for UserLogs ID {user_log.id}: {e}")
 
-                # Run in background thread to avoid blocking SMJ flow
-                thread = threading.Thread(target=async_submit, daemon=True)
-                thread.start()
-                print(f"Started background asset demand processing for UserLogs ID: {user_log.id}")
+            #     # Run in background thread to avoid blocking SMJ flow
+            #     thread = threading.Thread(target=async_submit, daemon=True)
+            #     thread.start()
+            #     print(f"Started background asset demand processing for UserLogs ID: {user_log.id}")
 
-            except Exception as e:
-                print(f"Failed to start asset demand processing: {e}")
-
+            # except Exception as e:
+            #     print(f"Failed to start asset demand processing: {e}")
+            logger.info(f"📝 UserLogs entry created with ID: {user_log.id} - Django signal will handle story processing")
             return "success"
                 
         except Exception as e:
@@ -2651,33 +2652,33 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 print(f"HDPI photo paths captured in UserLogs: {story_data['photos']}")
 
             # Process and submit story to Community Engagement API
-            try:
-                import threading
-                def async_submit():
-                    try:
-                        # Check if already processed (avoid duplicate processing from signal)
-                        user_log.refresh_from_db()
-                        if user_log.value2:  # If value2 is not empty, it's already been processed
-                            print(f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission")
-                            return
+            # try:
+            #     import threading
+            #     def async_submit():
+            #         try:
+            #             # Check if already processed (avoid duplicate processing from signal)
+            #             user_log.refresh_from_db()
+            #             if user_log.value2:  # If value2 is not empty, it's already been processed
+            #                 print(f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission")
+            #                 return
 
-                        self.process_and_submit_story(user_log.id)
-                        print(f"✅ Story processing initiated for UserLogs ID: {user_log.id}")
-                    except Exception as e:
-                        print(f"❌ Error processing story for UserLogs ID {user_log.id}: {e}")
+            #             self.process_and_submit_story(user_log.id)
+            #             print(f"✅ Story processing initiated for UserLogs ID: {user_log.id}")
+            #         except Exception as e:
+            #             print(f"❌ Error processing story for UserLogs ID {user_log.id}: {e}")
 
-                # Run in background thread to avoid blocking SMJ flow
-                thread = threading.Thread(target=async_submit, daemon=True)
-                thread.start()
-                print(f"🚀 Started background story processing for UserLogs ID: {user_log.id}")
+            #     # Run in background thread to avoid blocking SMJ flow
+            #     thread = threading.Thread(target=async_submit, daemon=True)
+            #     thread.start()
+            #     print(f"🚀 Started background story processing for UserLogs ID: {user_log.id}")
 
-            except Exception as e:
-                print(f"❌ Failed to start story processing: {e}")
-
+            # except Exception as e:
+            #     print(f"❌ Failed to start story processing: {e}")
+            logger.info(f"📝 UserLogs entry created with ID: {user_log.id} - Django signal will handle story processing")
             return "success"
                 
         except Exception as e:
-            print(f"Error in log_story_completion: {e}")
+            logger.error(f"Error in log_story_completion: {e}")
             return "failure"
 
 
@@ -3552,5 +3553,387 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             
         except Exception as e:
             print(f"Error in _send_asset_demands_with_limit: {e}")
+            return False
+
+    def fetch_story(self, bot_instance_id, data_dict):
+        """
+        Fetches published stories for the user's community from Community Engagement API.
+        
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Contains user_id, bot_id, and other session data
+            
+        Returns:
+            str: "has_stories" if stories found, "no_stories" if none found, "failure" on error
+        """
+        print(f"Fetching stories for bot_instance_id: {bot_instance_id} and data_dict: {data_dict}")
+        try:
+            import requests
+            from django.conf import settings
+            from bot_interface.models import BotUsers, UserSessions
+            
+            # Get user information
+            user_id = data_dict.get('user_id')
+            bot_id = data_dict.get('bot_id', 1)
+            
+            if not user_id:
+                print("No user_id found in data_dict")
+                return "failure"
+            
+            # Get user session and community ID from misc_data only
+            try:
+                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+                if not user or not user.misc_data:
+                    print(f"No session data found for user {user_id}")
+                    return "failure"
+                
+                # Get community_id from current session misc_data
+                active_community_id = user.misc_data.get('active_community_id')
+                if not active_community_id:
+                    print(f"No active_community_id found in session for user {user_id}")
+                    return "failure"
+                    
+                community_id = active_community_id
+                print(f"Using active_community_id from session: {community_id}")
+                
+            except Exception as e:
+                print(f"Error getting session data: {e}")
+                return "failure"
+            
+            # Call Community Engagement API to fetch stories
+            api_url = f"http://localhost:8000/api/v1/get_items_by_community/"
+            params = {
+                'community_id': community_id,
+                'item_type': 'STORY',
+                'item_state': 'PUBLISHED'
+            }
+            
+            print(f"Fetching stories for community {community_id} with params: {params}")
+            response = requests.get(api_url, params=params, timeout=30)
+            print(f"API Response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"API Response: {result}")
+                
+                if result.get('success'):
+                    stories = result.get('data', [])
+                    print(f"Found {len(stories)} stories for community {community_id}")
+                    
+                    # Limit to 10 stories and sort by newest first (if API doesn't handle this)
+                    if len(stories) > 10:
+                        # Sort by created_at descending (newest first) if available
+                        try:
+                            stories = sorted(stories, key=lambda x: x.get('created_at', ''), reverse=True)[:2]
+                            print(f"Limited to {len(stories)} most recent stories")
+                        except:
+                            stories = stories[:10]  # Fallback to first 10 if sorting fails
+                    
+                    # Store stories in user session with current index
+                    try:
+                        # Update session with story data while preserving other data
+                        user.misc_data.update({
+                            'stories': stories,
+                            'current_story_index': 0
+                        })
+                        
+                        # Ensure SMJ context is maintained
+                        if data_dict.get('smj_id'):
+                            try:
+                                smj_instance = bot_interface.models.SMJ.objects.get(id=data_dict.get('smj_id'))
+                                user.current_smj = smj_instance
+                            except bot_interface.models.SMJ.DoesNotExist:
+                                print(f"SMJ with id {data_dict.get('smj_id')} not found")
+                                
+                        if data_dict.get('state'):
+                            user.current_state = data_dict.get('state')
+
+                        user.save()
+                        print(f"Stored {len(stories)} stories in session for user {user_id}")
+                        
+                    except Exception as session_error:
+                        print(f"Error storing stories in session: {session_error}")
+                        return "failure"
+                    
+                    # Return event based on whether stories were found
+                    if stories:
+                        return "has_stories"
+                    else:
+                        return "no_stories"
+                else:
+                    print(f"API returned error: {result.get('message', 'Unknown error')}")
+                    return "failure"
+            else:
+                print(f"API request failed with status {response.status_code}: {response.text}")
+                return "failure"
+                
+        except Exception as e:
+            print(f"Error in fetch_story: {e}")
+            return "failure"
+
+    def display_story(self, bot_instance_id, data_dict):
+        """
+        Displays the current story from user session with media and navigation buttons.
+        Handles navigation events (next_story) automatically.
+        
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Contains user_id, bot_id, and other session data
+            
+        Returns:
+            str: "success" if story displayed successfully, "failure" otherwise
+        """
+        print(f"Displaying story for bot_instance_id: {bot_instance_id} and data_dict: {data_dict}")
+        try:
+            from bot_interface.models import BotUsers, UserSessions
+            
+            # Get user information
+            user_id = data_dict.get('user_id')
+            bot_id = data_dict.get('bot_id', 1)
+            
+            if not user_id:
+                print("No user_id found in data_dict")
+                return "failure"
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            user_session = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            # Retrieve stories from user session
+            try:
+                
+                if not user_session or not user_session.misc_data:
+                    print(f"No session data found for user {user_id}")
+                    return "failure"
+                
+                stories = user_session.misc_data.get('stories', [])
+                current_index = user_session.misc_data.get('current_story_index', 0)
+                
+                if not stories:
+                    print(f"No stories found in session for user {user_id}")
+                    return "failure"
+                    
+            except Exception as session_error:
+                print(f"Error retrieving session data: {session_error}")
+                return "failure"
+            print("usersession current smj", user_session.current_state, user_session.current_smj)
+            
+            # Check if this is a navigation event and update index
+            # Get navigation action from multiple possible sources
+            navigation_action = None
+            
+            # Try to get from event_packet in data_dict (if available)
+            event_packet = data_dict.get('event_packet', {})
+            navigation_action = event_packet.get('data', '')
+            
+            # If not found in event_packet, try to get from data_dict directly
+            if not navigation_action:
+                navigation_action = data_dict.get('data', '')
+            
+            # If still not found, check the last session entry for navigation events
+            if not navigation_action and user_session.current_session:
+                try:
+                    if isinstance(user_session.current_session, list) and user_session.current_session:
+                        last_session_entry = user_session.current_session[-1]
+                        if isinstance(last_session_entry, dict):
+                            for state_data in last_session_entry.values():
+                                if isinstance(state_data, dict) and state_data.get('data') == 'next_story':
+                                    navigation_action = 'next_story'
+                                    break
+                except Exception as e:
+                    print(f"Error checking session for navigation action: {e}")
+            
+            print(f"DEBUG: Navigation action detected: '{navigation_action}'")
+            
+            if navigation_action == 'next_story':
+                if current_index < len(stories) - 1:
+                    current_index += 1
+                    user_session.misc_data['current_story_index'] = current_index
+                    
+                    # Ensure SMJ context is maintained during navigation
+                    if data_dict.get('smj_id'):
+                        try:
+                            smj_instance = bot_interface.models.SMJ.objects.get(id=data_dict.get('smj_id'))
+                            user_session.current_smj = smj_instance
+                        except bot_interface.models.SMJ.DoesNotExist:
+                            print(f"SMJ with id {data_dict.get('smj_id')} not found")
+                    
+                    # Save the updated index to database
+                    user_session.save()
+                    print(f"✅ Navigated to next story: index {current_index} (Story {current_index + 1}/{len(stories)})")
+                else:
+                    print("Already at last story - no navigation needed")
+            else:
+                print(f"No navigation action detected or not 'next_story' (got: '{navigation_action}')")
+            
+            # Validate current index
+            if current_index >= len(stories):
+                print(f"Current index {current_index} is out of range for {len(stories)} stories")
+                return "failure"
+            
+            # Get current story
+            current_story = stories[current_index]
+            print(f"Displaying story {current_index + 1} of {len(stories)}: {current_story.get('title', 'Untitled')}")
+            
+            # Get user's contact number for WhatsApp
+            try:
+                bot_user = BotUsers.objects.get(pk=user_id)
+                contact_number = bot_user.user.contact_number
+            except BotUsers.DoesNotExist:
+                print(f"BotUsers with id {user_id} not found")
+                return "failure"
+            
+            # Send story content
+            try:
+                success = self._send_story_content(current_story, contact_number, bot_instance_id, current_index + 1, len(stories))
+                if success:
+                    print(f"Story content sent successfully to {contact_number}")
+                    
+                    # Check if this is the last story after navigation or initial display
+                    if current_index + 1 == len(stories):
+                        # This is the last story - send "No more stories" and transition to Thankyou
+                        print(f"Reached last story ({current_index + 1}/{len(stories)}), sending completion message")
+                        
+                        # Send completion message
+                        completion_text = "📚 आपने सभी उपलब्ध कहानियाँ सुन ली हैं।"
+                        bot_interface.api.send_text(
+                            bot_instance_id=bot_instance_id,
+                            contact_number=contact_number,
+                            text=completion_text
+                        )
+                        
+                        # Return "done" to trigger transition to Thankyou state
+                        return "done"
+                    else:
+                        # Not the last story - update session state and wait for user interaction
+                        user_session.current_state = data_dict.get('state')
+                        user_session.expected_response_type = "button"
+                        user_session.save()
+                        print(f"Updated session: state={user_session.current_state}, response_type={user_session.expected_response_type}")
+                        
+                        # Return None to let SMJ wait for user interaction
+                        return None
+                else:
+                    print(f"Failed to send story content to {contact_number}")
+                    return "failure"
+            except Exception as send_error:
+                print(f"Error sending story content: {send_error}")
+                return "failure"
+            
+        except Exception as e:
+            print(f"Error in display_story: {e}")
+            return "failure"
+
+    def _send_story_content(self, story, contact_number, bot_instance_id, story_num, total_stories):
+        """
+        Send story content including image, audio, and navigation buttons.
+        
+        Args:
+            story (dict): Story object from API
+            contact_number (str): User's contact number
+            bot_instance_id (int): Bot instance ID
+            story_num (int): Current story number (1-based)
+            total_stories (int): Total number of stories
+            
+        Returns:
+            bool: True if content sent successfully, False otherwise
+        """
+        try:
+            # Create caption with title and date
+            title = story.get('title', 'Untitled Story')
+            created_at = story.get('created_at', '')
+            
+            # Format date if available
+            formatted_date = ''
+            if created_at:
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    formatted_date = date_obj.strftime('%d/%m/%Y')
+                except:
+                    formatted_date = created_at[:10]  # Fallback to first 10 chars
+            
+            caption = f"{title}"
+            if formatted_date:
+                caption += f"\n📅 {formatted_date}"
+            
+            print(f"Sending story {story_num}/{total_stories}: {title}")
+            
+            # Send image if available
+            images = story.get('images', [])
+            if images:
+                image_url = images[0]
+                print(f"Sending image: {image_url}")
+                response = bot_interface.api.send_image_as_reply(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=contact_number,
+                    image_url=image_url,
+                    caption=caption
+                )
+                
+                if not response or (hasattr(response, 'status_code') and response.status_code != 200):
+                    print(f"Failed to send image for story {story_num}")
+                    # Continue anyway - we'll still send audio and buttons
+            else:
+                # Send caption as text if no image
+                bot_interface.api.send_text(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=contact_number,
+                    text=caption
+                )
+            
+            # Send audio if available
+            audios = story.get('audios', [])
+            if audios:
+                audio_url = audios[0]
+                print(f"Sending audio: {audio_url}")
+                response = bot_interface.api.send_audio_as_reply(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=contact_number,
+                    audio_path=audio_url,
+                    caption=""  # No caption for audio since we sent it with image
+                )
+                
+                if not response or (hasattr(response, 'status_code') and response.status_code != 200):
+                    print(f"Failed to send audio for story {story_num}")
+                    # Continue anyway - we'll still send buttons
+            time.sleep(2)
+            
+            # Only show navigation buttons if this is NOT the last story
+            if story_num < total_stories:
+                # Create navigation buttons for non-last stories
+                buttons = []
+                
+                buttons.append({
+                    "label": f"▶️ Next ({story_num + 1}/{total_stories})",
+                    "value": "next_story"
+                })
+                
+                buttons.append({
+                    "label": "🚪 Exit",
+                    "value": "exit"
+                })
+                
+                # Send navigation buttons
+                button_text = f"📖 Story {story_num} of {total_stories}\n\nChoose an option:"
+                
+                response = bot_interface.api.send_button_msg(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=contact_number,
+                    text=button_text,
+                    menu_list=buttons
+                )
+                
+                if not response or (hasattr(response, 'status_code') and response.status_code != 200):
+                    print(f"Failed to send navigation buttons for story {story_num}")
+                    return False
+                
+                print(f"Successfully sent story {story_num}/{total_stories} with navigation buttons")
+            else:
+                # This is the last story - no buttons, will be handled by display_story method
+                print(f"Successfully sent last story {story_num}/{total_stories} (no buttons - auto-completion)")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error in _send_story_content: {e}")
             return False
 

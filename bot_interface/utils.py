@@ -301,8 +301,155 @@ status_map = {
 #         print("Exception in set_user_profile_data : ", str(e))
 
 
+def check_event_type(event_packet, expected_response_type, user_session, event=None):
+    """
+    Validates if the user's response matches the expected response type.
+    
+    Args:
+        event_packet (dict): The incoming message data
+        expected_response_type (str): Expected response type (text, button, location, etc.)
+        user_session (UserSessions): User's session object to get stored context_id
+        event (str, optional): Event name, if present validation is bypassed
+        
+    Returns:
+        bool: True if valid response, False if invalid (error message sent)
+    """
+    # Bypass validation if event is specified (e.g., start event, onboarding, community_member)
+    if event:
+        print(f"Bypassing validation for event: {event}")
+        return True
+    
+    # Always allow notification type
+    if event_packet.get('type') == 'notification':
+        return True
+    
+    response_type = event_packet.get('type', '')
+    print(f"Response type: {response_type}, Expected: {expected_response_type}")
+    
+    # Define valid input types for each expected response
+    input_type_mapping = {
+        'text': ['text'],
+        'button': ['button', 'interactive'],
+        'audio': ['audio', 'voice'],
+        'image': ['image'],
+        'location': ['location'],
+        'audio_text': ['text', 'voice', 'audio'],
+        'community': ['button', 'interactive']  # Community selection is also button-based
+    }
+    
+    # Check if response type matches expected type
+    valid_types = input_type_mapping.get(expected_response_type, [])
+    if response_type in valid_types:
+        
+        # Special validation for button responses - check context_id
+        if expected_response_type in ['button', 'community']:
+            stored_context_id = user_session.misc_data.get('last_context_id') if user_session.misc_data else None
+            incoming_context_id = event_packet.get('context_id')
+            
+            print(f"Context validation - Stored: {stored_context_id}, Incoming: {incoming_context_id}")
+            
+            # If we have both context IDs, validate they match
+            if stored_context_id and incoming_context_id:
+                if stored_context_id == incoming_context_id:
+                    print(f"Context ID validation passed: {stored_context_id}")
+                    return True
+                else:
+                    print(f"Context ID mismatch: stored={stored_context_id}, incoming={incoming_context_id}")
+                    _send_validation_error(user_session, "button_wrong_menu")
+                    return False
+            elif stored_context_id and not incoming_context_id:
+                # We expect context but didn't get it (user sent text instead of clicking button)
+                print("Expected context ID but didn't receive one")
+                _send_validation_error(user_session, "button_no_context")
+                return False
+            elif not stored_context_id and incoming_context_id:
+                # We got context but didn't expect it (shouldn't happen often)
+                print("Received unexpected context ID, allowing")
+                return True
+            else:
+                # Neither stored nor incoming context (legacy or text-based button response)
+                print("No context IDs available, allowing response")
+                return True
+        
+        # For non-button types, allow without context validation
+        print(f"Valid response type: {response_type} matches expected: {expected_response_type}")
+        return True
+    
+    # Response type doesn't match expected - send error message
+    print(f"Invalid response type: {response_type} does not match expected: {expected_response_type}")
+    _send_validation_error(user_session, expected_response_type)
+    return False
 
-def check_event_type(app_instance_config_id, event_packet, expected_response_type, start_session_flag, event, app_instance_language, context_id):
+
+def _send_validation_error(user_session, error_type):
+    """
+    Send appropriate error message based on validation failure type.
+    
+    Args:
+        user_session (UserSessions): User session object
+        error_type (str): Type of validation error
+    """
+    try:
+        bot_language = user_session.bot.language
+        
+        error_messages = {
+            'text': {
+                'hi': "अमान्य विकल्प!! कृपया लिख कर अपना सवाल या टिप्पणी भेजिए।",
+                'en': "Sorry, we are expecting a text response from you."
+            },
+            'button': {
+                'hi': "आपने हमें जो भेजा है वो इन विकल्पों में से एक नहीं है। आपको दिए गए विकल्पों में से ही कोई विकल्प का चुनाव करना है।",
+                'en': "Sorry, we are expecting a button response from you."
+            },
+            'community': {
+                'hi': "कृपया दिए गए समुदाय विकल्पों में से चुनें।",
+                'en': "Please choose from the given community options."
+            },
+            'button_wrong_menu': {
+                'hi': "आपने ग़लत मेनू से विकल्प चुना है। कृपया नवीनतम मेनू का उपयोग करें।",
+                'en': "You have chosen an option from the wrong menu. Please use the latest menu."
+            },
+            'button_no_context': {
+                'hi': "कृपया दिए गए बटन का उपयोग करें, अपना टेक्स्ट न भेजें।",
+                'en': "Please use the provided buttons, don't send your own text."
+            },
+            'location': {
+                'hi': "माफ़ कीजिये, कृपया अपना स्थान भेजें।",
+                'en': "Sorry, we are expecting a location response from you."
+            },
+            'image': {
+                'hi': "माफ़ कीजिये, कृपया फोटो अपलोड कर अपनी बात रखें।",
+                'en': "Sorry, we are expecting an image response from you."
+            },
+            'audio': {
+                'hi': "माफ़ कीजिये, कृपया ऑडियो रिकॉर्ड करके भेजें।",
+                'en': "Sorry, we are expecting an audio response from you."
+            },
+            'audio_text': {
+                'hi': "माफ़ कीजिये, अपनी बात लिखित में या फिर ऑडियो रिकॉर्ड करके बताएं।",
+                'en': "Sorry, we are expecting a text or audio response from you."
+            }
+        }
+        
+        # Get message for the specific error type and language
+        message_dict = error_messages.get(error_type, error_messages.get('button', {}))
+        message = message_dict.get(bot_language, message_dict.get('hi', "अमान्य विकल्प!!"))
+        
+        print(f"Sending validation error message: {message}")
+        
+        # Send error message
+        bot_interface.api.send_text(
+            bot_instance_id=user_session.bot.id,
+            contact_number=user_session.phone,
+            text=message
+        )
+        
+    except Exception as e:
+        print(f"Error sending validation message: {e}")
+        logger.error(f"Error sending validation message: {e}")
+
+
+def check_event_type_(app_instance_config_id, event_packet, expected_response_type, start_session_flag, event, app_instance_language, context_id):
     """
     This function checks whether the expected input and user input is same. Check for ist time Hi
     """
@@ -869,4 +1016,12 @@ def callFunctionByName(funct_name, app_type, data_dict):
         print(f"calling display_asset_demands_text with data_dict: {data_dict}")
         event = whatsappInterface.display_asset_demands_text(bot_instance_id=bot_id, data_dict=data_dict)
         print(f"display_asset_demands_text returned: {event}")
+    elif funct_name == 'fetch_story':
+        print(f"calling fetch_story with data_dict: {data_dict}")
+        event = whatsappInterface.fetch_story(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"fetch_story returned: {event}")
+    elif funct_name == 'display_story':
+        print(f"calling display_story with data_dict: {data_dict}")
+        event = whatsappInterface.display_story(bot_instance_id=bot_id, data_dict=data_dict)
+        print(f"display_story returned: {event}")
     return event

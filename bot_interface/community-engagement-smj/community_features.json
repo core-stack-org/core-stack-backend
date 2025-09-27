@@ -177,6 +177,16 @@
             "description": "अपनी पिछली संसाधन मांगों की स्थिति देखें"
           },
           {
+            "label": "कहानी दर्ज करें",
+            "value": "story",
+            "description": "अपनी कहानी साझा करें"
+          },
+          {
+            "label": "कहानी सुनें",
+            "value": "viewstory",
+            "description": "अपनी समुदाय में कहानियाँ सुनें"
+          },
+          {
             "label": "शिकायत दर्ज करें",
             "value": "grievance",
             "description": "शिकायत या प्रभाव जमा करें"
@@ -194,6 +204,16 @@
       {
         "JumpToAssetDemandStatusSMJ": [
           "asset_demand_status"
+        ]
+      },
+      {
+        "JumpToStorySMJ": [
+          "story"
+        ]
+      },
+      {
+        "JumpToViewStorySMJ": [
+          "viewstory"
         ]
       },
       {
@@ -228,6 +248,16 @@
             "description": "अपनी पिछली संसाधन मांगों की स्थिति देखें"
           },
           {
+            "label": "कहानी दर्ज करें",
+            "value": "story",
+            "description": "अपनी कहानी साझा करें"
+          },
+          {
+            "label": "कहानी सुनें",
+            "value": "viewstory",
+            "description": "अपनी समुदाय में कहानियाँ सुनें"
+          },
+          {
             "label": "शिकायत दर्ज करें",
             "value": "grievance",
             "description": "शिकायत या प्रभाव जमा करें"
@@ -259,6 +289,16 @@
       {
         "JumpToAssetDemandStatusSMJ": [
           "asset_demand_status"
+        ]
+      },
+      {
+        "JumpToStorySMJ": [
+          "story"
+        ]
+      },
+      {
+        "JumpToViewStorySMJ": [
+          "viewstory"
         ]
       },
       {
@@ -396,6 +436,68 @@
     "transition": [
       {
         "JumpToAssetDemandStatusSMJ": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JumpToStorySMJ",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "📝 Opening story registration...",
+            "hi": "📝 कहानी पंजीकरण सेवा खोल रहे हैं...",
+            "default": "Opening grievance registration..."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "story",
+            "initState": "StoryWelcome"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "JumpToStorySMJ": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JumpToViewStorySMJ",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "👂 Opening story listening...",
+            "hi": "👂 कहानी सुनने की सेवा खोल रहे हैं...",
+            "default": "Opening story listening..."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "view_story",
+            "initState": "ViewStoryWelcome"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "JumpToViewStorySMJ": [
           "failure"
         ]
       }

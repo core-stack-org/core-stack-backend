@@ -273,6 +273,8 @@ def send_audio_as_reply(bot_instance_id, contact_number, audio_path, caption="")
         headers=HEADERS,
         timeout=20,
         json={
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
             "to": contact_number,
             "type": "audio",
             "audio": {"link": audio_path,},
@@ -299,12 +301,15 @@ def send_image_as_reply(bot_instance_id, contact_number, image_url, caption):
         headers=HEADERS,
         timeout=20,
         json={
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
             "to": contact_number,
             "type": "image",
             "image": {"link": image_url, "caption": caption},
         },
     )
     print(response)
+    return response
 
 def send_audio_with_retries(bot_instance_id, contact_number, s3_audio_url, caption, max_retries=3):
     """

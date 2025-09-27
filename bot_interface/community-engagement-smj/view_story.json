@@ -1,0 +1,114 @@
+[
+  {
+    "name": "ViewStoryWelcome",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📋 आप का स्वागत है।\n\nआप यहां अपने समुदाय के लोगों के अनुभव और कहानियाँ सुन सकते हैं।",
+            "en": "📋 Welcome\n\nYou can listen to the experiences and stories of people in your community here.",
+            "default": "📋 Welcome\n\nYou can listen to the experiences and stories of people in your community here."
+          }
+        ]
+      },
+      {
+        "function": "fetch_story"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "DisplayStories": [
+          "has_stories"
+        ]
+      },
+      {
+        "NoStoriesFound": [
+          "no_stories"
+        ]
+      },
+      {
+        "ViewStoryWelcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "DisplayStories",
+    "preAction": [
+      {
+        "function": "display_story"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "DisplayStories": [
+          "next_story"
+        ]
+      },
+      {
+        "Thankyou": [
+          "exit",
+          "done"
+        ]
+      },
+      {
+        "DisplayStories": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Thankyou",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "✅ धन्यवाद! \n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you!\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you!\n\n🙏 Send \"Hi\" to restart the chat."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "Thankyou": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "NoStoriesFound",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📝 हमें खेद है।\n\n आपके समुदाय में कोई कहानियाँ नहीं हैं।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "📝 We are Sorry. There are no stories in your community.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "📝 We are Sorry. There are no stories in your community.\n\n🙏 Send \"Hi\" to restart the chat."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "NoStoriesFound": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]
