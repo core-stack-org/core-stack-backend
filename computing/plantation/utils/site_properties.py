@@ -1,11 +1,12 @@
 import ee
 
+from utilities.constants import GEE_DATASET_PATH
 from utilities.gee_utils import ee_initialize, valid_gee_text
 from .plantation_utils import dataset_paths
 
 
 def get_site_properties():  # roi, state):
-    ee_initialize()
+    ee_initialize(1)
     roi = ee.FeatureCollection(
         "projects/ee-corestackdev/assets/apps/plantation/saytrees/mbrdi_biodiversity_conservation_-_kolar/SayTrees_MBRDI_Biodiversity_Conservation_-_Kolar"
     )
@@ -15,8 +16,12 @@ def get_site_properties():  # roi, state):
         "2ba17a6977b9a3a4bf534687cfa60051",
     ]
     roi = roi.filter(ee.Filter.inList("uid", uids))
-    state = "andhra pradesh"
+    state = "karnataka"
+    start_year = 2021
+    end_year = 2023
     state_dist_to_road = get_dist_to_road(state)
+    dist_to_drainage = get_distance_to_drainage()
+    dist_to_settlement = get_distance_to_settlement(start_year, end_year)
 
     # Function to compute slope/aspect
     def derive_terrain(asset_name, raster):
@@ -28,52 +33,73 @@ def get_site_properties():  # roi, state):
 
     def get_properties(feature):
         # Dictionary to hold vectorized outputs
-        vectorized = {}
+        vectorized_props = {}
 
         # Iterate through datasets
         for key, path in dataset_paths.items():
-            raster = ee.Image(path)
+            if key == "distToDrainage":
+                min_drainage_distance = dist_to_drainage.reduceRegion(
+                    reducer=ee.Reducer.min(),
+                    geometry=feature.geometry(),
+                    scale=10,
+                    maxPixels=1e12,
+                )
 
-            # Derive slope/aspect
-            raster = derive_terrain(key, raster)
+                vectorized_props[key] = (
+                    ee.Number(min_drainage_distance.get("distance"))
+                    .multiply(1000)
+                    .round()
+                    .divide(1000)
+                )
+            else:
+                raster = ee.Image(path)
 
-            raster = raster.select(0)
+                # Derive slope/aspect
+                raster = derive_terrain(key, raster)
 
-            # Get native scale from raster
-            scale = raster.projection().nominalScale()
+                raster = raster.select(0)
 
-            vectors = raster.reduceRegions(
-                feature.geometry(), ee.Reducer.mean(), scale, raster.projection()
-            )
+                # Get native scale from raster
+                scale = raster.projection().nominalScale()
 
-            # Store in dictionary
-            vectorized[key] = vectors.first().get("mean")
+                vectors = raster.reduceRegions(
+                    feature.geometry(), ee.Reducer.mean(), scale, raster.projection()
+                )
 
-        # # Distance to the nearest road
-        # min_distance = state_dist_to_road.reduceRegion(
-        #     reducer=ee.Reducer.min(),
-        #     geometry=feature.geometry(),
-        #     scale=30,  # TODO: Check this
-        #     maxPixels=1e12,
-        # )
-        #
-        # vectorized["distToRoad"] = (
-        #     ee.Number(min_distance.get("distance")).multiply(1000).round().divide(1000)
-        # )
-        roads = ee.FeatureCollection(
-            f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
+                vectorized_props[key] = vectors.first().get("mean")
+
+        # Distance to the nearest road
+        min_road_distance = state_dist_to_road.reduceRegion(
+            reducer=ee.Reducer.min(),
+            geometry=feature.geometry(),
+            scale=10,
+            maxPixels=1e12,
         )
 
-        # Compute distance from plantation polygon to each road
-        distances = roads.map(
-            lambda f: f.set("dist_m", f.geometry().distance(feature.geometry(), 1))
+        vectorized_props["distToRoad"] = (
+            ee.Number(min_road_distance.get("distance"))
+            .multiply(1000)
+            .round()
+            .divide(1000)
         )
 
-        # Get the minimum distance
-        min_distance = distances.aggregate_min("dist_m")
-        vectorized["distToRoad"] = min_distance
+        # Distance to the nearest settlement
 
-        return feature.set("site_props", vectorized)
+        min_settlement_distance = dist_to_settlement.reduceRegion(
+            reducer=ee.Reducer.min(),
+            geometry=feature.geometry(),
+            scale=10,
+            maxPixels=1e12,
+        )
+
+        vectorized_props["distToSettlement"] = (
+            ee.Number(min_settlement_distance.get("distance"))
+            .multiply(1000)
+            .round()
+            .divide(1000)
+        )
+
+        return feature.set("site_props", vectorized_props)
 
     site_properties = roi.map(get_properties)
     print(site_properties.getInfo())
@@ -84,31 +110,38 @@ def get_dist_to_road(state):
     dataset_collection = ee.FeatureCollection(
         f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
     )
-    # dataset = dataset_collection.reduceToImage(
-    #     properties=["STATE_ID"], reducer=ee.Reducer.first()
-    # )
-    # return dataset.fastDistanceTransform().sqrt().multiply(ee.Image.pixelArea().sqrt())
-    # Rasterize: give each road a dummy value (1)
-    # Rasterize: mark road pixels as 1
-    raster = (
-        dataset_collection.map(lambda f: f.set("val", 1))
-        .reduceToImage(properties=["val"], reducer=ee.Reducer.first())
-        .unmask(0)
-        .reproject(crs="EPSG:32645", scale=30)
-    )  # use UTM projection for Bihar
-
-    # Distance in meters
-    dist_m = raster.fastDistanceTransform().sqrt().multiply(30).rename("distance")
-
-    return dist_m
+    dataset = dataset_collection.reduceToImage(
+        properties=["STATE_ID"], reducer=ee.Reducer.first()
+    )
+    return dataset.fastDistanceTransform().sqrt().multiply(ee.Image.pixelArea().sqrt())
 
 
-# def get_distance_to_drainage(state):
-#     dataset = ee.Image(dataset_paths[variable])
-#     # Filter streams with Strahler order between 3 and 7
-#     strahler3to7 = dataset.select(["b1"]).lte(7).And(dataset.select(["b1"]).gt(2))
-#     return (
-#         strahler3to7.fastDistanceTransform()
-#         .sqrt()
-#         .multiply(ee.Image.pixelArea().sqrt())
-#     )
+def get_distance_to_drainage():
+    path = dataset_paths["distToDrainage"]
+    dataset = ee.Image(path)
+    # Filter streams with Strahler order between 3 and 7
+    strahler3to7 = dataset.select(["b1"]).lte(7).And(dataset.select(["b1"]).gt(2))
+    return (
+        strahler3to7.fastDistanceTransform()
+        .sqrt()
+        .multiply(ee.Image.pixelArea().sqrt())
+    )
+
+
+def get_distance_to_settlement(start_year, end_year):
+    lulc_years = []
+    while start_year <= end_year:
+        asset_id = f"{GEE_DATASET_PATH}/LULC_v3_river_basin/pan_india_lulc_v3_{start_year}_{str(start_year + 1)}"
+        lulc_img = ee.Image(asset_id).select(["predicted_label"])
+        lulc_years.append(lulc_img)
+        start_year += 1
+    lulc = ee.ImageCollection(lulc_years).mode()
+    settlement_mask = lulc.eq(1)
+
+    dist_to_settlement = (
+        settlement_mask.fastDistanceTransform()
+        .sqrt()
+        .multiply(ee.Image.pixelArea().sqrt())
+    )
+
+    return dist_to_settlement.rename("distance")
