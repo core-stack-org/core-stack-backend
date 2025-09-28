@@ -667,6 +667,11 @@ class SmjController(StateMapData):
                         preaction_result = self.preAction()
                         end_time = datetime.now()
                         
+                        # Skip processing preAction result for failure events - they should wait for user input
+                        if event_data.get("event") == "failure":
+                            print(f"DEBUG: Skipping preAction result processing for failure event - state should wait for user input")
+                            return 1  # Return success but don't process function results
+                        
                         # Handle transition info returned from preAction
                         if preaction_result and isinstance(preaction_result, dict):
                             if 'event' in preaction_result:

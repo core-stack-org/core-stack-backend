@@ -247,6 +247,9 @@
         ]
       },
       {
+        "function": "store_active_community_and_context"
+      },
+      {
         "text": [
           {
             "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",

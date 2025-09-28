@@ -1590,6 +1590,39 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 print("User selecting to choose from other communities - no community storage required")
                 return "choose_other"
                 
+            elif event in ["", "success", "start"] or not event:
+                # User coming from onboarding or default flow - auto-determine community
+                print("Auto-determining community for onboarding/default flow")
+                
+                if len(current_communities) == 1:
+                    # Single community user from onboarding
+                    community_id = current_communities[0].get('community_id')
+                    context = "onboarding_single"
+                    event = "continue_single"  # Normalize to standard event
+                elif len(current_communities) > 1:
+                    # Multiple communities - get last accessed from API
+                    success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
+                    if success and api_response.get('success'):
+                        community_data = api_response.get('data', {})
+                        last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                        if last_accessed_id:
+                            community_id = str(last_accessed_id)
+                            context = "onboarding_multiple"
+                            event = "continue_last"  # Normalize to standard event
+                        else:
+                            # Fallback to first community
+                            community_id = current_communities[0].get('community_id')
+                            context = "onboarding_fallback"
+                            event = "continue_single"
+                    else:
+                        # API failed, use first community
+                        community_id = current_communities[0].get('community_id')
+                        context = "onboarding_fallback"
+                        event = "continue_single"
+                else:
+                    print("No communities found for onboarding user")
+                    return "failure"
+                
             else:
                 print(f"Unknown event for community storage: '{event}'")
                 return "failure"
@@ -3903,17 +3936,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 buttons = []
                 
                 buttons.append({
-                    "label": f"▶️ Next ({story_num + 1}/{total_stories})",
+                    "label": f"▶️ अगली कहानी ({story_num + 1}/{total_stories})",
                     "value": "next_story"
                 })
                 
                 buttons.append({
-                    "label": "🚪 Exit",
+                    "label": "चैट बंद करें",
                     "value": "exit"
                 })
                 
                 # Send navigation buttons
-                button_text = f"📖 Story {story_num} of {total_stories}\n\nChoose an option:"
+                button_text = f"📖 कहानी {story_num}/{total_stories}\n\nकृपया विकल्प चुनें:"
                 
                 response = bot_interface.api.send_button_msg(
                     bot_instance_id=bot_instance_id,

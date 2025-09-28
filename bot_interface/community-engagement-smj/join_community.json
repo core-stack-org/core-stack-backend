@@ -227,6 +227,9 @@
         "function": "send_join_success_message"
       },
       {
+        "function": "store_active_community_and_context"
+      },
+      {
         "data": [
           {
             "smjName": "community_features",
