@@ -43,3 +43,7 @@ projects/migrations/*.py
 public_api/migrations/*.py
 stats_generator/migrations/*.py
 users/migrations/*.py
+
+*/migrations/*.py
+*/migrations/__pycache__/*
+!*/migrations/__init__.py
