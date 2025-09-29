@@ -77,7 +77,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
                 if is_gee_asset_exists(new_asset_id):
                     merge_fc_into_existing_fc(asset_id, description, new_asset_id)
 
-                sync_to_db_and_geoserver(
+                layer_at_geoserver = sync_to_db_and_geoserver(
                     asset_id=asset_id,
                     state=state,
                     district=district,
@@ -86,7 +86,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
                     start_year=start_year,
                     end_year=end_year,
                 )
-                return "merging completed..."
+                return layer_at_geoserver
         return "already upto date "
     else:
         generate_vector(
@@ -99,7 +99,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
             asset_id=asset_id,
             fc=fc,
         )
-        sync_to_db_and_geoserver(
+        layer_at_geoserver = sync_to_db_and_geoserver(
             asset_id=asset_id,
             state=state,
             district=district,
@@ -108,7 +108,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
             start_year=start_year,
             end_year=end_year,
         )
-        return "generated new layer"
+        return layer_at_geoserver
 
 
 def generate_vector(
@@ -180,6 +180,14 @@ def generate_vector(
             fc = fc.map(res)
 
     fc = ee.FeatureCollection(fc)
+
+    description = (
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(fc, description, asset_id)
     task_status = check_task_status([task])
     print("Task completed - ", task_status)
@@ -190,7 +198,6 @@ def sync_to_db_and_geoserver(
 ):
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
-
         layer_id = save_layer_info_to_db(
             state,
             district,
@@ -203,6 +210,7 @@ def sync_to_db_and_geoserver(
                 "end_year": end_year,
             },
         )
+        make_asset_public(asset_id)
 
         fc = ee.FeatureCollection(asset_id).getInfo()
 
@@ -217,6 +225,10 @@ def sync_to_db_and_geoserver(
             "lulc_vector",
         )
         print(res)
+        layer_at_geoserver = False
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layer_at_geoserver = True
+        return layer_at_geoserver
+    return False

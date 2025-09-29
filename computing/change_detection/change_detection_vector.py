@@ -67,7 +67,11 @@ def vectorise_change_detection(self, state, district, block, gee_account_id):
                 dataset_name="Change Detection Vector",
             )
             make_asset_public(asset_id)
-            sync_change_to_geoserver(block, district, state, asset_id, param, layer_id)
+            layer_at_geoserver = sync_change_to_geoserver(
+                block, district, state, asset_id, param, layer_id
+            )
+            return layer_at_geoserver
+        return False
 
 
 def afforestation_vector(roi, state, district, block):
@@ -214,6 +218,9 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
         "change_detection",
     )
     print(res)
+    layer_at_geoserver = False
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
+        layer_at_geoserver = True
+    return layer_at_geoserver

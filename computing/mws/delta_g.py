@@ -61,10 +61,11 @@ def delta_g(
             filtered_col = [col for col in col_names if col.startswith("20")]
             filtered_col.sort()
             existing_end_date = (
-                int(filtered_col[-1].split("-")[0]) + 1
+                filtered_col[-1].split("-")[0].split("_")[-1]
                 if is_annual
                 else filtered_col[-1].split("-")[0]
             )
+            print(f"{existing_end_date=}")
         existing_end_date = f"{existing_end_date}-06-30"
         existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")

@@ -27,7 +27,6 @@ from computing.utils import (
 @app.task(bind=True)
 def generate_hydrology(
     self,
-    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -38,6 +37,7 @@ def generate_hydrology(
     start_year=None,
     end_year=None,
     is_annual=False,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
@@ -90,6 +90,7 @@ def generate_hydrology(
         task_list.append(et_task_id)
 
     ro_task_id, ro_asset_id = run_off(
+        gee_account_id=gee_account_id,
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -190,7 +191,7 @@ def generate_hydrology(
         end_date,
         is_annual,
     )
-
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
@@ -211,3 +212,5 @@ def generate_hydrology(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

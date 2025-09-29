@@ -28,12 +28,26 @@ def well_depth(
 
     if is_gee_asset_exists(asset_id):
         print("Well depth asset already exists")
-        dataset = Dataset.objects.get(name="Hydrology")
-        layer_obj = Layer.objects.get(
-            dataset=dataset,
-            layer_name=f"deltaG_well_depth_{asset_suffix}",
-        )
-        db_end_date = layer_obj.misc["end_year"]
+        layer_obj = None
+        try:
+            dataset = Dataset.objects.get(name="Hydrology")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=f"deltaG_well_depth_{asset_suffix}",
+            )
+        except Exception as e:
+            print(
+                "layer not found for welldepth. So, reading the column name from asset_id"
+            )
+        if layer_obj:
+            db_end_date = layer_obj.misc["end_year"]
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            db_end_date = filtered_col[-1].split("_")[-1]
+
         db_end_date = f"{db_end_date}-06-30"
         db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")

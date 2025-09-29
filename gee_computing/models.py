@@ -9,6 +9,14 @@ from nrm_app.settings import FERNET_KEY
 class GEEAccount(models.Model):
     name = models.CharField(max_length=100, unique=True)
     service_account_email = models.EmailField()
+    helper_account = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='main_accounts'
+    )
+    is_visible = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.name}"

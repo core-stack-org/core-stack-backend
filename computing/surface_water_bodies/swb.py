@@ -23,7 +23,6 @@ from .swb3 import waterbody_wbc_intersection
 @app.task(bind=True)
 def generate_swb_layer(
     self,
-    gee_account_id=2,
     state=None,
     district=None,
     block=None,
@@ -33,6 +32,7 @@ def generate_swb_layer(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
     if state and district and block:
@@ -82,7 +82,7 @@ def generate_swb_layer(
         task_id_list = check_task_status([swb2])
         print("SWB2 task completed - task_id_list:", task_id_list)
 
-    sync_asset_to_db_and_geoserver(
+    layer_at_geoserver = sync_asset_to_db_and_geoserver(
         asset_id, layer_name, asset_suffix, start_date, end_date, state, district, block
     )
 
@@ -98,7 +98,7 @@ def generate_swb_layer(
         task_id_list = check_task_status([swb3])
         print("SWB task completed - swb3_task_id_list:", task_id_list)
 
-    sync_asset_to_db_and_geoserver(
+    layer_at_geoserver = sync_asset_to_db_and_geoserver(
         asset_id,
         layer_name,
         asset_suffix,
@@ -108,6 +108,7 @@ def generate_swb_layer(
         district,
         block,
     )
+    return layer_at_geoserver
 
 
 def sync_asset_to_db_and_geoserver(
@@ -122,6 +123,7 @@ def sync_asset_to_db_and_geoserver(
     dataset_name="Surface Water Bodies",
     workspace="swb",
 ):
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = None
         if state and district and block:
@@ -148,3 +150,5 @@ def sync_asset_to_db_and_geoserver(
         if res.get("status_code") == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

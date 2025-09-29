@@ -50,7 +50,8 @@ def get_communities(state_name, district_name, block_name):
         communities2 = Community.objects.filter(locations__state=state_obj, locations__district__isnull=True, locations__block__isnull=True).distinct()
         communities = communities1 | communities2
     else:
-        communities = Community.objects.all()
+        # communities = Community.objects.all()
+        return "no_communities"
 
     data = [get_community_summary_data(c.id) for c in communities]
     return data
