@@ -56,7 +56,6 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
-    "811f35f97225.ngrok-free.app",
     "api-doc.core-stack.org",
 ]
 
@@ -322,10 +321,6 @@ LOGGING = {
             "class": "django.utils.log.AdminEmailHandler",
             "level": "ERROR",
         },
-    },
-    "root": {  # applies to everything unless overridden
-        "handlers": ["console", "file"],
-        "level": "INFO",
     },
     "loggers": {
         "django": {
