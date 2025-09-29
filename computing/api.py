@@ -1120,7 +1120,6 @@ def wells_compute(request):
 
 @api_view(["POST"])
 @schema(None)
-@auth_free
 def generate_layer_in_order(request):
     print("inside generate_layer_order_first")
     try:
