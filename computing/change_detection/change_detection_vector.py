@@ -219,9 +219,9 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
         "change_detection",
     )
     print(res)
-    layer_at_geoserver = False
+
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
-        layer_at_geoserver = True
-    return layer_at_geoserver
+        return True
+    return False

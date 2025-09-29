@@ -737,7 +737,6 @@ def mws_drought_causality(request):
 
 @api_view(["POST"])
 @schema(None)
-@auth_free
 def tree_health_raster(request):
     print("Inside tree_health_change API")
     try:
