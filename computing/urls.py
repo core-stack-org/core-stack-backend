@@ -79,12 +79,6 @@ urlpatterns = [
         name="generate_drainage_layer",
     ),
     path(
-        "generate_drainage_density/",
-        api.generate_drainage_density,
-        name="generate_drainage_density",
-    ),
-    path("generate_lithology/", api.generate_lithology, name="generate_lithology"),
-    path(
         "plantation_site_suitability/",
         api.plantation_site_suitability,
         name="plantation_site_suitability",

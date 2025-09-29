@@ -17,8 +17,7 @@ from .rasterize_vector import rasterize_vector
 
 
 @app.task(bind=True)
-def generate_lithology_layer(self, state, gee_account_id):
-    ee_initialize(gee_account_id)
+def generate_lithology_layer(self, state):
     asset_id = get_gee_asset_path(state) + valid_gee_text(state.lower()) + "_lithology"
 
     if not is_gee_asset_exists(asset_id):
