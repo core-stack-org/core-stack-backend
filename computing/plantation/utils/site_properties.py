@@ -5,7 +5,7 @@ from utilities.gee_utils import ee_initialize, valid_gee_text
 from .plantation_utils import dataset_paths
 
 
-def get_site_properties():  # roi, state):
+def get_site_properties():  # roi, state, start_year, end_year):
     ee_initialize(1)
     roi = ee.FeatureCollection(
         "projects/ee-corestackdev/assets/apps/plantation/saytrees/mbrdi_biodiversity_conservation_-_kolar/SayTrees_MBRDI_Biodiversity_Conservation_-_Kolar"
@@ -19,6 +19,7 @@ def get_site_properties():  # roi, state):
     state = "karnataka"
     start_year = 2021
     end_year = 2023
+
     state_dist_to_road = get_dist_to_road(state)
     dist_to_drainage = get_distance_to_drainage()
     dist_to_settlement = get_distance_to_settlement(start_year, end_year)

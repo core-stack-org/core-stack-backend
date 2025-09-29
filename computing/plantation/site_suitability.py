@@ -32,12 +32,20 @@ logger = setup_logger(__name__)
 
 @app.task(bind=True)
 def site_suitability(
-    self, gee_account_id, project_id, start_year, end_year, state=None, district=None, block=None
+    self,
+    gee_account_id,
+    project_id,
+    start_year,
+    end_year,
+    state=None,
+    district=None,
+    block=None,
 ):
     """
     Main task for site suitability analysis using Google Earth Engine.
 
     Args:
+        gee_account_id: Id of the Earth Engine account from DB
         project_id: Id of the specific project
         state: Geographic state for the analysis
         district: Geographic district

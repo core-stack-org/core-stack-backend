@@ -67,6 +67,7 @@ def check_site_suitability(
         path_list = [org, project_name]
         GEE_PATH = GEE_PATH_PLANTATION
         GEE_HELPER = GEE_PATH_PLANTATION_HELPER
+        state = project.state.state_name
     else:
         project_name = f"{valid_gee_text(district)}_{valid_gee_text(block)}"
         asset_name = f"{project_name}_site_suitability"
@@ -138,6 +139,7 @@ def check_site_suitability(
                 is_default_profile,
                 descs[i],
                 chunk_asset_id,
+                state,
             )
             if task_id:
                 tasks.append(task_id)
@@ -165,6 +167,7 @@ def check_site_suitability(
             is_default_profile,
             description,
             asset_id,
+            state,
         )
         if task_id:
             check_task_status([task_id], 120)
@@ -186,7 +189,14 @@ def check_site_suitability(
 
 
 def generate_vector(
-    roi, start_year, end_year, pss_rasters, is_default_profile, description, asset_id
+    roi,
+    start_year,
+    end_year,
+    pss_rasters,
+    is_default_profile,
+    description,
+    asset_id,
+    state,
 ):
 
     def get_max_val(feature):
@@ -252,7 +262,9 @@ def generate_vector(
     suitability_vector = get_lulc_data(suitability_vector, start_year, end_year)
     logger.info("LULC calculation completed")
 
-    suitability_vector = get_site_properties(suitability_vector)
+    suitability_vector = get_site_properties(
+        suitability_vector, state, end_year - 2, end_year
+    )
 
     try:
         # Export annotated feature collection to Earth Engine
