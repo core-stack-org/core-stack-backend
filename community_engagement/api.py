@@ -272,6 +272,7 @@ def get_community_details(request):
 @schema(None)
 def get_communities_by_location(request):
     try:
+        print("Request query params:", request.query_params, request)
         state_id = request.query_params.get("state_id")
         district_id = request.query_params.get("district_id")
         block_id = request.query_params.get("block_id")
@@ -289,8 +290,9 @@ def get_communities_by_location(request):
         if block_id:
             block = Block.objects.filter(id=block_id).first()
             block_name = block.block_name if block else ""
-
+        print(f"Fetching communities for State: '{state_id}', District: '{district_id}'")
         data = get_communities(state_name, district_name, block_name)
+        print(f"Communities found: {data}")
         return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_communities_by_location:", e)
@@ -472,6 +474,7 @@ def is_user_in_community(request):
 @schema(None)
 def get_districts_with_community(request):
     try:
+        print("Request query params:", request.query_params, request)
         state_id = request.query_params.get("state_id").strip()
         state_obj = State.objects.filter(pk=state_id).first()
 
