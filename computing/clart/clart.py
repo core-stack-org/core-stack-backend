@@ -21,7 +21,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 @app.task(bind=True)
 def generate_clart_layer(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
-    drainage_density(state, district, block)
+    drainage_density(state, district, block, gee_account_id)
     generate_lithology_layer(state)
     layer_at_geoserver = clart_layer(state, district, block)
     return layer_at_geoserver

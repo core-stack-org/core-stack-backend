@@ -87,7 +87,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
                     end_year=end_year,
                 )
                 return layer_at_geoserver
-        return "already upto date "
+        return True
     else:
         generate_vector(
             start_year=start_year,

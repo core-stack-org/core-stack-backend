@@ -15,7 +15,9 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def tree_health_ch_raster(self, state, district, block, start_year, end_year, gee_account_id):
+def tree_health_ch_raster(
+    self, state, district, block, start_year, end_year, gee_account_id
+):
     ee_initialize(gee_account_id)
     print("Inside process tree_health_ch_raster")
     # ch_palette = [
@@ -38,7 +40,7 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year, ge
         + valid_gee_text(block.lower())
         + "_uid"
     )
-
+    layer_at_geoserver = False
     for year in range(start_year, end_year):
         description = (
             "tree_health_ch_raster_"
@@ -108,7 +110,6 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year, ge
         task_id_list = check_task_status([task_id])
         print("CH task_id_list", task_id_list)
 
-        layer_at_geoserver = False
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
             layer_name = (
@@ -144,4 +145,4 @@ def tree_health_ch_raster(self, state, district, block, start_year, end_year, ge
             #     print("sync to geoserver flag is updated")
             if res:
                 layer_at_geoserver = True
-        return layer_at_geoserver
+    return layer_at_geoserver

@@ -25,7 +25,7 @@ def merge_drought_layers_chunks(
     gee_obj = GEEAccount.objects.get(pk=gee_account_id)
 
     helper_layer_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
-    dst_filename = "drought" + asset_suffix + "" + str(current_year)
+    dst_filename = "drought_" + asset_suffix + "_" + str(current_year)
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
