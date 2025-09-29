@@ -97,6 +97,7 @@ def calculate_drought(
                     start_year,
                     end_year,
                     chunk_size,
+                    gee_account_id
                 )
 
                 task_id = merge_drought_layers_chunks(
@@ -106,6 +107,7 @@ def calculate_drought(
                     app_type,
                     current_year,
                     chunk_size,
+                    gee_account_id
                 )
                 if task_id:
                     merged_tasks.append(task_id)
