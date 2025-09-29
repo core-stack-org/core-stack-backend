@@ -31,10 +31,8 @@ from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster import terrain_raster
 from computing.misc.drainage_lines import clip_drainage_lines
-from computing.clart.drainage_density import drainage_density
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
-from .clart.lithology import generate_lithology_layer
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
@@ -114,42 +112,6 @@ def generate_drainage_layer(request):
         )
     except Exception as e:
         print("Exception in generate_drainage_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_drainage_density(request):
-    print("Inside generate_drainage_density API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
-        drainage_density.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        print("Exception in generate_drainage_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_lithology(request):
-    print("Inside generate_lithology API.")
-    try:
-        state = request.data.get("state").lower()
-        # district = request.data.get("district").lower()
-        generate_lithology_layer.apply_async(args=[state], queue="nrm")
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        print("Exception in generate_lithology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
