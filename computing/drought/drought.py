@@ -24,7 +24,6 @@ from nrm_app.celery import app
 @app.task(bind=True)
 def calculate_drought(
     self,
-    gee_account_id,
     state=None,
     district=None,
     block=None,
@@ -34,6 +33,7 @@ def calculate_drought(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    gee_account_id=None,
 ):
 
     ee_initialize(gee_account_id)
@@ -120,10 +120,16 @@ def calculate_drought(
             make_asset_public(asset)
 
         task_id = merge_yearly_layers(
-            asset_suffix, asset_folder_list, app_type, start_year, end_year, gee_account_id
+            asset_suffix,
+            asset_folder_list,
+            app_type,
+            start_year,
+            end_year,
+            gee_account_id,
         )
         check_task_status([task_id])
 
+    layera_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = None
         if state and district and block:
@@ -146,3 +152,5 @@ def calculate_drought(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layera_at_geoserver = True
+    return layera_at_geoserver

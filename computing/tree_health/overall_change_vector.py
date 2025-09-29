@@ -134,6 +134,10 @@ def sync_change_to_geoserver(block, district, state):
         + valid_gee_text(block.lower()),
         "tree_overall_ch",
     )
+    layer_at_geoserver = False
     # if res["status_code"] == 201 and layer_id:
     #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
     #     print("sync to geoserver flag is updated")
+    if res["status_code"] == 201:
+        layer_at_geoserver = True
+    return layer_at_geoserver
