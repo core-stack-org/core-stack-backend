@@ -1,3 +1,5 @@
+#script to install
+
 #!/bin/bash
 
 set -e
