@@ -5,12 +5,6 @@ from dateutil.relativedelta import relativedelta
 
 from utilities.gee_utils import (
     ee_initialize,
-    check_task_status,
-    valid_gee_text,
-    get_gee_asset_path,
-    sync_raster_to_gcs,
-    sync_raster_gcs_to_geoserver,
-    make_asset_public,
     is_gee_asset_exists,
 )
 from nrm_app.celery import app
@@ -26,7 +20,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize("aman")
+    ee_initialize(7)
     print("Inside lulc_river_basin")
 
     roi_boundary = ee.FeatureCollection(
@@ -36,7 +30,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
     filename_prefix = (
         str(basin_object_id) + "_" + roi_boundary.first().get("ba_name").getInfo()
     )
-    start_year = int(start_year) - 2  # TODO Check this
+
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
     loop_start = start_date
@@ -63,7 +57,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         )
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
-            "projects/corestack-datasets/assets/datasets/LULC_v2_river_basin/"
+            "projects/corestack-datasets/assets/datasets/lulc_v3/"
             + final_output_filename
         )
         final_output_filename_array_new.append(final_output_filename)

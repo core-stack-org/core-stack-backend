@@ -70,14 +70,15 @@
                                   Yes                       No
                                   |                          |
                                   v                          v
-                        +---------------------+     +----------------------+
-                        | create_chunk()      |     | generate_vector()    |
-                        | For each chunk:     |     | on full ROI          |
-                        |  generate_vector()  |     |                      |
-                        +---------------------+     | ├─ get_max_val()     |
-                        | merge_chunks()      |     | ├─ get_ndvi_data()   |
-                        +---------------------+     | └─ get_lulc_data()   |
-                                                    +----------------------+
+                        +---------------------+     +---------------------------+
+                        | create_chunk()      |     | generate_vector()         |
+                        | For each chunk:     |     | on full ROI               |
+                        |  generate_vector()  |     |                           |
+                        +---------------------+     | ├─ get_max_val()          |
+                        | merge_chunks()      |     | ├─ get_ndvi_data()        |
+                        +---------------------+     | └─ get_lulc_data()        |
+                                                    | └─ get_site_properties()  |
+                                                    +---------------------------+
 
                                              |
                                              v
