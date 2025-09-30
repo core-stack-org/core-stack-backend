@@ -9,6 +9,7 @@ from nrm_app.settings import (
     GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
     GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH,
     BASE_DIR,
+    GEE_DEFAULT_ACCOUNT_ID
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -26,7 +27,7 @@ from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 
 
-def ee_initialize(account_id):
+def ee_initialize(account_id = GEE_DEFAULT_ACCOUNT_ID):
     account = GEEAccount.objects.get(pk=account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
     credentials = service_account.Credentials.from_service_account_info(

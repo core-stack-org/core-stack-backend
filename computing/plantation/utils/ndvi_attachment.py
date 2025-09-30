@@ -1,5 +1,5 @@
 import ee
-from computing.plantation.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from utilities.gee_utils import (
     check_task_status,
     is_gee_asset_exists,

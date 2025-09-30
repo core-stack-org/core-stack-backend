@@ -17,8 +17,8 @@ from utilities.gee_utils import (
     make_asset_public,
     export_raster_asset_to_gee,
 )
-from .harmonized_ndvi import Get_Padded_NDVI_TS_Image
-from .plantation_utils import dataset_paths
+from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+from computing.plantation.utils.plantation_utils import dataset_paths
 from utilities.logger import setup_logger
 from ..utils import save_layer_info_to_db, update_layer_sync_status
 

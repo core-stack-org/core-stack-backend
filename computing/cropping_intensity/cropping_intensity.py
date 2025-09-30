@@ -100,7 +100,6 @@ def generate_cropping_intensity(
                     asset_id=asset_id,
                     dataset_name="Cropping Intensity",
                     workspace="crop_intensity",
-                    style_name="croppingintensity",
                     start_year=start_year,
                     end_year=end_year,
                     asset_suffix=asset_suffix,
@@ -108,11 +107,11 @@ def generate_cropping_intensity(
                     district=district,
                     block=block,
                 )
-                save_to_db_and_sync_to_geoserver(config)
-                return
+                layer_at_geoserver = save_to_db_and_sync_to_geoserver(config)
+                return layer_at_geoserver
         else:
             print("already upto date...")
-            return
+            return True
 
     task_id, asset_id = generate_gee_asset(
         roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
@@ -126,7 +125,6 @@ def generate_cropping_intensity(
         asset_id=asset_id,
         dataset_name="Cropping Intensity",
         workspace="crop_intensity",
-        style_name="croppingintensity",
         start_year=start_year,
         end_year=end_year,
         asset_suffix=asset_suffix,
@@ -341,7 +339,6 @@ class LayerConfig:
     asset_id: str
     dataset_name: str
     workspace: str
-    style_name: str
     start_year: Optional[int] = None
     end_year: Optional[int] = None
     asset_suffix: Optional[str] = None
@@ -377,7 +374,6 @@ def save_to_db_and_sync_to_geoserver(config: LayerConfig):
         config.asset_suffix,
         config.layer_name,
         config.workspace,
-        config.style_name,
     )
     print(res)
     layer_at_geoserver = False

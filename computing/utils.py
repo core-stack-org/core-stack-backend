@@ -62,9 +62,10 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
         workspace=workspace,
         file_extension=file_type,
     )
-    # if response["status_code"] in [200, 201, 202]:
-    #     os.remove(zip_path)
-    #     shutil.rmtree(shape_path_dir)
+    if response["status_code"] in [200, 201, 202]:
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)
     return response
 
 

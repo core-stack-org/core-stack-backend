@@ -164,6 +164,7 @@ def sync_lulc_to_geoserver(
 ):
     print("Syncing lulc to geoserver")
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
+    layer_at_geoserver = False
     for i in range(0, len(l1_asset_new)):
         name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
@@ -185,9 +186,8 @@ def sync_lulc_to_geoserver(
             res = sync_raster_gcs_to_geoserver(
                 workspace, gcs_file_name, layer_name, style
             )
-            layer_at_geoserver = False
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
                 print("geoserver flag is updated")
                 layer_at_geoserver = True
-            return layer_at_geoserver
+    return layer_at_geoserver
