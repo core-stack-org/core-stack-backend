@@ -107,11 +107,11 @@ def generate_cropping_intensity(
                     district=district,
                     block=block,
                 )
-                save_to_db_and_sync_to_geoserver(config)
-                return
+                layer_at_geoserver = save_to_db_and_sync_to_geoserver(config)
+                return layer_at_geoserver
         else:
             print("already upto date...")
-            return
+            return True
 
     task_id, asset_id = generate_gee_asset(
         roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
