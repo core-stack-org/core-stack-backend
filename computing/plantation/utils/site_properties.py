@@ -1,19 +1,12 @@
 import ee
 
 from utilities.constants import GEE_DATASET_PATH
-from utilities.gee_utils import ee_initialize, valid_gee_text
+from utilities.gee_utils import (
+    ee_initialize,
+    valid_gee_text,
+    export_vector_asset_to_gee,
+)
 from .plantation_utils import dataset_paths
-
-
-def get_data():
-    ee_initialize(1)
-    roi = ee.FeatureCollection(
-        "projects/ee-corestackdev/assets/apps/plantation/saytrees/mbrdi_biodiversity_conservation_-_kolar/SayTrees_MBRDI_Biodiversity_Conservation_-_Kolar_site_suitability_vector"
-    )
-    state = "karnataka"
-    start_year = 2021
-    end_year = 2023
-    fc = get_site_properties(roi, state, start_year, end_year)
 
 
 def get_site_properties(roi, state, start_year, end_year):
@@ -36,19 +29,7 @@ def get_site_properties(roi, state, start_year, end_year):
         # Iterate through datasets
         for key, path in dataset_paths.items():
             if key == "distToDrainage":
-                min_drainage_distance = dist_to_drainage.reduceRegion(
-                    reducer=ee.Reducer.min(),
-                    geometry=feature.geometry(),
-                    scale=10,
-                    maxPixels=1e12,
-                )
-
-                vectorized_props[key] = (
-                    ee.Number(min_drainage_distance.get("distance"))
-                    .multiply(1000)
-                    .round()
-                    .divide(1000)
-                )
+                vectorized_props[key] = vectorize_dataset(dist_to_drainage, feature, 10)
             else:
                 raster = ee.Image(path)
 
@@ -67,37 +48,20 @@ def get_site_properties(roi, state, start_year, end_year):
                 vectorized_props[key] = vectors.first().get("mean")
 
         # Distance to the nearest road
-        min_road_distance = state_dist_to_road.reduceRegion(
-            reducer=ee.Reducer.min(),
-            geometry=feature.geometry(),
-            scale=10,
-            maxPixels=1e12,
-        )
-
-        vectorized_props["distToRoad"] = (
-            ee.Number(min_road_distance.get("distance"))
-            .multiply(1000)
-            .round()
-            .divide(1000)
+        vectorized_props["distToRoad"] = vectorize_dataset(
+            state_dist_to_road, feature, 10
         )
 
         # Distance to the nearest settlement
-
-        min_settlement_distance = dist_to_settlement.reduceRegion(
-            reducer=ee.Reducer.min(),
-            geometry=feature.geometry(),
-            scale=10,
-            maxPixels=1e12,
+        vectorized_props["distToSettlement"] = vectorize_dataset(
+            dist_to_settlement, feature, 10
         )
 
-        vectorized_props["distToSettlement"] = (
-            ee.Number(min_settlement_distance.get("distance"))
-            .multiply(1000)
-            .round()
-            .divide(1000)
-        )
+        # Convert to dictionary and encode as JSON string
+        vectorized_dict = ee.Dictionary(vectorized_props)
+        vectorized_json = ee.String.encodeJSON(vectorized_dict)
 
-        return feature.set("site_props", vectorized_props)
+        return feature.set("site_props", vectorized_json)
 
     site_properties = roi.map(get_properties)
     print(site_properties.getInfo())
@@ -143,3 +107,18 @@ def get_distance_to_settlement(start_year, end_year):
     )
 
     return dist_to_settlement.rename("distance")
+
+
+def vectorize_dataset(dataset, roi, scale):
+    min_distance = dataset.reduceRegion(
+        reducer=ee.Reducer.min(),
+        geometry=roi.geometry(),
+        scale=scale,
+        maxPixels=1e12,
+    )
+
+    return ee.Algorithms.If(
+        min_distance.get("distance"),
+        ee.Number(min_distance.get("distance")).multiply(1000).round().divide(1000),
+        0,
+    )

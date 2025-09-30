@@ -1,20 +1,17 @@
 from django.db import models
 from cryptography.fernet import Fernet
-import environ
 from nrm_app.settings import FERNET_KEY
-
-# Create your models here.
 
 
 class GEEAccount(models.Model):
     name = models.CharField(max_length=100, unique=True)
     service_account_email = models.EmailField()
     helper_account = models.ForeignKey(
-        'self',
+        "self",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='main_accounts'
+        related_name="main_accounts",
     )
     is_visible = models.BooleanField(default=True)
 
@@ -31,5 +28,5 @@ class GEEAccount(models.Model):
         """Decrypt and return JSON key file content"""
         if self.credentials_encrypted:
             fernet = Fernet(FERNET_KEY)
-            return fernet.decrypt(bytes(self.credentials_encrypted))  # 👈 cast to bytes
+            return fernet.decrypt(bytes(self.credentials_encrypted))  # cast to bytes
         return None
