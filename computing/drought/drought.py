@@ -97,7 +97,7 @@ def calculate_drought(
                     start_year,
                     end_year,
                     chunk_size,
-                    gee_account_id
+                    gee_account_id,
                 )
 
                 task_id = merge_drought_layers_chunks(
@@ -107,7 +107,7 @@ def calculate_drought(
                     app_type,
                     current_year,
                     chunk_size,
-                    gee_account_id
+                    gee_account_id,
                 )
                 if task_id:
                     merged_tasks.append(task_id)
@@ -129,7 +129,7 @@ def calculate_drought(
         )
         check_task_status([task_id])
 
-    layera_at_geoserver = False
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = None
         if state and district and block:
@@ -152,5 +152,5 @@ def calculate_drought(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
-            layera_at_geoserver = True
-    return layera_at_geoserver
+            layer_at_geoserver = True
+    return layer_at_geoserver
