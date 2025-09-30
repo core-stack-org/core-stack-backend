@@ -263,8 +263,11 @@ def generate_vector(
     logger.info("LULC calculation completed")
 
     suitability_vector = get_site_properties(
-        suitability_vector, state, end_year - 2, end_year
-    )
+        suitability_vector,
+        state,
+        end_year - 2,
+        end_year,
+    )  # start_year = end_year-2, as we don't want to overburden our vector asset and show the relevant data for 3 years only
 
     try:
         # Export annotated feature collection to Earth Engine
