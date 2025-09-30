@@ -13,8 +13,8 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
     print ("singla trigger")
     if created:  # True only when a new org is created
         subject = f"New Organization Created: {instance.name}"
-        user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/{instance.created_by.id}/change/"
-        org_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
+        user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
+        org_approval_url = f"{BASE_URL}admin/organization/organization/{instance.id}"
         superuser_emails = list(
             User.objects.filter(is_superuser=True).values_list('email', flat=True)
         )

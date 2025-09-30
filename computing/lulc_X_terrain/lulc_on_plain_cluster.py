@@ -86,6 +86,7 @@ def lulc_on_plain_cluster(self, state, district, block, start_year, end_year, ge
         task_id_list = check_task_status([task])
         print("lulc_on_slope_cluster task completed - task_id_list:", task_id_list)
 
+    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
             state,
@@ -116,6 +117,8 @@ def lulc_on_plain_cluster(self, state, district, block, start_year, end_year, ge
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver
 
 
 def process_feature_collection(fc, landforms, area_lulc, plain_centroids):

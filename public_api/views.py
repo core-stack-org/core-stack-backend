@@ -84,7 +84,7 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
             "layer_name": dataset.name,
             "layer_type": layer_type,
             "layer_url": layer_url,
-            "layer_version": dataset.layer_version,
+            "layer_version": layer.layer_version,
             "style_url": '',
             "gee_asset_path": gee_asset_path
         })

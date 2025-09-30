@@ -7,6 +7,8 @@ from datetime import datetime
 import ee
 import sys
 import numpy as np
+
+from gee_computing.models import GEEAccount
 from nrm_app.celery import app
 from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
 from utilities.gee_utils import (
@@ -15,7 +17,7 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     export_vector_asset_to_gee,
     check_task_status,
-    is_gee_asset_exists,
+    is_gee_asset_exists, build_gee_helper_paths,
 )
 from utilities.constants import (
     GEE_HELPER_PATH,
@@ -513,6 +515,7 @@ def drought_causality(self, state, district, block, start_year, end_year, gee_ac
         + valid_gee_text(block.lower())
         + "_uid"
     )
+    gee_obj = GEEAccount.objects.get(pk = gee_account_id)
     mws_info = mws_feature_collection.getInfo()
     mws_features = mws_info["features"]
     mws_data = [feature["properties"] for feature in mws_features]
@@ -522,8 +525,9 @@ def drought_causality(self, state, district, block, start_year, end_year, gee_ac
     combined_uid_data = {}
 
     for year in range(start_year, end_year + 1):
+        helper_account_path = build_gee_helper_paths("mws", gee_obj.helper_account.name)
         asset_path = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block, asset_path=GEE_HELPER_PATH)
+            get_gee_asset_path(state, district, block, asset_path=helper_account_path)
             + "drought_"
             + valid_gee_text(district.lower())
             + "_"
@@ -610,6 +614,7 @@ def drought_causality(self, state, district, block, start_year, end_year, gee_ac
         }
         final_features.append(feature)
 
+    layer_at_geoserver = False
     try:
         geo_filename = (
             valid_gee_text(district.lower())
@@ -653,7 +658,8 @@ def drought_causality(self, state, district, block, start_year, end_year, gee_ac
                 dataset_name="Drought Causality",
                 sync_to_geoserver=True,
             )
+            layer_at_geoserver = True
     except Exception as e:
         print(f"Error syncing aggregated data to GeoServer: {e}")
 
-    return {"status": "Completed"}
+    return layer_at_geoserver

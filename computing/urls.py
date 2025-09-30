@@ -1,3 +1,5 @@
+from tkinter.font import names
+
 from django.urls import path
 from . import api
 
@@ -61,7 +63,7 @@ urlpatterns = [
     path("crop_grid/", api.crop_grid, name="crop_grid"),
     path("tree_health_raster/", api.tree_health_raster, name="tree_health_raster"),
     path("tree_health_vector/", api.tree_health_vector, name="tree_health_vector"),
-    path("stream_order_vector/", api.stream_order_vector, name="stream_order_vector"),
+    path("stream_order/", api.stream_order, name="stream_order"),
     path(
         "mws_drought_causality/",
         api.mws_drought_causality,
@@ -76,12 +78,6 @@ urlpatterns = [
         api.generate_drainage_layer,
         name="generate_drainage_layer",
     ),
-    path(
-        "generate_drainage_density/",
-        api.generate_drainage_density,
-        name="generate_drainage_density",
-    ),
-    path("generate_lithology/", api.generate_lithology, name="generate_lithology"),
     path(
         "plantation_site_suitability/",
         api.plantation_site_suitability,
@@ -101,5 +97,10 @@ urlpatterns = [
         "merge_swb_ponds/",
         api.swb_pond_merging,
         name="merge_swb_ponds",
+    ),
+    path(
+        "generate_layer_in_order/",
+        api.generate_layer_in_order,
+        name="generate_layer_in_order",
     ),
 ]

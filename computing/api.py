@@ -15,7 +15,7 @@ from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.v4.lulc_v4 import generate_lulc_v4
 from .misc.restoration_opportunity import generate_restoration_opportunity
-from .misc.stream_order import generate_stream_order_vector
+from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
 from .utils import (
     Geoserver,
@@ -31,10 +31,8 @@ from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster import terrain_raster
 from computing.misc.drainage_lines import clip_drainage_lines
-from computing.clart.drainage_density import drainage_density
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
-from .clart.lithology import generate_lithology_layer
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
@@ -54,6 +52,7 @@ from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
+from .layer_generation_in_order import layer_generate_map
 
 
 @api_security_check(allowed_methods="POST")
@@ -64,8 +63,9 @@ def generate_admin_boundary(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id").lower()
         generate_tehsil_shape_file_data.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -83,8 +83,9 @@ def generate_nrega_layer(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
         clip_nrega_district_block.apply_async(
-            args=[state, district, block], queue="nrm"
+            args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -102,45 +103,15 @@ def generate_drainage_layer(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        clip_drainage_lines.apply_async(args=[state, district, block], queue="nrm")
+        gee_account_id = request.data.get("gee_account_id")
+        clip_drainage_lines.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
         print("Exception in generate_drainage_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_drainage_density(request):
-    print("Inside generate_drainage_density API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        drainage_density.apply_async(args=[state, district, block], queue="nrm")
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        print("Exception in generate_drainage_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_lithology(request):
-    print("Inside generate_lithology API.")
-    try:
-        state = request.data.get("state").lower()
-        # district = request.data.get("district").lower()
-        generate_lithology_layer.apply_async(args=[state], queue="nrm")
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        print("Exception in generate_lithology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -264,6 +235,7 @@ def generate_annual_hydrology(request):
         gee_account_id = request.data.get("gee_account_id").lower()
         generate_hydrology.apply_async(
             kwargs={
+                "gee_account_id": gee_account_id,
                 "state": state,
                 "district": district,
                 "block": block,
@@ -542,12 +514,21 @@ def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
         state = request.data.get("state")
+        print(state)
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id").lower()
         terrain_raster.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={
+                "gee_account_id": gee_account_id,
+                "roi_path": None,
+                "state": state,
+                "district": district,
+                "block": block,
+            },
+            queue="nrm",
         )
+
         return Response(
             {"Success": "generate_terrain_raster task initiated"},
             status=status.HTTP_200_OK,
@@ -793,14 +774,14 @@ def gee_task_status(request):
 
 @api_view(["POST"])
 @schema(None)
-def stream_order_vector(request):
+def stream_order(request):
     print("Inside stream_order_vector api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
-        generate_stream_order_vector.apply_async(
+        generate_stream_order.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
@@ -851,13 +832,13 @@ def plantation_site_suitability(request):
         gee_account_id = request.data.get("gee_account_id").lower()
         site_suitability.apply_async(
             args=[
-                gee_account_id,
                 project_id,
                 start_year,
                 end_year,
                 state,
                 district,
                 block,
+                gee_account_id,
             ],
             queue="nrm",
         )
@@ -1098,3 +1079,37 @@ def wells_compute(request):
         )
     except Exception as e:
         return Response({"error": "Unhandled error", "details": str(e)}, status=500)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_layer_in_order(request):
+    print("inside generate_layer_order_first")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        map_order = request.data.get("map")
+        gee_account_id = request.data.get("gee_account_id").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        start_year = int(start_year) if start_year is not None else None
+        end_year = int(end_year) if end_year is not None else None
+        layer_generate_map.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "map_order": map_order,
+                "gee_account_id": gee_account_id,
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_layer_order_first api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

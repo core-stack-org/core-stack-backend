@@ -128,8 +128,22 @@
         }
       }
     ],
-    "postAction": [],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
     "transition": [
+      {
+        "AddUserToCommunityLoc": [
+          "success"
+        ]
+      },
+      {
+        "NoCommunitiesMsg": [
+          "no_communities"
+        ]
+      },
       {
         "CommunityByLocation": [
           "failure"
@@ -163,6 +177,32 @@
       },
       {
         "CommunityByStateDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "AddUserToCommunityLoc",
+    "preAction": [
+      {
+        "function": "add_user_to_community",
+        "data": {
+          "getDataFrom": {"state":"CommunityByLocation", "field":"misc"}
+        }
+      }
+    ],
+    "postAction": [
+      
+    ],
+    "transition": [
+      {
+        "PostOnboardingMenu": [
+          "success"
+        ]
+      },
+      {
+        "AddUserToCommunityLoc": [
           "failure"
         ]
       }
@@ -252,5 +292,30 @@
     ],
     "postAction": [],
     "transition": []
+  },
+  {
+    "name": "NoCommunitiesMsg",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "Sorry we don't have any communities for you exact location.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "hi": "क्षमा करें, आपके सटीक स्थान के लिए हमारे पास कोई समुदाय नहीं है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "default": "Sorry we don't have any communities for you exact location.\n\n🙏 Send \"Hi\" to restart the chat."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "NoCommunitiesMsg": [
+          "failure"
+        ]
+      }
+    ]
   }
 ]

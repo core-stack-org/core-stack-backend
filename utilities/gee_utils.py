@@ -22,7 +22,7 @@ import subprocess
 from google.cloud import storage
 from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
-from gee_computing.models import  GEEAccount
+from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 
 
@@ -32,9 +32,9 @@ def ee_initialize(account_id):
     credentials = service_account.Credentials.from_service_account_info(
         key_dict,
         scopes=[
-            'https://www.googleapis.com/auth/earthengine',
-            'https://www.googleapis.com/auth/devstorage.full_control',
-        ]
+            "https://www.googleapis.com/auth/earthengine",
+            "https://www.googleapis.com/auth/devstorage.full_control",
+        ],
     )
     ee.Initialize(credentials)
 
@@ -662,3 +662,9 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
     ee.data.copyAsset(f"{asset_id}_merge", asset_id)
     # Delete new asset
     ee.data.deleteAsset(f"{asset_id}_merge")
+
+
+def build_gee_helper_paths(app_type, helper_project):
+    gee_helper_base_path = f"projects/{helper_project}/assets/apps"
+    GEE_HELPER_PATH = f"{gee_helper_base_path}/{app_type.lower()}/"
+    return GEE_HELPER_PATH

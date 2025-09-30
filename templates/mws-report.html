@@ -353,19 +353,19 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Farm - Farm</span>
+                        <span>Crops - Crops</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Farm - Built Up</span>
+                        <span>Crops - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Farm - Barren</span>
+                        <span>Crops - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Farm - Scrub Land</span>
+                        <span>Crops - Shrubs and Scrubs</span>
                     </div>
                 </div>
 
@@ -386,23 +386,23 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #73bb53;"></div>
-                        <span>Tree Cover - Tree Cover</span>
+                        <span>Trees - Trees</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Tree Cover - Built Up</span>
+                        <span>Trees - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Tree Cover - Farm</span>
+                        <span>Trees - Crops</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Tree Cover - Barren</span>
+                        <span>Trees - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Tree Cover - Scrub land</span>
+                        <span>Trees - Shrubs and Scrubs</span>
                     </div>
                 </div>
                 <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
@@ -420,8 +420,26 @@
                     <div id="urbanMap" class="map"></div>
                     <div id="compMap5" class="map"></div>
                 </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff0000;"></div>
+                        <span>Built Up - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #1ca3ec;"></div>
+                        <span>Water - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #73bb53;"></div>
+                        <span>Tree/Crops - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                        <span>Barren/Shrubs and Scrubs - Built Up</span>
+                    </div>
+                </div>
                 <p class="legend-note">Note: Urbanization is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover, farmland, and barren land to human settlements (built-up) are computed.</p>
-
+                
             </section>
         {% endif %}
 
@@ -532,6 +550,30 @@
             
             <p>{{soge_desc}}</p>
 
+            <div id="sogeMap" class="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffffff;"></div>
+                    <span>Safe</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                    <span>Semi - Critical</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4575b4;"></div>
+                    <span>Critical</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #313695;"></div>
+                    <span>Over - Exploited</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Not Assessed</span>
+                </div>
+            </div>
+
         </section>
         {% endif %}
 
@@ -622,7 +664,12 @@
         const mainMap = new ol.Map({
             target: 'mainMap',
             layers: [baseLayer],
-            view: view
+            view: view,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         });
 
         const wmsLayer = new ol.layer.Image({
@@ -667,6 +714,20 @@
             name : 'lulc_raster'
         })
 
+        const waterRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "LULC_level_3:LULC_22_23_{{block}}_level_3",
+                    'STYLES' : "lulc_water_pixels"
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'water_raster'
+        })
+
         const urbanRaster = new ol.layer.Image({
             source : new ol.source.ImageWMS({
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
@@ -707,7 +768,12 @@
         const TerrainMap = new ol.Map({
             target: 'terrainMap',
             layers: [wmsLayer],
-            view: tempView1
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const ComparisonMap1 = new ol.Map({
@@ -722,7 +788,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView1
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView2 = new ol.View({
@@ -746,7 +817,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView2
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView3 = new ol.View({
@@ -770,7 +846,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView3
+            view: tempView3,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView4 = new ol.View({
@@ -794,7 +875,12 @@
                     preload: 4,
                 })
             ],
-            view: tempView4
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const tempView5 = new ol.View({
@@ -818,25 +904,45 @@
                     preload: 4,
                 })
             ],
-            view: tempView5
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const lulcMap = new ol.Map({
             target: 'lulcMap',
             layers: [lulcRaster],
-            view: tempView2
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const DegradMap = new ol.Map({
             target: 'degradLandMap',
             layers: [degradRaster],
-            view: tempView3
+            view: tempView3,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
         
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [treeReduceRaster],
-            view: tempView4
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const swbMap = new ol.Map({
@@ -858,13 +964,50 @@
                 constrainResolution: true,
                 smoothExtentConstraint: true,
                 smoothResolutionConstraint: true,
-            })
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const sogeMap = new ol.Map({
+            target: 'sogeMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const urbanMap = new ol.Map({
             target: 'urbanMap',
             layers: [urbanRaster],
-            view: tempView5
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
@@ -909,7 +1052,7 @@
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Fetch GeoJSON data and extract a feature by UID
-        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1) => {
+        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
             await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
                 .then(response => response.json())
                 .then(data => {
@@ -932,6 +1075,7 @@
                         lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
                         urbanRaster1.addFilter(crop);
+                        //waterRaster1.addFilter(crop);
                     }
 
                     const styleFunctionComp = feature => {
@@ -995,6 +1139,9 @@
 
                     swbMap.getView().setCenter(mapcenter);
                     swbMap.getView().setZoom(13);
+
+                    sogeMap.getView().setCenter(mapcenter);
+                    sogeMap.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
@@ -1020,11 +1167,65 @@
             });
 
             swbMap.addLayer(vectorLayer);
+            swbMap.addLayer(waterRaster);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                const type = feature.get('class');
+                let strokeColor = 'rgba(51, 51, 51, 0.0)'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.0)'; // Default fill color with 0.4 opacity
+
+                if (uid === '{{mws_id}}') {
+                    if (type === "Safe") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(255, 255, 255, 0.4)";
+                    } else if (type === "Semi-critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(224, 243, 248, 0.4)";
+                    } else if (type === "Critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(69, 117, 180, 0.4)";
+                    } else if (type === "Not Assessed") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(169, 169, 169, 0.4)";
+                    } else {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(49, 54, 149, 0.4)";
+                    }
+                }
+
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+
+            sogeMap.addLayer(vectorLayer);
         })
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Extract Feature
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster);
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
@@ -1417,9 +1618,7 @@
         const drysp_all = JSON.parse('{{drysp_all|safe}}')
         const dg_years = JSON.parse('{{dg_years|safe}}')
 
-       const barChart_weeks = new Chart(
-        document.getElementById('Chart-drought-weeks'),
-        {
+       const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'),{
             type: 'bar',
             data: {
             labels: dg_years,
@@ -1548,6 +1747,77 @@
                 mainMap.updateSize();
             }, 500);
         });
+
+        (function () {
+            // layers we want to wait on
+            const layersToWatch = [
+                /* tile */
+                baseLayer,
+                /* image/WMS */
+                wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
+            ].filter(Boolean);
+
+            let pending = 0;
+            let resolveReady;
+            const readyPromise = new Promise(res => (resolveReady = res));
+
+            function hookSource(src) {
+                // Works for Tile sources
+                if (src && src.on) {
+                src.on('tileloadstart', () => pending++);
+                src.on(['tileloadend','tileloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
+                // Works for ImageWMS
+                src.on('imageloadstart', () => pending++);
+                src.on(['imageloadend','imageloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
+                }
+            }
+
+            layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
+            
+            // consider SWB vector overlay too (not critical for basemap):
+            // hookSource(vectorLayer.getSource()); // if you want to block on this as well
+
+            let renderedOnce = false;
+            function afterRender() {
+                renderedOnce = true;
+                check();
+            }
+
+            // when any map renders, note it
+            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+            ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+            .filter(Boolean)
+            .forEach(m => m.once('rendercomplete', afterRender));
+
+            // Charts: flip a flag when you finish constructing them
+            window.__chartsReady = true; // you already set animation: {duration: 0}, so they’re instant
+
+            let settleTimer;
+            function check() {
+                // resolve only when nothing is loading, at least one render happened, and charts are done
+                if (pending === 0 && renderedOnce && window.__chartsReady) {
+                // give the browser a breath to paint the final frame
+                clearTimeout(settleTimer);
+                settleTimer = setTimeout(() => {
+                    try {
+                    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+                    ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                    .filter(Boolean)
+                    .forEach(m => m.renderSync());
+                    } catch(e) {}
+                    window.__mapsReady = true;
+                    resolveReady(true);
+                }, 300);
+                }
+            }
+
+            // expose a promise Selenium can await if you prefer execute_async_script
+            window.__mapsReadyPromise = readyPromise;
+
+            // kick the check once in case nothing loads (rare)
+            setTimeout(check, 0);
+        })();
+
     </script>
 </body>
 </html>

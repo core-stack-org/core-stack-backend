@@ -22,7 +22,7 @@ from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
-def drainage_density(self, state, district, block, gee_account_id):
+def drainage_density(self, state, district, block):
     asset_id = (
         get_gee_asset_path(state, district, block)
         + "drainage_density_"
@@ -70,7 +70,6 @@ def drainage_density(self, state, district, block, gee_account_id):
 
 
 def generate_vector(state, district, block):
-    ee_initialize()
     mws = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"

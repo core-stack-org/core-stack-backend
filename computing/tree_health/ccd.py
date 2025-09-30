@@ -15,7 +15,9 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def tree_health_ccd_raster(self, state, district, block, start_year, end_year, gee_account_id):
+def tree_health_ccd_raster(
+    self, state, district, block, start_year, end_year, gee_account_id
+):
     print("Inside process Tree health ccd raster")
     ee_initialize(gee_account_id)
 
@@ -31,7 +33,7 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year, g
 
     # Get the block geometry once for consistent clipping
     block_geometry = block_mws.geometry()
-
+    layer_at_geoserver = False
     for year in range(start_year, end_year + 1):
         description = (
             "tree_health_ccd_raster_"
@@ -122,3 +124,6 @@ def tree_health_ccd_raster(self, state, district, block, start_year, end_year, g
             # if res and layer_id:
             #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             #     print("sync to geoserver flag is updated")
+            if res:
+                layer_at_geoserver = True
+    return layer_at_geoserver
