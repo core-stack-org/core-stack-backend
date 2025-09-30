@@ -30,17 +30,12 @@ def run_off(
     end_date=None,
     is_annual=False,
 ):
-    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
-    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     description = (
         "Runoff_annual_" if is_annual else "Runoff_fortnight_"
     ) + asset_suffix
-    asset_id = (
-        get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
-        + description
-    )
-
+    asset_id = get_gee_dir_path(asset_folder_list) + description
     if is_gee_asset_exists(asset_id):
+        print("inside run off ")
         layer_obj = None
         try:
             layer_name_suffix = "annual" if is_annual else "fortnight"
