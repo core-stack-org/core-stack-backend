@@ -79,7 +79,7 @@ def calculate_drought(
             print("current_year", current_year)
             yearly_drought = (
                 get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_HELPER_PATH"]
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
                 )
                 + "drought_"
                 + asset_suffix

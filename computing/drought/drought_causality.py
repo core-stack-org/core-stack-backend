@@ -21,6 +21,7 @@ from utilities.gee_utils import (
 )
 from utilities.constants import (
     GEE_HELPER_PATH,
+    GEE_PATHS
 )
 
 
@@ -505,7 +506,7 @@ def convert_to_dict(causality_str):
 
 
 @app.task(bind=True)
-def drought_causality(self, state, district, block, start_year, end_year, gee_account_id):
+def drought_causality(self, state, district, block, start_year, end_year, gee_account_id, app_type="MWS"):
     ee_initialize(gee_account_id)
     mws_feature_collection = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -527,7 +528,7 @@ def drought_causality(self, state, district, block, start_year, end_year, gee_ac
     for year in range(start_year, end_year + 1):
         helper_account_path = build_gee_helper_paths("mws", gee_obj.helper_account.name)
         asset_path = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block, asset_path=helper_account_path)
+            get_gee_asset_path(state, district, block, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
             + "drought_"
             + valid_gee_text(district.lower())
             + "_"
