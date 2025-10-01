@@ -10,8 +10,75 @@ from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+RECHARGE_STRUCTURE_MAPPING = {
+    "select_one_check_dam": "Check dam",
+    "select_one_percolation_tank": "Percolation tank",
+    "select_one_earthen_gully_plug": "Earthen gully plug",
+    "select_one_drainage_soakage_channels": "Drainage/soakage channels",
+    "select_one_recharge_pits": "Recharge pits",
+    "select_one_sokage_pits": "Sokage pits",
+    "select_one_trench_cum_bund_network": "Trench cum bund network",
+    "select_one_continuous_contour_trenches": "Continuous contour trenches (CCT)",
+    "select_one_staggered_contour_trenches": "Staggered Contour trenches(SCT)",
+    "select_one_water_absorption_trenches": "Water absorption trenches(WAT)",
+    "select_one_loose_boulder_structure": "Loose boulder structure",
+    "select_one_rock_fill_dam": "Rock fill dam",
+    "select_one_stone_bunding": "Stone bunding",
+    "select_one_diversion_drains": "Diversion drains",
+    "select_one_bunding": "Bunding:Contour bunds/ graded bunds",
+    "select_one_model5_structure": "5% model structure",
+    "select_one_model30_40_structure": "30-40 model structure",
+}
+
+RECHARGE_STRUCTURE_REVERSE_MAPPING = {
+    v: k for k, v in RECHARGE_STRUCTURE_MAPPING.items()
+}
+
+IRRIGATION_STRUCTURE_MAPPING = {
+    "select_one_farm_pond": "Farm pond",
+    "select_one_community_pond": "Community Pond",
+    "select_one_well": "Well",
+    "select_one_canal": "Canal",
+    "select_one_farm_bund": "Farm bund",
+}
+
+IRRIGATION_STRUCTURE_REVERSE_MAPPING = {
+    v: k for k, v in IRRIGATION_STRUCTURE_MAPPING.items()
+}
+
+WATER_STRUCTURE_MAPPING = {
+    "select_one_farm_pond": "Farm pond",
+    "select_one_community_pond": "Community Pond",
+    "select_one_repair_large_water_body": "Large water body",
+    "select_one_repair_canal": "Canal",
+    "select_one_check_dam": "Check dam",
+    "select_one_percolation_tank": "Percolation tank",
+    "select_one_rock_fill_dam": "Rock fill dam",
+    "select_one_loose_boulder_structure": "Loose boulder structure",
+    "select_one_model5_structure": "5% Model structure",
+    "select_one_Model30_40_structure": "30-40 Model structure",
+}
+
+WATER_STRUCTURE_REVERSE_MAPPING = {v: k for k, v in WATER_STRUCTURE_MAPPING.items()}
+
+RS_WATER_STRUCTURE_MAPPING = {
+    "select_one_farm_pond": "Farm pond",
+    "select_one_community_pond": "Community Pond",
+    "select_one_repair_large_water_body": "Large water body",
+    "select_one_repair_canal": "Canal",
+    "select_one_check_dam": "Check dam",
+    "select_one_percolation_tank": "Percolation tank",
+    "select_one_rock_fill_dam": "Rock fill dam",
+    "select_one_loose_boulder_structure": "Loose boulder structure",
+    "select_one_model5_structure": "5% Model structure",
+    "select_one_Model30_40_structure": "30-40 Model structure",
+}
+
+RS_WATER_STRUCTIRE_REVERSE_MAPPING = {
+    v: k for k, v in RS_WATER_STRUCTURE_MAPPING.items()
+}
+
 STRUCTURE_TO_REPAIR_MAPPING = {
-    # Normalize structure types to repair activity keys
     "farm pond": "Repair_of_farm_ponds",
     "community pond": "Repair_of_community_pond",
     "large water body": "Repair_of_large_water_body",

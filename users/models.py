@@ -63,6 +63,17 @@ class User(AbstractUser):
             except Project.DoesNotExist:
                 return False
 
+        # org admin should have permission for all the projects in their org
+        if (
+            self.organization
+            and project
+            and project.organization == self.organization
+            and self.groups.filter(
+                name_in=["Organization Admin", "Org Admin", "Administrator"]
+            ).exists()
+        ):
+            return True
+
         try:
             user_project_group = UserProjectGroup.objects.get(
                 user=self, project=project
