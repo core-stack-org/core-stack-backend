@@ -136,7 +136,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
 
     fc = ee.FeatureCollection(fc)
     asset_id = get_gee_asset_path(state, district, block) + description
-    if not asset_id:
+    if not is_gee_asset_exists(asset_id):
         task_id = export_vector_asset_to_gee(fc, description, asset_id=asset_id)
         check_task_status([task_id])
 

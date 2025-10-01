@@ -3,7 +3,6 @@ import json
 import geopandas as gpd
 import os
 from utilities.gee_utils import (
-    ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
@@ -12,13 +11,13 @@ from utilities.gee_utils import (
     upload_tif_from_gcs_to_gee,
     sync_vector_to_gcs,
     get_geojson_from_gcs,
-    export_vector_asset_to_gee,
     make_asset_public,
 )
-from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
+from utilities.constants import DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
 from computing.utils import save_layer_info_to_db
+import shutil
 
 
 @app.task(bind=True)
@@ -67,6 +66,10 @@ def drainage_density(self, state, district, block):
             )
             print("saved drainage density info at the gee level...")
             make_asset_public(asset_id)
+        if input_path:
+            path = input_path.split("/")[:-1]
+            path = os.path.join(*path)
+            shutil.rmtree(path)
 
 
 def generate_vector(state, district, block):
