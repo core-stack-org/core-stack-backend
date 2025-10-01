@@ -1,31 +1,5 @@
-import json
-from computing.misc.admin_boundary import generate_tehsil_shape_file_data
-from computing.misc.nrega import clip_nrega_district_block
-from computing.mws.mws import mws_layer
-from computing.mws.generate_hydrology import generate_hydrology
-from computing.lulc.lulc_v3 import clip_lulc_v3
-from computing.lulc.lulc_vector import vectorise_lulc
-from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
-from computing.surface_water_bodies.swb import generate_swb_layer
-from computing.drought.drought import calculate_drought
-from computing.drought.drought_causality import drought_causality
-from computing.crop_grid.crop_grid import create_crop_grids
-from computing.change_detection.change_detection import get_change_detection
-from computing.change_detection.change_detection_vector import (
-    vectorise_change_detection,
-)
-from computing.misc.restoration_opportunity import generate_restoration_opportunity
-from computing.misc.aquifer_vector import generate_aquifer_vector
-from computing.terrain_descriptor.terrain_raster import terrain_raster
-from computing.terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from computing.lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
-from computing.lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
-from computing.misc.soge_vector import generate_soge_vector
-from computing.misc.drainage_lines import clip_drainage_lines
-from computing.clart.clart import generate_clart_layer
-from .layer_map import *
 from nrm_app.celery import app
-from .models import Layer
+from computing.models import Layer
 
 status = {}
 
@@ -149,22 +123,22 @@ def run_layer_with_dependency(
         print(
             f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
         )
-        # try:
-        result = (
-            node_func_obj(state, district, block, **args)
-            if args
-            else node_func_obj(state, district, block)
-        )
-        if result:
-            print(f"{node_func_name} is completed...")
-            status[node_func_name] = True
-        else:
-            print(f"check the {node_func_name}")
+        try:
+            result = (
+                node_func_obj(state, district, block, **args)
+                if args
+                else node_func_obj(state, district, block)
+            )
+            if result:
+                print(f"{node_func_name} is completed...")
+                status[node_func_name] = True
+            else:
+                print(f"check the {node_func_name}")
+                status[node_func_name] = False
+            print(f"{result = }")
+        except Exception as e:
+            print(f"{node_func_name} raised an error: {e}")
             status[node_func_name] = False
-        print(f"{result = }")
-        # except Exception as e:
-        #     print(f"{node_func_name} raised an error: {e}")
-        #     status[node_func_name] = False
 
 
 def get_args(iterator_name, global_args, gee_account_id):
