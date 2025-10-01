@@ -1,10 +1,8 @@
 from django.contrib import admin
-from .models import Organization
+from django.contrib.auth import get_user_model
+
 from users.models import User
 
-
-from django.contrib import admin
-from django.contrib.auth import get_user_model
 from .models import Organization
 
 User = get_user_model()
@@ -20,8 +18,8 @@ class OrganizationAdmin(admin.ModelAdmin):
         "updated_by",
         "updated_at",
     )
-    list_filter = ("created_at", "updated_at")
-    search_fields = ("name", "description", "created_by", "updated_by")
+    list_filter = ("created_at", "created_by__username", "updated_at")
+    search_fields = ("name", "description", "created_by__username", "updated_by")
     readonly_fields = ("created_at", "updated_at")
 
     def get_form(self, request, obj=None, **kwargs):
@@ -37,12 +35,6 @@ class OrganizationAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if not change:  # Creating a new organization
-            obj.created_by = request.user.username
+            obj.created_by = request.user
         obj.updated_by = request.user.username
         super().save_model(request, obj, form, change)
-
-
-
-
-
-

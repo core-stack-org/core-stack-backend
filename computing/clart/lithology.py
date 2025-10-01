@@ -14,6 +14,7 @@ from utilities.gee_utils import (
     ee_initialize,
 )
 from .rasterize_vector import rasterize_vector
+import shutil
 
 
 @app.task(bind=True)
@@ -152,3 +153,7 @@ def generate_lithology_layer(self, state):
 
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
+
+        path = output_path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)

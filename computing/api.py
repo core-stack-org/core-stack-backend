@@ -5,7 +5,6 @@ from rest_framework.decorators import api_view, parser_classes, schema
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
-from utilities.auth_utils import auth_free
 
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
@@ -52,7 +51,7 @@ from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
-from .layer_generation_in_order import layer_generate_map
+from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 
 
 @api_security_check(allowed_methods="POST")
@@ -235,7 +234,6 @@ def generate_annual_hydrology(request):
         gee_account_id = request.data.get("gee_account_id").lower()
         generate_hydrology.apply_async(
             kwargs={
-                "gee_account_id": gee_account_id,
                 "state": state,
                 "district": district,
                 "block": block,
