@@ -188,9 +188,10 @@ def send_dpr_email(
 
             email.attach(filename, content, "application/pdf")
 
-        email.attach(
-            f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
-        )
+        if resource_report is not None:
+            email.attach(
+                f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
+            )
 
         logger.info("Sending DPR email to %s", email_id)
         email.send(fail_silently=False)

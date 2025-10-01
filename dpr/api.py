@@ -106,7 +106,6 @@ def generate_dpr(request):
             )
 
         plan = get_plan_details(plan_id)
-        print("type", type(plan))
         logger.info("Plan found: %s", plan)
         if plan is None:
             return Response(
@@ -118,26 +117,44 @@ def generate_dpr(request):
         mws_Ids = get_mws_ids_for_report(plan)
 
         mws_reports = []
+        successful_mws_ids = []
 
         state = str(plan.state.state_name).lower().replace(" ", "_")
         district = str(plan.district.district_name).lower().replace(" ", "_")
         block = str(plan.block.block_name).lower().replace(" ", "_")
 
-        # for ids in mws_Ids:
-        #     report_html_url = (
-        #         f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
-        #         f"?state={state}&district={district}&block={block}&uid={ids}"
-        #     )
-        #     mws_report = render_pdf_with_firefox(report_html_url)
-        #     mws_reports.append(mws_report)
+        for ids in mws_Ids:
+            try:
+                report_html_url = (
+                    f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+                    f"?state={state}&district={district}&block={block}&uid={ids}"
+                )
+                mws_report = render_pdf_with_firefox(report_html_url)
+                mws_reports.append(mws_report)
+                successful_mws_ids.append(ids)
+            except Exception as e:
+                logger.error(f"Failed to generate MWS report for ID {ids}: {e}")
 
-        # resource_html_url = report_html_url = (
-        #     f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
-        #     f"?district={district}&block={block}&plan_id={plan_id}"
-        # )
-        # resource_report = render_pdf_with_firefox(report_html_url)
+        resource_report = None
+        resource_html_url = (
+            f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
+            f"?district={district}&block={block}&plan_id={plan_id}"
+        )
 
-        # send_dpr_email(doc, email_id, plan.plan, mws_reports, mws_Ids, resource_report, resource_html_url)
+        try:
+            resource_report = render_pdf_with_firefox(resource_html_url)
+        except Exception as e:
+            logger.error(f"Failed to generate resource report: {e}")
+
+        send_dpr_email(
+            doc=doc,
+            email_id=email_id,
+            plan_name=plan.plan,
+            mws_reports=mws_reports,
+            mws_Ids=successful_mws_ids,
+            resource_report=resource_report,
+            resource_report_url=resource_html_url,
+        )
 
         return Response(
             {
