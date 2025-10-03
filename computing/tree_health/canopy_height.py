@@ -53,7 +53,7 @@ def tree_health_ch_raster(
         asset_id = get_gee_asset_path(state, district, block) + description
 
         if is_gee_asset_exists(asset_id):
-            return
+            return True
 
         # Define the path for CH data based on start year
         if year == 2016 or year == 2022:

@@ -52,7 +52,7 @@ def tree_health_overall_change_raster(self, state, district, block, gee_account_
 
     # Check if asset already exists
     if is_gee_asset_exists(asset_id):
-        return
+        return True
 
     tree_change_path = "projects/ee-mtpictd/assets/dhruvi/overall_change_2017_2021"
 
@@ -115,7 +115,6 @@ def tree_health_overall_change_raster(self, state, district, block, gee_account_
         + valid_gee_text(block.lower())
     )
 
-    layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         # layer_id = save_layer_info_to_db(
@@ -141,5 +140,5 @@ def tree_health_overall_change_raster(self, state, district, block, gee_account_
         #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         #     print("sync to geoserver flag is updated")
         if res:
-            layer_at_geoserver = True
-    return layer_at_geoserver
+            return True
+    return False
