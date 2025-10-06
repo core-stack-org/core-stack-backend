@@ -8,8 +8,6 @@ from utilities.gee_utils import (
     check_task_status,
     get_geojson_from_gcs,
     is_gee_asset_exists,
-    valid_gee_text,
-    get_gee_asset_path,
     get_gee_dir_path,
     export_vector_asset_to_gee,
     is_asset_public,
@@ -17,7 +15,6 @@ from utilities.gee_utils import (
 from utilities.geoserver_utils import (
     Geoserver,
     delete_vector_store,
-    delete_raster_store,
 )
 import shutil
 from utilities.constants import (
@@ -130,13 +127,7 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-    # delete layer if already exist
-    # geo = Geoserver()
-    # layers = geo.get_layers(workspace)
-    # layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
-    # if layer_name in layer_names:
-    #     geo.delete_layer(layer_name)
-    #     print(f"deleted {layer_name} from geoserver")
+    delete_vector_store(workspace=workspace, store=layer_name)
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
@@ -150,15 +141,7 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         check_task_status([task_id])
 
         geojson_fc = get_geojson_from_gcs(layer_name)
-
-    # delete layer if already exist
-    geo = Geoserver()
-    layers = geo.get_layers(workspace)
-    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
-    if layer_name in layer_names:
-        geo.delete_layer(layer_name)
-        print(f"deleted {layer_name} from geoserver")
-
+    delete_vector_store(workspace=workspace, store=layer_name)
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):

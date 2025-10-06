@@ -2344,7 +2344,8 @@ def delete_vector_store(workspace, store):
     - workspace: Name of the workspace where the store exists
     - store: Name of the vector datastore to delete
     """
-    url = f"{GEOSERVER_URL}/workspaces/{workspace}/datastores/{store}?recurse=true"
+    print("inside delete_vector_store")
+    url = f"{GEOSERVER_URL}/rest/workspaces/{workspace}/datastores/{store}?recurse=true"
     resp = requests.delete(
         url, auth=HTTPBasicAuth(GEOSERVER_USERNAME, GEOSERVER_PASSWORD), verify=False
     )
@@ -2368,7 +2369,8 @@ def delete_raster_store(workspace, store):
     - workspace: Name of the workspace where the store exists
     - store: Name of the vector datastore to delete
     """
-    url = f"{GEOSERVER_URL}/workspaces/{workspace}/coveragestores/{store}?recurse=true"
+    print("inside delete_raster_store")
+    url = f"{GEOSERVER_URL}/rest/workspaces/{workspace}/coveragestores/{store}?recurse=true"
     resp = requests.delete(
         url, auth=HTTPBasicAuth(GEOSERVER_USERNAME, GEOSERVER_PASSWORD), verify=False
     )
