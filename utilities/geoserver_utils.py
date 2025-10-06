@@ -18,6 +18,8 @@ from utilities.geoserver_styles import (
     outline_only_xml,
 )
 from nrm_app.settings import GEOSERVER_URL, GEOSERVER_USERNAME, GEOSERVER_PASSWORD
+from requests.auth import HTTPBasicAuth
+from nrm_app.settings import GEOSERVER_USERNAME, GEOSERVER_PASSWORD
 
 
 # Custom exceptions.
@@ -2331,3 +2333,50 @@ class Geoserver:
             return "Group deleted successfully"
         else:
             raise GeoserverException(r.status_code, r.content)
+
+
+# delete datastore(vector)
+def delete_vector_store(workspace, store):
+    """
+    Deletes a vector datastore in GeoServer along with all its layers.
+
+    Parameters:
+    - workspace: Name of the workspace where the store exists
+    - store: Name of the vector datastore to delete
+    """
+    url = f"{GEOSERVER_URL}/workspaces/{workspace}/datastores/{store}?recurse=true"
+    resp = requests.delete(
+        url, auth=HTTPBasicAuth(GEOSERVER_USERNAME, GEOSERVER_PASSWORD), verify=False
+    )
+
+    if resp.status_code in [200, 202]:
+        print(f"Vector store '{store}' deleted successfully.")
+    elif resp.status_code == 404:
+        print(f"Vector store '{store}' not found.")
+    else:
+        print(
+            f"Failed to delete vector store '{store}'. Status: {resp.status_code}, Response: {resp.text}"
+        )
+
+
+# delete coveragestore(raster)
+def delete_raster_store(workspace, store):
+    """
+    Deletes a vector datastore in GeoServer along with all its layers.
+
+    Parameters:
+    - workspace: Name of the workspace where the store exists
+    - store: Name of the vector datastore to delete
+    """
+    url = f"{GEOSERVER_URL}/workspaces/{workspace}/coveragestores/{store}?recurse=true"
+    resp = requests.delete(
+        url, auth=HTTPBasicAuth(GEOSERVER_USERNAME, GEOSERVER_PASSWORD), verify=False
+    )
+    if resp.status_code in [200, 202]:
+        print(f"Raster store '{store}' deleted successfully.")
+    elif resp.status_code == 404:
+        print(f"Raster store '{store}' not found.")
+    else:
+        print(
+            f"Failed to delete raster store '{store}'. Status: {resp.status_code}, Response: {resp.text}"
+        )
