@@ -14,7 +14,11 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     is_asset_public,
 )
-from utilities.geoserver_utils import Geoserver
+from utilities.geoserver_utils import (
+    Geoserver,
+    delete_vector_store,
+    delete_raster_store,
+)
 import shutil
 from utilities.constants import (
     ADMIN_BOUNDARY_OUTPUT_DIR,
