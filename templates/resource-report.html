@@ -861,7 +861,7 @@
             const IrrigationLayer = new ol.layer.Vector({
                 source: vectorSourceIrr,
                 style: (feature) => {
-                    const name = (feature.get('TYPE_OF_WO') || '').toString();
+                    const name = (feature.get('TYPE_OF_WO') || feature.get('work_type') ||'').toString();
                     return new ol.style.Style({
                         image: new ol.style.Icon({
                             src: IrrigationIconsUrl,
@@ -928,7 +928,7 @@
             demandStructureMap.addLayer(RechargeLayer);
             const arr = vectorSourceRechr.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            demandStructureMap.getView().setZoom(16)
+            demandStructureMap.getView().setZoom(15)
             demandStructureMap.getView().setCenter(mapcenter);
         } catch (error) {
             console.log(error)

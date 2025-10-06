@@ -298,7 +298,7 @@ class Agri_maintenance(models.Model):
 
 class Overpass_Block_Details(models.Model):
     block_details_id = models.AutoField(primary_key=True)
-    location = models.TextField(max_length=255, null=False)
+    location = models.TextField(max_length=511, null=False)
     overpass_response = models.JSONField(null=True, blank=True)
 
     class Meta:
