@@ -5,10 +5,14 @@ import pandas as pd
 import numpy as np
 import pymannkendall as mk
 
+import json
+
 from datetime import datetime
 from shapely.geometry import Polygon, MultiPolygon, Point, LineString
 from shapely.ops import unary_union
 from scipy.spatial.distance import jensenshannon
+
+from .models import Overpass_Block_Details
 
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import OVERPASS_URL
@@ -230,57 +234,73 @@ def get_osm_data(state, district, block, uid):
         overpass_query = f"""
         [out:json];
         (
-        way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
-        way["natural"="wood"]({miny},{minx},{maxy},{maxx});
+            way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
+            way["natural"="wood"]({miny},{minx},{maxy},{maxx});
 
-        way["natural"="water"]({miny},{minx},{maxy},{maxx});
-        way["water"="lake"]({miny},{minx},{maxy},{maxx});
-        way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
+            way["natural"="water"]({miny},{minx},{maxy},{maxx});
+            way["water"="lake"]({miny},{minx},{maxy},{maxx});
+            way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
 
-        relation["natural"="water"]({miny},{minx},{maxy},{maxx});
+            relation["natural"="water"]({miny},{minx},{maxy},{maxx});
 
-        node["natural"="hill"]({miny},{minx},{maxy},{maxx});
-        way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
-        
-        node["place"="city"]({miny},{minx},{maxy},{maxx});
-        node["place"="town"]({miny},{minx},{maxy},{maxx});
+            node["natural"="hill"]({miny},{minx},{maxy},{maxx});
+            way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
 
-        way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
-        way["highway"="residential"]({miny},{minx},{maxy},{maxx});
-        way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
-        way["highway"="track"]({miny},{minx},{maxy},{maxx});
-        way["highway"="road"]({miny},{minx},{maxy},{maxx});
-        way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
-        way["highway"="construction"]({miny},{minx},{maxy},{maxx});
-        way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
+            node["place"="city"]({miny},{minx},{maxy},{maxx});
+            node["place"="town"]({miny},{minx},{maxy},{maxx});
+
+            way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
+            way["highway"="residential"]({miny},{minx},{maxy},{maxx});
+            way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
+            way["highway"="track"]({miny},{minx},{maxy},{maxx});
+            way["highway"="road"]({miny},{minx},{maxy},{maxx});
+            way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
+            way["highway"="construction"]({miny},{minx},{maxy},{maxx});
+            way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
         );
         out body;
         >;
         out skel qt;
         """
 
-        #print("API response start time", datetime.now())
-
         response = {}
-        try:
-            response = requests.get(OVERPASS_URL, params={"data": overpass_query})
-            response = response.json()
-        except Exception as e:
-            logger.info("Not able to fetch the Overpass API Info", e)
+        block_detail = Overpass_Block_Details.objects.filter(location=f"{district}_{block}").first()
 
-        #print("API response end time", datetime.now())
+        if block_detail:
+            logger.info(f"Using cached response for location: {district}_{block}")
+            response = block_detail.overpass_response
+        else:
+            logger.info(f"No cached data found. Fetching from Overpass API for location: {district}_{block}")
+            
+            try:
+                response = requests.get(OVERPASS_URL, params={"data": overpass_query})
+                response = response.json()
+                
+                # if DEBUG: 
+                    # Save to file (locally)
+                    # with open('overpass_response.json', 'w', encoding='utf-8') as f:
+                    #     json.dump(response, f, indent=2, ensure_ascii=False)
+
+                block_detail = Overpass_Block_Details.objects.create(
+                    location = f"{district}_{block}",
+                    overpass_response = response
+                )
+                logger.info(f"Response saved to DB for location: {district}_{block}")
+            
+            except Exception as e:
+                logger.info("Not able to fetch the Overpass API Info", e)
 
 
         #print("Data Processing", datetime.now())
