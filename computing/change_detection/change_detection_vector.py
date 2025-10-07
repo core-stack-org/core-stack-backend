@@ -1,19 +1,24 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
 )
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def vectorise_change_detection(self, state, district, block):
-    ee_initialize()
+def vectorise_change_detection(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
@@ -35,7 +40,39 @@ def vectorise_change_detection(self, state, district, block):
     task_id_list = check_task_status(task_list)
     print("Change vector task completed - task_id_list:", task_id_list)
 
-    sync_change_to_geoserver(block, district, state)
+    param_list = [
+        "Urbanization",
+        "Degradation",
+        "Deforestation",
+        "Afforestation",
+        "CropIntensity",
+    ]
+    layer_at_geoserver = False
+    for param in param_list:
+        description = (
+            "change_vector_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
+            + "_"
+            + param
+        )
+        asset_id = get_gee_asset_path(state, district, block) + description
+        if is_gee_asset_exists(asset_id):
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"change_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{param}",
+                asset_id=asset_id,
+                dataset_name="Change Detection Vector",
+            )
+            make_asset_public(asset_id)
+            layer_at_geoserver = sync_change_to_geoserver(
+                block, district, state, asset_id, param, layer_id
+            )
+
+    return layer_at_geoserver
 
 
 def afforestation_vector(roi, state, district, block):
@@ -161,47 +198,30 @@ def generate_vector(roi, args, state, district, block, layer_name):
         + "_"
         + layer_name
     )
-
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": description,
-            "assetId": get_gee_asset_path(state, district, block) + description,
-        }
+    task = export_vector_asset_to_gee(
+        fc, description, get_gee_asset_path(state, district, block) + description
     )
-    task.start()
-    return task.status()["id"]
+    return task
 
 
-def sync_change_to_geoserver(block, district, state):
-    param_list = [
-        "Urbanization",
-        "Degradation",
-        "Deforestation",
-        "Afforestation",
-        "CropIntensity",
-    ]
-    for param in param_list:
-        asset_id = (
-            get_gee_asset_path(state, district, block)
-            + "change_vector_"
-            + valid_gee_text(district)
-            + "_"
-            + valid_gee_text(block)
-            + "_"
-            + param
-        )
-        fc = ee.FeatureCollection(asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = sync_layer_to_geoserver(
-            state,
-            fc,
-            "change_vector_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + param,
-            "change_detection",
-        )
-        print(res)
+def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
+    fc = ee.FeatureCollection(asset_id).getInfo()
+    fc = {"features": fc["features"], "type": fc["type"]}
+    res = sync_layer_to_geoserver(
+        state,
+        fc,
+        "change_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_"
+        + param,
+        "change_detection",
+    )
+    print(res)
+
+    if res["status_code"] == 201 and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag updated")
+        return True
+    return False

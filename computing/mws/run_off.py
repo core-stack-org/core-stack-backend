@@ -1,43 +1,184 @@
 import ee
 import datetime
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from computing.utils import create_chunk, merge_chunks
+from gee_computing.models import GEEAccount
+from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    is_gee_asset_exists,
+    check_task_status,
+    make_asset_public,
+    ee_initialize,
+    create_gee_dir,
+    get_gee_dir_path,
+    export_vector_asset_to_gee,
+    merge_fc_into_existing_fc,
+    build_gee_helper_paths,
+)
+from computing.models import Layer, Dataset
 
 
-def run_off(state, district, block, start_date, end_date, is_annual):
+def run_off(
+    gee_account_id,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
+):
     description = (
-        ("Runoff_annual_" if is_annual else "Runoff_fortnight_")
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-
-    asset_id = get_gee_asset_path(state, district, block) + description
-
+        "Runoff_annual_" if is_annual else "Runoff_fortnight_"
+    ) + asset_suffix
+    asset_id = get_gee_dir_path(asset_folder_list) + description
     if is_gee_asset_exists(asset_id):
-        return
+        print("inside run off ")
+        layer_obj = None
+        try:
+            layer_name_suffix = "annual" if is_annual else "fortnight"
+            dataset = Dataset.objects.get(name="Hydrology Run Off")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
+            )
+        except Exception as e:
+            print(
+                "layer not found for run_off. So, reading the column name from asset_id."
+            )
+        if layer_obj:
+            existing_end_date = layer_obj.misc["end_year"]
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            existing_end_date = (
+                int(filtered_col[-1].split("-")[0]) + 1
+                if is_annual
+                else filtered_col[-1].split("-")[0]
+            )
+        existing_end_date = f"{existing_end_date}-06-30"
+        existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+        print("existing_end_date", existing_end_date)
+        print("end_date", end_date)
+        if existing_end_date < end_date:
+            new_start_date = existing_end_date + relativedelta(months=1, day=1)
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
+            end_date = end_date.strftime("%Y-%m-%d")
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+            if not is_gee_asset_exists(new_asset_id):
+                task_id, new_asset_id = _generate_layer(
+                    roi,
+                    app_type,
+                    asset_folder_list,
+                    new_asset_id,
+                    new_description,
+                    new_start_date,
+                    end_date,
+                    is_annual,
+                    gee_account_id,
+                )
+                check_task_status([task_id])
+                print("Runoff new year data generated.")
 
+            # Check if data for new year is generated, if yes then merge it in existing asset
+            if is_gee_asset_exists(new_asset_id):
+                merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+        return None, asset_id
+    else:
+        return _generate_layer(
+            roi,
+            app_type,
+            asset_folder_list,
+            asset_id,
+            description,
+            start_date,
+            end_date,
+            is_annual,
+            gee_account_id,
+        )
+
+
+def _generate_layer(
+    roi,
+    app_type,
+    asset_folder_list,
+    asset_id,
+    description,
+    start_date,
+    end_date,
+    is_annual,
+    gee_account_id,
+):
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
+    if roi.size().getInfo() > 50:
+        chunk_size = 30
+        rois, descs = create_chunk(roi, description, chunk_size)
+
+        ee_initialize(gee_obj.helper_account.id)
+        create_gee_dir(asset_folder_list, helper_account_path)
+
+        tasks = []
+        for i in range(len(rois)):
+            chunk_asset_id = (
+                get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
+                + descs[i]
+            )
+            if not is_gee_asset_exists(chunk_asset_id):
+                task_id = generate_run_off(
+                    rois[i],
+                    descs[i],
+                    chunk_asset_id,
+                    start_date,
+                    end_date,
+                    is_annual,
+                )
+                if task_id:
+                    tasks.append(task_id)
+
+        check_task_status(tasks, 500)
+
+        for desc in descs:
+            make_asset_public(
+                get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
+                + desc
+            )
+
+        runoff_task_id = merge_chunks(
+            roi,
+            asset_folder_list,
+            description,
+            chunk_size,
+            chunk_asset_path=helper_account_path,
+            merge_asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+    else:
+        runoff_task_id = generate_run_off(
+            roi, description, asset_id, start_date, end_date, is_annual
+        )
+    return runoff_task_id, asset_id
+
+
+def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual):
     soil = ee.Image("projects/ee-dharmisha-siddharth/assets/HYSOGs250m")
     # srtm = ee.Image("CGIAR/SRTM90_V4")
     srtm2 = ee.Image("USGS/SRTMGL1_003")
     lulc_img = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
 
-    shape = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )  # feature collection
-    geometry = shape.geometry()
+    geometry = roi.geometry()
     DEM = srtm2.clip(geometry)
 
     # Calculating Slope
     slope = ee.Terrain.slope(DEM)
 
     # fc = ee.FeatureCollection(shape)
-    size = shape.size()
+    size = roi.size()
     size1 = ee.Number(size).subtract(ee.Number(1))
 
     soil = soil.expression(
@@ -48,7 +189,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
         + ": b('b1')"
     ).rename("soil")
 
-    soil = soil.clip(shape).rename("soil").reproject(crs="EPSG:4326", scale=30)
+    soil = soil.clip(roi).rename("soil").reproject(crs="EPSG:4326", scale=30)
 
     mws = ee.List.sequence(0, size1)
 
@@ -73,7 +214,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
         dwComposite = classification.reduce(ee.Reducer.mode())
 
         dwComposite = (
-            dwComposite.clip(shape).rename("label").reproject(crs="EPSG:4326", scale=30)
+            dwComposite.clip(roi).rename("label").reproject(crs="EPSG:4326", scale=30)
         )
 
         lulc = dwComposite.rename(["lulc"])
@@ -126,7 +267,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
             + ": 0"
         ).rename("CN2")
 
-        CN2 = CN2.clip(shape).rename("CN2").reproject(crs="EPSG:4326", scale=30)
+        CN2 = CN2.clip(roi).rename("CN2").reproject(crs="EPSG:4326", scale=30)
 
         # CN1 = CN2.expression("-75*CN2/(CN2-175)", {"CN2": CN2.select("CN2")}).rename(
         #     "CN1"
@@ -138,11 +279,11 @@ def run_off(state, district, block, start_date, end_date, is_annual):
             "CN2*((2.718)**(0.00673*(100-CN2)))", {"CN2": CN2.select("CN2")}
         ).rename("CN3")
 
-        CN3 = CN3.clip(shape).rename("CN3").reproject(crs="EPSG:4326", scale=30)
+        CN3 = CN3.clip(roi).rename("CN3").reproject(crs="EPSG:4326", scale=30)
 
         slope = slope.rename("slope")
 
-        slope = slope.clip(shape).rename("slope").reproject(crs="EPSG:4326", scale=30)
+        slope = slope.clip(roi).rename("slope").reproject(crs="EPSG:4326", scale=30)
 
         part1 = (
             CN3.select("CN3")
@@ -151,13 +292,13 @@ def run_off(state, district, block, start_date, end_date, is_annual):
             .rename("p1")
         )
 
-        part1 = part1.clip(shape).rename("p1").reproject(crs="EPSG:4326", scale=30)
+        part1 = part1.clip(roi).rename("p1").reproject(crs="EPSG:4326", scale=30)
 
         part2 = slope.expression(
             "1-(2*(2.718)**(-13.86*slope))", {"slope": slope.select("slope")}
         ).rename("p2")
 
-        part2 = part2.clip(shape).rename("p2").reproject(crs="EPSG:4326", scale=30)
+        part2 = part2.clip(roi).rename("p2").reproject(crs="EPSG:4326", scale=30)
 
         CN2a = slope.expression(
             "p1*p2+CN2",
@@ -168,37 +309,37 @@ def run_off(state, district, block, start_date, end_date, is_annual):
             },
         ).rename("CN2a")
 
-        CN2a = CN2a.clip(shape).rename("CN2a").reproject(crs="EPSG:4326", scale=30)
+        CN2a = CN2a.clip(roi).rename("CN2a").reproject(crs="EPSG:4326", scale=30)
 
         CN1a = CN2a.expression(
             "4.2*CN2a/(10-0.058*CN2a)", {"CN2a": CN2a.select("CN2a")}
         ).rename("CN1a")
 
-        CN1a = CN1a.clip(shape).rename("CN1a").reproject(crs="EPSG:4326", scale=30)
+        CN1a = CN1a.clip(roi).rename("CN1a").reproject(crs="EPSG:4326", scale=30)
 
         CN3a = CN2a.expression(
             "23*CN2a/(10+0.13*CN2a)", {"CN2a": CN2a.select("CN2a")}
         ).rename("CN3a")
 
-        CN3a = CN3a.clip(shape).rename("CN3a").reproject(crs="EPSG:4326", scale=30)
+        CN3a = CN3a.clip(roi).rename("CN3a").reproject(crs="EPSG:4326", scale=30)
 
         sr1 = CN1a.expression("(25400/CN1a)-254", {"CN1a": CN1a.select("CN1a")}).rename(
             "sr1"
         )
 
-        sr1 = sr1.clip(shape).rename("sr1").reproject(crs="EPSG:4326", scale=30)
+        sr1 = sr1.clip(roi).rename("sr1").reproject(crs="EPSG:4326", scale=30)
 
         sr2 = CN2a.expression("(25400/CN2a)-254", {"CN2a": CN2a.select("CN2a")}).rename(
             "sr2"
         )
 
-        sr2 = sr2.clip(shape).rename("sr2").reproject(crs="EPSG:4326", scale=30)
+        sr2 = sr2.clip(roi).rename("sr2").reproject(crs="EPSG:4326", scale=30)
 
         sr3 = CN3a.expression("(25400/CN3a)-254", {"CN3a": CN3a.select("CN3a")}).rename(
             "sr3"
         )
 
-        sr3 = sr3.clip(shape).rename("sr3").reproject(crs="EPSG:4326", scale=30)
+        sr3 = sr3.clip(roi).rename("sr3").reproject(crs="EPSG:4326", scale=30)
 
         base = ee.Date(f_end_date)
 
@@ -216,7 +357,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
 
             antecedent = dataset.reduce(ee.Reducer.sum())
             antecedent = (
-                antecedent.clip(shape)
+                antecedent.clip(roi)
                 .select("hourlyPrecipRate_sum")
                 .reproject(crs="EPSG:4326", scale=30)
             )
@@ -229,7 +370,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
                 },
             ).rename("m2")
 
-            M2 = M2.clip(shape).rename("m2").reproject(crs="EPSG:4326", scale=30)
+            M2 = M2.clip(roi).rename("m2").reproject(crs="EPSG:4326", scale=30)
 
             M1 = CN2a.expression(
                 "0.5*(-sr+sqrt(sr**2+4*p*sr))",
@@ -239,7 +380,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
                 },
             ).rename("m1")
 
-            M1 = M1.clip(shape).rename("m1").reproject(crs="EPSG:4326", scale=30)
+            M1 = M1.clip(roi).rename("m1").reproject(crs="EPSG:4326", scale=30)
 
             M3 = CN2a.expression(
                 "0.5*(-sr+sqrt(sr**2+4*p*sr))",
@@ -249,7 +390,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
                 },
             ).rename("m3")
 
-            M3 = M3.clip(shape).rename("m3").reproject(crs="EPSG:4326", scale=30)
+            M3 = M3.clip(roi).rename("m3").reproject(crs="EPSG:4326", scale=30)
 
             dataset = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(
                 ee.Filter.date(dtMid, dtTo)
@@ -257,7 +398,7 @@ def run_off(state, district, block, start_date, end_date, is_annual):
             total = dataset.reduce(ee.Reducer.sum())
 
             total = (
-                total.clip(shape)
+                total.clip(roi)
                 .select("hourlyPrecipRate_sum")
                 .reproject(crs="EPSG:4326", scale=30)
             )
@@ -288,48 +429,35 @@ def run_off(state, district, block, start_date, end_date, is_annual):
         runoffTotal = runoffs.reduce(ee.Reducer.sum())
 
         runoffTotal = (
-            runoffTotal.clip(shape)
+            runoffTotal.clip(roi)
             .select("runoff_sum")
             .reproject(crs="EPSG:4326", scale=30)
         )
         total = runoffTotal
-        total = total.clip(shape)
+        total = total.clip(roi)
         total = total.select("runoff_sum")
         total = total.expression("p*30*30", {"p": total.select("runoff_sum")}).rename(
             "p"
         )
-        stats2 = total.reduceRegions(
-            reducer=ee.Reducer.sum(), collection=shape, scale=30
-        )
+        stats2 = total.reduceRegions(reducer=ee.Reducer.sum(), collection=roi, scale=30)
 
         statsl = ee.List(stats2.toList(size))
+
         # l = ee.List([])
 
         def res(m):
             f = ee.Feature(statsl.get(m))
             uid = f.get("uid")
-            feat = ee.Feature(shape.filter(ee.Filter.eq("uid", uid)).first())
+            feat = ee.Feature(roi.filter(ee.Filter.eq("uid", uid)).first())
             val = ee.Number(f.get("sum"))
             a = ee.Number(feat.area())
             val = val.divide(a)
             return feat.set(start_date, val)
 
-        shape = ee.FeatureCollection(mws.map(res))
+        roi = ee.FeatureCollection(mws.map(res))
         f_start_date = f_end_date
         start_date = str(f_start_date.date())
 
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": asset_id,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
-        )
-        task.start()
-        print("Successfully started the task run_off", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running run-off task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
+    return task_id

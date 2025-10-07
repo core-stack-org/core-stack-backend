@@ -30,3 +30,20 @@ home
 
 # ignored apps
 dashboard/
+
+#ignore migrations
+bot_interface/migrations/*.py
+community_engagement/migrations/*.py
+computing/migrations/*.py
+dpr/migrations/*.py
+geoadmin/migrations/*.py
+organization/migrations/*.py
+plans/migrations/*.py
+plantations/migrations/*.py
+projects/migrations/*.py
+public_api/migrations/*.py
+stats_generator/migrations/*.py
+users/migrations/*.py
+
+*/migrations/*.py
+*/migrations/__pycache__/

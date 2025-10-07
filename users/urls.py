@@ -1,25 +1,25 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_nested import routers
-from .views import (
-    UserViewSet,
-    GroupViewSet,
-    RegisterView,
-    LoginView,
-    LogoutView,
-    UserProjectGroupViewSet,
-    TokenRefreshView,
-)
+
 from projects.urls import (
     router as projects_router,
 )  # Import the router from projects.urls
 
-# Main router
+from .views import (
+    GroupViewSet,
+    LoginView,
+    LogoutView,
+    RegisterView,
+    TokenRefreshView,
+    UserProjectGroupViewSet,
+    UserViewSet,
+)
+
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
 router.register(r"groups", GroupViewSet)
 
-# Nested router for project users
 projects_user_router = routers.NestedSimpleRouter(
     projects_router, r"projects", lookup="project"
 )

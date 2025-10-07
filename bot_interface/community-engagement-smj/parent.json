@@ -1,0 +1,75 @@
+[
+  {
+    "name": "Startchat",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": ":folded_hands: Hello. Welcome to Community engagement Platform bot.",
+            "hi": "नमस्कार। सामुदायिक सहभागिता प्लेटफ़ॉर्म बॉट में आपका स्वागत है।",
+            "default": "Hello. Welcome to Community engagement Platform bot."
+          }
+        ]
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "JumpToOnboarding": [
+          "onboarding"
+        ]
+      },
+      {
+        "JumpToCommunityFlow": [
+          "community_member"
+        ]
+      },
+      {
+        "Startchat": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JumpToOnboarding",
+    "preAction": [
+      {
+        "data": [
+          {
+            "smjName": "onboarding",
+            "initState": "Welcome"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": []
+  },
+  {
+    "name": "JumpToCommunityFlow",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "Welcome back! You are already a community member. Here are your options:",
+            "hi": "वापस स्वागत है! आप पहले से ही एक समुदाय के सदस्य हैं। यहाँ आपके विकल्प हैं:",
+            "default": "Welcome back! You are already a community member."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "community_features",
+            "initState": "CheckCommunityCount"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": []
+  }
+]

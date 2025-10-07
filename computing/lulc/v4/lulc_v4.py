@@ -1,31 +1,50 @@
 import ee
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-from computing.lulc.built_up import get_builtup_prediction
-from computing.lulc.cropland import get_cropland_prediction
+from computing.lulc.utils.built_up import get_builtup_prediction
+from computing.lulc.utils.cropland import get_cropland_prediction
 from computing.lulc.misc import get_barrenland_prediction
 from computing.lulc.v4.classify_raster import classify_raster
+from computing.lulc.v4.create_classifier import create_model_classifier
 from computing.lulc.v4.cropping_frequency_detection import get_cropping_frequency
+from computing.lulc.v4.farm_boundaries_clustering import cluster_farm_boundaries
 from computing.lulc.v4.time_series import time_series
-from computing.lulc.water_body import get_water_prediction
+from computing.lulc.utils.water_body import get_water_prediction
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
     get_gee_asset_path,
     valid_gee_text,
     is_gee_asset_exists,
+    export_raster_asset_to_gee,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
+    make_asset_public,
 )
 from nrm_app.celery import app
+from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
 def generate_lulc_v4(self, state, district, block, start_year, end_year):
     ee_initialize()
 
-    task_id = time_series(state, district, block, start_year, end_year)
+    task_ids = []
+    ts_task_id = time_series(state, district, block, start_year, end_year)
+    if ts_task_id:
+        task_ids.append(ts_task_id)
+
+    fm_task_id = cluster_farm_boundaries(state, district, block)
+    if fm_task_id:
+        task_ids.append(fm_task_id)
+
+    check_task_status(task_ids, 500)
+    print("Time Series and clustering task completed.")
+
+    task_id = create_model_classifier(state, district, block)
     if task_id:
-        check_task_status([task_id], 500)
-    print("Time Series task completed.")
+        check_task_status([task_id], 1000)
+    print("Create classifier task completed.")
 
     task_id = classify_raster(state, district, block)
     if task_id:
@@ -40,7 +59,7 @@ def generate_final(state, district, block, start_year, end_year):
         f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
 
-    asset_id = get_gee_asset_path(state, district, block) + filename_prefix + "_lulc_v4"
+    asset_id = get_gee_asset_path(state, district, block) + f"lulc_v4_{filename_prefix}"
 
     if is_gee_asset_exists(asset_id):
         return
@@ -54,13 +73,14 @@ def generate_final(state, district, block, start_year, end_year):
         + "_uid"
     ).union()
 
-    all = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block) + filename_prefix + "_boundaries"
+    all_boundaries = ee.FeatureCollection(
+        get_gee_asset_path(state, district, block)
+        + f"lulc_v4_{filename_prefix}_boundaries_refined"
     )
 
-    farm = all.filter(ee.Filter.eq("class", "farm"))
-    scrubland = all.filter(ee.Filter.eq("class", "scrubland"))
-    plantation = all.filter(ee.Filter.eq("class", "plantation"))
+    farm = all_boundaries.filter(ee.Filter.eq("class", "farm"))
+    scrubland = all_boundaries.filter(ee.Filter.eq("class", "scrubland"))
+    plantation = all_boundaries.filter(ee.Filter.eq("class", "plantation"))
 
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-07-01"
@@ -165,14 +185,23 @@ def generate_final(state, district, block, start_year, end_year):
         # final_output_assetid_array_new.append(final_output_assetid)
         # L1_asset_new.append(final_lulc_img)
         # crop_freq_array.append(cropping_frequency_img)
-
-        task = ee.batch.Export.image.toAsset(
-            image=final_lulc_img,  # .select("predicted_label"),
-            description="lulc_" + filename_prefix + "_v4",
-            assetId=asset_id,
-            pyramidingPolicy={"predicted_label": "mode"},
+        task_id = export_raster_asset_to_gee(
+            image=final_lulc_img,
+            description="lulc_v4_" + filename_prefix,
+            asset_id=asset_id,
             scale=10,
-            maxPixels=1e13,
-            crs="EPSG:4326",
+            pyramiding_policy={"predicted_label": "mode"},
+            region=roi_boundary.geometry(),
         )
-        task.start()
+        check_task_status([task_id])
+
+        make_asset_public(asset_id)
+
+        # task_id = sync_raster_to_gcs(final_lulc_img, 10, filename_prefix + "_v4")
+        #
+        # check_task_status([task_id])
+        #
+        # sync_raster_gcs_to_geoserver(
+        #     "lulc_v4", filename_prefix + "_v4", filename_prefix + "_v4", None
+        # )
+        # save_layer_info_to_db(state, district, block, f"{district.title()}_{block.title()}", asset_id, "LULC")

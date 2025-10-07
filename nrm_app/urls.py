@@ -20,16 +20,17 @@ from django.urls import path, include
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from bot_interface.api import whatsapp_webhook
 
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="NRM APP APIs",
+        title="CoRE Stack APIs",
         default_version="v1",
-        description="nrm api",
+        description="CoRE Stack API",
         terms_of_service="",
-        contact=openapi.Contact(email="contact@snippets.local"),
-        license=openapi.License(name="BSD License"),
+        contact=openapi.Contact(email="support@core-stack.org"),
+        license=openapi.License(name=""),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
@@ -46,7 +47,10 @@ urlpatterns = [
     path("api/v1/", include("users.urls")),
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
-    
+    path("api/v1/", include("public_api.urls")),
+    path("api/v1/", include("gee_computing.urls")),
+    path("api/v1/", include("community_engagement.urls")),
+    path("api/v1/", include("bot_interface.urls"), name="whatsapp_webhook"),
     # Swagger Doc
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
@@ -56,6 +60,5 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
-    
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
 ]

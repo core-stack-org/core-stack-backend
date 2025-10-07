@@ -100,6 +100,14 @@
         th {
             background-color: #f2f2f2;
         }
+        .legend-note {
+            color: #6c757d;       /* gray */
+            text-align: center;
+            font-size: 0.9rem;
+            font-style: italic;
+            margin: 6px 0 0;      /* tight spacing under legend */
+        }
+
         /* Print Button Styles */
         .print-button {
             position: absolute;
@@ -125,6 +133,33 @@
             margin-right: 5px;
         }
         
+        .doc-button {
+            position: absolute;
+            top: 20px;
+            right: 140px; /* shift left of the PDF button */
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .doc-button:hover { background-color: #005a9e; }
+        
+        @media print { 
+            .doc-button { display: none; }   
+            .legend-note {
+                margin-top: 3em;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            } 
+        }
+
         /* Hide print button when printing */
         @media print {
             .print-button {
@@ -164,6 +199,8 @@
             width: 80vw !important;
             page-break-inside: avoid;
             break-inside: avoid;
+            margin-top: 1em;
+            margin-bottom: 4em;
         }
 
         .legend-color {
@@ -177,6 +214,8 @@
             height: auto !important;
             max-width: auto !important;
         }
+
+
       }
       
     </style>
@@ -195,11 +234,13 @@
                 Save as PDF
             </button>
         </div>
+
+
     </header>
 
     <div class="container">
         <section class="section">
-            <h2>Overview of block characteristics</h2>
+            <h2>Overview of Tehsil characteristics</h2>
             <p>{{block_osm}}</p>
         </section>
 
@@ -265,6 +306,10 @@
                     <span>Mountain tops, high ridges</span>
                 </div>
             </div>
+
+            <p class="legend-note">
+                Note: We used NASA’s SRTM Digital Elevation Model at 30m resolution to generate landform classification.
+            </p>
         </section>
 
         <section class="section">
@@ -284,14 +329,15 @@
             <h4>Land use on slopes and plains</h4>
             <p>{{terrain_land_use}}</p>
 
-            <div class="chart-container">
+            <div class="chart-container" id="slopeChartContainer">
                 <canvas id="barChart-terrain-lulc-slope"></canvas>
             </div>
 
-            <div class="chart-container">
+            <div class="chart-container" id="plainChartContainer">
                 <canvas id="barChart-terrain-lulc-plain"></canvas>
             </div>
 
+            <p class="legend-note">Note: Data remotely sensed from satellites including LandSat-7, LandSat-8, Sentinel-2, Sentinel-1, MODIS and Dynamic World.</p>
         </section>
 
         {% if land_degrad %}
@@ -307,21 +353,23 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Farm - Farm</span>
+                        <span>Crops - Crops</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Farm - Built Up</span>
+                        <span>Crops - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Farm - Barren</span>
+                        <span>Crops - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Farm - Scrub Land</span>
+                        <span>Crops - Shrubs and Scrubs</span>
                     </div>
                 </div>
+
+                <p class="legend-note">Note: The degradation in cropping is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from farmland to barren land, shrubs, human settlements (built-up) are computed</p>
             </section>
         {% endif %}
 
@@ -338,26 +386,28 @@
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #73bb53;"></div>
-                        <span>Forest - Forest</span>
+                        <span>Trees - Trees</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Forest - Built Up</span>
+                        <span>Trees - Built Up</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Forest - Farm</span>
+                        <span>Trees - Crops</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Forest - Barren</span>
+                        <span>Trees - Barren</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Forest - Scrub land</span>
+                        <span>Trees - Shrubs and Scrubs</span>
                     </div>
                 </div>
+                <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
 
+                <p>{{restore_desc}}</p>
             </section>
         {% endif %}
 
@@ -365,6 +415,31 @@
             <section class="section">
                 <h4>Urbanization</h4>
                 <p>{{urbanization}}</p>
+
+                <div class="map-group">
+                    <div id="urbanMap" class="map"></div>
+                    <div id="compMap5" class="map"></div>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff0000;"></div>
+                        <span>Built Up - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #1ca3ec;"></div>
+                        <span>Water - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #73bb53;"></div>
+                        <span>Tree/Crops - Built Up</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                        <span>Barren/Shrubs and Scrubs - Built Up</span>
+                    </div>
+                </div>
+                <p class="legend-note">Note: Urbanization is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover, farmland, and barren land to human settlements (built-up) are computed.</p>
+                
             </section>
         {% endif %}
 
@@ -377,6 +452,7 @@
                 <canvas id="barChart-intensity"></canvas>
             </div>
 
+            <p class="legend-note">Note: We use annual land use land cover (LULC), to identify areas under single cropping, double cropping and triple cropping using pixels which are classified as single kharif, single non-kharif, double and triple classes of LULC classifier to determine cropping intensity.</p>
         </section>
 
         <section class="section">
@@ -409,10 +485,13 @@
                     <span>Triple Cropping</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <div class="legend-color" style="background-color: #4c4ef5;"></div>
                     <span>Shrubs and Scrubs</span>
                 </div>
             </div>
+            <p class="legend-note">
+                Note: The Resolution of LULC image is 10 meter.
+            </p>
         </section>
 
         <section class="section">
@@ -423,15 +502,15 @@
 
             <p>{{final_desc}}</p>
 
-            {% if not trend_desc %}
-                <p>No surface water body descriptions available.</p>
-            {% endif %}
-
             <div class="chart-container">
                 <canvas id="barChart-swb"></canvas>
             </div>
 
             <div id="swbMap" class="map"></div>
+
+            <p class="legend-note">
+                Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif season and Dynamic World to detect water pixels in Rabi and Zaid seasons.
+            </p>
 
             <p>{{swb_season_desc}}</p>
         </section>
@@ -448,28 +527,79 @@
             <div class="chart-container">
                 <canvas id="lineChart-water"></canvas>
             </div>
+            <p class="legend-note">
+                Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP) dataset available on Google Earth Engine’s data catalogue. GSMaP provides a global precipitation in mm/hr at spatial resolution of approximately 11km.
+                Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m resolution). For further information on the computation, refer our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a>.
+            </p>
             <div class="chart-container">
                 <canvas id="lineChart-evp"></canvas>
             </div>
             <div class="chart-container">
                 <canvas id="lineChart-gw"></canvas>
             </div>
+            <p class="legend-note">
+                Note: Computed by subtracting outgoing fluxes (runoff and evaporatranspiration) from incoming water (precipitation).
+            </p>
         </section>
+
+        {% if soge_desc %}
+        <section class="section">
+            <h4>State of groundwater extraction</h4>
+
+            <p>The state of groundwater extraction refers to the current level or intensity at which groundwater is being withdrawn from aquifers compared to its natural replenishment rate. Based on this ratio, agencies like the Central Ground Water Board (CGWB) in India classify areas into categories indicating the extent of extraction.</p>
+            
+            <p>{{soge_desc}}</p>
+
+            <div id="sogeMap" class="map"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffffff;"></div>
+                    <span>Safe</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                    <span>Semi - Critical</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #4575b4;"></div>
+                    <span>Critical</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #313695;"></div>
+                    <span>Over - Exploited</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Not Assessed</span>
+                </div>
+            </div>
+
+        </section>
+        {% endif %}
 
         <section class="section">
             <h4>Drought Analysis</h4>
             <p>{{drought_desc}}</p>
 
+            <p>A Drought year is declared if the total number of weeks under severe intensity drought and moderate intensity drought exceed 5, which means that the rainfall deficit was more than 25% for more than 5 weeks during the monsoon of that year.</p>
+
             <p>The occurrence of dry spell is defined across four consecutive weeks with each week of these
                 four weeks incurring a rainfall deviation of less than 50%. Prolonged dry spells can lead to
                 significant reduction in crop sown area.</p>
 
-            <div class="chart-container">
+            <!-- <div class="chart-container">
                 <canvas id="Chart-drought"></canvas>
+            </div> -->
+
+            <div class="chart-container">
+                <canvas id="Chart-drought-weeks"></canvas>
             </div>
+
+            <p class="legend-note">Note: Drought is defined as per the Government of India's Drought Manual and considered moderate or severe if the number of weeks of drought is five or more. Drought weeks are identified based on whether meteorological drought occurred in that week (i.e. the rains were less than usual in that week as compared to previous years, possibly intensified by dry spells defined as consecutive weeks of low rainfall) and/or agricultural drought occurred in that week (i.e. cropped area or crop health were lower than usual in that week as compared to previous years). Severe drought weeks are those when meteorological and agricultural drought are both coincident.</p>
         </section>
         
         <section class="section">
+            <div class="village-section">
             <h2>Village Profile</h2>
             <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
             <ul id="village-names"></ul>
@@ -495,13 +625,15 @@
                 </thead>
                 <tbody></tbody>
             </table>
-
+            </div>
         </section>
+
     </div>
 
     <footer>
         <div class="container">
             <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>Refer to our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a> for more details on how data was collected and processed.</p>
             <p>
                 Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
                 <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
@@ -532,7 +664,12 @@
         const mainMap = new ol.Map({
             target: 'mainMap',
             layers: [baseLayer],
-            view: view
+            view: view,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         });
 
         const wmsLayer = new ol.layer.Image({
@@ -554,7 +691,7 @@
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params : {
                     'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
-                    'STYLES' : "change_detection_degradation"
+                    'STYLES' : "degradation"
                 },
                 ratio : 1,
                 serverType: 'geoserver',
@@ -577,12 +714,26 @@
             name : 'lulc_raster'
         })
 
-        const treeReduceRaster = new ol.layer.Image({
+        const waterRaster = new ol.layer.Image({
             source : new ol.source.ImageWMS({
                 url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params : {
-                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
-                    'STYLES' : "change_detection_deforestation"
+                    'LAYERS': "LULC_level_3:LULC_22_23_{{block}}_level_3",
+                    'STYLES' : "lulc_water_pixels"
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'water_raster'
+        })
+
+        const urbanRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
+                    'STYLES' : "urbanization"
                 },
                 ratio : 1,
                 serverType: 'geoserver',
@@ -591,17 +742,38 @@
             name : 'tree_raster'
         })
 
+        const treeReduceRaster = new ol.layer.Image({
+            source : new ol.source.ImageWMS({
+                url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params : {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
+                    'STYLES' : "deforestation"
+                },
+                ratio : 1,
+                serverType: 'geoserver',
+            }),
+            visible : true,
+            name : 'tree_raster'
+        })
+
+        const tempView1 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
         const TerrainMap = new ol.Map({
             target: 'terrainMap',
             layers: [wmsLayer],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const ComparisonMap1 = new ol.Map({
@@ -616,7 +788,15 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView2 = new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
                 projection: "EPSG:4326",
@@ -624,7 +804,6 @@
                 smoothExtentConstraint: true,
                 smoothResolutionConstraint: true,
             })
-        })
 
         const ComparisonMap2 = new ol.Map({
             target: 'compMap2',
@@ -638,14 +817,21 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView3 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
         })
 
         const ComparisonMap3 = new ol.Map({
@@ -660,14 +846,21 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView3,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView4 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
         })
 
         const ComparisonMap4 = new ol.Map({
@@ -682,53 +875,74 @@
                     preload: 4,
                 })
             ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView5 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const ComparisonMap5 = new ol.Map({
+            target: 'compMap5',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const lulcMap = new ol.Map({
             target: 'lulcMap',
             layers: [lulcRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const DegradMap = new ol.Map({
             target: 'degradLandMap',
             layers: [degradRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView3,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
         
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [treeReduceRaster],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            })
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         const swbMap = new ol.Map({
@@ -750,7 +964,50 @@
                 constrainResolution: true,
                 smoothExtentConstraint: true,
                 smoothResolutionConstraint: true,
-            })
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const sogeMap = new ol.Map({
+            target: 'sogeMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const urbanMap = new ol.Map({
+            target: 'urbanMap',
+            layers: [urbanRaster],
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
         })
 
         fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
@@ -795,7 +1052,7 @@
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Fetch GeoJSON data and extract a feature by UID
-        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1) => {
+        const fetchFeatureByUid = async(uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
             await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
                 .then(response => response.json())
                 .then(data => {
@@ -817,6 +1074,8 @@
                         degradRaster1.addFilter(crop);
                         lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
+                        urbanRaster1.addFilter(crop);
+                        //waterRaster1.addFilter(crop);
                     }
 
                     const styleFunctionComp = feature => {
@@ -842,6 +1101,7 @@
                     ComparisonMap2.addLayer(vectorLayerComp)
                     ComparisonMap3.addLayer(vectorLayerComp)
                     ComparisonMap4.addLayer(vectorLayerComp)
+                    ComparisonMap5.addLayer(vectorLayerComp)
                     swbMap.addLayer(vectorLayerComp)
 
                     const arr = vectorSource.getExtent();
@@ -870,14 +1130,23 @@
 
                     ComparisonMap4.getView().setCenter(mapcenter);
                     ComparisonMap4.getView().setZoom(13);
+                    
+                    ComparisonMap5.getView().setCenter(mapcenter);
+                    ComparisonMap5.getView().setZoom(13);
+
+                    urbanMap.getView().setCenter(mapcenter);
+                    urbanMap.getView().setZoom(13);
 
                     swbMap.getView().setCenter(mapcenter);
                     swbMap.getView().setZoom(13);
+
+                    sogeMap.getView().setCenter(mapcenter);
+                    sogeMap.getView().setZoom(13);
                 })
                 .catch(error => console.error('Error fetching GeoJSON:', error));
         };
 
-        fetch("https://geoserver.core-stack.org:8443/geoserver/water_bodies/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=water_bodies:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
         .then(response => response.json())
         .then(data => {
             const vectorSource = new ol.source.Vector({
@@ -898,11 +1167,65 @@
             });
 
             swbMap.addLayer(vectorLayer);
+            swbMap.addLayer(waterRaster);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                const type = feature.get('class');
+                let strokeColor = 'rgba(51, 51, 51, 0.0)'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.0)'; // Default fill color with 0.4 opacity
+
+                if (uid === '{{mws_id}}') {
+                    if (type === "Safe") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(255, 255, 255, 0.4)";
+                    } else if (type === "Semi-critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(224, 243, 248, 0.4)";
+                    } else if (type === "Critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(69, 117, 180, 0.4)";
+                    } else if (type === "Not Assessed") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(169, 169, 169, 0.4)";
+                    } else {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(49, 54, 149, 0.4)";
+                    }
+                }
+
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+
+            sogeMap.addLayer(vectorLayer);
         })
         .catch(error => console.error('Error fetching GeoJSON:', error));
 
         // Extract Feature
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster);
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
@@ -944,131 +1267,139 @@
 
         const lulc_mws_plain = JSON.parse('{{lulc_mws_plain|safe}}')
         const lulc_block_plain = JSON.parse('{{lulc_block_plain|safe}}')
+        
+        const slopeContainer = document.getElementById('slopeChartContainer');
+        const plainContainer = document.getElementById('plainChartContainer');
 
-
-        const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Slope',
-                    data: lulc_block_slope,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Slope',
-                    data: lulc_mws_slope,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
-                        }
-                    }
+        if(lulc_mws_slope.some(v => v > 0)){
+            const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Tehsil Terrain Area under Slope',
+                        data: lulc_block_slope,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Slope',
+                        data: lulc_mws_slope,
+                        backgroundColor: '#2ecc71'
+                    }]
                 },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
-
-        const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
-            type: 'bar',
-            data: {
-                labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                datasets: [{
-                    label: '% Block Terrain Area under Plain',
-                    data: lulc_block_plain,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area under Plain',
-                    data: lulc_mws_plain,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Percent'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
                         }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
                     }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
                 }
-            }
-        });
+            });
+        } else {
+            slopeContainer.style.display = 'none';
+          }
+        
+
+        if(lulc_mws_plain.some(v => v > 0)){
+            const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
+                type: 'bar',
+                data: {
+                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
+                    datasets: [{
+                        label: '% Tehsil Terrain Area under Plain',
+                        data: lulc_block_plain,
+                        backgroundColor: '#3498db'
+                    }, {
+                        label: '% MWS Terrain Area under Plain',
+                        data: lulc_mws_plain,
+                        backgroundColor: '#2ecc71'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title : {
+                                display: true,
+                                text: 'Percent'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 0 // Disable animation for better print support
+                    }
+                }
+            });
+        } else {
+            plainContainer.style.display = 'none';
+          }
 
         // Waterbody Graphs
         const kharifData = JSON.parse('{{kharif_data|safe}}')
         const rabiData = JSON.parse('{{rabi_data|safe}}')
         const zaidData = JSON.parse('{{zaid_data|safe}}')
+        const waterYears = JSON.parse('{{water_years|safe}}')
 
         const barChart_swb = new Chart(document.getElementById('barChart-swb'), {
-            type: 'bar',
-            data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
-                datasets: [
-                {
-                    label: 'Kharif-Rabi-Zaid',
-                    data: zaidData,
-                    backgroundColor: '#0000FF',
-
-                },
-                {
-                    label: 'Kharif-Rabi',
-                    data: rabiData,
-                    backgroundColor: '#6495ED'
-
-                },
-                {
-                    label: 'Kharif',
-                    data: kharifData,
-                    backgroundColor: '#ADD8E6'
-
-                },
-                ]
+        type: 'bar',
+        data: {
+            labels: waterYears,
+            datasets: [
+            {
+                label: 'Kharif',
+                data: kharifData,
+                backgroundColor: '#ADD8E6',
+                categoryPercentage: 0.6,
+                barPercentage: 0.9
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x : {
-                        stacked : true,
-                        title : {
-                            display: true,
-                            text: 'Year'
-                        }
-                    },
-                    y: {
-                        stacked : true,
-                        title : {
-                            display: true,
-                            text: 'Hectare'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
+            {
+                label: 'Kharif-Rabi',
+                data: rabiData,
+                backgroundColor: '#6495ED',
+                categoryPercentage: 0.6,
+                barPercentage: 0.9
             },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Surface water availability during Kharif, Rabi, and Zaid (2017-2022)',
-                },
+            {
+                label: 'Kharif-Rabi-Zaid',
+                data: zaidData,
+                backgroundColor: '#0000FF',
+                categoryPercentage: 0.6, // optional: tweak spacing
+                barPercentage: 0.9
+            },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+            x: {
+                stacked: false,
+                title: { display: true, text: 'Year' }
+            },
+            y: {
+                stacked: false,
+                title: { display: true, text: 'Hectare' }
             }
+            },
+            animation: { duration: 0 },
+            plugins: {
+            title: {
+                display: true,
+                text: 'Surface water availability during Kharif, Rabi, and Zaid (2017-2022)'
+            },
+            legend: { position: 'top' }
+            }
+        }
         });
         
         //? Cropping Intensity
@@ -1076,34 +1407,35 @@
         const double = JSON.parse('{{double|safe}}')
         const triple = JSON.parse('{{triple|safe}}')
         const uncrop = JSON.parse('{{uncrop|safe}}')
+        const cropYears = JSON.parse('{{crop_years|safe}}')
 
         const barChart_cropping = new Chart(document.getElementById('barChart-intensity'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                labels: cropYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
                 datasets: [
                 {
                     label: 'Single-Cropping',
                     data: single,
-                    backgroundColor: '#ffc413',
+                    backgroundColor: '#57ad2b',
 
                 },
                 {
                     label: 'Double-Cropping',
                     data: double,
-                    backgroundColor: '#fe8200'
+                    backgroundColor: '#e68600'
 
                 },
                 {
                     label: 'Triple-Cropping',
                     data: triple,
-                    backgroundColor: '#f44336'
+                    backgroundColor: '#b3561d'
 
                 },
                 {
                     label: 'Uncropped',
                     data: uncrop,
-                    backgroundColor: '#999999'
+                    backgroundColor: '#A9A9A9'
 
                 },
                 ]
@@ -1144,11 +1476,12 @@
         const runoffData = JSON.parse('{{runoff_data|safe}}')
         const etData = JSON.parse('{{et_data|safe}}')
         const dgData = JSON.parse('{{dg_data|safe}}')
+        const wbYears = JSON.parse('{{wb_years|safe}}')
 
         const lineChart = new Chart(document.getElementById('lineChart-water'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [
                 {
                     label: 'Runoff',
@@ -1198,7 +1531,7 @@
         const areaChartEvp = new Chart(document.getElementById('lineChart-evp'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [{
                     label: 'Evapotranspiration',
                     data: etData,
@@ -1240,9 +1573,9 @@
         const areaChartGW = new Chart(document.getElementById('lineChart-gw'), {
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
+                labels: wbYears,
                 datasets: [{
-                    label: 'Groundwater',
+                    label: 'Water Balance',
                     data: dgData,
                     type: 'line',
                     fill: true,
@@ -1263,7 +1596,7 @@
                         beginAtZero: true,
                         title : {
                             display: true,
-                            text: 'Groundwater(m)'
+                            text: 'Water Balance(mm)'
                         }
                     },
                     x : {
@@ -1280,51 +1613,62 @@
         });
 
         // Drought Graphs
-        const droughtData = JSON.parse('{{drought_weeks|safe}}')
+        const mod_weeks = JSON.parse('{{mod_drought|safe}}')
+        const sev_weeks = JSON.parse('{{sev_drought|safe}}')
+        const drysp_all = JSON.parse('{{drysp_all|safe}}')
+        const dg_years = JSON.parse('{{dg_years|safe}}')
 
-        const droughtChart = new Chart(document.getElementById('Chart-drought'), {
+       const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'),{
             type: 'bar',
             data: {
-                labels: ['2017', '2018', '2019', '2020', '2021', '2022'],
-                datasets: [{
-                    label: 'Drought Index(in Weeks)',
-                    data: droughtData,
-                    type: 'line',
-                    fill: false,
-                    borderColor: '#e67300',
-                    borderWidth: 2,
-                    pointRadius: 5,
-                    order: 1 // Lower order means it's drawn last (in front)
-                }
-                ]
+            labels: dg_years,
+            datasets: [
+                {
+                label: 'Moderate Weeks',
+                data: mod_weeks,
+                backgroundColor: '#EB984E',
+                stack: 'ms',           // <-- stack group A (Moderate+Severe)
+                },
+                {
+                label: 'Severe Weeks',
+                data: sev_weeks,
+                backgroundColor: '#E74C3C',
+                stack: 'ms',           // <-- same stack as Moderate
+                },
+                {
+                label: 'Dryspell Weeks',
+                data: drysp_all,
+                backgroundColor: '#8884d8',
+                stack: 'dry',          // <-- separate stack = separate bar
+                },
+            ],
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title : {
-                            display: true,
-                            text: 'Drought Index(in Weeks)'
-                        }
-                    },
-                    x : {
-                        title : {
-                            display: true,
-                            text: 'Year'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true },    // allow multiple stacks side-by-side
+                y: { stacked: true,      // stack within each stack group
+                    title: { display: true, text: 'No. of Weeks' } },
+            },
+            animation: { duration: 0 },
+            plugins: {
+                title: { display: true, text: 'Drought Data over the years' },
+                legend: { display: true },
+            },
+            },
+        }
+        );
+
 
         //Village Profile section
         const villageNames = JSON.parse('{{ villages_name|safe }}')
         var ulElement = document.getElementById("village-names");
+
+        if(villageNames.length === 0){
+            const section = document.querySelector('.village-section');
+            if (section) section.style.display = 'none';
+        }
 
         const swc_works = JSON.parse('{{ swc_works|safe }}')
         const lr_works = JSON.parse('{{ lr_works|safe }}')
@@ -1403,6 +1747,77 @@
                 mainMap.updateSize();
             }, 500);
         });
+
+        (function () {
+            // layers we want to wait on
+            const layersToWatch = [
+                /* tile */
+                baseLayer,
+                /* image/WMS */
+                wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
+            ].filter(Boolean);
+
+            let pending = 0;
+            let resolveReady;
+            const readyPromise = new Promise(res => (resolveReady = res));
+
+            function hookSource(src) {
+                // Works for Tile sources
+                if (src && src.on) {
+                src.on('tileloadstart', () => pending++);
+                src.on(['tileloadend','tileloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
+                // Works for ImageWMS
+                src.on('imageloadstart', () => pending++);
+                src.on(['imageloadend','imageloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
+                }
+            }
+
+            layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
+            
+            // consider SWB vector overlay too (not critical for basemap):
+            // hookSource(vectorLayer.getSource()); // if you want to block on this as well
+
+            let renderedOnce = false;
+            function afterRender() {
+                renderedOnce = true;
+                check();
+            }
+
+            // when any map renders, note it
+            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+            ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+            .filter(Boolean)
+            .forEach(m => m.once('rendercomplete', afterRender));
+
+            // Charts: flip a flag when you finish constructing them
+            window.__chartsReady = true; // you already set animation: {duration: 0}, so they’re instant
+
+            let settleTimer;
+            function check() {
+                // resolve only when nothing is loading, at least one render happened, and charts are done
+                if (pending === 0 && renderedOnce && window.__chartsReady) {
+                // give the browser a breath to paint the final frame
+                clearTimeout(settleTimer);
+                settleTimer = setTimeout(() => {
+                    try {
+                    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+                    ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                    .filter(Boolean)
+                    .forEach(m => m.renderSync());
+                    } catch(e) {}
+                    window.__mapsReady = true;
+                    resolveReady(true);
+                }, 300);
+                }
+            }
+
+            // expose a promise Selenium can await if you prefer execute_async_script
+            window.__mapsReadyPromise = readyPromise;
+
+            // kick the check once in case nothing loads (rare)
+            setTimeout(check, 0);
+        })();
+
     </script>
 </body>
 </html>

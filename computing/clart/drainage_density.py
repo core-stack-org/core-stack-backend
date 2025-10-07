@@ -3,17 +3,21 @@ import json
 import geopandas as gpd
 import os
 from utilities.gee_utils import (
-    ee_initialize,
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
     upload_tif_to_gcs,
     upload_tif_from_gcs_to_gee,
+    sync_vector_to_gcs,
+    get_geojson_from_gcs,
+    make_asset_public,
 )
-from utilities.constants import DRAINAGE_LINES_OUTPUT, DRAINAGE_DENSITY_OUTPUT
+from utilities.constants import DRAINAGE_DENSITY_OUTPUT
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
+from computing.utils import save_layer_info_to_db
+import shutil
 
 
 @app.task(bind=True)
@@ -51,10 +55,24 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
+        if is_gee_asset_exists(asset_id):
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"drainage_density_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+                asset_id=asset_id,
+                dataset_name="Drainage Density",
+            )
+            print("saved drainage density info at the gee level...")
+            make_asset_public(asset_id)
+        if input_path:
+            path = input_path.split("/")[:-1]
+            path = os.path.join(*path)
+            shutil.rmtree(path)
 
 
 def generate_vector(state, district, block):
-    ee_initialize()
     mws = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
@@ -73,7 +91,17 @@ def generate_vector(state, district, block):
     drainage_lines = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-    ).getInfo()
+    )
+
+    try:
+        drainage_lines = drainage_lines.getInfo()
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        layer_name = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        task_id = sync_vector_to_gcs(drainage_lines, layer_name, "GeoJSON")
+        check_task_status([task_id])
+
+        drainage_lines = get_geojson_from_gcs(layer_name)
 
     if isinstance(drainage_lines, str):
         drainage_lines = json.loads(drainage_lines)
@@ -170,23 +198,20 @@ def generate_vector(state, district, block):
     #
     # try:
     #     # Export an ee.FeatureCollection as an Earth Engine asset.
-    #     mws_task = ee.batch.Export.table.toAsset(
-    #         **{
-    #             "collection": fc,
-    #             "description": "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #             "assetId": get_gee_asset_path(state, district, block)
-    #             + "drainage_density_vector_"
-    #             + valid_gee_text(district.lower())
-    #             + "_"
-    #             + valid_gee_text(block.lower()),
-    #         }
+    #     mws_task = export_vector_asset_to_gee(
+    #         fc,
+    #         "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower()),
+    #         get_gee_asset_path(state, district, block)
+    #         + "drainage_density_vector_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower())
     #     )
-    #     mws_task.start()
-    #     print("Successfully started the drainage_density", mws_task.status())
-    #     # return [mws_task.status()["id"]]
+    #     print("Successfully started the drainage_density")
+    #     # return [mws_task]
     # except Exception as e:
     #     print(f"Error occurred in running drainage_density task: {e}")
     return output_path

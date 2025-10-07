@@ -1,5 +1,4 @@
 import os
-
 import geopandas as gpd
 import fiona
 
@@ -12,6 +11,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     get_gee_dir_path,
+    export_vector_asset_to_gee,
+    is_asset_public,
 )
 from utilities.geoserver_utils import Geoserver
 import shutil
@@ -26,6 +27,8 @@ import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
+from computing.models import Dataset, Layer, LayerType
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 
 def generate_shape_files(path):
@@ -59,10 +62,11 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
         workspace=workspace,
         file_extension=file_type,
     )
-    # if response["status_code"] in [200, 201, 202]:
-    #     os.remove(zip_path)
-    #     shutil.rmtree(shape_path_dir)
-    return response["response_text"]
+    if response["status_code"] in [200, 201, 202]:
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)
+    return response
 
 
 def kml_to_geojson(state_name, district_name, block_name, kml_path):
@@ -111,8 +115,8 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
     os.remove(shapefile_layer_path + ".zip")
 
 
-def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
-    state_dir = os.path.join("data/fc_to_shape", state_name)
+def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
+    state_dir = os.path.join("data/fc_to_shape", shp_folder)
     if not os.path.exists(state_dir):
         os.mkdir(state_dir)
     path = os.path.join(state_dir, f"{layer_name}")
@@ -122,12 +126,18 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-
+    # delete layer if already exist
+    # geo = Geoserver()
+    # layers = geo.get_layers(workspace)
+    # layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+    # if layer_name in layer_names:
+    #     geo.delete_layer(layer_name)
+    #     print(f"deleted {layer_name} from geoserver")
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
 
-def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
+def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None):
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -137,8 +147,16 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
 
         geojson_fc = get_geojson_from_gcs(layer_name)
 
+    # delete layer if already exist
+    geo = Geoserver()
+    layers = geo.get_layers(workspace)
+    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
+    if layer_name in layer_names:
+        geo.delete_layer(layer_name)
+        print(f"deleted {layer_name} from geoserver")
+
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", state_name)
+        state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
             os.mkdir(state_dir)
         path = os.path.join(state_dir, f"{layer_name}")
@@ -154,7 +172,14 @@ def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
 
-        return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        if style_name:
+            geo = Geoserver()
+            style_res = geo.publish_style(
+                layer_name=layer_name, style_name=style_name, workspace=workspace
+            )
+            print("Style response:", style_res)
+        return res
     else:
         return "No features in FeatureCollection"
         # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
@@ -226,21 +251,8 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
-    try:
-        # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": asset,
-                "description": description,
-                "assetId": asset_id,
-            }
-        )
-
-        task.start()
-        print("Successfully started the merge chunk", task.status())
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running merge task: {e}")
+    task_id = export_vector_asset_to_gee(asset, description, asset_id)
+    return task_id
 
 
 def fix_invalid_geometry_in_gdf(gdf):
@@ -252,3 +264,109 @@ def fix_invalid_geometry_in_gdf(gdf):
             gdf.loc[idx, "geometry"] = gdf.loc[idx, "geometry"].buffer(0)
 
     return gdf
+
+
+def get_directory_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+    return total_size
+
+
+def save_layer_info_to_db(
+    state,
+    district,
+    block,
+    layer_name,
+    asset_id,
+    dataset_name,
+    sync_to_geoserver=False,
+    layer_version=1.0,
+    misc=None,
+    is_override=False,
+):
+    print("inside the save_layer_info_to_db function ")
+    dataset = Dataset.objects.get(name=dataset_name)
+
+    try:
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
+            district_name__iexact=district, state=state_obj
+        )
+        block_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=block, district=district_obj
+        )
+    except Exception as e:
+        print("Error fetching in state district block:", e)
+        return
+    is_public = is_asset_public(asset_id)
+
+    layer_obj, created = Layer.objects.update_or_create(
+        dataset=dataset,
+        layer_name=layer_name,
+        state=state_obj,
+        district=district_obj,
+        block=block_obj,
+        layer_version=layer_version,
+        defaults={
+            "is_sync_to_geoserver": sync_to_geoserver,
+            "is_public_gee_asset": is_public,
+            "is_override": is_override,
+            "misc": misc,
+            "gee_asset_path": asset_id,
+        },
+    )
+    if layer_obj:
+        print("found layer object and updated")
+    else:
+        print("layer object not found so, created new one")
+
+    return layer_obj.id
+
+
+def update_layer_sync_status(layer_id, sync_to_geoserver=True):
+    try:
+        updated_count = Layer.objects.filter(id=layer_id).update(
+            is_sync_to_geoserver=sync_to_geoserver
+        )
+
+        if updated_count > 0:
+            print(
+                f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
+            )
+            return True
+        else:
+            print(f"Layer with ID {layer_id} not found")
+            return False
+
+    except Exception as e:
+        print(f"Error updating layer sync status: {e}")
+        return False
+
+
+def get_existing_end_year(dataset_name, layer_name):
+    """fetch objects from db on the basis of dataset name and layer_name"""
+    dataset = Dataset.objects.get(name=dataset_name)
+    layer_obj = Layer.objects.get(dataset=dataset, layer_name=layer_name)
+    existing_end_date = layer_obj.misc["end_year"]
+    print("existing_end_date", existing_end_date)
+    return existing_end_date
+
+
+def get_layer_object(state, district, block, layer_name, dataset_name):
+    state_obj = StateSOI.objects.get(state_name__iexact=state)
+    district_obj = DistrictSOI.objects.get(
+        district_name__iexact=district, state=state_obj
+    )
+    block_obj = TehsilSOI.objects.get(tehsil_name__iexact=block, district=district_obj)
+    layer_obj = Layer.objects.get(
+        state=state_obj,
+        district=district_obj,
+        block=block_obj,
+        layer_name=layer_name,
+        dataset__name=dataset_name,
+    )
+    return layer_obj

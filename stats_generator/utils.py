@@ -52,7 +52,7 @@ def get_vector_layer_geoserver(state, district, block):
             geojson_data = None
             try:
                 url = get_url(workspace, layer_name)
-                response = requests.get(url, timeout=10)
+                response = requests.get(url)
                 response.raise_for_status()
                 geojson_data = response.json()
             except requests.exceptions.RequestException as e:
@@ -67,7 +67,7 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_for_terrain_lulc_slope(geojson_data, xlsx_file, writer)
             elif workspace == 'terrain_lulc' and layer_name==f'{district}_{block}_lulc_plain':
                 create_excel_for_terrain_lulc_plain(geojson_data, xlsx_file, writer)
-            elif workspace == 'water_bodies':
+            elif workspace == 'swb':
                 create_excel_for_swb(geojson_data, xlsx_file, writer, start_year, end_year)
             elif workspace == 'nrega_assets':
                 mws_file_geojson = os.path.join(district_path, 'mws_annual.geojson')
@@ -75,7 +75,7 @@ def get_vector_layer_geoserver(state, district, block):
                 mws_file_url = get_url('mws_layers', mws_lay_name)
 
                 try:
-                    response = requests.get(mws_file_url, timeout=10)
+                    response = requests.get(mws_file_url)
                     response.raise_for_status()
                     mws_geojson_datas = response.json()
                 except requests.exceptions.RequestException as e:
@@ -87,7 +87,7 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_mws_inters_villages(mws_geojson_datas, xlsx_file, writer, district, block)
                 # create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
 
-            elif workspace == 'cropping_intensity':
+            elif workspace == 'crop_intensity':
                 create_excel_crop_inten(geojson_data, xlsx_file, writer, start_year, end_year)
             elif workspace == 'cropping_drought':
                 create_excel_crop_drou(geojson_data, xlsx_file, writer, start_year, end_year)
@@ -138,7 +138,7 @@ def create_excel_for_soge(data, xlsx_file, writer):
         row = {
             'UID': properties['uid'],  
             'area_in_ha': properties['area_in_ha'],  
-            'soge_dev_%': properties['sgw_dev_pe'],
+            'soge_dev_percent': properties['sgw_dev_pe'],
             'class_code': properties['code'],
             'class_name': properties['class']
         }
@@ -156,8 +156,6 @@ def create_excel_for_soge(data, xlsx_file, writer):
 
 
 def create_excel_for_aquifer(data, xlsx_file, writer):
-    import pandas as pd
-    
     df_data = []
     features = data['features']
     
@@ -189,7 +187,7 @@ def create_excel_for_aquifer(data, xlsx_file, writer):
     
     # Create empty columns for all aquifer percentages
     for aquifer in principal_aquifers:
-        df[f'principle_aq_{aquifer}_%'] = 0
+        df[f'principle_aq_{aquifer}_percent'] = 0
     
     # Group by UID
     grouped = df.groupby('UID')
@@ -204,21 +202,21 @@ def create_excel_for_aquifer(data, xlsx_file, writer):
         }
         
         # Initialize all percentage columns
-        aquifer_percentages = {f'principle_aq_{aq}_%': 0 for aq in principal_aquifers}
+        aquifer_percentages = {f'principle_aq_{aq}_percent': 0 for aq in principal_aquifers}
         
         # Process each entry in the group
         for _, row in group.iterrows():
             # Set aquifer percentage - handle None case
             aquifer = row['principal_aquifer'] if row['principal_aquifer'] != '' else 'None'
             if aquifer in principal_aquifers:
-                aquifer_percentages[f'principle_aq_{aquifer}_%'] += row['%_area_aquifer']
+                aquifer_percentages[f'principle_aq_{aquifer}_percent'] += row['%_area_aquifer']
         
         # Find the dominant aquifer (the one with the highest percentage)
         max_aquifer = None
         max_percentage = 0
         
         for aquifer in principal_aquifers:
-            percentage = aquifer_percentages[f'principle_aq_{aquifer}_%']
+            percentage = aquifer_percentages[f'principle_aq_{aquifer}_percent']
             if percentage > max_percentage:
                 max_percentage = percentage
                 max_aquifer = aquifer
@@ -262,10 +260,10 @@ def create_excel_for_restoration(data, xlsx_file, writer):
         row = {
             'UID': properties['uid'],  
             'area_in_ha': properties['area_in_ha'],  
-            'Wide-scale Restoration': properties['Wide-scale'],
-            'Protection': properties['Protection'],
-            'Mosaic Restoration': properties['Mosaic Res'],
-            'Excluded Areas': properties['Excluded A'],
+            'wide_scale_restoration_area_in_ha': properties['Wide-scale'],
+            'protection_area_in_ha': properties['Protection'],
+            'mosaic_restoration_area_in_ha': properties['Mosaic Res'],
+            'excluded_areas_in_ha': properties['Excluded A'],
         }
         
         df_data.append(row)
@@ -289,13 +287,13 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
         row = {
             'UID': properties['uid'],  
             'area_in_ha': properties['area_in_ha'],  
-            'Afforestation': properties['Afforestat'],
-            'Deforestation': properties['Deforestat'],
-            'Degradation': properties['Degradatio'],
-            'Improvement': properties['Improvemen'],
-            'Missing_Data': properties['Missing Da'],
-            'No_Change': properties['No_Change'],
-            'Partially_Degraded': properties['Partially_'],
+            'afforestation_area_in_ha': properties['Afforestat'],
+            'deforestation_area_in_ha': properties['Deforestat'],
+            'degradation_area_in_ha': properties['Degradatio'],
+            'improvement_area_in_ha': properties['Improvemen'],
+            'missing_data_in_ha': properties['Missing Da'],
+            'no_change_area_in_ha': properties['No_Change'],
+            'partially_degraded_area_in_ha': properties['Partially_'],
         }
         
         df_data.append(row)
@@ -323,9 +321,9 @@ def create_excel_for_ccd(data, xlsx_file, writer, start_year, end_year):
         }
 
         for year in range(start_year, end_year):
-            row['High_Density_' + str(year)] = properties.get('hi_de_' + str(year), None)
-            row['Low_Density_' + str(year)] = properties.get('lo_de_' + str(year), None)
-            row['Missing_Data_' + str(year)] = properties.get('mi_da_' + str(year), None)
+            row['high_density_area_in_ha_' + str(year)] = properties.get('hi_de_' + str(year), None)
+            row['low_density_area_in_ha_' + str(year)] = properties.get('lo_de_' + str(year), None)
+            row['missing_data_area_in_ha_' + str(year)] = properties.get('mi_da_' + str(year), None)
         
         df_data.append(row)
 
@@ -352,10 +350,10 @@ def create_excel_for_ch(data, xlsx_file, writer, start_year, end_year):
         }
 
         for year in range(start_year, end_year):
-            row['Short_Trees_' + str(year)] = properties.get('sh_tr_' + str(year), None)
-            row['Medium_Trees_' + str(year)] = properties.get('md_tr_' + str(year), None)
-            row['Tall_Trees_' + str(year)] = properties.get('tl_tr_' + str(year), None)
-            row['Missing_Data_' + str(year)] = properties.get('mi_da_' + str(year), None)
+            row['short_trees_area_in_ha_' + str(year)] = properties.get('sh_tr_' + str(year), None)
+            row['medium_trees_area_in_ha_' + str(year)] = properties.get('md_tr_' + str(year), None)
+            row['tall_trees_area_in_ha_' + str(year)] = properties.get('tl_tr_' + str(year), None)
+            row['missing_data_area_in_ha_' + str(year)] = properties.get('mi_da_' + str(year), None)
         
         df_data.append(row)
 
@@ -408,13 +406,13 @@ def create_excel_chan_detection_afforestation(data, xlsx_file, writer):
         uid = properties.get('uid', 'Unknown')
         df_data.append({
             'UID': uid,
-            'area_in_hac': properties.get('area_in_ha', None),
-            'Barren-Forest': properties.get('ba_fo', None),
-            'Built_Up-Forest': properties.get('bu_fo', None),
-            'Farm-Forest': properties.get('fa_fo', None),
-            'Forest-Forest': properties.get('fo_fo', None),
-            'Scrub_Land-Forest': properties.get('sc_fo', None),
-            'Total_afforestation': properties.get('total_aff', None),
+            'area_in_ha': properties.get('area_in_ha', None),
+            'barren_to_forest_area_in_ha': properties.get('ba_fo', None),
+            'built_up_to_forest_area_in_ha': properties.get('bu_fo', None),
+            'farm_to_forest_area_in_ha': properties.get('fa_fo', None),
+            'forest_to_forest_area_in_ha': properties.get('fo_fo', None),
+            'scrub_land_to_forest_area_in_ha': properties.get('sc_fo', None),
+            'total_afforestation_area_in_ha': properties.get('total_aff', None),
         })
 
     df = pd.DataFrame(df_data) 
@@ -437,15 +435,15 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
         uid = properties.get('uid', 'Unknown')
         df_data.append({
             'UID': uid,
-            'area_in_hac': properties.get('area_in_ha', None),
-            'Double-Single': properties.get('do_si', None),
-            'Double-Triple': properties.get('do_tr', None),
-            'Single-Double': properties.get('si_do', None),
-            'Single-Triple': properties.get('si_tr', None),
-            'Triple-Double': properties.get('tr_do', None),
-            'Triple-Single': properties.get('tr_si', None),
-            'No_Change': properties.get('same', None),
-            'Total_Change_crop_intensity': properties.get('total_chan', None),
+            'area_in_ha': properties.get('area_in_ha', None),
+            'double_to_single_area_in_ha': properties.get('do_si', None),
+            'double_to_triple_area_in_ha': properties.get('do_tr', None),
+            'single_to_double_area_in_ha': properties.get('si_do', None),
+            'single_to_triple_area_in_ha': properties.get('si_tr', None),
+            'triple_to_double_area_in_ha': properties.get('tr_do', None),
+            'triple_to_single_area_in_ha': properties.get('tr_si', None),
+            'no_change_area_in_ha': properties.get('same', None),
+            'total_change_crop_intensity_area_in_ha': properties.get('total_chan', None),
         })
 
     df = pd.DataFrame(df_data) 
@@ -468,13 +466,13 @@ def create_excel_chan_detection_deforestation(data, xlsx_file, writer):
         uid = properties.get('uid', 'Unknown')
         df_data.append({
             'UID': uid,
-            'area_in_hac': properties.get('area_in_ha', None),
-            'Forest-Barren': properties.get('fo_ba', None),
-            'Forest-Built_Up': properties.get('fo_bu', None),
-            'Forest-Farm': properties.get('fo_fa', None),
-            'Forest-Forest': properties.get('fo_fo', None),
-            'Forest-Scrub_land': properties.get('fo_sc', None),
-            'total_deforestation': properties.get('total_def', None),
+            'area_in_ha': properties.get('area_in_ha', None),
+            'forest_to_barren_area_in_ha': properties.get('fo_ba', None),
+            'forest_to_built_up_area_in_ha': properties.get('fo_bu', None),
+            'forest_to_farm_area_in_ha': properties.get('fo_fa', None),
+            'forest_to_forest_area_in_ha': properties.get('fo_fo', None),
+            'forest_to_scrub_land_area_in_ha': properties.get('fo_sc', None),
+            'total_deforestation_area_in_ha': properties.get('total_def', None),
         })
 
     df = pd.DataFrame(df_data) 
@@ -497,12 +495,12 @@ def create_excel_chan_detection_degradation(data, xlsx_file, writer):
         uid = properties.get('uid', 'Unknown')
         df_data.append({
             'UID': uid,
-            'area_in_hac': properties.get('area_in_ha', None),
-            'Farm-Barren': properties.get('f_ba', None),
-            'Farm-Built_Up': properties.get('f_bu', None),
-            'Farm-Farm': properties.get('f_f', None),
-            'Farm-Scrub_Land': properties.get('f_sc', None),
-            'Total_degradation': properties.get('total_deg', None),
+            'area_in_ha': properties.get('area_in_ha', None),
+            'farm_to_barren_area_in_ha': properties.get('f_ba', None),
+            'farm_to_built_up_area_in_ha': properties.get('f_bu', None),
+            'farm_to_farm_area_in_ha': properties.get('f_f', None),
+            'farm_to_scrub_land_area_in_ha': properties.get('f_sc', None),
+            'total_degradation_area_in_ha': properties.get('total_deg', None),
         })
 
     df = pd.DataFrame(df_data) 
@@ -525,12 +523,12 @@ def create_excel_chan_detection_urbanization(data, xlsx_file, writer):
         uid = properties.get('uid', 'Unknown')
         df_data.append({
             'UID': uid,
-            'area_in_hac': properties.get('area_in_ha', None),
-            'Barren/Shrub-Built_Up': properties.get('b_bu', None),
-            'Built_Up-Built_Up': properties.get('bu_bu', None),
-            'Tree/Farm-Built_Up': properties.get('tr_bu', None),
-            'Water-Built_Up': properties.get('w_bu', None),
-            'Total_urbanization': properties.get('total_urb', None),
+            'area_in_ha': properties.get('area_in_ha', None),
+            'barren_shrub_to_built_up_area_in_ha': properties.get('b_bu', None),
+            'built_up_to_built_up_area_in_ha': properties.get('bu_bu', None),
+            'tree_farm_to_built_up_area_in_ha': properties.get('tr_bu', None),
+            'water_to_built_up_area_in_ha': properties.get('w_bu', None),
+            'total_urbanization_area_in_ha': properties.get('total_urb', None),
         })
 
     df = pd.DataFrame(df_data) 
@@ -545,6 +543,7 @@ def create_excel_chan_detection_urbanization(data, xlsx_file, writer):
 
 
 def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, block):
+    print("Inside create_excel_mws_inters_villages")
     admin_layer_name = district + '_' + block
     admin_file_url = get_url('panchayat_boundaries', admin_layer_name)
 
@@ -555,28 +554,11 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
 
     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom: BaseGeometry, mws_geom: BaseGeometry) :
-        try:
-            # Check for empty geometries
-            if village_geom.is_empty or mws_geom.is_empty:
-                return 0.0
-                
-            # Fix invalid geometries if needed
-            if not village_geom.is_valid:
-                village_geom = village_geom.buffer(0)
-            if not mws_geom.is_valid:
-                mws_geom = mws_geom.buffer(0)
-            
-            # Calculate intersection
-            if village_geom.intersects(mws_geom):
-                intersection = village_geom.intersection(mws_geom)
-                return intersection.area if not intersection.is_empty else 0.0
-                
-            return 0.0
-            
-        except Exception as e:
-            print(f"Error calculating intersection area: {e}")
-            return 0.0
+    def calculate_intersection_area(village_geom, mws_geom):
+        if village_geom.intersects(mws_geom):
+            intersection = village_geom.intersection(mws_geom)
+            return intersection.area
+        return 0
 
     mws_villages_dict = {}
 
@@ -600,13 +582,10 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
     data = [{'MWS UID': mws_uid, 'Village IDs': village_ids} for mws_uid, village_ids in mws_villages_dict.items()]
 
     df = pd.DataFrame(data)
-
-     ## for roundoff all numeric value upto 2 decimal
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    df[numeric_cols] = df[numeric_cols].round(2) 
-
+    df[numeric_cols] = df[numeric_cols].round(2)
     df.to_excel(writer, sheet_name='mws_intersect_villages', index=False)
-    print("Excel created for mws_intersect_villages")
+    print("The data has been saved to mws_intersect_villages.xlsx")
 
 
 # def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, block):
@@ -703,14 +682,14 @@ def create_excel_for_terrain(data, output_file, writer):
         properties = feature['properties']        
         row = {
             'UID': properties['uid'],  
-            'area_in_hac': properties['area_in_ha'],
-            'terrainCluster_ID': properties['terrainClu'],
-            'Terrain_Description': terrain_description.get(properties['terrainClu']),
-            '% of area hill_slope': properties['hill_slope'],
-            '% of area plain_area': properties['plain_area'],
-            '% of area ridge_area': properties['ridge_area'],
-            '% of area slopy_area': properties['slopy_area'],
-            '% of area valley_area': properties['valley_are'],
+            'area_in_ha': properties['area_in_ha'],
+            'terrain_cluster_id': properties['terrainClu'],
+            'terrain_description': terrain_description.get(properties['terrainClu']),
+            'hill_slope_area_percent': properties['hill_slope'],
+            'plain_area_percent': properties['plain_area'],
+            'ridge_area_percent': properties['ridge_area'],
+            'slopy_area_percent': properties['slopy_area'],
+            'valley_area_percent': properties['valley_are'],
         }
         
         df_data.append(row)
@@ -742,17 +721,17 @@ def create_excel_for_terrain_lulc_slope(data, output_file, writer):
         properties = feature['properties']
         row = {
             'UID': properties['uid'],  
-            'area_in_hac': properties['area_in_ha'],
-            'terrainCluster_ID': properties['terrain_cl'],
-            'Terrain_Description': terrain_description.get(properties['terrain_cl']),
+            'area_in_ha': properties['area_in_ha'],
+            'terrain_cluster_id': properties['terrain_cl'],
+            'terrain_description': terrain_description.get(properties['terrain_cl']),
             'cluster_name': properties['clust_name'],
-            '% of area barren': properties['barren'],
-            '% of area forests': properties['forests'],
-            '% of area shrub_scrubs': properties['shrub_scru'],
-            '% of area single_kharif': properties['sing_khari'],
-            '% of area single_non_kharif': properties['sing_non_k'],
-            '% of area double cropping': properties['double'],
-            '% of area triple cropping': properties['triple'],
+            'barren_area_percent': properties['barren'],
+            'forests_area_percent': properties['forests'],
+            'shrub_scrubs_area_percent': properties['shrub_scru'],
+            'single_kharif_area_percent': properties['sing_khari'],
+            'single_non_kharif_area_percent': properties['sing_non_k'],
+            'double_cropping_area_percent': properties['double'],
+            'triple_cropping_area_percent': properties['triple'],
         }
         
         df_data.append(row)
@@ -783,17 +762,17 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
         properties = feature['properties']
         row = {
             'UID': properties['uid'],  
-            'area_in_hac': properties['area_in_ha'],
-            'terrainCluster_ID': properties['terrain_cl'],
-            'Terrain_Description': terrain_description.get(properties['terrain_cl']),
+            'area_in_ha': properties['area_in_ha'],
+            'terrain_cluster_id': properties['terrain_cl'],
+            'terrain_description': terrain_description.get(properties['terrain_cl']),
             'cluster_name': properties['clust_name'],
-            '% of area barren': properties['barren'],
-            '% of area forests': properties['forest'],
-            '% of area shrub_scrubs': properties['shrubs_scr'],
-            '% of area single_non_kharif': properties['sing_non_k'],
-            '% of area single_cropping': properties['sing_crop'],
-            '% of area double cropping': properties['double_cro'],
-            '% of area triple cropping': properties['triple_cro'],
+            'barren_area_percent': properties['barren'],
+            'forests_area_percent': properties['forest'],
+            'shrub_scrubs_area_percent': properties['shrubs_scr'],
+            'single_non_kharif_area_percent': properties['sing_non_k'],
+            'single_kharif_area_percent': properties['sing_crop'],
+            'double_cropping_area_percent': properties['double_cro'],
+            'triple_cropping_area_percent': properties['triple_cro'],
         }
         
         df_data.append(row)
@@ -801,7 +780,6 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
     df = pd.DataFrame(df_data) 
     df = df.sort_values(['UID']) 
 
-     ## for roundoff all numeric value upto 2 decimal
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
     df[numeric_cols] = df[numeric_cols].round(2)  
 
@@ -811,7 +789,6 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
 
 def create_excel_for_swb(data, output_file, writer, start_year, end_year):
     df_data = []
-
     features = data.get('features', [])
 
     for feature in features:
@@ -821,7 +798,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
         def calculate_area(base_area, percentage):
             if base_area == 0 or percentage == 0:
                 return 0
-            return (base_area * (percentage / 100)) / 10000
+            return (base_area * (percentage / 100))
 
         parts = uid.split('_')
         num_uid_parts_is = [f"{parts[i]}_{parts[i+1]}" for i in range(0, len(parts) - 1, 2)]
@@ -835,7 +812,6 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             row = {'UID': num_uid_part}
 
             for year in years:
-                # Construct shortened year format (e.g., 17-18 for 2017-2018)
                 short_year = f"{str(year)[-2:]}-{str(year+1)[-2:]}"
 
                 # Construct keys dynamically using the shortened year format
@@ -851,24 +827,21 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
                 zaid_percentage = properties.get(zaid_key, 0)
 
                 # Calculate areas
-                row[f'total_area_{year}-{year+1}'] = total_area / 10000 / len(num_uid_parts_is)
-                row[f'kharif_area_{year}-{year+1}'] = calculate_area(total_area, kharif_percentage) / len(num_uid_parts_is)
-                row[f'rabi_area_{year}-{year+1}'] = calculate_area(total_area, rabi_percentage) / len(num_uid_parts_is)
-                row[f'zaid_area_{year}-{year+1}'] = calculate_area(total_area, zaid_percentage) / len(num_uid_parts_is)
+                row[f'total_area_in_ha_{year}-{year+1}'] = total_area / len(num_uid_parts_is)
+                row[f'kharif_area_in_ha_{year}-{year+1}'] = calculate_area(total_area, kharif_percentage) / len(num_uid_parts_is)
+                row[f'rabi_area_in_ha_{year}-{year+1}'] = calculate_area(total_area, rabi_percentage) / len(num_uid_parts_is)
+                row[f'zaid_area_in_ha_{year}-{year+1}'] = calculate_area(total_area, zaid_percentage) / len(num_uid_parts_is)
 
             # Add total SWB area
-            row['total_swb_area'] = properties.get('area_ored', 0) / 10000 / len(num_uid_parts_is)
+            row['total_swb_area_in_ha'] = properties.get('area_ored', 0) / len(num_uid_parts_is)
             df_data.append(row)
 
     df = pd.DataFrame(df_data)
-
-    # Dynamically create the aggregation dictionary
     agg_dict = {col: 'sum' for col in df.columns if col != 'UID'}
     grouped_df = df.groupby('UID').agg(agg_dict).reset_index()
 
     df = grouped_df.sort_values(['UID'])
 
-     ## for roundoff all numeric value upto 2 decimal
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
     df[numeric_cols] = df[numeric_cols].round(2) 
 
@@ -913,6 +886,9 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
         "%d-%m-%Y %H:%M:%S",
         "%Y-%m-%d %H:%M:%S.%f",
         "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M:%S.%f",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%SZ",
     ]
 
     for _, row in joined.iterrows():
@@ -955,7 +931,7 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
         for year, categories in year_data.items():
             for category in workCategoryMapping.values():
                 count = categories.get(category, 0)
-                row[f"{category}_{year}"] = count
+                row[f"{category}_count_{year}"] = count
         df_data.append(row)
 
     if not df_data:
@@ -967,6 +943,7 @@ def create_excel_for_nrega_assets(nrega_data, mws_data, output_file, writer, sta
         df = pd.DataFrame(df_data)
         df.to_excel(writer, sheet_name='nrega_annual', index=False)
         print("Excel file created for nrega_annual")
+        return 'successfully created'
     else:
         print("No data available to write to Excel.")
 
@@ -994,7 +971,7 @@ def create_excel_village_nrega_assets(result_df, output_file, writer, all_villag
         }
         for year in year_range:
             for cat in workCategoryMapping.values():
-                base_row[f"{cat}_{year}"] = 0
+                base_row[f"{cat}_count_{year}"] = 0
         rows.append(base_row)
 
     final_df = pd.DataFrame(rows)
@@ -1018,7 +995,7 @@ def create_excel_village_nrega_assets(result_df, output_file, writer, all_villag
             continue
 
         mask = (final_df['vill_id'] == row['vill_ID']) & (final_df['vill_name'] == row['vill_name'])
-        col_name = f"{category}_{year}"
+        col_name = f"{category}_count_{year}"
         final_df.loc[mask, col_name] += 1
 
     # Sort columns for clean layout
@@ -1035,17 +1012,38 @@ def create_excel_village_nrega_assets(result_df, output_file, writer, all_villag
     print("Excel file created successfully with all villages.")
 
 def fetch_village_asset_count(state, district, block, writer, output_file, start_year, end_year):
-    # 1. Read village boundaries
-    village_gdf = gpd.read_file(get_url('panchayat_boundaries', f'{district}_{block}'))[
-        ['vill_ID', 'vill_name', 'geometry']
+    # 1. Read village data
+    village_gdf = gpd.read_file(get_url('panchayat_boundaries', f'{district}_{block}'))[ 
+        ['vill_ID', 'vill_name', 'geometry'] 
     ].copy()
-
-    # 2. Read NREGA asset data
-    nrega_json = requests.get(get_url('nrega_assets', f'{district}_{block}')).json()
-
-    # 3. Build asset GeoDataFrame
+    print("Village data loaded")
+    
+    # 2. Get NREGA data with timeout to prevent hanging
+    try:
+        nrega_url = get_url('nrega_assets', f'{district}_{block}')
+        print(f"Fetching: {nrega_url}")
+        
+        # Add timeout to prevent hanging
+        response = requests.get(nrega_url, timeout=120)
+        nrega_json = response.json()
+        print("NREGA data fetched successfully")
+        
+    except Exception as e:
+        print(f"Failed to get NREGA data: {e}")
+        # Return villages with "No Asset" if API fails
+        result_df = village_gdf[['vill_ID', 'vill_name']].copy()
+        result_df['Asset ID'] = 'No Asset'
+        result_df['creation_t'] = 'No Asset'
+        result_df['WorkCatego'] = 'No Asset'
+        create_excel_village_nrega_assets(result_df, output_file, writer, village_gdf[['vill_ID', 'vill_name']], start_year, end_year)
+        return result_df, village_gdf[['vill_ID', 'vill_name']]
+    
+    # 3. Process asset features
     points_data = []
-    for feature in nrega_json.get('features', []):
+    features = nrega_json.get('features', [])
+    print(f"Processing {len(features)} features")
+    
+    for feature in features:
         try:
             point = Point(feature['geometry']['coordinates'])
             properties = feature['properties']
@@ -1055,35 +1053,48 @@ def fetch_village_asset_count(state, district, block, writer, output_file, start
                 'creation_t': properties.get('creation_t', ''),
                 'WorkCatego': properties.get('WorkCatego', '')
             })
-        except Exception as e:
-            print(f"Skipping malformed feature: {e}")
-
+        except:
+            continue
+    
+    # If no valid points, return no assets
+    if not points_data:
+        print("No valid asset points found")
+        result_df = village_gdf[['vill_ID', 'vill_name']].copy()
+        result_df['Asset ID'] = 'No Asset'
+        result_df['creation_t'] = 'No Asset'
+        result_df['WorkCatego'] = 'No Asset'
+        create_excel_village_nrega_assets(result_df, output_file, writer, village_gdf[['vill_ID', 'vill_name']], start_year, end_year)
+        return result_df, village_gdf[['vill_ID', 'vill_name']]
+    
+    print("Asset points created")
+    
+    # 4. Create points GeoDataFrame and match CRS
     points_gdf = gpd.GeoDataFrame(points_data, geometry='geometry')
-
-    # 4. Ensure same CRS
     if village_gdf.crs != points_gdf.crs:
         points_gdf.set_crs(village_gdf.crs, inplace=True)
-
-    # 5. Spatial join assets to villages
+    
+    # 5. Find which village each asset belongs to
     joined_gdf = gpd.sjoin(points_gdf, village_gdf, how='inner', predicate='within')
-
-    # 6. Asset + village info
-    result_df = joined_gdf[[
-        'vill_ID', 'vill_name', 'Asset ID', 'creation_t', 'WorkCatego'
+    
+    # 6. Get asset + village info
+    result_df = joined_gdf[[ 
+        'vill_ID', 'vill_name', 'Asset ID', 'creation_t', 'WorkCatego' 
     ]].copy()
-
-    # 7. Add dummy rows for villages with no assets
-    villages_with_assets = result_df['vill_ID'].unique().tolist()
-
-    no_asset_rows = village_gdf[~village_gdf['vill_ID'].isin(villages_with_assets)].copy()
-    no_asset_rows['Asset ID'] = 'No Asset'
-    no_asset_rows['creation_t'] = 'No Asset'
-    no_asset_rows['WorkCatego'] = 'No Asset'
-
-    result_df = pd.concat([result_df, no_asset_rows], ignore_index=True)
-
-    # Return full result and all villages
+    
+    # 7. Add villages that have no assets
+    villages_with_assets = result_df['vill_ID'].unique()
+    no_asset_villages = village_gdf[~village_gdf['vill_ID'].isin(villages_with_assets)].copy()
+    no_asset_villages['Asset ID'] = 'No Asset'
+    no_asset_villages['creation_t'] = 'No Asset'
+    no_asset_villages['WorkCatego'] = 'No Asset'
+    
+    result_df = pd.concat([result_df, no_asset_villages[['vill_ID', 'vill_name', 'Asset ID', 'creation_t', 'WorkCatego']]], ignore_index=True)
+    
+    print("Processing complete")
+    
+    # 8. Create Excel file
     create_excel_village_nrega_assets(result_df, output_file, writer, village_gdf[['vill_ID', 'vill_name']], start_year, end_year)
+    
     return result_df, village_gdf[['vill_ID', 'vill_name']]
 
 def analyze_results(village_asset_count, village_gdf):
@@ -1104,52 +1115,36 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
         uid = properties.get('uid', 'Unknown')
         row = {'UID': uid, 'area_in_ha': properties.get('area_in_ha', 0)}
 
-        # Loop through each year in the range
+        # Process each year in range using new key naming convention
         for year in range(start_year, end_year + 1):
-            year_offset = year - start_year
-            
-            # Handle special case for 2017 (first year)
-            if year == start_year:
-                cropping_key = 'cropping_i'
-                single_c_key = 'single_cro'
-                single_k_key = 'single_kha'
-                single_n_key = 'single_non'
-                doubly_c_key = 'doubly_cro'
-                triply_c_key = 'triply_cro'
-            else:
-                # For subsequent years
-                cropping_key = f'cropping_{year_offset}'
-                single_c_key = f'single_c_{year_offset}'
-                single_k_key = f'single_k_{year_offset}'
-                single_n_key = f'single_n_{year_offset}'
-                doubly_c_key = f'doubly_c_{year_offset}'
-                triply_c_key = f'triply_c_{year_offset}'
+            cropping_key = f'cropping_intensity_{year}'
+            single_c_key = f'single_cropped_area_{year}'
+            single_k_key = f'single_kharif_cropped_area_{year}'
+            single_n_key = f'single_non_kharif_cropped_area_{year}'
+            doubly_c_key = f'doubly_cropped_area_{year}'
+            triply_c_key = f'triply_cropped_area_{year}'
 
-            # Add cropping intensity and area data for each year
-            row[f'cropping_intensity_{year}-{year + 1}'] = properties.get(cropping_key, 0)
-            row[f'single_cropped_area_{year}-{year + 1}'] = properties.get(single_c_key, 0) / 10000
-            row[f'single_kharif_cropped_area_{year}-{year + 1}'] = properties.get(single_k_key, 0) / 10000
-            row[f'single_non_kharif_cropped_area_{year}-{year + 1}'] = properties.get(single_n_key, 0) / 10000
-            row[f'doubly_cropped_area_{year}-{year + 1}'] = properties.get(doubly_c_key, 0) / 10000
-            row[f'triply_cropped_area_{year}-{year + 1}'] = properties.get(triply_c_key, 0) / 10000
+            row[f'cropping_intensity_unit_less_{year}-{year + 1}'] = properties.get(cropping_key, 0)
+            row[f'single_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_c_key, 0)
+            row[f'single_kharif_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_k_key, 0)
+            row[f'single_non_kharif_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(single_n_key, 0)
+            row[f'doubly_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(doubly_c_key, 0)
+            row[f'triply_cropped_area_in_ha_{year}-{year + 1}'] = properties.get(triply_c_key, 0)
 
-        # Add the 'sum' field
-        row['sum'] = properties.get('sum', 0) / 10000
-
+        row['sum_area_in_ha'] = properties.get('sum', 0) / 10000
         df_data.append(row)
 
-    # Create DataFrame
+    # Create and format DataFrame
     df = pd.DataFrame(df_data)
     df = df.sort_values(['UID'])
-
-    ## for roundoff all numeric value upto 2 decimal
+    
+    # Round numeric columns
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    df[numeric_cols] = df[numeric_cols].round(2) 
+    df[numeric_cols] = df[numeric_cols].round(2)
 
     # Write to Excel
     df.to_excel(writer, sheet_name='croppingIntensity_annual', index=False)
     print("Excel file created for cropping intensity.")
-
 
 def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
     df_data = []
@@ -1159,9 +1154,7 @@ def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
         properties = feature.get('properties', {})
         row = {'UID': properties.get('uid', 'Unknown ID')}
 
-        # Loop through each year in the range
         for year in range(start_year, end_year + 1):
-            # Construct keys dynamically
             drlb_key = f'drlb_{year}'
             drysp_key = f'drysp_{year}'
             kh_cr_key = f'kh_cr_{year}'
@@ -1171,16 +1164,16 @@ def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
 
             # Get drought levels (drlb) and count occurrences
             drlb_value = properties.get(drlb_key, '')
-            row[f'No_Drought_{year}'] = drlb_value.count('0')
-            row[f'Mild_{year}'] = drlb_value.count('1')
-            row[f'Moderate_{year}'] = drlb_value.count('2')
-            row[f'Severe_{year}'] = drlb_value.count('3')
+            row[f'No_Drought_in_weeks_{year}'] = drlb_value.count('0')
+            row[f'Mild_in_weeks_{year}'] = drlb_value.count('1')
+            row[f'Moderate_in_weeks_{year}'] = drlb_value.count('2')
+            row[f'Severe_in_weeks_{year}'] = drlb_value.count('3')
 
             # Add other properties
-            row[f'drysp_{year}'] = properties.get(drysp_key, '0')
+            row[f'drysp_unit_4_weeks_{year}'] = properties.get(drysp_key, '0')
             row[f'kharif_cropped_sqkm_{year}'] = properties.get(kh_cr_key, '0')
             row[f'monsoon_onset_{year}'] = properties.get(m_ons_key, '0')
-            row[f'%_area_cropped_kharif_{year}'] = properties.get(pcr_k_key, '0')
+            row[f'kharif_cropped_area_percent_{year}'] = properties.get(pcr_k_key, '0')
             row[f'total_weeks_{year}'] = properties.get(t_wks_key, '0')
 
         df_data.append(row)
@@ -1217,8 +1210,6 @@ def parse_geojson_annual_mws(data):
                         all_data[uid][year] = year_data
                     except Exception as e:
                         print(f"Couldn't parse data for {uid}, {key}: {e}")
-            else:
-                print(f"Skipping non-string key or value for {uid}: {key} -> {value}")
 
     return all_data
 
@@ -1236,8 +1227,12 @@ def create_excel_annual_mws(data, output_file, writer):
             formatted_year = f"{start_year}-{end_year}"
             
             for col in year_columns:
-                column_name = f"{col}_{formatted_year}"
-                row[column_name] = metrics.get(col, 'N/A')
+                if col =='WellDepth':
+                    column_name = f"{col}_in_m_{formatted_year}"
+                    row[column_name] = metrics.get(col, 'N/A')
+                else:
+                    column_name = f"{col}_in_mm_{formatted_year}"
+                    row[column_name] = metrics.get(col, 'N/A')
 
         df_data.append(row)
 
@@ -1319,7 +1314,7 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
         for year in range(start_year, end_year):
             for season in seasons:
                 end_to_year = year + 1
-                column_name = f'{variable}_{season}_{year}-{end_to_year}'
+                column_name = f'{variable}_{season}_in_mm_{year}-{end_to_year}'
                 data[column_name] = []
 
     for feature_data in processed_data:
@@ -1328,7 +1323,7 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
             for year in range(start_year, end_year):
                 for season in seasons:
                     end_to_year = year + 1
-                    column_name = f'{variable}_{season}_{year}-{end_to_year}'
+                    column_name = f'{variable}_{season}_in_mm_{year}-{end_to_year}'
                     value = feature_data[variable].get(season, {}).get(year, 0.0)
                     data[column_name].append(value)
 
@@ -1391,12 +1386,12 @@ def create_excel_for_village_boun(old_geojson, writer):
             'block_census_ID': data['block_census_ID'],
             'village_id': village_id,
             'village_name': data['village_name'],
-            'total_population': total_popu,
-            'total_SC_population': total_SC_popu,
-            'total_ST_population': total_ST_popu,
-            'literacy_rate': literacy_rate,
-            'SC_percentage': sc_perce,
-            'ST_percentage': st_perce,
+            'total_population_count': total_popu,
+            'total_SC_population_count': total_SC_popu,
+            'total_ST_population_count': total_ST_popu,
+            'literacy_rate_percent': literacy_rate,
+            'SC_percent': sc_perce,
+            'ST_percent': st_perce,
         })
 
     results_df = pd.DataFrame(results)
@@ -1425,3 +1420,24 @@ def download_layers_excel_file(state, district, block):
     else:
         return None
 
+
+def read_tehsil_excel_to_json(state, district, block):
+    file_path = download_layers_excel_file(state, district, block)
+    
+    if not file_path:
+        return {"error": "Excel file not found."}
+
+    try:
+        xls = pd.read_excel(file_path, sheet_name=None)
+        result = {}
+
+        for sheet_name, df in xls.items():
+            df.columns = [col.strip().lower() for col in df.columns]
+            df.replace([np.inf, -np.inf], np.nan, inplace=True)
+            df = df.where(pd.notnull(df), None)
+            result[sheet_name] = df.to_dict(orient="records")
+
+        return result
+
+    except Exception as e:
+        return {"error": str(e)}
