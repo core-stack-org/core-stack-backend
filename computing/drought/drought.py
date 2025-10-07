@@ -56,7 +56,7 @@ def calculate_drought(
         )
 
     dst_filename = (
-        "drought_" + asset_suffix + "_" + str(start_year) + "_" + str(end_year)
+        "drought_" + asset_suffix + "_" + str(start_year) + "_" + str(end_year) + "_hls"
     )
 
     asset_id = (
@@ -85,6 +85,7 @@ def calculate_drought(
                 + asset_suffix
                 + "_"
                 + str(current_year)
+                + "_hls"
             )
             yearly_assets.append(yearly_drought)
             if not is_gee_asset_exists(yearly_drought):
@@ -128,29 +129,29 @@ def calculate_drought(
             gee_account_id,
         )
         check_task_status([task_id])
-
-    layer_at_geoserver = False
-    if is_gee_asset_exists(asset_id):
-        layer_id = None
-        if state and district and block:
-            layer_id = save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=layer_name,
-                asset_id=asset_id,
-                dataset_name="Drought",
-                misc={"start_year": start_year, "end_year": end_year},
-            )
-
-        make_asset_public(asset_id)
-
-        fc = ee.FeatureCollection(asset_id)
-
-        res = sync_fc_to_geoserver(fc, state, layer_name, "cropping_drought")
-        print(res)
-        if res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag updated")
-            layer_at_geoserver = True
-    return layer_at_geoserver
+    #
+    # layer_at_geoserver = False
+    # if is_gee_asset_exists(asset_id):
+    #     layer_id = None
+    #     if state and district and block:
+    #         layer_id = save_layer_info_to_db(
+    #             state,
+    #             district,
+    #             block,
+    #             layer_name=layer_name,
+    #             asset_id=asset_id,
+    #             dataset_name="Drought",
+    #             misc={"start_year": start_year, "end_year": end_year},
+    #         )
+    #
+    #     make_asset_public(asset_id)
+    #
+    #     fc = ee.FeatureCollection(asset_id)
+    #
+    #     res = sync_fc_to_geoserver(fc, state, layer_name, "cropping_drought")
+    #     print(res)
+    #     if res["status_code"] == 201 and layer_id:
+    #         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+    #         print("sync to geoserver flag updated")
+    #         layer_at_geoserver = True
+    # return layer_at_geoserver

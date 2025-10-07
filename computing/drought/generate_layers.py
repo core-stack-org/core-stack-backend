@@ -10,7 +10,8 @@ from utilities.gee_utils import (
     make_asset_public,
     create_gee_dir,
     get_gee_dir_path,
-    export_vector_asset_to_gee, build_gee_helper_paths,
+    export_vector_asset_to_gee,
+    build_gee_helper_paths,
 )
 
 
@@ -90,7 +91,7 @@ def generate_drought_layers(
     chunk_size,
     gee_account_id,
 ):
-    gee_obj = GEEAccount.objects.get(pk = gee_account_id)
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
     task_ids = []
     asset_ids = []
 
@@ -100,9 +101,7 @@ def generate_drought_layers(
     print("parts=", parts)
     ee_initialize(gee_obj.helper_account.id)
     helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
-    create_gee_dir(
-        asset_folder_list, helper_account_path
-    )
+    create_gee_dir(asset_folder_list, helper_account_path)
     for part in range(parts + 1):
         start = part * chunk_size
         end = start + chunk_size
@@ -114,6 +113,7 @@ def generate_drought_layers(
             + str(end)
             + "_"
             + str(current_year)
+            + "_hls"
         )
         chunk = ee.FeatureCollection(aoi.toList(aoi.size()).slice(start, end))
         if chunk.size().getInfo() > 0:
@@ -128,7 +128,7 @@ def generate_drought_layers(
                 asset_suffix,
                 asset_folder_list,
                 app_type,
-                gee_account_id
+                gee_account_id,
             )
 
     print("Done iterating")
@@ -150,15 +150,12 @@ def drought_chunk(
     asset_suffix,
     asset_folder_list,
     app_type,
-    gee_account_id
+    gee_account_id,
 ):
-    gee_obj = GEEAccount.objects.get(pk = gee_account_id)
-    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name )
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, helper_account_path
-        )
-        + block_name_for_parts
+        get_gee_dir_path(asset_folder_list, helper_account_path) + block_name_for_parts
     )
 
     if is_gee_asset_exists(asset_id):
@@ -167,12 +164,22 @@ def drought_chunk(
     chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY").select("precipitation")
     chirps_available_from_year = 1981  # it is available from 1981-01-01
     # chirps_scale = 5566
-    modis_ndvi = ee.ImageCollection("MODIS/MOD09GA_006_NDVI").select("NDVI")
-    modis_ndvi_scale = 464
-    modis_ndvi_available_from_year = 2000  # it is available from 2000-02-24
-    modis_ndwi = ee.ImageCollection("MODIS/MOD09GA_006_NDWI").select("NDWI")
-    # modis_ndwi_scale = 464
-    modis_ndwi_available_from_year = 2000  # it is available from 2000-02-24
+    hls = ee.ImageCollection("NASA/HLS/HLSL30/v002")
+
+    def add_ndvi_ndwi(image):
+        ndvi = image.normalizedDifference(["B5", "B4"]).rename("NDVI")
+        ndwi = image.normalizedDifference(["B3", "B5"]).rename("NDWI")
+        return image.addBands(ndvi).float().addBands(ndwi).float()
+
+    hls_ndvi_ndwi = hls.map(add_ndvi_ndwi)
+    hls_scale = 30
+    hls_available_from_year = 2013
+    # modis_ndvi = ee.ImageCollection("MODIS/MOD09GA_006_NDVI").select("NDVI")
+    # modis_ndvi_scale = 464
+    # modis_ndvi_available_from_year = 2000  # it is available from 2000-02-24
+    # modis_ndwi = ee.ImageCollection("MODIS/MOD09GA_006_NDWI").select("NDWI")
+    # # modis_ndwi_scale = 464
+    # modis_ndwi_available_from_year = 2000  # it is available from 2000-02-24
     modis = ee.ImageCollection("MODIS/061/MOD16A2GF").select(["ET", "PET"])
     modis_scale = 500
     # modis_available_from_year = 2000  # it is available from 2000-01-01
@@ -804,14 +811,16 @@ def drought_chunk(
 
         starting_day_of_year = get_day_of_year(start_date)
 
-        years_ndvi = ee.List.sequence(modis_ndvi_available_from_year, current_year)
-        years_ndwi = ee.List.sequence(modis_ndwi_available_from_year, current_year)
+        years_ndvi = ee.List.sequence(hls_available_from_year, current_year)
+        years_ndwi = ee.List.sequence(hls_available_from_year, current_year)
 
         start = starting_day_of_year
         end = start.add(delta)
 
         ndvis = years_ndvi.map(
-            lambda year: modis_ndvi.filter(ee.Filter.calendarRange(year, year, "year"))
+            lambda year: hls_ndvi_ndwi.filter(
+                ee.Filter.calendarRange(year, year, "year")
+            )
             .filter(ee.Filter.calendarRange(start, end, "day_of_year"))
             .select("NDVI")
             .mean()
@@ -819,7 +828,7 @@ def drought_chunk(
 
         ndvis = ee.ImageCollection(ndvis)
         ndvi_cur = (
-            modis_ndvi.filter(
+            hls_ndvi_ndwi.filter(
                 ee.Filter.calendarRange(current_year, current_year, "year")
             )
             .filter(ee.Filter.calendarRange(start, end, "day_of_year"))
@@ -828,7 +837,9 @@ def drought_chunk(
         )
 
         ndwis = years_ndwi.map(
-            lambda year: modis_ndwi.filter(ee.Filter.calendarRange(year, year, "year"))
+            lambda year: hls_ndvi_ndwi.filter(
+                ee.Filter.calendarRange(year, year, "year")
+            )
             .filter(ee.Filter.calendarRange(start, end, "day_of_year"))
             .select("NDWI")
             .mean()
@@ -836,7 +847,7 @@ def drought_chunk(
 
         ndwis = ee.ImageCollection(ndwis)
         ndwi_cur = (
-            modis_ndwi.filter(
+            hls_ndvi_ndwi.filter(
                 ee.Filter.calendarRange(current_year, current_year, "year")
             )
             .filter(ee.Filter.calendarRange(start, end, "day_of_year"))
@@ -874,8 +885,8 @@ def drought_chunk(
         vci = ee.Image(vci).multiply(cropping_mask)
         vci = vci.multiply(100)
 
-        roi = vci.reduceRegions(roi, ee.Reducer.sum(), modis_ndvi_scale)
-        pc = cropping_mask.reduceRegions(roi, ee.Reducer.sum(), modis_ndvi_scale)
+        roi = vci.reduceRegions(roi, ee.Reducer.sum(), hls_scale)
+        pc = cropping_mask.reduceRegions(roi, ee.Reducer.sum(), hls_scale)
 
         def inner(feature):
             pkid = feature.get("uid")

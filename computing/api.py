@@ -466,7 +466,7 @@ def generate_drought_layer(request):
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         calculate_drought.apply_async(
             kwargs={
                 "state": state,
