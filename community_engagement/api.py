@@ -124,7 +124,7 @@ def handle_media_upload(request, item, user, source, bot_id=None):
         404: openapi.Response(description="Not Found - Item not found",examples={"application/json": {"success": False,"message": "Item not found"}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "Internal Server Error"}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
 @api_security_check(allowed_methods="POST", auth_type="Auth_free")
 @parser_classes([MultiPartParser, FormParser])
@@ -275,10 +275,11 @@ def upsert_item(request):
         404: openapi.Response(description="Not Found - Item not found",examples={"application/json": {"success": False,"message": "Item not found"}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "Internal server error"}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["POST"])
-@api_security_check(allowed_methods="POST")
+@auth_free
 @parser_classes([MultiPartParser, FormParser])
 def attach_media_to_item(request):
     try:
@@ -365,13 +366,14 @@ def attach_media_to_item(request):
         400: openapi.Response(description="Bad Request - The community_id parameter is required.",examples={"application/json": {"success": False,"message": "The 'community_id' parameter is required."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["GET"])
 @auth_free
 def get_community_details(request):
     try:
-        community_id = request.query_params.get('community_id')
+        community_id = request.data.get('community_id')
         if not community_id:
             return Response(
                 {"success": False, "message": "The community_id parameter is required."},
@@ -392,7 +394,7 @@ def get_community_details(request):
     operation_id='get_communities_by_location',
     operation_summary="Get Communities by Location",
     operation_description="""
-    Retrieve a list of communities filtered by state, district, or block ID. At least one location parameter must be provided.
+    Retrieve a list of communities filtered by state, district, or Tehsil ID. At least one location parameter must be provided.
     **Response dataset details:**
     ```
     {
@@ -413,16 +415,17 @@ def get_community_details(request):
     manual_parameters=[
         openapi.Parameter('state_id', openapi.IN_QUERY, description="Filter by State ID", type=openapi.TYPE_INTEGER),
         openapi.Parameter('district_id', openapi.IN_QUERY, description="Filter by District ID", type=openapi.TYPE_INTEGER),
-        openapi.Parameter('block_id', openapi.IN_QUERY, description="Filter by Block ID", type=openapi.TYPE_INTEGER),
+        openapi.Parameter('tehsil_id', openapi.IN_QUERY, description="Filter by Tehsil ID", type=openapi.TYPE_INTEGER),
     ],
     responses={
         200: openapi.Response(description="Success - Returns communities data",examples={"application/json": {"success": True,"data": [{"id": 1,"name": "Community Name","description": "Community description","organization": "Organization Name","member_count": 150,"location": "Location details"}]}}),
-        400: openapi.Response(description="Bad Request - At least one location parameter (state_id, district_id, or block_id) is required.",examples={"application/json": {"success": False,"message": "At least one location parameter (state_id, district_id, or block_id) is required."}}),
-        404: openapi.Response(description="Not Found - State not found OR District not found OR Block not found",examples={"application/json": {"success": False,"message": "State not found"}}),
+        400: openapi.Response(description="Bad Request - At least one location parameter (state_id, district_id, or tehsil_id) is required.",examples={"application/json": {"success": False,"message": "At least one location parameter (state_id, district_id, or tehsil_id) is required."}}),
+        404: openapi.Response(description="Not Found - State not found OR District not found OR Tehsil not found",examples={"application/json": {"success": False,"message": "State not found"}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["GET"])
 @auth_free
 def get_communities_by_location(request):
@@ -432,55 +435,28 @@ def get_communities_by_location(request):
         district_id = request.query_params.get("district_id")
         block_id = request.query_params.get("block_id")
 
-        # Validate that at least one location parameter is provided
-        if not state_id and not district_id and not block_id:
-            return Response(
-                {"success": False, "message": "At least one location parameter (state_id, district_id, or block_id) is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         state_name = district_name = block_name = ""
 
         if state_id:
             state = State.objects.filter(pk=state_id).first()
-            if not state:
-                return Response(
-                    {"success": False, "message": "State not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            state_name = state.state_name
+            state_name = state.state_name if state else ""
 
         if district_id:
             district = District.objects.filter(id=district_id).first()
-            if not district:
-                return Response(
-                    {"success": False, "message": "District not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            district_name = district.district_name
+            district_name = district.district_name if district else ""
 
         if block_id:
             block = Block.objects.filter(id=block_id).first()
-            if not block:
-                return Response(
-                    {"success": False, "message": "Block not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            block_name = block.block_name
-            
-        print(f"Fetching communities for State: '{state_name}', District: '{district_name}', Block: '{block_name}'")
+            block_name = block.block_name if block else ""
+        print(f"Fetching communities for State: '{state_id}', District: '{district_id}'")
         data = get_communities(state_name, district_name, block_name)
         print(f"Communities found: {data}")
         return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
-        
     except Exception as e:
         print("Exception in get_communities_by_location:", e)
-        return Response(
-            {"success": False, "message": "An internal server error occurred."},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
+  
 ############  Get Community by Lat Lon  ################
 
 @swagger_auto_schema(
@@ -516,8 +492,9 @@ def get_communities_by_location(request):
         400: openapi.Response(description="Bad Request - Both 'latitude' and 'longitude' parameters are required.",examples={"application/json": {"error": "Both 'latitude' and 'longitude' parameters are required."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["GET"])
 @auth_free
 def get_communities_by_lat_lon(request):
@@ -531,8 +508,8 @@ def get_communities_by_lat_lon(request):
         location = get_location_info_by_lat_lon(lat, lon)
         state_name = location.get("State", "")
         district_name = location.get("District", "")
-        block_name = location.get("Tehsil", "")
-        data = get_communities(state_name, district_name, block_name)
+        tehsil_name = location.get("Tehsil", "")
+        data = get_communities(state_name, district_name, tehsil_name)
         return Response({"success": True, "data": data}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_communities_by_lat_lon api :: ", e)
@@ -573,8 +550,9 @@ def get_communities_by_lat_lon(request):
         404: openapi.Response(description="Not Found - User not found",examples={"application/json": {"success": False,"message": "User not found."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["GET"])
 @auth_free
 def get_community_by_user(request):
@@ -627,8 +605,9 @@ def get_community_by_user(request):
         404: openapi.Response(description="Not Found - Community not found",examples={"application/json": {"detail": "Community not found."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["POST"])
 @auth_free
 @parser_classes([MultiPartParser, FormParser])
@@ -734,7 +713,7 @@ def map_users_to_community(request):
         404: openapi.Response(description="Not Found",examples={"application/json": {"detail": "Community does not exist."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"detail": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
 
 @api_view(["POST"])
@@ -816,7 +795,7 @@ def add_user_to_community(request):
         400: openapi.Response(description="Bad Request - Either 'number' field is missing or it is empty.",examples={"application/json": {"success": False,"message": "Either 'number' field is missing or it is empty."}}),
         404: openapi.Response(description="Not Found - User doesnot Exist.",examples={"application/json": {"success": False,"message": "User doesnot Exist."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})},
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
 
 @api_view(["POST"])
@@ -910,14 +889,14 @@ def is_user_in_community(request):
         404: openapi.Response(description="Not Found - State does not exist.", examples={"application/json": {"success": False,"message": "State does not exist."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
 
 @api_view(["GET"])
 @auth_free
 def get_districts_with_community(request):
     try:
-        state_id = request.query_params.get("state_id")
+        state_id = request.query_params.get("state_id").strip()
         if not state_id:
             return Response(
                 {"success": False, "message": "State ID is required."},
@@ -948,17 +927,17 @@ def get_districts_with_community(request):
 
 
 ##############################################
-###### Get Blocks with Community
+###### Get Tehsils with Community
 ##############################################
 
 @swagger_auto_schema(
     method='get',
-    operation_id='get_blocks_with_community',
-    operation_summary="Get Blocks with Communities",
+    operation_id='get_tehsils_with_community',
+    operation_summary="Get Tehsils with Communities",
     operation_description="""
-    Checks if a district has any communities and returns its blocks. 
+    Checks if a district has any communities and returns its tehsils. 
     
-    - If district has communities: Returns list of blocks with community data
+    - If district has communities: Returns list of tehsils with community data
     
     **Response dataset details:**
     ```
@@ -967,33 +946,33 @@ def get_districts_with_community(request):
         "data": [
             {
                 "id": 1,
-                "name": "Block A"
+                "name": "Tehsil A"
             },
             {
                 "id": 2,
-                "name": "Block B"
+                "name": "Tehsil B"
             }
         ]
     }
     ```
     """,
     manual_parameters=[
-        openapi.Parameter('district_id', openapi.IN_QUERY, required=True, type=openapi.TYPE_INTEGER, description="ID of the district to filter blocks")
+        openapi.Parameter('district_id', openapi.IN_QUERY, required=True, type=openapi.TYPE_INTEGER, description="ID of the district to filter tehsils")
     ],
     responses={
-        200: openapi.Response(description="Success - It will return json with data.",examples={"application/json": {"success": True,"data": [{"id": 1, "name": "Block A"},{"id": 2, "name": "Block B"}]}}),
+        200: openapi.Response(description="Success - It will return json with data.",examples={"application/json": {"success": True,"data": [{"id": 1, "name": "Tehsil A"},{"id": 2, "name": "Tehsil B"}]}}),
         400: openapi.Response(description="Bad Request - District ID is required.",examples={"application/json": {"success": False,"message": "District ID is required."}}),
         404: openapi.Response(description="Not Found - District does not exist.", examples={"application/json": {"success": False,"message": "District does not exist."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
 
 @api_view(["GET"])
 @auth_free
-def get_blocks_with_community(request):
+def get_tehsils_with_community(request):
     try:
-        district_id = request.query_params.get("district_id")
+        district_id = request.query_params.get("district_id").strip()
         if not district_id:
             return Response(
                 {"success": False, "message": "District ID is required."},
@@ -1008,7 +987,7 @@ def get_blocks_with_community(request):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Get blocks with communities for the district
+        # Get tehsils with communities for the district
         block_ids = Location.objects.filter(district=district_obj).values_list("block_id", flat=True)
         blocks = Block.objects.filter(pk__in=block_ids).order_by("block_name")
 
@@ -1016,7 +995,7 @@ def get_blocks_with_community(request):
         return Response({"success": True, "data": blocks_data}, status=status.HTTP_200_OK)
         
     except Exception as e:
-        print("Exception in get_blocks_with_community API ::", e)
+        print("Exception in get_tehsils_with_community API ::", e)
         return Response(
             {"success": False, "message": "An internal server error occurred."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1053,7 +1032,7 @@ def get_blocks_with_community(request):
         400: openapi.Response(description="Bad Request - user_id and community_id are required.",examples={"application/json": {"success": False,"error": "user_id and community_id are required."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"error": "An internal server error occurred."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
 
 @api_view(["POST"])
@@ -1133,8 +1112,9 @@ def update_last_accessed_community(request):
         400: openapi.Response(description="Bad Request - Missing 'community_id' in query parameters.",examples={"application/json": {"success": False,"message": "Missing 'community_id' in query parameters."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "Internal server error."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["GET"])
 @auth_free
 def get_items_by_community(request):
@@ -1265,8 +1245,9 @@ def get_items_by_community(request):
         404: openapi.Response(description="Not Found - User not found",examples={"application/json": {"success": False,"message": "User not found."}}),
         500: openapi.Response(description="Internal Server Error",examples={"application/json": {"success": False,"message": "Internal server error."}})
     },
-    tags=['Community Engagement']
+    tags=['Community Engagement APIs']
 )
+
 @api_view(["GET"])
 @auth_free
 def get_items_status(request):
@@ -1324,3 +1305,4 @@ def get_items_status(request):
             {"success": False, "message": "Internal server error."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        

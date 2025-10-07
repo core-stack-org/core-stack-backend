@@ -133,7 +133,7 @@ response_param = openapi.Parameter(
         404: openapi.Response(description="Not Found - Latitude and longitude is not in SOI boundary."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="Api_key")
 def get_admin_details_by_lat_lon(request):
@@ -218,7 +218,7 @@ def get_admin_details_by_lat_lon(request):
         404: openapi.Response(description="Not Found - Latitude and longitude is not in SOI boundary. OR Mws Layer is not generated for the given lat lon location."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="Auth_free")
 def get_mws_by_lat_lon(request):
@@ -326,7 +326,7 @@ def get_mws_by_lat_lon(request):
         404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil. OR Data not found for the given mws_id."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="API_key")
 def get_mws_json_by_stats_excel(request):
@@ -449,7 +449,7 @@ def get_mws_json_by_stats_excel(request):
         404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="API_key")
 def generate_tehsil_data(request):
@@ -581,7 +581,7 @@ def generate_tehsil_data(request):
         404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil. OR Not Found - Data not found for the given mws_id."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="API_key")
 def get_mws_json_by_kyl_indicator(request):
@@ -698,7 +698,7 @@ def get_mws_json_by_kyl_indicator(request):
         404: openapi.Response(description="Not Found - Data not found for this state, district, tehsil."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="API_key")
 def get_generated_layer_urls(request):
@@ -774,7 +774,7 @@ def get_generated_layer_urls(request):
         404: openapi.Response(description="Not Found - Data not found for the given mws_id OR Data not found for this state, district, tehsil. OR Mws Layer not found for the given location."),
         500: openapi.Response(description="Internal Server Error")
     },
-    tags=['NRM']
+    tags=['Dataset APIs']
 )
 @api_security_check(auth_type="API_key")
 def get_mws_report_urls(request):
