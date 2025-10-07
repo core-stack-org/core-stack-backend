@@ -19,7 +19,7 @@ import json
 import subprocess
 from google.cloud import storage
 from google.api_core import retry
-from utilities.geoserver_utils import Geoserver, delete_raster_store
+from utilities.geoserver_utils import Geoserver
 from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 
@@ -394,13 +394,13 @@ def sync_raster_to_gcs(image, scale, layer_name):
 
 def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
     print("inside sync_raster_to_geoserver")
-    delete_raster_store(workspace=workspace, store=layer_name)
+    geo = Geoserver()
+    geo.delete_raster_store(workspace=workspace, store=layer_name)
     bucket = gcs_config()
 
     blob = bucket.blob("nrm_raster/" + gcs_file_name + ".tif")
     tif_content = blob.download_as_bytes()
 
-    geo = Geoserver()
     file_upload_res = geo.upload_raster(tif_content, workspace, layer_name)
     print("File response:", file_upload_res)
     if style_name:

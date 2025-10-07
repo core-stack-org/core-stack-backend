@@ -14,7 +14,6 @@ from utilities.gee_utils import (
 )
 from utilities.geoserver_utils import (
     Geoserver,
-    delete_vector_store,
 )
 import shutil
 from utilities.constants import (
@@ -117,6 +116,7 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
 
 
 def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
+    geo = Geoserver()
     state_dir = os.path.join("data/fc_to_shape", shp_folder)
     if not os.path.exists(state_dir):
         os.mkdir(state_dir)
@@ -127,7 +127,7 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-    delete_vector_store(workspace=workspace, store=layer_name)
+    geo.delete_vector_store(workspace=workspace, store=layer_name)
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
@@ -141,7 +141,8 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         check_task_status([task_id])
 
         geojson_fc = get_geojson_from_gcs(layer_name)
-    delete_vector_store(workspace=workspace, store=layer_name)
+    geo = Geoserver()
+    geo.delete_vector_store(workspace=workspace, store=layer_name)
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
@@ -161,7 +162,6 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
         res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
         if style_name:
-            geo = Geoserver()
             style_res = geo.publish_style(
                 layer_name=layer_name, style_name=style_name, workspace=workspace
             )
