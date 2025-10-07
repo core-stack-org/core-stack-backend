@@ -14,11 +14,9 @@ from utilities.gen_utils import prepare_zip_file
 from utilities.geoserver_styles import (
     catagorize_xml,
     classified_xml,
-    coverage_style_xml,
     outline_only_xml,
 )
-from nrm_app.settings import GEOSERVER_URL, GEOSERVER_USERNAME, GEOSERVER_PASSWORD
-from requests.auth import HTTPBasicAuth
+from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import GEOSERVER_USERNAME, GEOSERVER_PASSWORD
 
 
