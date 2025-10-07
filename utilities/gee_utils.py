@@ -6,10 +6,7 @@ from nrm_app.settings import (
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH,
-    BASE_DIR,
-    GEE_DEFAULT_ACCOUNT_ID
+    GEE_DEFAULT_ACCOUNT_ID,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -27,7 +24,7 @@ from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 
 
-def ee_initialize(account_id = GEE_DEFAULT_ACCOUNT_ID):
+def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
     account = GEEAccount.objects.get(pk=account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
     credentials = service_account.Credentials.from_service_account_info(
@@ -397,12 +394,13 @@ def sync_raster_to_gcs(image, scale, layer_name):
 
 def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
     print("inside sync_raster_to_geoserver")
+    geo = Geoserver()
+    geo.delete_raster_store(workspace=workspace, store=layer_name)
     bucket = gcs_config()
 
     blob = bucket.blob("nrm_raster/" + gcs_file_name + ".tif")
     tif_content = blob.download_as_bytes()
 
-    geo = Geoserver()
     file_upload_res = geo.upload_raster(tif_content, workspace, layer_name)
     print("File response:", file_upload_res)
     if style_name:
