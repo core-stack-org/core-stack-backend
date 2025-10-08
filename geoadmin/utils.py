@@ -1,7 +1,33 @@
 from pathlib import Path
 from django.conf import settings
 import json
+import re
+from typing import Optional
+
 from .models import Block, District, State
+
+
+def normalize_name(name: Optional[str]) -> str:
+    """
+    Normalize names by removing special characters and extra whitespaces
+
+    Examples:
+        "Andaman & Nicobar" --> "Andaman Nicobar"
+        "Andaman (Nicobar)" --> "Andaman Nicobar"
+
+    Args:
+        name (str): The name to be normalized
+
+    Returns:
+        str: Normalized name <state, district, block/tehsil>
+    """
+    if not name:
+        return ""
+
+    normalized = re.sub(r"[&\-()]", " ", name)
+    normalized = re.sub(r"\s+", " ", normalized)
+
+    return normalized.strip()
 
 
 def activated_entities():
