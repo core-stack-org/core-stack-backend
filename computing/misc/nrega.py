@@ -154,8 +154,11 @@ def clip_nrega_district_block(self, state_name, district_name, block_name, gee_a
 
     path = os.path.join(
         NREGA_ASSETS_OUTPUT_DIR,
-        f"""{"_".join(district_name.split())}_{"_".join(block_name.split())}""",
+        formatted_state_name,
+        f"""{"_".join(district_name.split())}_{"_".join(block_name.split())}"""
     )
+    output_directory = os.path.dirname(path)
+    os.makedirs(output_directory, exist_ok=True)
 
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
 

@@ -18,7 +18,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
 )
 from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
-from computing.plantation.utils.plantation_utils import dataset_paths
+from computing.plantation.utils.plantation_utils import dataset_info
 from utilities.logger import setup_logger
 from ..utils import save_layer_info_to_db, update_layer_sync_status
 
@@ -441,11 +441,11 @@ def get_dataset(variable, state, roi, start_year, end_year):
     ]
 
     if variable not in diff_variables:
-        return ee.Image(dataset_paths[variable])
+        return ee.Image(dataset_info[variable]["path"])
 
     # Terrain-related variables (slope and aspect)
     if variable in ["slope", "aspect"]:
-        dataset = ee.Image(dataset_paths[variable])
+        dataset = ee.Image(dataset_info[variable]["path"])
         return (
             ee.Terrain.slope(dataset)
             if variable == "slope"
@@ -485,7 +485,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
 
     # Distance to Drainage
     if variable == "distToDrainage":
-        dataset = ee.Image(dataset_paths[variable])
+        dataset = ee.Image(dataset_info[variable]["path"])
         # Filter streams with Strahler order between 3 and 7
         strahler3to7 = dataset.select(["b1"]).lte(7).And(dataset.select(["b1"]).gt(2))
         return (
