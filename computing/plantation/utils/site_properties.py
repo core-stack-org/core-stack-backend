@@ -2,11 +2,9 @@ import ee
 
 from utilities.constants import GEE_DATASET_PATH
 from utilities.gee_utils import (
-    ee_initialize,
     valid_gee_text,
-    export_vector_asset_to_gee,
 )
-from .plantation_utils import dataset_paths
+from .plantation_utils import dataset_info
 
 
 def get_site_properties(roi, state, start_year, end_year):
@@ -27,9 +25,11 @@ def get_site_properties(roi, state, start_year, end_year):
         vectorized_props = {}
 
         # Iterate through datasets
-        for key, path in dataset_paths.items():
+        for key, value in dataset_info.items():
+            path = value["path"]
+            unit = value["unit"]
             if key == "distToDrainage":
-                vectorized_props[key] = vectorize_dataset(dist_to_drainage, feature, 10)
+                prop_value = vectorize_dataset(dist_to_drainage, feature, 10)
             else:
                 raster = ee.Image(path)
 
@@ -44,17 +44,36 @@ def get_site_properties(roi, state, start_year, end_year):
                 vectors = raster.reduceRegions(
                     feature.geometry(), ee.Reducer.mean(), scale, raster.projection()
                 )
+                prop_value = vectors.first().get("mean")
 
-                vectorized_props[key] = vectors.first().get("mean")
+            if "mapping" in value:
+                mapping = ee.Dictionary(value["mapping"])
+                prop_value = ee.Algorithms.If(
+                    prop_value, mapping.get(ee.Number(prop_value).toInt()), None
+                )
+
+            vectorized_props[key] = ee.Algorithms.If(
+                prop_value,
+                ee.String(prop_value).cat(ee.String(" ")).cat(ee.String(unit)),
+                None,
+            )
 
         # Distance to the nearest road
-        vectorized_props["distToRoad"] = vectorize_dataset(
-            state_dist_to_road, feature, 10
+        road_distance = ee.String(vectorize_dataset(state_dist_to_road, feature, 10))
+        vectorized_props["distToRoad"] = ee.Algorithms.If(
+            road_distance,
+            road_distance.cat(ee.String(" ")).cat(ee.String("m")),
+            None,
         )
 
         # Distance to the nearest settlement
-        vectorized_props["distToSettlement"] = vectorize_dataset(
-            dist_to_settlement, feature, 10
+        settlement_distance = ee.String(
+            vectorize_dataset(dist_to_settlement, feature, 10)
+        )
+        vectorized_props["distToSettlement"] = (
+            settlement_distance,
+            settlement_distance.cat(ee.String(" ")).cat(ee.String("m")),
+            None,
         )
 
         # Convert to dictionary and encode as JSON string
@@ -64,7 +83,6 @@ def get_site_properties(roi, state, start_year, end_year):
         return feature.set("site_props", vectorized_json)
 
     site_properties = roi.map(get_properties)
-    print(site_properties.getInfo())
     return site_properties
 
 
@@ -79,7 +97,7 @@ def get_dist_to_road(state):
 
 
 def get_distance_to_drainage():
-    path = dataset_paths["distToDrainage"]
+    path = dataset_info["distToDrainage"]["path"]
     dataset = ee.Image(path)
     # Filter streams with Strahler order between 3 and 7
     strahler3to7 = dataset.select(["b1"]).lte(7).And(dataset.select(["b1"]).gt(2))

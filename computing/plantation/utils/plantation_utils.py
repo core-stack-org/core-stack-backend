@@ -5,27 +5,100 @@ import geopandas as gpd
 import pandas as pd
 import fiona
 
-dataset_paths = {
-    "AWC": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",
-    "annualPrecipitation": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",
-    "meanAnnualTemperature": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",
-    "aridityIndex": "projects/ee-plantationsitescores/assets/India-AridityIndex",
-    "referenceEvapoTranspiration": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
-    "topsoilPH": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
-    "topsoilOC": "projects/ee-plantationsitescores/assets/Raster-T_OC",
-    "topsoilCEC": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
-    "topsoilTexture": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
-    "subsoilPH": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
-    "subsoilOC": "projects/ee-plantationsitescores/assets/Raster-S_OC",
-    "subsoilCEC": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
-    "subsoilTexture": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",
-    "topsoilBD": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
-    "subsoilBD": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
-    "drainage": "projects/ee-plantationsitescores/assets/Raster-Drainage",
-    "elevation": "USGS/SRTMGL1_003",
-    "slope": "USGS/SRTMGL1_003",
-    "aspect": "USGS/SRTMGL1_003",
-    "distToDrainage": "projects/ee-plantationsitescores/assets/so_thinned2",
+dataset_info = {
+    # World Clim v2.1 (https://www.worldclim.org/data/worldclim21.html)
+    "annualPrecipitation": {
+        "path": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",
+        "unit": "mm",
+    },
+    "meanAnnualTemperature": {
+        "path": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",
+        "unit": "°C",
+    },
+    # Global AI and PET v2 (https://doi.org/10.6084/m9.figshare.7504448.v3)
+    "aridityIndex": {
+        "path": "projects/ee-plantationsitescores/assets/India-AridityIndex",
+        "unit": "",
+    },
+    "referenceEvapoTranspiration": {
+        "path": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
+        "unit": "mm/day",
+    },
+    # HWSD v1.2 (https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v12/en/)
+    "AWC": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",
+        "unit": "cm",
+    },
+    "topsoilPH": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
+        "unit": "",
+    },
+    "topsoilOC": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-T_OC",
+        "unit": "%",
+    },
+    "topsoilCEC": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
+        "unit": "cmol/kg",
+    },
+    "topsoilTexture": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
+        "unit": "",
+        "mapping": {0: "none", 1: "coarse", 2: "medium", 3: "fine"},
+    },
+    "subsoilPH": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
+        "unit": "",
+    },
+    "subsoilOC": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-S_OC",
+        "unit": "%",
+    },
+    "subsoilCEC": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
+        "unit": "cmol/kg",
+    },
+    "subsoilTexture": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",
+        "unit": "",
+        "mapping": {
+            0: "none",
+            1: "Clay (heavy)",
+            2: "Silty clay",
+            3: "Clay",
+            4: "Silty clay loam",
+            5: "Clay loam",
+            6: "Silt",
+            7: "Silt loam",
+            8: "Sandy clay",
+            9: "Loam",
+            10: "Sandy clay loam",
+            11: "Sandy loam",
+            12: "Loamy sand",
+            13: "Sand",
+        },
+    },
+    "topsoilBD": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
+        "unit": "kg/dm3",
+    },
+    "subsoilBD": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
+        "unit": "kg/dm3",
+    },
+    "drainage": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-Drainage",
+        "unit": "",  # Check class mapping
+    },
+    # SRTM DEM v3 (https://lpdaac.usgs.gov/documents/13/SRTM_Quick_Guide.pdf)
+    "elevation": {"path": "USGS/SRTMGL1_003", "unit": "m"},
+    "slope": {"path": "USGS/SRTMGL1_003", "unit": "degrees"},
+    "aspect": {"path": "USGS/SRTMGL1_003", "unit": "degrees"},
+    # In-lab Drainage Network
+    "distToDrainage": {
+        "path": "projects/ee-plantationsitescores/assets/so_thinned2",
+        "unit": "m",
+    },
 }
 
 
