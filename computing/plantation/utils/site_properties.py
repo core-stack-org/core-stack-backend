@@ -27,7 +27,7 @@ def get_site_properties(roi, state, start_year, end_year):
         # Iterate through datasets
         for key, value in dataset_info.items():
             path = value["path"]
-            unit = value["unit"]
+            label = value["label"]
             if key == "distToDrainage":
                 prop_value = vectorize_dataset(dist_to_drainage, feature, 10)
             else:
@@ -49,31 +49,19 @@ def get_site_properties(roi, state, start_year, end_year):
             if "mapping" in value:
                 mapping = ee.Dictionary(value["mapping"])
                 prop_value = ee.Algorithms.If(
-                    prop_value, mapping.get(ee.Number(prop_value).toInt()), None
+                    prop_value, mapping.get(ee.Number(prop_value).toInt()), "None"
                 )
 
-            vectorized_props[key] = ee.Algorithms.If(
-                prop_value,
-                ee.String(prop_value).cat(ee.String(" ")).cat(ee.String(unit)),
-                None,
-            )
+            vectorized_props[label] = prop_value
 
         # Distance to the nearest road
-        road_distance = ee.String(vectorize_dataset(state_dist_to_road, feature, 10))
-        vectorized_props["distToRoad"] = ee.Algorithms.If(
-            road_distance,
-            road_distance.cat(ee.String(" ")).cat(ee.String("m")),
-            None,
+        vectorized_props["Distance to Road (m)"] = vectorize_dataset(
+            state_dist_to_road, feature, 10
         )
 
         # Distance to the nearest settlement
-        settlement_distance = ee.String(
-            vectorize_dataset(dist_to_settlement, feature, 10)
-        )
-        vectorized_props["distToSettlement"] = (
-            settlement_distance,
-            settlement_distance.cat(ee.String(" ")).cat(ee.String("m")),
-            None,
+        vectorized_props["Distance to Settlement (m)"] = vectorize_dataset(
+            dist_to_settlement, feature, 10
         )
 
         # Convert to dictionary and encode as JSON string

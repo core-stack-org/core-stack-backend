@@ -9,58 +9,58 @@ dataset_info = {
     # World Clim v2.1 (https://www.worldclim.org/data/worldclim21.html)
     "annualPrecipitation": {
         "path": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",
-        "unit": "mm",
+        "label": "Annual Precipitation (mm)",
     },
     "meanAnnualTemperature": {
         "path": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",
-        "unit": "°C",
+        "label": "Mean Annual Temperature (°C)",
     },
     # Global AI and PET v2 (https://doi.org/10.6084/m9.figshare.7504448.v3)
     "aridityIndex": {
         "path": "projects/ee-plantationsitescores/assets/India-AridityIndex",
-        "unit": "",
+        "label": "Aridity Index",
     },
     "referenceEvapoTranspiration": {
         "path": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
-        "unit": "mm/day",
+        "label": "Reference ET (mm/day)",
     },
     # HWSD v1.2 (https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v12/en/)
     "AWC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",
-        "unit": "cm",
+        "label": "Available Water Capacity (cm)",
     },
     "topsoilPH": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
-        "unit": "",
+        "label": "Topsoil pH",
     },
     "topsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_OC",
-        "unit": "%",
+        "label": "Topsoil Organic Carbon (%)",
     },
     "topsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
-        "unit": "cmol/kg",
+        "label": "Topsoil CEC (cmol/kg)",
     },
     "topsoilTexture": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
-        "unit": "",
+        "label": "Topsoil Texture",
         "mapping": {0: "none", 1: "coarse", 2: "medium", 3: "fine"},
     },
     "subsoilPH": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
-        "unit": "",
+        "label": "Subsoil pH",
     },
     "subsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_OC",
-        "unit": "%",
+        "label": "Subsoil Organic Carbon (%)",
     },
     "subsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
-        "unit": "cmol/kg",
+        "label": "Subsoil CEC (cmol/kg)",
     },
     "subsoilTexture": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",
-        "unit": "",
+        "label": "Subsoil Texture",
         "mapping": {
             0: "none",
             1: "Clay (heavy)",
@@ -80,24 +80,31 @@ dataset_info = {
     },
     "topsoilBD": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
-        "unit": "kg/dm3",
+        "label": "Topsoil Bulk Density (kg/dm3)",
     },
     "subsoilBD": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
-        "unit": "kg/dm3",
+        "label": "Subsoil Bulk Density (kg/dm3)",
     },
     "drainage": {
         "path": "projects/ee-plantationsitescores/assets/Raster-Drainage",
-        "unit": "",  # Check class mapping
+        # "mapping": "",  # Check class mapping
+        "label": "Drainage Class",
     },
     # SRTM DEM v3 (https://lpdaac.usgs.gov/documents/13/SRTM_Quick_Guide.pdf)
-    "elevation": {"path": "USGS/SRTMGL1_003", "unit": "m"},
-    "slope": {"path": "USGS/SRTMGL1_003", "unit": "degrees"},
-    "aspect": {"path": "USGS/SRTMGL1_003", "unit": "degrees"},
+    "elevation": {"path": "USGS/SRTMGL1_003", "label": "Elevation (m)"},
+    "slope": {
+        "path": "USGS/SRTMGL1_003",
+        "label": "Slope (°)",
+    },
+    "aspect": {
+        "path": "USGS/SRTMGL1_003",
+        "label": "Aspect (°)",
+    },
     # In-lab Drainage Network
     "distToDrainage": {
         "path": "projects/ee-plantationsitescores/assets/so_thinned2",
-        "unit": "m",
+        "label": "Distance to Drainage (m)",
     },
 }
 
