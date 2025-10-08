@@ -27,7 +27,16 @@ dataset_info = {
     # HWSD v1.2 (https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v12/en/)
     "AWC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",
-        "label": "Available Water Capacity (cm)",
+        "label": "Available Water Capacity (mm/m)",
+        "mapping": {
+            1: 150,
+            2: 125,
+            3: 100,
+            4: 75,
+            5: 50,
+            6: 15,
+            7: 0,
+        },
     },
     "topsoilPH": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
