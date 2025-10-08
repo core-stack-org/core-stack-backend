@@ -1568,7 +1568,7 @@ def add_section_g(doc, plan, mws):
             row_cells[8].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
-            row_cells[7].text = (
+            row_cells[9].text = (
                 "{:.6f}".format(record.longitude) if record.longitude else "NA"
             )
 
@@ -1607,6 +1607,6 @@ def add_section_g(doc, plan, mws):
             row_cells[8].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
-            row_cells[7].text = (
+            row_cells[9].text = (
                 "{:.6f}".format(record.longitude) if record.longitude else "NA"
             )
