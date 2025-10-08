@@ -1,18 +1,19 @@
 import json
+from datetime import timedelta
+
 from django.http import HttpRequest
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, schema
 from rest_framework.request import Request
 from rest_framework.response import Response
-from django.utils import timezone
-from datetime import timedelta
 
-from .models import Block, District, State
-from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
-from .utils import transform_data, activated_entities
-from utilities.auth_utils import auth_free
-from .models import UserAPIKey
 from utilities.auth_check_decorator import api_security_check
+from utilities.auth_utils import auth_free
+
+from .models import Block, District, DistrictSOI, State, StateSOI, TehsilSOI, UserAPIKey
+from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
+from .utils import activated_entities, normalize_name, transform_data
 
 
 # state id is the census code while the district id is the id of the district from the DB
@@ -21,22 +22,31 @@ from utilities.auth_check_decorator import api_security_check
 @schema(None)
 def get_states(request):
     try:
-        states = State.objects.all()
+        states = StateSOI.objects.all()
         serializer = StateSerializer(states, many=True)
-        return Response({"states": serializer.data}, status=status.HTTP_200_OK)
+        states_data = serializer.data
+
+        for state in states_data:
+            state["normalized_state_name"] = normalize_name(state["state_name"])
+        return Response({"states": states_data}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_states api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 @api_security_check(auth_type="Auth_free")
 @schema(None)
 def get_districts(request, state_id):
     try:
-        districts = District.objects.filter(state_id=state_id)
+        districts = DistrictSOI.objects.filter(state_id=state_id)
         serializer = DistrictSerializer(districts, many=True)
-        return Response({"districts": serializer.data}, status=status.HTTP_200_OK)
+        districts_data = serializer.data
+
+        for district in districts_data:
+            district["normalized_district_name"] = normalize_name(
+                district["district_name"]
+            )
+        return Response({"districts": districts_data}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_districts api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -46,74 +56,18 @@ def get_districts(request, state_id):
 @schema(None)
 def get_blocks(request, district_id):
     try:
-        blocks = Block.objects.filter(district=district_id)
+        blocks = TehsilSOI.objects.filter(district=district_id)
         serializer = BlockSerializer(blocks, many=True)
-        return Response({"blocks": serializer.data}, status=status.HTTP_200_OK)
+        tehsils_data = serializer.data
+
+        for tehsil in tehsils_data:
+            tehsil["normalized_tehsil_name"] = normalize_name(tehsil["tehsil_name"])
+            tehsil["normalized_block_name"] = normalize_name(tehsil["tehsil_name"])
+            tehsil["block_name"] = tehsil["tehsil_name"]
+        return Response({"blocks": tehsils_data}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_blocks api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@auth_free
-@schema(None)
-def activate_entities(request):
-    try:
-        messages = []
-
-        state_id = request.data.get("state_id")  # census code of the state
-        district_id = request.data.get("district_id")  # id of the district
-        block_id = request.data.get("block_id")  # id of the block
-
-        state = None
-        if state_id:
-            state = State.objects.get(state_census_code=state_id)
-
-        if district_id:
-            district = District.objects.get(id=district_id)
-            district.active_status = not district.active_status
-            district.save()
-            status_msg = "activated" if district.active_status else "deactivated"
-            messages.append(
-                f"District '{district.district_name}' has been {status_msg}"
-            )
-
-        if block_id:
-            block = Block.objects.get(id=block_id)
-            block.active_status = not block.active_status
-            block.save()
-            status_msg = "activated" if block.active_status else "deactivated"
-            messages.append(f"Block '{block.block_name}' has been {status_msg}")
-
-        if state:
-            any_district_active = District.objects.filter(
-                state=state, active_status=True
-            ).exists()
-            any_block_active = Block.objects.filter(
-                district__state=state, active_status=True
-            ).exists()
-            state.active_status = any_district_active or any_block_active
-            state.save()
-            status_msg = "activated" if state.active_status else "deactivated"
-            messages.insert(
-                0,
-                f"State '{state.state_name}' has been {status_msg} based on its districts/blocks status",
-            )
-
-        status_code = (
-            status.HTTP_200_OK
-            if any(
-                entity.active_status for entity in [district, block, state] if entity
-            )
-            else status.HTTP_204_NO_CONTENT
-        )
-        return Response({"message": ", ".join(messages)}, status=status_code)
-
-    except Exception as e:
-        print(f"Exception in activate_entities api: {e}")
-        return Response(
-            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
 @api_security_check(auth_type="Auth_free")
@@ -143,7 +97,7 @@ def activate_location(request):
         "location_id": str,
         "active": bool
     }
-    
+
     Hierarchical validation rules:
     - Districts can only be activated if their State is active
     - Blocks can only be activated if both their State and District are active
@@ -174,22 +128,24 @@ def activate_location(request):
                 location = State.objects.get(state_census_code=location_id)
             elif location_type == "district":
                 location = District.objects.get(id=location_id)
-                
+
                 if active and not location.state.active_status:
                     return Response(
                         {"error": "State not active yet, please activate."},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-            else:  
+            else:
                 location = Block.objects.get(id=location_id)
-                
+
                 if active:
                     state_active = location.district.state.active_status
                     district_active = location.district.active_status
-                    
+
                     if not state_active and not district_active:
                         return Response(
-                            {"error": "State and District not active yet, please activate them first."},
+                            {
+                                "error": "State and District not active yet, please activate them first."
+                            },
                             status=status.HTTP_400_BAD_REQUEST,
                         )
                     elif not district_active:
@@ -206,7 +162,11 @@ def activate_location(request):
             if location.active_status != active:
                 location.active_status = active
                 location.save()
-                message = "Successfully activated a location" if active else "Successfully deactivated a location"
+                message = (
+                    "Successfully activated a location"
+                    if active
+                    else "Successfully deactivated a location"
+                )
                 return Response(
                     {
                         "message": message,
@@ -217,7 +177,9 @@ def activate_location(request):
                     status=status.HTTP_200_OK,
                 )
             else:
-                message = "Location already active" if active else "Location already inactive"
+                message = (
+                    "Location already active" if active else "Location already inactive"
+                )
                 return Response(
                     {
                         "message": message,
@@ -245,15 +207,15 @@ def generate_api_key(request):
     """
     Single API for generating and deactivating API keys
     POST /api/v1/generate_api_key/
-    
+
     Generate new API key (default action - no params needed):
-    {} 
+    {}
     OR
     {
         "name": "My API Key",
         "expiry_days": 30
     }
-    
+
     Deactivate API key:
     {
         "action": "deactivate",
@@ -262,23 +224,27 @@ def generate_api_key(request):
     }
     """
     try:
-        if request.content_type == 'application/json':
+        if request.content_type == "application/json":
             data = json.loads(request.body)
         else:
             data = request.POST
-        
-        action = data.get('action', 'generate')
-        if action == 'generate':
+
+        action = data.get("action", "generate")
+        if action == "generate":
             try:
-                expiry_days = int(data.get('expiry_days', 3000))
-                name = data.get('name', f"API Key {timezone.now().strftime('%Y-%m-%d %H:%M')}")
-                
+                expiry_days = int(data.get("expiry_days", 3000))
+                name = data.get(
+                    "name", f"API Key {timezone.now().strftime('%Y-%m-%d %H:%M')}"
+                )
+
                 expires_at = timezone.now() + timedelta(days=expiry_days)
-                api_key_obj, generated_key = UserAPIKey.objects.create_key(user=request.user, name=name, expires_at=expires_at)
-                
+                api_key_obj, generated_key = UserAPIKey.objects.create_key(
+                    user=request.user, name=name, expires_at=expires_at
+                )
+
                 api_key_obj.api_key = generated_key
                 api_key_obj.save()
-                
+
                 response_data = {
                     "action": "generate",
                     "success": True,
@@ -287,34 +253,37 @@ def generate_api_key(request):
                         "api_key": generated_key,
                         "is_active": api_key_obj.is_active,
                         "expires_at": api_key_obj.expires_at,
-                        "created_at": api_key_obj.created_at
-                    }
+                        "created_at": api_key_obj.created_at,
+                    },
                 }
-                
+
                 return Response(response_data, status=status.HTTP_201_CREATED)
-                
+
             except ValueError:
                 return Response(
-                    {"success": False, "error": "Invalid expiry_days value"}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"success": False, "error": "Invalid expiry_days value"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-        
-        elif action == 'deactivate':
-            user_id = data.get('user_id')
-            api_key = data.get('api_key')
-            
+
+        elif action == "deactivate":
+            user_id = data.get("user_id")
+            api_key = data.get("api_key")
+
             if not user_id or not api_key:
                 return Response(
-                    {"success": False, "error": "user_id and api_key are required for deactivation"}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {
+                        "success": False,
+                        "error": "user_id and api_key are required for deactivation",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             try:
                 api_key_obj = UserAPIKey.objects.get(user_id=user_id, api_key=api_key)
                 api_key_obj.is_active = False
                 api_key_obj.expires_at = timezone.now()
-                api_key_obj.save(update_fields=['is_active', 'expires_at'])
-                
+                api_key_obj.save(update_fields=["is_active", "expires_at"])
+
                 response_data = {
                     "action": "deactivate",
                     "success": True,
@@ -322,28 +291,28 @@ def generate_api_key(request):
                     "data": {
                         "api_key": api_key,
                         "is_active": api_key_obj.is_active,
-                        "expires_at": api_key_obj.expires_at
-                    }
+                        "expires_at": api_key_obj.expires_at,
+                    },
                 }
-                
+
                 return Response(response_data, status=status.HTTP_200_OK)
-                
+
             except UserAPIKey.DoesNotExist:
                 return Response(
-                    {"success": False, "error": "API key not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
+                    {"success": False, "error": "API key not found"},
+                    status=status.HTTP_404_NOT_FOUND,
                 )
-        
+
         else:
             return Response(
-                {"error": "Invalid action. Use: generate, deactivate"}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Invalid action. Use: generate, deactivate"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            
+
     except Exception as e:
         return Response(
-            {"success": False, "error": str(e)}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"success": False, "error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
@@ -355,26 +324,30 @@ def get_user_api_keys(request):
     GET /api/v1/get_user_api_keys/
     """
     try:
-        api_keys = UserAPIKey.objects.filter(user=request.user, is_active=True, api_key__isnull=False).order_by('-created_at')
+        api_keys = UserAPIKey.objects.filter(
+            user=request.user, is_active=True, api_key__isnull=False
+        ).order_by("-created_at")
         formatted_keys = []
         for api_key_obj in api_keys:
-            formatted_keys.append({
-                "api_key": api_key_obj.api_key,
-                "is_active": api_key_obj.is_active,
-                "expires_at": api_key_obj.expires_at,
-                "created_at": api_key_obj.created_at
-            })
-        
+            formatted_keys.append(
+                {
+                    "api_key": api_key_obj.api_key,
+                    "is_active": api_key_obj.is_active,
+                    "expires_at": api_key_obj.expires_at,
+                    "created_at": api_key_obj.created_at,
+                }
+            )
+
         response_data = {
             "success": True,
             "message": "API keys retrieved successfully",
-            "api_keys": formatted_keys
+            "api_keys": formatted_keys,
         }
-        
+
         return Response(response_data, status=status.HTTP_200_OK)
-        
+
     except Exception as e:
         return Response(
-            {"success": False, "error": str(e)}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"success": False, "error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
