@@ -58,6 +58,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "0.0.0.0",
     "api-doc.core-stack.org",
+    "0cb52a0325c7.ngrok-free.app",
 ]
 
 # MARK: Django Apps
@@ -155,8 +156,8 @@ REST_FRAMEWORK = {
 
 # MARK: JWT settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=60),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=90),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=90),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=120),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
@@ -271,31 +272,6 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-STATICFILES_DIRS  = [
-    os.path.join(BASE_DIR, 'static')
-]
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-# ODK settings
-# https://odk.gramvaani.org/#/projects/9/forms/Add_Settlements_form%20_V1.0.1
-OD_DATA_URL_hemlet = "https://odk.gramvaani.org/v1/projects/9/forms/Add_Hamlet_form%20_V1.0.1.svc/Submissions"
-OD_DATA_URL_well = (
-    "https://odk.gramvaani.org/v1/projects/9/forms/Add_well_form_V1.0.1.svc/Submissions"
-)
-OD_DATA_URL_wb = "https://odk.gramvaani.org/v1/projects/9/forms/Hamlet_Waterbodies_Form_V1.0.3.svc/Submissions"
-OD_DATA_URL_plan = {
-    "odk_prop_agri": {
-        "odk_url": "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_Agri_Screen_V1.0.0.svc/Submissions",
-        "gps_point": "GPS_point_irrigation_work",
-    },
-    "odk_prop_wb": {
-        "odk_url": "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_NRM_form_Waterbody_Screen_V1.0.0.svc/Submissions",
-        "gps_point": "GPS_point_propose_maintainence",
-    },
-    "odk_prop_gw": {
-        "odk_url": "https://odk.gramvaani.org/v1/projects/9/forms/NRM_form_propose_new_recharge_structure_V1.0.0.svc/Submissions",
-        "gps_point": "GPS_point_recharge_structure",
-    },
-}
 
 LOGGING = {
     "version": 1,
