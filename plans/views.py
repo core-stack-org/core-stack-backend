@@ -1,11 +1,234 @@
 # plans/views.py
-from django.shortcuts import get_object_or_404
-from rest_framework import viewsets, permissions, status
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
+from rest_framework.authentication import BaseAuthentication
 from rest_framework.response import Response
-from projects.models import Project, AppType
-from users.permissions import IsOrganizationMember, HasProjectPermission
-from .models import Plan
-from .serializers import PlanSerializer, PlanCreateSerializer
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
+from geoadmin.models import UserAPIKey
+from organization.models import Organization
+from projects.models import AppType, Project
+
+from .models import PlanApp
+from .serializers import (
+    PlanAppSerializer,
+    PlanCreateSerializer,
+    PlanSerializer,
+    PlanUpdateSerializer,
+)
+
+
+class PlanPermission(permissions.BasePermission):
+    """
+    Custom permission for PlanApp:
+    - All authenticated users can view plans
+    - Only superadmins, org admins, administrators, and project managers can create/edit plans
+    - Plans must be enabled to be visible
+    """
+
+    schema = None
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        if request.user.is_superadmin or request.user.is_superuser:
+            return True
+
+        project_id = view.kwargs.get("project_pk")
+        if not project_id:
+            return False
+
+        if request.user.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists():
+            try:
+                project = Project.objects.get(id=project_id)
+                return project.organization == request.user.organization
+            except Project.DoesNotExist:
+                return False
+
+        if request.method == "POST":
+            return request.user.has_project_permission(
+                project_id=project_id, codename="add_watershed"
+            )
+        elif request.method in ["PUT", "PATCH"]:
+            return request.user.has_project_permission(
+                project_id=project_id, codename="change_watershed"
+            )
+        elif request.method == "DELETE":
+            return request.user.has_project_permission(
+                project_id=project_id, codename="delete_watershed"
+            )
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, "enabled") and not obj.enabled:
+            return False
+
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        if request.user.is_superadmin or request.user.is_superuser:
+            return True
+
+        project = None
+        if hasattr(obj, "project"):
+            project = obj.project
+
+        if not project:
+            return False
+
+        if request.user.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists():
+            return project.organization == request.user.organization
+
+        if request.method in ["PUT", "PATCH"]:
+            return request.user.has_project_permission(
+                project=project, codename="change_watershed"
+            )
+        elif request.method == "DELETE":
+            return request.user.has_project_permission(
+                project=project, codename="delete_watershed"
+            )
+
+        return False
+
+
+class APIKeyOrJWTAuth(BaseAuthentication):
+    """
+    Custom authentication class that supports both JWT tokens and API keys
+    """
+
+    def authenticate(self, request):
+        jwt_auth = JWTAuthentication()
+        try:
+            jwt_result = jwt_auth.authenticate(request)
+            if jwt_result:
+                return jwt_result
+        except Exception as e:
+            raise e
+
+        api_key = request.headers.get("X-API-Key")
+        if api_key:
+            try:
+                api_key_obj = UserAPIKey.objects.get_from_key(api_key)
+                if api_key_obj and api_key_obj.is_active and not api_key_obj.is_expired:
+                    api_key_obj.last_used_at = timezone.now()
+                    api_key_obj.save()
+                    return (api_key_obj.user, api_key_obj)
+            except Exception as e:
+                raise e
+        return None
+
+
+class GlobalPlanPermission(permissions.BasePermission):
+    """
+    Custom permission that allows:
+        - Superadmin and superusers
+        - Users with API Key
+    """
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if request.user.is_superadmin or request.user.is_superuser:
+            return True
+
+        if hasattr(request, "auth") and isinstance(request.auth, UserAPIKey):
+            return True
+
+        return False
+
+
+class SuperAdminPlanPermission(permissions.BasePermission):
+    """
+    Custom permission for superadmin only plan endpoints
+    """
+
+    schema = None
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        return request.user.is_superadmin or request.user.is_superuser
+
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, "enabled") and not obj.enabled:
+            return False
+
+        return request.user.is_superadmin or request.user.is_superuser
+
+
+class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for global watershed planning operations
+    Allows superadmin to view all plans across all organizations and projects
+    URL: /api/v1/watershed/plans/
+    """
+
+    schema = None
+    serializer_class = PlanAppSerializer
+    authentication_classes = [APIKeyOrJWTAuth]
+    permission_classes = [GlobalPlanPermission]
+
+    def get_queryset(self):
+        """
+        Return all plans for superadmins and API key users
+        """
+
+        queryset = PlanApp.objects.filter(enabled=True)
+
+        block_id = self.request.query_params.get("block", None)
+        district_id = self.request.query_params.get("district", None)
+        state_id = self.request.query_params.get("state", None)
+
+        if block_id:
+            queryset = queryset.filter(block=block_id)
+        elif district_id:
+            queryset = queryset.filter(district=district_id)
+        elif state_id:
+            queryset = queryset.filter(state=state_id)
+        return queryset.order_by("-created_at")
+
+
+class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for organization level watershed planning ops
+    Allows superadmins to view plans for a specific organization
+    URL: /api/v1/organization/{organization_id}/watershed/plans/
+    """
+
+    schema = None
+
+    serializer_class = PlanAppSerializer
+    permissions_classes = [permissions.IsAuthenticated, SuperAdminPlanPermission]
+
+    def get_queryset(self):
+        """
+        Filter plans by organizations for superadmins
+        """
+        if not (self.request.user.is_superadmin or self.request.user.is_superuser):
+            return PlanApp.objects.none()
+
+        organization_id = self.kwargs.get("organization_pk")
+        if organization_id:
+            try:
+                organization = Organization.objects.get(pk=organization_id)
+                return PlanApp.objects.filter(
+                    organization=organization, enabled=True
+                ).order_by("-created_at")
+            except Organization.DoesNotExist:
+                return PlanApp.objects.none()
+
+        return PlanApp.objects.none()
 
 
 class PlanViewSet(viewsets.ModelViewSet):
@@ -14,25 +237,72 @@ class PlanViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = PlanSerializer
-    permission_classes = [permissions.IsAuthenticated, HasProjectPermission]
-    # For the HasProjectPermission to work correctly
+    permission_classes = [permissions.IsAuthenticated, PlanPermission]
+    schema = None
     app_type = AppType.WATERSHED
 
     def get_queryset(self):
         """
         Filter plans by project
+        Superadmins: can see all the plans from all the projects from all the organizations
+        Org Admins: can see all plans from all the projects for an organization
+        App Users: can see all the plans from a project they are associated with
         """
         project_id = self.kwargs.get("project_pk")
-        if project_id:
-            # Get the watershed project
-            try:
-                project = Project.objects.get(
-                    id=project_id, app_type=AppType.WATERSHED, enabled=True
-                )
-                return Plan.objects.filter(project=project)
-            except Project.DoesNotExist:
-                return Plan.objects.none()
-        return Plan.objects.none()
+
+        if self.request.user.is_superuser or self.request.user.is_superadmin:
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
+                    base_queryset = PlanApp.objects.filter(
+                        project=project, enabled=True
+                    )
+                except Project.DoesNotExist:
+                    return PlanApp.objects.none()
+            else:
+                base_queryset = PlanApp.objects.filter(enabled=True)
+
+        elif self.request.user.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists():
+            base_queryset = PlanApp.objects.filter(
+                organization=self.request.user.organization, enabled=True
+            )
+
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
+                    if project.organization == self.request.user.organization:
+                        base_queryset = base_queryset.filter(project=project)
+                    else:
+                        return PlanApp.objects.none()
+                except Project.DoesNotExist:
+                    return PlanApp.objects.none()
+
+        else:
+            # regular user
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
+                    base_queryset = PlanApp.objects.filter(
+                        project=project, enabled=True
+                    )
+                except Project.DoesNotExist:
+                    return PlanApp.objects.none()
+            else:
+                return PlanApp.objects.none()
+
+        block_id = self.request.query_params.get("block", None)
+        if block_id:
+            base_queryset = base_queryset.filter(block=block_id)
+
+        return base_queryset
 
     def get_serializer_class(self):
         """
@@ -40,6 +310,10 @@ class PlanViewSet(viewsets.ModelViewSet):
         """
         if self.action in ["create"]:
             return PlanCreateSerializer
+        elif self.action in ["update", "partial_update"]:
+            return PlanUpdateSerializer
+        elif self.action in ["list", "retrieve"]:
+            return PlanAppSerializer
         return PlanSerializer
 
     def create(self, request, *args, **kwargs):
@@ -49,31 +323,33 @@ class PlanViewSet(viewsets.ModelViewSet):
         project_id = self.kwargs.get("project_pk")
         if not project_id:
             return Response(
-                {"detail": "Project ID is required."},
+                {"message": "Project ID is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get project and check if it's a watershed project and enabled
         try:
             project = Project.objects.get(
                 id=project_id, app_type=AppType.WATERSHED, enabled=True
             )
         except Project.DoesNotExist:
             return Response(
-                {"detail": "Watershed planning is not enabled for this project."},
+                {"message": "Watershed Planning is not enabled for this project."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Add project, organization, and created_by
         plan = serializer.save(
             project=project, organization=project.organization, created_by=request.user
         )
 
-        # Use the full serializer for response
-        return Response(PlanSerializer(plan).data, status=status.HTTP_201_CREATED)
+        response_data = {
+            "plan_data": PlanAppSerializer(plan).data,
+            "message": f"Successfully created the watershed plan,{plan.plan}",
+        }
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         """
@@ -82,17 +358,19 @@ class PlanViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        # Use PlanCreateSerializer for validation
-        create_serializer = PlanCreateSerializer(
-            instance, data=request.data, partial=partial
+        update_serializer = PlanUpdateSerializer(
+            instance, data=request.data, partial=partial, context={"request": request}
         )
-        create_serializer.is_valid(raise_exception=True)
+        update_serializer.is_valid(raise_exception=True)
 
-        # Save the instance with validated data
-        updated_instance = create_serializer.save()
+        updated_instance = update_serializer.save()
 
-        # Use PlanSerializer for response
-        return Response(PlanSerializer(updated_instance).data)
+        response_data = {
+            "plan_data": PlanAppSerializer(updated_instance).data,
+            "message": f"Successfully updated the watershed plan,{updated_instance.plan}",
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
         """

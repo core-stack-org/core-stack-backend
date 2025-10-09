@@ -1,7 +1,9 @@
-from django.db import models
 import uuid
+
 from django.contrib.auth.models import AbstractUser, Group, Permission
+from django.db import models
 from django.utils.translation import gettext_lazy as _
+
 from organization.models import Organization
 
 
@@ -14,7 +16,6 @@ class User(AbstractUser):
     odk_username = models.CharField(max_length=255, blank=True, null=True)
     is_superadmin = models.BooleanField(default=False)
 
-    # Override the ManyToMany fields from AbstractUser with custom related_name
     groups = models.ManyToManyField(
         Group,
         verbose_name=_("groups"),
@@ -51,11 +52,9 @@ class User(AbstractUser):
         Returns:
             bool: True if the user has permission, False otherwise
         """
-        # Super admins have all permissions
         if self.is_superadmin or self.is_superuser:
             return True
 
-        # Get project object if only ID was provided
         if not project and project_id:
             from projects.models import Project
 
@@ -64,7 +63,17 @@ class User(AbstractUser):
             except Project.DoesNotExist:
                 return False
 
-        # Check if user has any role in this project
+        # org admin should have permission for all the projects in their org
+        if (
+                self.organization
+                and project
+                and project.organization == self.organization
+                and self.groups.filter(
+            name_in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
+        ):
+            return True
+
         try:
             user_project_group = UserProjectGroup.objects.get(
                 user=self, project=project

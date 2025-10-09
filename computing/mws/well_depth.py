@@ -2,34 +2,78 @@ import ee
 import datetime
 
 from dateutil.relativedelta import relativedelta
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
+from computing.models import Layer, Dataset
 
 
-def well_depth(state, district, block, start_date, end_date):
+def well_depth(
+        asset_suffix=None,
+        asset_folder_list=None,
+        app_type=None,
+        start_date=None,
+        end_date=None,
+):
     print("Inside well depth script")
-    description = (
-        "well_depth_annual_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+    description = "well_depth_annual_" + asset_suffix
+    asset_path = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
     )
-    if is_gee_asset_exists(get_gee_asset_path(state, district, block) + description):
-        return
+    asset_id = asset_path + description
 
+    if is_gee_asset_exists(asset_id):
+        print("Well depth asset already exists")
+        layer_obj = None
+        try:
+            dataset = Dataset.objects.get(name="Hydrology")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=f"deltaG_well_depth_{asset_suffix}",
+            )
+        except Exception as e:
+            print(
+                "layer not found for welldepth. So, reading the column name from asset_id"
+            )
+        if layer_obj:
+            db_end_date = layer_obj.misc["end_year"]
+        else:
+            fc = ee.FeatureCollection(asset_id)
+            col_names = fc.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("20")]
+            filtered_col.sort()
+            db_end_date = filtered_col[-1].split("_")[-1]
+
+        db_end_date = f"{db_end_date}-06-30"
+        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+
+        if db_end_date < end_date:
+            end_date = end_date.strftime("%Y-%m-%d")
+            ee.data.deleteAsset(asset_id)
+        else:
+            return None, asset_id
+
+    return _generate_data(
+        asset_id, asset_path, description, asset_suffix, start_date, end_date
+    )
+
+
+def _generate_data(
+        asset_id, asset_path, description, asset_suffix, start_date, end_date
+):
     principal_aquifers = ee.FeatureCollection(
         "projects/ee-anz208490/assets/principalAquifer"
     )
     slopes = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_delta_g_annual_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )  # Feature collection path of any deltag asset of any location
+        asset_path + "filtered_delta_g_annual_" + asset_suffix + "_uid"
+    )
     yeild__ = ee.List(principal_aquifers.aggregate_array("yeild__"))
     distinct = yeild__.distinct()
-
     diction = ee.Dictionary(
         {
             "": "NA",
@@ -102,11 +146,9 @@ def well_depth(state, district, block, start_date, end_date):
 
     shape = slopes.map(fun2)
     keys = ["Precipitation", "RunOff", "ET", "DeltaG", "WellDepth"]
-
     # year of interest
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-
     while f_start_date <= end_date:
         f_end_date = f_start_date + relativedelta(years=1)
 
@@ -129,19 +171,6 @@ def well_depth(state, district, block, start_date, end_date):
         shape = shape.map(res)
         f_start_date = f_end_date
         start_date = f_start_date
-
-    try:
-        task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": shape,
-                "description": description,
-                "assetId": get_gee_asset_path(state, district, block) + description,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
-        )
-        print("Successfully started the task well_depth_annual ", task.status())
-        task.start()
-        return task.status()["id"]
-    except Exception as e:
-        print(f"Error occurred in running well_depth task: {e}")
+    # Export feature collection to GEE
+    task_id = export_vector_asset_to_gee(shape, description, asset_id)
+    return task_id, asset_id

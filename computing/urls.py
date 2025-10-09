@@ -1,3 +1,5 @@
+from tkinter.font import names
+
 from django.urls import path
 from . import api
 
@@ -11,12 +13,21 @@ urlpatterns = [
     path("delete_layer/", api.delete_layer, name="delete_layer"),
     path("upload_kml/", api.upload_kml, name="upload_kml"),
     path("generate_mws_layer/", api.generate_mws_layer, name="generate_mws_layer"),
-    path("lulc_v3/", api.lulc_v3_river_basin, name="lulc_v3"),
+    path(
+        "hydrology_fortnightly/",
+        api.generate_fortnightly_hydrology,
+        name="hydrology_fortnightly",
+    ),
+    path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
+    path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
+    path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
+    path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
     path("lulc_vector/", api.lulc_vector, name="lulc_vector"),
+    path("lulc_farm_boundary/", api.lulc_farm_boundary, name="lulc_farm_boundary"),
+    path("lulc_v4/", api.lulc_v4, name="lulc_v4"),
     path("get_gee_layer/", api.get_gee_layer, name="get_gee_layer"),
     path("generate_ci_layer/", api.generate_ci_layer, name="generate_ci_layer"),
     path("generate_swb/", api.generate_swb, name="generate_swb"),
-    path("generate_well_depth/", api.generate_well_depth, name="generate_well_depth"),
     path(
         "generate_drought_layer/",
         api.generate_drought_layer,
@@ -52,7 +63,7 @@ urlpatterns = [
     path("crop_grid/", api.crop_grid, name="crop_grid"),
     path("tree_health_raster/", api.tree_health_raster, name="tree_health_raster"),
     path("tree_health_vector/", api.tree_health_vector, name="tree_health_vector"),
-    path("stream_order_vector/", api.stream_order_vector, name="stream_order_vector"),
+    path("stream_order/", api.stream_order, name="stream_order"),
     path(
         "mws_drought_causality/",
         api.mws_drought_causality,
@@ -68,12 +79,6 @@ urlpatterns = [
         name="generate_drainage_layer",
     ),
     path(
-        "generate_drainage_density/",
-        api.generate_drainage_density,
-        name="generate_drainage_density",
-    ),
-    path("generate_lithology/", api.generate_lithology, name="generate_lithology"),
-    path(
         "plantation_site_suitability/",
         api.plantation_site_suitability,
         name="plantation_site_suitability",
@@ -82,5 +87,20 @@ urlpatterns = [
         "restoration_opportunity/",
         api.restoration_opportunity,
         name="restoration_opportunity",
+    ),
+    path("aquifer_vector/", api.aquifer_vector, name="aquifer_vector"),
+    path("soge_vector/", api.soge_vector, name="soge_vector"),
+    path("fes_clart_layer/", api.fes_clart_upload_layer, name="fes_clart_layer"),
+    path("generate_ponds/", api.ponds_compute, name="ponds_compute"),
+    path("generate_wells/", api.wells_compute, name="wells_compute"),
+    path(
+        "merge_swb_ponds/",
+        api.swb_pond_merging,
+        name="merge_swb_ponds",
+    ),
+    path(
+        "generate_layer_in_order/",
+        api.generate_layer_in_order,
+        name="generate_layer_in_order",
     ),
 ]

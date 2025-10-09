@@ -1,7 +1,8 @@
 from django.db import models
-from geoadmin.models import State, District, Block
-from projects.models import Project, AppType
+
+from geoadmin.models import Block, District, DistrictSOI, State, StateSOI, TehsilSOI
 from organization.models import Organization
+from projects.models import Project
 from users.models import User
 
 
@@ -34,6 +35,15 @@ class PlanApp(models.Model):
     state = models.ForeignKey(State, on_delete=models.CASCADE)
     district = models.ForeignKey(District, on_delete=models.CASCADE)
     block = models.ForeignKey(Block, on_delete=models.CASCADE)
+    state_soi = models.ForeignKey(
+        StateSOI, on_delete=models.CASCADE, null=True, blank=True
+    )
+    district_soi = models.ForeignKey(
+        DistrictSOI, on_delete=models.CASCADE, null=True, blank=True
+    )
+    tehsil_soi = models.ForeignKey(
+        TehsilSOI, on_delete=models.CASCADE, null=True, blank=True
+    )
     village_name = models.CharField(max_length=255)
     gram_panchayat = models.CharField(max_length=255)
     created_by = models.ForeignKey(
@@ -49,6 +59,12 @@ class PlanApp(models.Model):
     is_dpr_generated = models.BooleanField(default=False)
     is_dpr_reviewed = models.BooleanField(default=False)
     is_dpr_approved = models.BooleanField(default=False)
+    latitude = models.DecimalField(
+        max_digits=20, decimal_places=8, null=True, blank=True
+    )
+    longitude = models.DecimalField(
+        max_digits=20, decimal_places=8, null=True, blank=True
+    )
 
     def __str__(self):
         return str(self.plan)

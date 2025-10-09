@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MWS Analysis Report</title>
+
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.4.0/ol.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.4.0/dist/ol.js"></script>
+
+    <!-- OpenLayers-ext JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.js"></script>
+
+    <!-- OpenLayers-ext CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+        .map-group{
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+        .map {
+            height: 400px;
+            width: 100%;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 70vw;
+            margin: 20px 0 10px 0;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 2px;
+        }
+        footer {
+            margin-top: 40px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        /* Print Button Styles */
+        .print-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+        
+        .print-button:hover {
+            background-color: #2ecc71;
+        }
+        
+        .print-button svg {
+            margin-right: 5px;
+        }
+        
+        /* Hide print button when printing */
+        @media print {
+            .print-button {
+                display: none;
+            }
+        }
+
+       /* Print-specific styles */
+       @media print {
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          padding: 0;
+        }
+        #map {
+          width: 100vw;
+          height: 100vh;
+        }
+
+        .container {
+            width: 100vw;
+            max-width: none;
+            padding: 0;
+        }
+
+        header {
+            background-color: #2c3e50 !important;
+            color: white !important;
+            padding: 15px 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .chart-container {
+            height: 250px !important;
+            width: 80vw !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .legend-color {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            background-clip: content-box !important;
+        }
+
+        /* Ensure charts render properly */
+        canvas {
+            height: auto !important;
+            max-width: auto !important;
+        }
+      }
+
+    </style>
+</head>
+<body>
+<header>
+    <div class="container">
+        <h1>Micro-Watershed Data Analysis Report</h1>
+        <p>Spatial and Temporal Analysis of Key Metrics</p>
+        <button class="print-button" onclick="printReport()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Save as PDF
+        </button>
+    </div>
+</header>
+
+<div class="container">
+
+    <section class="section">
+
+        <h2>Overview of block characteristics</h2>
+        <p>{{block_osm}}</p>
+
+        <div id="mainMap" class="map"></div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #000000;"></div>
+                <span>Farm - Farm</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #87CEEB;"></div>
+                <span>Selected MWS</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h3>Terrain Description</h3>
+        <p>{{terrain_desc}}</p>
+        <div id="terrainMap" class="map"></div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #313695;"></div>
+                <span>V-shape river valleys, Deep narrow canyons</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4575b4;"></div>
+                <span>Lateral midslope incised drainages, Local valleys in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a50026;"></div>
+                <span>Upland incised drainages, Stream headwaters</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                <span>U-shape valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #fffc00;"></div>
+                <span>Broad Flat Areas</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #feb24c;"></div>
+                <span>Broad open slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f46d43;"></div>
+                <span>Mesa tops</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d73027;"></div>
+                <span>Upper Slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #91bfdb;"></div>
+                <span>Local ridge/hilltops within broad valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #800000;"></div>
+                <span>Lateral midslope drainage divides, Local ridges in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4d0000;"></div>
+                <span>Mountain tops, high ridges</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h3>Land use on Slopes and Plains Description</h3>
+        <p>{{lulc_desc}}</p>
+    </section>
+
+    {% if land_degrad_desc %}
+    <section class="section">
+        <h4>Degradation of land</h4>
+        <p>{{land_degrad_desc}}</p>
+
+        <div id="landDegredMap" class="map"></div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eee05d;"></div>
+                <span>Farm - Farm</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <span>Farm - Built Up</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                <span>Farm - Barren</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                <span>Farm - Scrub Land</span>
+            </div>
+        </div>
+
+    </section>
+    {% endif %}
+
+    {% if tree_reduce_desc %}
+    <section class="section">
+        <h4>Reduction of Tree Cover</h4>
+        <p>{{tree_reduce_desc}}</p>
+
+        <div id="treeReduceMap" class="map"></div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #73bb53;"></div>
+                <span>Forest - Forest</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <span>Forest - Built Up</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eee05d;"></div>
+                <span>Forest - Farm</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                <span>Forest - Barren</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                <span>Forest - Scrub land</span>
+            </div>
+        </div>
+
+    </section>
+    {% endif %}
+
+    {% if urban_desc %}
+    <section class="section">
+        <h4>Urbanization</h4>
+        <p>{{urban_desc}}</p>
+    </section>
+    {% endif %}
+
+    <section class="section">
+        <h4>Cropping Intensity</h4>
+        <p>{{inten_desc1}}</p>
+        <p>{{inten_desc2}}</p>
+        <p>{{inten_desc3}}</p>
+
+        <div class="chart-container">
+            <canvas id="barChart-intensity"></canvas>
+        </div>
+
+    </section>
+
+    <section class="section">
+        <h4>Surface water bodies</h4>
+        <p>{{swb_desc}}</p>
+        <p>{{rabi_desc}}</p>
+        <p>{{kh_desc_1}}</p>
+        <p>{{kh_desc_2}}</p>
+        <p>{{kh_desc_3}}</p>
+    </section>
+
+    <section class="section">
+        <h4>Water Balance</h4>
+        <p>A water balance study of the micro watersheds indicates whether it is helping conserve water or deplete water
+            from the underlying aquifer. Incoming water into a microwatershed is through rainfall. Some of this is lost
+            as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for
+            irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of
+            the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more
+            water.</p>
+        <p>{{deltag_desc}}</p>
+        <p>{{good_rainfall_desc}}</p>
+        <p>{{bad_rainfall_desc}}</p>
+    </section>
+
+
+    <footer>
+        <div class="container">
+            <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+        </div>
+    </footer>
+
+    <script>
+
+        const mwsList = JSON.parse('{{mwsList|safe}}')
+
+        const mainMap = new ol.Map({
+            target: 'mainMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        });
+
+        const landDegrad = new ol.Map({
+            target: 'landDegredMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                }),
+                new ol.layer.Image({
+                    source : new ol.source.ImageWMS({
+                        url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                        params : {
+                            'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
+                            'STYLES' : "change_detection_degradation"
+                        },
+                        ratio : 1,
+                        serverType: 'geoserver',
+                    }),
+                    visible : true,
+                    name : 'degrad_raster'
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        });
+
+        const treeReduceMap = new ol.Map({
+            target: 'treeReduceMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                }),
+                new ol.layer.Image({
+                    source : new ol.source.ImageWMS({
+                        url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                        params : {
+                            'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
+                            'STYLES' : "change_detection_deforestation"
+                        },
+                        ratio : 1,
+                        serverType: 'geoserver',
+                    }),
+                    visible : true,
+                    name : 'tree_raster'
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        const terrainMap = new ol.Map({
+            target: 'terrainMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                }),
+                new ol.layer.Image({
+                    source : new ol.source.ImageWMS({
+                        url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                        params : {
+                            'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                            'STYLES' : 'Terrain_Style_11_Classes'
+                        },
+                        ratio : 1,
+                        serverType: 'geoserver',
+                    }),
+                    visible : true,
+                    name : 'terrain_raster'
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        })
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                let strokeColor = 'black'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.0)'; // Default fill color with 0.4 opacity
+
+                if (mwsList.includes(uid)) {
+                    strokeColor = 'skyblue';
+                    fillColor = 'rgba(255, 255, 0, 0.0)';
+                }
+
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+            mainMap.addLayer(vectorLayer);
+            landDegrad.addLayer(vectorLayer)
+            treeReduceMap.addLayer(vectorLayer)
+            terrainMap.addLayer(vectorLayer)
+
+            const arr = vectorSource.getExtent();
+            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+            mainMap.getView().setCenter(mapcenter);
+            
+            landDegrad.getView().setCenter(mapcenter);
+            treeReduceMap.getView().setCenter(mapcenter);
+            terrainMap.getView().setCenter(mapcenter);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
+        //? Cropping Intensity
+        const single = JSON.parse('{{single|safe}}')
+        const double = JSON.parse('{{double|safe}}')
+        const triple = JSON.parse('{{triple|safe}}')
+        const uncrop = JSON.parse('{{uncrop|safe}}')
+
+        const barChart_cropping = new Chart(document.getElementById('barChart-intensity'), {
+            type: 'bar',
+            data: {
+                labels: ['2017', '2018', '2019', '2020', '2021', '2022'], // TODO : Get years from backend, don't hardcode as year would increase as data increase
+                datasets: [
+                {
+                    label: 'Single-Cropping',
+                    data: single,
+                    backgroundColor: '#ffc413',
+
+                },
+                {
+                    label: 'Double-Cropping',
+                    data: double,
+                    backgroundColor: '#fe8200'
+
+                },
+                {
+                    label: 'Triple-Cropping',
+                    data: triple,
+                    backgroundColor: '#f44336'
+
+                },
+                {
+                    label: 'Uncropped',
+                    data: uncrop,
+                    backgroundColor: '#999999'
+
+                },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x : {
+                        stacked : true,
+                        title : {
+                            display: true,
+                            text: 'Year'
+                        }
+                    },
+                    y: {
+                        stacked : true,
+                        title : {
+                            display: true,
+                            text: 'Percentage'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 0 // Disable animation for better print support
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Area under single, double, triple cropping over the years',
+                },
+            }
+        });
+
+        //Setting the Date Time of Report being saved or printed
+        const currentDate = new Date();
+
+        // Format the date as "Month Day, Year" (e.g., "March 3, 2025")
+        const formattedDate = currentDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Insert the formatted date into the span
+        document.getElementById("report-date").textContent = formattedDate;
+
+        function printReport() {
+            // Trigger browser print dialog
+            window.print();
+        }
+
+    </script>
+
+</body>
+</html>

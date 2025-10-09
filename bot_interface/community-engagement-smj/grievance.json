@@ -1,0 +1,162 @@
+[
+  {
+    "name": "GrievanceStart",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📝 शिकायत पंजीकरण\n\nकृपया अपनी शिकायत दर्ज करने के लिए निम्नलिखित चरणों का पालन करें।",
+            "en": "📝 Grievance Registration\n\nPlease follow the steps below to register your grievance.",
+            "default": "📝 Grievance Registration\n\nPlease follow the steps below to register your grievance."
+          }
+        ]
+      },
+      {
+        "function": "move_forward"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "SendLocationRequest": [
+          "success"
+        ]
+      },
+      {
+        "GrievanceStart": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendLocationRequest",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📍 कृपया संसाधन स्थल की लोकेशन भेजें",
+            "en": "📍 Please send the location of the work site",
+            "default": "📍 Please send the location of the work site"
+          }
+        ]
+      },
+      {
+        "function": "send_location_request"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_location_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestAudio": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RequestAudio",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "🎤 कृपया अपनी शिकायत की जानकारी के लिए एक ऑडियो रिकॉर्ड करें।\n\nऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• आपकी शिकायत का विस्तृत विवरण\n• समस्या कब से है\n• किससे संबंधित है (सरकारी विभाग, स्थानीय अधिकारी, आदि)",
+            "en": "🎤 Please record an audio for your grievance information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your grievance\n• Since when this problem exists\n• Who is it related to (government department, local official, etc.)",
+            "default": "🎤 Please record an audio for your grievance information.\n\nInclude the following details in audio:\n• State, district, tehsil and village name\n• Detailed description of your grievance\n• Since when this problem exists\n• Who is it related to (government department, local official, etc.)"
+          }
+        ]
+      },
+      {
+        "function": "pick_audio"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_audio_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestPhotos": [
+          "success"
+        ]
+      },
+      {
+        "RequestAudio": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RequestPhotos",
+    "preAction": [
+      {
+        "text": [
+          {
+            "hi": "📷 कृपया समस्या से संबंधित फोटो अपलोड करें (यदि कोई हो)",
+            "en": "📷 Please upload photos related to the issue (if any)",
+            "default": "📷 Please upload photos related to the issue (if any)"
+          }
+        ]
+      },
+      {
+        "function": "pick_img"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_photo_data"
+      }
+    ],
+    "transition": [
+      {
+        "ThankYou": [
+          "success"
+        ]
+      },
+      {
+        "RequestPhotos": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ThankYou",
+    "preAction": [
+      {
+        "function": "log_grievance_completion"
+      },
+      {
+        "text": [
+          {
+            "hi": "✅ धन्यवाद! आपकी शिकायत सफलतापूर्वक दर्ज कर दी गई है।\n\nआपकी शिकायत की जांच की जाएगी और आपको अपडेट दिया जाएगा।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
+            "en": "✅ Thank you! Your grievance has been successfully registered.\n\nYour grievance will be reviewed and you will be updated.\n\n🙏 Send \"Hi\" to restart the chat.",
+            "default": "✅ Thank you! Your grievance has been successfully registered.\n\nYour grievance will be reviewed and you will be updated.\n\n🙏 Send \"Hi\" to restart the chat."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "ThankYou": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]

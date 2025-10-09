@@ -5,13 +5,24 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    sync_raster_to_gcs,
+    sync_raster_gcs_to_geoserver,
+    export_raster_asset_to_gee,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
+from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+from utilities.constants import GEE_DATASET_PATH
 
 
 @app.task(bind=True)
-def generate_restoration_opportunity(self, state, district, block):
-    ee_initialize()
+def generate_restoration_opportunity(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
@@ -28,15 +39,16 @@ def generate_restoration_opportunity(self, state, district, block):
     raster_asset_id = clip_raster(roi, state, district, block, description)
 
     args = [
-        {"value": 0, "label": "Protection"},
-        {"value": 1, "label": "Wide-scale Restoration"},
-        {"value": 2, "label": "Mosaic Restoration"},
-        {"value": 3, "label": "Excluded Areas"},
+        {"value": 0, "label": "Excluded Areas"},
+        {"value": 1, "label": "Mosaic Restoration"},
+        {"value": 2, "label": "Wide-scale Restoration"},
+        {"value": 3, "label": "Protection"},
     ]
 
-    return generate_vector(
+    layer_at_geoserver = generate_vector(
         roi, raster_asset_id, args, state, district, block, description + "_vector"
     )
+    return layer_at_geoserver
 
 
 def clip_raster(roi, state, district, block, description):
@@ -45,25 +57,44 @@ def clip_raster(roi, state, district, block, description):
         return asset_id
 
     restoration_raster = ee.Image(
-        "projects/ee-corestackdev/assets/datasets/WRI/LandscapeRestorationOpportunities"
+        GEE_DATASET_PATH + "/WRI/LandscapeRestorationOpportunities"
     )
 
     clipped_raster = restoration_raster.clip(roi.geometry())
-
-    task = ee.batch.Export.image.toAsset(
+    task_id = export_raster_asset_to_gee(
         image=clipped_raster,
         description=description + "_raster",
-        assetId=asset_id,
-        pyramidingPolicy={"predicted_label": "mode"},
+        asset_id=asset_id,
         scale=60,
         region=roi.geometry(),
-        maxPixels=1e13,
-        crs="EPSG:4326",
     )
-    task.start()
-    check_task_status(task.status()["id"])
+    check_task_status([task_id])
 
-    return asset_id
+    if is_gee_asset_exists(asset_id):
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"restoration_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster",
+            asset_id=asset_id,
+            dataset_name="Restoration Raster",
+        )
+        make_asset_public(asset_id)
+
+        image = ee.Image(asset_id)
+        task_id = sync_raster_to_gcs(image, 60, description + "_raster")
+        check_task_status([task_id])
+        res = sync_raster_gcs_to_geoserver(
+            "restoration",
+            description + "_raster",
+            description + "_raster",
+            "restoration_style",
+        )
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+        return asset_id
+    return None
 
 
 def generate_vector(roi, raster_asset_id, args, state, district, block, description):
@@ -86,7 +117,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         forest_area = pixel_area.updateMask(mask)
 
         fc = forest_area.reduceRegions(
-            collection=fc, reducer=ee.Reducer.sum(), scale=60, crs=raster.projection()
+            collection=fc, reducer=ee.Reducer.sum(), scale=10, crs=raster.projection()
         )
 
         def remove_property(feat, prop):
@@ -104,13 +135,27 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         fc = fc.map(process_feature)
 
     fc = ee.FeatureCollection(fc)
+    asset_id = get_gee_asset_path(state, district, block) + description
+    if not is_gee_asset_exists(asset_id):
+        task_id = export_vector_asset_to_gee(fc, description, asset_id=asset_id)
+        check_task_status([task_id])
 
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": description,
-            "assetId": get_gee_asset_path(state, district, block) + description,
-        }
-    )
-    task.start()
-    return task.status()["id"]
+    layer_at_geoserver = False
+    if is_gee_asset_exists(asset_id):
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"restoration_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector",
+            asset_id=asset_id,
+            dataset_name="Restoration Vector",
+        )
+
+        fc = ee.FeatureCollection(fc).getInfo()
+        fc = {"features": fc["features"], "type": fc["type"]}
+        res = sync_layer_to_geoserver(state, fc, description, "restoration")
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

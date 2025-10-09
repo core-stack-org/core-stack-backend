@@ -1,6 +1,8 @@
 import ee
 from computing.utils import (
     sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -8,13 +10,15 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    make_asset_public,
 )
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def generate_terrain_clusters(self, state, district, block):
-    ee_initialize()
+def generate_terrain_clusters(self, state, district, block, gee_account_id):
+    ee_initialize(gee_account_id)
 
     asset_name = (
         valid_gee_text(district.lower())
@@ -24,11 +28,12 @@ def generate_terrain_clusters(self, state, district, block):
     )
 
     asset_id = get_gee_asset_path(state, district, block) + asset_name
-
+    layer_id = None
     if not is_gee_asset_exists(asset_id):
-        compute_on_gee(state, district, block, asset_id, asset_name)
+        layer_id = compute_on_gee(state, district, block, asset_id, asset_name)
 
-    sync_to_geoserver(state, district, block, asset_id)
+    layer_at_geoserver = sync_to_geoserver(state, district, block, asset_id, layer_id)
+    return layer_at_geoserver
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
@@ -353,19 +358,24 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
 
     fc = mt1k.map(process_geometry)
     # Export an ee.FeatureCollection as an Earth Engine asset.
-    task = ee.batch.Export.table.toAsset(
-        **{
-            "collection": fc,
-            "description": asset_name,
-            "assetId": asset_id,
-        }
-    )
-    task.start()
-    print("Successfully started the terrain cluster", task.status())
-    check_task_status([task.status()["id"]])
+    task = export_vector_asset_to_gee(fc, asset_name, asset_id)
+    check_task_status([task])
+
+    layer_id = None
+    if is_gee_asset_exists(asset_id):
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_cluster",
+            asset_id=asset_id,
+            dataset_name="Terrain Vector",
+        )
+        make_asset_public(asset_id)
+    return layer_id
 
 
-def sync_to_geoserver(state, district, block, asset_id):
+def sync_to_geoserver(state, district, block, asset_id, layer_id):
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -378,3 +388,9 @@ def sync_to_geoserver(state, district, block, asset_id):
         "terrain",
     )
     print(res)
+    layer_at_geoserver = False
+    if res["status_code"] == 201 and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag is updated")
+        layer_at_geoserver = True
+    return layer_at_geoserver

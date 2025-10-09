@@ -1,34 +1,32 @@
-# projects/views.py
-from rest_framework import viewsets, permissions, status
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-from .models import Project, AppType
-from .serializers import (
-    ProjectSerializer,
-    ProjectDetailSerializer,
-    AppTypeSerializer,
-)
-from users.permissions import IsOrganizationMember, HasProjectPermission
+
+from users.permissions import IsOrganizationMember
 from users.serializers import UserProjectGroup, UserProjectGroupSerializer
+
+from .models import Project
+from .serializers import (
+    AppTypeSerializer,
+    ProjectDetailSerializer,
+    ProjectSerializer,
+)
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated, IsOrganizationMember]
+    schema = None
 
     def get_queryset(self):
         user = self.request.user
 
-        # Super admins can see all projects
         if user.is_superadmin or user.is_superuser:
             return Project.objects.all()
 
-        # Organization users can see their organization's projects
         if user.organization:
             return Project.objects.filter(organization=user.organization)
 
-        # Users without organization see nothing
         return Project.objects.none()
 
     def get_serializer_class(self):
@@ -37,9 +35,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return ProjectSerializer
 
     def perform_create(self, serializer):
-        # Ensure the project is created within the user's organization
-        organization = self.request.user.organization
-        serializer.save(organization=organization)
+        user = self.request.user
+
+        if user.is_superadmin or user.is_superuser:
+            if (
+                    "organization" not in serializer.validated_data
+                    or not serializer.validated_data["organization"]
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "organization": "Organization ID is required for superadmin users."
+                    }
+                )
+            serializer.save()
+        else:
+            organization = user.organization
+            serializer.save(organization=organization)
 
     @action(detail=True, methods=["patch"])
     def update_app_type(self, request, pk=None):

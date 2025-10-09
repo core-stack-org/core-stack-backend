@@ -1,28 +1,31 @@
 import ee
-from utilities.gee_utils import valid_gee_text, get_gee_asset_path, is_gee_asset_exists
-from waterrejuvenation.utils import wait_for_task_completion, WATER_REJ_GEE_ASSET
+
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+)
 
 
-def calculate_swb3(aoi, state=None, district=None, block=None, roi=None, app_name=None, proj_name=None):
-    # Generate a unique description and asset ID for the water body processing
-    if state and block and district:
-        description = (
-        "swb3_" + valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-        asset_id = get_gee_asset_path(state, district, block) + description
-        water_bodies = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
-            + "swb2_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+def waterbody_wbc_intersection(
+        roi=None,
+        state=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        app_type=None,
+):
+    if not state:
+        print("State name must be provided to run this script")
+        return None
+
+    description = "swb3_" + asset_suffix
+    asset_id = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
-    else:
-        description = "swb3_" + str(app_name) + "_" + str(proj_name)
-        asset_id = WATER_REJ_GEE_ASSET + str(proj_name)+ "/"+"filtered_mws_" + str(proj_name)+"/"+str(description)
-        water_bodies = ee.FeatureCollection(
-             WATER_REJ_GEE_ASSET + str(proj_name)+ "/"+"filtered_mws_" + str(proj_name)+"/"+"swb2_" + str(app_name) + "_" + str(proj_name)
-           )
+            + description
+    )
 
     # Check if the asset already exists to avoid redundant processing
     if is_gee_asset_exists(asset_id):
@@ -32,11 +35,17 @@ def calculate_swb3(aoi, state=None, district=None, block=None, roi=None, app_nam
     census_state = ee.FeatureCollection(
         "projects/ee-vatsal/assets/WBC_" + state.upper().replace(" ", "") + "_UPD"
     )
-
+    water_bodies = ee.FeatureCollection(
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + "swb2_"
+        + asset_suffix
+    )
 
     # Filter points and polygons within the area of interest (aoi)
-    points = census_state.filterBounds(aoi)
-    polygons = water_bodies.filterBounds(aoi)
+    points = census_state.filterBounds(roi)
+    polygons = water_bodies.filterBounds(roi)
 
     feature_collection = points
 
@@ -174,20 +183,5 @@ def calculate_swb3(aoi, state=None, district=None, block=None, roi=None, app_nam
     final_upd = filtered_fc1.merge(merged)
 
     # Export the final feature collection to Google Earth Engine asset
-    try:
-        swb_task = ee.batch.Export.table.toAsset(
-            **{
-                "collection": final_upd,
-                "description": description,
-                "assetId": asset_id,
-                "scale": 30,
-                "maxPixels": 1e13,
-            }
-        )
-
-        swb_task.start()
-        wait_for_task_completion(swb_task)
-        print("Successfully started the swb3", swb_task.status())
-        return swb_task.status()["id"], asset_id
-    except Exception as e:
-        print(f"Error occurred in running swb3 task: {e}")
+    task_id = export_vector_asset_to_gee(final_upd, description, asset_id)
+    return task_id, asset_id

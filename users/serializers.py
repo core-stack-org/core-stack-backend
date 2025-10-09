@@ -1,8 +1,10 @@
-from rest_framework import serializers
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
-from .models import User, UserProjectGroup
+from rest_framework import serializers
+
 from projects.models import Project
+
+from .models import User, UserProjectGroup
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -57,11 +59,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         write_only=True, required=True, validators=[validate_password]
     )
     password_confirm = serializers.CharField(write_only=True, required=True)
-    organization = serializers.UUIDField(required=False, write_only=True)
+    organization = serializers.CharField(required=False, write_only=True)  # Changed from UUIDField to CharField
 
     class Meta:
         model = User
         fields = [
+            "id",
             "username",
             "email",
             "password",
@@ -71,6 +74,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "contact_number",
             "organization",
         ]
+        read_only_fields = ["id"]
 
     def validate(self, attrs):
         # Check that passwords match
@@ -79,41 +83,74 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 {"password": "Password fields didn't match."}
             )
 
-        # Validate organization if provided
-        organization_id = attrs.get("organization")
-        if organization_id:
+        organization_input = attrs.get("organization")
+        if organization_input:
             from organization.models import Organization
+            import uuid
 
+            # Check if input is UUID
             try:
-                organization = Organization.objects.get(id=organization_id)
-                # Store the organization object for use in create
-                attrs["organization_obj"] = organization
-            except Organization.DoesNotExist:
-                raise serializers.ValidationError(
-                    {"organization": "Organization not found."}
-                )
+                uuid.UUID(organization_input)
+                is_uuid = True
+            except (ValueError, TypeError):
+                is_uuid = False
+
+            if is_uuid:
+                try:
+                    organization = Organization.objects.get(id=organization_input)
+                    attrs["organization_obj"] = organization
+                except Organization.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"organization": "Organization not found."}
+                    )
+            else:
+                # Case-insensitive lookup for existing org
+                try:
+                    organization = Organization.objects.filter(
+                        name__iexact=organization_input
+                    ).first()
+
+                    if organization:
+                        attrs["organization_obj"] = organization
+                    else:
+                        # Defer creation to `create()` so we can assign `created_by`
+                        attrs["_new_org_name"] = organization_input
+                except Exception as e:
+                    raise serializers.ValidationError(
+                        {"organization": f"Failed to create/find organization: {str(e)}"}
+                    )
 
         return attrs
 
     def create(self, validated_data):
-        # Remove password_confirm as it's not part of the User model
+        from organization.models import Organization
+
+        # pop custom fields
+        org_obj = validated_data.pop("organization_obj", None)
+        new_org_name = validated_data.pop("_new_org_name", None)
         validated_data.pop("password_confirm")
 
-        # Handle organization separately
-        organization = None
-        if "organization_obj" in validated_data:
-            organization = validated_data.pop("organization_obj")
-        if "organization" in validated_data:
-            validated_data.pop("organization")
+        # Create the user first
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            contact_number=validated_data.get("contact_number", ""),
+        )
 
-        # Create the user with a hashed password
-        user = User.objects.create_user(**validated_data)
+        # Assign organization
+        if org_obj:
+            user.organization = org_obj
+        elif new_org_name:
+            org_obj = Organization.objects.create(
+                name=new_org_name,
+                created_by=user  # <-- here we set created_by to the same new user
+            )
+            user.organization = org_obj
 
-        # Assign organization if provided
-        if organization:
-            user.organization = organization
-            user.save()
-
+        user.save()
         return user
 
 

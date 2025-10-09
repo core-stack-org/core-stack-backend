@@ -2,14 +2,14 @@ import csv
 import json
 import logging
 import re
-
-import requests
-
 from datetime import datetime, timezone
+
 import dateutil.parser
+import requests
 
 from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
 from utilities.constants import (
+    ODK_URL_SESSION,
     ODK_URL_agri,
     ODK_URL_gw,
     ODK_URL_livelihood,
@@ -69,9 +69,6 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
     request_obj_odk = requests.get(ODK_url, auth=(ODK_USERNAME, ODK_PASSWORD))
     response_dict = json.loads(request_obj_odk.content)
     response_list = response_dict["value"]
-    print("INCOMING ODK DATA")
-    print(response_list[0:1])
-    print("DONE")
     logger.info(f"Fetched data from the ODK: {ODK_url}")
     all_keys = set()
 
@@ -212,9 +209,7 @@ def modify_response_list_settlement(res, block, plan_id):
 
 # MARK: Modify ODK Well Data
 def modify_response_list_well(res, block, plan_id):
-    print(f"block name: {block} and plan id: {plan_id}")
     res_list = []
-
     for result in res:
         if result is None:
             continue
@@ -252,34 +247,32 @@ def modify_response_list_well(res, block, plan_id):
 
         result["status_re"] = result["__system"]["reviewState"]
         result["well_id"] = result["well_id"]
+
+        well_usage_section = result.get("Well_usage", {})
         try:
-            result["ben_settlement"] = result.get("beneficiary_settlement", "") or "0"
-            who_owns = result["select_one_owns"]
-            if who_owns:
-                who_owns = str(who_owns).lower()
-                if who_owns == "other" or who_owns == "any other":
-                    result["owner"] = result.get("text_one_owns", "") or ""
-                else:
-                    result["owner"] = result.get("select_one_owns", "") or ""
-            else:
-                result["owner"] = "0"
-            result["hh_benefitted"] = result.get("households_benefited", "") or "0"
-            result["caste"] = result.get("select_multiple_caste_use", "") or "0"
+            result["ben_settlement"] = result.get("beneficiary_settlement", "") or "NA"
+            result["owner"] = result.get("select_one_owns", "") or "NA"
+            result["hh_benefitted"] = result.get("households_benefited", "") or "NA"
+            result["caste"] = result.get("select_multiple_caste_use", "") or "NA"
             result["functional"] = (
-                result.get("select_one_Functional_Non_functional", "") or 0
+                    well_usage_section.get("select_one_Functional_Non_functional", "")
+                    or "NA"
             )
-            result["need_maintenance"] = result.get("select_one_maintenance", "") or "0"
-            repair_value = result.get("select_one_repairs_well")
+            result["need_maintenance"] = (
+                    well_usage_section.get("select_one_maintenance", "") or "NA"
+            )
+            repair_value = well_usage_section.get("select_one_repairs_well")
             if repair_value:
                 repair_value = str(repair_value).lower()
                 if repair_value == "other":
                     result["repair"] = (
-                        result.get("select_one_repairs_well_other", "") or "0"
+                            well_usage_section.get("select_one_repairs_well_other", "")
+                            or "NA"
                     )
                 else:
                     result["repair"] = repair_value
             else:
-                result["repair"] = "0"
+                result["repair"] = "NA"
         except Exception as e:
             print("Exception occured in adding data from ODK to well layer: ", e)
             continue
@@ -532,7 +525,6 @@ def extract_keys(d, parent_key="", sep="_"):
 
 # MARK: Bearer Token
 def fetch_bearer_token(email: str, password: str) -> str:
-    ODK_SESSION_URL = "https://odk.gramvaani.org/v1/sessions"
     try:
         if _token_cache["token"] and _token_cache["expires_at"]:
             now = datetime.now(timezone.utc)
@@ -540,7 +532,7 @@ def fetch_bearer_token(email: str, password: str) -> str:
                 return _token_cache["token"]
 
         response = requests.post(
-            ODK_SESSION_URL, json={"email": email, "password": password}
+            ODK_URL_SESSION, json={"email": email, "password": password}
         )
         print("Response: ", response)
         if response.status_code == 200:
