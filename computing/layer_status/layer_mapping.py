@@ -172,11 +172,11 @@ workspace_config = {
         "suffix": "2021",
         "type": "raster",
     },
-    "Canopy height vector": {
-        "name": "canopy_height",
-        "suffix": "tree_health_ch_vector_2017_2022",
-        "type": "vector",
-    },
+    # "Canopy height vector": {
+    #     "name": "canopy_height",
+    #     "suffix": "tree_health_ch_vector_2017_2022",
+    #     "type": "vector",
+    # },
     "Ccd raster 2017": {
         "name": "ccd",
         "prefix": "tree_health_ccd_raster",
@@ -213,11 +213,11 @@ workspace_config = {
         "suffix": "2022",
         "type": "raster",
     },
-    "Ccd vector": {
-        "name": "ccd",
-        "suffix": "tree_health_ccd_vector_2017_2022",
-        "type": "vector",
-    },
+    # "Ccd vector": {
+    #     "name": "ccd",
+    #     "suffix": "tree_health_ccd_vector_2017_2022",
+    #     "type": "vector",
+    # },
     "LULC_level_1 LULC_17_18": {
         "name": "LULC_level_1",
         "prefix": "LULC_17_18",

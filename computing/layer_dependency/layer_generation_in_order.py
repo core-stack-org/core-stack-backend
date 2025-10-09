@@ -33,6 +33,7 @@ from computing.tree_health.overall_change import tree_health_overall_change_rast
 from computing.tree_health.overall_change_vector import (
     tree_health_overall_change_vector,
 )
+from utilities.gee_utils import valid_gee_text
 from .layer_map import *
 from nrm_app.celery import app
 from computing.models import Layer
@@ -57,7 +58,9 @@ def layer_generate_map(
     # checking:- is mws layer generated?
     try:
         if map_order in ["map_2", "map_3", "map_4"]:
-            layer = Layer.objects.get(layer_name=f"mws_{district}_{block}")
+            layer = Layer.objects.get(
+                layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+            )
             if not layer:
                 return f"check mws layer for {district}_{block}"
     except Exception as e:
