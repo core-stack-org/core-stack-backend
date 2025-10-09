@@ -41,6 +41,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
     layer_id = None
     # Generate shape files and sync to geoserver
     shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
+    create_gee_directory(state, district, block)
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
