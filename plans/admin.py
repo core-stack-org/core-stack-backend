@@ -7,6 +7,7 @@ from .models import Plan, PlanApp
 @admin.register(PlanApp)
 class PlanAppAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "plan",
         "organization",
         "project",

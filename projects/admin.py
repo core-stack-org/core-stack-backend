@@ -7,6 +7,7 @@ from .models import Project
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "name",
         "get_organization_name",
         "state",
