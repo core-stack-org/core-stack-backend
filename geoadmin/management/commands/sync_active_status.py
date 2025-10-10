@@ -44,7 +44,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("=" * 60))
             self.stdout.write("")
 
-        # Display matching mode
         self.stdout.write(
             self.style.NOTICE(
                 f"Matching mode: {'Case-sensitive' if case_sensitive else 'Case-insensitive'}"
@@ -109,6 +108,7 @@ class Command(BaseCommand):
         unmatched_soi = []
         updated = []
         deactivated = []
+        already_synced = []
 
         # Build dictionary of StateSOI for efficient lookup
         state_soi_dict = {}
@@ -139,10 +139,12 @@ class Command(BaseCommand):
                                 f"  ✓ {state.state_name} -> {state_soi.state_name}: Set to {status_change}"
                             )
                         )
-                elif verbose:
-                    self.stdout.write(
-                        f"  - {state.state_name}: Already synced (active={state.active_status})"
-                    )
+                else:
+                    already_synced.append((state, state_soi))
+                    if verbose:
+                        self.stdout.write(
+                            f"  - {state.state_name}: Already synced (active={state.active_status})"
+                        )
 
                 # Remove from dict to track unmatched SOI states
                 del state_soi_dict[state_key]
@@ -175,22 +177,33 @@ class Command(BaseCommand):
         unmatched_soi = list(state_soi_dict.values())
 
         # Print summary
-        self.stdout.write("\nState Summary:")
-        self.stdout.write(f"  Total Active States to sync: {states.count()}")
-        self.stdout.write(f"  Matched: {len(matched)}")
+        self.stdout.write("\n" + "=" * 60)
+        self.stdout.write(self.style.MIGRATE_HEADING("STATE SYNC STATISTICS"))
+        self.stdout.write("=" * 60)
+        self.stdout.write(f"Total States to process: {states.count()}")
+        self.stdout.write(f"Total StateSOI records: {StateSOI.objects.count()}")
+        self.stdout.write("")
+        self.stdout.write("Match Results:")
+        self.stdout.write(f"Matched & already synced: {len(already_synced)}")
+        self.stdout.write(self.style.SUCCESS(f"  ✓ Matched & updated: {len(updated)}"))
         self.stdout.write(
-            self.style.SUCCESS(f"  Activated/Updated in SOI: {len(updated)}")
+            self.style.ERROR(f"States not found in StateSOI: {len(unmatched_states)}")
         )
+        if include_inactive:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"StateSOI records with no matching State: {len(unmatched_soi)}"
+                )
+            )
         if not include_inactive:
             self.stdout.write(
                 self.style.WARNING(
-                    f"  Deactivated in SOI (no active match): {len(deactivated)}"
+                    f"StateSOI deactivated (no active match): {len(deactivated)}"
                 )
             )
+        self.stdout.write("")
         self.stdout.write(
-            self.style.ERROR(
-                f"  Active States not found in StateSOI: {len(unmatched_states)}"
-            )
+            f"Summary: {len(matched)} total matches, {len(updated)} updates applied"
         )
 
         if unmatched_states and not verbose:
@@ -229,6 +242,7 @@ class Command(BaseCommand):
         unmatched_districts = []
         updated = []
         deactivated = []
+        already_synced = []
 
         # Build dictionary of DistrictSOI for efficient lookup
         district_soi_dict = {}
@@ -279,10 +293,12 @@ class Command(BaseCommand):
                                         f"  ✓ {district.district_name} ({district.state.state_name}) -> {district_soi.district_name}: Set to {status_change}"
                                     )
                                 )
-                        elif verbose:
-                            self.stdout.write(
-                                f"  - {district.district_name} ({district.state.state_name}): Already synced (active={district.active_status})"
-                            )
+                        else:
+                            already_synced.append((district, district_soi))
+                            if verbose:
+                                self.stdout.write(
+                                    f"  - {district.district_name} ({district.state.state_name}): Already synced (active={district.active_status})"
+                                )
                         break
 
                 if not found_match:
@@ -290,7 +306,7 @@ class Command(BaseCommand):
                     if verbose:
                         self.stdout.write(
                             self.style.ERROR(
-                                f"  ✗ District '{district.district_name}' ({district.state.state_name}) not matched in DistrictSOI"
+                                f"District '{district.district_name}' ({district.state.state_name}) not matched in DistrictSOI"
                             )
                         )
             else:
@@ -298,7 +314,7 @@ class Command(BaseCommand):
                 if verbose:
                     self.stdout.write(
                         self.style.ERROR(
-                            f"  ✗ District '{district.district_name}' ({district.state.state_name}) not found in DistrictSOI"
+                            f"District '{district.district_name}' ({district.state.state_name}) not found in DistrictSOI"
                         )
                     )
 
@@ -316,27 +332,33 @@ class Command(BaseCommand):
                     if verbose:
                         self.stdout.write(
                             self.style.WARNING(
-                                f"  ⚠ Deactivating DistrictSOI '{district_soi.district_name}' (no matching active District)"
+                                f"Deactivating DistrictSOI '{district_soi.district_name}' (no matching active District)"
                             )
                         )
 
-        # Print summary
-        self.stdout.write("\nDistrict Summary:")
-        self.stdout.write(f"  Total Active Districts to sync: {districts.count()}")
-        self.stdout.write(f"  Matched: {len(matched)}")
+        self.stdout.write("\n" + "=" * 60)
+        self.stdout.write(self.style.MIGRATE_HEADING("DISTRICT SYNC STATISTICS"))
+        self.stdout.write("=" * 60)
+        self.stdout.write(f"Total Districts to process: {districts.count()}")
+        self.stdout.write(f"Total DistrictSOI records: {DistrictSOI.objects.count()}")
+        self.stdout.write("")
+        self.stdout.write("Match Results:")
+        self.stdout.write(f"Matched & already synced: {len(already_synced)}")
+        self.stdout.write(self.style.SUCCESS(f"  ✓ Matched & updated: {len(updated)}"))
         self.stdout.write(
-            self.style.SUCCESS(f"  Activated/Updated in SOI: {len(updated)}")
+            self.style.ERROR(
+                f"Districts not found in DistrictSOI: {len(unmatched_districts)}"
+            )
         )
         if not include_inactive:
             self.stdout.write(
                 self.style.WARNING(
-                    f"  Deactivated in SOI (no active match): {len(deactivated)}"
+                    f"DistrictSOI deactivated (no active match): {len(deactivated)}"
                 )
             )
+        self.stdout.write("")
         self.stdout.write(
-            self.style.ERROR(
-                f"  Active Districts not found in DistrictSOI: {len(unmatched_districts)}"
-            )
+            f"Summary: {len(matched)} total matches, {len(updated)} updates applied"
         )
 
         if unmatched_districts and not verbose:
@@ -379,6 +401,7 @@ class Command(BaseCommand):
         unmatched_blocks = []
         updated = []
         deactivated = []
+        already_synced = []
 
         # Build dictionary of TehsilSOI for efficient lookup
         tehsil_soi_dict = {}
@@ -431,10 +454,12 @@ class Command(BaseCommand):
                                         f"  ✓ {block.block_name} ({block.district.district_name}) -> {tehsil_soi.tehsil_name}: Set to {status_change}"
                                     )
                                 )
-                        elif verbose:
-                            self.stdout.write(
-                                f"  - {block.block_name} ({block.district.district_name}): Already synced (active={block.active_status})"
-                            )
+                        else:
+                            already_synced.append((block, tehsil_soi))
+                            if verbose:
+                                self.stdout.write(
+                                    f"  - {block.block_name} ({block.district.district_name}): Already synced (active={block.active_status})"
+                                )
                         break
 
                 if not found_match:
@@ -470,22 +495,27 @@ class Command(BaseCommand):
                         )
 
         # Print summary
-        self.stdout.write("\nBlock -> Tehsil Summary:")
-        self.stdout.write(f"  Total Active Blocks to sync: {blocks.count()}")
-        self.stdout.write(f"  Matched: {len(matched)}")
+        self.stdout.write("\n" + "=" * 60)
+        self.stdout.write(self.style.MIGRATE_HEADING("BLOCK -> TEHSIL SYNC STATISTICS"))
+        self.stdout.write("=" * 60)
+        self.stdout.write(f"Total Blocks to process: {blocks.count()}")
+        self.stdout.write(f"Total TehsilSOI records: {TehsilSOI.objects.count()}")
+        self.stdout.write("")
+        self.stdout.write("Match Results:")
+        self.stdout.write(f"Matched & already synced: {len(already_synced)}")
+        self.stdout.write(self.style.SUCCESS(f"  ✓ Matched & updated: {len(updated)}"))
         self.stdout.write(
-            self.style.SUCCESS(f"  Activated/Updated in SOI: {len(updated)}")
+            self.style.ERROR(f"Blocks not found in TehsilSOI: {len(unmatched_blocks)}")
         )
         if not include_inactive:
             self.stdout.write(
                 self.style.WARNING(
-                    f"  Deactivated in SOI (no active match): {len(deactivated)}"
+                    f"TehsilSOI deactivated (no active match): {len(deactivated)}"
                 )
             )
+        self.stdout.write("")
         self.stdout.write(
-            self.style.ERROR(
-                f"  Active Blocks not found in TehsilSOI: {len(unmatched_blocks)}"
-            )
+            f"Summary: {len(matched)} total matches, {len(updated)} updates applied"
         )
 
         if unmatched_blocks and not verbose:

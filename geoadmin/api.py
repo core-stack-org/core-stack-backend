@@ -13,7 +13,7 @@ from utilities.auth_utils import auth_free
 
 from .models import Block, District, DistrictSOI, State, StateSOI, TehsilSOI, UserAPIKey
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
-from .utils import activated_entities, normalize_name, transform_data
+from .utils import activated_blocks, normalize_name, transform_data
 
 
 # state id is the census code while the district id is the id of the district from the DB
@@ -74,7 +74,7 @@ def get_blocks(request, district_id):
 @schema(None)
 def proposed_blocks(request):
     try:
-        response_data = activated_entities()
+        response_data = activated_blocks()
         transformed_data = transform_data(data=response_data)
         return Response(transformed_data, status=status.HTTP_200_OK)
     except Exception as e:
@@ -125,9 +125,9 @@ def activate_location(request):
 
         try:
             if location_type == "state":
-                location = State.objects.get(state_census_code=location_id)
+                location = StateSOI.objects.get(id=location_id)
             elif location_type == "district":
-                location = District.objects.get(id=location_id)
+                location = DistrictSOI.objects.get(id=location_id)
 
                 if active and not location.state.active_status:
                     return Response(
@@ -135,7 +135,7 @@ def activate_location(request):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
             else:
-                location = Block.objects.get(id=location_id)
+                location = TehsilSOI.objects.get(id=location_id)
 
                 if active:
                     state_active = location.district.state.active_status
@@ -190,7 +190,11 @@ def activate_location(request):
                     status=status.HTTP_200_OK,
                 )
 
-        except (State.DoesNotExist, District.DoesNotExist, Block.DoesNotExist):
+        except (
+            StateSOI.DoesNotExist,
+            DistrictSOI.DoesNotExist,
+            TehsilSOI.DoesNotExist,
+        ):
             return Response(
                 {"error": f"{location_type.title()} with id {location_id} not found"},
                 status=status.HTTP_404_NOT_FOUND,
