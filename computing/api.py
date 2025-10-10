@@ -52,6 +52,7 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
+from .views import layer_status
 
 
 @api_security_check(allowed_methods="POST")
@@ -1110,4 +1111,22 @@ def generate_layer_in_order(request):
         )
     except Exception as e:
         print("Exception in generate_layer_order_first api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def layer_staus_dashboard(request):
+    print("inside layer_staus_dashboard")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        result = layer_status(state, district, block)
+        return Response(
+            {"result": result},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in layer_staus_dashboard api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

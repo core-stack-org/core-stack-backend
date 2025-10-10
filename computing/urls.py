@@ -2,6 +2,7 @@ from tkinter.font import names
 
 from django.urls import path
 from . import api
+from .views import layer_status
 
 urlpatterns = [
     path("create_workspace/", api.create_workspace, name="create_workspace"),
@@ -102,5 +103,10 @@ urlpatterns = [
         "generate_layer_in_order/",
         api.generate_layer_in_order,
         name="generate_layer_in_order",
+    ),
+    path(
+        "layer_staus_dashboard/",
+        api.layer_staus_dashboard,
+        name="layer_staus_dashboard",
     ),
 ]
