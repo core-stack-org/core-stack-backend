@@ -451,7 +451,7 @@ class Command(BaseCommand):
                                 )
                                 self.stdout.write(
                                     self.style.SUCCESS(
-                                        f"  ✓ {block.block_name} ({block.district.district_name}) -> {tehsil_soi.tehsil_name}: Set to {status_change}"
+                                        f"{block.block_name} ({block.district.district_name}) -> {tehsil_soi.tehsil_name}: Set to {status_change}"
                                     )
                                 )
                         else:
@@ -467,7 +467,7 @@ class Command(BaseCommand):
                     if verbose:
                         self.stdout.write(
                             self.style.ERROR(
-                                f"  ✗ Block '{block.block_name}' ({block.district.district_name}) not matched in TehsilSOI"
+                                f"Block '{block.block_name}' ({block.district.district_name}) not matched in TehsilSOI"
                             )
                         )
             else:
@@ -475,7 +475,7 @@ class Command(BaseCommand):
                 if verbose:
                     self.stdout.write(
                         self.style.ERROR(
-                            f"  ✗ Block '{block.block_name}' ({block.district.district_name}) not found in TehsilSOI"
+                            f"Block '{block.block_name}' ({block.district.district_name}) not found in TehsilSOI"
                         )
                     )
 
