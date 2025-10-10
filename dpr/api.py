@@ -126,11 +126,11 @@ def generate_dpr(request):
         for ids in mws_Ids:
             try:
                 report_html_url = (
-                    f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+                    f"https://geoserver.core-stack.org/api/v1/download_mws_report/"
                     f"?state={state}&district={district}&block={block}&uid={ids}"
                 )
-                mws_report = render_pdf_with_firefox(report_html_url)
-                mws_reports.append(mws_report)
+                #mws_report = render_pdf_with_firefox(report_html_url)
+                mws_reports.append(report_html_url)
                 successful_mws_ids.append(ids)
             except Exception as e:
                 logger.error(f"Failed to generate MWS report for ID {ids}: {e}")

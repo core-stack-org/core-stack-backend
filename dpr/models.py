@@ -294,3 +294,14 @@ class Agri_maintenance(models.Model):
         verbose_name = "Agri Maintenance"
         verbose_name_plural = "Agri Maintenance"
         db_table = "odk_agri_maintenance"
+
+
+class Overpass_Block_Details(models.Model):
+    block_details_id = models.AutoField(primary_key=True)
+    location = models.TextField(max_length=511, null=False)
+    overpass_response = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Overpass Block Details"
+        verbose_name_plural = "Overpass Block Details"
+        db_table = "overpass_block_details"

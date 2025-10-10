@@ -5,10 +5,14 @@ import pandas as pd
 import numpy as np
 import pymannkendall as mk
 
+import json
+
 from datetime import datetime
 from shapely.geometry import Polygon, MultiPolygon, Point, LineString
 from shapely.ops import unary_union
 from scipy.spatial.distance import jensenshannon
+
+from .models import Overpass_Block_Details
 
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import OVERPASS_URL
@@ -25,7 +29,7 @@ logger = setup_logger(__name__)
 DATA_DIR_TEMP = env("EXCEL_DIR")
 
 
-# MARK: HELPER FUNCTIONS
+# ? MARK: HELPER FUNCTIONS
 def get_geojson(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
     geojson_url = f"{GEOSERVER_URL}/{workspace}/ows?service=WFS&version=1.0.0&request=GetFeature&typeName={workspace}:{layer_name}&outputFormat=application/json"
@@ -211,7 +215,7 @@ def get_rainfall_type(rainfall):
         return "Very high"
 
 
-# ? MAIN SECTION
+# ? MARK: MAIN SECTION
 def get_osm_data(state, district, block, uid):
     try:
         region_gdf = gpd.read_file(
@@ -230,58 +234,73 @@ def get_osm_data(state, district, block, uid):
         overpass_query = f"""
         [out:json];
         (
-        way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
-        way["natural"="wood"]({miny},{minx},{maxy},{maxx});
+            way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
+            way["natural"="wood"]({miny},{minx},{maxy},{maxx});
 
-        way["natural"="water"]({miny},{minx},{maxy},{maxx});
-        way["water"="lake"]({miny},{minx},{maxy},{maxx});
-        way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
+            way["natural"="water"]({miny},{minx},{maxy},{maxx});
+            way["water"="lake"]({miny},{minx},{maxy},{maxx});
+            way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
 
-        relation["natural"="water"]({miny},{minx},{maxy},{maxx});
+            relation["natural"="water"]({miny},{minx},{maxy},{maxx});
 
-        node["natural"="hill"]({miny},{minx},{maxy},{maxx});
-        way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
-        
-        node["place"="city"]({miny},{minx},{maxy},{maxx});
-        node["place"="town"]({miny},{minx},{maxy},{maxx});
+            node["natural"="hill"]({miny},{minx},{maxy},{maxx});
+            way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
 
-        way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
-        way["highway"="residential"]({miny},{minx},{maxy},{maxx});
-        way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
-        way["highway"="track"]({miny},{minx},{maxy},{maxx});
-        way["highway"="road"]({miny},{minx},{maxy},{maxx});
-        way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
-        way["highway"="construction"]({miny},{minx},{maxy},{maxx});
-        way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
+            node["place"="city"]({miny},{minx},{maxy},{maxx});
+            node["place"="town"]({miny},{minx},{maxy},{maxx});
+
+            way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
+            way["highway"="residential"]({miny},{minx},{maxy},{maxx});
+            way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
+            way["highway"="track"]({miny},{minx},{maxy},{maxx});
+            way["highway"="road"]({miny},{minx},{maxy},{maxx});
+            way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
+            way["highway"="construction"]({miny},{minx},{maxy},{maxx});
+            way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
         );
         out body;
         >;
         out skel qt;
         """
 
-        #print("API response start time", datetime.now())
-
         response = {}
-        try:
-            response = requests.get(OVERPASS_URL, params={"data": overpass_query})
-            response = response.json()
-        except Exception as e:
-            logger.info("Not able to fetch the Overpass API Info", e)
+        block_detail = Overpass_Block_Details.objects.filter(location=f"{district}_{block}").first()
 
-        #print("API response end time", datetime.now())
+        if block_detail:
+            logger.info(f"Using cached response for location: {district}_{block}")
+            response = block_detail.overpass_response
+        else:
+            logger.info(f"No cached data found. Fetching from Overpass API for location: {district}_{block}")
+            
+            try:
+                response = requests.get(OVERPASS_URL, params={"data": overpass_query})
+                response = response.json()
+                
+                # if DEBUG: 
+                    # Save to file (locally)
+                    # with open('overpass_response.json', 'w', encoding='utf-8') as f:
+                    #     json.dump(response, f, indent=2, ensure_ascii=False)
 
+                block_detail = Overpass_Block_Details.objects.create(
+                    location = f"{district}_{block}",
+                    overpass_response = response
+                )
+                logger.info(f"Response saved to DB for location: {district}_{block}")
+            
+            except Exception as e:
+                logger.info("Not able to fetch the Overpass API Info", e)
 
         #print("Data Processing", datetime.now())
         
@@ -657,8 +676,11 @@ def get_osm_data(state, district, block, uid):
             final_data["river_mws"] = calculate_river_length(river_lines)
             final_data["river_mws"] += calculate_river_length(filtered_river_gdf)
 
+        # Minimum area threshold (1 hectare = 10,000 square meters)
+        MIN_AREA_THRESHOLD = 10000  # 1 hectare in square meters
+
         # ? Block Parameters
-        #parameter_block = f"The Tehsil {block}"
+
         parameter_block = f""
 
         if final_data["cities"]:
@@ -679,37 +701,43 @@ def get_osm_data(state, district, block, uid):
             parameter_block += f". Key natural features such as {temp} shape the Tehsil landscape and impact water flow"
 
         if final_data["forests"]:
-            parameter_block += (
-                f". Part of {final_data['forests'][0]['name']}, covering roughly "
-                f"{round(final_data['forests'][0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
-            )
+            large_forests = [f for f in final_data["forests"] if f["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            if large_forests:
+                parameter_block += (
+                    f". Part of {large_forests[0]['name']}, covering roughly "
+                    f"{round(large_forests[0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
+                )
 
         if final_data["lakes"] or final_data["reservoirs"]:
-            rname = [temp["name"] for temp in final_data["lakes"]]
-            rname += [temp["name"] for temp in final_data["reservoirs"]]
-            rarea = [
-                str(round(temp["area_sq_m"] / 10000, 1)) for temp in final_data["lakes"]
-            ]
-            rarea += [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["reservoirs"]
-            ]
+            large_lakes = [lake for lake in final_data["lakes"] if lake["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            large_reservoirs = [res for res in final_data["reservoirs"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            
+            if large_lakes or large_reservoirs:
+                rname = [temp["name"] for temp in large_lakes]
+                rname += [temp["name"] for temp in large_reservoirs]
+                rarea = [
+                    str(round(temp["area_sq_m"] / 10000, 1)) for temp in large_lakes
+                ]
+                rarea += [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_reservoirs
+                ]
 
-            parameter_block += f". Additionally, large water bodies such as "
-            if len(rname) == 1:
-                parameter_block += rname[0]
-            elif len(rname) == 2:
-                parameter_block += " and ".join(rname)
-            else:
-                parameter_block += ", ".join(rname[:-1]) + ", and " + rname[-1]
-            parameter_block += f" span about "
-            if len(rname) == 1:
-                parameter_block += rarea[0]
-            elif len(rname) == 2:
-                parameter_block += " and ".join(rarea)
-            else:
-                parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_block += f"  hectares  respectively within the Tehsil"
+                parameter_block += f". Additionally, large water bodies such as "
+                if len(rname) == 1:
+                    parameter_block += rname[0]
+                elif len(rname) == 2:
+                    parameter_block += " and ".join(rname)
+                else:
+                    parameter_block += ", ".join(rname[:-1]) + ", and " + rname[-1]
+                parameter_block += f" span about "
+                if len(rname) == 1:
+                    parameter_block += rarea[0]
+                elif len(rname) == 2:
+                    parameter_block += " and ".join(rarea)
+                else:
+                    parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
+                parameter_block += f"  hectares  respectively within the Tehsil"
 
         if final_data["river"]:
             rname = [temp["name"] for temp in final_data["river"]]
@@ -739,7 +767,6 @@ def get_osm_data(state, district, block, uid):
             )
 
         # ? MWS Parameters
-        #parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}"
         parameter_mws = f""
 
         if final_data["cities_mws"]:
@@ -758,38 +785,44 @@ def get_osm_data(state, district, block, uid):
             parameter_mws += f". Key natural features such as {temp} shape the micro-watershed landscape and impact water flow"
 
         if final_data["forests_mws"]:
-            parameter_mws += (
-                f". Part of {final_data['forests_mws'][0]['name']}, covering roughly "
-                f"{(round(final_data['forests_mws'][0]['area_sq_m'] / 10000))} hectares, lies within the micro-watershed supporting local wildlife and promoting biodiversity"
-            )
+            large_forests_mws = [f for f in final_data["forests_mws"] if f["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            if large_forests_mws:
+                parameter_mws += (
+                    f". Part of {large_forests_mws[0]['name']}, covering roughly "
+                    f"{(round(large_forests_mws[0]['area_sq_m'] / 10000))} hectares, lies within the micro-watershed supporting local wildlife and promoting biodiversity"
+                )
 
         if final_data["lakes_mws"] or final_data["reservoirs_mws"]:
-            rname = [temp["name"] for temp in final_data["lakes_mws"]]
-            rname += [temp["name"] for temp in final_data["reservoirs_mws"]]
-            rarea = [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["lakes_mws"]
-            ]
-            rarea += [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["reservoirs_mws"]
-            ]
+            large_lakes_mws = [lake for lake in final_data["lakes_mws"] if lake["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            large_reservoirs_mws = [res for res in final_data["reservoirs_mws"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            
+            if large_lakes_mws or large_reservoirs_mws:
+                rname = [temp["name"] for temp in large_lakes_mws]
+                rname += [temp["name"] for temp in large_reservoirs_mws]
+                rarea = [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_lakes_mws
+                ]
+                rarea += [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_reservoirs_mws
+                ]
 
-            parameter_mws += f". Additionally, large water bodies such as "
-            if len(rname) == 1:
-                parameter_mws += rname[0]
-            elif len(rname) == 2:
-                parameter_mws += " and ".join(rname)
-            else:
-                parameter_mws += ", ".join(rname[:-1]) + ", and " + rname[-1]
-            parameter_mws += f" span about "
-            if len(rname) == 1:
-                parameter_mws += rarea[0]
-            elif len(rname) == 2:
-                parameter_mws += " and ".join(rarea)
-            else:
-                parameter_mws += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_mws += f"  hectares  respectively within the micro-watershed, providing essential resources for irrigation, fishing, and drinking water"
+                parameter_mws += f". Additionally, large water bodies such as "
+                if len(rname) == 1:
+                    parameter_mws += rname[0]
+                elif len(rname) == 2:
+                    parameter_mws += " and ".join(rname)
+                else:
+                    parameter_mws += ", ".join(rname[:-1]) + ", and " + rname[-1]
+                parameter_mws += f" span about "
+                if len(rname) == 1:
+                    parameter_mws += rarea[0]
+                elif len(rname) == 2:
+                    parameter_mws += " and ".join(rarea)
+                else:
+                    parameter_mws += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
+                parameter_mws += f"  hectares  respectively within the micro-watershed, providing essential resources for irrigation, fishing, and drinking water"
 
         if final_data["river_mws"]:
             rname = [temp["name"] for temp in final_data["river_mws"]]
@@ -828,8 +861,6 @@ def get_osm_data(state, district, block, uid):
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
         else :
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws
-
-        #print("Data Processing End", datetime.now())
 
         return parameter_block, parameter_mws
 
