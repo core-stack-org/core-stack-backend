@@ -4,7 +4,7 @@ import json
 import re
 from typing import Optional
 
-from .models import Block, District, State
+from .models import DistrictSOI, StateSOI, TehsilSOI
 
 
 def normalize_name(name: Optional[str]) -> str:
@@ -30,25 +30,25 @@ def normalize_name(name: Optional[str]) -> str:
     return normalized.strip()
 
 
-def activated_entities():
+def activated_blocks():
     """Returns all the activated Blocks with block id, block name
 
     Returns:
         List: A list of JSON data
     """
-    active_states = State.objects.filter(active_status=True).order_by("state_name")
+    active_states = StateSOI.objects.filter(active_status=True).order_by("state_name")
     response_data = []
     for state in active_states:
-        active_districts = District.objects.filter(
+        active_districts = DistrictSOI.objects.filter(
             state=state, active_status=True
         ).order_by("district_name")
         districts_data = []
         for district in active_districts:
-            active_blocks = Block.objects.filter(
+            active_blocks = TehsilSOI.objects.filter(
                 district=district, active_status=True
-            ).order_by("block_name")
+            ).order_by("tehsil_name")
             blocks_data = [
-                {"block_name": block.block_name, "block_id": block.id}
+                {"block_name": block.tehsil_name, "block_id": block.id}
                 for block in active_blocks
             ]
             districts_data.append(
@@ -61,7 +61,7 @@ def activated_entities():
         response_data.append(
             {
                 "state_name": state.state_name,
-                "state_id": state.state_census_code,
+                "state_id": state.id,
                 "districts": districts_data,
             }
         )
