@@ -19,10 +19,12 @@ def get_media_type(param):
 
 def get_community_summary_data(community_id):
     community = Community.objects.get(id=community_id)
-    return {"community_id": community_id,
-            "name": str(community.project.name),
-            "description": str(community.project.description),
-            "organization": str(community.project.organization)}
+    return {
+        "community_id": community_id,
+        "name": str(community.project.name),
+        "description": str(community.project.description),
+        "organization": str(community.project.organization),
+    }
 
 
 def get_communities(state_name, district_name, block_name):
@@ -37,18 +39,28 @@ def get_communities(state_name, district_name, block_name):
     elif block_obj and not state_obj and not district_obj:
         communities = Community.objects.filter(locations__block=block_obj)
     elif state_obj and district_obj and not block_obj:
-        communities1 = Community.objects.filter(locations__state=state_obj, locations__district=district_obj).distinct()
-        communities2 = Community.objects.filter(locations__state=state_obj, locations__district__isnull=True,
-                                                locations__block__isnull=True).distinct()
+        communities1 = Community.objects.filter(
+            locations__state=state_obj, locations__district=district_obj
+        ).distinct()
+        communities2 = Community.objects.filter(
+            locations__state=state_obj,
+            locations__district__isnull=True,
+            locations__block__isnull=True,
+        ).distinct()
         communities = communities1 | communities2
     elif state_obj and block_obj and not district_obj:
         communities = Community.objects.filter(locations__state=state_obj)
     elif district_obj and block_obj and not state_obj:
         communities = Community.objects.filter(locations__district=district_obj)
     elif block_obj and district_obj and state_obj:
-        communities1 = Community.objects.filter(locations__state=state_obj, locations__district=district_obj).distinct()
-        communities2 = Community.objects.filter(locations__state=state_obj, locations__district__isnull=True,
-                                                locations__block__isnull=True).distinct()
+        communities1 = Community.objects.filter(
+            locations__state=state_obj, locations__district=district_obj
+        ).distinct()
+        communities2 = Community.objects.filter(
+            locations__state=state_obj,
+            locations__district__isnull=True,
+            locations__block__isnull=True,
+        ).distinct()
         communities = communities1 | communities2
     else:
         # communities = Community.objects.all()

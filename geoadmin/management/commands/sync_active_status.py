@@ -306,8 +306,8 @@ class Command(BaseCommand):
         if not include_inactive:
             for district_soi in all_district_soi.values():
                 if (
-                        district_soi.id not in matched_soi_ids
-                        and district_soi.active_status
+                    district_soi.id not in matched_soi_ids
+                    and district_soi.active_status
                 ):
                     if not dry_run:
                         district_soi.active_status = False
@@ -364,7 +364,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"    ... and {len(deactivated) - 10} more")
 
     def sync_blocks_to_tehsils(
-            self, dry_run, verbose, include_inactive, case_sensitive
+        self, dry_run, verbose, include_inactive, case_sensitive
     ):
         """Sync Block active_status to TehsilSOI"""
         # ONLY get blocks with active_status=True by default
@@ -384,7 +384,7 @@ class Command(BaseCommand):
         tehsil_soi_dict = {}
         all_tehsil_soi = {}
         for tehsil_soi in TehsilSOI.objects.select_related(
-                "district", "district__state"
+            "district", "district__state"
         ).all():
             all_tehsil_soi[tehsil_soi.id] = tehsil_soi
             key = self.normalize_name(tehsil_soi.tehsil_name, case_sensitive)

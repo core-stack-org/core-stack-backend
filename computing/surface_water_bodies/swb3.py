@@ -9,11 +9,11 @@ from utilities.gee_utils import (
 
 
 def waterbody_wbc_intersection(
-        roi=None,
-        state=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type=None,
+    roi=None,
+    state=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
 ):
     if not state:
         print("State name must be provided to run this script")
@@ -21,10 +21,10 @@ def waterbody_wbc_intersection(
 
     description = "swb3_" + asset_suffix
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
-            + description
+        + description
     )
 
     # Check if the asset already exists to avoid redundant processing

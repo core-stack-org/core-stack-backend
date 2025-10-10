@@ -197,7 +197,7 @@ def sync_settlement():
         )
 
         def safe_update_field(
-                field_name, odk_key, default_value=None, nested_path=None
+            field_name, odk_key, default_value=None, nested_path=None
         ):
             if nested_path:
                 # for nested data like mgnrega_info.get("NREGA_aware")
@@ -280,7 +280,7 @@ def sync_settlement():
                     nrega_issues = f"{nrega_issues}"
         settlement.nrega_issues = nrega_issues
         settlement.nrega_community = (
-                mgnrega_info.get("select_one_contributions", "") or "NA"
+            mgnrega_info.get("select_one_contributions", "") or "NA"
         )
         settlement.save()
 
@@ -305,7 +305,7 @@ def sync_well():
         )
 
         well.status_re = (
-                record.get("__system", {}).get("reviewState", "") or "in progress"
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
         well.beneficiary_settlement = record.get("beneficiary_settlement", "") or "NA"
         well.block_name = record.get("block_name", "") or "NA"
@@ -316,7 +316,7 @@ def sync_well():
         well_usage = record.get("Well_usage", {})
         well_condition = record.get("Well_condition", {})
         well.is_functional = (
-                well_usage.get("select_one_Functional_Non_functional", "") or "NA"
+            well_usage.get("select_one_Functional_Non_functional", "") or "NA"
         )
         well.need_maintenance = well_usage.get("is_maintenance_required", "") or "NA"
         if well.need_maintenance == "NA":
@@ -357,7 +357,7 @@ def sync_waterbody():
         submission_date = timezone.make_aware(submission_date, pytz.UTC)
 
         waterbody.status_re = (
-                record.get("__system", {}).get("reviewState", "") or "in progress"
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
 
         waterbody.waterbody_id = record.get("waterbodies_id", "")
@@ -367,7 +367,7 @@ def sync_waterbody():
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
         waterbody.beneficiary_settlement = (
-                record.get("beneficiary_settlement", "") or "NA"
+            record.get("beneficiary_settlement", "") or "NA"
         )
         waterbody.block_name = record.get("block_name", "") or "NA"
         waterbody.who_manages = record.get("select_one_manages", "") or "NA"
@@ -376,10 +376,10 @@ def sync_waterbody():
         waterbody.caste_who_uses = record.get("select_multiple_caste_use", "") or "NA"
         waterbody.household_benefitted = record.get("households_benefited", "") or 0
         waterbody.water_structure_type = (
-                record.get("select_one_water_structure", "") or "NA"
+            record.get("select_one_water_structure", "") or "NA"
         )
         waterbody.water_structure_other = (
-                record.get("select_one_water_structure_other", "") or "NA"
+            record.get("select_one_water_structure_other", "") or "NA"
         )
 
         waterbody.identified_by = (
@@ -424,11 +424,11 @@ def sync_groundwater():
         )
 
         recharge_st.status_re = (
-                record.get("__system", {}).get("reviewState", "") or "in progress"
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
 
         recharge_st.beneficiary_settlement = (
-                record.get("beneficiary_settlement", "") or "NA"
+            record.get("beneficiary_settlement", "") or "NA"
         )
         recharge_st.block_name = record.get("block_name", "") or "NA"
         recharge_st.work_type = record.get("TYPE_OF_WORK_ID", "") or "NA"
@@ -474,7 +474,7 @@ def sync_agri():
         irrigation.uuid = record.get("__id", "") or "0"
 
         irrigation.status_re = (
-                record.get("__system", {}).get("reviewState", "") or "in progress"
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
 
         irrigation.submission_time = timezone.datetime.strptime(
@@ -593,7 +593,7 @@ def sync_cropping_pattern():
         ]
 
         cropping_pattern.status_re = (
-                record.get("__system", {}).get("reviewState", "") or "in progress"
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
 
         # if latest_submission_time and submission_date <= latest_submission_time:
@@ -606,13 +606,13 @@ def sync_cropping_pattern():
         )
         cropping_pattern.uuid = record.get("__id", "") or "NA"
         cropping_pattern.beneficiary_settlement = (
-                record.get("beneficiary_settlement", "") or "NA"
+            record.get("beneficiary_settlement", "") or "NA"
         )
         cropping_pattern.irrigation_source = (
-                record.get("select_multiple_widgets", "") or "NA"
+            record.get("select_multiple_widgets", "") or "NA"
         )
         cropping_pattern.land_classification = (
-                record.get("select_one_classified", "") or "NA"
+            record.get("select_one_classified", "") or "NA"
         )
 
         # For Kharif season, check if 'other' is selected and use the _other field if it is
@@ -651,7 +651,7 @@ def sync_cropping_pattern():
             cropping_pattern.cropping_patterns_zaid = zaid_crops or "NA"
 
         cropping_pattern.agri_productivity = (
-                record.get("select_one_productivity", "") or "NA"
+            record.get("select_one_productivity", "") or "NA"
         )
         cropping_pattern.plan_id = record.get("plan_id", "") or "NA"
         cropping_pattern.plan_name = record.get("plan_name", "") or "NA"
@@ -677,7 +677,7 @@ def sync_agri_maintenance():
         )
 
         agri_maintenance.status_re = (
-                record.get("__system", {}).get("reviewState", "") or "in progress"
+            record.get("__system", {}).get("reviewState", "") or "in progress"
         )
 
         agri_maintenance.uuid = record.get("__id", "") or "0"
@@ -957,9 +957,9 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
                 repair_value = data_waterbody.get(field)
                 other_field = field + "_other"
                 if (
-                        repair_value
-                        and repair_value.lower() == "other"
-                        and data_waterbody.get(other_field)
+                    repair_value
+                    and repair_value.lower() == "other"
+                    and data_waterbody.get(other_field)
                 ):
                     return f"Other: {data_waterbody.get(other_field)}"
                 elif repair_value:

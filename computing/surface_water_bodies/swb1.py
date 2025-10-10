@@ -11,12 +11,12 @@ from dateutil.relativedelta import relativedelta
 
 
 def vectorize_water_pixels(
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type=None,
-        start_date=None,
-        end_date=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
 ):
     """
     Analyzes water body presence and characteristics over time.
@@ -35,10 +35,10 @@ def vectorize_water_pixels(
     # Generate description and asset ID for the analysis
     description = "swb1_" + asset_suffix
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + description
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
 
     # Skip if asset already exists

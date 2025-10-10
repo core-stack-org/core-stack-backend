@@ -39,8 +39,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         if user.is_superadmin or user.is_superuser:
             if (
-                    "organization" not in serializer.validated_data
-                    or not serializer.validated_data["organization"]
+                "organization" not in serializer.validated_data
+                or not serializer.validated_data["organization"]
             ):
                 raise serializers.ValidationError(
                     {

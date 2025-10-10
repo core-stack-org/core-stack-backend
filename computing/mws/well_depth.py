@@ -13,11 +13,11 @@ from computing.models import Layer, Dataset
 
 
 def well_depth(
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type=None,
-        start_date=None,
-        end_date=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
 ):
     print("Inside well depth script")
     description = "well_depth_annual_" + asset_suffix
@@ -64,7 +64,7 @@ def well_depth(
 
 
 def _generate_data(
-        asset_id, asset_path, description, asset_suffix, start_date, end_date
+    asset_id, asset_path, description, asset_suffix, start_date, end_date
 ):
     principal_aquifers = ee.FeatureCollection(
         "projects/ee-anz208490/assets/principalAquifer"

@@ -8,21 +8,19 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
 
-from computing.plantation.process_profile import process_project_profile
+
 from projects.models import Project, AppType
 from users.permissions import IsOrganizationMember, HasProjectPermission
 from utilities.gee_utils import valid_gee_text
 from .models import WaterbodiesFileUploadLog
-from .serializers import (
-    ExcelFileSerializer
-)
+from .serializers import ExcelFileSerializer
 
 
 class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
     """ViewSet for KML file operations"""
 
     serializer_class = ExcelFileSerializer
-    #permission_classes = [permissions.IsAuthenticated, HasProjectPermission]
+    # permission_classes = [permissions.IsAuthenticated, HasProjectPermission]
     parser_classes = [MultiPartParser, FormParser, FileUploadParser]
     # For the HasProjectPermission to work correctly
     app_type = AppType.WATERBODY_REJ
@@ -41,13 +39,11 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 return WaterbodiesFileUploadLog.objects.none()
         return WaterbodiesFileUploadLog.objects.none()
 
-
-
     def create(self, request, *args, **kwargs):
-        print ("inside create api")
+        print("inside create api")
         """Create new excel files - supports both single and multiple file uploads"""
         project_id = self.kwargs.get("project_pk")
-        print ("Project: " +str(project_id))
+        print("Project: " + str(project_id))
         if not project_id:
             return Response(
                 {"detail": "Project ID is required."},
@@ -67,7 +63,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
 
         # Check if we have files in the request
         files = []
-        print (request.FILES)
+        print(request.FILES)
         # Handle single file upload case
         if "file" in request.FILES:
             files.append(request.FILES["file"])
@@ -106,7 +102,9 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
             excel_hash = file_hash.hexdigest()
             print(excel_hash)
             # Check if file with same hash already exists
-            if WaterbodiesFileUploadLog.objects.filter(project=project, excel_hash=excel_hash).exists():
+            if WaterbodiesFileUploadLog.objects.filter(
+                project=project, excel_hash=excel_hash
+            ).exists():
                 errors.append(f"File '{uploaded_file.name}' has already been uploaded.")
                 continue
 
@@ -121,14 +119,13 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
 
             try:
                 if serializer.is_valid():
-                    print ("inside serailizer sv")
+                    print("inside serailizer sv")
                     # Save excel file
                     excel_file = serializer.save(
                         project=project,
                         uploaded_by=request.user,
                         excel_hash=excel_hash,
                     )
-
 
                     # # Convert KML to GeoJSON
                     # file_path = kml_file.file.path
@@ -140,7 +137,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                     #     kml_file.save(update_fields=["geojson_data"])
 
                     created_files.append(serializer.data)
-                    print (created_files)
+                    print(created_files)
                 else:
                     errors.append(
                         f"Error validating file '{uploaded_file.name}': {serializer.errors}"
@@ -165,6 +162,3 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         )
 
         return Response(response_data, status=status_code)
-
-
-

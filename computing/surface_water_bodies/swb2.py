@@ -9,17 +9,17 @@ from utilities.gee_utils import (
 
 
 def waterbody_mws_intersection(
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
 ):
     description = "swb2_" + asset_suffix
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + description
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
 
     if is_gee_asset_exists(asset_id):

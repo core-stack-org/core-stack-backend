@@ -43,7 +43,7 @@ class PlanPermission(permissions.BasePermission):
             return False
 
         if request.user.groups.filter(
-                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
         ).exists():
             try:
                 project = Project.objects.get(id=project_id)
@@ -84,7 +84,7 @@ class PlanPermission(permissions.BasePermission):
             return False
 
         if request.user.groups.filter(
-                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
         ).exists():
             return project.organization == request.user.organization
 
@@ -265,7 +265,7 @@ class PlanViewSet(viewsets.ModelViewSet):
                 base_queryset = PlanApp.objects.filter(enabled=True)
 
         elif self.request.user.groups.filter(
-                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
         ).exists():
             base_queryset = PlanApp.objects.filter(
                 organization=self.request.user.organization, enabled=True

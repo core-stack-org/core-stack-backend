@@ -20,15 +20,15 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 def terrain_raster(
-        self,
-        state=None,
-        district=None,
-        block=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type="MWS",
-        roi_path=None,
-        gee_account_id=None,
+    self,
+    state=None,
+    district=None,
+    block=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type="MWS",
+    roi_path=None,
+    gee_account_id=None,
 ):
 
     print("Inside terrain_raster")
@@ -38,10 +38,10 @@ def terrain_raster(
     ee_initialize(gee_account_id)
     if state and district and block:
         description = (
-                "terrain_raster_"
-                + valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
+            "terrain_raster_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
         )
         asset_id = get_gee_asset_path(state, district, block) + description
         roi_boundary = ee.FeatureCollection(
@@ -56,10 +56,10 @@ def terrain_raster(
         description = "terrain_raster_" + asset_suffix
 
         asset_id = (
-                get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-                )
-                + description
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
         )
         roi_boundary = ee.FeatureCollection(roi_path)
 
@@ -86,10 +86,10 @@ def terrain_raster(
 
         """ Sync image to google cloud storage and then to geoserver"""
         layer_name = (
-                valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
-                + "_terrain_raster"
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_terrain_raster"
         )
         task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
 

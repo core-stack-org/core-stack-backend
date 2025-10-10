@@ -1,46 +1,90 @@
 import csv
 import os
 import time
-
 from celery import shared_task
 import pandas as pd
 
-from computing.utils import sync_project_fc_to_geoserver
-from computing.water_rejuvenation.water_rejuventation import get_lulc_class, find_closest_water_pixel, \
-    find_watersheds_for_point_with_buffer
+from computing.catchment_area.catchmentarea import (
+    compute_max_stream_order_and_catchment_for_swb,
+)
+from computing.cropping_intensity.cropping_intensity import (
+    generate_cropping_intensity,
+    generate_gee_asset,
+)
+from computing.mws.generate_hydrology import generate_hydrology
+from computing.utils import (
+    sync_project_fc_to_geoserver,
+    calculate_precipitation_season,
+    generate_geojson_with_ci_and_ndvi,
+    generate_geojson_with_ci_ndvi_ndmi,
+)
+from computing.water_rejuvenation.water_rejuventation import (
+    get_lulc_class,
+    find_closest_water_pixel,
+    find_watersheds_for_point_with_buffer,
+    generate_zoi_asset_on_gee,
+    generate_ndmi_layer,
+)
 from nrm_app.settings import PAN_INDIA_LULC_PATH
 from projects.models import Project
 from projects.serializers import ProjectSerializer
-from utilities.constants import SITE_DATA_PATH
+from utilities.constants import SITE_DATA_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
-    get_distance_between_two_lan_long, get_gee_asset_path, check_task_status, gdf_to_ee_fc
+    get_distance_between_two_lan_long,
+    get_gee_asset_path,
+    check_task_status,
+    gdf_to_ee_fc,
+    get_gee_dir_path,
+    make_asset_public,
 )
 import ee
 import logging
-from datetime import  datetime
-
-logger = logging.getLogger(__name__)
-
-from waterrejuvenation.utils import get_filtered_mws_layer_name, gen_proj_roi, wait_for_task_completion, \
-    get_waterbody_id_for_lat_long, WATER_REJ_GEE_ASSET, clip_lulc_output, delete_asset_on_GEE, find_nearest_water_pixel
-from computing.surface_water_bodies.swb1 import generate_swb_layer
+from datetime import datetime
+import geemap
+from waterrejuvenation.utils import (
+    get_filtered_mws_layer_name,
+    gen_proj_roi,
+    wait_for_task_completion,
+    get_waterbody_id_for_lat_long,
+    WATER_REJ_GEE_ASSET,
+    clip_lulc_output,
+    delete_asset_on_GEE,
+    find_nearest_water_pixel,
+    get_ndvi_for_zoi,
+    compute_zoi,
+    generate_zoi_ring_layer,
+)
+from computing.surface_water_bodies.swb import generate_swb_layer
+from computing.mws.precipitation import precipitation
 from shapely.geometry import Point
 import geopandas as gpd
+from computing.drought.drought import calculate_drought
+from computing.misc.drainage_lines import clip_drainage_lines
+
+# logger object for writing logs to file
+logger = logging.getLogger(__name__)
+
+# task to take file obj and process all desilting points shared
+
 
 @shared_task
-def Upload_Desilting_Points(file_obj_id):
+def Upload_Desilting_Points(file_obj_id, is_closest_wp=True, is_lulc_required=True):
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
-    ee_initialize()
+
+    project_id = ee_initialize()
     merged_features = []
-    #Initialize objects for given parameters
-    wb_obj = WaterbodiesFileUploadLog.objects.get(pk = file_obj_id)
+
+    # Initialize objects for given parameters
+    wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
     # Generating mws layer name
-    mws_asset_id = get_filtered_mws_layer_name(proj_obj.name, 'filtered_mws')
+    mws_asset_id = get_filtered_mws_layer_name(
+        proj_obj.name, "filtered_mws", project_id=project_id
+    )
 
-    #Since we wanted to build all the layer new everytime some one upload We are deleting asset first
+    # Since we wanted to build all the layer new everytime some one upload We are deleting asset first
     delete_asset_on_GEE(mws_asset_id)
 
     if wb_obj.process:
@@ -48,115 +92,321 @@ def Upload_Desilting_Points(file_obj_id):
     else:
         filepath = wb_obj.file
         df = pd.read_excel(filepath)
+
         for index, row in df.iterrows():
-             dsilting_obj_log = WaterbodiesDesiltingLog(**{
-                'name_of_ngo': row['Name of NGO'],
-                'State': row['State'],
-                'District': row['District'],
-                'Taluka': row['Taluka'],
-                'Village': row['Village'],
-                'waterbody_name': row['Name of the waterbody '],
-                'lat': row['Latitude'],
-                'lon': row['Longitude'],
-                'slit_excavated': row['Silt Excavated as per App'],
-                'excel_hash': wb_obj.excel_hash,
-                'project': proj_obj
-             })
+            dsilting_obj_log = WaterbodiesDesiltingLog(
+                **{
+                    "name_of_ngo": row["Name of NGO"],
+                    "State": row["State"],
+                    "District": row["District"],
+                    "Taluka": row["Taluka"],
+                    "Village": row["Village"],
+                    "waterbody_name": row["Name of the waterbody "],
+                    "lat": row["Latitude"],
+                    "lon": row["Longitude"],
+                    "slit_excavated": row["Silt Excavated as per App"],
+                    "excel_hash": wb_obj.excel_hash,
+                    "project": proj_obj,
+                }
+            )
 
-             #get lulc class on given lat long
-             lulc_class = get_lulc_class(dsilting_obj_log.lat, dsilting_obj_log.lon)
+            # Figure out closet waterbody pixel
+            if is_closest_wp:
+                result_dict = find_nearest_water_pixel(
+                    dsilting_obj_log.lat, dsilting_obj_log.lon, 1500
+                )
+            else:
+                result_dict = {
+                    "success": True,
+                    "latitude": dsilting_obj_log.lat,
+                    "longitude": dsilting_obj_log.lon,
+                    "distance_m": 0,
+                }
 
-             #Figure out closet waterbody pixel
-             result_dict= find_nearest_water_pixel(dsilting_obj_log.lat, dsilting_obj_log.lon,  1500)
-             status, closest_lat, closest_lon, distance = result_dict['success'], result_dict['latitude'], result_dict['longitude'], result_dict['distance_m']
-             logger.info(f"Desilting points generated by algo: lat={closest_lat}, lon={closest_lon}")
+            if not result_dict["success"]:
+                dsilting_obj_log.process = False
+                dsilting_obj_log.save()
+                continue
 
-             #todos :  Add a filed in desilting log to detect for any particular lat long alog is not able to find closest waterbody pixel for furture analysis
-             if closest_lat and closest_lat:
+            status, closest_lat, closest_lon, distance = (
+                result_dict["success"],
+                result_dict["latitude"],
+                result_dict["longitude"],
+                result_dict["distance_m"],
+            )
+            logger.info(
+                f"Desilting points generated by algo: lat={closest_lat}, lon={closest_lon}"
+            )
+
+            # todos :  Add a filed in desilting log to detect for any particular lat long alog is not able to find closest waterbody pixel for furture analysis
+            if closest_lat and closest_lat:
                 if status:
-                     dsilting_obj_log.closest_wb_lat  = closest_lat
-                     dsilting_obj_log.closest_wb_long = closest_lon
-                     dsilting_obj_log.distance_closest_wb_pixel = distance
-                     dsilting_obj_log.process = True
-                     dsilting_obj_log.save()
-                     watershed_fc, buffer = find_watersheds_for_point_with_buffer(closest_lat, closest_lon)
-                     merged_features.append(watershed_fc)
+                    dsilting_obj_log.closest_wb_lat = closest_lat
+                    dsilting_obj_log.closest_wb_long = closest_lon
+                    dsilting_obj_log.distance_closest_wb_pixel = distance
+                    dsilting_obj_log.process = True
+                    dsilting_obj_log.save()
+                    watershed_fc, buffer = find_watersheds_for_point_with_buffer(
+                        closest_lat, closest_lon
+                    )
+                    merged_features.append(watershed_fc)
 
-        intersecting_mws_asset = ee.FeatureCollection(merged_features).flatten()
+        intersecting_mws_asset = (
+            ee.FeatureCollection(merged_features).flatten().distinct("uid")
+        )
         filter_mws_task = ee.batch.Export.table.toAsset(
-                 collection=intersecting_mws_asset,
-                 description='water_rej_app_mws_tasks',
-                 assetId=mws_asset_id
-             )
+            collection=intersecting_mws_asset,
+            description="water_rej_app_mws_tasks",
+            assetId=mws_asset_id,
+        )
         try:
             filter_mws_task.start()
             logger.info("MWS task started for given lat long")
             wait_for_task_completion(filter_mws_task)
             logger.info("MWS task completed")
-            clip_lulc_output(mws_asset_id, proj_obj.id)
-            logger.info("luc Task finished for lulc")
+            make_asset_public(mws_asset_id)
+            if is_lulc_required:
+                clip_lulc_output(mws_asset_id, proj_obj.id, project_id)
+                logger.info("luc Task finished for lulc")
         except Exception as e:
             logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
+    watar_balance_task = Generate_water_balance_indicator.delay(
+        mws_asset_id, project_id
+    )
+    water_balance_task_result = watar_balance_task.get()
+    zoi_task = Genereate_zoi_and_zoi_indicator.delay(
+        water_balance_task_result.project_id
+    )
+    zoi_task_result = zoi_task.get()
 
-    roi = gen_proj_roi(proj_obj.name)
+
+def Generate_water_balance_indicator(mws_asset_id, proj_id):
+    proj_obj = Project.objects.get(pk=proj_id)
     logger.info("Generating SWB layer for given lat long")
-    result =  generate_swb_layer.delay('2017', '2023', roi=roi, app_name="waterrej_app", proj_name=proj_obj.name, force_regenerate=True)
-    swb_asset_id = result.get()
+    asset_suffix_lulc = "clipped_lulc_filtered_mws_" + str(proj_obj.name.lower())
+    asset_folder_lulc = [str(proj_obj.name)]
+    asset_id_swb1 = (
+        get_gee_dir_path(
+            asset_folder_lulc, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + f"swb1_{asset_suffix_lulc}"
+    )
+    asset_id_swb2 = (
+        get_gee_dir_path(
+            asset_folder_lulc, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + f"swb2_{asset_suffix_lulc}"
+    )
+
+    delete_asset_on_GEE(asset_id_swb1)
+    delete_asset_on_GEE(asset_id_swb2)
+    result = generate_swb_layer.delay(
+        roi_path=mws_asset_id,
+        asset_suffix=asset_suffix_lulc,
+        asset_folder_list=asset_folder_lulc,
+        app_type="WATER_REJ",
+        start_year="2017",
+        end_year="2023",
+        is_all_classes=True,
+    )
+    result_task = result.get()
     logger.info("SWB layer Generation successfull")
-    mapping_result = get_waterbody_id_for_lat_long(wb_obj.excel_hash, swb_asset_id)
+    make_asset_public(asset_id_swb2)
+    asset_suffix_prec = "clipped_precipitation_filtered_mws_" + str(
+        proj_obj.name.lower()
+    )
+    asset_folder_prec = [str(proj_obj.name)]
+    asset_id_prec = (
+        get_gee_dir_path(
+            asset_folder_prec, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + f"Prec_fortnight_{asset_suffix_prec}"
+    )
+    hydrology = generate_hydrology.delay(
+        roi=mws_asset_id,
+        asset_suffix=asset_suffix_prec,
+        asset_folder_list=asset_folder_prec,
+        app_type="WATER_REJ",
+        start_year="2017",
+        end_year="2023",
+        is_annual=False,
+    )
+    make_asset_public(asset_id_prec)
+    result_hydrology = hydrology.get()
+    asset_suffix_draught = "clipped_lulc_filtered_mws_" + str(proj_obj.name.lower())
+    result_d = calculate_drought.delay(
+        roi_path=mws_asset_id,
+        asset_suffix=asset_suffix_draught,
+        asset_folder_list=asset_folder_prec,
+        app_type="WATER_REJ",
+        start_year=2017,
+        end_year=2022,
+    )
+    dst_filename = "drought_" + asset_suffix_draught + "_" + str(2017) + "_" + str(2022)
+    draught_asset_id = (
+        get_gee_dir_path(
+            asset_folder_prec, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + dst_filename
+    )
+
+    description = "Prec_fortnight_" + asset_suffix_prec
+    layer_name = "WaterRejapp_mws_" + str(proj_obj.name) + "_" + str(proj_obj.id)
+    precip = ee.FeatureCollection(asset_id_prec)
+    gdf = geemap.ee_to_gdf(precip)
+    mws_geojson_op = "data/fc_to_shape/" + str(proj_obj.name) + "/" + layer_name
+    gdf.to_file(mws_geojson_op, driver="GeoJSON")
+    season_fc = calculate_precipitation_season(
+        mws_geojson_op, draught_asset_id, proj_obj.id
+    )
+    sync_project_fc_to_geoserver(season_fc, proj_obj.name, layer_name, "waterrej")
+    asset_id_swb_with_catchement = compute_max_stream_order_and_catchment_for_swb(
+        asset_id_swb2, proj_obj.id
+    )
+    make_asset_public(asset_id_swb_with_catchement)
+    # mapping_result = get_waterbody_id_for_lat_long(wb_obj.excel_hash, asset_id_swb2)
     desilting_layer_task = BuildDesiltingLayer.delay(proj_obj.id)
     logger.info("Desilting point layer is generated")
     result = desilting_layer_task.get()
+    # logger.info(result)
+    geoserver_layer_name = "WaterRejapp-" + str(proj_obj.name) + "_" + str(proj_obj.id)
+    asset_id_result = BuildGeojson.delay(
+        asset_id_swb_with_catchement, result, geoserver_layer_name, proj_obj.name
+    )
+    asset_id_with_wb_indicator = asset_id_result.get()
+    logger.info("Waterbody Geojson Generated and pushed to geoserver")
+    drainage_line_task = clip_drainage_lines.delay(
+        roi_path=mws_asset_id,
+        asset_suffix=asset_suffix_draught,
+        asset_folder_list=asset_folder_prec,
+        app_type="WATER_REJ",
+        workspace_name="waterrej",
+        proj_id=proj_obj.id,
+    )
+    return asset_id_with_wb_indicator
 
-    geoserver_layer_name='WaterRejapp-'+str(proj_obj.name)+'_'+str(proj_obj.id)
-    BuildGeojson.delay(swb_asset_id, result, geoserver_layer_name)
-    logger.info("layer generaetd and pushed to geoserver")
+
+@shared_task()
+def Genereate_zoi_and_zoi_indicator(asset_id_with_wb_indicator, proj_id, ee_project=""):
+    ee_initialize(ee_project)
+    proj_obj = Project.objects.get(pk=proj_id)
+    wb_indicator_fc = ee.FeatureCollection(asset_id_with_wb_indicator)
+    asset_suffix = "clipped_lulc_filtered_mws_" + str(proj_obj.name.lower())
+    asset_folder = [str(proj_obj.name)]
+    zoi_fc = wb_indicator_fc.map(compute_zoi)
+    logger.info("Zoi Geojson generation started")
+    zoi_asset_id = generate_zoi_ring_layer(zoi_fc, proj_id)
+    ndmi_asset_id = generate_ndmi_layer(asset_id_with_wb_indicator, proj_obj.id)
+    ndvi_asset = get_ndvi_for_zoi(zoi_asset_id, asset_suffix, asset_folder)
+
+    task_id = generate_cropping_intensity(
+        roi=zoi_asset_id,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder,
+        app_type="WATER_REJ",
+        start_year=2017,
+        end_year=2023,
+    )
+    asset_id_ci = f"cropping_intensity_{asset_suffix}_2017-23"
+    generate_geojson_with_ci_ndvi_ndmi(
+        zoi_asset_id, asset_id_ci, "ndmi", ndmi_asset_id, proj_obj.id
+    )
 
 
 @shared_task()
 def BuildDesiltingLayer(project_id):
     ee_initialize()
     from .models import WaterbodiesDesiltingLog
-    instance = Project.objects.get(pk=project_id)
-    data = WaterbodiesDesiltingLog.objects.filter(project_id=project_id, closest_wb_lat__isnull=False)
 
-    asset_id = WATER_REJ_GEE_ASSET + str(instance.name) + "/" + 'Closest_point_to_Desilting_' + str(instance.app_type)
+    instance = Project.objects.get(pk=project_id)
+    data = WaterbodiesDesiltingLog.objects.filter(
+        project_id=project_id, closest_wb_lat__isnull=False, process=True
+    )
+
+    asset_id = (
+        WATER_REJ_GEE_ASSET
+        + str(instance.name.lower())
+        + "/"
+        + "Closest_point_to_Desilting_"
+        + str(instance.app_type)
+    )
     delete_asset_on_GEE(asset_id)
     project_id = instance.id
     org_name = instance.organization.name
     app_type = instance.app_type
     project_name = instance.name
-    filename = f"{org_name}_{app_type}_{project_id}_{project_name}_{int(datetime.now().timestamp())}"+".csv"
+    filename = (
+        f"{org_name}_{app_type}_{project_id}_{project_name}_{int(datetime.now().timestamp())}"
+        + ".csv"
+    )
     directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
     full_path = os.path.join(SITE_DATA_PATH, directory)
     file_path = full_path + filename
     os.makedirs(full_path, exist_ok=True)
-    with open(file_path, 'w', newline='') as csvfile:
+    with open(file_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(['latitude', 'longitude', 'desiltingpoint_lat', 'desiltingpoint_lon', 'name_of_ngo', 'State', 'District', 'Taluka', 'village', 'waterbody_name', 'slit_excavated'])
+        writer.writerow(
+            [
+                "latitude",
+                "longitude",
+                "desiltingpoint_lat",
+                "desiltingpoint_lon",
+                "Village",
+                "distance_from_desilting_point",
+                "name_of_ngo",
+                "State",
+                "District",
+                "Taluka",
+                "waterbody_name",
+                "slit_excavated",
+            ]
+        )
         for loc in data:
-            writer.writerow([loc.closest_wb_lat, loc.closest_wb_long,loc.lat, loc.lon, loc.name_of_ngo, loc.State, loc.District, loc.Taluka, loc.Village, loc.waterbody_name, loc.slit_excavated])
+            writer.writerow(
+                [
+                    val if val is not None and str(val).strip() != "" else "N/A"
+                    for val in [
+                        loc.closest_wb_lat,
+                        loc.closest_wb_long,
+                        loc.lat,
+                        loc.lon,
+                        loc.Village,
+                        loc.distance_closest_wb_pixel,
+                        loc.name_of_ngo,
+                        loc.State,
+                        loc.District,
+                        loc.Taluka,
+                        loc.waterbody_name,
+                        loc.slit_excavated,
+                    ]
+                ]
+            )
     df = pd.read_csv(file_path)
-    geometry = [Point(xy) for xy in zip(df['longitude'], df['latitude'])]
+    df = df.fillna("N/A").replace(r"^\s*$", "N/A", regex=True)
+    geometry = [Point(xy) for xy in zip(df["longitude"], df["latitude"])]
     gdf = gpd.GeoDataFrame(df, geometry=geometry)
     gdf.set_crs("EPSG:4326", allow_override=True, inplace=True)
-    gdf = gdf.dropna(subset=['geometry'])
+    gdf = gdf.dropna(subset=["geometry"])
     fc = gdf_to_ee_fc(gdf)
+    delete_asset_on_GEE(asset_id)
     point_tasks = ee.batch.Export.table.toAsset(
-        collection=fc,
-        description='water_rej_desilting_point_tasks',
-        assetId=asset_id
+        collection=fc, description="water_rej_desilting_point_tasks", assetId=asset_id
     )
     point_tasks.start()
     wait_for_task_completion(point_tasks)
     return asset_id
 
+
 @shared_task()
-def BuildGeojson(swb2_asset, desilting_point_asset, layer_name):
+def BuildGeojson(swb2_asset, desilting_point_asset, layer_name, project_name):
     ee_initialize()
     # Load the FeatureCollections and Image
-    waterbodies = ee.FeatureCollection(swb2_asset)  # Replace with your actual table2 asset
-    desiltingPoints = ee.FeatureCollection(desilting_point_asset)  # Replace with your actual table asset
+    waterbodies = ee.FeatureCollection(
+        swb2_asset
+    )  # Replace with your actual table2 asset
+    desiltingPoints = ee.FeatureCollection(
+        desilting_point_asset
+    )  # Replace with your actual table asset
 
     # Map over waterbodies to attach intersecting point geometry and properties
     def attach_matching_point(feature):
@@ -169,32 +419,24 @@ def BuildGeojson(swb2_asset, desilting_point_asset, layer_name):
         # Check if any point was found
         return ee.Algorithms.If(
             point,
-            ee.Feature(feature).copyProperties(point).set('matched', True),
-            feature.set('matched', False)
+            ee.Feature(feature).copyProperties(point).set("matched", True),
+            feature.set("matched", False),
         )
 
     # Apply the function to each waterbody polygon
     joined = waterbodies.map(attach_matching_point)
-    matched_polygons = ee.FeatureCollection(joined).filter(ee.Filter.eq('matched', True))
+    matched_polygons = ee.FeatureCollection(joined).filter(
+        ee.Filter.eq("matched", True)
+    )
+    asset_id_desilt = get_filtered_mws_layer_name(project_name, layer_name)
+    delete_asset_on_GEE(asset_id_desilt)
+    point_tasks = ee.batch.Export.table.toAsset(
+        collection=matched_polygons,
+        description="water_rej_desilting_point_tasks",
+        assetId=asset_id_desilt,
+    )
+    point_tasks.start()
+    wait_for_task_completion(point_tasks)
 
-    # Filter for polygons that had matches
-
-    print (layer_name)
-    # Export the result
-
-
-    sync_project_fc_to_geoserver(matched_polygons, layer_name, 'waterrej', 5)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    sync_project_fc_to_geoserver(matched_polygons, project_name, layer_name, "waterrej")
+    return asset_id_desilt

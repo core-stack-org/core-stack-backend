@@ -25,6 +25,7 @@ from nrm_app.settings import GEOSERVER_URL
 
 # Create your views here.
 
+
 def is_valid_string(value):
     if not value:
         return True
@@ -35,11 +36,11 @@ def is_valid_string(value):
 def is_valid_mws_id(value):
     if not value:
         return True
-    return all(c.isdigit() or c == '_' for c in value)
+    return all(c.isdigit() or c == "_" for c in value)
 
 
 def excel_file_exists(state, district, tehsil):
-    base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
+    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
     state_path = os.path.join(base_path, state.upper())
     district_path = os.path.join(state_path, district.upper())
     filename = f"{district}_{tehsil}.xlsx"
@@ -83,14 +84,16 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         else:
             continue  # Skip unknown types
 
-        layer_data.append({
-            "layer_name": dataset.name,
-            "layer_type": layer_type,
-            "layer_url": layer_url,
-            "layer_version": layer.layer_version,
-            "style_url": '',
-            "gee_asset_path": gee_asset_path
-        })
+        layer_data.append(
+            {
+                "layer_name": dataset.name,
+                "layer_type": layer_type,
+                "layer_url": layer_url,
+                "layer_version": layer.layer_version,
+                "style_url": "",
+                "gee_asset_path": gee_asset_path,
+            }
+        )
 
     return layer_data
 
@@ -98,19 +101,26 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 def get_location_info_by_lat_lon(lat, lon):
     ee_initialize()
     point = ee.Geometry.Point([lon, lat])
-    feature_collection = ee.FeatureCollection("projects/corestack-datasets/assets/datasets/SOI_tehsil")
+    feature_collection = ee.FeatureCollection(
+        "projects/corestack-datasets/assets/datasets/SOI_tehsil"
+    )
     try:
         intersected = feature_collection.filterBounds(point)
         collection_size = intersected.size().getInfo()
         if collection_size == 0:
-            return Response({"error": "Latitude and longitude is not in SOI boundary."},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Latitude and longitude is not in SOI boundary."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         features = intersected.toList(intersected.size())
         for i in range(intersected.size().getInfo()):
             feature = ee.Feature(features.get(i))
-            feature_loc = feature.getInfo()['properties']
-            locat_details = {"State": feature_loc.get('STATE'), "District": feature_loc.get('District'),
-                             "Tehsil": feature_loc.get('TEHSIL')}
+            feature_loc = feature.getInfo()["properties"]
+            locat_details = {
+                "State": feature_loc.get("STATE"),
+                "District": feature_loc.get("District"),
+                "Tehsil": feature_loc.get("TEHSIL"),
+            }
             return locat_details
     except Exception as e:
         print("Exception while getting admin details", str(e))
@@ -122,24 +132,31 @@ def get_mws_id_by_lat_lon(lon, lat):
     print("Data dict for the lat lon", data_dict)
     if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
         return Response(
-            {"error": "Latitude and longitude is not in SOI boundary."}, status=status.HTTP_404_NOT_FOUND)
-    state = data_dict.get('State')
-    district = data_dict.get('District')
-    tehsil = data_dict.get('Tehsil')
+            {"error": "Latitude and longitude is not in SOI boundary."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    state = data_dict.get("State")
+    district = data_dict.get("District")
+    tehsil = data_dict.get("Tehsil")
 
     try:
         asset_path = get_gee_asset_path(state, district, tehsil)
-        mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
+        mws_asset_id = (
+            asset_path
+            + f"filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid"
+        )
         if is_gee_asset_exists(mws_asset_id):
             mws_fc = ee.FeatureCollection(mws_asset_id)
             point = ee.Geometry.Point([lon, lat])
             matching_feature = mws_fc.filterBounds(point).first()
-            uid = ee.String(matching_feature.get('uid')).getInfo()
+            uid = ee.String(matching_feature.get("uid")).getInfo()
             data_dict["uid"] = uid
             return data_dict
         else:
-            return Response({"error": "Mws Layer is not generated for the given lat lon location."},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Mws Layer is not generated for the given lat lon location."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
     except Exception as e:
         print("Exception while getting mws_id using lat lon", str(e))
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -148,27 +165,37 @@ def get_mws_id_by_lat_lon(lon, lat):
 def get_mws_json_from_stats_excel(state, district, tehsil, mws_id):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + tehsil
-    xlsx_file = file_xl_path + '.xlsx'
+    file_xl_path = (
+        EXCEL_PATH
+        + "data/stats_excel_files/"
+        + state_folder
+        + "/"
+        + district_folder
+        + "/"
+        + district
+        + "_"
+        + tehsil
+    )
+    xlsx_file = file_xl_path + ".xlsx"
 
     sheets = {
-        'hydrological_annual': -1,
-        'terrain': -1,
-        'croppingIntensity_annual': -1,
-        'surfaceWaterBodies_annual': -1,
-        'croppingDrought_kharif': -1,
-        'nrega_annual': -1,
-        'mws_intersect_villages': -1,
-        'change_detection_degradation': -1,
-        'change_detection_afforestation': -1,
-        'change_detection_deforestation': -1,
-        'change_detection_urbanization': -1,
-        'change_detection_cropintensity': -1,
-        'terrain_lulc_slope': -1,
-        'terrain_lulc_plain': -1,
-        'restoration_vector': -1,
-        'aquifer_vector': -1,
-        'soge_vector': -1,
+        "hydrological_annual": -1,
+        "terrain": -1,
+        "croppingIntensity_annual": -1,
+        "surfaceWaterBodies_annual": -1,
+        "croppingDrought_kharif": -1,
+        "nrega_annual": -1,
+        "mws_intersect_villages": -1,
+        "change_detection_degradation": -1,
+        "change_detection_afforestation": -1,
+        "change_detection_deforestation": -1,
+        "change_detection_urbanization": -1,
+        "change_detection_cropintensity": -1,
+        "terrain_lulc_slope": -1,
+        "terrain_lulc_plain": -1,
+        "restoration_vector": -1,
+        "aquifer_vector": -1,
+        "soge_vector": -1,
     }
 
     result = {}
@@ -186,15 +213,15 @@ def get_mws_json_from_stats_excel(state, district, tehsil, mws_id):
         try:
             df = xls.parse(sheet_name)
             df.columns = [col.strip().lower() for col in df.columns]
-            if sheet_name == 'nrega_annual':
-                filtered_df = df[df['mws_id'] == mws_id]
-            elif sheet_name == 'mws_intersect_villages':
-                filtered_df = df[df['mws uid'] == mws_id]
+            if sheet_name == "nrega_annual":
+                filtered_df = df[df["mws_id"] == mws_id]
+            elif sheet_name == "mws_intersect_villages":
+                filtered_df = df[df["mws uid"] == mws_id]
             else:
-                filtered_df = df[df['uid'] == mws_id]
+                filtered_df = df[df["uid"] == mws_id]
 
             if not filtered_df.empty:
-                result[sheet_name] = filtered_df.to_dict(orient='records')
+                result[sheet_name] = filtered_df.to_dict(orient="records")
 
         except Exception as e:
             result[sheet_name] = {"error": f"Error processing sheet: {str(e)}"}
@@ -203,25 +230,35 @@ def get_mws_json_from_stats_excel(state, district, tehsil, mws_id):
 
 
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
-    get_generate_filter_mws_data(state, district, tehsil, 'xlsx')
+    get_generate_filter_mws_data(state, district, tehsil, "xlsx")
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + tehsil
-    xlsx_file = file_xl_path + '_KYL_filter_data.xlsx'
+    file_xl_path = (
+        EXCEL_PATH
+        + "data/stats_excel_files/"
+        + state_folder
+        + "/"
+        + district_folder
+        + "/"
+        + district
+        + "_"
+        + tehsil
+    )
+    xlsx_file = file_xl_path + "_KYL_filter_data.xlsx"
 
     try:
         df = pd.read_excel(xlsx_file)
         df.columns = [col.strip().lower() for col in df.columns]
 
-        if 'mws_id' not in df.columns:
+        if "mws_id" not in df.columns:
             return {"error": "'mws_id' column not found in Excel file."}
 
-        filtered_df = df[df['mws_id'] == mws_id]
+        filtered_df = df[df["mws_id"] == mws_id]
         filtered_df = filtered_df.replace([np.inf, -np.inf], np.nan)
 
         # Convert to dict with null-safe serialization
         json_compatible = json.loads(
-            filtered_df.to_json(orient='records', default_handler=str)
+            filtered_df.to_json(orient="records", default_handler=str)
         )
 
         return json_compatible

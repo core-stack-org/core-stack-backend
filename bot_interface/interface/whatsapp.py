@@ -24,15 +24,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     BUCKET_NAME = "your-s3-bucket-name"
 
     @staticmethod
-    def create_event_packet(json_obj: Any, bot_id: int, event: str = "start") -> Dict[str, Any]:
+    def create_event_packet(
+        json_obj: Any, bot_id: int, event: str = "start"
+    ) -> Dict[str, Any]:
         """
         Create an event packet from WhatsApp webhook data.
-        
+
         Args:
             json_obj: JSON string or dict containing webhook data
             bot_id: Bot instance ID
             event: Event type (default: "start")
-            
+
         Returns:
             dict: Event packet dictionary
         """
@@ -80,7 +82,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             "type": "",
             "user_number": "",
             "smj_id": "",
-            "state": ""
+            "state": "",
         }
 
         # Process different types of incoming data
@@ -160,7 +162,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             "latitude": latitude,
             "longitude": longitude,
             "name": location.get("name", ""),
-            "address": location.get("address", "")
+            "address": location.get("address", ""),
         }
         print(f"Processed location message: {latitude}, {longitude}")
 
@@ -177,17 +179,25 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Check if user exists in our system
             try:
-                bot_user = bot_interface.models.BotUsers.objects.get(user__contact_number=user_number)
-                user_session = bot_interface.models.UserSessions.objects.get(user_id=bot_user.id, bot=bot_instance)
+                bot_user = bot_interface.models.BotUsers.objects.get(
+                    user__contact_number=user_number
+                )
+                user_session = bot_interface.models.UserSessions.objects.get(
+                    user_id=bot_user.id, bot=bot_instance
+                )
 
                 # Preserve current SMJ and state context
                 if user_session.current_smj and user_session.current_state:
                     event_packet["smj_id"] = user_session.current_smj.id
                     event_packet["state"] = user_session.current_state
                     print(
-                        f"Preserved user context - SMJ: {user_session.current_smj.id}, State: {user_session.current_state}")
+                        f"Preserved user context - SMJ: {user_session.current_smj.id}, State: {user_session.current_state}"
+                    )
 
-            except (bot_interface.models.BotUsers.DoesNotExist, bot_interface.models.UserSessions.DoesNotExist):
+            except (
+                bot_interface.models.BotUsers.DoesNotExist,
+                bot_interface.models.UserSessions.DoesNotExist,
+            ):
                 # User or session doesn't exist yet, will be handled in session creation
                 print("No existing user session found, will use default context")
 
@@ -230,8 +240,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         event_packet["data"] = filepath
 
     @staticmethod
-    def _download_and_upload_media(bot_id: int, mime_type: str, media_id: str,
-                                   media_type: str) -> str:
+    def _download_and_upload_media(
+        bot_id: int, mime_type: str, media_id: str, media_type: str
+    ) -> str:
         """Download media from WhatsApp and upload to S3"""
         # You need to implement these functions
         if media_type == "image":
@@ -254,8 +265,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def _download_image(bot_id: int, mime_type: str, media_id: str) -> str:
         """Download image from WhatsApp API using proper API flow"""
         try:
-            print(f"Downloading image: bot_id={bot_id}, mime_type={mime_type}, media_id={media_id}")
-            response, filepath = bot_interface.api.download_image(bot_id, mime_type, media_id)
+            print(
+                f"Downloading image: bot_id={bot_id}, mime_type={mime_type}, media_id={media_id}"
+            )
+            response, filepath = bot_interface.api.download_image(
+                bot_id, mime_type, media_id
+            )
 
             if response and response.status_code == 200 and filepath:
                 print(f"Successfully downloaded image to: {filepath}")
@@ -274,8 +289,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def _download_audio(bot_id: int, mime_type: str, media_id: str) -> str:
         """Download audio from WhatsApp API using proper API flow"""
         try:
-            print(f"Downloading audio: bot_id={bot_id}, mime_type={mime_type}, media_id={media_id}")
-            response, filepath = bot_interface.api.download_audio(bot_id, mime_type, media_id)
+            print(
+                f"Downloading audio: bot_id={bot_id}, mime_type={mime_type}, media_id={media_id}"
+            )
+            response, filepath = bot_interface.api.download_audio(
+                bot_id, mime_type, media_id
+            )
 
             if response and response.status_code == 200 and filepath:
                 print(f"Successfully downloaded audio to: {filepath}")
@@ -293,8 +312,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     @staticmethod
     def _is_interactive_message(json_obj: Dict) -> bool:
         """Check if this is an interactive message"""
-        return bool(json_obj.get("id") and
-                    json_obj.get("type") == "interactive")
+        return bool(json_obj.get("id") and json_obj.get("type") == "interactive")
 
     @staticmethod
     def _process_interactive_message(json_obj: Dict, event_packet: Dict) -> None:
@@ -319,11 +337,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         print(text, bot_id)
 
         try:
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             response = bot_interface.api.send_text(
-                bot_instance_id=bot_id,
-                contact_number=user.phone,
-                text=text)
+                bot_instance_id=bot_id, contact_number=user.phone, text=text
+            )
             print("Text message response:", response)
 
             # Update user session state
@@ -340,7 +359,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             logger.info("Exiting sendText with response: ")
 
             # Return success/failure based on API response
-            if response and response.get('messages'):
+            if response and response.get("messages"):
                 return "success"
             else:
                 return "failure"
@@ -372,7 +391,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         print("caption", caption)
 
         try:
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             print("user in sendButton", user)
             user.expected_response_type = "button"
             user.current_state = data_dict.get("state")
@@ -393,18 +414,20 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     contact_number=user.phone,
                     text=caption,
                     menu_list=data,
-                    button_label=label
+                    button_label=label,
                 )
                 print("List message without description response :", response)
             elif len(data) <= 3 and ("description" in data[0]):
-                print("in send_list msg with less than equals to 3 options- labels with description::")
+                print(
+                    "in send_list msg with less than equals to 3 options- labels with description::"
+                )
                 label = "Select Here"
                 response = bot_interface.api.send_list_msg(
                     bot_instance_id=bot_instance_id,
                     contact_number=user.phone,
                     text=caption,
                     menu_list=data,
-                    button_label=label
+                    button_label=label,
                 )
                 print("List message with description response :", response)
             else:
@@ -414,12 +437,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     bot_instance_id=bot_instance_id,
                     contact_number=user.phone,
                     text=caption,
-                    menu_list=data
+                    menu_list=data,
                 )
                 print("Button message response:", response)
 
             # Return success/failure based on API response
-            if response and response.get('messages'):
+            if response and response.get("messages"):
                 return "success"
             else:
                 return "failure"
@@ -447,7 +470,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         print("user in sendLocationRequest", user_id)
 
         # check if user is created
-        user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+        user = bot_interface.models.UserSessions.objects.get(
+            user=user_id, bot=bot_instance
+        )
         print("user in sendLocationRequest", user)
         user.expected_response_type = "location"
         user.current_state = data_dict.get("state")
@@ -460,13 +485,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         response = bot_interface.api.send_location_request(
             bot_instance_id=bot_instance_id,
             contact_number=user.phone,
-            text="कृपया स्थान भेजें"
+            text="कृपया स्थान भेजें",
         )
 
         print("Location request response:", response)
 
         # Return success/failure based on API response
-        if response and response.get('messages'):
+        if response and response.get("messages"):
             return "success"
         else:
             return "failure"
@@ -500,16 +525,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             get_data_from_state_field = None
 
             # check if data_dict has 'getDataFrom' key
-            if 'getDataFrom' in data:
+            if "getDataFrom" in data:
                 # getDataFrom has the statename from which we need to get the data received to use it here
-                get_data_from = data['getDataFrom']
+                get_data_from = data["getDataFrom"]
                 get_data_from_state = get_data_from.get("state", "")
                 get_data_from_state_field = get_data_from.get("field", "data")
                 print("State name from data_dict:", get_data_from_state)
                 print("Field name from data_dict:", get_data_from_state_field)
 
             # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             print("user in sendCommunityByLocation", user)
             # user.expected_response_type = "community"
             user.current_state = data_dict.get("state")
@@ -528,8 +555,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if get_data_from_state and current_session:
                 # current_session is a list of dictionaries, need to search through them
                 for session_dict in current_session:
-                    if isinstance(session_dict, dict) and get_data_from_state in session_dict:
-                        data = session_dict[get_data_from_state].get(get_data_from_state_field, {})
+                    if (
+                        isinstance(session_dict, dict)
+                        and get_data_from_state in session_dict
+                    ):
+                        data = session_dict[get_data_from_state].get(
+                            get_data_from_state_field, {}
+                        )
                         print("Data from current session for state:", data)
                         location_data_found = True
 
@@ -539,15 +571,23 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             if len(lat_lon) == 2:
                                 latitude = lat_lon[0].strip()
                                 longitude = lat_lon[1].strip()
-                                print("Latitude and Longitude from string:", latitude, longitude)
+                                print(
+                                    "Latitude and Longitude from string:",
+                                    latitude,
+                                    longitude,
+                                )
                                 break  # Found the data, exit the loop
                             else:
                                 print("Invalid latitude and longitude format in string")
                         else:
-                            print("Latitude and Longitude not found in current session data - data is not string")
+                            print(
+                                "Latitude and Longitude not found in current session data - data is not string"
+                            )
 
             if not location_data_found or not latitude or not longitude:
-                print(f"Required location data not found in session: {get_data_from_state}")
+                print(
+                    f"Required location data not found in session: {get_data_from_state}"
+                )
                 return "failure"
 
             # Handle SMJ object lookup with error handling
@@ -557,10 +597,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             response = None
             # try:
             from public_api.views import get_location_info_by_lat_lon
+
             print("Fetching community by location...", latitude, longitude)
             response = get_location_info_by_lat_lon(
-                lat=float(latitude),
-                lon=float(longitude)
+                lat=float(latitude), lon=float(longitude)
             )
             logger.info("Location info response:", response)
             # except Exception as e:
@@ -581,6 +621,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             if response:
                 from community_engagement.utils import get_communities
+
                 # Handle response based on its type
                 if isinstance(response, tuple):
                     # If response is a tuple (success, data), extract the data
@@ -589,7 +630,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         community_data = get_communities(
                             state_name=location_data.get("State", ""),
                             district_name=location_data.get("District", ""),
-                            block_name=location_data.get("Block", "")
+                            block_name=location_data.get("Block", ""),
                         )
                     else:
                         return "failure"
@@ -598,7 +639,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     community_data = get_communities(
                         state_name=response.get("State", ""),
                         district_name=response.get("District", ""),
-                        block_name=response.get("Block", "")
+                        block_name=response.get("Block", ""),
                     )
                 else:
                     return "failure"
@@ -608,11 +649,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 communities_list = []
                 if community_data:
                     for community in community_data:
-                        communities_list.append({
-                            "value": community.get("community_id"),
-                            "label": community.get("name"),
-                            "description": community.get("description", "")
-                        })
+                        communities_list.append(
+                            {
+                                "value": community.get("community_id"),
+                                "label": community.get("name"),
+                                "description": community.get("description", ""),
+                            }
+                        )
 
                     print("Communities list for WhatsApp:", communities_list)
 
@@ -622,13 +665,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             bot_instance_id=bot_instance_id,
                             contact_number=user.phone,
                             text="कृपया अपना समुदाय चुनें",
-                            menu_list=communities_list
+                            menu_list=communities_list,
                         )
 
-                        print("Communities list message response:", send_communities_response)
+                        print(
+                            "Communities list message response:",
+                            send_communities_response,
+                        )
                     user.expected_response_type = "community"
                     user.save()
-                    if send_communities_response and send_communities_response.get('messages'):
+                    if send_communities_response and send_communities_response.get(
+                        "messages"
+                    ):
                         return "success"
                     else:
                         return "failure"
@@ -660,7 +708,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         print("user in sendStates", user_id)
 
         # check if user is created
-        user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+        user = bot_interface.models.UserSessions.objects.get(
+            user=user_id, bot=bot_instance
+        )
         print("user in sendStates", user)
         user.expected_response_type = "button"
         user.current_state = data_dict.get("state")
@@ -671,24 +721,33 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         user.save()
 
         from community_engagement.models import Location
-        state_ids_with_community = Location.objects.filter(communities__isnull=False).values_list('state_id',
-                                                                                                  flat=True).distinct()
-        states = State.objects.filter(pk__in=state_ids_with_community).order_by('state_name')
+
+        state_ids_with_community = (
+            Location.objects.filter(communities__isnull=False)
+            .values_list("state_id", flat=True)
+            .distinct()
+        )
+        states = State.objects.filter(pk__in=state_ids_with_community).order_by(
+            "state_name"
+        )
 
         print("States to be sent:", states)
-        states_list = [{"value": state.pk, "label": state.state_name, "description": ""} for state in states]
+        states_list = [
+            {"value": state.pk, "label": state.state_name, "description": ""}
+            for state in states
+        ]
         # states_list = [{"value": state.pk, "label": state.state_name}]
         print("States list to be sent:", states_list)
         response = bot_interface.api.send_list_msg(
             bot_instance_id=bot_instance_id,
             contact_number=user.phone,
             text="कृपया अपना राज्य चुनें",
-            menu_list=states_list
+            menu_list=states_list,
         )
         print("List message response:", response)
 
         # Return success/failure based on API response
-        if response and response.get('messages'):
+        if response and response.get("messages"):
             return "success"
         else:
             return "failure"
@@ -714,7 +773,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print("user in sendDistricts", user_id)
 
             # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             print("user in sendDistricts", user)
 
             # get the state name from data_dict
@@ -733,9 +794,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             get_data_from_state_field = "data"  # Default value
 
             # check if data_dict has 'getDataFrom' key
-            if 'getDataFrom' in data:
+            if "getDataFrom" in data:
                 # getDataFrom has the statename from which we need to get the data received to use it here
-                get_data_from = data['getDataFrom']
+                get_data_from = data["getDataFrom"]
                 get_data_from_state = get_data_from.get("state", "")
                 get_data_from_state_field = get_data_from.get("field", "data")
                 print("State name from data_dict:", get_data_from_state)
@@ -747,11 +808,19 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return "failure"
 
             current_session = user.current_session
-            print("Current session in sendDistricts:", type(current_session), current_session)
+            print(
+                "Current session in sendDistricts:",
+                type(current_session),
+                current_session,
+            )
 
             # Validate session structure and extract state ID
             state_id = None
-            if current_session and isinstance(current_session, list) and len(current_session) > 0:
+            if (
+                current_session
+                and isinstance(current_session, list)
+                and len(current_session) > 0
+            ):
                 if get_data_from_state in current_session[0]:
                     state_data = current_session[0][get_data_from_state]
                     state_id = state_data.get(get_data_from_state_field, "")
@@ -770,7 +839,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_districts_with_community/",
                     url=f"http://localhost:8000/api/v1/get_districts_with_community/",
                     params={"state_id": state_id},
-                    timeout=30
+                    timeout=30,
                 )
                 response.raise_for_status()  # Raise an error for bad responses
                 print("Response from get_districts_with_community:", response.json())
@@ -783,14 +852,20 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print("Districts data:", districts_data)
             for district in districts_data:
                 print("District:", district, district.get("id"), district.get("name"))
-            districts_list = [{"value": district.get("id"), "label": district.get("name"), "description": ""} for
-                              district in districts_data]
+            districts_list = [
+                {
+                    "value": district.get("id"),
+                    "label": district.get("name"),
+                    "description": "",
+                }
+                for district in districts_data
+            ]
 
             send_districts_response = bot_interface.api.send_list_msg(
                 bot_instance_id=bot_instance_id,
                 contact_number=user.phone,
                 text="कृपया अपना जिला चुनें",
-                menu_list=districts_list
+                menu_list=districts_list,
             )
 
             print("List message response:", send_districts_response)
@@ -799,11 +874,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user.save()
 
             # Return success/failure based on API response
-            if send_districts_response and send_districts_response.get('messages'):
+            if send_districts_response and send_districts_response.get("messages"):
                 return "success"
             else:
                 return "failure"
-
 
         except Exception as e:
             print(f"Error in sendDistricts: {e}")
@@ -830,7 +904,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print("user in sendCommunityByStateDistrict", user_id)
 
             # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             print("user in sendCommunityByStateDistrict", user)
 
             # Set user session properties
@@ -849,12 +925,16 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             district_id = None
 
             # Check if data_dict has 'getDataFrom' key
-            if 'getDataFrom' in data:
-                get_data_from_list = data['getDataFrom']
+            if "getDataFrom" in data:
+                get_data_from_list = data["getDataFrom"]
                 print("getDataFrom configuration:", get_data_from_list)
 
                 current_session = user.current_session
-                print("Current session in sendCommunityByStateDistrict:", type(current_session), current_session)
+                print(
+                    "Current session in sendCommunityByStateDistrict:",
+                    type(current_session),
+                    current_session,
+                )
 
                 # Extract state and district IDs from session data
                 for get_data_from in get_data_from_list:
@@ -865,18 +945,32 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
                     if state_name == "SendState":
                         # Get state_id from SendState session data
-                        if current_session and len(current_session) > 0 and state_name in current_session[0]:
-                            state_id = current_session[0][state_name].get(field_name, "")
+                        if (
+                            current_session
+                            and len(current_session) > 0
+                            and state_name in current_session[0]
+                        ):
+                            state_id = current_session[0][state_name].get(
+                                field_name, ""
+                            )
                             print(f"Extracted state_id: {state_id}")
                     elif state_name == "SendDistrict":
                         # Get district_id from SendDistrict session data
-                        if current_session and len(current_session) > 0 and state_name in current_session[0]:
-                            district_id = current_session[0][state_name].get(field_name, "")
+                        if (
+                            current_session
+                            and len(current_session) > 0
+                            and state_name in current_session[0]
+                        ):
+                            district_id = current_session[0][state_name].get(
+                                field_name, ""
+                            )
                             print(f"Extracted district_id: {district_id}")
 
             # Check if we have the required state and district data
             if not state_id or not district_id:
-                print(f"Missing required data - state_id: {state_id}, district_id: {district_id}")
+                print(
+                    f"Missing required data - state_id: {state_id}, district_id: {district_id}"
+                )
                 return "failure"
 
             # # Get state and district names for API call
@@ -895,11 +989,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 response = requests.get(
                     # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_communities_by_location/",
                     url=f"http://localhost:8000/api/v1/get_communities_by_location/",
-                    params={
-                        "state_id": state_id,
-                        "district_id": district_id
-                    },
-                    timeout=30
+                    params={"state_id": state_id, "district_id": district_id},
+                    timeout=30,
                 )
                 response.raise_for_status()
                 api_response = response.json()
@@ -913,11 +1004,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     # Format communities for WhatsApp list message
                     communities_list = []
                     for community in communities_data:
-                        communities_list.append({
-                            "value": community.get("community_id"),
-                            "label": community.get("name"),
-                            "description": community.get("description", "")
-                        })
+                        communities_list.append(
+                            {
+                                "value": community.get("community_id"),
+                                "label": community.get("name"),
+                                "description": community.get("description", ""),
+                            }
+                        )
 
                     print("Communities list for WhatsApp:", communities_list)
 
@@ -927,21 +1020,28 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             bot_instance_id=bot_instance_id,
                             contact_number=user.phone,
                             text="कृपया अपना समुदाय चुनें",
-                            menu_list=communities_list
+                            menu_list=communities_list,
                         )
 
-                        print("Communities list message response:", send_communities_response)
+                        print(
+                            "Communities list message response:",
+                            send_communities_response,
+                        )
 
                         # Save user session
                         user.save()
 
                         # Return success/failure based on API response
-                        if send_communities_response and send_communities_response.get('messages'):
+                        if send_communities_response and send_communities_response.get(
+                            "messages"
+                        ):
                             return "success"
                         else:
                             return "failure"
                     else:
-                        print("No communities found for the selected state and district")
+                        print(
+                            "No communities found for the selected state and district"
+                        )
                         return "failure"
                 else:
                     print("API response indicates failure or no data")
@@ -976,7 +1076,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print("user in addUserToCommunity", user_id)
 
             # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             print("user in addUserToCommunity", user)
 
             # Set user session properties
@@ -994,8 +1096,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             community_id = None
 
             # Check if data_dict has 'getDataFrom' key
-            if 'getDataFrom' in data:
-                get_data_from_config = data['getDataFrom']
+            if "getDataFrom" in data:
+                get_data_from_config = data["getDataFrom"]
                 print("getDataFrom configuration:", get_data_from_config)
 
                 # Normalize getDataFrom to list format for consistent processing
@@ -1012,7 +1114,11 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 print("Normalized getDataFrom list:", get_data_from_list)
 
                 current_session = user.current_session
-                print("Current session in addUserToCommunity:", type(current_session), current_session)
+                print(
+                    "Current session in addUserToCommunity:",
+                    type(current_session),
+                    current_session,
+                )
 
                 # Extract community ID from session data
                 for get_data_from in get_data_from_list:
@@ -1024,16 +1130,22 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     if state_name == "CommunityByStateDistrict":
                         # Get community_id from CommunityByStateDistrict session data
                         if current_session and len(current_session) > 0:
-                            print(f"Session structure check - type: {type(current_session[0])}")
+                            print(
+                                f"Session structure check - type: {type(current_session[0])}"
+                            )
                             if state_name in current_session[0]:
                                 state_data = current_session[0][state_name]
-                                print(f"State data type: {type(state_data)}, content: {state_data}")
+                                print(
+                                    f"State data type: {type(state_data)}, content: {state_data}"
+                                )
 
                                 if isinstance(state_data, dict):
                                     community_id = state_data.get(field_name)
                                     print(f"Extracted community_id: {community_id}")
                                 else:
-                                    print(f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}")
+                                    print(
+                                        f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}"
+                                    )
                                     return "failure"
                             else:
                                 print(f"State {state_name} not found in session")
@@ -1041,16 +1153,22 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             print("No current session data available")
                     elif state_name == "CommunityByLocation":
                         if current_session and len(current_session) > 0:
-                            print(f"Session structure check - type: {type(current_session[0])}")
+                            print(
+                                f"Session structure check - type: {type(current_session[0])}"
+                            )
                             if state_name in current_session[0]:
                                 state_data = current_session[0][state_name]
-                                print(f"State data type: {type(state_data)}, content: {state_data}")
+                                print(
+                                    f"State data type: {type(state_data)}, content: {state_data}"
+                                )
 
                                 if isinstance(state_data, dict):
                                     community_id = state_data.get(field_name)
                                     print(f"Extracted community_id: {community_id}")
                                 else:
-                                    print(f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}")
+                                    print(
+                                        f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}"
+                                    )
                                     return "failure"
                 # add user to community
                 if community_id:
@@ -1059,80 +1177,126 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         response = requests.post(
                             # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
                             url="http://localhost:8000/api/v1/add_user_to_community/",
-                            data={
-                                "community_id": community_id,
-                                "number": user.phone
-                            },
-                            timeout=30
+                            data={"community_id": community_id, "number": user.phone},
+                            timeout=30,
                         )
                         response.raise_for_status()
                         api_response = response.json()
                         print("Add user to community API response:", api_response)
 
                         # Return success/failure based on API response
-                        if api_response.get('success'):
+                        if api_response.get("success"):
                             # Save community membership data locally
                             try:
                                 from bot_interface.utils import add_community_membership
 
                                 # Extract community data from API response
                                 community_data = {
-                                    'community_id': community_id,
-                                    'community_name': api_response.get('community_name', ''),
-                                    'community_description': api_response.get('community_description', ''),
-                                    'organization': api_response.get('organization', '')
+                                    "community_id": community_id,
+                                    "community_name": api_response.get(
+                                        "community_name", ""
+                                    ),
+                                    "community_description": api_response.get(
+                                        "community_description", ""
+                                    ),
+                                    "organization": api_response.get(
+                                        "organization", ""
+                                    ),
                                 }
 
                                 # If API didn't return complete data, try database fallback
-                                if not community_data['community_name'] or not community_data['organization']:
-                                    print("API returned incomplete data, trying database fallback...")
+                                if (
+                                    not community_data["community_name"]
+                                    or not community_data["organization"]
+                                ):
+                                    print(
+                                        "API returned incomplete data, trying database fallback..."
+                                    )
                                     try:
-                                        from community_engagement.models import Community_user_mapping
+                                        from community_engagement.models import (
+                                            Community_user_mapping,
+                                        )
                                         from users.models import User
 
                                         # Get user's phone number
-                                        bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+                                        bot_user = (
+                                            bot_interface.models.BotUsers.objects.get(
+                                                id=user_id
+                                            )
+                                        )
                                         phone_number = bot_user.user.contact_number
 
                                         # Find user and community mapping
-                                        user_obj = User.objects.get(contact_number=phone_number)
-                                        community_mapping = Community_user_mapping.objects.filter(
-                                            user=user_obj,
-                                            community_id=community_id
-                                        ).select_related('community', 'community__project').first()
+                                        user_obj = User.objects.get(
+                                            contact_number=phone_number
+                                        )
+                                        community_mapping = (
+                                            Community_user_mapping.objects.filter(
+                                                user=user_obj, community_id=community_id
+                                            )
+                                            .select_related(
+                                                "community", "community__project"
+                                            )
+                                            .first()
+                                        )
 
                                         if community_mapping:
                                             # Update with database data
-                                            if not community_data[
-                                                'community_name'] and community_mapping.community.project:
+                                            if (
+                                                not community_data["community_name"]
+                                                and community_mapping.community.project
+                                            ):
+                                                community_data["community_name"] = (
+                                                    community_mapping.community.project.name
+                                                )
+                                            if (
+                                                not community_data["organization"]
+                                                and community_mapping.community.project
+                                                and community_mapping.community.project.organization
+                                            ):
+                                                community_data["organization"] = (
+                                                    community_mapping.community.project.organization.name
+                                                )
+                                            if (
+                                                not community_data[
+                                                    "community_description"
+                                                ]
+                                                and community_mapping.community.project
+                                            ):
                                                 community_data[
-                                                    'community_name'] = community_mapping.community.project.name
-                                            if not community_data[
-                                                'organization'] and community_mapping.community.project and community_mapping.community.project.organization:
-                                                community_data[
-                                                    'organization'] = community_mapping.community.project.organization.name
-                                            if not community_data[
-                                                'community_description'] and community_mapping.community.project:
-                                                community_data['community_description'] = getattr(
-                                                    community_mapping.community.project, 'description', '')
+                                                    "community_description"
+                                                ] = getattr(
+                                                    community_mapping.community.project,
+                                                    "description",
+                                                    "",
+                                                )
 
-                                            print(f"Enhanced community data from database: {community_data}")
+                                            print(
+                                                f"Enhanced community data from database: {community_data}"
+                                            )
 
                                     except Exception as db_e:
                                         print(f"Database fallback failed: {db_e}")
                                         # Use defaults if database lookup fails
-                                        if not community_data['community_name']:
-                                            community_data['community_name'] = f"Community {community_id}"
-                                        if not community_data['organization']:
-                                            community_data['organization'] = "Unknown Organization"
+                                        if not community_data["community_name"]:
+                                            community_data["community_name"] = (
+                                                f"Community {community_id}"
+                                            )
+                                        if not community_data["organization"]:
+                                            community_data["organization"] = (
+                                                "Unknown Organization"
+                                            )
 
                                 # Get the BotUsers object from user_id
-                                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+                                bot_user = bot_interface.models.BotUsers.objects.get(
+                                    id=user_id
+                                )
 
                                 # Add community membership to user's local data
                                 add_community_membership(bot_user, community_data)
                                 print(
-                                    f"Successfully added community membership data for user {user.phone}: {community_data}")
+                                    f"Successfully added community membership data for user {user.phone}: {community_data}"
+                                )
 
                             except Exception as e:
                                 print(f"Error saving community membership data: {e}")
@@ -1175,7 +1339,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             user.current_state = data_dict.get("state")
 
             # Handle SMJ object lookup
@@ -1192,6 +1358,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Sync community data from database for existing users (if needed)
             try:
                 from bot_interface.utils import sync_community_data_from_database
+
                 sync_community_data_from_database(bot_user)
             except Exception as sync_e:
                 print(f"Community data sync failed (non-critical): {sync_e}")
@@ -1225,7 +1392,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             response = requests.get(
                 f"http://localhost:8000/api/v1/get_community_by_user/",
                 params={"number": phone_number},
-                timeout=10
+                timeout=10,
             )
 
             print(f"API response status: {response.status_code}")
@@ -1274,22 +1441,40 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return []
 
             # Get community mappings for this user
-            community_mappings = Community_user_mapping.objects.filter(user=user_obj).select_related('community',
-                                                                                                     'community__project')
+            community_mappings = Community_user_mapping.objects.filter(
+                user=user_obj
+            ).select_related("community", "community__project")
 
             communities = []
             for mapping in community_mappings:
                 # Get community name from the related project
-                community_name = mapping.community.project.name if mapping.community.project else f"Community {mapping.community.id}"
+                community_name = (
+                    mapping.community.project.name
+                    if mapping.community.project
+                    else f"Community {mapping.community.id}"
+                )
 
                 community_data = {
-                    'community_id': mapping.community.id,
-                    'community_name': community_name,
-                    'community_description': getattr(mapping.community.project, 'description',
-                                                     '') if mapping.community.project else '',
-                    'organization': mapping.community.project.organization.name if (
-                                mapping.community.project and mapping.community.project.organization) else '',
-                    'created_at': mapping.created_at.isoformat() if hasattr(mapping, 'created_at') else None
+                    "community_id": mapping.community.id,
+                    "community_name": community_name,
+                    "community_description": (
+                        getattr(mapping.community.project, "description", "")
+                        if mapping.community.project
+                        else ""
+                    ),
+                    "organization": (
+                        mapping.community.project.organization.name
+                        if (
+                            mapping.community.project
+                            and mapping.community.project.organization
+                        )
+                        else ""
+                    ),
+                    "created_at": (
+                        mapping.created_at.isoformat()
+                        if hasattr(mapping, "created_at")
+                        else None
+                    ),
                 }
                 communities.append(community_data)
 
@@ -1319,7 +1504,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print("User has multiple communities")
             return "multiple_communities"
         else:
-            print("User has no communities - this shouldn't happen in community features flow")
+            print(
+                "User has no communities - this shouldn't happen in community features flow"
+            )
             return "failure"
 
     def display_single_community_message(self, bot_instance_id, data_dict):
@@ -1338,28 +1525,36 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
 
             # Get BotUsers object to access user_misc
             bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
 
             if len(current_communities) > 0:
-                community_name = current_communities[0].get('community_name', 'Unknown Community')
+                community_name = current_communities[0].get(
+                    "community_name", "Unknown Community"
+                )
 
                 # Create welcome message
-                welcome_text = f"🏠 आप {community_name} समुदाय का हिस्सा हैं।\n\nआप कैसे आगे बढ़ना चाहेंगे?"
+                welcome_text = (
+                    f"🏠 आप {community_name} समुदाय का हिस्सा हैं।\n\nआप कैसे आगे बढ़ना चाहेंगे?"
+                )
 
                 # Send text message
                 response = bot_interface.api.send_text(
                     bot_instance_id=bot_instance_id,
                     contact_number=user.phone,
-                    text=welcome_text
+                    text=welcome_text,
                 )
 
                 print(f"Single community welcome message sent: {response}")
 
-                if response and response.get('messages'):
+                if response and response.get("messages"):
                     return "success"
                 else:
                     return "failure"
@@ -1387,43 +1582,57 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
 
             # Get BotUsers object to access user_misc
             bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
 
             if len(current_communities) > 0:
                 # Get fresh community data with last accessed info
-                success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
-                if success and api_response.get('success'):
-                    community_data = api_response.get('data', {})
-                    last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                success, api_response = (
+                    bot_interface.utils.check_user_community_status_http(user.phone)
+                )
+                if success and api_response.get("success"):
+                    community_data = api_response.get("data", {})
+                    last_accessed_id = community_data.get("misc", {}).get(
+                        "last_accessed_community_id"
+                    )
 
                     # Find the last accessed community name
-                    communities_list = community_data.get('data', [])
+                    communities_list = community_data.get("data", [])
                     last_community_name = "Unknown Community"
                     for community in communities_list:
-                        if community.get('community_id') == last_accessed_id:
-                            last_community_name = community.get('name', 'Unknown Community')
+                        if community.get("community_id") == last_accessed_id:
+                            last_community_name = community.get(
+                                "name", "Unknown Community"
+                            )
                             break
                 else:
                     # Fallback to first community
-                    last_community_name = current_communities[0].get('community_name', 'Unknown Community')
+                    last_community_name = current_communities[0].get(
+                        "community_name", "Unknown Community"
+                    )
 
                 # Create welcome message
-                welcome_text = f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।"
+                welcome_text = (
+                    f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।"
+                )
 
                 # Send text message
                 response = bot_interface.api.send_text(
                     bot_instance_id=bot_instance_id,
                     contact_number=user.phone,
-                    text=welcome_text
+                    text=welcome_text,
                 )
 
                 print(f"Multiple community welcome message sent: {response}")
 
-                if response and response.get('messages'):
+                if response and response.get("messages"):
                     return "success"
                 else:
                     return "failure"
@@ -1451,7 +1660,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             user.expected_response_type = "button"
             user.current_state = data_dict.get("state")
 
@@ -1462,45 +1673,59 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Get BotUsers object to access user_misc
             bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
 
             if len(current_communities) > 0:
                 # Get fresh community data with last accessed info
-                success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
-                if success and api_response.get('success'):
-                    community_data = api_response.get('data', {})
-                    last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
-                    communities_list = community_data.get('data', [])
+                success, api_response = (
+                    bot_interface.utils.check_user_community_status_http(user.phone)
+                )
+                if success and api_response.get("success"):
+                    community_data = api_response.get("data", {})
+                    last_accessed_id = community_data.get("misc", {}).get(
+                        "last_accessed_community_id"
+                    )
+                    communities_list = community_data.get("data", [])
 
                     # Create menu excluding the last accessed community
                     communities_menu_list = []
                     for community in communities_list:
-                        community_id = community.get('community_id')
+                        community_id = community.get("community_id")
                         if community_id != last_accessed_id:  # Exclude last accessed
-                            communities_menu_list.append({
-                                "value": f"community_{community_id}",
-                                "label": community.get('name', 'Unknown Community'),
-                                "description": f"Select {community.get('name', 'Unknown Community')}"
-                            })
+                            communities_menu_list.append(
+                                {
+                                    "value": f"community_{community_id}",
+                                    "label": community.get("name", "Unknown Community"),
+                                    "description": f"Select {community.get('name', 'Unknown Community')}",
+                                }
+                            )
                 else:
                     # Fallback to existing logic (show all communities)
                     communities_menu_list = []
                     for community in current_communities:
-                        community_id = community.get('community_id')
-                        community_name = community.get('community_name', 'Unknown Community')
+                        community_id = community.get("community_id")
+                        community_name = community.get(
+                            "community_name", "Unknown Community"
+                        )
 
-                        communities_menu_list.append({
-                            "value": f"community_{community_id}",
-                            "label": community_name,
-                            "description": f"Select {community_name}"
-                        })
+                        communities_menu_list.append(
+                            {
+                                "value": f"community_{community_id}",
+                                "label": community_name,
+                                "description": f"Select {community_name}",
+                            }
+                        )
 
                 # Add option to continue with last accessed community
-                communities_menu_list.append({
-                    "value": "continue_last_accessed",
-                    "label": "पिछला समुदाय चुनें",
-                    "description": "अपने पिछले समुदाय के साथ वापस जाएं"
-                })
+                communities_menu_list.append(
+                    {
+                        "value": "continue_last_accessed",
+                        "label": "पिछला समुदाय चुनें",
+                        "description": "अपने पिछले समुदाय के साथ वापस जाएं",
+                    }
+                )
 
                 print(f"Generated community menu: {communities_menu_list}")
 
@@ -1510,12 +1735,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     contact_number=user.phone,
                     text="कृपया अपना समुदाय चुनें:",
                     menu_list=communities_menu_list,
-                    button_label="समुदाय चुनें"
+                    button_label="समुदाय चुनें",
                 )
 
                 print(f"Community menu sent: {response}")
 
-                if response and response.get('messages'):
+                if response and response.get("messages"):
                     return "success"
                 else:
                     return "failure"
@@ -1543,11 +1768,15 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
 
             # Get BotUsers object
             bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
 
             # Get the event to determine which community to store
             # First try direct event, then extract from event_data for button events
@@ -1563,7 +1792,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if event == "continue_single":
                 # Single community - store the only community
                 if len(current_communities) > 0:
-                    community_id = current_communities[0].get('community_id')
+                    community_id = current_communities[0].get("community_id")
                     context = "single_community"
                 else:
                     print("No communities found for single community user")
@@ -1571,10 +1800,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             elif event == "continue_last":
                 # Multiple communities - store the actual last accessed community
-                success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
-                if success and api_response.get('success'):
-                    community_data = api_response.get('data', {})
-                    last_accessed_id = community_data.get('misc', {}).get('last_accessed_community_id')
+                success, api_response = (
+                    bot_interface.utils.check_user_community_status_http(user.phone)
+                )
+                if success and api_response.get("success"):
+                    community_data = api_response.get("data", {})
+                    last_accessed_id = community_data.get("misc", {}).get(
+                        "last_accessed_community_id"
+                    )
                     if last_accessed_id:
                         community_id = str(last_accessed_id)
                         context = "multiple_community"
@@ -1584,7 +1817,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 else:
                     # Fallback to first community if API fails
                     if len(current_communities) > 0:
-                        community_id = current_communities[0].get('community_id')
+                        community_id = current_communities[0].get("community_id")
                         context = "multiple_community"
                     else:
                         print("No communities found for multiple community user")
@@ -1592,12 +1825,16 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             elif event == "join_new":
                 # User wants to join a new community - return original event for proper transition
-                print("User selecting to join new community - no community storage required")
+                print(
+                    "User selecting to join new community - no community storage required"
+                )
                 return "join_new"
 
             elif event == "choose_other":
                 # User wants to choose from multiple communities - return original event for proper transition
-                print("User selecting to choose from other communities - no community storage required")
+                print(
+                    "User selecting to choose from other communities - no community storage required"
+                )
                 return "choose_other"
 
             else:
@@ -1608,9 +1845,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if not user.misc_data:
                 user.misc_data = {}
 
-            user.misc_data['active_community_id'] = community_id
-            user.misc_data['navigation_context'] = context
-            user.misc_data['last_service_event'] = event
+            user.misc_data["active_community_id"] = community_id
+            user.misc_data["navigation_context"] = context
+            user.misc_data["last_service_event"] = event
             user.save()
 
             print(f"Stored active community {community_id} with context {context}")
@@ -1630,7 +1867,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         Returns:
             str: "community_selected" or "failure"
         """
-        print(f"DEBUG: store_selected_community_and_context called with bot_instance_id={bot_instance_id}")
+        print(
+            f"DEBUG: store_selected_community_and_context called with bot_instance_id={bot_instance_id}"
+        )
         print(f"DEBUG: data_dict keys: {list(data_dict.keys())}")
         print(f"DEBUG: data_dict contents: {data_dict}")
 
@@ -1640,7 +1879,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"DEBUG: bot_instance={bot_instance}, user_id={user_id}")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             print(f"DEBUG: Found user session: {user}")
 
             # Extract community ID from button data or event
@@ -1659,21 +1900,32 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"DEBUG: User chose to continue with last accessed community")
                     # Get last accessed community from API or user data
                     bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-                    success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
-                    if success and api_response.get('success'):
-                        community_data = api_response.get('data', {})
-                        community_id = community_data.get('misc', {}).get('last_accessed_community_id')
-                        print(f"DEBUG: Got last accessed community ID from API: {community_id}")
+                    success, api_response = (
+                        bot_interface.utils.check_user_community_status_http(user.phone)
+                    )
+                    if success and api_response.get("success"):
+                        community_data = api_response.get("data", {})
+                        community_id = community_data.get("misc", {}).get(
+                            "last_accessed_community_id"
+                        )
+                        print(
+                            f"DEBUG: Got last accessed community ID from API: {community_id}"
+                        )
                     else:
                         # Fallback to stored data
-                        community_id = bot_user.user_misc.get('community_membership', {}).get(
-                            'last_accessed_community_id')
-                        print(f"DEBUG: Got last accessed community ID from stored data: {community_id}")
+                        community_id = bot_user.user_misc.get(
+                            "community_membership", {}
+                        ).get("last_accessed_community_id")
+                        print(
+                            f"DEBUG: Got last accessed community ID from stored data: {community_id}"
+                        )
                 elif button_value and button_value.startswith("community_"):
                     community_id = button_value.split("_")[1]
                     print(f"DEBUG: Extracted community ID from button: {community_id}")
                 else:
-                    print(f"DEBUG: Button value doesn't start with 'community_': {button_value}")
+                    print(
+                        f"DEBUG: Button value doesn't start with 'community_': {button_value}"
+                    )
             else:
                 # For non-button events, extract from event field
                 event = data_dict.get("event", "")
@@ -1681,18 +1933,29 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
                 if event == "continue_last_accessed":
                     # User wants to continue with last accessed community
-                    print(f"DEBUG: User chose to continue with last accessed community (event)")
+                    print(
+                        f"DEBUG: User chose to continue with last accessed community (event)"
+                    )
                     bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-                    success, api_response = bot_interface.utils.check_user_community_status_http(user.phone)
-                    if success and api_response.get('success'):
-                        community_data = api_response.get('data', {})
-                        community_id = community_data.get('misc', {}).get('last_accessed_community_id')
-                        print(f"DEBUG: Got last accessed community ID from API: {community_id}")
+                    success, api_response = (
+                        bot_interface.utils.check_user_community_status_http(user.phone)
+                    )
+                    if success and api_response.get("success"):
+                        community_data = api_response.get("data", {})
+                        community_id = community_data.get("misc", {}).get(
+                            "last_accessed_community_id"
+                        )
+                        print(
+                            f"DEBUG: Got last accessed community ID from API: {community_id}"
+                        )
                     else:
                         # Fallback to stored data
-                        community_id = bot_user.user_misc.get('community_membership', {}).get(
-                            'last_accessed_community_id')
-                        print(f"DEBUG: Got last accessed community ID from stored data: {community_id}")
+                        community_id = bot_user.user_misc.get(
+                            "community_membership", {}
+                        ).get("last_accessed_community_id")
+                        print(
+                            f"DEBUG: Got last accessed community ID from stored data: {community_id}"
+                        )
                 elif event.startswith("community_"):
                     community_id = event.split("_")[1]
                     print(f"DEBUG: Extracted community ID from event: {community_id}")
@@ -1704,21 +1967,26 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if not user.misc_data:
                     user.misc_data = {}
 
-                user.misc_data['active_community_id'] = community_id
-                user.misc_data['navigation_context'] = "community_selection"
-                user.misc_data['last_service_event'] = "choose_other"
+                user.misc_data["active_community_id"] = community_id
+                user.misc_data["navigation_context"] = "community_selection"
+                user.misc_data["last_service_event"] = "choose_other"
                 user.save()
 
-                print(f"DEBUG: Stored selected community {community_id} with context community_selection")
+                print(
+                    f"DEBUG: Stored selected community {community_id} with context community_selection"
+                )
                 print(f"DEBUG: Returning 'community_selected'")
                 return "community_selected"
             else:
-                print(f"DEBUG: Could not extract community ID from event data, returning 'failure'")
+                print(
+                    f"DEBUG: Could not extract community ID from event data, returning 'failure'"
+                )
                 return "failure"
 
         except Exception as e:
             print(f"DEBUG: Exception in store_selected_community_and_context: {e}")
             import traceback
+
             traceback.print_exc()
             return "failure"
 
@@ -1738,21 +2006,27 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
 
             # Get active community name for context
-            active_community_id = user.misc_data.get('active_community_id') if user.misc_data else None
+            active_community_id = (
+                user.misc_data.get("active_community_id") if user.misc_data else None
+            )
 
             if active_community_id:
                 # Get BotUsers object to find community name
                 bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-                current_communities = bot_user.user_misc.get('community_membership', {}).get('current_communities', [])
+                current_communities = bot_user.user_misc.get(
+                    "community_membership", {}
+                ).get("current_communities", [])
 
                 # Find the active community name
                 community_name = "आपके समुदाय"  # Default fallback
                 for community in current_communities:
-                    if str(community.get('community_id')) == str(active_community_id):
-                        community_name = community.get('community_name', community_name)
+                    if str(community.get("community_id")) == str(active_community_id):
+                        community_name = community.get("community_name", community_name)
                         break
 
                 # Create contextual service menu message
@@ -1765,12 +2039,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             response = bot_interface.api.send_text(
                 bot_instance_id=bot_instance_id,
                 contact_number=user.phone,
-                text=service_text
+                text=service_text,
             )
 
             print(f"Service menu message sent: {response}")
 
-            if response and response.get('messages'):
+            if response and response.get("messages"):
                 return "success"
             else:
                 return "failure"
@@ -1795,7 +2069,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
 
             # Get the event
             event = data_dict.get("event", "")
@@ -1824,7 +2100,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
             except bot_interface.models.Bot.DoesNotExist:
-                print(f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance")
+                print(
+                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
+                )
                 bot_instance = bot_interface.models.Bot.objects.first()
                 if not bot_instance:
                     print("No bot instances found in database")
@@ -1836,13 +2114,19 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Get user session with better error handling
             try:
-                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+                user = bot_interface.models.UserSessions.objects.get(
+                    user=user_id, bot=bot_instance
+                )
             except bot_interface.models.UserSessions.DoesNotExist:
-                print(f"UserSession not found for user_id: {user_id}, bot: {bot_instance}")
+                print(
+                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
+                )
                 # Try to get user session without bot constraint
                 try:
                     user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(f"Found user session for user_id: {user_id} without bot constraint")
+                    print(
+                        f"Found user session for user_id: {user_id} without bot constraint"
+                    )
                 except bot_interface.models.UserSessions.DoesNotExist:
                     print(f"No user session found for user_id: {user_id}")
                     return "failure"
@@ -1859,9 +2143,11 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         "latitude": str(location_raw_dict.get("latitude", "")),
                         "longitude": str(location_raw_dict.get("longitude", "")),
                         "address": location_raw_dict.get("address", ""),
-                        "name": location_raw_dict.get("name", "")
+                        "name": location_raw_dict.get("name", ""),
                     }
-                    print(f"Found structured location data in data_dict: {location_data}")
+                    print(
+                        f"Found structured location data in data_dict: {location_data}"
+                    )
             elif "event_data" in data_dict:
                 # Extract from event_data if available
                 event_data = data_dict.get("event_data")
@@ -1869,47 +2155,67 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     location_raw = event_data.get("data", "")
                     misc_data = event_data.get("misc", {})
 
-                    if isinstance(misc_data, dict) and misc_data.get("latitude") and misc_data.get("longitude"):
+                    if (
+                        isinstance(misc_data, dict)
+                        and misc_data.get("latitude")
+                        and misc_data.get("longitude")
+                    ):
                         # Use misc data (preferred for WhatsApp location data)
                         location_data = {
                             "latitude": str(misc_data.get("latitude", "")),
                             "longitude": str(misc_data.get("longitude", "")),
                             "address": misc_data.get("address", ""),
-                            "name": misc_data.get("name", "")
+                            "name": misc_data.get("name", ""),
                         }
-                        print(f"Found location data in event_data misc: {location_data}")
-                    elif location_raw and isinstance(location_raw, str) and "," in location_raw:
+                        print(
+                            f"Found location data in event_data misc: {location_data}"
+                        )
+                    elif (
+                        location_raw
+                        and isinstance(location_raw, str)
+                        and "," in location_raw
+                    ):
                         # Fallback to raw coordinate string
                         lat, lon = location_raw.split(",", 1)
                         location_data = {
                             "latitude": lat.strip(),
                             "longitude": lon.strip(),
                             "address": "",
-                            "name": ""
+                            "name": "",
                         }
                         print(f"Found location data in event_data raw: {location_data}")
 
             # Fallback: Look for location data in current session if not found in event packet
             if not location_data:
                 current_session = user.current_session
-                print(f"Location not found in event packet, checking current session: {current_session}")
+                print(
+                    f"Location not found in event packet, checking current session: {current_session}"
+                )
 
                 if current_session and len(current_session) > 0:
                     # Find the SendLocationRequest state in session
                     for session_item in current_session:
                         if "SendLocationRequest" in session_item:
-                            location_raw = session_item["SendLocationRequest"].get("data", "")
-                            misc_data = session_item["SendLocationRequest"].get("misc", {})
+                            location_raw = session_item["SendLocationRequest"].get(
+                                "data", ""
+                            )
+                            misc_data = session_item["SendLocationRequest"].get(
+                                "misc", {}
+                            )
 
                             # Parse location data
-                            if location_raw and isinstance(location_raw, str) and "," in location_raw:
+                            if (
+                                location_raw
+                                and isinstance(location_raw, str)
+                                and "," in location_raw
+                            ):
                                 # Format: "latitude,longitude"
                                 lat, lon = location_raw.split(",", 1)
                                 location_data = {
                                     "latitude": lat.strip(),
                                     "longitude": lon.strip(),
                                     "address": misc_data.get("address", ""),
-                                    "name": misc_data.get("name", "")
+                                    "name": misc_data.get("name", ""),
                                 }
                             elif isinstance(misc_data, dict):
                                 # Use misc data if available
@@ -1917,7 +2223,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                                     "latitude": misc_data.get("latitude", ""),
                                     "longitude": misc_data.get("longitude", ""),
                                     "address": misc_data.get("address", ""),
-                                    "name": misc_data.get("name", "")
+                                    "name": misc_data.get("name", ""),
                                 }
                             break
 
@@ -1960,7 +2266,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
             except bot_interface.models.Bot.DoesNotExist:
-                print(f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance")
+                print(
+                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
+                )
                 bot_instance = bot_interface.models.Bot.objects.first()
                 if not bot_instance:
                     print("No bot instances found in database")
@@ -1972,13 +2280,19 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Get user session with better error handling
             try:
-                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+                user = bot_interface.models.UserSessions.objects.get(
+                    user=user_id, bot=bot_instance
+                )
             except bot_interface.models.UserSessions.DoesNotExist:
-                print(f"UserSession not found for user_id: {user_id}, bot: {bot_instance}")
+                print(
+                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
+                )
                 # Try to get user session without bot constraint
                 try:
                     user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(f"Found user session for user_id: {user_id} without bot constraint")
+                    print(
+                        f"Found user session for user_id: {user_id} without bot constraint"
+                    )
                 except bot_interface.models.UserSessions.DoesNotExist:
                     print(f"No user session found for user_id: {user_id}")
                     return "failure"
@@ -1991,7 +2305,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 audio_raw_dict = data_dict.get("audio_data")
                 if audio_raw_dict:
                     # Use the structured audio data from event packet
-                    audio_data = audio_raw_dict.get("file_path") or audio_raw_dict.get("data")
+                    audio_data = audio_raw_dict.get("file_path") or audio_raw_dict.get(
+                        "data"
+                    )
                     print(f"Found structured audio data in data_dict: {audio_data}")
             elif "event_data" in data_dict:
                 # Extract from event_data if available
@@ -2003,7 +2319,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Fallback: Look for audio data in current session if not found in event packet
             if not audio_data:
                 current_session = user.current_session
-                print(f"Audio not found in event packet, checking current session: {current_session}")
+                print(
+                    f"Audio not found in event packet, checking current session: {current_session}"
+                )
 
                 if current_session and len(current_session) > 0:
                     # Find the RequestAudio state in session
@@ -2065,7 +2383,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
             except bot_interface.models.Bot.DoesNotExist:
-                print(f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance")
+                print(
+                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
+                )
                 bot_instance = bot_interface.models.Bot.objects.first()
                 if not bot_instance:
                     print("No bot instances found in database")
@@ -2077,13 +2397,19 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Get user session with better error handling
             try:
-                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+                user = bot_interface.models.UserSessions.objects.get(
+                    user=user_id, bot=bot_instance
+                )
             except bot_interface.models.UserSessions.DoesNotExist:
-                print(f"UserSession not found for user_id: {user_id}, bot: {bot_instance}")
+                print(
+                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
+                )
                 # Try to get user session without bot constraint
                 try:
                     user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(f"Found user session for user_id: {user_id} without bot constraint")
+                    print(
+                        f"Found user session for user_id: {user_id} without bot constraint"
+                    )
                 except bot_interface.models.UserSessions.DoesNotExist:
                     print(f"No user session found for user_id: {user_id}")
                     return "failure"
@@ -2096,7 +2422,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 photo_raw_dict = data_dict.get("photo_data")
                 if photo_raw_dict:
                     # Use the structured photo data from event packet
-                    photo_data = photo_raw_dict.get("file_path") or photo_raw_dict.get("data")
+                    photo_data = photo_raw_dict.get("file_path") or photo_raw_dict.get(
+                        "data"
+                    )
                     print(f"Found structured photo data in data_dict: {photo_data}")
             elif "event_data" in data_dict:
                 # Extract from event_data if available
@@ -2132,9 +2460,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             flow_type = "grievance"
                         elif smj.name == "work_demand":
                             flow_type = "work_demand"
-                        print(f"Detected flow type for photos: {flow_type} (SMJ: {smj.name})")
+                        print(
+                            f"Detected flow type for photos: {flow_type} (SMJ: {smj.name})"
+                        )
                 except Exception as e:
-                    print(f"Could not determine flow type for photos, using default: {e}")
+                    print(
+                        f"Could not determine flow type for photos, using default: {e}"
+                    )
 
                 # Initialize structure based on flow type
                 if flow_type not in user.misc_data:
@@ -2178,7 +2510,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
 
             # Get BotUsers object for archiving
             bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
@@ -2188,8 +2522,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 "session_data": user.current_session,
                 "misc_data": user.misc_data,
                 "final_state": user.current_state,
-                "session_duration": (user.last_updated_at - user.started_at).total_seconds(),
-                "archived_reason": "work_demand_completion"
+                "session_duration": (
+                    user.last_updated_at - user.started_at
+                ).total_seconds(),
+                "archived_reason": "work_demand_completion",
             }
 
             # Create UserArchive entry
@@ -2197,7 +2533,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 app_type=user.app_type,
                 bot=bot_instance,
                 user=bot_user,
-                session_data=archive_data
+                session_data=archive_data,
             )
 
             print(f"Successfully archived session for user {user_id}")
@@ -2234,7 +2570,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
             except bot_interface.models.Bot.DoesNotExist:
-                print(f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance")
+                print(
+                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
+                )
                 bot_instance = bot_interface.models.Bot.objects.first()
                 if not bot_instance:
                     print("No bot instances found in database")
@@ -2246,12 +2584,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Get user session with better error handling
             try:
-                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+                user = bot_interface.models.UserSessions.objects.get(
+                    user=user_id, bot=bot_instance
+                )
             except bot_interface.models.UserSessions.DoesNotExist:
-                print(f"UserSession not found for user_id: {user_id}, bot: {bot_instance}")
+                print(
+                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
+                )
                 try:
                     user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(f"Found user session for user_id: {user_id} without bot constraint")
+                    print(
+                        f"Found user session for user_id: {user_id} without bot constraint"
+                    )
                 except bot_interface.models.UserSessions.DoesNotExist:
                     print(f"No user session found for user_id: {user_id}")
                     return "failure"
@@ -2279,22 +2623,33 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if "photos" in work_demand_data:
                     print(f"Photo paths being logged: {work_demand_data['photos']}")
                     # Add explicit note about HDPI paths in the data
-                    work_demand_data["photos_note"] = "Photo paths are HDPI processed images from WhatsApp media"
+                    work_demand_data["photos_note"] = (
+                        "Photo paths are HDPI processed images from WhatsApp media"
+                    )
 
             # Collect community context
             community_context = {}
-            active_community_id = user.misc_data.get('active_community_id') if user.misc_data else None
+            active_community_id = (
+                user.misc_data.get("active_community_id") if user.misc_data else None
+            )
 
             if active_community_id:
                 try:
                     from community_engagement.models import Community
+
                     community = Community.objects.get(id=active_community_id)
 
                     # Get community details
                     community_context = {
                         "community_id": active_community_id,
-                        "community_name": community.project.name if community.project else "Unknown",
-                        "organization": community.project.organization.name if community.project and community.project.organization else "Unknown"
+                        "community_name": (
+                            community.project.name if community.project else "Unknown"
+                        ),
+                        "organization": (
+                            community.project.organization.name
+                            if community.project and community.project.organization
+                            else "Unknown"
+                        ),
                     }
 
                     # Get location hierarchy from community locations
@@ -2303,7 +2658,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         if location.state:
                             location_hierarchy["state"] = location.state.state_name
                         if location.district:
-                            location_hierarchy["district"] = location.district.district_name
+                            location_hierarchy["district"] = (
+                                location.district.district_name
+                            )
                         if location.block:
                             location_hierarchy["block"] = location.block.block_name
 
@@ -2311,21 +2668,26 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
                 except Exception as e:
                     print(f"Error getting community context: {e}")
-                    community_context = {"community_id": active_community_id,
-                                         "error": "Failed to load community details"}
+                    community_context = {
+                        "community_id": active_community_id,
+                        "error": "Failed to load community details",
+                    }
 
             # Prepare comprehensive misc data
             from datetime import datetime
+
             comprehensive_misc_data = {
                 "work_demand_data": work_demand_data,
                 "community_context": community_context,
                 "flow_metadata": {
                     "smj_name": "work_demand",
                     "completion_timestamp": datetime.now().isoformat(),
-                    "user_number": bot_user.user.username if bot_user.user else "unknown",
+                    "user_number": (
+                        bot_user.user.username if bot_user.user else "unknown"
+                    ),
                     "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
-                    "app_type": user.app_type
-                }
+                    "app_type": user.app_type,
+                },
             }
 
             # Create UserLogs entry with specified structure
@@ -2341,36 +2703,53 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 value3="",
                 key4="",  # Leave empty as not specified
                 misc=comprehensive_misc_data,
-                smj=smj
+                smj=smj,
             )
 
-            print(f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}")
-            print(f"Work demand data logged for user {user_id} in community {active_community_id}")
+            print(
+                f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}"
+            )
+            print(
+                f"Work demand data logged for user {user_id} in community {active_community_id}"
+            )
 
             # Additional logging for HDPI path verification
             if "photos" in work_demand_data:
-                print(f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}")
+                print(
+                    f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}"
+                )
 
             # Process and submit work demand to Community Engagement API
             try:
                 import threading
+
                 def async_submit():
                     try:
                         # Check if already processed (avoid duplicate processing from signal)
                         user_log.refresh_from_db()
-                        if user_log.value2:  # If value2 is not empty, it's already been processed
-                            print(f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission")
+                        if (
+                            user_log.value2
+                        ):  # If value2 is not empty, it's already been processed
+                            print(
+                                f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission"
+                            )
                             return
 
                         self.process_and_submit_work_demand(user_log.id)
-                        print(f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}")
+                        print(
+                            f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}"
+                        )
                     except Exception as e:
-                        print(f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}")
+                        print(
+                            f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}"
+                        )
 
                 # Run in background thread to avoid blocking SMJ flow
                 thread = threading.Thread(target=async_submit, daemon=True)
                 thread.start()
-                print(f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}")
+                print(
+                    f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}"
+                )
 
             except Exception as e:
                 print(f"❌ Failed to start work demand processing: {e}")
@@ -2397,7 +2776,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
             except bot_interface.models.Bot.DoesNotExist:
-                print(f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance")
+                print(
+                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
+                )
                 bot_instance = bot_interface.models.Bot.objects.first()
                 if not bot_instance:
                     print("No bot instances found in database")
@@ -2409,12 +2790,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Get user session with better error handling
             try:
-                user = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+                user = bot_interface.models.UserSessions.objects.get(
+                    user=user_id, bot=bot_instance
+                )
             except bot_interface.models.UserSessions.DoesNotExist:
-                print(f"UserSession not found for user_id: {user_id}, bot: {bot_instance}")
+                print(
+                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
+                )
                 try:
                     user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(f"Found user session for user_id: {user_id} without bot constraint")
+                    print(
+                        f"Found user session for user_id: {user_id} without bot constraint"
+                    )
                 except bot_interface.models.UserSessions.DoesNotExist:
                     print(f"No user session found for user_id: {user_id}")
                     return "failure"
@@ -2442,22 +2829,33 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if "photos" in grievance_data:
                     print(f"Photo paths being logged: {grievance_data['photos']}")
                     # Add explicit note about HDPI paths in the data
-                    grievance_data["photos_note"] = "Photo paths are HDPI processed images from WhatsApp media"
+                    grievance_data["photos_note"] = (
+                        "Photo paths are HDPI processed images from WhatsApp media"
+                    )
 
             # Collect community context
             community_context = {}
-            active_community_id = user.misc_data.get('active_community_id') if user.misc_data else None
+            active_community_id = (
+                user.misc_data.get("active_community_id") if user.misc_data else None
+            )
 
             if active_community_id:
                 try:
                     from community_engagement.models import Community
+
                     community = Community.objects.get(id=active_community_id)
 
                     # Get community details
                     community_context = {
                         "community_id": active_community_id,
-                        "community_name": community.project.name if community.project else "Unknown",
-                        "organization": community.project.organization.name if community.project and community.project.organization else "Unknown"
+                        "community_name": (
+                            community.project.name if community.project else "Unknown"
+                        ),
+                        "organization": (
+                            community.project.organization.name
+                            if community.project and community.project.organization
+                            else "Unknown"
+                        ),
                     }
 
                     # Get location hierarchy from community locations
@@ -2466,7 +2864,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         if location.state:
                             location_hierarchy["state"] = location.state.state_name
                         if location.district:
-                            location_hierarchy["district"] = location.district.district_name
+                            location_hierarchy["district"] = (
+                                location.district.district_name
+                            )
                         if location.block:
                             location_hierarchy["block"] = location.block.block_name
 
@@ -2474,21 +2874,26 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
                 except Exception as e:
                     print(f"Error getting community context: {e}")
-                    community_context = {"community_id": active_community_id,
-                                         "error": "Failed to load community details"}
+                    community_context = {
+                        "community_id": active_community_id,
+                        "error": "Failed to load community details",
+                    }
 
             # Prepare comprehensive misc data
             from datetime import datetime
+
             comprehensive_misc_data = {
                 "grievance_data": grievance_data,
                 "community_context": community_context,
                 "flow_metadata": {
                     "smj_name": "grievance",
                     "completion_timestamp": datetime.now().isoformat(),
-                    "user_number": bot_user.user.username if bot_user.user else "unknown",
+                    "user_number": (
+                        bot_user.user.username if bot_user.user else "unknown"
+                    ),
                     "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
-                    "app_type": user.app_type
-                }
+                    "app_type": user.app_type,
+                },
             }
 
             # Create UserLogs entry with specified structure
@@ -2504,15 +2909,21 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 value3="",
                 key4="",  # Leave empty as not specified
                 misc=comprehensive_misc_data,
-                smj=smj
+                smj=smj,
             )
 
-            print(f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}")
-            print(f"Grievance data logged for user {user_id} in community {active_community_id}")
+            print(
+                f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}"
+            )
+            print(
+                f"Grievance data logged for user {user_id} in community {active_community_id}"
+            )
 
             # Additional logging for HDPI path verification
             if "photos" in grievance_data:
-                print(f"HDPI photo paths captured in UserLogs: {grievance_data['photos']}")
+                print(
+                    f"HDPI photo paths captured in UserLogs: {grievance_data['photos']}"
+                )
 
             return "success"
 
@@ -2531,7 +2942,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             str: "success" or "failure"
         """
         import json
-        print(f"DEBUG: add_user_to_selected_community_join_flow called with bot_instance_id={bot_instance_id}")
+
+        print(
+            f"DEBUG: add_user_to_selected_community_join_flow called with bot_instance_id={bot_instance_id}"
+        )
         print(f"DEBUG: data_dict keys: {list(data_dict.keys())}")
 
         try:
@@ -2539,7 +2953,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user_session = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user_session = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             bot_user = user_session.user
 
             # Extract community ID from session data (from either CommunityByLocation or CommunityByStateDistrict)
@@ -2559,14 +2975,22 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 for session_entry in current_session:
                     if isinstance(session_entry, dict):
                         # Check CommunityByStateDistrict first
-                        if 'CommunityByStateDistrict' in session_entry:
-                            community_id = session_entry['CommunityByStateDistrict'].get('misc')
-                            print(f"DEBUG: Found community ID from CommunityByStateDistrict: {community_id}")
+                        if "CommunityByStateDistrict" in session_entry:
+                            community_id = session_entry[
+                                "CommunityByStateDistrict"
+                            ].get("misc")
+                            print(
+                                f"DEBUG: Found community ID from CommunityByStateDistrict: {community_id}"
+                            )
                             break
                         # Check CommunityByLocation second
-                        elif 'CommunityByLocation' in session_entry:
-                            community_id = session_entry['CommunityByLocation'].get('misc')
-                            print(f"DEBUG: Found community ID from CommunityByLocation: {community_id}")
+                        elif "CommunityByLocation" in session_entry:
+                            community_id = session_entry["CommunityByLocation"].get(
+                                "misc"
+                            )
+                            print(
+                                f"DEBUG: Found community ID from CommunityByLocation: {community_id}"
+                            )
                             break
 
             except (json.JSONDecodeError, TypeError) as e:
@@ -2581,10 +3005,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if event_data.get("type") == "button":
                     # For button events, extract community ID from button value (misc field)
                     button_value = event_data.get("misc") or event_data.get("data")
-                    print(f"DEBUG: Button event detected - button_value: {button_value}")
+                    print(
+                        f"DEBUG: Button event detected - button_value: {button_value}"
+                    )
                     if button_value:
                         community_id = button_value
-                        print(f"DEBUG: Extracted community ID from button: {community_id}")
+                        print(
+                            f"DEBUG: Extracted community ID from button: {community_id}"
+                        )
 
             if community_id:
                 # Add user to selected community using existing API pattern
@@ -2595,11 +3023,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     # Use similar pattern as existing addUserToCommunity function
                     response = requests.post(
                         url="http://localhost:8000/api/v1/add_user_to_community/",
-                        data={
-                            "community_id": community_id,
-                            "number": int(user_phone)
-                        },
-                        timeout=30
+                        data={"community_id": community_id, "number": int(user_phone)},
+                        timeout=30,
                     )
                     response.raise_for_status()
                     api_response = response.json()
@@ -2610,12 +3035,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         if not user_session.misc_data:
                             user_session.misc_data = {}
 
-                        user_session.misc_data['active_community_id'] = community_id
-                        user_session.misc_data['navigation_context'] = "join_community"
-                        user_session.misc_data['join_timestamp'] = str(timezone.now())
+                        user_session.misc_data["active_community_id"] = community_id
+                        user_session.misc_data["navigation_context"] = "join_community"
+                        user_session.misc_data["join_timestamp"] = str(timezone.now())
                         user_session.save()
 
-                        print(f"DEBUG: Successfully added user to community {community_id}")
+                        print(
+                            f"DEBUG: Successfully added user to community {community_id}"
+                        )
                         return "success"
                     else:
                         print(f"DEBUG: Failed to add user to community: {api_response}")
@@ -2625,12 +3052,15 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"DEBUG: API call failed: {api_error}")
                     return "failure"
             else:
-                print(f"DEBUG: Could not extract community ID from session or event data")
+                print(
+                    f"DEBUG: Could not extract community ID from session or event data"
+                )
                 return "failure"
 
         except Exception as e:
             print(f"DEBUG: Exception in add_user_to_selected_community_join_flow: {e}")
             import traceback
+
             traceback.print_exc()
             return "failure"
 
@@ -2650,17 +3080,24 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             user_id = data_dict.get("user_id")
 
             # Get user session
-            user_session = bot_interface.models.UserSessions.objects.get(user=user_id, bot=bot_instance)
+            user_session = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
             bot_user = user_session.user
 
             # Get community name from misc_data
-            community_id = user_session.misc_data.get('active_community_id') if user_session.misc_data else None
+            community_id = (
+                user_session.misc_data.get("active_community_id")
+                if user_session.misc_data
+                else None
+            )
             community_name = "the community"
 
             if community_id:
                 try:
                     # Try to get community name from existing patterns
                     from community_engagement.models import Community
+
                     community = Community.objects.get(id=community_id)
                     community_name = community.project
                 except:
@@ -2674,7 +3111,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             response = bot_interface.api.send_text(
                 bot_instance_id=bot_instance_id,
                 contact_number=user_phone,
-                text=success_text
+                text=success_text,
             )
 
             print(f"DEBUG: Join success message sent: {response}")
@@ -2683,6 +3120,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         except Exception as e:
             print(f"DEBUG: Exception in send_join_success_message: {e}")
             import traceback
+
             traceback.print_exc()
             return "failure"
 
@@ -2704,7 +3142,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     "smj_name": "community_features",
                     "smj_id": 6,  # Assuming community features SMJ ID is 6
                     "init_state": "ServiceMenu",
-                    "states": []  # Will be loaded from SMJ
+                    "states": [],  # Will be loaded from SMJ
                 }
             }
 
@@ -2717,16 +3155,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         except Exception as e:
             print(f"DEBUG: Exception in return_to_community_services: {e}")
             import traceback
+
             traceback.print_exc()
             return "failure"
 
     def process_and_submit_work_demand(self, user_log_id):
         """
         Processes work demand data from UserLogs and submits to Community Engagement API.
-        
+
         Args:
             user_log_id (int): ID of the UserLogs record containing work demand data
-            
+
         Returns:
             dict: API response from upsert_item endpoint or error dict
         """
@@ -2741,7 +3180,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 user_log = UserLogs.objects.get(id=user_log_id)
             except UserLogs.DoesNotExist:
-                return {"success": False, "message": f"UserLogs record with id {user_log_id} not found"}
+                return {
+                    "success": False,
+                    "message": f"UserLogs record with id {user_log_id} not found",
+                }
 
             # Extract work demand data from misc field
             work_demand_data = user_log.misc.get("work_demand_data", {})
@@ -2750,7 +3192,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 work_demand_data = user_log.misc.get("work_demand", {})
 
             if not work_demand_data:
-                return {"success": False, "message": "No work demand data found in UserLogs.misc"}
+                return {
+                    "success": False,
+                    "message": "No work demand data found in UserLogs.misc",
+                }
 
             print(f"Processing work demand data: {work_demand_data}")
 
@@ -2764,11 +3209,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"Found community_id in UserLogs: {community_id}")
 
                 if not community_id:
-                    return {"success": False, "message": "Could not find community_id in UserLogs data"}
+                    return {
+                        "success": False,
+                        "message": "Could not find community_id in UserLogs data",
+                    }
 
             except Exception as e:
                 print(f"Error getting community context from UserLogs: {e}")
-                return {"success": False, "message": f"Error getting community context: {e}"}
+                return {
+                    "success": False,
+                    "message": f"Error getting community context: {e}",
+                }
 
             # Prepare files for upload from local filesystem
             files = {}
@@ -2778,12 +3229,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 audio_path = work_demand_data["audio"]
                 if audio_path and os.path.exists(audio_path):
                     try:
-                        with open(audio_path, 'rb') as audio_file:
+                        with open(audio_path, "rb") as audio_file:
                             audio_content = audio_file.read()
                             # Determine file extension
-                            file_ext = os.path.splitext(audio_path)[1] or '.ogg'
-                            mime_type = 'audio/ogg' if file_ext == '.ogg' else 'audio/mpeg'
-                            files['audios'] = (f'audio{file_ext}', audio_content, mime_type)
+                            file_ext = os.path.splitext(audio_path)[1] or ".ogg"
+                            mime_type = (
+                                "audio/ogg" if file_ext == ".ogg" else "audio/mpeg"
+                            )
+                            files["audios"] = (
+                                f"audio{file_ext}",
+                                audio_content,
+                                mime_type,
+                            )
                             print(f"Added audio file: {audio_path}")
                     except Exception as e:
                         print(f"Error reading audio file {audio_path}: {e}")
@@ -2791,16 +3248,26 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"Audio file not found or invalid path: {audio_path}")
 
             # Handle photo files - use indexed keys for multiple images
-            if "photos" in work_demand_data and isinstance(work_demand_data["photos"], list):
+            if "photos" in work_demand_data and isinstance(
+                work_demand_data["photos"], list
+            ):
                 for i, photo_path in enumerate(work_demand_data["photos"]):
                     if photo_path and os.path.exists(photo_path):
                         try:
-                            with open(photo_path, 'rb') as photo_file:
+                            with open(photo_path, "rb") as photo_file:
                                 photo_content = photo_file.read()
                                 # Determine file extension
-                                file_ext = os.path.splitext(photo_path)[1] or '.jpg'
-                                mime_type = 'image/jpeg' if file_ext.lower() in ['.jpg', '.jpeg'] else 'image/png'
-                                files[f'images_{i}'] = (f'photo_{i}{file_ext}', photo_content, mime_type)
+                                file_ext = os.path.splitext(photo_path)[1] or ".jpg"
+                                mime_type = (
+                                    "image/jpeg"
+                                    if file_ext.lower() in [".jpg", ".jpeg"]
+                                    else "image/png"
+                                )
+                                files[f"images_{i}"] = (
+                                    f"photo_{i}{file_ext}",
+                                    photo_content,
+                                    mime_type,
+                                )
                                 print(f"Added photo file {i}: {photo_path}")
                         except Exception as e:
                             print(f"Error reading photo file {photo_path}: {e}")
@@ -2814,7 +3281,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if isinstance(location, dict):
                     coordinates = {
                         "lat": location.get("latitude"),
-                        "lon": location.get("longitude")
+                        "lon": location.get("longitude"),
                     }
                     # Only include if both lat and lon are available
                     if not (coordinates["lat"] and coordinates["lon"]):
@@ -2828,21 +3295,29 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 contact_number = actual_user.contact_number
 
                 if not contact_number:
-                    return {"success": False, "message": "Could not get user contact number"}
+                    return {
+                        "success": False,
+                        "message": "Could not get user contact number",
+                    }
 
             except AttributeError as e:
-                return {"success": False, "message": f"Could not get user contact number from relationship chain: {e}"}
+                return {
+                    "success": False,
+                    "message": f"Could not get user contact number from relationship chain: {e}",
+                }
 
             # Prepare API payload
             payload = {
-                'item_type': 'WORK_DEMAND',
-                'coordinates': json.dumps(coordinates) if coordinates else '',
-                'number': contact_number,
-                'community_id': community_id,
-                'source': 'BOT',
-                'bot_id': user_log.bot.id,
-                'title': 'Work Demand Request',  # Auto-generated if not provided
-                'transcript': work_demand_data.get('description', ''),  # If any description exists
+                "item_type": "WORK_DEMAND",
+                "coordinates": json.dumps(coordinates) if coordinates else "",
+                "number": contact_number,
+                "community_id": community_id,
+                "source": "BOT",
+                "bot_id": user_log.bot.id,
+                "title": "Work Demand Request",  # Auto-generated if not provided
+                "transcript": work_demand_data.get(
+                    "description", ""
+                ),  # If any description exists
             }
 
             print(f"API Payload: {payload}")
@@ -2853,10 +3328,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             try:
                 response = requests.post(
-                    api_url,
-                    data=payload,
-                    files=files,
-                    timeout=30  # 30 second timeout
+                    api_url, data=payload, files=files, timeout=30  # 30 second timeout
                 )
 
                 print(f"API Response Status: {response.status_code}")
@@ -2865,7 +3337,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 if response.status_code == 200 or response.status_code == 201:
                     result = response.json()
                     if result.get("success"):
-                        print(f"Successfully submitted work demand. Item ID: {result.get('item_id')}")
+                        print(
+                            f"Successfully submitted work demand. Item ID: {result.get('item_id')}"
+                        )
 
                         # Update UserLogs with success status
                         user_log.value2 = "success"
@@ -2885,7 +3359,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         user_log.key4 = "response"
                         user_log.value4 = response.text
                         user_log.save()
-                        print(f"Updated UserLogs ID {user_log.id} with API failure status")
+                        print(
+                            f"Updated UserLogs ID {user_log.id} with API failure status"
+                        )
 
                         return result
                 else:
@@ -2899,7 +3375,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
                     return {
                         "success": False,
-                        "message": f"API call failed with status {response.status_code}: {response.text}"
+                        "message": f"API call failed with status {response.status_code}: {response.text}",
                     }
 
             except requests.exceptions.RequestException as e:
@@ -2918,6 +3394,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         except Exception as e:
             print(f"Error in process_and_submit_work_demand: {e}")
             import traceback
+
             traceback.print_exc()
 
             # Update UserLogs with internal error status
@@ -2936,15 +3413,17 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def fetch_work_demand_status(self, bot_instance_id, data_dict):
         """
         Fetches work demand status for the current user from Community Engagement API.
-        
+
         Args:
             bot_instance_id (int): The ID of the bot instance.
             data_dict (dict): Contains user_id, bot_id, and other session data
-            
+
         Returns:
             str: "has_work_demands" if user has work demands, "no_work_demands" if none found, "failure" on error
         """
-        print(f"Fetching work demand status for bot_instance_id: {bot_instance_id} and data_dict: {data_dict}")
+        print(
+            f"Fetching work demand status for bot_instance_id: {bot_instance_id} and data_dict: {data_dict}"
+        )
         try:
             import requests
             from django.conf import settings
@@ -2952,8 +3431,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             from community_engagement.models import Community_user_mapping
 
             # Get user information
-            user_id = data_dict.get('user_id')
-            bot_id = data_dict.get('bot_id', 1)
+            user_id = data_dict.get("user_id")
+            bot_id = data_dict.get("bot_id", 1)
 
             if not user_id:
                 print("No user_id found in data_dict")
@@ -2970,8 +3449,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Get user's active community
             try:
                 community_mapping = Community_user_mapping.objects.filter(
-                    user=bot_user.user,
-                    is_last_accessed_community=True
+                    user=bot_user.user, is_last_accessed_community=True
                 ).first()
 
                 if not community_mapping:
@@ -2986,32 +3464,40 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # Call Community Engagement API
             api_url = f"http://localhost:8000/api/v1/get_items_status/"
             params = {
-                'number': contact_number,
-                'bot_id': bot_instance_id,
+                "number": contact_number,
+                "bot_id": bot_instance_id,
                 # 'community_id': str(community_id),
-                'work_demand_only': 'true'
+                "work_demand_only": "true",
             }
 
             print(
-                f"Fetching work demand status for user {contact_number} in community {community_id} and bot_id {bot_instance_id}")
+                f"Fetching work demand status for user {contact_number} in community {community_id} and bot_id {bot_instance_id}"
+            )
             response = requests.get(api_url, params=params, timeout=30)
             print("response from GET request of get_items_status/ :", response)
 
             if response.status_code == 200:
                 result = response.json()
-                if result.get('success'):
-                    work_demands = result.get('data', [])
-                    print(f"Found {len(work_demands)} work demands for user {contact_number}")
+                if result.get("success"):
+                    work_demands = result.get("data", [])
+                    print(
+                        f"Found {len(work_demands)} work demands for user {contact_number}"
+                    )
 
                     # Store work demands in user session for persistence between states
                     try:
                         from bot_interface.models import UserSessions
+
                         session_data = {
-                            'work_demands': work_demands,
-                            'community_id': community_id
+                            "work_demands": work_demands,
+                            "community_id": community_id,
                         }
-                        UserSessions.objects.filter(user_id=user_id).update(misc_data=session_data)
-                        print(f"Stored {len(work_demands)} work demands in session for user {user_id}")
+                        UserSessions.objects.filter(user_id=user_id).update(
+                            misc_data=session_data
+                        )
+                        print(
+                            f"Stored {len(work_demands)} work demands in session for user {user_id}"
+                        )
                     except Exception as session_error:
                         print(f"Error storing work demands in session: {session_error}")
 
@@ -3020,10 +3506,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     else:
                         return "no_work_demands"
                 else:
-                    print(f"API returned error: {result.get('message', 'Unknown error')}")
+                    print(
+                        f"API returned error: {result.get('message', 'Unknown error')}"
+                    )
                     return "failure"
             else:
-                print(f"API request failed with status {response.status_code}: {response.text}")
+                print(
+                    f"API request failed with status {response.status_code}: {response.text}"
+                )
                 return "failure"
 
         except Exception as e:
@@ -3033,11 +3523,11 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def display_work_demands_text(self, bot_instance_id, data_dict):
         """
         Displays work demands as WhatsApp text message with Hindi format and character limit handling.
-        
+
         Args:
             bot_instance_id (int): The ID of the bot instance.
             data_dict (dict): Contains user_id, bot_id, and other session data
-            
+
         Returns:
             str: "success" if message sent successfully, "failure" otherwise
         """
@@ -3045,8 +3535,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             from bot_interface.models import UserSessions, BotUsers
 
             # Get user information
-            user_id = data_dict.get('user_id')
-            bot_id = data_dict.get('bot_id', 1)
+            user_id = data_dict.get("user_id")
+            bot_id = data_dict.get("bot_id", 1)
 
             if not user_id:
                 print("No user_id found in data_dict")
@@ -3060,7 +3550,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     return "failure"
 
                 session_data = user_session.misc_data
-                work_demands = session_data.get('work_demands', [])
+                work_demands = session_data.get("work_demands", [])
 
                 if not work_demands:
                     print(f"No work demands found in session for user {user_id}")
@@ -3080,7 +3570,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Send work demands with character limit handling
             try:
-                success = self._send_work_demands_with_limit(work_demands, contact_number, bot_instance_id)
+                success = self._send_work_demands_with_limit(
+                    work_demands, contact_number, bot_instance_id
+                )
                 if success:
                     print(f"Asset demands text sent successfully to {contact_number}")
                     return "success"
@@ -3095,16 +3587,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Error in display_work_demands_text: {e}")
             return "failure"
 
-    def _send_work_demands_with_limit(self, work_demands, contact_number, bot_instance_id, max_length=4000):
+    def _send_work_demands_with_limit(
+        self, work_demands, contact_number, bot_instance_id, max_length=4000
+    ):
         """
         Send work demands with character limit handling, splitting into multiple messages if needed.
-        
+
         Args:
             work_demands (list): List of work demand objects
             contact_number (str): User's contact number
             bot_instance_id (int): Bot instance ID
             max_length (int): Maximum characters per message
-            
+
         Returns:
             bool: True if all messages sent successfully, False otherwise
         """
@@ -3117,10 +3611,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             entry_length = len(sample_entry)
 
             # Calculate how many entries can fit in one message
-            available_space = max_length - len(header) - 50  # 50 chars buffer for part indicator
+            available_space = (
+                max_length - len(header) - 50
+            )  # 50 chars buffer for part indicator
             entries_per_message = max(1, available_space // entry_length)
 
-            total_messages = (len(work_demands) + entries_per_message - 1) // entries_per_message
+            total_messages = (
+                len(work_demands) + entries_per_message - 1
+            ) // entries_per_message
 
             # Send messages
             for msg_num in range(total_messages):
@@ -3139,10 +3637,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 # Add work demand entries
                 for i in range(start_idx, end_idx):
                     demand = work_demands[i]
-                    demand_id = demand.get('id', 'N/A')
-                    title = demand.get('title', 'Asset Demand Request')
-                    status = demand.get('status', 'UNMODERATED')
-                    transcription = demand.get('transcription', '')
+                    demand_id = demand.get("id", "N/A")
+                    title = demand.get("title", "Asset Demand Request")
+                    status = demand.get("status", "UNMODERATED")
+                    transcription = demand.get("transcription", "")
 
                     text += f"{i + 1}. संसाधन मांग ID: {demand_id}\n"
                     text += f"   शीर्षक: {title}\n"
@@ -3165,10 +3663,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 response = bot_interface.api.send_text(
                     bot_instance_id=bot_instance_id,
                     contact_number=contact_number,
-                    text=text
+                    text=text,
                 )
 
-                if not response or not response.get('messages'):
+                if not response or not response.get("messages"):
                     print(f"Failed to send message part {msg_num + 1}/{total_messages}")
                     return False
 

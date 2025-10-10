@@ -255,19 +255,19 @@ def modify_response_list_well(res, block, plan_id):
             result["hh_benefitted"] = result.get("households_benefited", "") or "NA"
             result["caste"] = result.get("select_multiple_caste_use", "") or "NA"
             result["functional"] = (
-                    well_usage_section.get("select_one_Functional_Non_functional", "")
-                    or "NA"
+                well_usage_section.get("select_one_Functional_Non_functional", "")
+                or "NA"
             )
             result["need_maintenance"] = (
-                    well_usage_section.get("select_one_maintenance", "") or "NA"
+                well_usage_section.get("select_one_maintenance", "") or "NA"
             )
             repair_value = well_usage_section.get("select_one_repairs_well")
             if repair_value:
                 repair_value = str(repair_value).lower()
                 if repair_value == "other":
                     result["repair"] = (
-                            well_usage_section.get("select_one_repairs_well_other", "")
-                            or "NA"
+                        well_usage_section.get("select_one_repairs_well_other", "")
+                        or "NA"
                     )
                 else:
                     result["repair"] = repair_value

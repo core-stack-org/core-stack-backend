@@ -22,6 +22,7 @@ from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
 from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
+import numpy as np
 
 
 def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
@@ -126,10 +127,10 @@ def check_task_status(task_id_list, sleep_time=60):
             for task in tasks:
                 task_id = task["name"].split("/")[-1]
                 if task_id in task_id_list and task["metadata"]["state"] in (
-                        "SUCCEEDED",
-                        "COMPLETED",
-                        "FAILED",
-                        "CANCELLED",
+                    "SUCCEEDED",
+                    "COMPLETED",
+                    "FAILED",
+                    "CANCELLED",
                 ):
                     task_id_list.remove(task_id)
         print("task_id_list after", task_id_list)
@@ -192,11 +193,11 @@ def create_gee_directory(state, district, block, gee_project_path=GEE_ASSET_PATH
     create_gee_folder(folder_path, gee_project_path)
 
     folder_path = (
-            valid_gee_text(state.lower())
-            + "/"
-            + valid_gee_text(district.lower())
-            + "/"
-            + valid_gee_text(block.lower())
+        valid_gee_text(state.lower())
+        + "/"
+        + valid_gee_text(district.lower())
+        + "/"
+        + valid_gee_text(block.lower())
     )
     create_gee_folder(folder_path, gee_project_path)
 
@@ -244,14 +245,14 @@ def export_vector_asset_to_gee(fc, description, asset_id):
 
 
 def export_raster_asset_to_gee(
-        image,
-        description,
-        asset_id,
-        scale,
-        region,
-        pyramiding_policy=None,
-        max_pixel=1e13,
-        crs="EPSG:4326",
+    image,
+    description,
+    asset_id,
+    scale,
+    region,
+    pyramiding_policy=None,
+    max_pixel=1e13,
+    crs="EPSG:4326",
 ):
     try:
         export_params = {
@@ -416,10 +417,10 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
     blob_name = "nrm_raster/" + gcs_file_name
     blob = bucket.blob(blob_name)
     out_path = (
-            "/".join(local_file_path.split("/")[:-1])
-            + "/"
-            + gcs_file_name.split(".")[0]
-            + "_comp.tif"
+        "/".join(local_file_path.split("/")[:-1])
+        + "/"
+        + gcs_file_name.split(".")[0]
+        + "_comp.tif"
     )
     print(out_path)
     cmd = f"gdal_translate {local_file_path} {out_path} -co TILED=YES -co COPY_SRC_OVERVIEWS=YES -co COMPRESS=LZW"
@@ -667,3 +668,13 @@ def build_gee_helper_paths(app_type, helper_project):
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
     GEE_HELPER_PATH = f"{gee_helper_base_path}/{app_type.lower()}/"
     return GEE_HELPER_PATH
+
+
+def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371
+    return c * r * 1000
