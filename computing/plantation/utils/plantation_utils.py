@@ -5,6 +5,8 @@ import geopandas as gpd
 import pandas as pd
 import fiona
 
+from dpr import mapping
+
 dataset_info = {
     # World Clim v2.1 (https://www.worldclim.org/data/worldclim21.html)
     "annualPrecipitation": {
@@ -19,6 +21,13 @@ dataset_info = {
     "aridityIndex": {
         "path": "projects/ee-plantationsitescores/assets/India-AridityIndex",
         "label": "Aridity Index",
+        "mapping": {
+            "< 0.03": "Hyper Arid",
+            "0.03 – 0.2": "Arid",
+            "0.2 – 0.5": "Semi-Arid",
+            "0.5 – 0.65": "Dry sub-humid",
+            "> 0.65": "Humid",
+        },
     },
     "referenceEvapoTranspiration": {
         "path": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
@@ -53,7 +62,7 @@ dataset_info = {
     "topsoilTexture": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
         "label": "Topsoil Texture",
-        "mapping": {0: "none", 1: "coarse", 2: "medium", 3: "fine"},
+        "mapping": {0: "none", 1: "Coarse", 2: "Medium", 3: "Fine"},
     },
     "subsoilPH": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
@@ -97,7 +106,15 @@ dataset_info = {
     },
     "drainage": {
         "path": "projects/ee-plantationsitescores/assets/Raster-Drainage",
-        # "mapping": "",  # Check class mapping
+        "mapping": {
+            0: "Excessively drained",
+            1: "Somewhat excessively drained",
+            2: "Well drained",
+            3: "Moderately well drained",
+            4: "Imperfectly drained",
+            5: "Poorly drained",
+            6: "Very poorly drained",
+        },
         "label": "Drainage Class",
     },
     # SRTM DEM v3 (https://lpdaac.usgs.gov/documents/13/SRTM_Quick_Guide.pdf)

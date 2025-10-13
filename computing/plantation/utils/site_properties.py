@@ -3,8 +3,22 @@ import ee
 from utilities.constants import GEE_DATASET_PATH
 from utilities.gee_utils import (
     valid_gee_text,
+    ee_initialize,
+    export_vector_asset_to_gee,
 )
 from .plantation_utils import dataset_info
+
+
+def get_data():
+    ee_initialize(1)
+    asset_id = "projects/ee-corestackdev/assets/apps/plantation/saytrees/mbrdi_biodiversity_conservation_-_kolar/SayTrees_MBRDI_Biodiversity_Conservation_-_Kolar_site_suitability_vector"
+    roi = ee.FeatureCollection(asset_id)
+    print(roi.size().getInfo())
+    state = "karnataka"
+    start_year = 2021
+    end_year = 2023
+    fc = get_site_properties(roi, state, start_year, end_year)
+    export_vector_asset_to_gee(fc, "site_properties", asset_id + "_1")
 
 
 def get_site_properties(roi, state, start_year, end_year):
@@ -46,11 +60,7 @@ def get_site_properties(roi, state, start_year, end_year):
                 )
                 prop_value = vectors.first().get("mean")
 
-            if "mapping" in value:
-                mapping = ee.Dictionary(value["mapping"])
-                prop_value = ee.Algorithms.If(
-                    prop_value, mapping.get(ee.Number(prop_value).toInt()), "None"
-                )
+            prop_value = get_mapping(key, prop_value, value)
 
             vectorized_props[label] = prop_value
 
@@ -127,4 +137,37 @@ def vectorize_dataset(dataset, roi, scale):
         min_distance.get("distance"),
         ee.Number(min_distance.get("distance")).multiply(1000).round().divide(1000),
         0,
+    )
+
+
+def get_mapping(key, prop_value, value):
+    if "mapping" in value:
+        if key == "aridityIndex":
+            prop_value = ee.Algorithms.If(
+                prop_value,
+                ee.String(classify_aridity(prop_value)),
+                "None",
+            )
+        else:
+            mapping = ee.Dictionary(value["mapping"])
+            prop_value = ee.Algorithms.If(
+                prop_value, mapping.get(ee.Number(prop_value).toInt()), "None"
+            )
+    return prop_value
+
+
+def classify_aridity(prop_value):
+    prop_value = ee.Number(prop_value).divide(10000)
+    return ee.Algorithms.If(
+        prop_value.lt(0.03),
+        "Hyper Arid",
+        ee.Algorithms.If(
+            prop_value.lt(0.2),
+            "Arid",
+            ee.Algorithms.If(
+                prop_value.lt(0.5),
+                "Semi-Arid",
+                ee.Algorithms.If(prop_value.lt(0.65), "Dry sub-humid", "Humid"),
+            ),
+        ),
     )
