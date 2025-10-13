@@ -46,5 +46,3 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
-
-overpass_response.json
