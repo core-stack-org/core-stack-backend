@@ -76,18 +76,6 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
 
                 if is_gee_asset_exists(new_asset_id):
                     merge_fc_into_existing_fc(asset_id, description, new_asset_id)
-
-                layer_at_geoserver = sync_to_db_and_geoserver(
-                    asset_id=asset_id,
-                    state=state,
-                    district=district,
-                    block=block,
-                    description=description,
-                    start_year=start_year,
-                    end_year=end_year,
-                )
-                return layer_at_geoserver
-        return True
     else:
         generate_vector(
             start_year=start_year,
@@ -99,16 +87,18 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
             asset_id=asset_id,
             fc=fc,
         )
-        layer_at_geoserver = sync_to_db_and_geoserver(
-            asset_id=asset_id,
-            state=state,
-            district=district,
-            block=block,
-            description=description,
-            start_year=start_year,
-            end_year=end_year,
-        )
-        return layer_at_geoserver
+
+    layer_at_geoserver = sync_to_db_and_geoserver(
+        asset_id=asset_id,
+        state=state,
+        district=district,
+        block=block,
+        description=description,
+        start_year=start_year,
+        end_year=end_year,
+    )
+
+    return layer_at_geoserver
 
 
 def generate_vector(
