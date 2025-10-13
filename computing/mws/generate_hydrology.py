@@ -190,6 +190,7 @@ def generate_hydrology(
         start_date,
         end_date,
         is_annual,
+        gee_account_id,
     )
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
