@@ -22,6 +22,7 @@ def calculate_g(
     start_date,
     end_date,
     is_annual,
+    gee_account_id,
 ):
     layer_name = (
         "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
@@ -150,6 +151,6 @@ def calculate_g(
             path = f"{path}/{layer_name}.shp"
             gdf.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
             print("path", path)
-            upload_shp_to_gee(path, layer_name, asset_id)
+            upload_shp_to_gee(path, layer_name, asset_id, gee_account_id)
 
     return asset_id

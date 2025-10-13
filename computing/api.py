@@ -63,7 +63,7 @@ def generate_admin_boundary(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_tehsil_shape_file_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
