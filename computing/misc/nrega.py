@@ -35,7 +35,7 @@ import ee
 import numpy as np
 
 
-def export_shp_to_gee(district, block, layer_path, asset_id):
+def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
     layer_name = (
         "nrega_"
         + valid_gee_text(district.lower())
@@ -43,11 +43,13 @@ def export_shp_to_gee(district, block, layer_path, asset_id):
         + valid_gee_text(block.lower())
     )
     layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
-    upload_shp_to_gee(layer_path, layer_name, asset_id)
+    upload_shp_to_gee(layer_path, layer_name, asset_id, gee_account_id)
 
 
 @app.task(bind=True)
-def clip_nrega_district_block(self, state_name, district_name, block_name, gee_account_id):
+def clip_nrega_district_block(
+    self, state_name, district_name, block_name, gee_account_id
+):
     ee_initialize(gee_account_id)
     print("inside clip")
     s3 = boto3.resource(
@@ -155,7 +157,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name, gee_a
     path = os.path.join(
         NREGA_ASSETS_OUTPUT_DIR,
         formatted_state_name,
-        f"""{"_".join(district_name.split())}_{"_".join(block_name.split())}"""
+        f"""{"_".join(district_name.split())}_{"_".join(block_name.split())}""",
     )
     output_directory = os.path.dirname(path)
     os.makedirs(output_directory, exist_ok=True)
@@ -184,7 +186,7 @@ def clip_nrega_district_block(self, state_name, district_name, block_name, gee_a
 
     if not is_gee_asset_exists(asset_id):
         if file_size_mb > 10:
-            export_shp_to_gee(district_name, block_name, path, asset_id)
+            export_shp_to_gee(district_name, block_name, path, asset_id, gee_account_id)
         else:
             fc = gdf_to_ee_fc(block_metadata_df)
             task_id = export_vector_asset_to_gee(fc, description, asset_id)
