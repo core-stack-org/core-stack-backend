@@ -828,7 +828,11 @@ def plantation_site_suitability(request):
         block = request.data.get("block").lower() if request.data.get("block") else None
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = (
+            request.data.get("gee_account_id")
+            if request.data.get("gee_account_id")
+            else None
+        )
         site_suitability.apply_async(
             args=[
                 project_id,

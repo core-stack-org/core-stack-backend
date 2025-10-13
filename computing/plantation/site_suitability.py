@@ -33,13 +33,13 @@ logger = setup_logger(__name__)
 @app.task(bind=True)
 def site_suitability(
     self,
-    gee_account_id,
     project_id,
     start_year,
     end_year,
     state=None,
     district=None,
     block=None,
+    gee_account_id=None,
 ):
     """
     Main task for site suitability analysis using Google Earth Engine.
