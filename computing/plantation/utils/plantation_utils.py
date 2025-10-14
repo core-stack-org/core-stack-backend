@@ -46,7 +46,7 @@ dataset_info = {
     },
     "topsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_OC",
-        "label": "Topsoil Organic Carbon (%)",
+        "label": "Topsoil Organic Carbon (% weight)",
     },
     "topsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
@@ -63,7 +63,7 @@ dataset_info = {
     },
     "subsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_OC",
-        "label": "Subsoil Organic Carbon (%)",
+        "label": "Subsoil Organic Carbon (% weight)",
     },
     "subsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
