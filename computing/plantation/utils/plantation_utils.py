@@ -21,13 +21,6 @@ dataset_info = {
     "aridityIndex": {
         "path": "projects/ee-plantationsitescores/assets/India-AridityIndex",
         "label": "Aridity Index",
-        "mapping": {
-            "< 0.03": "Hyper Arid",
-            "0.03 – 0.2": "Arid",
-            "0.2 – 0.5": "Semi-Arid",
-            "0.5 – 0.65": "Dry sub-humid",
-            "> 0.65": "Humid",
-        },
     },
     "referenceEvapoTranspiration": {
         "path": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
@@ -53,7 +46,7 @@ dataset_info = {
     },
     "topsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_OC",
-        "label": "Topsoil Organic Carbon (%)",
+        "label": "Topsoil Organic Carbon (% weight)",
     },
     "topsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
@@ -70,7 +63,7 @@ dataset_info = {
     },
     "subsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_OC",
-        "label": "Subsoil Organic Carbon (%)",
+        "label": "Subsoil Organic Carbon (% weight)",
     },
     "subsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
@@ -115,7 +108,7 @@ dataset_info = {
             5: "Poorly drained",
             6: "Very poorly drained",
         },
-        "label": "Drainage Class",
+        "label": "Soil Drainage",
     },
     # SRTM DEM v3 (https://lpdaac.usgs.gov/documents/13/SRTM_Quick_Guide.pdf)
     "elevation": {"path": "USGS/SRTMGL1_003", "label": "Elevation (m)"},
