@@ -1,0 +1,181 @@
+layer_name,layer_description
+land_use_land_cover_raster,"Land Use Land Cover (LULC) map for India built by ACT4D research group at IIT Delhi. Novelty of this approach is intra-annual classes for agriculture and water availability aligned to the agriculture seasons of India.
+
+The Pan India map is available from 2017 onwards at 10m resolution.
+These are the classes in the current version of LULC:
+1. builtup
+2. water in kharif only
+3. water in kharif and rabi only
+4. water in kharif, rabi and zaid (perennial water)
+5. cropland
+6. trees and forest
+7. barren land
+8. single kharif cropping
+9. single non-kharif cropping
+10. double cropping
+11. tripple cropping
+12. shrubs and scrubs
+
+Input to the model is Dynamic World output, and timeseries data from Landsat-7, Landsat-8, Sentinel-2, Sentinel-1 and MODIS. Details of methodology can be found in our technical manual and the codebase on github
+"
+terrain_raster,"Terrain classification map at 30m resolution for India built by ACT4D research group at IIT Delhi. The map is based on Topographic Position Index (TPI) and slope. The algorithm is based on a landform classification method by The Nature Conservency (https://www.jennessent.com/downloads/TPI-poster-TNC_18x22.pdf), with fine tuning of the thresholds done for Indian landscapes.
+
+The following classes are available in the current version of the map:
+1. V-shape river valleys, Deep narrow canyons
+2. Lateral midslope incised drainages, Local valleys in plains
+3. Upland incised drainages, Stream headwaters
+4. U-shape valleys
+5. Broad flat areas
+6. Broad open slopes
+7. Mesa tops
+8. Upper Slopes
+9. Local ridge/hilltops within broad valleys
+10. Lateral midslope drainage divides, Local ridges in plains
+11. Mountain tops, high ridges
+
+Input to the model is digital elevation data (SRTM Digital Elevation 30m). Details of methodology can be found in our technical manual and the codebase on github
+"
+change_tree_cover_gain_raster,"Change detection map for India built by ACT4D research group at IIT Delhi. The various change detection maps are Change in Land use layers are computing by using IndiaSAT Land Use Land Cover outputs and computing the change in pixel classes across the years. 
+Currently the layer is computed for the period of 2017-2022 and two composite images are generated using the mode of the first three years (2017-2019) and the last three years (2020-2022) and a transition matrix is prepared for the classes for these outputs. 
+
+Tree cover gain layer includes the transition of built-up,barren, shrubs and farms class to trees class from the previous output to the current output. Following are the classes in this layer: 
+Trees - Trees
+Built Up - Trees
+Farm - Trees
+Barren - Trees
+Scrub Land - Trees
+
+Details of methodology can be found in the technical manual and the codebase on github."
+change_tree_cover_loss_raster,"Change detection map for India built by ACT4D research group at IIT Delhi. The various change detection maps are Change in Land use layers are computing by using IndiaSAT Land Use Land Cover outputs and computing the change in pixel classes across the years. 
+Currently the layer is computed for the period of 2017-2022 and two composite images are generated using the mode of the first three years (2017-2019) and the last three years (2020-2022) and a transition matrix is prepared for the classes for these outputs. 
+
+Deforestation (tree cover loss) layer includes trees to built-up, barren, shrubs and Crops from the previous output to the current output. Following are the classes in this layer: 
+Trees - Trees
+Trees - Built Up
+Trees - Crops
+Trees - Barren
+Trees - Shrubs and Scrubs
+Details of methodology can be found in the technical manual and the codebase on github."
+change_urbanization_raster,"Change detection map for India built by ACT4D research group at IIT Delhi. The various change detection maps are Change in Land use layers are computing by using IndiaSAT Land Use Land Cover outputs and computing the change in pixel classes across the years. 
+Currently the layer is computed for the period of 2017-2022 and two composite images are generated using the mode of the first three years (2017-2019) and the last three years (2020-2022) and a transition matrix is prepared for the classes for these outputs. 
+
+Urbanization layer includes the transition of built-up, green, water, and barren areas to built-up. Following are the classes in this layer: 
+Built Up - Built Up
+Water - Built Up
+Trees/Crops - Built Up
+Barren/Shrubs and Scrubs - Built Up"
+change_cropping_reduction_raster,"Change detection map for India built by ACT4D research group at IIT Delhi. The various change detection maps are Change in Land use layers are computing by using IndiaSAT Land Use Land Cover outputs and computing the change in pixel classes across the years. 
+Currently the layer is computed for the period of 2017-2022 and two composite images are generated using the mode of the first three years (2017-2019) and the last three years (2020-2022) and a transition matrix is prepared for the classes for these outputs. 
+Degradation layer includes the transition of crops area into built-up, barren and shrubs. Following are the classes in this layer: 
+Crops - Crops
+Crops - Built Up
+Crops - Barren
+Crops - Shrubs and Scrubs"
+change_cropping_intensity,"Change detection map for India built by ACT4D research group at IIT Delhi. The various change detection maps are Change in Land use layers are computing by using IndiaSAT Land Use Land Cover outputs and computing the change in pixel classes across the years. 
+Currently the layer is computed for the period of 2017-2022 and two composite images are generated using the mode of the first three years (2017-2019) and the last three years (2020-2022) and a transition matrix is prepared for the classes for these outputs. 
+
+Cropping intensity change layer includes transitions from single to double cropping, single
+to triple cropping, double to single cropping, double to triple cropping, triple to double
+cropping and triple to single cropping. Following are the classes in this layer: 
+Double - Single
+Triple - Single
+Triple - Double
+Single - Double
+Single - Triple
+Double - Triple
+No change"
+tree_canopy_cover_density_raster,"Tree canopy cover density map for India built by ACT4D research group at IIT Delhi. Tree canopy cover density (CCD) indicates the density of tree cover in a given area, with higher canopy cover percentages signifying a denser canopy and more shade on the ground and vice versa. 
+
+The Pan India map (except ACZ 12-15 currently missing due to insufficient data points for training the respective models)  is available from 2017 onwards at 25m resolution.
+These are the classes in the current version of the map: 
+Low density 
+High density
+Missing data 
+
+Input to the model is Dynamic World output, and timeseries data from Sentinel-2, Sentinel-1 and GEDI as ground truth. Details of methodology can be found  in the technical manual and the codebase at https://github.com/Dhruvi-Goyal/Tree-Health-Monitoring/"
+tree_canopy_height_raster,"Tree canopy height map for India built by ACT4D research group at IIT Delhi. Tree canopy height layer describes how tall are trees in a given pixel. 
+The Pan India map (except ACZ 12-15)  is available from 2017 onwards at 25m resolution.
+These are the classes in the current version of the map: 
+
+Short 
+Medium
+Tall "
+drainage_lines_vector,Drainage lines map for India built by ACT4D research group at IIT Delhi. Drainage lines in hydrology refer to the visible channels through which water flows from higher elevations to lower elevations on the surface of earth such as streams and rivers. The Pan India map of drainage lines has been generated using SRTM DEM V4 data on QGIS (r.stream.extract). The drainage lines are labeled by their Strahler order. Details of methodology can be found in the technical manual.
+stream_order_raster,"Stream order raster map for India built by ACT4D research group at IIT Delhi. While drainage lines are essential to plan assets such as check dams located on the drainage lines, it is also important to identify areas outside of the drainage lines that are under the influence of drainage lines. We use digital elevation model (DEM) data that provides pixel level information on the elevation and drainage lines (with stream orders) as inputs to compute stream order rasters. Areas with higher stream orders are those downstream of areas with lower stream orders, and can help identify cropping regions like low-land, mid-land, and up-land. Details of methodology can be found in the technical manual and the codebase on github."
+distance_to_upstream_drainage_line,"Distance to upstream drainage line map for India built by ACT4D research group at IIT Delhi. Spatial indexing technique (e.g. k-d tree) is applied on pixel level digital elevation data (SRTM DEM) to compute the distance of each non-drainage pixel to its nearest upstream drainage line. 
+Details of methodology can be found in the technical manual and the codebase on github."
+catchment_area,Catchment area map for India built by ACT4D research group at IIT Delhi. The catchment area of a point represents the total land area from which rain water drains into that point. The pan-India catchment area map has been built using digital elevation data and r.watershed tool of GRASS GIS to compute flow accumulation. Details of methodology can be found in the technical manual and the codebase on github.
+runoff_accumulation,"Runoff accumulation map for India built by ACT4D research group at IIT Delhi. Pixel-level elevation data, upstream-downstream microwatershed connectivity, drainage lines and pixel-level runoff data is used to compute pixel-level runoff accumulation. Details of methodology can be found in the technical manual and the codebase on github.
+"
+natural_depressions,"Natural depressions map for India built by ACT4D research group at IIT Delhi. Natural depressions are valuable for planning water structures under MGNREGA as they naturally collect and store water, making them ideal sites for various water conservation interventions. This is computed using pixel level digital elevation data, and r.fill.dir algorithm of GRASS GIS tool. Details of methodology can be found in the technical manual and the codebase on github.
+"
+clart_raster,"Composite Land Assessment and Restoration Tool (CLART) is a tool built by the Foundation for Ecological Security (FES) with the goal of empowering rural communities for planning the sites for soil and water conservation measures. This map is intended to reproduce CLART in
+a reprogrammable/reconfigurable manner to allow dynamic scoring based on community
+requirements for their landscape. The recharge score is computed as a weighted index based on underlying layers.
+
+The Pan India map has the following classes: 
+Good recharge 
+Moderate recharge
+Regeneration
+High runoff zone 
+Surface water harvesting 
+
+Details of methodology can be found in the technical manual and the codebase on github."
+aquifer_vector,"Aquifer map for India generated with data from India Water Resources Information System (WRIS) ArcGIS portal. Ground water is the water present beneath the Earth’s surface in rock and soil pore spaces and in the fractures of rock formation. A unit of rock or an unconsolidated deposit is called an aquifer when it can yield a usable quantity of water. 
+
+Based on the hydrogeological characteristics, the entire nation is divided into 14 principal aquifers: 
+
+Alluvium
+Laterite
+Basalt
+Sandstone
+Shale
+Limestone
+Granite
+Schist
+Quartzite
+Charnockite
+Khondalite
+Banded Gneissic Complex
+Gneiss
+Intrusive
+
+Each major aquifer is uniquely identified by its region-specific aquifer properties such as aquifer thickness, specific yield, transmissivity and whether it is an unconfined and confined aquifer."
+stage_of_groundwater_extraction_vector,"The stage of groundwater extraction map for India generated from National Compilation on Dynamic Ground Water Resources of India (2022), by Central Ground Water Board, Government of India. Stage of groundwater extraction (SOGE) is defined as the ratio of annual extraction of groundwater resource and annual extractable groundwater resource. 
+
+The Pan India map is available for the years 2011, 2013, 2017, and 2020. The categories in the map currently are: 
+Safe (<= 70%), 
+Semi-critical (> 70% and ≤ 90%), 
+Critical (> 90% and ≤ 100%) and 
+Over Exploited (> 100%)"
+nrega_vector,"Mahatma Gandhi National Rural Employment Guarantee Act (MGNREGA) assets categorization map for India built by ACT4D research group at IIT Delhi. Permissible works under the scheme have been categorized from the natural resource management (NRM) lens through keyword matching, with the goal of helping in examining the current distribution of assets and facilitate the planning of new assets to ensure water security and sustainable livelihoods in rural India. 
+
+The Pan India map is available from 2017 onwards.
+These are the classes in the current version of the map:
+1. Soil and water conservation
+2. Irrigation on farms
+3. Other on-farm works
+4. Plantations
+5. Land restoration
+6. Off-farm livelihood assets
+7. Community assets
+
+Input to the keyword matching algorithm is MGNREGS permissible work list and MGNREGA assets obtained from Bhuvan. Details of methodology can be found in the technical manual and the codebase on github."
+admin_boundaries_vector,"Administration boundaries map of India built by ACT4D research group at IIT Delhi. State and district boundaries data is taken from Survey of India. Administrative block boundaries are generated for 15 states by using village shapefiles from NASA SEDAC website, and village to panchayat mapping obtained from the Local Government Directory data.  Additionally, the village level data is compiled with village level household variables of census 2011 and the Aggregate Development Index (ADI) of 2001, 2011 and 2019.
+Details of methodology can be found in the technical manual and the codebase on github."
+drought_frequency_vector,"Drought frequency map for India built by ACT4D research group at IIT Delhi. The Department of Agriculture, Cooperation & Farmers Welfare under the Ministry of Agriculture & Farmers Welfare, Government of India released the ""Manual for Drought Management"" in 2016 for the pre-
+vention, mitigation and management of droughts in India. The manual introduces scientific
+indices and parameters such as Vegetation Condition Index (VCI) for more accurate determi-
+nation and assessment of drought. This map is an attempt to implement the methodology of the drought manual using various remote sensing products.
+
+Following are the output classes in the model: 
+Severe
+Moderate
+Mild
+
+Input to the model is Rainfall data  (CHIRPS), Vegetation data (Landsat), Crop data (MODIS), Land use land cover (IndiaSAT). Details of methodology can be found in the technical manual and the codebase on github."
+surface_water_bodies_vector,"Surface water bodies map for India built by ACT4D research group at IIT Delhi. Surface Water is any body of water above ground, including streams, rivers, and lakes. [1]  
+To generate this map, water pixels from the Land Use Land Cover model (IndiaSAT) for each year are taken and converted into a vector layer. Given the intra annual classes for water availability based on India’s agriculture calendar in IndiaSAT, water availability in each season of the year (kharif, rabi, zaid) for each of the waterbodies is computed. This data is also combined with waterbody census data (2023) to additionally get a capacity map for the waterbodies.  Details of methodology can be found in the technical manual and the codebase on github. "
+water_balance,"Water balance map for India at fortnightly temporal resolution built by ACT4D research group at IIT Delhi. The law of water balance states that the inflows to any water system or area is equal to its outflows plus change in storage during a time interval [1]. The general water balance equation is Precipitation (P) = Runoff (Qout) + Evapotranspiration (ET) +/- Change in ground water (ΔG). Precipitation data has been obtained from JAXA’s Global Satellite Mapping of Precipitation (GSMaP), Evapotranspiration data from FLDAS Noah land Surface model by NASA and USGS, and runoff has been computed on a per-pixel using slope-adjusted CN numbers, the hydrological soil group, and LULC. Details of methodology can be found in the technical manual and the codebase on github.
+"
+change_in_well_depth_vector,Change in well depth map for India built by ACT4D research group at IIT Delhi. Input data to compute change in well depth for each microwatershed is the specific yield obtained from aquifer data and water balance. This only takes the vertical flux into account and hence is likely to suffer from accuracy issues in the absence of accounting for lateral flow through the underlying aquifer. Details of methodology can be found in the technical manual and the codebase on github.
