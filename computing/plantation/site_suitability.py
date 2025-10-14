@@ -100,6 +100,7 @@ def site_suitability(
             start_year=start_year,
             end_year=end_year,
             have_new_sites=have_new_sites,
+            gee_account_id=gee_account_id,
         )
         # Sync the results to GeoServer for visualization
         sync_suitability_to_geoserver(
@@ -121,6 +122,7 @@ def site_suitability(
             block=block,
             start_year=start_year,
             end_year=end_year,
+            gee_account_id=gee_account_id,
         )
 
         # Sync the results to GeoServer for visualization

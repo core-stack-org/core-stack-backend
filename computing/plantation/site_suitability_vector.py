@@ -1,5 +1,6 @@
 import ee
 
+from gee_computing.models import GEEAccount
 from utilities.constants import (
     GEE_PATH_PLANTATION,
     GEE_PATH_PLANTATION_HELPER,
@@ -15,6 +16,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     make_asset_public,
     export_vector_asset_to_gee,
+    build_gee_helper_paths,
 )
 from computing.plantation.utils.lulc_attachment import get_lulc_data
 from computing.plantation.utils.ndvi_attachment import get_ndvi_data
@@ -40,6 +42,7 @@ def check_site_suitability(
     district=None,
     block=None,
     have_new_sites=False,
+    gee_account_id=None,
 ):
     """
     Perform comprehensive site suitability analysis.
@@ -54,6 +57,7 @@ def check_site_suitability(
         start_year: Analysis start year
         end_year: Analysis end year
         have_new_sites: Boolean flag for if there are new sites in the ROI
+        gee_account_id: GEE account ID
 
     Returns:
         Asset ID of the suitability vector
@@ -120,9 +124,12 @@ def check_site_suitability(
     if roi.size().getInfo() > 50:
         chunk_size = 30
         rois, descs = create_chunk(roi, description, chunk_size)
-
-        ee_initialize("helper")
-        create_gee_dir(path_list, gee_project_path=GEE_HELPER)
+        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+        helper_account_path = build_gee_helper_paths(
+            "PLANTATION", gee_obj.helper_account.name
+        )
+        ee_initialize(gee_obj.helper_account.id)
+        create_gee_dir(path_list, helper_account_path)
 
         tasks = []
         for i in range(len(rois)):
