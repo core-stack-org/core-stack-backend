@@ -1,4 +1,6 @@
 import ee
+import os
+from nrm_app.settings import BASE_DIR
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -18,14 +20,15 @@ from computing.models import *
 
 
 @app.task(bind=True)
-def generate_fes_clart_layer(
-    self, state, district, block, file_path, clart_filename, gee_account_id
-):
+def generate_fes_clart_layer(self, state, district, block, file_path, gee_account_id):
     print("Inside generate_fes_clart_layer")
     ee_initialize(gee_account_id)
+
     try:
+        clart_filename = os.path.basename(file_path)
+
         description = (
-            f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_clart"
+            valid_gee_text(district) + "_" + valid_gee_text(block) + "_clart"
         )
         asset_id = get_gee_asset_path(state, district, block) + description + "_fes"
 
