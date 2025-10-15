@@ -20,6 +20,11 @@
       "rel": "item",
       "href": "./odisha_koraput_koraput_admin_boundaries_vector/odisha_koraput_koraput_admin_boundaries_vector.json",
       "type": "application/geo+json"
+    },
+    {
+      "rel": "item",
+      "href": "./odisha_koraput_koraput_aquifer_vector/odisha_koraput_koraput_aquifer_vector.json",
+      "type": "application/geo+json"
     }
   ],
   "title": "STAC for koraput"
