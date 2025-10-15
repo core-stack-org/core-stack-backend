@@ -45,7 +45,9 @@ def get_site_properties(roi, state, start_year, end_year):
                     feature.geometry(), ee.Reducer.mean(), scale, raster.projection()
                 )
                 prop_value = vectors.first().get("mean")
-                prop_value = round_to(ee.Number(prop_value), 4)
+                prop_value = ee.Algorithms.If(
+                    prop_value, round_to(prop_value, 4), prop_value
+                )
 
             prop_value = get_mapping(data_key, data_value, prop_value)
 
