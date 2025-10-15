@@ -147,6 +147,7 @@ def check_site_suitability(
                 descs[i],
                 chunk_asset_id,
                 state,
+                project,
             )
             if task_id:
                 tasks.append(task_id)
@@ -175,6 +176,7 @@ def check_site_suitability(
             description,
             asset_id,
             state,
+            project,
         )
         if task_id:
             check_task_status([task_id], 120)
@@ -204,6 +206,7 @@ def generate_vector(
     description,
     asset_id,
     state,
+    project,
 ):
 
     def get_max_val(feature):
@@ -225,7 +228,7 @@ def generate_vector(
         patch_average = ee.Algorithms.If(
             ee.Algorithms.IsEqual(patch_average, None), 0, patch_average
         )
-        if is_default_profile:
+        if is_default_profile and not project:
             map_string = ee.Dictionary(
                 {
                     1: "Very Good",
