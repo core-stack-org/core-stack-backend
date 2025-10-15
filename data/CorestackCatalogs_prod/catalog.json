@@ -1,0 +1,33 @@
+{
+  "type": "Catalog",
+  "id": "corestack_STAC",
+  "stac_version": "1.1.0",
+  "description": "This spatio temporal asset catalog contains all data layers of CoREStack (https://core-stack.org/). The data layers are generated at an administrative block level, and some layers are available for Pan India.",
+  "links": [
+    {
+      "rel": "root",
+      "href": "./catalog.json",
+      "type": "application/json",
+      "title": "CoREStack Spatio Temporal Asset Catalog"
+    },
+    {
+      "rel": "child",
+      "href": "./uttar_pradesh/collection.json",
+      "type": "application/json",
+      "title": "uttar_pradesh"
+    },
+    {
+      "rel": "child",
+      "href": "./jharkhand/collection.json",
+      "type": "application/json",
+      "title": "jharkhand"
+    },
+    {
+      "rel": "child",
+      "href": "./odisha/collection.json",
+      "type": "application/json",
+      "title": "odisha"
+    }
+  ],
+  "title": "CoREStack Spatio Temporal Asset Catalog"
+}
