@@ -222,7 +222,7 @@ class PlantationProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter KML files by project"""
         project_id = self.kwargs.get("project_pk")
-        default_profile = PlantationProfile.objects.filter(profile_id=1)
+        # default_profile = PlantationProfile.objects.filter(profile_id=1)
         if project_id:
             # Get the plantation project
             try:
@@ -232,10 +232,10 @@ class PlantationProfileViewSet(viewsets.ModelViewSet):
                 profile = PlantationProfile.objects.filter(project=project)
                 if profile.exists():
                     return profile
-                return default_profile
+                return None  # default_profile
             except Project.DoesNotExist:
-                return default_profile
-        return default_profile
+                return None  # default_profile
+        return None  # default_profile
 
     def get_serializer_class(self):
         if self.action == "retrieve":
