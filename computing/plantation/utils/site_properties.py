@@ -52,12 +52,12 @@ def get_site_properties(roi, state, start_year, end_year):
             vectorized_props[label] = prop_value
 
         # Distance to the nearest road
-        vectorized_props["Distance to Road (m)"] = vectorize_dataset(
+        vectorized_props["Distance to Roads (m)"] = vectorize_dataset(
             state_dist_to_road, feature, 10
         )
 
         # Distance to the nearest settlement
-        vectorized_props["Distance to Settlement (m)"] = vectorize_dataset(
+        vectorized_props["Distance to Settlements (m)"] = vectorize_dataset(
             dist_to_settlement, feature, 10
         )
 
