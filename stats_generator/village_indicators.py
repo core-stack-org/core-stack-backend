@@ -15,6 +15,8 @@ def get_generate_filter_data_village(state, district, block):
     file_xl_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files', state_folder, district_folder, f"{district}_{block}")
     xlsx_file = file_xl_path + '.xlsx'
 
+    print("file path", xlsx_file)
+
     # Try to load required sheets
     try:
         df_soc_eco_indi = pd.read_excel(xlsx_file, sheet_name='social_economic_indicator')
