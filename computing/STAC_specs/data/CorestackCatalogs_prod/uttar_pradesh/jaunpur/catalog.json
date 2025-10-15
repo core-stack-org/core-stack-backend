@@ -1,8 +1,8 @@
 {
   "type": "Catalog",
-  "id": "koraput",
+  "id": "jaunpur",
   "stac_version": "1.1.0",
-  "description": "STAC catalog for data of koraput district",
+  "description": "STAC catalog for data of jaunpur district",
   "links": [
     {
       "rel": "root",
@@ -12,16 +12,16 @@
     },
     {
       "rel": "child",
-      "href": "./koraput/catalog.json",
+      "href": "./badlapur/catalog.json",
       "type": "application/json",
-      "title": "STAC for koraput"
+      "title": "STAC for badlapur"
     },
     {
       "rel": "parent",
       "href": "../collection.json",
       "type": "application/json",
-      "title": "odisha"
+      "title": "uttar_pradesh"
     }
   ],
-  "title": "koraput"
+  "title": "jaunpur"
 }

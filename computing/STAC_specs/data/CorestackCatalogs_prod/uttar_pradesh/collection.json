@@ -1,8 +1,8 @@
 {
   "type": "Collection",
-  "id": "odisha",
+  "id": "uttar_pradesh",
   "stac_version": "1.1.0",
-  "description": "STAC Collection for data of odisha state.",
+  "description": "STAC Collection for data of uttar_pradesh state.",
   "links": [
     {
       "rel": "root",
@@ -35,9 +35,9 @@
     },
     {
       "rel": "child",
-      "href": "./koraput/catalog.json",
+      "href": "./jaunpur/catalog.json",
       "type": "application/json",
-      "title": "koraput"
+      "title": "jaunpur"
     },
     {
       "rel": "parent",
@@ -46,7 +46,7 @@
       "title": "CoREStack Spatio Temporal Asset Catalog"
     }
   ],
-  "title": "odisha",
+  "title": "uttar_pradesh",
   "extent": {
     "spatial": {
       "bbox": [
@@ -72,9 +72,9 @@
     "social-ecological",
     "sustainability",
     "CoRE stack",
-    "koraput",
-    "koraput",
-    "odisha"
+    "badlapur",
+    "jaunpur",
+    "uttar_pradesh"
   ],
   "providers": [
     {
