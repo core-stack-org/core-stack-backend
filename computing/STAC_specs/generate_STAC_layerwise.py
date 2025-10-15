@@ -1,8 +1,6 @@
 # %% [markdown]
 
 # %%
-import pystac
-import constants
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -27,12 +25,14 @@ from shapely.geometry import mapping, box, Polygon
 
 import sys
 sys.path.append('..')
+import constants
 
-# from pystac.extensions.table import TableExtension
-# from pystac import Asset, MediaType
-# from pystac.extensions.classification import ClassificationExtension, Classification
-# from pystac.extensions.raster import RasterExtension,RasterBand
-# from pystac.extensions.projection import ProjectionExtension
+import pystac
+from pystac.extensions.table import TableExtension
+from pystac import Asset, MediaType
+from pystac.extensions.classification import ClassificationExtension, Classification
+from pystac.extensions.raster import RasterExtension,RasterBand
+from pystac.extensions.projection import ProjectionExtension
 
 # %%
 GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
@@ -49,7 +49,7 @@ RASTER_STYLE_PATH = '../data/LULC0_12class.qml'
 LOCAL_DATA_DIR = '../data/'
 
 # %%
-STYLE_FILE_DIR = os.path.join(LOCAL_DATA_DIR, 'input/style_files/')
+STYLE_FILE_DIR = os.path.join(LOCAL_DATA_DIR,'input/style_files/')
 
 # %%
 THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR,
@@ -63,7 +63,7 @@ THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR,
 # %%
 STAC_FILES_DIR = os.path.join(
     LOCAL_DATA_DIR,
-    'CorestackCatalogs_prod'  # test folder
+    'CorestackCatalogs_prod' #test folder
 )
 # STAC_FILES_DIR
 
@@ -77,23 +77,17 @@ STAC_FILES_DIR = os.path.join(
 # ### Raster flow
 
 # %%
-
-
 def read_layer_description(filepath,
                            layer_name):
     layer_desc_df = pd.read_csv(filepath)
     if (layer_name in layer_desc_df['layer_name'].tolist()):
-        layer_desc = layer_desc_df[layer_desc_df['layer_name']
-                                   == layer_name]['layer_description'].iloc[0]
+        layer_desc = layer_desc_df[layer_desc_df['layer_name'] == layer_name]['layer_description'].iloc[0]
     else:
-        print(
-            f"layer description for {layer_name} layer does not exist currently")
+        print(f"layer description for {layer_name} layer does not exist currently")
         layer_desc = ''
     return layer_desc
 
 # %%
-
-
 def generate_raster_url(workspace,
                         layer_name,
                         geoserver_base_url,
@@ -104,20 +98,18 @@ def generate_raster_url(workspace,
         f"CoverageId={workspace}:{layer_name}&"
         f"format={output_format}"
     )
-    print("Raster URL:", wcs_url)
+    print("Raster URL:",wcs_url)
     return wcs_url
 
 # %%
-
-
 def read_raster_data(raster_url):
 
-    # when reading from geoserver
+    #when reading from geoserver
     response = requests.get(raster_url, verify=False)
     response.raise_for_status()
     raster_data = BytesIO(response.content)
 
-    # read the data and fetch the metadata
+    #read the data and fetch the metadata
     with rasterio.open(raster_data) as r:
         crs = r.crs
         bounds = r.bounds
@@ -128,14 +120,14 @@ def read_raster_data(raster_url):
             [bounds.right, bounds.top],
             [bounds.right, bounds.bottom]
         ])
-        data = r.read(1)  # TODO: wouldn't work if there are multiple bands
+        data = r.read(1) #TODO: wouldn't work if there are multiple bands
 
         # id = os.path.basename(raster_url) #works when data is local
         # id = layer_name
         # gsd = 10
         shape = r.shape
         data_type = str(r.dtypes[0])
-
+        
         return (data,
                 bbox,
                 mapping(footprint),
@@ -147,8 +139,6 @@ def read_raster_data(raster_url):
                 )
 
 # %%
-
-
 def create_raster_item(raster_url,
                        id,
                        layer_title,
@@ -159,55 +149,48 @@ def create_raster_item(raster_url,
                        ):
 
     # raster_data,bbox,footprint,crs,id,gsd,shape,data_type = read_raster_data(raster_filepath)
-    raster_data, bbox, footprint, crs, shape, data_type = read_raster_data(
-        raster_url)
+    raster_data,bbox,footprint,crs,shape,data_type = read_raster_data(raster_url)
 
     if ((start_date != '') & (end_date != '') & (not pd.isna(gsd))):
         raster_item = pystac.Item(id=id,
                                   geometry=footprint,
                                   bbox=bbox,
-                                  datetime=datetime.datetime.now(
-                                      datetime.timezone.utc),
+                                  datetime=datetime.datetime.now(datetime.timezone.utc),
                                   properties={
-                                      "title": layer_title,
-                                      "description": layer_description,
-                                      "start_datetime": start_date.isoformat() + 'Z',
-                                      "end_datetime": end_date.isoformat() + 'Z',
-                                      "gsd": gsd,  # adding this in raster extension
+                                        "title" : layer_title,
+                                        "description" : layer_description,
+                                        "start_datetime": start_date.isoformat() + 'Z',
+                                        "end_datetime": end_date.isoformat() + 'Z',
+                                      "gsd": gsd, #adding this in raster extension 
                                   })
-    elif (not pd.isna(gsd)):
-        raster_item = pystac.Item(id=id,
+    elif (not pd.isna(gsd)): 
+         raster_item = pystac.Item(id=id,
                                   geometry=footprint,
                                   bbox=bbox,
-                                  datetime=datetime.datetime.now(
-                                      datetime.timezone.utc),
+                                  datetime=datetime.datetime.now(datetime.timezone.utc),
                                   properties={
-                                      "title": layer_title,
-                                      "description": layer_description,
-                                      "gsd": gsd,  # adding this in raster extension
-                                  })
+                                        "title" : layer_title,
+                                        "description" : layer_description,
+                                      "gsd": gsd, #adding this in raster extension 
+                                  })       
     else:
-        raster_item = pystac.Item(id=id,
+         raster_item = pystac.Item(id=id,
                                   geometry=footprint,
                                   bbox=bbox,
-                                  datetime=datetime.datetime.now(
-                                      datetime.timezone.utc),
+                                  datetime=datetime.datetime.now(datetime.timezone.utc),
                                   properties={
-                                      "title": layer_title,
-                                      "description": layer_description
-                                  })
-
-    # add certain metadata under projection extension
+                                        "title" : layer_title,
+                                        "description" : layer_description
+                                  })            
+    
+    #add certain metadata under projection extension
     proj_ext = ProjectionExtension.ext(raster_item, add_if_missing=True)
     proj_ext.epsg = crs
     proj_ext.shape = [shape[0], shape[1]]
 
-    # raster_data is needed for thumbnail generation so returning that as well
-    return (raster_item, raster_data)
+    return (raster_item,raster_data) #raster_data is needed for thumbnail generation so returning that as well
 
 # %%
-
-
 def add_raster_data_asset(raster_item,
                           geoserver_url
                           ):
@@ -225,29 +208,28 @@ def add_raster_data_asset(raster_item,
 #         #add certain metadata under raster extension
 #     raster_ext = RasterExtension.ext(raster_item.assets["data"], add_if_missing=True)
 #     raster_band = RasterBand.create(
-#         data_type=data_type,
+#         data_type=data_type, 
 #         spatial_resolution=gsd,
 #         # nodata=nodata
 #     )
-#     raster_ext.bands = [raster_band]
+#     raster_ext.bands = [raster_band]  
 
 # %%
-
-
 def parse_raster_style_file(style_file_url,
                             STYLE_FILE_DIR
                             ):
-
-    # download style file if not already downloaded, and save it locally
+    
+    #download style file if not already downloaded, and save it locally
     style_file_name = os.path.basename(style_file_url)
     style_file_local_path = os.path.join(STYLE_FILE_DIR,
                                          style_file_name)
-
+    
     if not os.path.exists(style_file_local_path):
-        # TODO: try statement
-        urllib.request.urlretrieve(style_file_url,
-                                   style_file_local_path)
-
+            #TODO: try statement
+            os.makedirs(os.path.dirname(style_file_local_path), exist_ok=True)
+            urllib.request.urlretrieve(style_file_url,
+                                       style_file_local_path)       
+    
     tree = ET.parse(style_file_local_path)
     root = tree.getroot()
     classes = []
@@ -280,34 +262,29 @@ def parse_raster_style_file(style_file_url,
     return classes
 
 # %%
-
-
 def add_classification_extension(raster_style_url,
                                  raster_item,
                                  STYLE_FILE_DIR
                                  ):
-
+    
     style_info = parse_raster_style_file(style_file_url=raster_style_url,
                                          STYLE_FILE_DIR=STYLE_FILE_DIR
                                          )
-    classification_ext = ClassificationExtension.ext(
-        raster_item.assets["data"], add_if_missing=True)
+    classification_ext = ClassificationExtension.ext(raster_item.assets["data"], add_if_missing=True)
     stac_classes = []
     for cls in style_info:
         stac_class_obj = Classification.create(
             value=int(cls["value"]),
             name=cls.get("label") or f"Class {cls['value']}",
             description=cls.get("label"),
-            color_hint=cls['color'].replace('#', '')
+            color_hint=cls['color'].replace('#','')
         )
         stac_classes.append(stac_class_obj)
     classification_ext.classes = stac_classes
 
-    return (raster_item, style_info)  # style info is required for thumbnail
+    return (raster_item,style_info) #style info is required for thumbnail 
 
 # %%
-
-
 def add_stylefile_asset(STAC_item,
                         style_file_url):
     STAC_item.add_asset("style", Asset(
@@ -320,30 +297,25 @@ def add_stylefile_asset(STAC_item,
     return STAC_item
 
 # %%
-
-
 def generate_raster_thumbnail(raster_data,
                               style_info,
                               output_path
                               ):
-
-    unique_raster_values = np.unique(raster_data.compressed() if isinstance(
-        raster_data, np.ma.MaskedArray) else raster_data)
+    
+    unique_raster_values = np.unique(raster_data.compressed() if isinstance(raster_data, np.ma.MaskedArray) else raster_data)
     # Filter QML info to only include values present in the raster data
-    filtered_style_info = [cls for cls in style_info if cls.get(
-        'value') in unique_raster_values]
-
+    filtered_style_info = [cls for cls in style_info if cls.get('value') in unique_raster_values]
+    
     values = [cls['value'] for cls in filtered_style_info if 'value' in cls]
     colors = [cls['color'] for cls in filtered_style_info if 'color' in cls]
-
+    
     # print(f"Parsed QML values: {values}")
     # print(f"Parsed QML colors: {colors}")
-
+        
     try:
         if not values or not colors or len(values) != len(colors):
-            raise ValueError(
-                "Invalid or insufficient palette information in QML file.")
-
+            raise ValueError("Invalid or insufficient palette information in QML file.")
+    
         sorted_indices = np.argsort(values)
         sorted_values = np.array(values)[sorted_indices]
         sorted_colors = np.array(colors)[sorted_indices]
@@ -354,12 +326,11 @@ def generate_raster_thumbnail(raster_data,
         norm = Normalize(vmin=bounds.min(), vmax=bounds.max())
 
     except ValueError as e:
-        print(
-            f"Skipping palette generation due to error: {e}. Using a default colormap.")
+        print(f"Skipping palette generation due to error: {e}. Using a default colormap.")
         cmap = 'gray'
         norm = None
     plt.figure(figsize=(3, 3), dpi=100)
-
+    
     plt.imshow(raster_data, cmap=cmap, norm=norm, interpolation='none')
     plt.axis('off')
 
@@ -368,11 +339,9 @@ def generate_raster_thumbnail(raster_data,
     plt.close()
 
 # %%
-
-
 def add_thumbnail_asset(STAC_item,
                         THUMBNAIL_PATH,
-                        LOCAL_DATA_DIR,  # TODO
+                        LOCAL_DATA_DIR, #TODO
                         GITHUB_DATA_URL
                         ):
     STAC_item.add_asset("thumbnail", Asset(
@@ -386,48 +355,39 @@ def add_thumbnail_asset(STAC_item,
     return STAC_item
 
 # %%
-
-
-def read_layer_mapping(layer_map_csv_path,  # TODO: update this function for each type of layer
+def read_layer_mapping(layer_map_csv_path, #TODO: update this function for each type of layer
                        layer_name,
-                       district,
+                       district, #
                        block,
-                       start_year='',
-                       end_year=''
+                       start_year = '',
+                       end_year = ''
                        ):
     layer_mapping_df = pd.read_csv(layer_map_csv_path)
-    layer_display_name = layer_mapping_df[layer_mapping_df['layer_name']
-                                          == layer_name]['display_name'].iloc[0]
+    layer_display_name = layer_mapping_df[layer_mapping_df['layer_name'] == layer_name]['display_name'].iloc[0]
 
-    geoserver_workspace_name = layer_mapping_df[layer_mapping_df['layer_name']
-                                                == layer_name]['geoserver_workspace_name'].iloc[0]
-    geoserver_layer_name = layer_mapping_df[layer_mapping_df['layer_name']
-                                            == layer_name]['geoserver_layer_name'].iloc[0]
+    geoserver_workspace_name = layer_mapping_df[layer_mapping_df['layer_name'] == layer_name]['geoserver_workspace_name'].iloc[0]
+    geoserver_layer_name = layer_mapping_df[layer_mapping_df['layer_name'] == layer_name]['geoserver_layer_name'].iloc[0]
+    
+    style_file_url = layer_mapping_df[layer_mapping_df['layer_name'] == layer_name]['style_file_url'].iloc[0]
+    ee_layer_name = layer_mapping_df[layer_mapping_df['layer_name'] == layer_name]['ee_layer_name'].iloc[0]
 
-    style_file_url = layer_mapping_df[layer_mapping_df['layer_name']
-                                      == layer_name]['style_file_url'].iloc[0]
-    ee_layer_name = layer_mapping_df[layer_mapping_df['layer_name']
-                                     == layer_name]['ee_layer_name'].iloc[0]
-
-    gsd = layer_mapping_df[layer_mapping_df['layer_name']
-                           == layer_name]['spatial_resolution_in_meters'].iloc[0]
-
+    gsd = layer_mapping_df[layer_mapping_df['layer_name'] == layer_name]['spatial_resolution_in_meters'].iloc[0]
+    
     if (layer_name == 'land_use_land_cover_raster'):
-        # keep only last 2 digits of the full year
-        start_year = str(int(start_year) % 100)
+        start_year = str(int(start_year) % 100) #keep only last 2 digits of the full year
         end_year = str(int(end_year) % 100)
-        geoserver_layer_name = geoserver_layer_name.format(start_year=start_year,
-                                                           end_year=end_year,
-                                                           block=block)
+        geoserver_layer_name = geoserver_layer_name.format(start_year = start_year,
+                                                    end_year = end_year,
+                                                    block = block)    
     # print(geoserver_workspace_name,geoserver_layer_name)
-    elif ((layer_name == 'tree_canopy_cover_density_raster') |
+    elif ((layer_name == 'tree_canopy_cover_density_raster') |\
           (layer_name == 'tree_canopy_height_raster')):
-        geoserver_layer_name = geoserver_layer_name.format(start_year=start_year,
-                                                           district=district,
-                                                           block=block)
-    else:  # only LULC has some specific things such as 2 digit year representation and no district information
-        geoserver_layer_name = geoserver_layer_name.format(district=district,
-                                                           block=block)
+                geoserver_layer_name = geoserver_layer_name.format(start_year = start_year,
+                                                                   district = district,
+                                                                   block = block)
+    else: #only LULC has some specific things such as 2 digit year representation and no district information
+        geoserver_layer_name = geoserver_layer_name.format(district = district,
+                                                           block = block)
     return (geoserver_workspace_name,
             geoserver_layer_name,
             style_file_url,
@@ -437,8 +397,6 @@ def read_layer_mapping(layer_map_csv_path,  # TODO: update this function for eac
             )
 
 # %%
-
-
 def generate_raster_item(state,
                          district,
                          block,
@@ -447,16 +405,16 @@ def generate_raster_item(state,
                          layer_desc_csv_path,
                          start_year='',
                          end_year=''
-                         ):
-
-    # 1. read layer description
-    layer_description = read_layer_description(filepath=layer_desc_csv_path,
+                         ):    
+    
+    #1. read layer description
+    layer_description = read_layer_description(filepath= layer_desc_csv_path,
                                                layer_name=layer_name)
-
-    # 2. get geoserver url parameters from the layer details
-    geoserver_workspace_name, geoserver_layer_name, style_file_url, layer_display_name, ee_layer_name, gsd = \
-        read_layer_mapping(layer_map_csv_path=layer_map_csv_path,
-                           district=district,
+    
+    #2. get geoserver url parameters from the layer details
+    geoserver_workspace_name,geoserver_layer_name,style_file_url,layer_display_name,ee_layer_name,gsd = \
+        read_layer_mapping(layer_map_csv_path = layer_map_csv_path,
+                           district = district,
                            block=block,
                            layer_name=layer_name,
                            start_year=start_year,
@@ -466,73 +424,72 @@ def generate_raster_item(state,
     print(f"geoserver_layer_name={geoserver_layer_name}")
     print(f"style file url = {style_file_url}")
 
-    # 3. generate geoserver url
+    #3. generate geoserver url
     geoserver_url = generate_raster_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
-
-    # 4. create raster item
-    # updated layer title and layer id
+    
+    #4. create raster item
+    #updated layer title and layer id
     start_date = ''
     end_date = ''
-    layer_title = layer_display_name  # default layer title
-    layer_id = f"{state}_{district}_{block}_{layer_name}"  # default layer id
+    layer_title = layer_display_name #default layer title
+    layer_id = f"{state}_{district}_{block}_{layer_name}" #default layer id
 
-    # Update it further if start year and end year exist
+    #Update it further if start year and end year exist
     if (start_year != ""):
         layer_title = f"{layer_display_name} : {start_year}"
         layer_id = f"{state}_{district}_{block}_{layer_name}_{start_year}"
         start_date = start_year + '-' + constants.AGRI_YEAR_START_DATE
         start_date = pd.to_datetime(start_date)
-        if (end_year == ''):  # like in tree layers
-            end_date = str(int(start_year) + 1) + '-' + \
-                constants.AGRI_YEAR_END_DATE
+        if (end_year == ''): #like in tree layers
+            end_date = str(int(start_year) + 1) + '-' + constants.AGRI_YEAR_END_DATE
             end_date = pd.to_datetime(end_date)
     if (end_year != ""):
         end_date = end_year + '-' + constants.AGRI_YEAR_END_DATE
         end_date = pd.to_datetime(end_date)
     print(f"start_date = {start_date}")
     print(f"end_date = {end_date}")
-    raster_item, raster_data = create_raster_item(geoserver_url,
-                                                  #  id=f"{layer_name}_{block}",
-                                                  #  id=geoserver_layer_name,
-                                                  id=layer_id,
-                                                  layer_title=layer_title,
-                                                  layer_description=layer_description,
-                                                  start_date=start_date,
-                                                  end_date=end_date,
-                                                  gsd=gsd
-                                                  )
-
-    # 5. add raster data asset
+    raster_item,raster_data = create_raster_item(geoserver_url,
+                                                #  id=f"{layer_name}_{block}",
+                                                #  id=geoserver_layer_name,
+                                                 id=layer_id,
+                                                 layer_title=layer_title,
+                                                 layer_description = layer_description,
+                                                 start_date=start_date,
+                                                 end_date=end_date,
+                                                 gsd = gsd
+                                                 )
+    
+    #5. add raster data asset
     raster_item = add_raster_data_asset(raster_item,
                                         geoserver_url=geoserver_url)
-
-    # 6. add classification extension
-    raster_item, style_info = add_classification_extension(raster_style_url=style_file_url,
-                                                           raster_item=raster_item,
-                                                           STYLE_FILE_DIR=STYLE_FILE_DIR
-                                                           )
-
-    # 7. add style file asset
+    
+    #6. add classification extension
+    raster_item,style_info = add_classification_extension(raster_style_url=style_file_url,
+                                                          raster_item=raster_item,
+                                                          STYLE_FILE_DIR=STYLE_FILE_DIR
+                                                          )
+    
+    #7. add style file asset
     add_stylefile_asset(STAC_item=raster_item,
                         style_file_url=style_file_url
                         )
-
-    # 8. generate thumbnail
+    
+    #8. generate thumbnail
     if (start_year != ''):
         thumbnail_filename = f'{block}_{layer_name}_{start_year}.png'
     else:
-        thumbnail_filename = f'{block}_{layer_name}.png'  # TODO:
+        thumbnail_filename = f'{block}_{layer_name}.png' #TODO:
     THUMBNAIL_PATH = os.path.join(THUMBNAIL_DIR,
-                                  thumbnail_filename)
-
+                                         thumbnail_filename)
+    
     generate_raster_thumbnail(raster_data=raster_data,
                               style_info=style_info,
                               output_path=THUMBNAIL_PATH
                               )
-
-    # 9. add thumbnail asset
+    
+    #9. add thumbnail asset
     raster_item = add_thumbnail_asset(
         STAC_item=raster_item,
         THUMBNAIL_PATH=THUMBNAIL_PATH,
@@ -543,47 +500,44 @@ def generate_raster_item(state,
     return raster_item
 
 # %%
-
-
 def update_STAC_files(state,
                       district,
                       block,
                       STAC_item,
-                      #   corestack_dir,#TODO
-                      #   block_title,#TODO
-                      #   district_title,#TODO
-                      #   state_title #TODO
+                    #   corestack_dir,#TODO
+                    #   block_title,#TODO
+                    #   district_title,#TODO
+                    #   state_title #TODO
                       ):
-    # 1. create block catalog,if not already existing
+    #1. create block catalog,if not already existing 
     block_dir = os.path.join(STAC_FILES_DIR,
                              state,
                              district,
                              block)
     os.makedirs(block_dir, exist_ok=True)
-    block_catalog_path = os.path.join(block_dir, 'catalog.json')
+    block_catalog_path = os.path.join(block_dir,'catalog.json')
 
-    # if it already exists, read the catalog
+    #if it already exists, read the catalog
     if os.path.exists(block_catalog_path):
         block_catalog = pystac.read_file(block_catalog_path)
         print(f"Loaded existing block catalog: {block}")
 
-        # If block exists already then also district,state and root exist so nothing needs to be done further!
-        # just save the updated block
-        # 2. add item to block catalog.
+        #If block exists already then also district,state and root exist so nothing needs to be done further! 
+        #just save the updated block 
+         #2. add item to block catalog. 
 
-        # currently if the item already exists in the catalog, remove it, and add the newly generated
-        # item.
+        #currently if the item already exists in the catalog, remove it, and add the newly generated
+        #item. 
         block_items = list(block_catalog.get_all_items())
         if (STAC_item.id in [x.id for x in block_items]):
-            # remove older entry
+            #remove older entry
             block_catalog.remove_item(STAC_item.id)
-            print(
-                f"Removed previously existing {STAC_item.id} from the catalog")
+            print(f"Removed previously existing {STAC_item.id} from the catalog")
 
         block_catalog.add_item(STAC_item)
         block_catalog.normalize_and_save(block_dir,
                                          catalog_type=pystac.CatalogType.SELF_CONTAINED)
-        return
+        return 
     else:
         block_catalog = pystac.Catalog(
             id=block,
@@ -592,37 +546,35 @@ def update_STAC_files(state,
 
         print("created block catalog")
 
-    # 2. add item to block catalog.
+    #2. add item to block catalog. 
     block_catalog.add_item(STAC_item)
-
-    # 3. create district catalog if not existing
+    
+    #3. create district catalog if not existing
     district_dir = os.path.join(STAC_FILES_DIR,
-                                state,
-                                district)
+                             state,
+                             district)
     os.makedirs(district_dir, exist_ok=True)
-    district_catalog_path = os.path.join(district_dir, 'catalog.json')
+    district_catalog_path = os.path.join(district_dir,'catalog.json')
 
     if os.path.exists(district_catalog_path):
         district_catalog = pystac.read_file(district_catalog_path)
         print("loaded district catalog")
-        # add block catalog to the district
+        #add block catalog to the district
         district_catalog.add_child(block_catalog)
-        district_catalog.normalize_and_save(
-            district_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
+        district_catalog.normalize_and_save(district_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
         return
-    else:
+    else: 
         district_catalog = pystac.Catalog(
             id=district,
-            title=f"{district}",  # f"{district_title}",
+            title= f"{district}",#f"{district_title}",
             description=f"STAC catalog for data of {district} district"
-        )
+        )   
         print("created district catalog")
-        # add block catalog to the district
+        #add block catalog to the district
         district_catalog.add_child(block_catalog)
-        district_catalog.normalize_and_save(
-            district_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
+        district_catalog.normalize_and_save(district_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)     
 
-    # 4. create state collection if not existing
+    #4. create state collection if not existing
     state_dir = os.path.join(STAC_FILES_DIR,
                              state)
     state_collection_path = os.path.join(state_dir, "collection.json")
@@ -631,38 +583,35 @@ def update_STAC_files(state,
         state_collection = pystac.read_file(state_collection_path)
         print("loaded state collection")
         state_collection.add_child(district_catalog)
-        state_collection.normalize_and_save(
-            state_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
-        return
+        state_collection.normalize_and_save(state_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
+        return 
     else:
         state_collection = pystac.Collection(
             id=state,
-            title=state,  # f"{state_title}",
+            title= state,#f"{state_title}",
             description=f"STAC Collection for data of {state} state.",
             license="CC-BY-4.0",
             extent=pystac.Extent(
-                # TODO: let it come automatically from data, or make it India wide
-                spatial=pystac.SpatialExtent([0, 0, 0, 0]),
-                temporal=pystac.TemporalExtent([[constants.DEFAULT_START_DATE,
+                spatial=pystac.SpatialExtent([0, 0, 0, 0]), #TODO: let it come automatically from data, or make it India wide
+                temporal=pystac.TemporalExtent([[constants.DEFAULT_START_DATE, 
                                                  constants.DEFAULT_END_DATE]])),
-            providers=[
+            providers=[ 
                 pystac.Provider(
                     name="CoRE Stack",
-                    roles=[pystac.ProviderRole.PRODUCER, pystac.ProviderRole.PROCESSOR,
-                           pystac.ProviderRole.HOST, pystac.ProviderRole.LICENSOR],
+                    roles=[pystac.ProviderRole.PRODUCER, pystac.ProviderRole.PROCESSOR, pystac.ProviderRole.HOST, pystac.ProviderRole.LICENSOR ],
                     url="https://core-stack.org/"
-                )],
-            keywords=["social-ecological", "sustainability",
-                      "CoRE stack", block, district, state]
-        )  # TODO: move this to constants and not hardcode it here.
-
+                    )],
+                    keywords=["social-ecological", "sustainability","CoRE stack", block, district, state]
+                    )   #TODO: move this to constants and not hardcode it here. 
+        
+          
         state_collection.add_link(
             pystac.Link(
                 rel=pystac.RelType.LICENSE,
                 target="https://spdx.org/licenses/CC-BY-4.0.html",
                 media_type="text/html")
         )
-
+         
         state_collection.add_link(
             pystac.Link(
                 rel="documentation",
@@ -678,21 +627,20 @@ def update_STAC_files(state,
                 title="Technical Manual",
                 media_type="application/pdf")
         )
-
+        
         state_collection.add_link(
             pystac.Link(
                 rel="documentation",
                 target="https://github.com/orgs/core-stack-org/repositories",
                 title="Github link",
                 media_type="application/pdf")
-        )
+        ) 
 
         print("created state collection")
         state_collection.add_child(district_catalog)
-        state_collection.normalize_and_save(
-            state_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
-
-    # 5. create root catalog if not existing
+        state_collection.normalize_and_save(state_dir, catalog_type=pystac.CatalogType.SELF_CONTAINED)
+        
+    #5. create root catalog if not existing
     root_catalog_path = os.path.join(STAC_FILES_DIR, "catalog.json")
     if os.path.exists(root_catalog_path):
         root_catalog = pystac.read_file(root_catalog_path)
@@ -707,16 +655,13 @@ def update_STAC_files(state,
         root_catalog.set_self_href(root_catalog_path)
         print("created root catalog")
     root_catalog.add_child(state_collection)
-    root_catalog.normalize_and_save(
-        STAC_FILES_DIR, catalog_type=pystac.CatalogType.SELF_CONTAINED)
+    root_catalog.normalize_and_save(STAC_FILES_DIR, catalog_type=pystac.CatalogType.SELF_CONTAINED)
     return
 
 # %% [markdown]
 # ### Vector flow
 
 # %%
-
-
 def generate_vector_url(workspace,
                         layer_name,
                         geoserver_base_url,
@@ -737,23 +682,19 @@ def generate_vector_url(workspace,
     return wfs_url
 
 # %%
-
-
 def read_vector_data(vector_url,
                      target_crs='4326'
                      ):
     vector_gdf = gpd.read_file(vector_url)
     vector_gdf = vector_gdf.to_crs(epsg=target_crs)
-    # TODO: remove such constants like here in crs. make it standard. available in constants.
+    #TODO: remove such constants like here in crs. make it standard. available in constants. 
     bounds = vector_gdf.total_bounds
-    bbox = [float(b) for b in bounds]  # footprint also in vector
+    bbox = [float(b) for b in bounds] #footprint also in vector
     geom = mapping(vector_gdf.union_all())
-
-    return (vector_gdf, bounds, bbox, geom)
+    
+    return (vector_gdf,bounds,bbox,geom)
 
 # %%
-
-
 def create_vector_item(vector_url,
                        id,
                        layer_title,
@@ -775,58 +716,50 @@ def create_vector_item(vector_url,
         }
     )
 
-    return vector_item, vector_gdf
+    return vector_item,vector_gdf
 
 # %%
-
-
 def add_vector_data_asset(vector_item,
                           geoserver_url
                           ):
-
+                          
     vector_item.add_asset("data", Asset(
         href=geoserver_url,
         media_type=MediaType.GEOJSON,
         roles=["data"],
         title="Vector Layer"))
-
+    
     return vector_item
 
 # %%
-
-
 def add_tabular_extension(vector_item,
                           vector_data_gdf,
                           column_desc_csv_path,
                           ee_layer_name
                           ):
     vector_column_desc_gdf = pd.read_csv(column_desc_csv_path)
-    vector_column_desc_filtered_gdf = vector_column_desc_gdf[
-        vector_column_desc_gdf['ee_layer_name'] == ee_layer_name]
-    vector_column_desc_filtered_gdf.rename(
-        {'column_name_description': 'column_description'}, axis=1, inplace=True)
+    vector_column_desc_filtered_gdf = vector_column_desc_gdf[vector_column_desc_gdf['ee_layer_name'] == ee_layer_name]
+    vector_column_desc_filtered_gdf.rename({'column_name_description':'column_description'},axis=1,inplace=True)
     table_ext = TableExtension.ext(vector_item, add_if_missing=True)
     vector_merged_df = vector_data_gdf.dtypes.reset_index()
-    vector_merged_df.columns = ['column_name', 'column_dtype']
-    vector_merged_df = vector_merged_df.merge(vector_column_desc_filtered_gdf[['column_name', 'column_description']],
-                                              on='column_name',
-                                              how='left').fillna('')
-
+    vector_merged_df.columns = ['column_name','column_dtype']
+    vector_merged_df = vector_merged_df.merge(vector_column_desc_filtered_gdf[['column_name','column_description']],
+                                            on='column_name',
+                                            how='left').fillna('')
+    
     table_ext.columns = [
         {
             "name": row['column_name'],
             "type": str(row['column_dtype']),
-            "description": row['column_description']
+            "description" : row['column_description']
         }
-        for ind, row in vector_merged_df.iterrows()
-    ]
-
+        for ind,row in vector_merged_df.iterrows()
+        ]
+    
     return vector_item
 
 # %%
-# helper functions to generate vector thumbnail
-
-
+#helper functions to generate vector thumbnail 
 def rgba_to_hex(rgba_tuple):
     if rgba_tuple is None:
         return '#808080'  # Default gray
@@ -842,13 +775,13 @@ def extract_styling_info(symbol_element):
     if symbol_element is None:
         return fill_color, outline_color, line_width
 
+    
     fill_layer = symbol_element.find('.//layer[@class="SimpleFill"]')
     if fill_layer is not None:
         color_option = fill_layer.find('Option[@name="color"]')
         if color_option is not None:
             try:
-                rgb_parts = [int(p)
-                             for p in color_option.get('value').split(',')[:3]]
+                rgb_parts = [int(p) for p in color_option.get('value').split(',')[:3]]
                 fill_color = tuple([p / 255 for p in rgb_parts])
             except (ValueError, TypeError):
                 fill_color = None
@@ -856,12 +789,11 @@ def extract_styling_info(symbol_element):
         outline_option = fill_layer.find('Option[@name="outline_color"]')
         if outline_option is not None:
             try:
-                rgb_parts = [int(p) for p in outline_option.get(
-                    'value').split(',')[:3]]
+                rgb_parts = [int(p) for p in outline_option.get('value').split(',')[:3]]
                 outline_color = tuple([p / 255 for p in rgb_parts])
             except (ValueError, TypeError):
                 outline_color = None
-
+        
         width_option = fill_layer.find('Option[@name="outline_width"]')
         if width_option is not None:
             try:
@@ -869,40 +801,40 @@ def extract_styling_info(symbol_element):
             except (ValueError, TypeError):
                 line_width = None
 
+    
     line_layer = symbol_element.find('.//layer[@class="SimpleLine"]')
     if line_layer is not None:
         color_option = line_layer.find('Option[@name="line_color"]')
         if color_option is not None:
             try:
-                rgb_parts = [int(p)
-                             for p in color_option.get('value').split(',')[:3]]
+                rgb_parts = [int(p) for p in color_option.get('value').split(',')[:3]]
                 outline_color = tuple([p / 255 for p in rgb_parts])
             except (ValueError, TypeError):
                 outline_color = None
-
+        
         width_option = line_layer.find('Option[@name="line_width"]')
         if width_option is not None:
             try:
                 line_width = float(width_option.get('value'))
             except (ValueError, TypeError):
                 line_width = None
-
+    
     return fill_color, outline_color, line_width
-
 
 def parse_vector_style_file(style_file_url,
                             STYLE_FILE_DIR
                             ):
-    # download style file if not already downloaded, and save it locally
+    #download style file if not already downloaded, and save it locally
     style_file_name = os.path.basename(style_file_url)
     style_file_local_path = os.path.join(STYLE_FILE_DIR,
                                          style_file_name)
-
+    
     if not os.path.exists(style_file_local_path):
-        # TODO: try statement
-        urllib.request.urlretrieve(style_file_url,
-                                   style_file_local_path)
-
+            #TODO: try statement
+            os.makedirs(os.path.dirname(style_file_local_path), exist_ok=True)
+            urllib.request.urlretrieve(style_file_url,
+                                       style_file_local_path)       
+    
     try:
         tree = ET.parse(style_file_local_path)
         root = tree.getroot()
@@ -917,43 +849,34 @@ def parse_vector_style_file(style_file_url,
         symbols = {s.get('name'): s for s in root.findall('.//symbols/symbol')}
 
         if renderer_type == 'singleSymbol':
-            symbol_element = renderer_element.find(
-                './/symbol') or symbols.get(renderer_element.get('symbol'))
+            symbol_element = renderer_element.find('.//symbol') or symbols.get(renderer_element.get('symbol'))
             if symbol_element is not None:
-
-                color_option = symbol_element.find(
-                    './/layer/Option[@name="line_color"]') or symbol_element.find('.//layer/Option[@name="color"]')
-
+                
+                color_option = symbol_element.find('.//layer/Option[@name="line_color"]') or symbol_element.find('.//layer/Option[@name="color"]')
+                
                 if color_option is not None:
                     color_value = color_option.get('value').split(',')[0:3]
                     rgb_parts = [int(p) for p in color_value]
-                    style['color'] = (rgb_parts[0] / 255,
-                                      rgb_parts[1] / 255, rgb_parts[2] / 255)
+                    style['color'] = (rgb_parts[0] / 255, rgb_parts[1] / 255, rgb_parts[2] / 255)
                 else:
-
+                    
                     color_prop = symbol_element.find('.//prop[@k="color"]')
                     if color_prop is not None:
-                        rgb_parts = [int(p)
-                                     for p in color_prop.get('v').split(',')[:3]]
-                        style['color'] = (
-                            rgb_parts[0] / 255, rgb_parts[1] / 255, rgb_parts[2] / 255)
+                        rgb_parts = [int(p) for p in color_prop.get('v').split(',')[:3]]
+                        style['color'] = (rgb_parts[0] / 255, rgb_parts[1] / 255, rgb_parts[2] / 255)
                     else:
-                        print(
-                            f"Warning: Single symbol color not found in {style_file_local_path}.")
+                        print(f"Warning: Single symbol color not found in {style_file_local_path}.")
                         return None
             else:
-                print(
-                    f"Warning: Could not find symbol element for singleSymbol in {style_file_local_path}.")
+                print(f"Warning: Could not find symbol element for singleSymbol in {style_file_local_path}.")
                 return None
 
         elif renderer_type == 'categorizedSymbol':
             style['attribute'] = renderer_element.get('attr')
             style['categories'] = []
             for cat in renderer_element.findall('categories/category'):
-                symbol_element = cat.find(
-                    'symbol') or symbols.get(cat.get('symbol'))
-                fill_color, outline_color, line_width = extract_styling_info(
-                    symbol_element)
+                symbol_element = cat.find('symbol') or symbols.get(cat.get('symbol'))
+                fill_color, outline_color, line_width = extract_styling_info(symbol_element)
                 style['categories'].append({
                     'value': cat.get('value'),
                     'label': cat.get('label'),
@@ -966,10 +889,8 @@ def parse_vector_style_file(style_file_url,
             style['attribute'] = renderer_element.get('attr')
             style['classes'] = []
             for cls in renderer_element.findall('classes/class'):
-                symbol_element = cls.find(
-                    'symbol') or symbols.get(cls.get('symbol'))
-                fill_color, outline_color, line_width = extract_styling_info(
-                    symbol_element)
+                symbol_element = cls.find('symbol') or symbols.get(cls.get('symbol'))
+                fill_color, outline_color, line_width = extract_styling_info(symbol_element)
                 style['classes'].append({
                     'lower_bound': float(cls.get('lower')),
                     'upper_bound': float(cls.get('upper')),
@@ -978,13 +899,12 @@ def parse_vector_style_file(style_file_url,
                     'outline_color': outline_color,
                     'line_width': line_width
                 })
-
+        
         elif renderer_type == 'RuleRenderer':
             style['rules'] = []
             for rule in renderer_element.findall('.//rule'):
                 symbol_element = rule.find('.//symbol')
-                fill_color, outline_color, line_width = extract_styling_info(
-                    symbol_element)
+                fill_color, outline_color, line_width = extract_styling_info(symbol_element)
                 style['rules'].append({
                     'filter': rule.get('filter'),
                     'label': rule.get('label'),
@@ -993,8 +913,7 @@ def parse_vector_style_file(style_file_url,
                     'line_width': line_width
                 })
         else:
-            print(
-                f"Warning: Unsupported renderer type '{renderer_type}'. Using default style.")
+            print(f"Warning: Unsupported renderer type '{renderer_type}'. Using default style.")
             return None
         return style
     except Exception as e:
@@ -1002,36 +921,33 @@ def parse_vector_style_file(style_file_url,
         return None
 
 # %%
-
-
 def generate_vector_thumbnail(vector_gdf,
                               style_file_url,
                               output_path,
                               STYLE_FILE_DIR
                               ):
-
+    
     try:
         # vector_gdf = gpd.read_file(vector_path)
-        style_info = parse_vector_style_file(style_file_url, STYLE_FILE_DIR)
+        style_info = parse_vector_style_file(style_file_url,STYLE_FILE_DIR)
 
         fig, ax = plt.subplots(figsize=(6, 6))
-
-        default_fill_color = (0.8, 0.8, 0.8, 1.0)  # Light gray
+        
+        default_fill_color = (0.8, 0.8, 0.8, 1.0) # Light gray
         default_outline_color = (0, 0, 0, 1.0)   # Black
         default_line_width = 1.0
 
         if style_info is None:
             print("Applying default style due to parsing error.")
             vector_gdf.plot(ax=ax,
-                            color=rgba_to_hex(default_fill_color),
+                            color=rgba_to_hex(default_fill_color), 
                             edgecolor=rgba_to_hex(default_outline_color),
                             linewidth=default_line_width)
-
+        
         elif style_info.get('renderer_type') == 'singleSymbol':
             print("Applying single symbol style...")
             fill_color = style_info.get('fill_color', default_fill_color)
-            outline_color = style_info.get(
-                'outline_color', default_outline_color)
+            outline_color = style_info.get('outline_color', default_outline_color)
             line_width = style_info.get('line_width', default_line_width)
             vector_gdf.plot(ax=ax,
                             color=rgba_to_hex(fill_color),
@@ -1040,12 +956,12 @@ def generate_vector_thumbnail(vector_gdf,
 
         elif style_info.get('renderer_type') == 'categorizedSymbol':
             print("Applying categorized style...")
-
+            
             color_map = {
                 cat.get('value'): rgba_to_hex(cat.get('fill_color', default_fill_color))
                 for cat in style_info.get('categories', [])
             }
-
+            
             outline_color_map = {
                 cat.get('value'): rgba_to_hex(cat.get('outline_color', default_outline_color))
                 for cat in style_info.get('categories', [])
@@ -1054,34 +970,28 @@ def generate_vector_thumbnail(vector_gdf,
             attribute_name = style_info.get('attribute')
 
             if attribute_name not in vector_gdf.columns:
-                print(
-                    f"Error: Attribute column '{attribute_name}' not found. Applying default style.")
+                print(f"Error: Attribute column '{attribute_name}' not found. Applying default style.")
                 vector_gdf.plot(ax=ax,
                                 color=rgba_to_hex(default_fill_color),
                                 edgecolor=rgba_to_hex(default_outline_color),
                                 linewidth=default_line_width)
             else:
-                vector_gdf['mapped_value'] = vector_gdf[attribute_name].apply(
-                    lambda x: str(x).strip() if pd.notnull(x) else None)
-
+                vector_gdf['mapped_value'] = vector_gdf[attribute_name].apply(lambda x: str(x).strip() if pd.notnull(x) else None)
+                
                 fill_colors = vector_gdf['mapped_value'].map(color_map)
-                fill_colors = fill_colors.fillna(
-                    rgba_to_hex(default_fill_color))
+                fill_colors = fill_colors.fillna(rgba_to_hex(default_fill_color))
 
-                outline_colors = vector_gdf['mapped_value'].map(
-                    outline_color_map)
-                outline_colors = outline_colors.fillna(
-                    rgba_to_hex(default_outline_color))
-
-                vector_gdf.plot(
-                    ax=ax, color=fill_colors, edgecolor=outline_colors, linewidth=default_line_width)
+                outline_colors = vector_gdf['mapped_value'].map(outline_color_map)
+                outline_colors = outline_colors.fillna(rgba_to_hex(default_outline_color))
+                
+                vector_gdf.plot(ax=ax, color=fill_colors, edgecolor=outline_colors, linewidth=default_line_width)
+            
 
         elif style_info.get('renderer_type') == 'graduatedSymbol':
             print("Applying graduated style...")
             attribute_name = style_info.get('attribute')
             if attribute_name not in vector_gdf.columns:
-                print(
-                    f"Error: Attribute column '{attribute_name}' not found. Applying default style.")
+                print(f"Error: Attribute column '{attribute_name}' not found. Applying default style.")
                 vector_gdf.plot(ax=ax,
                                 color=rgba_to_hex(default_fill_color),
                                 edgecolor=rgba_to_hex(default_outline_color),
@@ -1094,11 +1004,10 @@ def generate_vector_thumbnail(vector_gdf,
                     for cls in style_info.get('classes', []):
                         if cls.get('lower_bound') is not None and cls.get('upper_bound') is not None:
                             if cls['lower_bound'] <= val < cls['upper_bound']:
-                                found_color = cls.get(
-                                    'fill_color', default_fill_color)
+                                found_color = cls.get('fill_color', default_fill_color)
                                 break
                     fill_colors.append(rgba_to_hex(found_color))
-
+                
                 vector_gdf.plot(ax=ax,
                                 color=fill_colors,
                                 edgecolor=rgba_to_hex(default_outline_color),
@@ -1111,14 +1020,12 @@ def generate_vector_thumbnail(vector_gdf,
                 assigned_color = default_fill_color
                 for rule in style_info.get('rules', []):
                     try:
-                        attribute_name = rule['filter'].split(
-                            ' ')[0].strip().strip('"').strip("'")
+                        attribute_name = rule['filter'].split(' ')[0].strip().strip('"').strip("'")
                         if attribute_name in row and pd.eval(rule['filter'], local_dict={attribute_name: row[attribute_name]}):
-                            assigned_color = rule.get(
-                                'fill_color', default_fill_color)
+                            assigned_color = rule.get('fill_color', default_fill_color)
                             break
                     except Exception:
-                        continue
+                        continue 
                 fill_colors.append(rgba_to_hex(assigned_color))
 
             vector_gdf.plot(ax=ax,
@@ -1144,8 +1051,6 @@ def generate_vector_thumbnail(vector_gdf,
         print(f"Error generating vector thumbnail: {e}")
 
 # %%
-
-
 def generate_vector_item(state,
                          district,
                          block,
@@ -1153,77 +1058,77 @@ def generate_vector_item(state,
                          layer_map_csv_path,
                          layer_desc_csv_path,
                          column_desc_csv_path,
-                         #  start_year='',
-                         #  end_year=''
-                         ):
+                        #  start_year='',
+                        #  end_year=''
+                         ):    
 
-    # 1. read layer description
+    #1. read layer description
     layer_description = read_layer_description(filepath=layer_desc_csv_path,
                                                layer_name=layer_name)
-
-    # 2. get geoserver url parameters from the layer details
-    geoserver_workspace_name, geoserver_layer_name, style_file_url, layer_display_name, ee_layer_name, _ = \
-        read_layer_mapping(layer_map_csv_path=layer_map_csv_path,
-                           district=district,
+    
+    #2. get geoserver url parameters from the layer details
+    geoserver_workspace_name,geoserver_layer_name,style_file_url,layer_display_name,ee_layer_name,_ = \
+        read_layer_mapping(layer_map_csv_path = layer_map_csv_path,
+                           district = district,
                            block=block,
                            layer_name=layer_name,
-                           #    start_year=start_year,
-                           #    end_year=end_year
+                        #    start_year=start_year,
+                        #    end_year=end_year
                            )
-
+    
     print(f"geoserver_workspace_name={geoserver_workspace_name}")
     print(f"geoserver_layer_name={geoserver_layer_name}")
     print(f"style file url = {style_file_url}")
 
-    # 3. generate geoserver url
+    #3. generate geoserver url
     geoserver_url = generate_vector_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
-
-    # 4. create vector item
+    
+    #4. create vector item
     layer_title = layer_display_name
     layer_id = f"{state}_{district}_{block}_{layer_name}"
 
-    vector_item, vector_data_gdf = create_vector_item(geoserver_url,
-                                                      #  id=f"{layer_name}_{block}",
-                                                      #  id=geoserver_layer_name,
-                                                      id=layer_id,
-                                                      layer_title=layer_title,
-                                                      layer_description=layer_description,
-                                                      column_desc_csv_path=column_desc_csv_path
-                                                      )
-
-    # 5. add vector data asset
+    vector_item,vector_data_gdf = create_vector_item(geoserver_url,                                                     
+                                                #  id=f"{layer_name}_{block}",
+                                                #  id=geoserver_layer_name,
+                                                    id=layer_id,
+                                                    layer_title=layer_title,
+                                                    layer_description = layer_description,
+                                                    column_desc_csv_path = column_desc_csv_path
+                                                    )
+    
+    #5. add vector data asset
     vector_item = add_vector_data_asset(vector_item,
                                         geoserver_url=geoserver_url)
-
-    # 6. add table extension
+    
+    #6. add table extension
     vector_item = add_tabular_extension(vector_item=vector_item,
                                         vector_data_gdf=vector_data_gdf,
                                         column_desc_csv_path=column_desc_csv_path,
                                         ee_layer_name=ee_layer_name)
-
-    # 7. add style file asset
+    
+    #7. add style file asset
     add_stylefile_asset(STAC_item=vector_item,
                         style_file_url=style_file_url
                         )
-
-    # start from here : TODO
-    # 8. generate thumbnail
+    
+    #start from here : TODO
+    #8. generate thumbnail
     # if (start_year != ''):
     #     thumbnail_filename = f'{block}_{layer_name}_{start_year}.png'
     # else:
-    thumbnail_filename = f'{block}_{layer_name}.png'  # TODO:
+    thumbnail_filename = f'{block}_{layer_name}.png' #TODO:
     THUMBNAIL_PATH = os.path.join(THUMBNAIL_DIR,
                                   thumbnail_filename)
-
+    
     generate_vector_thumbnail(vector_gdf=vector_data_gdf,
                               style_file_url=style_file_url,
                               output_path=THUMBNAIL_PATH,
                               STYLE_FILE_DIR=STYLE_FILE_DIR
                               )
-
-    # 9. add thumbnail asset
+    
+    #9. add thumbnail asset
     vector_item = add_thumbnail_asset(
         STAC_item=vector_item,
         THUMBNAIL_PATH=THUMBNAIL_PATH,
@@ -1234,12 +1139,10 @@ def generate_vector_item(state,
     return vector_item
 
 # %% [markdown]
-# Making a combined function to generate raster/vector STAC :
+# Making a combined function to generate raster/vector STAC : 
 # The function generates the item, and updates the files
 
 # %%
-
-@app.task(bind=True)
 def generate_vector_stac(state,
                          district,
                          block,
@@ -1247,7 +1150,7 @@ def generate_vector_stac(state,
                          layer_map_csv_path,
                          layer_desc_csv_path,
                          column_desc_csv_path):
-
+    
     vector_item = generate_vector_item(state,
                                        district,
                                        block,
@@ -1261,8 +1164,6 @@ def generate_vector_stac(state,
                       STAC_item=vector_item)
 
 # %%
-
-@app.task(bind=True)
 def generate_raster_stac(state,
                          district,
                          block,
@@ -1271,7 +1172,7 @@ def generate_raster_stac(state,
                          layer_desc_csv_path,
                          start_year='',
                          end_year=''):
-
+    
     raster_item = generate_raster_item(state,
                                        district,
                                        block,
@@ -1280,7 +1181,7 @@ def generate_raster_stac(state,
                                        layer_desc_csv_path,
                                        start_year,
                                        end_year)
-
+    
     update_STAC_files(state,
                       district,
                       block,
@@ -1288,7 +1189,7 @@ def generate_raster_stac(state,
                       )
 
 # %% [markdown]
-# Test the raster and vector flow
+# Test the raster and vector flow 
 
 # %%
 # block_district_state_df = pd.DataFrame({
@@ -1324,3 +1225,795 @@ def generate_raster_stac(state,
 #                     #  column_desc_csv_path='../data/vector_column_descriptions.csv',
 #                      start_year='2019'
 #                      )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='admin_boundaries_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='aquifer_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='drainage_lines_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='surface_water_bodies_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='nrega_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='terrain_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     # corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='cropping_intensity_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     # corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='stage_of_groundwater_extraction_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='drought_frequency_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_cover_change_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     # corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# vector_item = generate_vector_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_vector',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=vector_item,
+#     # corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2017',
+#                                    end_year='2018')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2018',
+#                                    end_year='2019')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2019',
+#                                    end_year='2020')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2020',
+#                                    end_year='2021')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2021',
+#                                    end_year='2022')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2022',
+#                                    end_year='2023')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='land_use_land_cover_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2023',
+#                                    end_year='2024')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %% [markdown]
+# Tree Canopy Cover Density
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2017',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2018',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2019',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2020',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2021',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2022')
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %% [markdown]
+# Tree Height 
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_height_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2017',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_height_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2018',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_height_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2019',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_height_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2020',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_height_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2021',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_height_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2022',
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     corestack_dir=STAC_FILES_DIR
+# )
+
+# %% [markdown]
+# All remaining static raster layers
+
+# %%
+# block = 'koraput'
+# district = block_district_state_df[block_district_state_df['block'] == block]['district'].iloc[0]
+# state = block_district_state_df[block_district_state_df['block'] == block]['state'].iloc[0]
+# print(state,district,block)
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='change_tree_cover_gain_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='change_tree_cover_loss_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='change_cropping_reduction_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='change_urbanization_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='terrain_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='clart_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_cover_change_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='change_cropping_intensity_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
+#                                    )
+
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     #corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='terrain_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    )
+
+# %%
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     corestack_dir=STAC_FILES_DIR
+# )
+
+# %%
+# raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name='tree_canopy_cover_density_raster',
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2022',
+#                                    end_year='2023'
+#                                    )
+
+# %%
+# update_STAC_files(
+#     state=state,
+#     district=district,
+#     block=block,
+#     STAC_item=raster_item,
+#     corestack_dir=STAC_FILES_DIR
+# )
+
+# %% [markdown]
+# Test all remaining raster layers
+
+# %%
+# layer_mapping_df = pd.read_csv('../data/layer_mapping.csv')
+
+# %%
+# layer_mapping_df.shape
+
+# %%
+# layer_mapping_df = layer_mapping_df[layer_mapping_df['layer_name'].notna()]
+
+# %%
+# layer_mapping_df.shape
+
+# %%
+# raster_layers_df = layer_mapping_df[layer_mapping_df['layer_name'].str.contains('raster')]
+# raster_layers_df.shape
+
+# %%
+# static_raster_layers_df = pd.DataFrame()
+
+# %%
+# raster_layers_df[raster_layers_df['geoserver_layer_name'].str.contains('year')]
+
+# %%
+# layer_name_year_combinations_df = pd.DataFrame({
+#     'layer_name' : ['land_use_land_cover_raster','tree_health_ccd'],
+
+# }
+ 
+# )
+
+# %%
+# layer
+
+# %%
+# for raster_layer_name in raster_layers_df['layer_name']:
+
+#     raster_item = generate_raster_item(state=state,
+#                                    district=district,
+#                                    block=block,
+#                                    layer_name=raster_layer_name,
+#                                    layer_map_csv_path='../data/layer_mapping.csv',
+#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
+#                                    start_year='2022',
+#                                    end_year='2023'
+#                                    )
+
+# %%
+# layer_desc_df[layer_desc_df['layer_name'] == 'tree_cover_change_raster']
+
+# %%
+# read_layer_mapping(layer_map_csv_path = '../data/layer_mapping.csv',
+#                     district = district,
+#                     block=block,
+#                     layer_name='tree_canopy_height_raster',
+#                     start_year='2018'
+#                     )
+
+# %%
+# layer_description = read_layer_description(filepath= '../data/layer_descriptions.csv',
+#                                             layer_name='tree_cover_change_raster')
+
+
