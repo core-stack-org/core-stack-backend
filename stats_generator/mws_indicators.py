@@ -50,6 +50,7 @@ def get_generate_filter_mws_data(state, district, block, file_type):
     district_folder = district.replace(" ", "_").upper() 
     file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + block
     xlsx_file = file_xl_path + '.xlsx'
+    print("file path", xlsx_file)
     
     # If sheet is need availabe then value become 0
     sheets = {
