@@ -75,13 +75,27 @@ STAC_FILES_DIR = os.path.join(
 
 # STAC_FILES_DIR
 
+# %%
+LAYER_DESC_GITHUB_URL = constants.LAYER_DESC_GITHUB_URL
+# LAYER_DESC_GITHUB_URL
+
+# %%
+VECTOR_COLUMN_DESC_GITHUB_URL = constants.VECTOR_COLUMN_DESC_GITHUB_URL
+# VECTOR_COLUMN_DESC_GITHUB_URL
+
 # %% [markdown]
 # ### Raster flow
 
 # %%
 def read_layer_description(filepath,
                            layer_name):
-    layer_desc_df = pd.read_csv(filepath)
+    if (os.path.exists(filepath)):
+        layer_desc_df = pd.read_csv(filepath)
+    else:
+        #download and save
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        layer_desc_df = pd.read_csv(LAYER_DESC_GITHUB_URL)
+        layer_desc_df.to_csv(filepath)
     if (layer_name in layer_desc_df['layer_name'].tolist()):
         layer_desc = layer_desc_df[layer_desc_df['layer_name'] == layer_name]['layer_description'].iloc[0]
     else:
@@ -755,7 +769,13 @@ def add_tabular_extension(vector_item,
                           column_desc_csv_path,
                           ee_layer_name
                           ):
-    vector_column_desc_gdf = pd.read_csv(column_desc_csv_path)
+    if (os.path.exists(column_desc_csv_path)):
+        vector_column_desc_gdf = pd.read_csv(column_desc_csv_path)
+    else:
+        os.makedirs(os.path.dirname(column_desc_csv_path), exist_ok=True)
+        vector_column_desc_gdf = pd.read_csv(VECTOR_COLUMN_DESC_GITHUB_URL)
+        vector_column_desc_gdf.to_csv(column_desc_csv_path)
+
     vector_column_desc_filtered_gdf = vector_column_desc_gdf[vector_column_desc_gdf['ee_layer_name'] == ee_layer_name]
     vector_column_desc_filtered_gdf.rename({'column_name_description':'column_description'},axis=1,inplace=True)
     table_ext = pystac.extensions.table.TableExtension.ext(vector_item, add_if_missing=True)
@@ -1165,9 +1185,9 @@ def generate_vector_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/layer_mapping.csv',
-                         layer_desc_csv_path='../data/layer_descriptions.csv',
-                         column_desc_csv_path='../data/vector_column_descriptions.csv'):
+                         layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+                         layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+                         column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'):
     # print(layer_map_csv_path)
     
     vector_item = generate_vector_item(state,
@@ -1187,8 +1207,8 @@ def generate_raster_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/layer_mapping.csv',
-                         layer_desc_csv_path='../data/layer_descriptions.csv',
+                         layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+                         layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
                          start_year='',
                          end_year=''):
     
@@ -1206,4 +1226,53 @@ def generate_raster_stac(state,
                       block,
                       STAC_item=raster_item
                       )
+
+# %% [markdown]
+# Test the raster and vector flow 
+
+# %%
+# block_district_state_df = pd.DataFrame({
+#     'block' : ['gobindpur','mirzapur','koraput','badlapur'],
+#     'district' : ['saraikela-kharsawan','mirzapur','koraput','jaunpur'],
+#     'state' : ['jharkhand','uttar_pradesh','odisha','uttar_pradesh']
+# })
+
+# block_district_state_df
+
+# %%
+# block = 'badlapur'
+# district = block_district_state_df[block_district_state_df['block'] == block]['district'].iloc[0]
+# state = block_district_state_df[block_district_state_df['block'] == block]['state'].iloc[0]
+# print(state,district,block)
+
+# %%
+# generate_vector_stac(state=state,
+#                      district=district,
+#                      block=block,
+#                      layer_name='drainage_lines_vector',
+#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                     #  column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'
+#                      )
+
+# %%
+# generate_vector_stac(state=state,
+#                      district=district,
+#                      block=block,
+#                      layer_name='aquifer_vector',
+#                      # column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv',
+#                      # layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+#                      # layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                  )
+
+# %%
+# generate_raster_stac(state=state,
+#                      district=district,
+#                      block=block,
+#                      layer_name='tree_canopy_height_raster',
+#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                      start_year='2019'
+#                      )
+
 
