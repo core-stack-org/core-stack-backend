@@ -12,12 +12,6 @@
     },
     {
       "rel": "child",
-      "href": "./uttar_pradesh/collection.json",
-      "type": "application/json",
-      "title": "uttar_pradesh"
-    },
-    {
-      "rel": "child",
       "href": "./bihar/collection.json",
       "type": "application/json",
       "title": "bihar"

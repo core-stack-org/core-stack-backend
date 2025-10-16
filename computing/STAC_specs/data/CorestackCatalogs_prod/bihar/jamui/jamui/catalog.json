@@ -23,6 +23,11 @@
     },
     {
       "rel": "item",
+      "href": "./bihar_jamui_jamui_drainage_lines_vector/bihar_jamui_jamui_drainage_lines_vector.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "item",
       "href": "./bihar_jamui_jamui_tree_canopy_height_raster_2019/bihar_jamui_jamui_tree_canopy_height_raster_2019.json",
       "type": "application/geo+json"
     }
