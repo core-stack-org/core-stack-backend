@@ -15,6 +15,12 @@
       "href": "./bihar/collection.json",
       "type": "application/json",
       "title": "bihar"
+    },
+    {
+      "rel": "child",
+      "href": "./odisha/collection.json",
+      "type": "application/json",
+      "title": "odisha"
     }
   ],
   "title": "CoREStack Spatio Temporal Asset Catalog"
