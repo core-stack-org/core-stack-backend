@@ -1,4 +1,12 @@
 # %% [markdown]
+# Final flow 
+# - all code in functions
+# - data pull from geoserver
+# - column descriptions and layer descriptions from csv
+# - style file from github
+# - output stored locally
+# 
+# Common functions between raster and vector wherever possible
 
 # %%
 import numpy as np
@@ -8,8 +16,10 @@ import matplotlib.pyplot as plt
 
 import rasterio
 import os
+# import fsspec
+# import s3fs
 
-import json
+# import json
 import xml.etree.ElementTree as ET
 import datetime
 # from datetime import datetime, timezone
@@ -18,21 +28,19 @@ import urllib
 import requests
 from io import BytesIO
 
-from rasterio.warp import transform_bounds
+# from rasterio.warp import transform_bounds
 
 from matplotlib.colors import ListedColormap, Normalize
 from shapely.geometry import mapping, box, Polygon
+
+import pystac
 
 import sys
 sys.path.append('..')
 import constants
 
-import pystac
-from pystac.extensions.table import TableExtension
-from pystac import Asset, MediaType
-from pystac.extensions.classification import ClassificationExtension, Classification
-from pystac.extensions.raster import RasterExtension,RasterBand
-from pystac.extensions.projection import ProjectionExtension
+# %%
+# !pip install fsspec s3fs
 
 # %%
 GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
@@ -56,21 +64,15 @@ THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR,
                              'STAC_output_prod')
 # THUMBNAIL_DIR
 
-# THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR,
-#                                      'STAC_output')
-# THUMBNAIL_DIR
 
 # %%
 STAC_FILES_DIR = os.path.join(
     LOCAL_DATA_DIR,
     'CorestackCatalogs_prod' #test folder
 )
-# STAC_FILES_DIR
 
-# STAC_FILES_DIR = os.path.join(
-#     LOCAL_DATA_DIR,
-#     'CorestackCatalogs' #test folder
-# )
+# STAC_FILES_DIR = 's3://spatio-temporal-asset-catalog/CorestackCatalogs_prod'
+
 # STAC_FILES_DIR
 
 # %% [markdown]
@@ -184,7 +186,7 @@ def create_raster_item(raster_url,
                                   })            
     
     #add certain metadata under projection extension
-    proj_ext = ProjectionExtension.ext(raster_item, add_if_missing=True)
+    proj_ext = pystac.extensions.projection.ProjectionExtension.ext(raster_item, add_if_missing=True)
     proj_ext.epsg = crs
     proj_ext.shape = [shape[0], shape[1]]
 
@@ -194,10 +196,10 @@ def create_raster_item(raster_url,
 def add_raster_data_asset(raster_item,
                           geoserver_url
                           ):
-    raster_item.add_asset("data", Asset(
+    raster_item.add_asset("data", pystac.Asset(
         # href=os.path.join(data_url, os.path.relpath(raster_path, start=data_dir)), #TODO
         href=geoserver_url,
-        media_type=MediaType.GEOTIFF,
+        media_type=pystac.MediaType.GEOTIFF,
         roles=["data"],
         title="Raster Layer"))
 
@@ -206,8 +208,8 @@ def add_raster_data_asset(raster_item,
 # %%
 # def add_raster_extension(raster_item): #TODO
 #         #add certain metadata under raster extension
-#     raster_ext = RasterExtension.ext(raster_item.assets["data"], add_if_missing=True)
-#     raster_band = RasterBand.create(
+#     raster_ext = pystac.extensions.raster.RasterExtension.ext(raster_item.assets["data"], add_if_missing=True)
+#     raster_band = pystac.extensions.raster.RasterBand.create(
 #         data_type=data_type, 
 #         spatial_resolution=gsd,
 #         # nodata=nodata
@@ -270,10 +272,10 @@ def add_classification_extension(raster_style_url,
     style_info = parse_raster_style_file(style_file_url=raster_style_url,
                                          STYLE_FILE_DIR=STYLE_FILE_DIR
                                          )
-    classification_ext = ClassificationExtension.ext(raster_item.assets["data"], add_if_missing=True)
+    classification_ext = pystac.extensions.classification.ClassificationExtension.ext(raster_item.assets["data"], add_if_missing=True)
     stac_classes = []
     for cls in style_info:
-        stac_class_obj = Classification.create(
+        stac_class_obj = pystac.extensions.classification.Classification.create(
             value=int(cls["value"]),
             name=cls.get("label") or f"Class {cls['value']}",
             description=cls.get("label"),
@@ -287,10 +289,10 @@ def add_classification_extension(raster_style_url,
 # %%
 def add_stylefile_asset(STAC_item,
                         style_file_url):
-    STAC_item.add_asset("style", Asset(
+    STAC_item.add_asset("style", pystac.Asset(
         # href=os.path.join(data_url, os.path.relpath(raster_style_path, start=data_dir)),
         href=style_file_url,
-        media_type=MediaType.XML,
+        media_type=pystac.MediaType.XML,
         roles=["metadata"],
         title="QGIS Style file"
     ))
@@ -344,10 +346,10 @@ def add_thumbnail_asset(STAC_item,
                         LOCAL_DATA_DIR, #TODO
                         GITHUB_DATA_URL
                         ):
-    STAC_item.add_asset("thumbnail", Asset(
+    STAC_item.add_asset("thumbnail", pystac.Asset(
         href=os.path.join(GITHUB_DATA_URL, os.path.relpath(THUMBNAIL_PATH,
                                                            start=LOCAL_DATA_DIR)),
-        media_type=MediaType.PNG,
+        media_type=pystac.MediaType.PNG,
         roles=["thumbnail"],
         title="Thumbnail"
     ))
@@ -401,8 +403,8 @@ def generate_raster_item(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path,
-                         layer_desc_csv_path,
+                         layer_map_csv_path='../data/layer_mapping.csv',
+                         layer_desc_csv_path='../data/layer_descriptions.csv',
                          start_year='',
                          end_year=''
                          ):    
@@ -500,6 +502,9 @@ def generate_raster_item(state,
     return raster_item
 
 # %%
+# fs = fsspec.filesystem('s3') 
+
+# %%
 def update_STAC_files(state,
                       district,
                       block,
@@ -509,16 +514,26 @@ def update_STAC_files(state,
                     #   district_title,#TODO
                     #   state_title #TODO
                       ):
+    
+    # def s3_path(*args):
+    #     return os.path.join(*args).replace("\\", "/")
+    
     #1. create block catalog,if not already existing 
+    # block_dir = s3_path(STAC_FILES_DIR,
+    #                          state,
+    #                          district,
+    #                          block)
     block_dir = os.path.join(STAC_FILES_DIR,
                              state,
                              district,
                              block)
     os.makedirs(block_dir, exist_ok=True)
     block_catalog_path = os.path.join(block_dir,'catalog.json')
+    # block_catalog_path = s3_path(block_dir,'catalog.json')
 
     #if it already exists, read the catalog
     if os.path.exists(block_catalog_path):
+    # if fs.exists(block_catalog_path):  
         block_catalog = pystac.read_file(block_catalog_path)
         print(f"Loaded existing block catalog: {block}")
 
@@ -556,6 +571,7 @@ def update_STAC_files(state,
     os.makedirs(district_dir, exist_ok=True)
     district_catalog_path = os.path.join(district_dir,'catalog.json')
 
+    ##if os.path.exists(district_catalog_path):
     if os.path.exists(district_catalog_path):
         district_catalog = pystac.read_file(district_catalog_path)
         print("loaded district catalog")
@@ -580,6 +596,7 @@ def update_STAC_files(state,
     state_collection_path = os.path.join(state_dir, "collection.json")
 
     if os.path.exists(state_collection_path):
+    # if fs.exists(state_collection_path):    
         state_collection = pystac.read_file(state_collection_path)
         print("loaded state collection")
         state_collection.add_child(district_catalog)
@@ -643,16 +660,17 @@ def update_STAC_files(state,
     #5. create root catalog if not existing
     root_catalog_path = os.path.join(STAC_FILES_DIR, "catalog.json")
     if os.path.exists(root_catalog_path):
+    # if fs.exists(root_catalog_path):   
         root_catalog = pystac.read_file(root_catalog_path)
         print("loaded root catalog")
     else:
-        os.makedirs(STAC_FILES_DIR, exist_ok=True)
+        ##os.makedirs(STAC_FILES_DIR, exist_ok=True)
         root_catalog = pystac.Catalog(
             id="corestack_STAC",
             title=constants.ROOT_CATALOG_TITLE,
             description=constants.ROOT_CATALOG_DESCRIPTION
         )
-        root_catalog.set_self_href(root_catalog_path)
+        ##root_catalog.set_self_href(root_catalog_path)
         print("created root catalog")
     root_catalog.add_child(state_collection)
     root_catalog.normalize_and_save(STAC_FILES_DIR, catalog_type=pystac.CatalogType.SELF_CONTAINED)
@@ -723,9 +741,9 @@ def add_vector_data_asset(vector_item,
                           geoserver_url
                           ):
                           
-    vector_item.add_asset("data", Asset(
+    vector_item.add_asset("data", pystac.Asset(
         href=geoserver_url,
-        media_type=MediaType.GEOJSON,
+        media_type=pystac.MediaType.GEOJSON,
         roles=["data"],
         title="Vector Layer"))
     
@@ -740,7 +758,7 @@ def add_tabular_extension(vector_item,
     vector_column_desc_gdf = pd.read_csv(column_desc_csv_path)
     vector_column_desc_filtered_gdf = vector_column_desc_gdf[vector_column_desc_gdf['ee_layer_name'] == ee_layer_name]
     vector_column_desc_filtered_gdf.rename({'column_name_description':'column_description'},axis=1,inplace=True)
-    table_ext = TableExtension.ext(vector_item, add_if_missing=True)
+    table_ext = pystac.extensions.table.TableExtension.ext(vector_item, add_if_missing=True)
     vector_merged_df = vector_data_gdf.dtypes.reset_index()
     vector_merged_df.columns = ['column_name','column_dtype']
     vector_merged_df = vector_merged_df.merge(vector_column_desc_filtered_gdf[['column_name','column_description']],
@@ -1058,10 +1076,10 @@ def generate_vector_item(state,
                          layer_map_csv_path,
                          layer_desc_csv_path,
                          column_desc_csv_path,
-                        #  start_year='',
-                        #  end_year=''
                          ):    
-
+    print(layer_map_csv_path)
+    print(layer_desc_csv_path)
+    print(column_desc_csv_path)
     #1. read layer description
     layer_description = read_layer_description(filepath=layer_desc_csv_path,
                                                layer_name=layer_name)
@@ -1147,9 +1165,10 @@ def generate_vector_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path,
-                         layer_desc_csv_path,
-                         column_desc_csv_path):
+                         layer_map_csv_path='../data/layer_mapping.csv',
+                         layer_desc_csv_path='../data/layer_descriptions.csv',
+                         column_desc_csv_path='../data/vector_column_descriptions.csv'):
+    # print(layer_map_csv_path)
     
     vector_item = generate_vector_item(state,
                                        district,
@@ -1168,8 +1187,8 @@ def generate_raster_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path,
-                         layer_desc_csv_path,
+                         layer_map_csv_path='../data/layer_mapping.csv',
+                         layer_desc_csv_path='../data/layer_descriptions.csv',
                          start_year='',
                          end_year=''):
     
@@ -1187,833 +1206,4 @@ def generate_raster_stac(state,
                       block,
                       STAC_item=raster_item
                       )
-
-# %% [markdown]
-# Test the raster and vector flow 
-
-# %%
-# block_district_state_df = pd.DataFrame({
-#     'block' : ['gobindpur','mirzapur','koraput','badlapur'],
-#     'district' : ['saraikela-kharsawan','mirzapur','koraput','jaunpur'],
-#     'state' : ['jharkhand','uttar_pradesh','odisha','uttar_pradesh']
-# })
-
-# block_district_state_df
-
-# %%
-# block = 'badlapur'
-# district = block_district_state_df[block_district_state_df['block'] == block]['district'].iloc[0]
-# state = block_district_state_df[block_district_state_df['block'] == block]['state'].iloc[0]
-# print(state,district,block)
-
-# %%
-# generate_vector_stac(state=state,
-#                      district=district,
-#                      block=block,
-#                      layer_name='admin_boundaries_vector',
-#                      layer_map_csv_path='../data/layer_mapping.csv',
-#                      layer_desc_csv_path='../data/layer_descriptions.csv',
-#                      column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# %%
-# generate_raster_stac(state=state,
-#                      district=district,
-#                      block=block,
-#                      layer_name='tree_canopy_height_raster',
-#                      layer_map_csv_path='../data/layer_mapping.csv',
-#                      layer_desc_csv_path='../data/layer_descriptions.csv',
-#                     #  column_desc_csv_path='../data/vector_column_descriptions.csv',
-#                      start_year='2019'
-#                      )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='admin_boundaries_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='aquifer_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='drainage_lines_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='surface_water_bodies_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='nrega_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='terrain_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     # corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='cropping_intensity_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     # corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='stage_of_groundwater_extraction_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='drought_frequency_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_cover_change_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     # corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# vector_item = generate_vector_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_vector',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    column_desc_csv_path='../data/vector_column_descriptions.csv')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=vector_item,
-#     # corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2017',
-#                                    end_year='2018')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2018',
-#                                    end_year='2019')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2019',
-#                                    end_year='2020')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2020',
-#                                    end_year='2021')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2021',
-#                                    end_year='2022')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2022',
-#                                    end_year='2023')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='land_use_land_cover_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2023',
-#                                    end_year='2024')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %% [markdown]
-# Tree Canopy Cover Density
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2017',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2018',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2019',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2020',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2021',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2022')
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %% [markdown]
-# Tree Height 
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_height_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2017',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_height_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2018',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_height_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2019',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_height_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2020',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_height_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2021',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_height_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2022',
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     corestack_dir=STAC_FILES_DIR
-# )
-
-# %% [markdown]
-# All remaining static raster layers
-
-# %%
-# block = 'koraput'
-# district = block_district_state_df[block_district_state_df['block'] == block]['district'].iloc[0]
-# state = block_district_state_df[block_district_state_df['block'] == block]['state'].iloc[0]
-# print(state,district,block)
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='change_tree_cover_gain_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='change_tree_cover_loss_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='change_cropping_reduction_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='change_urbanization_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='terrain_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='clart_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_cover_change_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='change_cropping_intensity_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv'                             
-#                                    )
-
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     #corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='terrain_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    )
-
-# %%
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     corestack_dir=STAC_FILES_DIR
-# )
-
-# %%
-# raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name='tree_canopy_cover_density_raster',
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2022',
-#                                    end_year='2023'
-#                                    )
-
-# %%
-# update_STAC_files(
-#     state=state,
-#     district=district,
-#     block=block,
-#     STAC_item=raster_item,
-#     corestack_dir=STAC_FILES_DIR
-# )
-
-# %% [markdown]
-# Test all remaining raster layers
-
-# %%
-# layer_mapping_df = pd.read_csv('../data/layer_mapping.csv')
-
-# %%
-# layer_mapping_df.shape
-
-# %%
-# layer_mapping_df = layer_mapping_df[layer_mapping_df['layer_name'].notna()]
-
-# %%
-# layer_mapping_df.shape
-
-# %%
-# raster_layers_df = layer_mapping_df[layer_mapping_df['layer_name'].str.contains('raster')]
-# raster_layers_df.shape
-
-# %%
-# static_raster_layers_df = pd.DataFrame()
-
-# %%
-# raster_layers_df[raster_layers_df['geoserver_layer_name'].str.contains('year')]
-
-# %%
-# layer_name_year_combinations_df = pd.DataFrame({
-#     'layer_name' : ['land_use_land_cover_raster','tree_health_ccd'],
-
-# }
- 
-# )
-
-# %%
-# layer
-
-# %%
-# for raster_layer_name in raster_layers_df['layer_name']:
-
-#     raster_item = generate_raster_item(state=state,
-#                                    district=district,
-#                                    block=block,
-#                                    layer_name=raster_layer_name,
-#                                    layer_map_csv_path='../data/layer_mapping.csv',
-#                                    layer_desc_csv_path='../data/layer_descriptions.csv',
-#                                    start_year='2022',
-#                                    end_year='2023'
-#                                    )
-
-# %%
-# layer_desc_df[layer_desc_df['layer_name'] == 'tree_cover_change_raster']
-
-# %%
-# read_layer_mapping(layer_map_csv_path = '../data/layer_mapping.csv',
-#                     district = district,
-#                     block=block,
-#                     layer_name='tree_canopy_height_raster',
-#                     start_year='2018'
-#                     )
-
-# %%
-# layer_description = read_layer_description(filepath= '../data/layer_descriptions.csv',
-#                                             layer_name='tree_cover_change_raster')
-
 
