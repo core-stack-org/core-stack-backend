@@ -16,15 +16,15 @@
       "type": "application/geo+json"
     },
     {
+      "rel": "item",
+      "href": "./uttar_pradesh_jaunpur_badlapur_tree_canopy_height_raster_2019/uttar_pradesh_jaunpur_badlapur_tree_canopy_height_raster_2019.json",
+      "type": "application/geo+json"
+    },
+    {
       "rel": "parent",
       "href": "../catalog.json",
       "type": "application/json",
       "title": "jaunpur"
-    },
-    {
-      "rel": "item",
-      "href": "./uttar_pradesh_jaunpur_badlapur_tree_canopy_height_raster_2019/uttar_pradesh_jaunpur_badlapur_tree_canopy_height_raster_2019.json",
-      "type": "application/geo+json"
     }
   ],
   "title": "STAC for badlapur"

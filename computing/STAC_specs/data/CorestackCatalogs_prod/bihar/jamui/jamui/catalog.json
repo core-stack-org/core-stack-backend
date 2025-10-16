@@ -1,0 +1,31 @@
+{
+  "type": "Catalog",
+  "id": "jamui",
+  "stac_version": "1.1.0",
+  "description": "STAC catalog for jamui block data in jamui, bihar",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../../catalog.json",
+      "type": "application/json",
+      "title": "CoREStack Spatio Temporal Asset Catalog"
+    },
+    {
+      "rel": "item",
+      "href": "./bihar_jamui_jamui_admin_boundaries_vector/bihar_jamui_jamui_admin_boundaries_vector.json",
+      "type": "application/geo+json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json",
+      "title": "jamui"
+    },
+    {
+      "rel": "item",
+      "href": "./bihar_jamui_jamui_tree_canopy_height_raster_2019/bihar_jamui_jamui_tree_canopy_height_raster_2019.json",
+      "type": "application/geo+json"
+    }
+  ],
+  "title": "STAC for jamui"
+}
