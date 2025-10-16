@@ -15484,7 +15484,7 @@
         "description": ""
       }
     ],
-    "datetime": "2025-10-16T09:44:40.999247Z"
+    "datetime": "2025-10-16T09:47:23.015529Z"
   },
   "links": [
     {
@@ -15518,7 +15518,7 @@
       ]
     },
     "thumbnail": {
-      "href": "https://raw.githubusercontent.com/Nirzaree/STAC-spec/stac-spec-common/data/STAC_output_prod/jamui_admin_boundaries_vector.png",
+      "href": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/computing/STAC_specs/data/STAC_output_prod/jamui_admin_boundaries_vector.png",
       "type": "image/png",
       "title": "Thumbnail",
       "roles": [

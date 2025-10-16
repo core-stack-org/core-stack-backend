@@ -50,7 +50,7 @@
       2995,
       3177
     ],
-    "datetime": "2025-10-16T09:45:17.632278Z"
+    "datetime": "2025-10-16T09:47:46.422956Z"
   },
   "links": [
     {
@@ -134,7 +134,7 @@
       ]
     },
     "thumbnail": {
-      "href": "https://raw.githubusercontent.com/Nirzaree/STAC-spec/stac-spec-common/data/STAC_output_prod/jamui_tree_canopy_height_raster_2019.png",
+      "href": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/computing/STAC_specs/data/STAC_output_prod/jamui_tree_canopy_height_raster_2019.png",
       "type": "image/png",
       "title": "Thumbnail",
       "roles": [

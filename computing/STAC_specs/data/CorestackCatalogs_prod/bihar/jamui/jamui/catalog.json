@@ -11,15 +11,15 @@
       "title": "CoREStack Spatio Temporal Asset Catalog"
     },
     {
-      "rel": "item",
-      "href": "./bihar_jamui_jamui_admin_boundaries_vector/bihar_jamui_jamui_admin_boundaries_vector.json",
-      "type": "application/geo+json"
-    },
-    {
       "rel": "parent",
       "href": "../catalog.json",
       "type": "application/json",
       "title": "jamui"
+    },
+    {
+      "rel": "item",
+      "href": "./bihar_jamui_jamui_admin_boundaries_vector/bihar_jamui_jamui_admin_boundaries_vector.json",
+      "type": "application/geo+json"
     },
     {
       "rel": "item",
