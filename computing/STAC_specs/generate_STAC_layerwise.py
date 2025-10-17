@@ -38,6 +38,7 @@ import pystac
 import sys
 sys.path.append('..')
 import constants
+# from computing.STAC_specs import constants
 
 # %%
 # !pip install fsspec s3fs
@@ -54,7 +55,7 @@ GITHUB_DATA_URL = constants.GITHUB_DATA_URL
 RASTER_STYLE_PATH = '../data/LULC0_12class.qml'
 
 # %%
-LOCAL_DATA_DIR = '../data/'
+LOCAL_DATA_DIR = 'computing/STAC_specs/data/'
 
 # %%
 STYLE_FILE_DIR = os.path.join(LOCAL_DATA_DIR,'input/style_files/')
@@ -1185,9 +1186,9 @@ def generate_vector_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-                         layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
-                         column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'):
+                         layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+                         layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+                         column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'):
     # print(layer_map_csv_path)
     
     vector_item = generate_vector_item(state,
@@ -1207,8 +1208,8 @@ def generate_raster_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-                         layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+                         layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+                         layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
                          start_year='',
                          end_year=''):
     
