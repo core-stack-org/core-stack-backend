@@ -1249,9 +1249,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='drainage_lines_vector',
-#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
-#                     #  column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'
+#                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+#                     #  column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'
 #                      )
 
 # %%
@@ -1259,9 +1259,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='aquifer_vector',
-#                      # column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv',
-#                      # layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-#                      # layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                      # column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv',
+#                      # layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+#                      # layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                  )
 
 # %%
@@ -1269,8 +1269,8 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='tree_canopy_height_raster',
-#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                      start_year='2019'
 #                      )
 
