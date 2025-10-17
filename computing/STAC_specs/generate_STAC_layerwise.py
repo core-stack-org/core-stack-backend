@@ -415,8 +415,8 @@ def generate_raster_item(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='computing/STAC_specs/data/layer_mapping.csv',
-                         layer_desc_csv_path='computing/STAC_specs/data/layer_descriptions.csv',
+                         layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+                         layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
                          start_year='',
                          end_year=''
                          ):    
