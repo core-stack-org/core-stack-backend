@@ -37,8 +37,8 @@ import pystac
 
 import sys
 sys.path.append('..')
-import constants
-# from computing.STAC_specs import constants
+# import constants
+from computing.STAC_specs import constants
 
 # %%
 # !pip install fsspec s3fs
@@ -50,9 +50,6 @@ GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
 # %%
 GITHUB_DATA_URL = constants.GITHUB_DATA_URL
 # GITHUB_DATA_URL
-
-# %%
-RASTER_STYLE_PATH = '../data/LULC0_12class.qml'
 
 # %%
 LOCAL_DATA_DIR = 'computing/STAC_specs/data/'
@@ -418,8 +415,8 @@ def generate_raster_item(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/layer_mapping.csv',
-                         layer_desc_csv_path='../data/layer_descriptions.csv',
+                         layer_map_csv_path='computing/STAC_specs/data/layer_mapping.csv',
+                         layer_desc_csv_path='computing/STAC_specs/data/layer_descriptions.csv',
                          start_year='',
                          end_year=''
                          ):    
@@ -445,6 +442,7 @@ def generate_raster_item(state,
     geoserver_url = generate_raster_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
+    print(geoserver_url)
     
     #4. create raster item
     #updated layer title and layer id
