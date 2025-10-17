@@ -1,0 +1,145 @@
+{
+  "type": "Feature",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://stac-extensions.github.io/projection/v2.0.0/schema.json",
+    "https://stac-extensions.github.io/classification/v2.0.0/schema.json"
+  ],
+  "id": "odisha_koraput_koraput_tree_canopy_height_raster_2019",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          82.54942539276567,
+          18.65279822251457
+        ],
+        [
+          82.54942539276567,
+          19.238679450817322
+        ],
+        [
+          83.26412503281117,
+          19.238679450817322
+        ],
+        [
+          83.26412503281117,
+          18.65279822251457
+        ],
+        [
+          82.54942539276567,
+          18.65279822251457
+        ]
+      ]
+    ]
+  },
+  "bbox": [
+    82.54942539276567,
+    18.65279822251457,
+    83.26412503281117,
+    19.238679450817322
+  ],
+  "properties": {
+    "title": "Tree canopy height : 2019",
+    "description": "Tree canopy height map for India built by ACT4D research group at IIT Delhi. Tree canopy height layer describes how tall are trees in a given pixel. \nThe Pan India map (except ACZ 12-15)  is available from 2017 onwards at 25m resolution.\nThese are the classes in the current version of the map: \n\nShort \nMedium\nTall ",
+    "start_datetime": "2019-07-01T00:00:00Z",
+    "end_datetime": "2020-06-30T00:00:00Z",
+    "gsd": 25.0,
+    "proj:code": "EPSG:EPSG:4326",
+    "proj:shape": [
+      2174,
+      2652
+    ],
+    "datetime": "2025-10-16T16:28:32.891264Z"
+  },
+  "links": [
+    {
+      "rel": "root",
+      "href": "../../../../catalog.json",
+      "type": "application/json",
+      "title": "CoREStack Spatio Temporal Asset Catalog"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json",
+      "title": "STAC for koraput"
+    }
+  ],
+  "assets": {
+    "data": {
+      "href": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:tree_health_ch_raster_koraput_koraput_2019&format=geotiff",
+      "type": "image/tiff; application=geotiff",
+      "title": "Raster Layer",
+      "classification:classes": [
+        {
+          "value": -2,
+          "name": "Deforestation",
+          "description": "Deforestation",
+          "color_hint": "ff0000"
+        },
+        {
+          "value": -1,
+          "name": "Degradation",
+          "description": "Degradation",
+          "color_hint": "ffa500"
+        },
+        {
+          "value": 0,
+          "name": "No Change",
+          "description": "No Change",
+          "color_hint": "ffffff"
+        },
+        {
+          "value": 1,
+          "name": "Improvement",
+          "description": "Improvement",
+          "color_hint": "8aff8a"
+        },
+        {
+          "value": 2,
+          "name": "Afforestation",
+          "description": "Afforestation",
+          "color_hint": "007500"
+        },
+        {
+          "value": 3,
+          "name": "Partially Degraded",
+          "description": "Partially Degraded",
+          "color_hint": "dee64c"
+        },
+        {
+          "value": 4,
+          "name": "Partially Degraded",
+          "description": "Partially Degraded",
+          "color_hint": "dee64c"
+        },
+        {
+          "value": 5,
+          "name": "Missing Data",
+          "description": "Missing Data",
+          "color_hint": "000000"
+        }
+      ],
+      "roles": [
+        "data"
+      ]
+    },
+    "style": {
+      "href": "https://raw.githubusercontent.com/core-stack-org/QGIS-Styles/main/Tree%20Health/tree_cover_change.qml",
+      "type": "application/xml",
+      "title": "QGIS Style file",
+      "roles": [
+        "metadata"
+      ]
+    },
+    "thumbnail": {
+      "href": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/computing/STAC_specs/data/STAC_output_prod/koraput_tree_canopy_height_raster_2019.png",
+      "type": "image/png",
+      "title": "Thumbnail",
+      "roles": [
+        "thumbnail"
+      ]
+    }
+  }
+}
