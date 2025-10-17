@@ -20,6 +20,7 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
+    path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
     path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
