@@ -106,8 +106,8 @@ urlpatterns = [
         name="generate_layer_in_order",
     ),
     path(
-        "layer_staus_dashboard/",
-        api.layer_staus_dashboard,
+        "layer_status_dashboard/",
+        api.layer_status_dashboard,
         name="layer_staus_dashboard",
     ),
 ]

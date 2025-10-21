@@ -1165,7 +1165,7 @@ def generate_layer_in_order(request):
 
 @api_view(["GET"])
 @schema(None)
-def layer_staus_dashboard(request):
+def layer_status_dashboard(request):
     print("inside layer_staus_dashboard")
     try:
         state = request.data.get("state").lower()
