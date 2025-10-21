@@ -93,6 +93,7 @@ def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
+        language = request.data.get("language")
 
         logger.info(
             "Generating DPR for plan ID: %s and email ID: %s", plan_id, email_id
@@ -112,7 +113,7 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        doc = create_dpr_document(plan)
+        doc = create_dpr_document(plan, language)
 
         mws_Ids = get_mws_ids_for_report(plan)
 
@@ -129,7 +130,7 @@ def generate_dpr(request):
                     f"https://geoserver.core-stack.org/api/v1/download_mws_report/"
                     f"?state={state}&district={district}&block={block}&uid={ids}"
                 )
-                #mws_report = render_pdf_with_firefox(report_html_url)
+                # mws_report = render_pdf_with_firefox(report_html_url)
                 mws_reports.append(report_html_url)
                 successful_mws_ids.append(ids)
             except Exception as e:
