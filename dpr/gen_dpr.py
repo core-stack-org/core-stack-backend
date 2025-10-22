@@ -398,7 +398,10 @@ def create_table_village_brief(
         (json_data["section_b_table1_row3_2"], plan.district.district_name),
         (json_data["section_b_table1_row3_3"], plan.state.state_name),
         (json_data["section_b_table1_row4_1"], str(total_settlements)),
-        ("Intersecting Micro Watershed IDs", None),  # Will be handled separately
+        (
+            json_data["section_b_table1_last_heading"],
+            None,
+        ),  # Will be handled separately
         (
             json_data["section_b_table1_row5_1"],
             f"{centroid.y:.8f}, {centroid.x:.8f}" if centroid else "Not available",
@@ -409,7 +412,7 @@ def create_table_village_brief(
         row_cells = table.rows[i].cells
         row_cells[0].text = key
 
-        if key == "Intersecting Micro Watershed IDs":
+        if key == "Intersecting Micro Watershed IDs" or key == "अंतरवर्ती लघु जलाशय आईडी":
             settlement_mws_pairs = []
             if intersecting_mws_ids:
                 pairs = intersecting_mws_ids.split("; ")
