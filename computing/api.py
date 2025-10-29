@@ -30,7 +30,7 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from .terrain_descriptor.terrain_raster import terrain_raster
+from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from computing.misc.drainage_lines import clip_drainage_lines
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
@@ -550,17 +550,15 @@ def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
         state = request.data.get("state")
-        print(state)
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        terrain_raster.apply_async(
+        generate_terrain_raster_clip.apply_async(
             kwargs={
-                "gee_account_id": gee_account_id,
-                "roi_path": None,
                 "state": state,
                 "district": district,
                 "block": block,
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
