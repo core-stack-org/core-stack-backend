@@ -55,6 +55,7 @@ class Layer(models.Model):
     updated_by = models.CharField(max_length=255, blank=True, null=True)
     is_sync_to_geoserver = models.BooleanField(default=False)
     is_override = models.BooleanField(default=False)
+    is_stac_specs_generated = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Layer"

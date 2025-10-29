@@ -18,6 +18,7 @@ from nrm_app.celery import app
 from .swb1 import vectorize_water_pixels
 from .swb2 import waterbody_mws_intersection
 from .swb3 import waterbody_wbc_intersection
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -151,4 +152,7 @@ def sync_asset_to_db_and_geoserver(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
+            generate_STAC_layerwise.generate_vector_stac(state=state,district=district,block=block,layer_name='surface_water_bodies_vector')
+            update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
+            print("Stac Specs generated and updated")
     return layer_at_geoserver

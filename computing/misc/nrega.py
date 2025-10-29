@@ -33,6 +33,7 @@ from utilities.gee_utils import (
 )
 import ee
 import numpy as np
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
@@ -207,4 +208,8 @@ def clip_nrega_district_block(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_at_geoserver = True
             print("sync to geoserver flag is updated")
+
+            generate_STAC_layerwise.generate_vector_stac(state=state_name,district=district_name,block=block_name,layer_name='nrega_vector')
+            update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
+            print("Stac Specs generated and updated")
     return layer_at_geoserver
