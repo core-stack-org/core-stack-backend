@@ -232,7 +232,7 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
 
-        layer_name = stac_spec_layer_name_dict.get(param)
+        layer_name = stac_spec_layer_name_dict[param]
         generate_STAC_layerwise.generate_vector_stac(state=state,district=district,block=block,layer_name=layer_name)
         update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
         print("Stac Specs generated and updated")
