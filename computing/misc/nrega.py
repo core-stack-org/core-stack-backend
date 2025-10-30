@@ -206,10 +206,10 @@ def clip_nrega_district_block(
         res = push_shape_to_geoserver(path, workspace="nrega_assets")
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            layer_at_geoserver = True
             print("sync to geoserver flag is updated")
 
             generate_STAC_layerwise.generate_vector_stac(state=state_name,district=district_name,block=block_name,layer_name='nrega_vector')
             update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
             print("Stac Specs generated and updated")
+            layer_at_geoserver = True
     return layer_at_geoserver

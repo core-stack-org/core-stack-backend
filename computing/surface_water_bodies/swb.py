@@ -151,8 +151,9 @@ def sync_asset_to_db_and_geoserver(
         if res.get("status_code") == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
-            layer_at_geoserver = True
+
             generate_STAC_layerwise.generate_vector_stac(state=state,district=district,block=block,layer_name='surface_water_bodies_vector')
             update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
             print("Stac Specs generated and updated")
+            layer_at_geoserver = True
     return layer_at_geoserver

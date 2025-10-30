@@ -314,8 +314,9 @@ def save_layer_info_to_db(
 
 def update_layer_sync_status(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
     try:
+        layer_obj = Layer.objects.filter(id=layer_id)
         if sync_to_geoserver is not None:
-            updated_count = Layer.objects.filter(id=layer_id).update(
+            updated_count = layer_obj.update(
                 is_sync_to_geoserver=sync_to_geoserver
             )
 
@@ -323,9 +324,9 @@ def update_layer_sync_status(layer_id, sync_to_geoserver=None, is_stac_specs_gen
                 print(
                     f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
                 )
-                return True
+            
         if is_stac_specs_generated is not None:
-            updated_count = Layer.objects.filter(id=layer_id).update(
+            updated_count = layer_obj.update(
                 is_stac_specs_generated=is_stac_specs_generated
             )
 
@@ -333,14 +334,9 @@ def update_layer_sync_status(layer_id, sync_to_geoserver=None, is_stac_specs_gen
                 print(
                     f"Updated sync status to {is_stac_specs_generated} for layer ID: {layer_id}"
                 )
-                return True
-        else:
-            print(f"Layer with ID {layer_id} not found")
-            return False
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
-        return False
 
 
 def get_existing_end_year(dataset_name, layer_name):

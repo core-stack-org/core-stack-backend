@@ -18,6 +18,7 @@ from nrm_app.celery import app
 from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -189,5 +190,8 @@ def sync_lulc_to_geoserver(
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
                 print("geoserver flag is updated")
+                generate_STAC_layerwise.generate_raster_stac(state=state_name,district=district_name,block=block_name,layer_name='land_use_land_cover_raster')
+                update_layer_sync_status(layer_id=layer_ids[i], is_stac_specs_generated=True)
+                print("Stac Specs generated and updated")
                 layer_at_geoserver = True
     return layer_at_geoserver

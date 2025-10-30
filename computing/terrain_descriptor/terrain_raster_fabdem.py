@@ -75,10 +75,10 @@ def generate_terrain_raster_clip(self, state=None, district=None, block=None, ge
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
-            layer_at_geoserver = True
             
             generate_STAC_layerwise.generate_raster_stac(state=state,district=district,block=block,layer_name='terrain_raster')
             update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
             print("Stac Specs generated and updated")
+            layer_at_geoserver = True
     return layer_at_geoserver
 
