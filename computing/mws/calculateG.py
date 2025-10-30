@@ -33,7 +33,8 @@ def calculate_g(
         )
         + layer_name
     )
-
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    last_date = None
     if is_gee_asset_exists(asset_id):
         dataset = Dataset.objects.get(name="Hydrology")
         layer_obj = None
@@ -46,45 +47,41 @@ def calculate_g(
             print("layer not found. So, reading the column name from asset_id.")
 
         if layer_obj:
-            db_end_date = layer_obj.misc["end_year"]
+            db_end_date = layer_obj.misc["end_date"]
         else:
             roi = ee.FeatureCollection(asset_id)
             col_names = roi.first().propertyNames().getInfo()
             filtered_col = [col for col in col_names if col.startswith("20")]
             filtered_col.sort()
-            db_end_date = filtered_col[-1].split("-")[0].split("_")[-1]
+            db_end_date = filtered_col[-1]  # .split("-")[0].split("_")[-1]
 
-        db_end_date = f"{db_end_date}-06-30"
+        # db_end_date = f"{db_end_date}-06-30"
         db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
-        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-
-        if db_end_date < end_date:
-            end_date = end_date.strftime("%Y-%m-%d")
+        # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+        last_date = str(db_end_date.date())
+        if db_end_date.year < end_date.year:
+            # end_date = end_date.strftime("%Y-%m-%d")
             ee.data.deleteAsset(asset_id)
         else:
-            return asset_id
+            return asset_id, last_date
 
     fc = ee.FeatureCollection(delta_g_asset_id).getInfo()
     features = fc["features"]
-    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
     for f in features:
         properties = f["properties"]
-        n_start_date = start_date
-        f_start_date = datetime.datetime.strptime(n_start_date, "%Y-%m-%d")
+        # n_start_date = start_date
+        f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
         l_start_date = None
-        fn_index = 0
 
         while f_start_date <= end_date:
             if is_annual:
-                f_end_date = f_start_date + relativedelta(years=1)
+                f_end_date = f_start_date + datetime.timedelta(days=364)
             else:
-                if fn_index == 25:
-                    f_end_date = f_start_date + relativedelta(months=1, day=1)
-                    fn_index = 0
-                else:
-                    f_end_date = f_start_date + datetime.timedelta(days=14)
-                    fn_index += 1
+                f_end_date = f_start_date + datetime.timedelta(days=14)
+                if f_end_date > end_date:
+                    break
 
             col_date = (
                 str(f_start_date.year) + "_" + str(f_start_date.year + 1)
@@ -110,9 +107,10 @@ def calculate_g(
 
             l_start_date = f_start_date
             f_start_date = f_end_date
-            n_start_date = f_start_date.strftime("%Y-%m-%d")
+            # n_start_date = f_start_date.strftime("%Y-%m-%d")
 
         f["properties"] = properties
+        last_date = str(f_start_date.date())
 
     try:
         # Rewrap into ee.FeatureCollection with valid geometry
@@ -153,4 +151,4 @@ def calculate_g(
             print("path", path)
             upload_shp_to_gee(path, layer_name, asset_id, gee_account_id)
 
-    return asset_id
+    return asset_id, last_date

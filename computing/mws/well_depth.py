@@ -26,6 +26,8 @@ def well_depth(
     )
     asset_id = asset_path + description
 
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+
     if is_gee_asset_exists(asset_id):
         print("Well depth asset already exists")
         layer_obj = None
@@ -39,24 +41,23 @@ def well_depth(
             print(
                 "layer not found for welldepth. So, reading the column name from asset_id"
             )
+        db_end_date = None
         if layer_obj:
-            db_end_date = layer_obj.misc["end_year"]
-        else:
-            fc = ee.FeatureCollection(asset_id)
-            col_names = fc.first().propertyNames().getInfo()
-            filtered_col = [col for col in col_names if col.startswith("20")]
-            filtered_col.sort()
-            db_end_date = filtered_col[-1].split("_")[-1]
+            db_end_date = layer_obj.misc["end_date"]
+            # else:
+            #     fc = ee.FeatureCollection(asset_id)
+            #     col_names = fc.first().propertyNames().getInfo()
+            #     filtered_col = [col for col in col_names if col.startswith("20")]
+            #     filtered_col.sort()
+            #     db_end_date = filtered_col[-1]  # .split("_")[-1]
 
-        db_end_date = f"{db_end_date}-06-30"
-        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
-        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+            db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            last_date = str(db_end_date.date())
 
-        if db_end_date < end_date:
-            end_date = end_date.strftime("%Y-%m-%d")
+        if not db_end_date or db_end_date.year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
-            return None, asset_id
+            return None, asset_id, last_date
 
     return _generate_data(
         asset_id, asset_path, description, asset_suffix, start_date, end_date
@@ -148,9 +149,9 @@ def _generate_data(
     keys = ["Precipitation", "RunOff", "ET", "DeltaG", "WellDepth"]
     # year of interest
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     while f_start_date <= end_date:
-        f_end_date = f_start_date + relativedelta(years=1)
+        f_end_date = f_start_date + datetime.timedelta(days=364)
 
         def res(n):
             col_date = str(f_start_date.year) + "_" + str(f_start_date.year + 1)
@@ -171,6 +172,7 @@ def _generate_data(
         shape = shape.map(res)
         f_start_date = f_end_date
         start_date = f_start_date
+
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(shape, description, asset_id)
-    return task_id, asset_id
+    return task_id, asset_id, start_date

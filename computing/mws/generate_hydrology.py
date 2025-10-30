@@ -43,7 +43,7 @@ def generate_hydrology(
 
     sys.setrecursionlimit(6000)
 
-    end_year = end_year + 1
+    end_year = end_year if is_annual else end_year + 1
     task_list = []
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
@@ -64,8 +64,9 @@ def generate_hydrology(
             + valid_gee_text(block.lower())
             + "_uid"
         )
+
     layer_name_suffix = "annual" if is_annual else "fortnight"
-    ppt_task_id, ppt_asset_id = precipitation(
+    ppt_task_id, ppt_asset_id, ppt_last_date = precipitation(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -77,7 +78,7 @@ def generate_hydrology(
     if ppt_task_id:
         task_list.append(ppt_task_id)
 
-    et_task_id, et_asset_id = evapotranspiration(
+    et_task_id, et_asset_id, et_last_date = evapotranspiration(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -89,7 +90,7 @@ def generate_hydrology(
     if et_task_id:
         task_list.append(et_task_id)
 
-    ro_task_id, ro_asset_id = run_off(
+    ro_task_id, ro_asset_id, ro_last_date = run_off(
         gee_account_id=gee_account_id,
         roi=roi,
         asset_suffix=asset_suffix,
@@ -106,19 +107,6 @@ def generate_hydrology(
     print("task_id_list", task_id_list)
 
     if state and district and block:
-        if is_gee_asset_exists(et_asset_id):
-            make_asset_public(et_asset_id)
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
-                asset_id=et_asset_id,
-                dataset_name="Hydrology Evapotranspiration",
-                misc={"start_year": start_year, "end_year": end_year},
-            )
-            print("save Evapotranspiration info at the gee level...")
-
         if is_gee_asset_exists(ppt_asset_id):
             make_asset_public(ppt_asset_id)
             save_layer_info_to_db(
@@ -128,9 +116,22 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
-                misc={"start_year": start_year, "end_year": end_year},
+                misc={"start_date": start_date, "end_date": ppt_last_date},
             )
             print("save Precipitation info at the gee level...")
+
+        if is_gee_asset_exists(et_asset_id):
+            make_asset_public(et_asset_id)
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
+                asset_id=et_asset_id,
+                dataset_name="Hydrology Evapotranspiration",
+                misc={"start_date": start_date, "end_date": et_last_date},
+            )
+            print("save Evapotranspiration info at the gee level...")
 
         if is_gee_asset_exists(ro_asset_id):
             make_asset_public(ro_asset_id)
@@ -141,7 +142,7 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
-                misc={"start_year": start_year, "end_year": end_year},
+                misc={"start_date": start_date, "end_date": ro_last_date},
             )
             print("save Run Off info at the gee level...")
 
@@ -154,19 +155,21 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
+
     task_id_list = check_task_status([dg_task_id]) if dg_task_id else []
     print("dg task_id_list", task_id_list)
 
     layer_name = "deltaG_fortnight_" + asset_suffix
 
     if is_annual:
-        wd_task_id, wd_asset_id = well_depth(
+        wd_task_id, wd_asset_id, w_last_date = well_depth(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
             app_type=app_type,
             start_date=start_date,
             end_date=end_date,
         )
+
         task_id_list = check_task_status([wd_task_id]) if wd_task_id else []
         print("wd task_id_list", task_id_list)
 
@@ -182,7 +185,7 @@ def generate_hydrology(
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    asset_id = calculate_g(
+    asset_id, g_last_date = calculate_g(
         delta_g_asset_id,
         asset_folder_list,
         asset_suffix,
@@ -202,7 +205,10 @@ def generate_hydrology(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Hydrology",
-            misc={"start_year": start_year, "end_year": end_year},
+            misc={
+                "start_date": start_date,
+                "end_date": g_last_date,
+            },
         )
 
         fc = ee.FeatureCollection(asset_id).getInfo()

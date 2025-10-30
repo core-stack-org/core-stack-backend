@@ -2,6 +2,7 @@ import ee
 import datetime
 from dateutil.relativedelta import relativedelta
 
+from computing.mws.utils import get_last_date
 from computing.utils import create_chunk, merge_chunks
 from gee_computing.models import GEEAccount
 from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
@@ -48,31 +49,21 @@ def run_off(
             print(
                 "layer not found for run_off. So, reading the column name from asset_id."
             )
-        if layer_obj:
-            existing_end_date = layer_obj.misc["end_year"]
-        else:
-            fc = ee.FeatureCollection(asset_id)
-            col_names = fc.first().propertyNames().getInfo()
-            filtered_col = [col for col in col_names if col.startswith("20")]
-            filtered_col.sort()
-            existing_end_date = (
-                int(filtered_col[-1].split("-")[0]) + 1
-                if is_annual
-                else filtered_col[-1].split("-")[0]
-            )
-        existing_end_date = f"{existing_end_date}-06-30"
-        existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
+        existing_end_date = get_last_date(asset_id, is_annual, layer_obj)
+
         end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
         print("existing_end_date", existing_end_date)
         print("end_date", end_date)
-        if existing_end_date < end_date:
-            new_start_date = existing_end_date + relativedelta(months=1, day=1)
+        last_date = str(existing_end_date.date())
+        if existing_end_date.year < end_date.year:
+            new_start_date = existing_end_date
             new_start_date = new_start_date.strftime("%Y-%m-%d")
             end_date = end_date.strftime("%Y-%m-%d")
             new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
             new_description = f"{description}_{new_start_date}_{end_date}"
+
             if not is_gee_asset_exists(new_asset_id):
-                task_id, new_asset_id = _generate_layer(
+                task_id, new_asset_id, last_date = _generate_layer(
                     roi,
                     app_type,
                     asset_folder_list,
@@ -89,7 +80,7 @@ def run_off(
             # Check if data for new year is generated, if yes then merge it in existing asset
             if is_gee_asset_exists(new_asset_id):
                 merge_fc_into_existing_fc(asset_id, description, new_asset_id)
-        return None, asset_id
+        return None, asset_id, last_date
     else:
         return _generate_layer(
             roi,
@@ -125,13 +116,15 @@ def _generate_layer(
         create_gee_dir(asset_folder_list, helper_account_path)
 
         tasks = []
+        last_date = None
         for i in range(len(rois)):
             chunk_asset_id = (
                 get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
                 + descs[i]
             )
+
             if not is_gee_asset_exists(chunk_asset_id):
-                task_id = generate_run_off(
+                task_id, last_date = generate_run_off(
                     rois[i],
                     descs[i],
                     chunk_asset_id,
@@ -141,6 +134,21 @@ def _generate_layer(
                 )
                 if task_id:
                     tasks.append(task_id)
+            else:
+                if not last_date:
+                    fc = ee.FeatureCollection(chunk_asset_id)
+                    col_names = fc.first().propertyNames().getInfo()
+                    filtered_col = [col for col in col_names if col.startswith("20")]
+                    filtered_col.sort()
+                    chunk_end_date = datetime.datetime.strptime(
+                        filtered_col[-1], "%Y-%m-%d"
+                    )
+                    if is_annual:
+                        chunk_end_date = chunk_end_date + datetime.timedelta(days=364)
+                    else:
+                        chunk_end_date = chunk_end_date + datetime.timedelta(days=14)
+
+                    last_date = str(chunk_end_date.date())
 
         check_task_status(tasks, 500)
 
@@ -159,15 +167,14 @@ def _generate_layer(
             merge_asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
     else:
-        runoff_task_id = generate_run_off(
+        runoff_task_id, last_date = generate_run_off(
             roi, description, asset_id, start_date, end_date, is_annual
         )
-    return runoff_task_id, asset_id
+    return runoff_task_id, asset_id, last_date
 
 
 def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual):
     soil = ee.Image("projects/ee-dharmisha-siddharth/assets/HYSOGs250m")
-    # srtm = ee.Image("CGIAR/SRTM90_V4")
     srtm2 = ee.Image("USGS/SRTMGL1_003")
     lulc_img = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
 
@@ -195,19 +202,13 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
 
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    fn_index = 0
     while f_start_date <= end_date:
         if is_annual:
-            f_end_date = f_start_date + relativedelta(years=1)
+            f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
-            if fn_index == 25:
-                # Setting date to 1st July if index==25
-                f_end_date = f_start_date + relativedelta(months=1, day=1)
-                fn_index = 0
-            else:
-                f_end_date = f_start_date + datetime.timedelta(days=14)
-                fn_index += 1
-
+            f_end_date = f_start_date + datetime.timedelta(days=14)
+            if f_end_date > end_date:
+                break
         lulc = lulc_img.filterDate(f_start_date, f_end_date)
         classification = lulc.select("label")
 
@@ -460,4 +461,4 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
-    return task_id
+    return task_id, start_date
