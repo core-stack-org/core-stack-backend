@@ -22,6 +22,7 @@ from computing.lulc.utils.cropland import *
 from computing.lulc.cropping_frequency import *
 from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -508,6 +509,8 @@ def generate_lulc_v3_tehsil(
     layer_at_geoserver = sync_lulc_to_geoserver(
         final_output_filename_array_new,
         l1_asset_new,
+        state_name,
+        district_name,
         tehsil_name,
         layer_ids,
     )
@@ -534,6 +537,8 @@ def sync_lulc_to_gcs(
 def sync_lulc_to_geoserver(
     final_output_filename_array_new,
     l1_asset_new,
+    state_name,
+    district_name,
     block_name,
     layer_ids,
 ):
@@ -565,4 +570,7 @@ def sync_lulc_to_geoserver(
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
                 print("geoserver flag is updated")
                 layer_at_geoserver = True
+                generate_STAC_layerwise.generate_raster_stac(state=state_name,district=district_name,block=block_name,layer_name='land_use_land_cover_raster')
+                update_layer_sync_status(layer_id=layer_ids[i], is_stac_specs_generated=True)
+                print("Stac Specs generated and updated")
     return layer_at_geoserver

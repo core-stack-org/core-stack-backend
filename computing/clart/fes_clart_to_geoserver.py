@@ -17,6 +17,9 @@ from computing.utils import (
     get_layer_object,
 )
 from computing.models import *
+from computing.STAC_specs import generate_STAC_layerwise
+from computing.utils import update_layer_sync_status
+
 
 
 @app.task(bind=True)
@@ -50,6 +53,10 @@ def generate_fes_clart_layer(self, state, district, block, file_path, gee_accoun
                     misc={"override_asset_id": asset_id},
                     is_override=True,
                 )
+
+                generate_STAC_layerwise.generate_raster_stac(state=state,district=district,block=block,layer_name='clart_raster')
+                update_layer_sync_status(layer_id=Layer.id, is_stac_specs_generated=True)
+                print("Stac Specs generated and updated")
             return res
     except Exception as e:
         raise e

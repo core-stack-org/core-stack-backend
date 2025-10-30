@@ -16,6 +16,7 @@ from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -245,4 +246,8 @@ def clart_layer(state, district, block):
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
+
+            generate_STAC_layerwise.generate_raster_stac(state=state,district=district,block=block,layer_name='clart_raster')
+            update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
+            print("Stac Specs generated and updated")
     return layer_at_geoserver
