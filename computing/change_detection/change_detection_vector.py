@@ -14,6 +14,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -205,6 +206,13 @@ def generate_vector(roi, args, state, district, block, layer_name):
 
 
 def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
+    stac_spec_layer_name_dict = {
+        "Urbanization": 'change_urbanization_vector',
+        "Degradation": 'change_cropping_reduction_vector',
+        "Deforestation": 'change_tree_cover_loss_vector',
+        "Afforestation": 'change_tree_cover_gain_vector',
+        "CropIntensity": 'change_cropping_intensity_vector',
+    }
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
@@ -223,5 +231,10 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
+
+        layer_name = stac_spec_layer_name_dict.get(param)
+        generate_STAC_layerwise.generate_vector_stac(state=state,district=district,block=block,layer_name=layer_name)
+        update_layer_sync_status(layer_id=layer_id, is_stac_specs_generated=True)
+        print("Stac Specs generated and updated")
         return True
     return False
