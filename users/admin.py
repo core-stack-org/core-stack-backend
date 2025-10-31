@@ -20,6 +20,7 @@ class CustomUserAdmin(UserAdmin):
     )
     list_filter = ("is_superadmin", "is_staff", "is_active", "groups", "organization")
     search_fields = ("username", "email", "first_name", "last_name")
+    autocomplete_fields = ("organization",)
 
     fieldsets = (
         (None, {"fields": ("username", "password")}),
