@@ -65,16 +65,26 @@ def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
 #         print("Exception in gee connection", e)
 
 
-def gcs_config():
+def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
     from google.oauth2 import service_account
 
     # # Authenticate Earth Engine
     # ee_initialize()
 
     # Authenticate Google Cloud Storage
-    credentials = service_account.Credentials.from_service_account_file(
-        GEE_SERVICE_ACCOUNT_KEY_PATH,
-        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    # credentials = service_account.Credentials.from_service_account_file(
+    #     GEE_SERVICE_ACCOUNT_KEY_PATH,
+    #     scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    # )
+
+    account = GEEAccount.objects.get(pk=gee_account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+    credentials = service_account.Credentials.from_service_account_info(
+        key_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/earthengine",
+            "https://www.googleapis.com/auth/devstorage.full_control",
+        ],
     )
 
     # Create Storage Client
