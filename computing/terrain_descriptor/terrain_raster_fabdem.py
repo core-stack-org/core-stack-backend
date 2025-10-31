@@ -19,7 +19,9 @@ from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def generate_terrain_raster_clip(self, state=None, district=None, block=None, gee_account_id=None):
+def generate_terrain_raster_clip(
+    self, state=None, district=None, block=None, gee_account_id=None
+):
     ee_initialize(gee_account_id)
     roi_asset_id = (
         get_gee_asset_path(state, district, block)
@@ -30,7 +32,6 @@ def generate_terrain_raster_clip(self, state=None, district=None, block=None, ge
         + "_uid"
     )
 
-
     # Output configuration
     dataset_name = "terrain_raster"
     description = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{dataset_name}"
@@ -38,9 +39,11 @@ def generate_terrain_raster_clip(self, state=None, district=None, block=None, ge
 
     # Load ROI geometry
     roi = ee.FeatureCollection(roi_asset_id)
-    
+
     # Load the raster image and clip to ROI
-    pan_india_raster = ee.Image("projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem")
+    pan_india_raster = ee.Image(
+        "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
+    )
 
     task = export_raster_asset_to_gee(
         image=pan_india_raster.clip(roi.geometry()),
@@ -49,14 +52,14 @@ def generate_terrain_raster_clip(self, state=None, district=None, block=None, ge
         scale=30,
         region=roi.geometry(),
     )
-    
+
     # Check task status
     task_id_list = check_task_status([task])
     print(f"Task completed. Task IDs: {task_id_list}")
-    
+
     # Check if asset was created
     layer_id = None
-    
+
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
 
@@ -65,7 +68,15 @@ def generate_terrain_raster_clip(self, state=None, district=None, block=None, ge
         print("task_id_list sync to gcs ", task_id_list)
 
         layer_id = save_layer_info_to_db(
-            state, district, block, description, asset_id, "Terrain Raster", layer_version=2.0,
+            state,
+            district,
+            block,
+            description,
+            asset_id,
+            "Terrain Raster",
+            layer_version=1.0,
+            algorithm="terrain_fabdem",
+            algorithm_version=2.0,
         )
 
         res = sync_raster_gcs_to_geoserver(
@@ -76,4 +87,3 @@ def generate_terrain_raster_clip(self, state=None, district=None, block=None, ge
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True
     return layer_at_geoserver
-
