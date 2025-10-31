@@ -163,7 +163,6 @@ def format_date_monsoon_onset(date_list):
     return min_date.strftime("%m-%d"), max_date.strftime("%m-%d")
 
 
-# The Start_only is for case 2023-2024 , so when true it will return 2023 if false then return 2023 and 2024 both
 def extract_years(items, *, start_only=True):
     years = []
     seen = set()
@@ -191,7 +190,7 @@ def extract_years(items, *, start_only=True):
 
     return sorted(years, key=int)
 
-# For columns like "drysp_unit_4_weeks_2018"
+
 def extract_years_single(items):
     years, seen = [], set()
     for s in map(str, items):
@@ -201,7 +200,8 @@ def extract_years_single(items):
                 seen.add(y)
                 years.append(y)
     return sorted(years, key=int) 
- 
+
+
 def get_rainfall_type(rainfall):
     if rainfall < 740:
         return "Semi-arid"
@@ -218,6 +218,25 @@ def get_rainfall_type(rainfall):
 # ? MARK: MAIN SECTION
 def get_osm_data(state, district, block, uid):
     try:
+        # * Area of the Tehsil
+        excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
+
+        df = pd.read_excel(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            sheet_name="terrain",
+        )
+        df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
+
+        total_area = df["area_in_ha"].sum()
+
         region_gdf = gpd.read_file(
             get_geojson(
                 "mws_layers", "deltaG_well_depth" + "_" + district + "_" + block
@@ -855,12 +874,12 @@ def get_osm_data(state, district, block, uid):
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_block = f"The Tehsil {block}" + parameter_block
+            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
 
         if parameter_mws == "":
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws
+            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws + "."
 
         return parameter_block, parameter_mws
 
@@ -1208,6 +1227,11 @@ def get_cropping_intensity(state, district, block, uid):
 
         filtered_df_inten = df.loc[df["UID"] == uid, selected_columns_inten]
 
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         if not filtered_df_inten.empty:
 
             inten_parameter_1 = f""
@@ -1219,13 +1243,39 @@ def get_cropping_intensity(state, district, block, uid):
             avg_inten = sum(filtered_df_inten.values[0]) / len(filtered_df_inten.values[0])
             
             if result.trend == "increasing":
-                inten_parameter_1 += f"The cropping intensity of the micro-watershed has increased over the last eight years from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
+                inten_parameter_1 += (
+                    f"The cropping intensity of the micro-watershed has increased over the years {year_range_text} "
+                    f"from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} "
+                    f"compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                    f"over the years in the Tehsil. "
+                )
             else:
                 if result.trend == "decreasing":
-                    inten_parameter_1 += f"The cropping intensity of this area has reduced over time from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
+                    inten_parameter_1 += (
+                        f"The cropping intensity of this area has reduced over the years {year_range_text} "
+                        f"from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} "
+                        f"compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                        f"over the years in the Tehsil. "
+                    )
                 else :
-                    inten_parameter_1 += f"The cropping intensity of this area has stayed steady at {round(avg_inten, 2)} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
-
+                    if avg_inten > block_avg:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"more than the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
+                    elif avg_inten < block_avg:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"less than the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
+                    else:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"similar to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
                 if avg_inten < 1.5:
                     inten_parameter_1 += f"It might be possible to improve cropping intensity through more strategic placement, while keeping equity in mind, of rainwater harvesting or groundwater recharge structures. "
             
@@ -1279,11 +1329,8 @@ def get_cropping_intensity(state, district, block, uid):
             
             formatted_years = format_years(drought_years)
 
-            if abs(drought_inten - non_drought_inten) > 0.2:
+            if (non_drought_inten - drought_inten) > 0.2 and len(drought_years):
                 inten_parameter_2 += f"Cropping intensity is reduced by {round(abs(drought_inten - non_drought_inten), 2)} during the drought years (AAA and BBB), as compared to non-drought years, and reveals a marked sensitivity of agricultural productivity to water scarcity. This decline underscores the critical need for farmers to adopt drought-resilient practices, such as constructing water harvesting structures. By capturing and storing rainwater, these structures can provide a crucial buffer against drought periods, helping to stabilize cropping intensity and sustain productivity even in water-stressed conditions."
-
-            else :
-                inten_parameter_2 += f"The observed {round(abs(drought_inten - non_drought_inten), 2)} reduction in the cropping intensity during drought years (AAA and BBB), compared to non-drought years, reveals a marked sensitivity of agricultural productivity to water scarcity. This decline underscores the critical need for farmers to adopt drought-resilient practices, such as constructing water harvesting structures. By capturing and storing rainwater, these structures can provide a crucial buffer against drought periods, helping to stabilize cropping intensity and sustain productivity even in water-stressed conditions."
 
             inten_parameter_2 = inten_parameter_2.replace("AAA and BBB",formatted_years)
 
@@ -1378,6 +1425,13 @@ def get_double_cropping_area(state, district, block, uid):
         filtered_df_double = df.loc[df["UID"] == uid, selected_columns_double].values[0]
         filtered_df_triple = df.loc[df["UID"] == uid, selected_columns_triple].values[0]
 
+        current_years = extract_years(selected_columns_single)
+
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         double_cropping_percent = []
 
         for index, area in enumerate(filtered_df_single):
@@ -1404,7 +1458,7 @@ def get_double_cropping_area(state, district, block, uid):
         else:
             parameter_double_crop += f"This microwatershed area has a high percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is more than 60% of the total agricultural land being cultivated twice a year."
 
-        return parameter_double_crop
+        return parameter_double_crop, year_range_text
 
     except Exception as e:
         logger.info(
@@ -1412,7 +1466,7 @@ def get_double_cropping_area(state, district, block, uid):
             district,
             block
         )
-        return ""
+        return "", ""
 
 
 def get_surface_Water_bodies_data(state, district, block, uid):
@@ -1449,6 +1503,11 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
         current_years = extract_years(selected_columns)
 
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         parameter_swb_1 = f""
         parameter_swb_2 = f""
         parameter_swb_3 = f""
@@ -1480,8 +1539,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             elif result.trend == "decreasing":
                 parameter_swb_1 = f"Surface water presence has decreased by {round(result.slope, 2)} hectares per year during 2017-22.Siltation could be a cause for decrease in surface water presence and therefore may require repair and maintenance of surface water bodies. Waterbody analysis can help identify waterbodies that may need such treatment."
             else:
-                parameter_swb_1 = f"The surface water presence has remained steady during 2017-22."
-
+                parameter_swb_1 = f"The surface water availability shows no definite trend over the years {year_range_text}."
 
             #? Drought Years SWB
             mws_drought_moderate = df_drought.loc[df_drought["UID"] == uid, selected_columns_moderate].values[0]
@@ -1983,11 +2041,21 @@ def get_drought_data(state, district, block, uid):
                     non_drought_years.append(match_exp.group(0))
 
         parameter_drought = f""
-        original_string = "An analysis of identified drought years — XXX, YYY and ZZZ reveals significant insights into the underlying rainfall patterns such as dry spells and deviations from normal precipitation. "
-        formatted_years = format_years(drought_years)
-        parameter_drought += original_string.replace(
-            "XXX, YYY and ZZZ", formatted_years
-        )
+
+        current_years = extract_years(selected_columns_mild)
+
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
+        if len(drought_years):
+            original_string = "An analysis of identified drought years — XXX, YYY and ZZZ reveals significant insights into the underlying rainfall patterns such as dry spells and deviations from normal precipitation. "
+            formatted_years = format_years(drought_years)
+            parameter_drought += original_string.replace("XXX, YYY and ZZZ", formatted_years)
+        
+        else :
+            parameter_drought = f"Refer to the following graph and see how the intensity of drought has changed in this microwatershed over the years {year_range_text}"
         
         #? Get all the Dryspell for data for Graph
         selected_columns_drysp_all = [col for col in df.columns if col.startswith("drysp_unit_4_weeks")]

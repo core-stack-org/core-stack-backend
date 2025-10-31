@@ -232,7 +232,7 @@ def generate_mws_report(request):
         )
 
         # ? Double Cropping Description Generation
-        double_crop_des = get_double_cropping_area(
+        double_crop_des, year_range_text = get_double_cropping_area(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
@@ -313,6 +313,7 @@ def generate_mws_report(request):
             "urbanization": urbanization,
             "restore_desc": restore_desc,
             "double_crop_des": double_crop_des,
+            "year_range_text" : year_range_text,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,
