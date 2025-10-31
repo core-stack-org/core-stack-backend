@@ -25,6 +25,7 @@ class ProjectAdmin(admin.ModelAdmin):
         "updated_by__first_name",
         "updated_by__last_name",
     )
+    autocomplete_fields = ("organization", "state_soi", "district_soi", "tehsil_soi")
 
     fieldsets = (
         (
