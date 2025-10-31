@@ -116,6 +116,7 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
+                layer_version=1.0,
                 misc={"start_date": start_date, "end_date": ppt_last_date},
             )
             print("save Precipitation info at the gee level...")
@@ -129,6 +130,9 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
+                algorithm="fldas",
+                algorithm_version=1.1,
+                layer_version=1.0,
                 misc={"start_date": start_date, "end_date": et_last_date},
             )
             print("save Evapotranspiration info at the gee level...")
@@ -142,6 +146,7 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
+                layer_version=1.0,
                 misc={"start_date": start_date, "end_date": ro_last_date},
             )
             print("save Run Off info at the gee level...")
@@ -205,6 +210,7 @@ def generate_hydrology(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Hydrology",
+            layer_version=1.0,
             misc={
                 "start_date": start_date,
                 "end_date": g_last_date,
