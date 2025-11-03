@@ -1,4 +1,4 @@
-# Frontend Implementation Guide
+/# Frontend Implementation Guide
 
 This document provides guidelines for implementing the frontend application that interacts with the Core Stack Backend. It outlines the architecture, components, authentication flow, and best practices based on the API, hierarchy, and database design.
 
