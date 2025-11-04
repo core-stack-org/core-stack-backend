@@ -20,7 +20,6 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
-    path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
     path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
@@ -106,8 +105,19 @@ urlpatterns = [
         name="generate_layer_in_order",
     ),
     path(
-        "layer_status_dashboard/",
-        api.layer_status_dashboard,
+        "layer_staus_dashboard/",
+        api.layer_staus_dashboard,
         name="layer_staus_dashboard",
+    ),
+    # Temperature & Humidity endpoints
+    path(
+        "generate-climate-layer/",
+        api.generate_climate_layer,
+        name="generate-climate-layer",
+    ),
+    path(
+        "climate-task-status/<str:task_id>/",
+        api.get_climate_task_status,
+        name="climate-task-status",
     ),
 ]

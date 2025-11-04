@@ -17,12 +17,13 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
-env = environ.Env()
-
-environ.Env.read_env()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+
+# Read .env file
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -52,6 +53,7 @@ PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = 2
 GEE_DEFAULT_ACCOUNT_ID = 1
+GEE_ACCOUNT_ID = 1  # Default account for temperature/humidity processing
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
@@ -213,16 +215,25 @@ DATA_UPLOAD_MAX_NUMBER_FILES = 1000
 # MARK: Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# Use SQLite for testing (comment out for production PostgreSQL)
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": DB_NAME,
-        "USER": DB_USER,
-        "PASSWORD": DB_PASSWORD,
-        "HOST": "127.0.0.1",
-        "PORT": "",
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+# Original PostgreSQL config (uncomment for production)
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": DB_NAME,
+#         "USER": DB_USER,
+#         "PASSWORD": DB_PASSWORD,
+#         "HOST": "127.0.0.1",
+#         "PORT": "",
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

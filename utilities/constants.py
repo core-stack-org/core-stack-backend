@@ -182,6 +182,10 @@ GEE_PATHS = {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/waterbody/",
         "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/waterbody/",
     },
+    "TEMPERATURE_HUMIDITY": {
+        "GEE_ASSET_PATH": GEE_BASE_PATH + "/temperature_humidity/",
+        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/temperature_humidity/",
+    },
 }
 
 WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
