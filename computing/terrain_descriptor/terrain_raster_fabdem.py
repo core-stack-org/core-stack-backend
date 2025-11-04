@@ -74,8 +74,7 @@ def generate_terrain_raster_clip(
             description,
             asset_id,
             "Terrain Raster",
-            layer_version=1.0,
-            algorithm="terrain_fabdem",
+            algorithm="FABDEM",
             algorithm_version=2.0,
         )
 
