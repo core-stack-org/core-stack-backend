@@ -110,4 +110,5 @@ urlpatterns = [
         api.layer_status_dashboard,
         name="layer_staus_dashboard",
     ),
+    path("generate_lcw_data/", api.generate_lcw_to_gee, name="generate_lcw_to_gee"),
 ]
