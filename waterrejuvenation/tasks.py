@@ -25,7 +25,7 @@ from computing.water_rejuvenation.water_rejuventation import (
     generate_zoi_asset_on_gee,
     generate_ndmi_layer,
 )
-from nrm_app.settings import PAN_INDIA_LULC_PATH
+from constants.pan_india_path import PAN_INDIA_LULC_PATH
 from projects.models import Project
 from projects.serializers import ProjectSerializer
 from utilities.constants import SITE_DATA_PATH, GEE_PATHS
