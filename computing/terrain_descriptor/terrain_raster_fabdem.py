@@ -67,6 +67,13 @@ def generate_terrain_raster_clip(
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
 
+        layer_name = (
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_terrain_raster"
+        )
+
         task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, description)
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
@@ -75,7 +82,7 @@ def generate_terrain_raster_clip(
             state,
             district,
             block,
-            description,
+            layer_name,
             asset_id,
             "Terrain Raster",
             layer_version=1.0,
@@ -84,7 +91,7 @@ def generate_terrain_raster_clip(
         )
 
         res = sync_raster_gcs_to_geoserver(
-            "terrain", description, description, "terrain_raster"
+            "terrain", layer_name, layer_name, "terrain_raster"
         )
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
