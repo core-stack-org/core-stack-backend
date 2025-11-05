@@ -3,7 +3,6 @@ import ee
 from nrm_app.celery import app
 import geopandas as gpd
 from geojson import Feature, FeatureCollection
-from shapely import wkt
 from shapely.geometry import mapping
 from computing.utils import (
     generate_shape_files,
@@ -11,14 +10,11 @@ from computing.utils import (
 )
 from utilities.gee_utils import (
     ee_initialize,
-    check_task_status,
     valid_gee_text,
     get_gee_asset_path,
-    geojson_to_ee_featurecollection,
     is_gee_asset_exists,
     create_gee_directory,
     upload_shp_to_gee,
-    export_vector_asset_to_gee,
     make_asset_public,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
@@ -27,7 +23,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
-    ee_initialize(gee_account_id)
+    ee_initialize()
     description = (
         "admin_boundary_"
         + valid_gee_text(district.lower())
@@ -41,6 +37,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
     layer_id = None
     # Generate shape files and sync to geoserver
     shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
+    create_gee_directory(state, district, block)
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
@@ -86,21 +83,6 @@ def create_shp_files(collection, state_dir, district, block, layer_id):
             print(e)
     path = generate_shape_files(path)
     return path
-
-
-def sync_admin_boundary_to_ee(collection, description, state, district, block):
-    create_gee_directory(state, district, block)
-
-    fc = geojson_to_ee_featurecollection(collection)
-    try:
-        # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = export_vector_asset_to_gee(
-            fc, description, get_gee_asset_path(state, district, block) + description
-        )
-        return task
-    except Exception as e:
-        print(f"Error occurred in running admin_boundary_task: {e}")
-        return None
 
 
 def clip_block_from_admin_boundary(state, district, block):

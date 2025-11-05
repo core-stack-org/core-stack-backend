@@ -3,7 +3,7 @@ from projects.models import Project
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import ee_initialize, get_gee_asset_path, get_gee_dir_path
 import ee
-from nrm_app.settings import PAN_INDIA_CATCHMENT_AREA, PAN_INDIA_STREAM_ORDER
+from constants.pan_india_path import CATCHMENT_AREA, STREAM_ORDER_RASTER
 from waterrejuvenation.utils import delete_asset_on_GEE, wait_for_task_completion
 
 
@@ -15,13 +15,11 @@ def compute_max_stream_order_and_catchment_for_swb(swb_layer_asset, proj_id):
 
     # Load the raster image (must contain 'SR_B1' or your band)
 
-    catchemnt_area_raster = ee.Image(
-        PAN_INDIA_CATCHMENT_AREA
-    )  # Replace with your image ID
+    catchemnt_area_raster = ee.Image(CATCHMENT_AREA)  # Replace with your image ID
     catchment_band = catchemnt_area_raster.select(
         "b1"
     )  # Adjust based on the band you need
-    stream_order_raster = ee.Image(PAN_INDIA_STREAM_ORDER)
+    stream_order_raster = ee.Image(STREAM_ORDER_RASTER)
     stream_order_band = stream_order_raster.select("b1")
 
     # Function to compute max B1 inside each feature

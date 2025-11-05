@@ -32,14 +32,14 @@ logger = setup_logger(__name__)
 
 @app.task(bind=True)
 def site_suitability(
-        self,
-        gee_account_id,
-        project_id,
-        start_year,
-        end_year,
-        state=None,
-        district=None,
-        block=None,
+    self,
+    project_id,
+    start_year,
+    end_year,
+    state=None,
+    district=None,
+    block=None,
+    gee_account_id=None,
 ):
     """
     Main task for site suitability analysis using Google Earth Engine.
@@ -57,11 +57,15 @@ def site_suitability(
     ee_initialize(gee_account_id)
 
     if project_id:
-        project = Project.objects.get(
-            id=project_id, app_type=AppType.PLANTATION, enabled=True
-        )
-        organization = project.organization.name
-        project_name = project.name
+        try:
+            project = Project.objects.get(
+                id=project_id, app_type=AppType.PLANTATION, enabled=True
+            )
+            organization = project.organization.name
+            project_name = project.name
+        except Project.DoesNotExist:
+            print("Project {} not found".format(project_id))
+            return
 
         kml_files_obj = KMLFile.objects.filter(project=project)
         have_new_sites = False
@@ -74,10 +78,10 @@ def site_suitability(
         # Construct a unique description and asset ID for the project
         description = valid_gee_text(organization) + "_" + valid_gee_text(project_name)
         asset_id = (
-                get_gee_dir_path(
-                    [organization, project_name], asset_path=GEE_PATH_PLANTATION
-                )
-                + description
+            get_gee_dir_path(
+                [organization, project_name], asset_path=GEE_PATH_PLANTATION
+            )
+            + description
         )
 
         # Check if the asset already exists and handle accordingly
@@ -100,6 +104,7 @@ def site_suitability(
             start_year=start_year,
             end_year=end_year,
             have_new_sites=have_new_sites,
+            gee_account_id=gee_account_id,
         )
         # Sync the results to GeoServer for visualization
         sync_suitability_to_geoserver(
@@ -121,6 +126,7 @@ def site_suitability(
             block=block,
             start_year=start_year,
             end_year=end_year,
+            gee_account_id=gee_account_id,
         )
 
         # Sync the results to GeoServer for visualization

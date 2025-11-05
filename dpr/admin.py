@@ -12,6 +12,7 @@ from .models import (
     ODK_well,
     SWB_maintenance,
     SWB_RS_maintenance,
+    Overpass_Block_Details
 )
 
 
@@ -615,5 +616,39 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {"fields": ("uuid", "data_agri_maintenance"), "classes": ("collapse",)},
+        ),
+    )
+
+
+@admin.register(Overpass_Block_Details)
+class OverpassBlockDetailsAdmin(admin.ModelAdmin):
+    list_display = [
+        "block_details_id",
+        "location",
+        "has_overpass_response",
+    ]
+    search_fields = ["location", "block_details_id"]
+    ordering = ["-block_details_id"]
+
+    def has_overpass_response(self, obj):
+        return obj.overpass_response is not None
+    has_overpass_response.boolean = True
+    has_overpass_response.short_description = "Has Response"
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": (
+                    "location",
+                )
+            },
+        ),
+        (
+            "Overpass Response Data",
+            {
+                "fields": ("overpass_response",),
+                "classes": ("collapse",),
+            },
         ),
     )

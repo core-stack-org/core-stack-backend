@@ -6,6 +6,9 @@ from .mws_indicators import get_generate_filter_mws_data, download_KYL_filter_da
 from .village_indicators import get_generate_filter_data_village
 from utilities.auth_utils import auth_free
 import logging
+from utilities.gee_utils import (
+    valid_gee_text,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,9 +20,9 @@ logging.basicConfig(
 @schema(None)
 def generate_excel_file_layer(request):
     try:
-        state = request.query_params.get("state", "").lower().strip().replace(" ", "_")
-        district = request.query_params.get("district", "").lower().strip().replace(" ", "_")
-        block = request.query_params.get("block", "").lower().strip().replace(" ", "_")
+        state = valid_gee_text(request.query_params.get("state", "").lower())
+        district = valid_gee_text(request.query_params.get("district", "").lower())
+        block = valid_gee_text(request.query_params.get("block", "").lower())
 
         logging.info(f"Request to generate Excel for state: {state}, district: {district}, block: {block}")
 
@@ -71,9 +74,9 @@ def generate_kyl_data_excel(request):
     try:
         print("Inside generate_kyl_data_excel API.")
         
-        state = request.query_params.get("state", "").lower().strip()
-        district = request.query_params.get("district", "").lower().strip().replace(" ", "_")
-        block = request.query_params.get("block", "").lower().strip().replace(" ", "_")
+        state = valid_gee_text(request.query_params.get("state", "").lower())
+        district = valid_gee_text(request.query_params.get("district", "").lower())
+        block = valid_gee_text(request.query_params.get("block", "").lower())
         file_type = request.query_params.get("file_type", "").lower().strip()
         
         # Generate data for the file
@@ -107,9 +110,9 @@ def generate_kyl_village_data(request):
     try:
         print("Inside generate_filter_data_village API.")
         
-        state = request.query_params.get("state").lower()
-        district = request.query_params.get("district").lower().replace(" ", "_")
-        block = request.query_params.get("block").lower().replace(" ", "_")
+        state = valid_gee_text(request.query_params.get("state", "").lower())
+        district = valid_gee_text(request.query_params.get("district", "").lower())
+        block = valid_gee_text(request.query_params.get("block", "").lower())
         village_kyl_json =  get_generate_filter_data_village(state, district, block)
         if village_kyl_json:
             if isinstance(village_kyl_json, str) and os.path.exists(village_kyl_json):

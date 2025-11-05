@@ -22,6 +22,8 @@ def get_generate_filter_data_village(state, district, block):
     )
     xlsx_file = file_xl_path + ".xlsx"
 
+    print("file path", xlsx_file)
+
     # Try to load required sheets
     try:
         df_soc_eco_indi = pd.read_excel(

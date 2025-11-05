@@ -13,6 +13,9 @@ class PlanAppAdmin(admin.ModelAdmin):
         "state",
         "district",
         "block",
+        "state_soi",
+        "district_soi",
+        "tehsil_soi",
         "village_name",
         "facilitator_name",
         "created_by",
@@ -44,12 +47,25 @@ class PlanAppAdmin(admin.ModelAdmin):
         "state__state_name",
         "district__district_name",
         "block__block_name",
+        "state_soi__state_name",
+        "district_soi__district_name",
+        "tehsil_soi__tehsil_name",
         "village_name",
         "gram_panchayat",
         "facilitator_name",
         "created_by__username",
     )
     readonly_fields = ("created_by", "created_at", "updated_by", "updated_at")
+    autocomplete_fields = (
+        "state_soi",
+        "district_soi",
+        "tehsil_soi",
+        "state",
+        "district",
+        "block",
+        "project",
+        "organization",
+    )
 
     fieldsets = (
         (None, {"fields": ("plan", "project", "organization")}),
@@ -60,6 +76,9 @@ class PlanAppAdmin(admin.ModelAdmin):
                     "state",
                     "district",
                     "block",
+                    "state_soi",
+                    "district_soi",
+                    "tehsil_soi",
                     "village_name",
                     "gram_panchayat",
                     "facilitator_name",

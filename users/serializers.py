@@ -40,6 +40,21 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_project_details(self, obj):
         """Get project-specific roles for the user."""
+        if (
+            obj.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            ).exists()
+            and obj.organization
+        ):
+            projects = Project.objects.filter(organization=obj.organization)
+            return [
+                {
+                    "project_id": project.id,
+                    "project_name": project.name,
+                }
+                for project in projects
+            ]
+
         project_details = UserProjectGroup.objects.filter(user=obj).select_related(
             "project", "group"
         )
@@ -59,7 +74,9 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         write_only=True, required=True, validators=[validate_password]
     )
     password_confirm = serializers.CharField(write_only=True, required=True)
-    organization = serializers.CharField(required=False, write_only=True)  # Changed from UUIDField to CharField
+    organization = serializers.CharField(
+        required=False, write_only=True
+    )  # Changed from UUIDField to CharField
 
     class Meta:
         model = User
@@ -77,7 +94,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def validate(self, attrs):
-        # Check that passwords match
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError(
                 {"password": "Password fields didn't match."}
@@ -85,10 +101,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         organization_input = attrs.get("organization")
         if organization_input:
-            from organization.models import Organization
             import uuid
 
-            # Check if input is UUID
+            from organization.models import Organization
+
             try:
                 uuid.UUID(organization_input)
                 is_uuid = True
@@ -104,7 +120,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                         {"organization": "Organization not found."}
                     )
             else:
-                # Case-insensitive lookup for existing org
                 try:
                     organization = Organization.objects.filter(
                         name__iexact=organization_input
@@ -113,11 +128,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                     if organization:
                         attrs["organization_obj"] = organization
                     else:
-                        # Defer creation to `create()` so we can assign `created_by`
                         attrs["_new_org_name"] = organization_input
                 except Exception as e:
                     raise serializers.ValidationError(
-                        {"organization": f"Failed to create/find organization: {str(e)}"}
+                        {
+                            "organization": f"Failed to create/find organization: {str(e)}"
+                        }
                     )
 
         return attrs
@@ -140,13 +156,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             contact_number=validated_data.get("contact_number", ""),
         )
 
-        # Assign organization
         if org_obj:
             user.organization = org_obj
         elif new_org_name:
             org_obj = Organization.objects.create(
                 name=new_org_name,
-                created_by=user  # <-- here we set created_by to the same new user
+                created_by=user,  # <-- here we set created_by to the same new user
             )
             user.organization = org_obj
 

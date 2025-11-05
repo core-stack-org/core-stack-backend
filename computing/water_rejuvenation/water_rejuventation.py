@@ -6,7 +6,7 @@ from gee_computing.utils import extract_ndmis, classify_checkdams, mask_landsat_
 from nrm_app.celery import app
 from projects.models import Project
 from utilities.gee_utils import ee_initialize, get_distance_between_two_lan_long
-from nrm_app.settings import PAN_INDIA_LULC_PATH, PAN_INDIA_MWS_PATH
+from constants.pan_india_path import PAN_INDIA_LULC_PATH, PAN_INDIA_MWS_PATH
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures

@@ -81,6 +81,13 @@
             margin-right: 5px;
             border-radius: 2px;
         }
+        .legend-note {
+            color: #6c757d;       /* gray */
+            text-align: center;
+            font-size: 0.9rem;
+            font-style: italic;
+            margin: 6px 0 0;      /* tight spacing under legend */
+        }
         footer {
             margin-top: 40px;
             border-top: 1px solid #ddd;
@@ -203,170 +210,215 @@
     </style>
 </head>
 <body>
-<header>
+    <header>
+        <div class="container">
+            <h1>Resource and Demand Map Report</h1>
+            <button class="print-button" onclick="printReport()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Save as PDF
+            </button>
+        </div>
+
+
+    </header>
+
     <div class="container">
-        <h1>Resource and Demand Map Report</h1>
-        <button class="print-button" onclick="printReport()">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                <rect x="6" y="14" width="12" height="8"></rect>
-            </svg>
-            Save as PDF
-        </button>
+
+        <section class="section">
+            <h2>Village Overview over LULC</h2>
+            <div id="villageMap" class="map"></div>
+        </section>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #A9A9A9;"></div>
+                <span>Barren Lands</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #c6e46d;"></div>
+               <span>Single Kharif</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eee05d;"></div>
+                <span>Single Non-Kharif</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f9b249;"></div>
+                <span>Double Cropping</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #fb5139;"></div>
+                <span>Tripple/Annual/Perennial Cropping</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4c4ef5;"></div>
+                <span>Shrubs and Scrubs</span>
+            </div>
+        </div>
     </div>
 
-
-</header>
-
-<div class="container">
-
-    <section class="section">
-        <h2>Village Overview over LULC</h2>
-        <div id="villageMap" class="map"></div>
-    </section>
-    <div class="legend">
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #A9A9A9;"></div>
-            <span>Barren Lands</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #c6e46d;"></div>
-            <span>Single Kharif</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #eee05d;"></div>
-            <span>Single Non-Kharif</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #f9b249;"></div>
-            <span>Double Cropping</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #fb5139;"></div>
-            <span>Tripple/Annual/Perennial Cropping</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #4c4ef5;"></div>
-            <span>Shrubs and Scrubs</span>
-        </div>
-    </div>
-</div>
-
-<div class="container">
-
-    <section class="section">
-        <h2>Settlement Overview</h2>
-        <div id="mainMap" class="map"></div>
-    </section>
-
-</div>
-
-<div class="container">
-
-    <section class="section">
-        <h2>Well Overview</h2>
-        <div id="wellMap" class="map"></div>
-    </section>
-
-</div>
-
-<div class="container">
-
-    <section class="section">
-        <h2>Water Structures Overview</h2>
-        <div id="waterStructureMap" class="map"></div>
-    </section>
-    <div class="legend">
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #4ade80;"></div>
-            <span>Good recharge</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #fde047;"></div>
-            <span>Moderate recharge</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #be185d;"></div>
-            <span>Regeneration</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #3b82f6;"></div>
-            <span>High runoff zone</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #dc2626;"></div>
-            <span>Surface water harvesting</span>
-        </div>
-    </div>
-</div>
-
-<div class="container">
-
-    <section class="section">
-        <h2>Demands Overview</h2>
-        <div id="demandStructureMap" class="map"></div>
-    </section>
-    <div class="legend">
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #313695;"></div>
-            <span>V-shape river valleys, Deep narrow canyons</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #4575b4;"></div>
-            <span>Lateral midslope incised drainages, Local valleys in plains</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #a50026;"></div>
-            <span>Upland incised drainages, Stream headwaters</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #e0f3f8;"></div>
-            <span>U-shape valleys</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #fffc00;"></div>
-            <span>Broad Flat Areas</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #feb24c;"></div>
-            <span>Broad open slopes</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #f46d43;"></div>
-            <span>Mesa tops</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #d73027;"></div>
-            <span>Upper Slopes</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #91bfdb;"></div>
-            <span>Local ridge/hilltops within broad valleys</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #800000;"></div>
-            <span>Lateral midslope drainage divides, Local ridges in plains</span>
-        </div>
-        <div class="legend-item">
-            <div class="legend-color" style="background-color: #4d0000;"></div>
-            <span>Mountain tops, high ridges</span>
-        </div>
-    </div>
-</div>
-
-<footer>
     <div class="container">
-        <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
-        <p>
-            Please do share your feedback with
-            <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
-        </p>
-    </div>
-</footer>
 
-<script>
+        <section class="section">
+            <h2>Settlement Overview</h2>
+            <div id="mainMap" class="map"></div>
+        </section>
+
+    </div>
+
+    <div class="container">
+
+        <section class="section">
+            <h2>Well Overview</h2>
+            <div id="wellMap" class="map"></div>
+        </section>
+        <p class="legend-note">Note: Well Demands on Stream Order Raster</p>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f7fbff;"></div>
+                <span>1</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #e4eff9;"></div>
+                <span>2</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d1e2f3;"></div>
+                <span>3</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #bad6eb;"></div>
+                <span>4</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #9ac8e0;"></div>
+                <span>5</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #73b2d8;"></div>
+                <span>6</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #529dcc;"></div>
+                <span>7</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #3585bf;"></div>
+                <span>8</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #1d6cb1;"></div>
+                <span>9</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #08519c;"></div>
+                <span>10</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #08306b;"></div>
+                <span>11</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <section class="section">
+            <h2>Water Structures Overview</h2>
+            <div id="waterStructureMap" class="map"></div>
+        </section>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4ade80;"></div>
+                <span>Good recharge</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #fde047;"></div>
+               <span>Moderate recharge</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #be185d;"></div>
+                <span>Regeneration</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #3b82f6;"></div>
+                <span>High runoff zone</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #dc2626;"></div>
+                <span>Surface water harvesting</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <section class="section">
+            <h2>Demands Overview</h2>
+            <div id="demandStructureMap" class="map"></div>
+        </section>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #313695;"></div>
+                <span>V-shape river valleys, Deep narrow canyons</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4575b4;"></div>
+                <span>Lateral midslope incised drainages, Local valleys in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a50026;"></div>
+                <span>Upland incised drainages, Stream headwaters</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                <span>U-shape valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #fffc00;"></div>
+                <span>Broad Flat Areas</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #feb24c;"></div>
+                <span>Broad open slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f46d43;"></div>
+                <span>Mesa tops</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d73027;"></div>
+                <span>Upper Slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #91bfdb;"></div>
+                <span>Local ridge/hilltops within broad valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #800000;"></div>
+                <span>Lateral midslope drainage divides, Local ridges in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4d0000;"></div>
+                <span>Mountain tops, high ridges</span>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>
+                Please do share your feedback with
+                <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
+            </p>
+        </div>
+    </footer>
+
+    <script>
     const view = new ol.View({
         center: [78.9, 23.6],
         zoom: 10,
@@ -434,14 +486,30 @@
 
     const wellMap = new ol.Map({
         target: 'wellMap',
-        layers: [new ol.layer.Tile({
+        layers: [
+        new ol.layer.Tile({
                     source: new ol.source.XYZ({
                         url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
                         maxZoom: 30,
                         transition: 500,
                     }),
                     preload: 4,
-                })],
+                }),
+                    new ol.layer.Image({
+                        source : new ol.source.ImageWMS({
+                            url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                            params : {
+                                'LAYERS': "stream_order:stream_order_{{district}}_{{block}}_raster",
+                                'STYLES' : "stream_order"
+                            },
+                            ratio : 1,
+                            serverType: 'geoserver',
+                        }),
+                        visible : true,
+                        name : 'stream_raster',
+                        opacity: 0.7
+                    })
+                ],
         view: new ol.View({
             center: [78.9, 23.6],
             zoom: 10,
@@ -847,7 +915,7 @@
             const IrrigationLayer = new ol.layer.Vector({
                 source: vectorSourceIrr,
                 style: (feature) => {
-                    const name = (feature.get('TYPE_OF_WO') || '').toString();
+                    const name = (feature.get('TYPE_OF_WO') || feature.get('work_type') ||'').toString();
                     return new ol.style.Style({
                         image: new ol.style.Icon({
                             src: IrrigationIconsUrl,
@@ -914,7 +982,7 @@
             demandStructureMap.addLayer(RechargeLayer);
             const arr = vectorSourceRechr.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            demandStructureMap.getView().setZoom(16)
+            demandStructureMap.getView().setZoom(15)
             demandStructureMap.getView().setCenter(mapcenter);
         } catch (error) {
             console.log(error)

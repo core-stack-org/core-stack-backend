@@ -3,6 +3,7 @@ import datetime
 
 from dateutil.relativedelta import relativedelta
 
+from computing.mws.utils import get_last_date
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
@@ -40,7 +41,6 @@ def delta_g(
         layer_obj = None
         try:
             dataset = Dataset.objects.get(name="Hydrology")
-            # TODO instead of here, pass in arguments from main file
             layer_name = (
                              "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
                          ) + asset_suffix
@@ -53,47 +53,58 @@ def delta_g(
             print(
                 "layer not found for deltaG. So, reading the column name from asset_id"
             )
+
+        # existing_end_date = get_last_date(asset_id, is_annual, layer_obj)
+
         if layer_obj:
-            existing_end_date = layer_obj.misc["end_year"]
-        else:
-            fc = ee.FeatureCollection(asset_id)
-            col_names = fc.first().propertyNames().getInfo()
-            filtered_col = [col for col in col_names if col.startswith("20")]
-            filtered_col.sort()
-            existing_end_date = (
-                filtered_col[-1].split("-")[0].split("_")[-1]
-                if is_annual
-                else filtered_col[-1].split("-")[0]
+            existing_end_date = layer_obj.misc["end_date"]
+            existing_end_date = datetime.datetime.strptime(
+                existing_end_date, "%Y-%m-%d"
             )
-            print(f"{existing_end_date=}")
-        existing_end_date = f"{existing_end_date}-06-30"
-        existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
-        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+            # else:
+            #     fc = ee.FeatureCollection(asset_id)
+            #     col_names = fc.first().propertyNames().getInfo()
+            #     filtered_col = [col for col in col_names if col.startswith("20")]
+            #     filtered_col.sort()
+            #     existing_end_date = filtered_col[-1]
+            #
+            #     if is_annual:
+            #         existing_end_date = existing_end_date + datetime.timedelta(days=364)
+            #     else:
+            #         existing_end_date = datetime.datetime.strptime(
+            #             filtered_col[-1], "%Y-%m-%d"
+            #         )
+            #         existing_end_date = existing_end_date + datetime.timedelta(days=14)
 
-        if existing_end_date < end_date:
-            new_start_date = existing_end_date + relativedelta(months=1, day=1)
-            new_start_date = new_start_date.strftime("%Y-%m-%d")
-            end_date = end_date.strftime("%Y-%m-%d")
-            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
-            new_description = f"{description}_{new_start_date}_{end_date}"
-            if not is_gee_asset_exists(new_asset_id):
-                task_id, new_asset_id = _generate_data(
-                    roi,
-                    new_asset_id,
-                    asset_path,
-                    asset_suffix,
-                    new_description,
-                    new_start_date,
-                    end_date,
-                    is_annual,
-                )
-                check_task_status([task_id])
-                print("DeltaG new year data generated.")
+            end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
-            # Check if data for new year is generated, if yes then merge it in existing asset
-            if is_gee_asset_exists(new_asset_id):
-                merge_fc_into_existing_fc(asset_id, description, new_asset_id)
-        return None, asset_id
+            if existing_end_date.year < end_date.year:
+                new_start_date = existing_end_date
+                new_start_date = new_start_date.strftime("%Y-%m-%d")
+                end_date = end_date.strftime("%Y-%m-%d")
+                new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+                new_description = f"{description}_{new_start_date}_{end_date}"
+
+                if not is_gee_asset_exists(new_asset_id):
+                    task_id, new_asset_id = _generate_data(
+                        roi,
+                        new_asset_id,
+                        asset_path,
+                        asset_suffix,
+                        new_description,
+                        new_start_date,
+                        end_date,
+                        is_annual,
+                    )
+                    check_task_status([task_id])
+                    print("DeltaG new year data generated.")
+
+                # Check if data for new year is generated, if yes then merge it in existing asset
+                if is_gee_asset_exists(new_asset_id):
+                    merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+            return None, asset_id
+        else:
+            ee.data.deleteAsset(asset_id)
 
     return _generate_data(
         roi,
@@ -120,30 +131,29 @@ def _generate_data(
     prec = ee.FeatureCollection(
         asset_path + "Prec_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # Precipitation feature collection
+
     runoff = ee.FeatureCollection(
         asset_path
         + "Runoff_"
         + ("annual_" if is_annual else "fortnight_")
         + asset_suffix
     )  # RO feature collection
+
     et = ee.FeatureCollection(
         asset_path + "ET_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # et feature collection
+
     keys = ["Precipitation", "RunOff", "ET", "DeltaG"]
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    fn_index = 0
+
     while f_start_date <= end_date:
         if is_annual:
-            f_end_date = f_start_date + relativedelta(years=1)
+            f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
-            if fn_index == 25:
-                # Setting date to 1st July if index==25
-                f_end_date = f_start_date + relativedelta(months=1, day=1)
-                fn_index = 0
-            else:
-                f_end_date = f_start_date + datetime.timedelta(days=14)
-                fn_index += 1
+            f_end_date = f_start_date + datetime.timedelta(days=14)
+            if f_end_date > end_date:
+                break
 
         def res(feat):
             uid = feat.get("uid")

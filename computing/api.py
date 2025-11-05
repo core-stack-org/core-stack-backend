@@ -12,6 +12,8 @@ from computing.change_detection.change_detection_vector import (
 from .lulc.lulc_vector import vectorise_lulc
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
+from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
+from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
 from .lulc.v4.lulc_v4 import generate_lulc_v4
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order
@@ -28,7 +30,7 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from .terrain_descriptor.terrain_raster import terrain_raster
+from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from computing.misc.drainage_lines import clip_drainage_lines
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
@@ -52,6 +54,7 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
+from .views import layer_status
 
 
 @api_security_check(allowed_methods="POST")
@@ -62,7 +65,7 @@ def generate_admin_boundary(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_tehsil_shape_file_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -178,7 +181,7 @@ def generate_mws_layer(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         mws_layer.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -200,7 +203,7 @@ def generate_fortnightly_hydrology(request):
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_hydrology.apply_async(
             kwargs={
                 "state": state,
@@ -231,7 +234,7 @@ def generate_annual_hydrology(request):
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_hydrology.apply_async(
             kwargs={
                 "state": state,
@@ -249,6 +252,41 @@ def generate_annual_hydrology(request):
         )
     except Exception as e:
         print("Exception in generate_annual_hydrology api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def lulc_for_tehsil(request):
+    print("Inside lulc_v3 api.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        version = request.data.get("version")
+        if version == "v2":
+            generate_lulc_v2_tehsil.apply_async(
+                args=[state, district, block, start_year, end_year, gee_account_id],
+                queue="nrm",
+            )
+            return Response(
+                {"Success": "generate_lulc_v2_tehsil task initiated"},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            generate_lulc_v3_tehsil.apply_async(
+                args=[state, district, block, start_year, end_year, gee_account_id],
+                queue="nrm",
+            )
+            return Response(
+                {"Success": "generate_lulc_v3_tehsil task initiated"},
+                status=status.HTTP_200_OK,
+            )
+    except Exception as e:
+        print("Exception in lulc_for_tehsil api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -316,7 +354,7 @@ def lulc_v3(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         clip_lulc_v3.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -339,7 +377,7 @@ def lulc_vector(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         vectorise_lulc.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -363,7 +401,7 @@ def lulc_v4(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_lulc_v4.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -403,7 +441,7 @@ def generate_ci_layer(request):
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_cropping_intensity.apply_async(
             kwargs={
                 "state": state,
@@ -434,7 +472,7 @@ def generate_swb(request):
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_swb_layer.apply_async(
             kwargs={
                 "state": state,
@@ -464,7 +502,7 @@ def generate_drought_layer(request):
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         calculate_drought.apply_async(
             kwargs={
                 "state": state,
@@ -493,7 +531,7 @@ def generate_terrain_descriptor(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_terrain_clusters.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -512,17 +550,15 @@ def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
         state = request.data.get("state")
-        print(state)
         district = request.data.get("district")
         block = request.data.get("block")
-        gee_account_id = request.data.get("gee_account_id").lower()
-        terrain_raster.apply_async(
+        gee_account_id = request.data.get("gee_account_id")
+        generate_terrain_raster_clip.apply_async(
             kwargs={
-                "gee_account_id": gee_account_id,
-                "roi_path": None,
                 "state": state,
                 "district": district,
                 "block": block,
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
@@ -546,7 +582,7 @@ def terrain_lulc_slope_cluster(request):
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         lulc_on_slope_cluster.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -570,7 +606,7 @@ def terrain_lulc_plain_cluster(request):
         block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         lulc_on_plain_cluster.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -592,7 +628,7 @@ def generate_clart(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_clart_layer.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -615,7 +651,7 @@ def change_detection(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         get_change_detection.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -637,7 +673,7 @@ def change_detection_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         vectorise_change_detection.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -658,7 +694,7 @@ def crop_grid(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         create_crop_grids.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -681,7 +717,7 @@ def mws_drought_causality(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         drought_causality.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -705,7 +741,7 @@ def tree_health_raster(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         tree_health_ccd_raster.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -736,7 +772,7 @@ def tree_health_vector(request):
         block = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         tree_health_overall_change_vector.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -778,7 +814,7 @@ def stream_order(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_stream_order.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -799,7 +835,7 @@ def restoration_opportunity(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_restoration_opportunity.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -827,7 +863,11 @@ def plantation_site_suitability(request):
         block = request.data.get("block").lower() if request.data.get("block") else None
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = (
+            request.data.get("gee_account_id")
+            if request.data.get("gee_account_id")
+            else None
+        )
         site_suitability.apply_async(
             args=[
                 project_id,
@@ -857,7 +897,7 @@ def aquifer_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_aquifer_vector.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -878,7 +918,7 @@ def soge_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_soge_vector.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -897,9 +937,9 @@ def soge_vector(request):
 def fes_clart_upload_layer(request):
     try:
         print("Inside upload_fes_clart_layer API")
-        state = request.data.get("state", "").lower().strip().replace(" ", "_")
-        district = request.data.get("district", "").lower().strip().replace(" ", "_")
-        block = request.data.get("block", "").lower().strip().replace(" ", "_")
+        state = request.data.get("state", "").lower()
+        district = request.data.get("district", "").lower()
+        block = request.data.get("block", "").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
         uploaded_file = request.FILES.get("clart_file")
 
@@ -908,19 +948,27 @@ def fes_clart_upload_layer(request):
                 {"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Save file to temp location
+        file_extension = os.path.splitext(uploaded_file.name)[1]
+        filename = f'{district.strip().replace(" ", "_")}_{block.strip().replace(" ", "_")}_clart_fes{file_extension}'
+
         temp_upload_dir = os.path.join(
-            BASE_DIR, "data", "fes_clart_file", state, district
+            BASE_DIR,
+            "data",
+            "fes_clart_file",
+            state.strip().replace(" ", "_"),
+            district.strip().replace(" ", "_"),
         )
         os.makedirs(temp_upload_dir, exist_ok=True)
+        file_path = os.path.join(temp_upload_dir, filename)
 
-        file_extension = os.path.splitext(uploaded_file.name)[1]
-        clart_filename = f"{district}_{block}_clart_fes{file_extension}"
-        file_path = os.path.join(temp_upload_dir, clart_filename)
         with open(file_path, "wb+") as destination:
             for chunk in uploaded_file.chunks():
                 destination.write(chunk)
+
+        # Pass file path to the task
         generate_fes_clart_layer.apply_async(
-            args=[state, district, block, file_path, clart_filename, gee_account_id],
+            args=[state, district, block, file_path, gee_account_id],
             queue="nrm",
         )
 
@@ -941,7 +989,7 @@ def swb_pond_merging(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         merge_swb_ponds.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -1088,7 +1136,7 @@ def generate_layer_in_order(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         map_order = request.data.get("map")
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         start_year = int(start_year) if start_year is not None else None
@@ -1110,4 +1158,22 @@ def generate_layer_in_order(request):
         )
     except Exception as e:
         print("Exception in generate_layer_order_first api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def layer_status_dashboard(request):
+    print("inside layer_staus_dashboard")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        result = layer_status(state, district, block)
+        return Response(
+            {"result": result},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in layer_staus_dashboard api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -626,6 +626,8 @@ def save_layer_info_to_db(
     dataset_name,
     sync_to_geoserver=False,
     layer_version=1.0,
+    algorithm=None,
+    algorithm_version=1.0,
     misc=None,
     is_override=False,
 ):
@@ -653,6 +655,8 @@ def save_layer_info_to_db(
         block=block_obj,
         layer_version=layer_version,
         defaults={
+            "algorithm": algorithm,
+            "algorithm_version": algorithm_version,
             "is_sync_to_geoserver": sync_to_geoserver,
             "is_public_gee_asset": is_public,
             "is_override": is_override,

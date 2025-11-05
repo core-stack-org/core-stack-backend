@@ -3,6 +3,7 @@ import datetime
 
 from dateutil.relativedelta import relativedelta
 
+from computing.mws.utils import get_last_date
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     check_task_status,
@@ -16,21 +17,23 @@ from computing.models import Layer, Dataset
 
 
 def evapotranspiration(
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type=None,
-        start_year=None,
-        end_year=None,
-        is_annual=False,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_year=None,
+    end_year=None,
+    is_annual=False,
 ):
+    start_date = f"{start_year}-07-01"
+    end_date = f"{end_year}-06-30"
     description = ("ET_annual_" if is_annual else "ET_fortnight_") + asset_suffix
 
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + description
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
 
     if is_gee_asset_exists(asset_id):
@@ -46,31 +49,26 @@ def evapotranspiration(
             print(
                 "layer not found for evapotranspiration. So, reading the column name from asset_id."
             )
-        if layer_obj:
-            existing_end_date = int(layer_obj.misc["end_year"])
-        else:
-            fc = ee.FeatureCollection(asset_id)
-            col_names = fc.first().propertyNames().getInfo()
-            filtered_col = [col for col in col_names if col.startswith("20")]
-            filtered_col.sort()
-            existing_end_date = (
-                int(filtered_col[-1].split("-")[0]) + 1
-                if is_annual
-                else int(filtered_col[-1].split("-")[0])
-            )
+        existing_end_date = get_last_date(asset_id, is_annual, layer_obj)
+
+        end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
         print("existing_end_date", existing_end_date)
-        print("end_year", end_year)
-        if existing_end_date < end_year:
-            new_start_year = existing_end_date
-            new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
-            new_description = f"{description}_{new_start_year}_{end_year}"
+        print("end_date", end_date)
+        last_date = str(existing_end_date.date())
+        if existing_end_date.year < end_date.year:
+            new_start_date = existing_end_date
+            new_start_date = new_start_date.strftime("%Y-%m-%d")
+            end_date = end_date.strftime("%Y-%m-%d")
+            new_asset_id = f"{asset_id}_{new_start_date}_{end_date}"
+            new_description = f"{description}_{new_start_date}_{end_date}"
+
             if not is_gee_asset_exists(new_asset_id):
-                task_id, new_asset_id = _generate_data(
+                task_id, new_asset_id, last_date = _generate_data(
                     roi,
                     new_asset_id,
                     new_description,
-                    new_start_year,
-                    end_year,
+                    new_start_date,
+                    end_date,
                     is_annual,
                 )
                 check_task_status([task_id])
@@ -79,32 +77,32 @@ def evapotranspiration(
             # Check if data for new year is generated, if yes then merge it in existing asset
             if is_gee_asset_exists(new_asset_id):
                 merge_fc_into_existing_fc(asset_id, description, new_asset_id)
-        return None, asset_id
+        return None, asset_id, last_date
 
-    return _generate_data(roi, asset_id, description, start_year, end_year, is_annual)
+    return _generate_data(roi, asset_id, description, start_date, end_date, is_annual)
 
 
-def _generate_data(roi, asset_id, description, start_year, end_year, is_annual):
+def _generate_data(roi, asset_id, description, start_date, end_date, is_annual):
+    start_year = int(start_date.split("-")[0])
+    end_year = int(end_date.split("-")[0])
     if not is_annual and (end_year - start_year > 5):
         print("In chunking")
         chunk_assets = []
         s_year = start_year
         task_ids = []
+
         while s_year <= end_year:
-            start_date = f"{s_year}-07-01"
+            # start_date = f"{s_year}-07-01"
 
             e_year = end_year if s_year + 5 > end_year else s_year + 5
             end_date = f"{e_year}-06-30"
-
-            print(start_date, end_date)
-
-            chunk_asset_id = asset_id + "_" + str(s_year) + "_" + str(e_year)
+            chunk_asset_id = asset_id + "_" + str(start_date) + "_" + str(end_date)
             chunk_assets.append(chunk_asset_id)
 
-            task_id = calculate_et(
+            task_id, start_date = calculate_et(
                 roi,
                 chunk_asset_id,
-                description + "_" + str(s_year) + "_" + str(e_year),
+                description + "_" + str(start_date) + "_" + str(end_date),
                 start_date,
                 end_date,
                 is_annual,
@@ -117,22 +115,22 @@ def _generate_data(roi, asset_id, description, start_year, end_year, is_annual):
         return (
             merge_assets_chunked_on_year(chunk_assets, description, asset_id),
             asset_id,
+            start_date,
         )
     else:
         print("In else")
-        start_date = f"{start_year}-07-01"
-        end_date = f"{end_year}-06-30"
-        return (
-            calculate_et(
-                roi,
-                asset_id,
-                description,
-                start_date,
-                end_date,
-                is_annual,
-            ),
+        # start_date = f"{start_year}-07-01"
+        # end_date = f"{end_year}-06-30"
+
+        task_id, last_date = calculate_et(
+            roi,
             asset_id,
+            description,
+            start_date,
+            end_date,
+            is_annual,
         )
+        return task_id, asset_id, last_date
 
 
 def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
@@ -205,13 +203,12 @@ def et_fldas(
 
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    fn_index = 0  # fortnight index
     s_year = f_start_date.date().year
     while f_start_date < end_date:
         if is_annual:
-            f_end_date = f_start_date + relativedelta(years=1)
+            f_end_date = f_start_date + datetime.timedelta(days=363)
             image_path = (
-                    "projects/corestack-datasets/assets/datasets/ET_FLDAS/ET_Hydroyear/ET_"
+                "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_annual/ET_"
                 + str(s_year)
                 + "_"
                 + str(s_year + 1)
@@ -219,22 +216,16 @@ def et_fldas(
             )
             s_year += 1
         else:
+            f_end_date = f_start_date + datetime.timedelta(days=13)
+            if f_end_date > end_date:
+                break
+
             image_path = (
-                    "projects/corestack-datasets/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
-                + str(s_year)
+                "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
+                + str(f_start_date.date()).replace("-", "")
                 + "_"
-                + str(s_year + 1)
-                + "_"
-                + str(fn_index)
+                + str(f_end_date.date()).replace("-", "")
             )
-            if fn_index == 25:
-                # Setting date to 1st July if index==25
-                f_end_date = f_start_date + relativedelta(months=1, day=1)
-                fn_index = 0
-                s_year += 1
-            else:
-                f_end_date = f_start_date + datetime.timedelta(days=14)
-                fn_index += 1
 
         total = ee.Image(image_path)  # downloaded image for ET Hydro_2017_2018_25
         mws = ee.List.sequence(0, size1)
@@ -285,12 +276,12 @@ def et_fldas(
             return feat.set(start_date, val)
 
         shape = ee.FeatureCollection(mws.map(res))
-        f_start_date = f_end_date
+        f_start_date = f_end_date + datetime.timedelta(days=1)
         start_date = str(f_start_date.date())
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(shape, description, asset_id)
-    return task_id
+    return task_id, start_date
 
 
 def et_global_fldas(
@@ -304,8 +295,8 @@ def et_global_fldas(
     print("In Global FLDAS")
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    fn_index = 0  # fortnight index
-    s_year = f_start_date.date().year
+    # fn_index = 0  # fortnight index
+    # s_year = f_start_date.date().year
 
     size = shape.size()
     size1 = ee.Number(size).subtract(ee.Number(1))
@@ -315,13 +306,13 @@ def et_global_fldas(
     while f_start_date < end_date:
         if is_annual:
             f_end_date = f_start_date + relativedelta(years=1)
-            s_year += 1
+            # s_year += 1
             img = ee.Image.constant(0).clip(shape)
             annual_start_date = f_start_date
             # Loop over all months and individually calculate the ET for each month. Add them later to get ET for an entire year.
             for n in range(12):
-                s = annual_start_date
-                e = s + relativedelta(months=1) - relativedelta(days=1)
+                # s = annual_start_date
+                e = annual_start_date + relativedelta(months=1) - relativedelta(days=1)
                 number_of_days_in_month = ee.Date(str(e.date())).get("day")
                 image = filter_dataset(
                     annual_start_date, number_of_days_in_month, fldas_dataset
@@ -332,14 +323,9 @@ def et_global_fldas(
 
             sd = str(f_start_date.year) + "-07-01"
         else:
-            if fn_index == 25:
-                """Setting date to 1st July if index==25"""
-                f_end_date = f_start_date + relativedelta(months=1, day=1)
-                fn_index = 0
-                s_year += 1
-            else:
-                f_end_date = f_start_date + datetime.timedelta(days=14)
-                fn_index += 1
+            f_end_date = f_start_date + datetime.timedelta(days=14)
+            if f_end_date > end_date:
+                break
 
             """ Checking if fortnight falls in two months """
             if f_start_date.month != f_end_date.month:
@@ -359,7 +345,7 @@ def et_global_fldas(
                 number_of_days = f_end_date.day - f_start_date.day
                 img = filter_dataset(f_start_date, number_of_days, fldas_dataset)
 
-            sd = str(f_start_date.date())
+            # sd = str(f_start_date.date())
 
         mws = ee.List.sequence(0, size1)
 
@@ -377,14 +363,15 @@ def et_global_fldas(
             mean = ee.Number(f.get("mean"))
             uid = f.get("uid")
             feat = shape.filter(ee.Filter.eq("uid", uid)).first()
-            return feat.set(sd, mean)
+            return feat.set(start_date, mean)
 
         shape = ee.FeatureCollection(mws.map(res))
         f_start_date = f_end_date
+        start_date = str(f_start_date.date())
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(shape, description, asset_id)
-    return task_id
+    return task_id, start_date
 
 
 def filter_dataset(f_start_date, number_of_days, fldas_dataset):

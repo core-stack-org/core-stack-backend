@@ -5,10 +5,14 @@ import pandas as pd
 import numpy as np
 import pymannkendall as mk
 
+import json
+
 from datetime import datetime
 from shapely.geometry import Polygon, MultiPolygon, Point, LineString
 from shapely.ops import unary_union
 from scipy.spatial.distance import jensenshannon
+
+from .models import Overpass_Block_Details
 
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import OVERPASS_URL
@@ -25,7 +29,7 @@ logger = setup_logger(__name__)
 DATA_DIR_TEMP = env("EXCEL_DIR")
 
 
-# MARK: HELPER FUNCTIONS
+# ? MARK: HELPER FUNCTIONS
 def get_geojson(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
     geojson_url = f"{GEOSERVER_URL}/{workspace}/ows?service=WFS&version=1.0.0&request=GetFeature&typeName={workspace}:{layer_name}&outputFormat=application/json"
@@ -137,9 +141,7 @@ def format_date_monsoon_onset(date_list):
 
         y, m, d = parts
         try:
-            y = int(y);
-            m = int(m);
-            d = int(d)
+            y = int(y); m = int(m); d = int(d)
             standardized_dates.append(f"{y:04d}-{m:02d}-{d:02d}")
         except ValueError:
             continue
@@ -161,7 +163,6 @@ def format_date_monsoon_onset(date_list):
     return min_date.strftime("%m-%d"), max_date.strftime("%m-%d")
 
 
-# The Start_only is for case 2023-2024 , so when true it will return 2023 if false then return 2023 and 2024 both
 def extract_years(items, *, start_only=True):
     years = []
     seen = set()
@@ -190,7 +191,6 @@ def extract_years(items, *, start_only=True):
     return sorted(years, key=int)
 
 
-# For columns like "drysp_unit_4_weeks_2018"
 def extract_years_single(items):
     years, seen = [], set()
     for s in map(str, items):
@@ -200,7 +200,8 @@ def extract_years_single(items):
                 seen.add(y)
                 years.append(y)
     return sorted(years, key=int) 
- 
+
+
 def get_rainfall_type(rainfall):
     if rainfall < 740:
         return "Semi-arid"
@@ -214,9 +215,28 @@ def get_rainfall_type(rainfall):
         return "Very high"
 
 
-# ? MAIN SECTION
+# ? MARK: MAIN SECTION
 def get_osm_data(state, district, block, uid):
     try:
+        # * Area of the Tehsil
+        excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
+
+        df = pd.read_excel(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            sheet_name="terrain",
+        )
+        df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
+
+        total_area = df["area_in_ha"].sum()
+
         region_gdf = gpd.read_file(
             get_geojson(
                 "mws_layers", "deltaG_well_depth" + "_" + district + "_" + block
@@ -233,59 +253,75 @@ def get_osm_data(state, district, block, uid):
         overpass_query = f"""
         [out:json];
         (
-        way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
-        way["natural"="wood"]({miny},{minx},{maxy},{maxx});
+            way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
+            way["natural"="wood"]({miny},{minx},{maxy},{maxx});
 
-        way["natural"="water"]({miny},{minx},{maxy},{maxx});
-        way["water"="lake"]({miny},{minx},{maxy},{maxx});
-        way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
+            way["natural"="water"]({miny},{minx},{maxy},{maxx});
+            way["water"="lake"]({miny},{minx},{maxy},{maxx});
+            way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
 
-        relation["natural"="water"]({miny},{minx},{maxy},{maxx});
+            relation["natural"="water"]({miny},{minx},{maxy},{maxx});
 
-        node["natural"="hill"]({miny},{minx},{maxy},{maxx});
-        way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
-        
-        node["place"="city"]({miny},{minx},{maxy},{maxx});
-        node["place"="town"]({miny},{minx},{maxy},{maxx});
+            node["natural"="hill"]({miny},{minx},{maxy},{maxx});
+            way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
 
-        way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
-        way["highway"="residential"]({miny},{minx},{maxy},{maxx});
-        way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
-        way["highway"="track"]({miny},{minx},{maxy},{maxx});
-        way["highway"="road"]({miny},{minx},{maxy},{maxx});
-        way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
-        way["highway"="construction"]({miny},{minx},{maxy},{maxx});
-        way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
+            node["place"="city"]({miny},{minx},{maxy},{maxx});
+            node["place"="town"]({miny},{minx},{maxy},{maxx});
+
+            way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
+            way["highway"="residential"]({miny},{minx},{maxy},{maxx});
+            way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
+            way["highway"="track"]({miny},{minx},{maxy},{maxx});
+            way["highway"="road"]({miny},{minx},{maxy},{maxx});
+            way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
+            way["highway"="construction"]({miny},{minx},{maxy},{maxx});
+            way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
         );
         out body;
         >;
         out skel qt;
         """
 
-        # print("API response start time", datetime.now())
-
         response = {}
-        try:
-            response = requests.get(OVERPASS_URL, params={"data": overpass_query})
-            response = response.json()
-        except Exception as e:
-            logger.info("Not able to fetch the Overpass API Info", e)
+        block_detail = Overpass_Block_Details.objects.filter(location=f"{district}_{block}").first()
 
-        # print("API response end time", datetime.now())
+        if block_detail:
+            logger.info(f"Using cached response for location: {district}_{block}")
+            response = block_detail.overpass_response
+        else:
+            logger.info(f"No cached data found. Fetching from Overpass API for location: {district}_{block}")
+            
+            try:
+                response = requests.get(OVERPASS_URL, params={"data": overpass_query})
+                response = response.json()
+                
+                # if DEBUG: 
+                    # Save to file (locally)
+                    # with open('overpass_response.json', 'w', encoding='utf-8') as f:
+                    #     json.dump(response, f, indent=2, ensure_ascii=False)
 
-        # print("Data Processing", datetime.now())
+                block_detail = Overpass_Block_Details.objects.create(
+                    location = f"{district}_{block}",
+                    overpass_response = response
+                )
+                logger.info(f"Response saved to DB for location: {district}_{block}")
+            
+            except Exception as e:
+                logger.info("Not able to fetch the Overpass API Info", e)
+
+        #print("Data Processing", datetime.now())
         
         # dictionary for storage
         names = {
@@ -387,10 +423,10 @@ def get_osm_data(state, district, block, uid):
 
                                 # Forests
                                 if (
-                                        element.get("tags", {}).get("landuse") == "forest"
-                                        or element.get("tags", {}).get("natural") == "wood"
-                                        or element.get("tags", {}).get("boundary")
-                                        in ["forest", "forest_compartment"]
+                                    element.get("tags", {}).get("landuse") == "forest"
+                                    or element.get("tags", {}).get("natural") == "wood"
+                                    or element.get("tags", {}).get("boundary")
+                                    in ["forest", "forest_compartment"]
                                 ):
                                     forests.append(
                                         {
@@ -403,15 +439,15 @@ def get_osm_data(state, district, block, uid):
                                     names["Forests"].append(f"Forest: {element_name}")
                                 # Lakes
                                 if (
-                                        (
-                                                element.get("tags", {}).get("natural") == "water"
-                                                or element.get("tags", {}).get("water") == "lake"
-                                        )
-                                        and not (
+                                    (
+                                        element.get("tags", {}).get("natural") == "water"
+                                        or element.get("tags", {}).get("water") == "lake"
+                                    )
+                                    and not (
                                         element.get("tags", {}).get("landuse")
                                         == "reservoir"
-                                )
-                                        and not element.get("tags", {}).get("water") == "river"
+                                    )
+                                    and not element.get("tags", {}).get("water") == "river"
                                 ):
                                     lakes.append(
                                         {
@@ -435,8 +471,8 @@ def get_osm_data(state, district, block, uid):
                                     names["Reservoirs"].append(f"Reservoir: {element_name}")
                                 # Rivers (if defined as a polygon)
                                 if (
-                                        element.get("tags", {}).get("natural") == "water"
-                                        and element.get("tags", {}).get("water") == "river"
+                                    element.get("tags", {}).get("natural") == "water"
+                                    and element.get("tags", {}).get("water") == "river"
                                 ) or element.get("tags", {}).get("waterway") == "riverbank":
                                     rivers.append(
                                         {
@@ -501,13 +537,13 @@ def get_osm_data(state, district, block, uid):
                                             (f"Highway: {element_name}")
                                         )
                                 if (
-                                        (
-                                                element.get("tags", {}).get("natural") == "water"
-                                                and element.get("tags", {}).get("water") == "river"
-                                        )
-                                        or element.get("tags", {}).get("waterway") == "river"
-                                        or element.get("tags", {}).get("waterway")
-                                        == "riverbank"
+                                    (
+                                        element.get("tags", {}).get("natural") == "water"
+                                        and element.get("tags", {}).get("water") == "river"
+                                    )
+                                    or element.get("tags", {}).get("waterway") == "river"
+                                    or element.get("tags", {}).get("waterway")
+                                    == "riverbank"
                                 ):
                                     rivers.append(
                                         {
@@ -659,8 +695,11 @@ def get_osm_data(state, district, block, uid):
             final_data["river_mws"] = calculate_river_length(river_lines)
             final_data["river_mws"] += calculate_river_length(filtered_river_gdf)
 
+        # Minimum area threshold (1 hectare = 10,000 square meters)
+        MIN_AREA_THRESHOLD = 10000  # 1 hectare in square meters
+
         # ? Block Parameters
-        # parameter_block = f"The Tehsil {block}"
+
         parameter_block = f""
 
         if final_data["cities"]:
@@ -681,37 +720,43 @@ def get_osm_data(state, district, block, uid):
             parameter_block += f". Key natural features such as {temp} shape the Tehsil landscape and impact water flow"
 
         if final_data["forests"]:
-            parameter_block += (
-                f". Part of {final_data['forests'][0]['name']}, covering roughly "
-                f"{round(final_data['forests'][0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
-            )
+            large_forests = [f for f in final_data["forests"] if f["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            if large_forests:
+                parameter_block += (
+                    f". Part of {large_forests[0]['name']}, covering roughly "
+                    f"{round(large_forests[0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
+                )
 
         if final_data["lakes"] or final_data["reservoirs"]:
-            rname = [temp["name"] for temp in final_data["lakes"]]
-            rname += [temp["name"] for temp in final_data["reservoirs"]]
-            rarea = [
-                str(round(temp["area_sq_m"] / 10000, 1)) for temp in final_data["lakes"]
-            ]
-            rarea += [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["reservoirs"]
-            ]
+            large_lakes = [lake for lake in final_data["lakes"] if lake["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            large_reservoirs = [res for res in final_data["reservoirs"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            
+            if large_lakes or large_reservoirs:
+                rname = [temp["name"] for temp in large_lakes]
+                rname += [temp["name"] for temp in large_reservoirs]
+                rarea = [
+                    str(round(temp["area_sq_m"] / 10000, 1)) for temp in large_lakes
+                ]
+                rarea += [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_reservoirs
+                ]
 
-            parameter_block += f". Additionally, large water bodies such as "
-            if len(rname) == 1:
-                parameter_block += rname[0]
-            elif len(rname) == 2:
-                parameter_block += " and ".join(rname)
-            else:
-                parameter_block += ", ".join(rname[:-1]) + ", and " + rname[-1]
-            parameter_block += f" span about "
-            if len(rname) == 1:
-                parameter_block += rarea[0]
-            elif len(rname) == 2:
-                parameter_block += " and ".join(rarea)
-            else:
-                parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_block += f"  hectares  respectively within the Tehsil"
+                parameter_block += f". Additionally, large water bodies such as "
+                if len(rname) == 1:
+                    parameter_block += rname[0]
+                elif len(rname) == 2:
+                    parameter_block += " and ".join(rname)
+                else:
+                    parameter_block += ", ".join(rname[:-1]) + ", and " + rname[-1]
+                parameter_block += f" span about "
+                if len(rname) == 1:
+                    parameter_block += rarea[0]
+                elif len(rname) == 2:
+                    parameter_block += " and ".join(rarea)
+                else:
+                    parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
+                parameter_block += f"  hectares  respectively within the Tehsil"
 
         if final_data["river"]:
             rname = [temp["name"] for temp in final_data["river"]]
@@ -741,7 +786,6 @@ def get_osm_data(state, district, block, uid):
             )
 
         # ? MWS Parameters
-        # parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}"
         parameter_mws = f""
 
         if final_data["cities_mws"]:
@@ -760,38 +804,44 @@ def get_osm_data(state, district, block, uid):
             parameter_mws += f". Key natural features such as {temp} shape the micro-watershed landscape and impact water flow"
 
         if final_data["forests_mws"]:
-            parameter_mws += (
-                f". Part of {final_data['forests_mws'][0]['name']}, covering roughly "
-                f"{(round(final_data['forests_mws'][0]['area_sq_m'] / 10000))} hectares, lies within the micro-watershed supporting local wildlife and promoting biodiversity"
-            )
+            large_forests_mws = [f for f in final_data["forests_mws"] if f["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            if large_forests_mws:
+                parameter_mws += (
+                    f". Part of {large_forests_mws[0]['name']}, covering roughly "
+                    f"{(round(large_forests_mws[0]['area_sq_m'] / 10000))} hectares, lies within the micro-watershed supporting local wildlife and promoting biodiversity"
+                )
 
         if final_data["lakes_mws"] or final_data["reservoirs_mws"]:
-            rname = [temp["name"] for temp in final_data["lakes_mws"]]
-            rname += [temp["name"] for temp in final_data["reservoirs_mws"]]
-            rarea = [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["lakes_mws"]
-            ]
-            rarea += [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["reservoirs_mws"]
-            ]
+            large_lakes_mws = [lake for lake in final_data["lakes_mws"] if lake["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            large_reservoirs_mws = [res for res in final_data["reservoirs_mws"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            
+            if large_lakes_mws or large_reservoirs_mws:
+                rname = [temp["name"] for temp in large_lakes_mws]
+                rname += [temp["name"] for temp in large_reservoirs_mws]
+                rarea = [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_lakes_mws
+                ]
+                rarea += [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_reservoirs_mws
+                ]
 
-            parameter_mws += f". Additionally, large water bodies such as "
-            if len(rname) == 1:
-                parameter_mws += rname[0]
-            elif len(rname) == 2:
-                parameter_mws += " and ".join(rname)
-            else:
-                parameter_mws += ", ".join(rname[:-1]) + ", and " + rname[-1]
-            parameter_mws += f" span about "
-            if len(rname) == 1:
-                parameter_mws += rarea[0]
-            elif len(rname) == 2:
-                parameter_mws += " and ".join(rarea)
-            else:
-                parameter_mws += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_mws += f"  hectares  respectively within the micro-watershed, providing essential resources for irrigation, fishing, and drinking water"
+                parameter_mws += f". Additionally, large water bodies such as "
+                if len(rname) == 1:
+                    parameter_mws += rname[0]
+                elif len(rname) == 2:
+                    parameter_mws += " and ".join(rname)
+                else:
+                    parameter_mws += ", ".join(rname[:-1]) + ", and " + rname[-1]
+                parameter_mws += f" span about "
+                if len(rname) == 1:
+                    parameter_mws += rarea[0]
+                elif len(rname) == 2:
+                    parameter_mws += " and ".join(rarea)
+                else:
+                    parameter_mws += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
+                parameter_mws += f"  hectares  respectively within the micro-watershed, providing essential resources for irrigation, fishing, and drinking water"
 
         if final_data["river_mws"]:
             rname = [temp["name"] for temp in final_data["river_mws"]]
@@ -820,18 +870,16 @@ def get_osm_data(state, district, block, uid):
             parameter_mws += (
                 f" as a crucial water source for agriculture and daily needs"
             )
-
+        
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
-        else:
-            parameter_block = f"The Tehsil {block}" + parameter_block
+        else :
+            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
 
         if parameter_mws == "":
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
-        else:
-            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws
-
-        #print("Data Processing End", datetime.now())
+        else :
+            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws + "."
 
         return parameter_block, parameter_mws
 
@@ -843,8 +891,7 @@ def get_osm_data(state, district, block, uid):
 def get_terrain_data(state, district, block, uid):
     try:
 
-        excel_file = pd.ExcelFile(
-            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+        excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
 
         df = pd.read_excel(
             DATA_DIR_TEMP
@@ -866,22 +913,22 @@ def get_terrain_data(state, district, block, uid):
         df["slopy_area_percent"] = pd.to_numeric(df["slopy_area_percent"], errors="coerce")
         df["valley_area_percent"] = pd.to_numeric(df["valley_area_percent"], errors="coerce")
 
-        (area, hill_slope, plain_area, ridge_area, slopy_area, valley_area) = df.loc[df["UID"] == uid,
-        ["area_in_ha",
-         "hill_slope_area_percent",
-         "plain_area_percent",
-         "ridge_area_percent",
-         "slopy_area_percent",
-         "valley_area_percent"
+        (area, hill_slope,plain_area,ridge_area,slopy_area,valley_area) = df.loc[df["UID"] == uid,
+            [   "area_in_ha",
+                "hill_slope_area_percent",
+                "plain_area_percent",
+                "ridge_area_percent",
+                "slopy_area_percent",
+                "valley_area_percent"
             ],
         ].values[0]
 
         selected_columns_cluster = [col for col in df.columns if col.startswith("terrain_description")]
-
+        
         filtered_df = df.loc[df["UID"] == uid, selected_columns_cluster].values[0]
         mws_area = df.loc[df["UID"] == uid, "area_in_ha"].values[0]
 
-        # ? Parameters Desc
+        #? Parameters Desc
         parameter_main = f""
         parameter_comp = f""
         parameter_lulc = f"During  2017- 22, the micro-watershed's slopes and plains have exhibited distinct land-use patterns."
@@ -897,13 +944,13 @@ def get_terrain_data(state, district, block, uid):
         percent_valley = df.loc[df["UID"] == uid, "valley_area_percent"].values[0]
 
         if filtered_df[0] == "Broad Plains and Slopes":
-            parameter_main += f"The micro-watershed is spread across {round(mws_area, 2)} hectares. The micro-watershed includes flat plains and gentle slopes with {round(percent_plain, 2)} % area as plains and {round(percent_slope, 2)} % area under broad slopes."
+            parameter_main += f"The micro-watershed is spread across {round(mws_area,2)} hectares. The micro-watershed includes flat plains and gentle slopes with {round(percent_plain, 2)} % area as plains and {round(percent_slope, 2)} % area under broad slopes."
 
         elif filtered_df[0] == "Mostly Plains":
-            parameter_main += f"The micro-watershed is spread across {round(mws_area, 2)} hectares. The micro-watershed mainly consists of flat plains covering {round(percent_plain, 2)} % micro-watershed area."
+            parameter_main += f"The micro-watershed is spread across {round(mws_area,2)} hectares. The micro-watershed mainly consists of flat plains covering {round(percent_plain, 2)} % micro-watershed area."
 
         elif filtered_df[0] == "Broad Sloppy and Hilly":
-            parameter_main += f"The micro-watershed is spread across {round(mws_area, 2)} hectares. The terrain of our micro-watershed consists of gently sloping land and rolling hills with {round(percent_slope, 2)} % area under broad slopes and {round(percent_hill, 2)} % area under hills."
+            parameter_main += f"The micro-watershed is spread across {round(mws_area,2)} hectares. The terrain of our micro-watershed consists of gently sloping land and rolling hills with {round(percent_slope,2)} % area under broad slopes and {round(percent_hill, 2)} % area under hills."
 
         else:
             parameter_main += f"The micro-watershed is spread across {round(mws_area, 2)} hectares. The micro-watershed terrain is mainly hills and valleys with {round(percent_hill, 2)} % under hills and {round(percent_valley, 2)} % under valleys."
@@ -912,7 +959,7 @@ def get_terrain_data(state, district, block, uid):
 
         total_block_area = df["area_in_ha"].sum()
 
-        # * Calculate weighted area for each topography type
+        #* Calculate weighted area for each topography type
         block_hill_slope = sum(df["hill_slope_area_percent"] * df["area_in_ha"] / 100)
         block_plain_area = sum(df["plain_area_percent"] * df["area_in_ha"] / 100)
         block_ridge_area = sum(df["ridge_area_percent"] * df["area_in_ha"] / 100)
@@ -963,12 +1010,11 @@ def get_terrain_data(state, district, block, uid):
         else:
             parameter_comp += f"The microwatershed profile is similar to the typical microwatershed profile observed at the Tehsil level."
 
-        # ? Land use on Slopes and Plains
+
+        #? Land use on Slopes and Plains
         if "terrain_lulc_slope" in excel_file.sheet_names:
 
-            df_slopes = pd.read_excel(
-                DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-                sheet_name="terrain_lulc_slope")
+            df_slopes = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="terrain_lulc_slope")
 
             block_shrub_area = sum(df_slopes["shrub_scrubs_area_percent"] * df_slopes["area_in_ha"] / 100)
             block_barren_area = sum(df_slopes["barren_area_percent"] * df_slopes["area_in_ha"] / 100)
@@ -981,16 +1027,10 @@ def get_terrain_data(state, district, block, uid):
             block_lulc_area_slope[0] += (block_shrub_area / total_block_area) * 100
             block_lulc_area_slope[1] += (block_barren_area / total_block_area) * 100
             block_lulc_area_slope[2] += (block_tree_area / total_block_area) * 100
-            block_lulc_area_slope[3] += ((
-                                                     block_kh_area + block_non_kh_area + block_double_area + block_triple_area) / total_block_area) * 100
+            block_lulc_area_slope[3] += ((block_kh_area + block_non_kh_area + block_double_area + block_triple_area) / total_block_area) * 100
 
             if uid in df_slopes["UID"].values:
-                (area, tree_percent, shrub_percent, barren_percent, single_crop_kh, single_crop_non_kh, double_crop,
-                 triple_crop) = df_slopes.loc[
-                    df_slopes["UID"] == uid, ["area_in_ha", "forests_area_percent", "shrub_scrubs_area_percent",
-                                              "barren_area_percent", "single_kharif_area_percent",
-                                              "single_non_kharif_area_percent", "double_cropping_area_percent",
-                                              "triple_cropping_area_percent"]].values[0]
+                (area, tree_percent, shrub_percent, barren_percent, single_crop_kh, single_crop_non_kh, double_crop, triple_crop) = df_slopes.loc[df_slopes["UID"] == uid, ["area_in_ha", "forests_area_percent", "shrub_scrubs_area_percent", "barren_area_percent", "single_kharif_area_percent", "single_non_kharif_area_percent", "double_cropping_area_percent", "triple_cropping_area_percent"]].values[0]
 
                 mws_lulc_area_slope[0] += float(shrub_percent)
 
@@ -1004,14 +1044,12 @@ def get_terrain_data(state, district, block, uid):
                 triple_area = (area * triple_crop) / 100
 
                 farmland_area = single_area_kh + single_area_non_kh + double_area + triple_area
-                mws_lulc_area_slope[3] += (farmland_area / area) * 100
+                mws_lulc_area_slope[3] += (farmland_area / area) * 100   
 
-                parameter_lulc += f" On the slopes, land use is predominantly characterized by {round(tree_percent, 2)} % trees, {round(shrub_percent, 2)} % shrubs, and {round(barren_percent, 2)} % barren areas."
+                parameter_lulc += f" On the slopes, land use is predominantly characterized by {round(tree_percent, 2)} % trees, {round(shrub_percent,2)} % shrubs, and {round(barren_percent,2)} % barren areas."
 
         if "terrain_lulc_plain" in excel_file.sheet_names:
-            df_plain = pd.read_excel(
-                DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-                sheet_name="terrain_lulc_plain")
+            df_plain = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="terrain_lulc_plain")
 
             block_shrub_area = sum(df_plain["shrub_scrubs_area_percent"] * df_plain["area_in_ha"] / 100)
             block_barren_area = sum(df_plain["barren_area_percent"] * df_plain["area_in_ha"] / 100)
@@ -1023,15 +1061,11 @@ def get_terrain_data(state, district, block, uid):
             block_lulc_area_plain[0] += (block_shrub_area / total_block_area) * 100
             block_lulc_area_plain[1] += (block_barren_area / total_block_area) * 100
             block_lulc_area_plain[2] += (block_tree_area / total_block_area) * 100
-            block_lulc_area_plain[3] += ((
-                                                     block_single_area + block_double_area + block_triple_area) / total_block_area) * 100
+            block_lulc_area_plain[3] += ((block_single_area + block_double_area + block_triple_area) / total_block_area) * 100
 
             if uid in df_plain["UID"].values:
-                (area, barren_percent, shrub_percent, tree_percent, single_crop, double_crop, triple_crop) = \
-                df_plain.loc[df_plain["UID"] == uid, ["area_in_ha", "barren_area_percent", "shrub_scrubs_area_percent",
-                                                      "forests_area_percent", "single_kharif_area_percent",
-                                                      "double_cropping_area_percent",
-                                                      "triple_cropping_area_percent"]].values[0]
+                
+                (area, barren_percent, shrub_percent, tree_percent, single_crop, double_crop, triple_crop) = df_plain.loc[df_plain["UID"] == uid, ["area_in_ha", "barren_area_percent", "shrub_scrubs_area_percent", "forests_area_percent", "single_kharif_area_percent", "double_cropping_area_percent", "triple_cropping_area_percent"]].values[0]
 
                 mws_lulc_area_plain[0] += float(shrub_percent)
 
@@ -1049,7 +1083,7 @@ def get_terrain_data(state, district, block, uid):
 
                 mws_lulc_area_plain[3] += float(farmland_area_percent)
 
-                parameter_lulc += f" On the plains, land use has predominance of {round(farmland_area_percent, 2)} % farmlands, {round(barren_percent, 2)} % barren areas, and {round(shrub_percent, 2)} % shrubs."
+                parameter_lulc += f" On the plains, land use has predominance of {round(farmland_area_percent,2)} % farmlands, {round(barren_percent,2)} % barren areas, and {round(shrub_percent,2)} % shrubs."
 
         return parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain
 
@@ -1178,12 +1212,8 @@ def get_change_detection_data(state, district, block, uid):
 
 def get_cropping_intensity(state, district, block, uid):
     try:
-        df = pd.read_excel(
-            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="croppingIntensity_annual")
-        df_drought = pd.read_excel(
-            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="croppingDrought_kharif")
+        df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="croppingIntensity_annual")
+        df_drought = pd.read_excel( DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="croppingDrought_kharif")
 
         selected_columns_inten = [col for col in df.columns if col.startswith("cropping_intensity_")]
 
@@ -1197,6 +1227,11 @@ def get_cropping_intensity(state, district, block, uid):
 
         filtered_df_inten = df.loc[df["UID"] == uid, selected_columns_inten]
 
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         if not filtered_df_inten.empty:
 
             inten_parameter_1 = f""
@@ -1206,26 +1241,50 @@ def get_cropping_intensity(state, district, block, uid):
             result = mk.original_test(filtered_df_inten.values[0])
 
             avg_inten = sum(filtered_df_inten.values[0]) / len(filtered_df_inten.values[0])
-
+            
             if result.trend == "increasing":
-                inten_parameter_1 += f"The cropping intensity of the micro-watershed has increased over the last eight years from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
+                inten_parameter_1 += (
+                    f"The cropping intensity of the micro-watershed has increased over the years {year_range_text} "
+                    f"from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} "
+                    f"compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                    f"over the years in the Tehsil. "
+                )
             else:
                 if result.trend == "decreasing":
-                    inten_parameter_1 += f"The cropping intensity of this area has reduced over time from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
-                else:
-                    inten_parameter_1 += f"The cropping intensity of this area has stayed steady at {round(avg_inten, 2)} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
-
+                    inten_parameter_1 += (
+                        f"The cropping intensity of this area has reduced over the years {year_range_text} "
+                        f"from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} "
+                        f"compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                        f"over the years in the Tehsil. "
+                    )
+                else :
+                    if avg_inten > block_avg:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"more than the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
+                    elif avg_inten < block_avg:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"less than the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
+                    else:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"similar to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
                 if avg_inten < 1.5:
                     inten_parameter_1 += f"It might be possible to improve cropping intensity through more strategic placement, while keeping equity in mind, of rainwater harvesting or groundwater recharge structures. "
-
-            # ? Drought Parameters
+            
+            #? Drought Parameters
             selected_columns_moderate = [col for col in df_drought.columns if col.startswith("Moderate_")]
             selected_columns_severe = [col for col in df_drought.columns if col.startswith("Severe_")]
-
-            df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric,
-                                                                                                errors="coerce")
-            df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric,
-                                                                                            errors="coerce")
+            
+            df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric, errors="coerce")
+            df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric, errors="coerce")
 
             mws_drought_moderate = df_drought.loc[df_drought["UID"] == uid, selected_columns_moderate].values[0]
             mws_drought_severe = df_drought.loc[df_drought["UID"] == uid, selected_columns_severe].values[0]
@@ -1242,13 +1301,12 @@ def get_cropping_intensity(state, district, block, uid):
                 else:
                     if match_exp:
                         non_drought_years.append(match_exp.group(0))
-
+            
             drought_inten = 0
             non_drought_inten = 0
 
             for year in drought_years:
-                selected_columns_d = [col for col in df.columns if
-                                      col.startswith("cropping_intensity_unit_less_" + year)]
+                selected_columns_d = [col for col in df.columns if col.startswith("cropping_intensity_unit_less_" + year)]
 
                 filtered_d_df = df.loc[df["UID"] == uid, selected_columns_d]
 
@@ -1256,31 +1314,27 @@ def get_cropping_intensity(state, district, block, uid):
                     drought_inten += filtered_d_df.values[0][0]
 
             for year in non_drought_years:
-                selected_columns_nd = [col for col in df.columns if
-                                       col.startswith("cropping_intensity_unit_less_" + year)]
+                selected_columns_nd = [col for col in df.columns if col.startswith("cropping_intensity_unit_less_" + year)]
 
                 filtered_nd_df = df.loc[df["UID"] == uid, selected_columns_nd]
 
                 if not filtered_nd_df.empty:
                     non_drought_inten += filtered_nd_df.values[0][0]
-
+            
             if len(drought_years):
                 drought_inten = drought_inten / len(drought_years)
 
             if len(non_drought_years):
                 non_drought_inten = non_drought_inten / len(non_drought_years)
-
+            
             formatted_years = format_years(drought_years)
 
-            if abs(drought_inten - non_drought_inten) > 0.2:
+            if (non_drought_inten - drought_inten) > 0.2 and len(drought_years):
                 inten_parameter_2 += f"Cropping intensity is reduced by {round(abs(drought_inten - non_drought_inten), 2)} during the drought years (AAA and BBB), as compared to non-drought years, and reveals a marked sensitivity of agricultural productivity to water scarcity. This decline underscores the critical need for farmers to adopt drought-resilient practices, such as constructing water harvesting structures. By capturing and storing rainwater, these structures can provide a crucial buffer against drought periods, helping to stabilize cropping intensity and sustain productivity even in water-stressed conditions."
 
-            else:
-                inten_parameter_2 += f"The observed {round(abs(drought_inten - non_drought_inten), 2)} reduction in the cropping intensity during drought years (AAA and BBB), compared to non-drought years, reveals a marked sensitivity of agricultural productivity to water scarcity. This decline underscores the critical need for farmers to adopt drought-resilient practices, such as constructing water harvesting structures. By capturing and storing rainwater, these structures can provide a crucial buffer against drought periods, helping to stabilize cropping intensity and sustain productivity even in water-stressed conditions."
+            inten_parameter_2 = inten_parameter_2.replace("AAA and BBB",formatted_years)
 
-            inten_parameter_2 = inten_parameter_2.replace("AAA and BBB", formatted_years)
-
-            # ? Cropping Areas Graphs
+            #? Cropping Areas Graphs
             selected_columns_single = [col for col in df.columns if col.startswith("single_cropped_area_")]
             selected_columns_double = [col for col in df.columns if col.startswith("doubly_cropped_area_")]
             selected_columns_triple = [col for col in df.columns if col.startswith("triply_cropped_area_")]
@@ -1303,8 +1357,7 @@ def get_cropping_intensity(state, district, block, uid):
 
             if not filtered_d_single.empty and not filtered_d_double.empty and not filtered_d_triple.empty:
 
-                for single, double, triple in zip(filtered_d_single.values[0], filtered_d_double.values[0],
-                                                  filtered_d_triple.values[0]):
+                for single, double, triple in zip(filtered_d_single.values[0], filtered_d_double.values[0], filtered_d_triple.values[0]):
                     if filtered_d_sum.values[0][0] != 0:
                         p1 = (float(single) / float(filtered_d_sum.values[0][0])) * 100
                         p2 = (float(double) / float(filtered_d_sum.values[0][0])) * 100
@@ -1313,15 +1366,15 @@ def get_cropping_intensity(state, district, block, uid):
                         p1 = 0
                         p2 = 0
                         p3 = 0
-                    final_single_percent.append(round(p1, 2))
-                    final_double_percent.append(round(p2, 2))
-                    final_triple_percent.append(round(p3, 2))
-                    final_non_cropped.append(100 - round(p1 + p2 + p3, 2))
+                    final_single_percent.append(round(p1,2))
+                    final_double_percent.append(round(p2,2))
+                    final_triple_percent.append(round(p3,2))
+                    final_non_cropped.append(100 - round(p1+p2+p3, 2))
 
             return inten_parameter_1, inten_parameter_2, final_single_percent, final_double_percent, final_triple_percent, final_non_cropped, current_years
 
         else:
-            return "", "", [], [],[],[],[]
+            return "", "", [],[],[],[],[]
 
     except Exception as e:
         logger.info(
@@ -1329,7 +1382,7 @@ def get_cropping_intensity(state, district, block, uid):
             district,
             block
         )
-        return "", "", [], [],[],[],[]
+        return "", "", [],[],[],[],[]
 
 
 def get_double_cropping_area(state, district, block, uid):
@@ -1372,6 +1425,13 @@ def get_double_cropping_area(state, district, block, uid):
         filtered_df_double = df.loc[df["UID"] == uid, selected_columns_double].values[0]
         filtered_df_triple = df.loc[df["UID"] == uid, selected_columns_triple].values[0]
 
+        current_years = extract_years(selected_columns_single)
+
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         double_cropping_percent = []
 
         for index, area in enumerate(filtered_df_single):
@@ -1380,7 +1440,7 @@ def get_double_cropping_area(state, district, block, uid):
                 + filtered_df_double[index]
                 + filtered_df_triple[index]
             )
-
+            
             double_cropping_percent.append(
                 (filtered_df_double[index] / total_cropped_area) * 100
             )
@@ -1398,7 +1458,7 @@ def get_double_cropping_area(state, district, block, uid):
         else:
             parameter_double_crop += f"This microwatershed area has a high percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is more than 60% of the total agricultural land being cultivated twice a year."
 
-        return parameter_double_crop
+        return parameter_double_crop, year_range_text
 
     except Exception as e:
         logger.info(
@@ -1406,7 +1466,7 @@ def get_double_cropping_area(state, district, block, uid):
             district,
             block
         )
-        return ""
+        return "", ""
 
 
 def get_surface_Water_bodies_data(state, district, block, uid):
@@ -1443,6 +1503,11 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
         current_years = extract_years(selected_columns)
 
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         parameter_swb_1 = f""
         parameter_swb_2 = f""
         parameter_swb_3 = f""
@@ -1460,12 +1525,11 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             selected_columns_severe = [col for col in df_drought.columns if col.startswith("Severe_")]
 
             df[selected_columns_kh] = df[selected_columns_kh].apply(pd.to_numeric, errors="coerce")
-            df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric,
-                                                                                                errors="coerce")
-            df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric,
-                                                                                            errors="coerce")
+            df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric, errors="coerce")
+            df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric, errors="coerce")
 
-            # ? Trend Calculation
+
+            #? Trend Calculation
             filtered_df_kh = df.loc[df["UID"] == uid, selected_columns_kh].values[0]
 
             result = mk.original_test(filtered_df_kh)
@@ -1475,9 +1539,9 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             elif result.trend == "decreasing":
                 parameter_swb_1 = f"Surface water presence has decreased by {round(result.slope, 2)} hectares per year during 2017-22.Siltation could be a cause for decrease in surface water presence and therefore may require repair and maintenance of surface water bodies. Waterbody analysis can help identify waterbodies that may need such treatment."
             else:
-                parameter_swb_1 = f"The surface water presence has remained steady during 2017-22."
+                parameter_swb_1 = f"The surface water availability shows no definite trend over the years {year_range_text}."
 
-            # ? Drought Years SWB
+            #? Drought Years SWB
             mws_drought_moderate = df_drought.loc[df_drought["UID"] == uid, selected_columns_moderate].values[0]
             mws_drought_severe = df_drought.loc[df_drought["UID"] == uid, selected_columns_severe].values[0]
 
@@ -1495,7 +1559,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             
 
             if len(drought_years):
-
+                
                 total_area_d = 0
                 total_area_nd = 0
 
@@ -1504,20 +1568,21 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
                     total_area_d += yearly_area[0]
 
+
                 for year in non_drought_year:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
                     total_area_nd += yearly_area[0]
-
-                percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd) * 100
+                
+                percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
 
                 if result.trend == "increasing":
                     parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
-
+                    
                 else:
                     parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
 
-            # ? Non-Drought Years SWB
+            #? Non-Drought Years SWB
             if len(non_drought_year):
                 area_under_rb_nd = 0
                 area_under_kh_nd = 0
@@ -1534,14 +1599,14 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     area_under_kh_nd += yearly_area_kh[0]
 
                 if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd) * 100
+                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd ) * 100
 
                     if result.trend == "increasing":
-                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh, 2)}% from the Kharif to the Rabi season."
+                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh,2)}% from the Kharif to the Rabi season."
                     elif result.trend == "decreasing":
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
                     else:
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
 
             if len(drought_years):
                 area_under_rb = 0
@@ -1557,16 +1622,16 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                     area_under_rb += yearly_area_rb[0]
                     area_under_kh += yearly_area_kh[0]
-
+                
                 if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh) * 100
+                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh ) * 100
 
                 if result.trend == "increasing":
-                    parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh, 2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh,2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
                 elif result.trend == "decreasing":
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
                 else:
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
 
             # ? Data yearwise for waterbody
             selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
@@ -1581,7 +1646,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             filtered_df_rabi = (df.loc[df["UID"] == uid, selected_columns_rabi].values[0].tolist())
             filtered_df_zaid = (df.loc[df["UID"] == uid, selected_columns_zaid].values[0].tolist())
 
-            # filtered_df_kharif = [abs(kharif - rabi) for kharif, rabi in zip(filtered_df_kharif, filtered_df_rabi)]
+            #filtered_df_kharif = [abs(kharif - rabi) for kharif, rabi in zip(filtered_df_kharif, filtered_df_rabi)]
             #filtered_df_rabi = [abs(rabi - zaid) for rabi, zaid in zip(filtered_df_rabi, filtered_df_zaid)]
 
         else:
@@ -1600,7 +1665,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         )
 
     except Exception as e:
-        logger.info("Not able to access excel for %s district, %s block for Waterbodies", district, block)
+        logger.info("Not able to access excel for %s district, %s block for Waterbodies",district,block)
         return "", "", "", [], [], [], []
 
 
@@ -1644,12 +1709,12 @@ def get_water_balance_data(state, district, block, uid):
             sheet_name="hydrological_seasonal",
         )
 
-        # ? Parameters and Lists for Graphs
+        #? Parameters and Lists for Graphs
         trend_desc = f""
         good_rainfall = f""
         bad_rainfall = f""
 
-        # ? Columns
+        #? Columns
         selected_column_dg = [col for col in df.columns if col.startswith("DeltaG_")]
         selected_column_g = [col for col in df.columns if col.startswith("G_")]
 
@@ -1659,16 +1724,15 @@ def get_water_balance_data(state, district, block, uid):
         df[selected_column_dg] = df[selected_column_dg].apply(pd.to_numeric, errors="coerce")
         df[selected_column_g] = df[selected_column_g].apply(pd.to_numeric, errors="coerce")
 
-        df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric,
-                                                                                            errors="coerce")
+        df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric, errors="coerce")
         df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric, errors="coerce")
 
         current_years = extract_years(selected_column_dg)
-
-        # ? Trend Calculation
+        
+        #? Trend Calculation
         filtered_df_dg = df.loc[df["UID"] == uid, selected_column_dg].values[0]
         avg_del_g = sum(filtered_df_dg) / len(filtered_df_dg)
-
+        
         filtered_df_g = df.loc[df["UID"] == uid, selected_column_g].values[0]
 
         result = mk.original_test(filtered_df_g)
@@ -1701,7 +1765,8 @@ def get_water_balance_data(state, district, block, uid):
                 if match_exp:
                     non_drought_years.append(match_exp.group(0))
 
-        # ? Good Rainfall Years
+
+        #? Good Rainfall Years
         if len(non_drought_years):
 
             avg_rainfall = 0
@@ -1710,23 +1775,21 @@ def get_water_balance_data(state, district, block, uid):
             runoff_percent = 0
 
             for year in non_drought_years:
-                # ? Rainfall
+
+                #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
                 rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
                 avg_rainfall += rainfall[0]
 
-                # ? Monsoon Onset
+                #? Monsoon Onset
                 selected_column_onset = [col for col in df_drought.columns if col.startswith("monsoon_onset_" + year)]
                 onset = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values[0]
                 monsoon_onset.append(onset[0])
 
-                # ? Fortnight Delg Calc
-                selected_column_kh = [col for col in df_seasonal.columns if
-                                      col.startswith("delta g_kharif_in_mm_" + year)]
-                selected_column_rb = [col for col in df_seasonal.columns if
-                                      col.startswith("delta g_rabi_in_mm_" + year)]
-                selected_column_zd = [col for col in df_seasonal.columns if
-                                      col.startswith("delta g_zaid_in_mm_" + year)]
+                #? Fortnight Delg Calc
+                selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
+                selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
+                selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
                 delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
                 delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
@@ -1734,12 +1797,12 @@ def get_water_balance_data(state, district, block, uid):
 
                 avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
 
-                # ? Runoff
+                #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
                 runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
 
                 runoff_percent += ((runoff[0] / rainfall[0]) * 100)
-
+            
             avg_rainfall = avg_rainfall / len(non_drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(non_drought_years)
             runoff_percent = runoff_percent / len(non_drought_years)
@@ -1752,37 +1815,35 @@ def get_water_balance_data(state, district, block, uid):
             formatted_years = format_years(non_drought_years)
             good_rainfall += original_string.replace("XXX, YYY and ZZZ", formatted_years)
 
-            good_rainfall += f"bringing an average annual rainfall of approximately {round(avg_rainfall, 2)} mm"
+            good_rainfall += f"bringing an average annual rainfall of approximately {round(avg_rainfall,2)} mm"
 
-            if (min_date != None and max_date != None):
+            if(min_date != None and max_date != None):
                 good_rainfall += f" with monsoon onset between [{min_date}, {max_date}]."
             else:
                 good_rainfall += f"."
 
             if avg_fortnight_delg > 0:
-                good_rainfall += f"This rainfall pattern resulted in positive groundwater recharge, with average groundwater change of {round(avg_fortnight_delg, 2)} mm, indicating replenishment of groundwater resources. During these years, around {round(runoff_percent, 2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
+                good_rainfall += f"This rainfall pattern resulted in positive groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating replenishment of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
             else:
-                good_rainfall += f"This rainfall pattern resulted in negative groundwater recharge, with average groundwater change of {round(avg_fortnight_delg, 2)} mm, indicating depletion of groundwater resources. During these years, around {round(runoff_percent, 2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
+                good_rainfall += f"This rainfall pattern resulted in negative groundwater recharge, with average groundwater change of {round(avg_fortnight_delg,2)} mm, indicating depletion of groundwater resources. During these years, around {round(runoff_percent,2)} % of the rainfall became surface runoff, offering potential for water harvesting, although this should be evaluated carefully so as to not impact downstream micro-watersheds. "
 
-        # ? Bad Rainfall Years
+        #? Bad Rainfall Years
         if len(drought_years):
             avg_rainfall = 0
             avg_fortnight_delg = 0
             runoff_percent = 0
 
             for year in drought_years:
-                # ? Rainfall
+
+                #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
                 rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
                 avg_rainfall += rainfall[0]
 
-                # ? Fortnight Delg Calc
-                selected_column_kh = [col for col in df_seasonal.columns if
-                                      col.startswith("delta g_kharif_in_mm_" + year)]
-                selected_column_rb = [col for col in df_seasonal.columns if
-                                      col.startswith("delta g_rabi_in_mm_" + year)]
-                selected_column_zd = [col for col in df_seasonal.columns if
-                                      col.startswith("delta g_zaid_in_mm_" + year)]
+                #? Fortnight Delg Calc
+                selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
+                selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
+                selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
                 delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
                 delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
@@ -1790,7 +1851,7 @@ def get_water_balance_data(state, district, block, uid):
 
                 avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
 
-                # ? Runoff
+                #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
                 runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
 
@@ -1806,12 +1867,12 @@ def get_water_balance_data(state, district, block, uid):
             formatted_years = format_years(drought_years)
             bad_rainfall += original_string.replace("XXX and YYY", formatted_years)
 
-            bad_rainfall += f" leading to annual rainfall averaging around {round(avg_rainfall, 2)} mm."
+            bad_rainfall += f" leading to annual rainfall averaging around {round(avg_rainfall,2)} mm."
 
             if avg_fortnight_delg >= 0:
-                bad_rainfall += f"Limited water availability in these years resulted in positive groundwater changes, with an average replenishment of {round(avg_fortnight_delg, 2)} mm. Runoff in these years is {round(runoff_percent, 2)} % of total rainfall, diminishing the harvestable water. "
+                bad_rainfall += f"Limited water availability in these years resulted in positive groundwater changes, with an average replenishment of {round(avg_fortnight_delg,2)} mm. Runoff in these years is {round(runoff_percent,2)} % of total rainfall, diminishing the harvestable water. "
             else:
-                bad_rainfall += f"Limited water availability in these years resulted in negative groundwater changes, with an average depletion of {round(avg_fortnight_delg, 2)} mm. Runoff in these years is {round(runoff_percent, 2)} % of total rainfall, diminishing the harvestable water."
+                bad_rainfall += f"Limited water availability in these years resulted in negative groundwater changes, with an average depletion of {round(avg_fortnight_delg,2)} mm. Runoff in these years is {round(runoff_percent,2)} % of total rainfall, diminishing the harvestable water."
 
         selected_columns_precip = [col for col in df.columns if col.startswith("Precipitation_")]
         df[selected_columns_precip] = df[selected_columns_precip].apply(pd.to_numeric, errors="coerce")
@@ -1850,22 +1911,16 @@ def get_water_balance_data(state, district, block, uid):
 
 
 def get_soge_data(state, district, block, uid):
-    try:
-        df = pd.read_excel(
-            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="aquifer_vector")
-        df_soge = pd.read_excel(
-            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="soge_vector")
-        df_hydro = pd.read_excel(
-            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="hydrological_annual")
+    try :
+        df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="aquifer_vector")
+        df_soge = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="soge_vector")
+        df_hydro = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="hydrological_annual")
 
         parameter_soge = f""
 
         aquifer_class = df.loc[df["UID"] == uid, "aquifer_class"].values[0]
 
-        if (aquifer_class == "Alluvium"):
+        if(aquifer_class == "Alluvium"):
             soge_class = df_soge.loc[df_soge["UID"] == uid, "class_name"].values[0]
 
             selected_column_g = [col for col in df_hydro.columns if col.startswith("G_")]
@@ -1874,29 +1929,29 @@ def get_soge_data(state, district, block, uid):
 
             result = mk.original_test(filtered_df_g)
 
-            if (soge_class == "Safe"):
-
+            if(soge_class == "Safe"):
+                
                 parameter_soge += f"Extraction is within recharge limits."
-
-                if result.trend == "increasing":
+                
+                if result.trend == "increasing" :
                     parameter_soge += f" However, the groundwater situation appears stable and annual usage is also within limits. Care should be taken that things remain the way they are."
                 else:
                     parameter_soge += f" However, it requires close monitoring to check that the situation is not worsened."
-
-            elif (soge_class == "Semi-Critical"):
+            
+            elif(soge_class == "Semi-Critical"):
 
                 parameter_soge += f"Extraction is 70–90% of the recharge. The signs of stress have started to appear."
 
-                if result.trend == "increasing":
+                if result.trend == "increasing" :
                     parameter_soge += f" The groundwater situation appears stable and annual usage is also within limits. Care should be taken that things remain the way they are."
                 else:
                     parameter_soge += f" It requires close monitoring to check that the situation does not worsen."
 
-            elif (soge_class == "Critical"):
-
+            elif(soge_class == "Critical"):
+                
                 parameter_soge += f"Extraction is 90-100% of the recharge. There is a high risk of depletion of groundwater."
 
-                if result.trend == "increasing":
+                if result.trend == "increasing" :
                     parameter_soge += f" Pressure to increase cropping intensity can worsen the situation. Innovative solutions of drip irrigation and strong water collectives along with canal irrigation must be considered to improve the situation."
                 else:
                     parameter_soge += f" Policies for an immediate shift in cropping patterns might be required."
@@ -1905,7 +1960,7 @@ def get_soge_data(state, district, block, uid):
 
                 parameter_soge += f"Extraction exceeds recharge; groundwater levels falling sharply."
 
-                if result.trend == "increasing":
+                if result.trend == "increasing" :
                     parameter_soge += f" Pressure to increase cropping intensity can worsen the situation. Innovative solutions of drip irrigation and strong water collectives along with canal irrigation must be considered to improve the situation."
                 else:
                     parameter_soge += f" Policies for an immediate shift in cropping patterns are required."
@@ -1986,13 +2041,23 @@ def get_drought_data(state, district, block, uid):
                     non_drought_years.append(match_exp.group(0))
 
         parameter_drought = f""
-        original_string = "An analysis of identified drought years — XXX, YYY and ZZZ reveals significant insights into the underlying rainfall patterns such as dry spells and deviations from normal precipitation. "
-        formatted_years = format_years(drought_years)
-        parameter_drought += original_string.replace(
-            "XXX, YYY and ZZZ", formatted_years
-        )
 
-        # ? Get all the Dryspell for data for Graph
+        current_years = extract_years(selected_columns_mild)
+
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
+        if len(drought_years):
+            original_string = "An analysis of identified drought years — XXX, YYY and ZZZ reveals significant insights into the underlying rainfall patterns such as dry spells and deviations from normal precipitation. "
+            formatted_years = format_years(drought_years)
+            parameter_drought += original_string.replace("XXX, YYY and ZZZ", formatted_years)
+        
+        else :
+            parameter_drought = f"Refer to the following graph and see how the intensity of drought has changed in this microwatershed over the years {year_range_text}"
+        
+        #? Get all the Dryspell for data for Graph
         selected_columns_drysp_all = [col for col in df.columns if col.startswith("drysp_unit_4_weeks")]
         df[selected_columns_drysp_all] = df[selected_columns_drysp_all].apply(
             pd.to_numeric, errors="coerce"
@@ -2006,8 +2071,7 @@ def get_drought_data(state, district, block, uid):
             years = []
             drysp_tuple = []
 
-            selected_columns_drysp = [col for col in df.columns if
-                                      any(col.startswith(f"drysp_unit_4_weeks_{year}") for year in drought_years)]
+            selected_columns_drysp = [col for col in df.columns if any(col.startswith(f"drysp_unit_4_weeks_{year}") for year in drought_years)]
             df[selected_columns_drysp] = df[selected_columns_drysp].apply(
                 pd.to_numeric, errors="coerce"
             )
@@ -2297,4 +2361,4 @@ def get_village_data(state, district, block, uid):
             district,
             block
         )
-        return [], [], [], [], [], [], [], [], [], [], []
+        return [],[],[],[],[],[],[],[],[],[],[]

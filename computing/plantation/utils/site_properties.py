@@ -25,16 +25,16 @@ def get_site_properties(roi, state, start_year, end_year):
         vectorized_props = {}
 
         # Iterate through datasets
-        for key, value in dataset_info.items():
-            path = value["path"]
-            label = value["label"]
-            if key == "distToDrainage":
+        for data_key, data_value in dataset_info.items():
+            path = data_value["path"]
+            label = data_value["label"]
+            if data_key == "distToDrainage":
                 prop_value = vectorize_dataset(dist_to_drainage, feature, 10)
             else:
                 raster = ee.Image(path)
 
                 # Derive slope/aspect
-                raster = derive_terrain(key, raster)
+                raster = derive_terrain(data_key, raster)
 
                 raster = raster.select(0)
 
@@ -45,26 +45,25 @@ def get_site_properties(roi, state, start_year, end_year):
                     feature.geometry(), ee.Reducer.mean(), scale, raster.projection()
                 )
                 prop_value = vectors.first().get("mean")
-
-            if "mapping" in value:
-                mapping = ee.Dictionary(value["mapping"])
                 prop_value = ee.Algorithms.If(
-                    prop_value, mapping.get(ee.Number(prop_value).toInt()), "None"
+                    prop_value, round_to(prop_value, 4), prop_value
                 )
+
+            prop_value = get_mapping(data_key, data_value, prop_value)
 
             vectorized_props[label] = prop_value
 
         # Distance to the nearest road
-        vectorized_props["Distance to Road (m)"] = vectorize_dataset(
+        vectorized_props["Distance to Roads (m)"] = vectorize_dataset(
             state_dist_to_road, feature, 10
         )
 
         # Distance to the nearest settlement
-        vectorized_props["Distance to Settlement (m)"] = vectorize_dataset(
+        vectorized_props["Distance to Settlements (m)"] = vectorize_dataset(
             dist_to_settlement, feature, 10
         )
 
-        # Convert to dictionary and encode as JSON string
+        # # Convert to dictionary and encode as JSON string
         vectorized_dict = ee.Dictionary(vectorized_props)
         vectorized_json = ee.String.encodeJSON(vectorized_dict)
 
@@ -76,7 +75,7 @@ def get_site_properties(roi, state, start_year, end_year):
 
 def get_dist_to_road(state):
     dataset_collection = ee.FeatureCollection(
-        f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
+        f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state.lower())}"
     )
     dataset = dataset_collection.reduceToImage(
         properties=["STATE_ID"], reducer=ee.Reducer.first()
@@ -128,3 +127,85 @@ def vectorize_dataset(dataset, roi, scale):
         ee.Number(min_distance.get("distance")).multiply(1000).round().divide(1000),
         0,
     )
+
+
+def get_mapping(data_key, data_value, prop_value):
+    if "mapping" in data_value:
+        mapping = ee.Dictionary(data_value["mapping"])
+        prop_value = ee.Algorithms.If(
+            prop_value, mapping.get(ee.Number(prop_value).toInt()), "None"
+        )
+    else:
+        if data_key == "aridityIndex":
+            prop_value = ee.Algorithms.If(
+                prop_value,
+                ee.String(classify_aridity(prop_value)),
+                "None",
+            )
+        elif data_key == "aspect":
+            prop_value = ee.Algorithms.If(
+                prop_value,
+                ee.String(classify_aspect(prop_value)).cat(
+                    ee.String(" (").cat(ee.String(prop_value)).cat(ee.String(")"))
+                ),
+                "None",
+            )
+    return prop_value
+
+
+def classify_aridity(prop_value):
+    prop_value = ee.Number(prop_value).divide(10000)
+    return ee.Algorithms.If(
+        prop_value.lt(0.03),
+        "Hyper Arid",
+        ee.Algorithms.If(
+            prop_value.lt(0.2),
+            "Arid",
+            ee.Algorithms.If(
+                prop_value.lt(0.5),
+                "Semi-Arid",
+                ee.Algorithms.If(prop_value.lt(0.65), "Dry sub-humid", "Humid"),
+            ),
+        ),
+    )
+
+
+def classify_aspect(aspect_value):
+    aspect_value = ee.Number(aspect_value)
+
+    return ee.Algorithms.If(
+        aspect_value.lt(22.5).Or(aspect_value.gte(337.5)),
+        "North",
+        ee.Algorithms.If(
+            aspect_value.lt(67.5),
+            "North-East",
+            ee.Algorithms.If(
+                aspect_value.lt(112.5),
+                "East",
+                ee.Algorithms.If(
+                    aspect_value.lt(157.5),
+                    "South-East",
+                    ee.Algorithms.If(
+                        aspect_value.lt(202.5),
+                        "South",
+                        ee.Algorithms.If(
+                            aspect_value.lt(247.5),
+                            "South-West",
+                            ee.Algorithms.If(
+                                aspect_value.lt(292.5),
+                                "West",
+                                ee.Algorithms.If(
+                                    aspect_value.lt(337.5), "North-West", "Unknown"
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
+def round_to(value, decimals):
+    scale = ee.Number(10).pow(decimals)
+    return ee.Number(value).multiply(scale).round().divide(scale)

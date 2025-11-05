@@ -5,11 +5,13 @@ import geopandas as gpd
 import pandas as pd
 import fiona
 
+from dpr import mapping
+
 dataset_info = {
     # World Clim v2.1 (https://www.worldclim.org/data/worldclim21.html)
     "annualPrecipitation": {
         "path": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",
-        "label": "Annual Precipitation (mm)",
+        "label": "Annual Precipitation (mm/yr)",
     },
     "meanAnnualTemperature": {
         "path": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",
@@ -22,7 +24,7 @@ dataset_info = {
     },
     "referenceEvapoTranspiration": {
         "path": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
-        "label": "Reference ET (mm/day)",
+        "label": "Reference Evapotranspiration (mm/yr)",
     },
     # HWSD v1.2 (https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v12/en/)
     "AWC": {
@@ -42,30 +44,38 @@ dataset_info = {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
         "label": "Topsoil pH",
     },
+    "topsoilBD": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
+        "label": "Topsoil Bulk Density (kg/dm3)",
+    },
     "topsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_OC",
-        "label": "Topsoil Organic Carbon (%)",
+        "label": "Topsoil Organic Carbon (% weight)",
     },
     "topsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
-        "label": "Topsoil CEC (cmol/kg)",
+        "label": "Topsoil Cation Exchange Capacity (cmol/kg)",
     },
     "topsoilTexture": {
         "path": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
         "label": "Topsoil Texture",
-        "mapping": {0: "none", 1: "coarse", 2: "medium", 3: "fine"},
+        "mapping": {0: "none", 1: "Coarse", 2: "Medium", 3: "Fine"},
     },
     "subsoilPH": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
         "label": "Subsoil pH",
     },
+    "subsoilBD": {
+        "path": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
+        "label": "Subsoil Bulk Density (kg/dm3)",
+    },
     "subsoilOC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_OC",
-        "label": "Subsoil Organic Carbon (%)",
+        "label": "Subsoil Organic Carbon (% weight)",
     },
     "subsoilCEC": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
-        "label": "Subsoil CEC (cmol/kg)",
+        "label": "Subsoil Cation Exchange Capacity (cmol/kg)",
     },
     "subsoilTexture": {
         "path": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",
@@ -87,18 +97,18 @@ dataset_info = {
             13: "Sand",
         },
     },
-    "topsoilBD": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
-        "label": "Topsoil Bulk Density (kg/dm3)",
-    },
-    "subsoilBD": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
-        "label": "Subsoil Bulk Density (kg/dm3)",
-    },
     "drainage": {
         "path": "projects/ee-plantationsitescores/assets/Raster-Drainage",
-        # "mapping": "",  # Check class mapping
-        "label": "Drainage Class",
+        "label": "Soil Drainage",
+        "mapping": {
+            0: "Excessively drained",
+            1: "Somewhat excessively drained",
+            2: "Well drained",
+            3: "Moderately well drained",
+            4: "Imperfectly drained",
+            5: "Poorly drained",
+            6: "Very poorly drained",
+        },
     },
     # SRTM DEM v3 (https://lpdaac.usgs.gov/documents/13/SRTM_Quick_Guide.pdf)
     "elevation": {"path": "USGS/SRTMGL1_003", "label": "Elevation (m)"},
@@ -113,7 +123,7 @@ dataset_info = {
     # In-lab Drainage Network
     "distToDrainage": {
         "path": "projects/ee-plantationsitescores/assets/so_thinned2",
-        "label": "Distance to Drainage (m)",
+        "label": "Distance to Drainage Lines (m)",
     },
 }
 
