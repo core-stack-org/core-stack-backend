@@ -556,6 +556,67 @@ def generate_geojson_with_ci_ndvi_ndmi(
     sync_project_fc_to_geoserver(final_merged, proj_obj.name, layer_name, "waterrej")
 
 
+def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
+    # Load project
+    proj_obj = Project.objects.get(pk=proj_id)
+
+    # Initialize Earth Engine
+    ee_initialize(4)
+
+    # Load FeatureCollections
+    zoi = ee.FeatureCollection(zoi_asset)
+    ci = ee.FeatureCollection(ci_asset)
+    ndvi = ee.FeatureCollection(ndvi_asset)
+
+    print("ZOI:", zoi.size().getInfo())
+    print("CI:", ci.size().getInfo())
+    print("NDVI:", ndvi.size().getInfo())
+
+    # Common join logic on UID
+    join = ee.Join.inner()
+    uid_filter = ee.Filter.equals(leftField="UID", rightField="UID")
+
+    # --- Join ZOI + CI ---
+    zoi_ci_joined = join.apply(zoi, ci, uid_filter)
+
+    def merge_zoi_ci(pair):
+        zoi_feat = ee.Feature(pair.get("primary"))
+        ci_feat = ee.Feature(pair.get("secondary"))
+        merged_props = zoi_feat.toDictionary().combine(ci_feat.toDictionary(), True)
+        # Keep ZOI geometry only
+        return ee.Feature(zoi_feat.geometry(), merged_props)
+
+    zoi_with_ci = ee.FeatureCollection(zoi_ci_joined.map(merge_zoi_ci))
+
+    # --- Join with NDVI ---
+    zoi_ndvi_joined = join.apply(zoi_with_ci, ndvi, uid_filter)
+
+    def merge_with_ndvi(pair):
+        base_feat = ee.Feature(pair.get("primary"))
+        ndvi_feat = ee.Feature(pair.get("secondary"))
+        merged_props = base_feat.toDictionary().combine(ndvi_feat.toDictionary(), True)
+        # Always retain ZOI geometry
+        return ee.Feature(base_feat.geometry(), merged_props)
+
+    merged_final = ee.FeatureCollection(zoi_ndvi_joined.map(merge_with_ndvi))
+
+    # --- Ensure ZOI geometry retained in all features ---
+    merged_final = merged_final.map(
+        lambda f: ee.Feature(
+            f.setGeometry(
+                ee.Feature(
+                    zoi.filter(ee.Filter.eq("UID", f.get("UID"))).first()
+                ).geometry()
+            )
+        )
+    )
+
+    layer_name = f"WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}"
+    print(layer_name)
+
+    sync_project_fc_to_geoserver(merged_final, proj_obj.name, layer_name, "waterrej")
+
+
 def save_layer_info_to_db(
     state,
     district,
