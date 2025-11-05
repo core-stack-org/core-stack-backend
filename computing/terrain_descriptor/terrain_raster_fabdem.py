@@ -16,6 +16,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
 )
 from nrm_app.celery import app
+from utilities.constants import GEE_DATASET_PATH
 
 
 @app.task(bind=True)
@@ -32,9 +33,12 @@ def generate_terrain_raster_clip(
         + "_uid"
     )
 
-    # Output configuration
-    dataset_name = "terrain_raster"
-    description = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{dataset_name}"
+    description = (
+        "terrain_raster_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
     asset_id = get_gee_asset_path(state, district, block) + description
 
     # Load ROI geometry
@@ -42,7 +46,7 @@ def generate_terrain_raster_clip(
 
     # Load the raster image and clip to ROI
     pan_india_raster = ee.Image(
-        "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
+        f"{GEE_DATASET_PATH}/terrain/pan_india_terrain_raster_fabdem"
     )
 
     task = export_raster_asset_to_gee(
@@ -63,6 +67,13 @@ def generate_terrain_raster_clip(
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
 
+        layer_name = (
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_terrain_raster"
+        )
+
         task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, description)
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
@@ -71,7 +82,7 @@ def generate_terrain_raster_clip(
             state,
             district,
             block,
-            description,
+            layer_name,
             asset_id,
             "Terrain Raster",
             algorithm="FABDEM",
@@ -79,7 +90,7 @@ def generate_terrain_raster_clip(
         )
 
         res = sync_raster_gcs_to_geoserver(
-            "terrain", description, description, "terrain_raster"
+            "terrain", layer_name, layer_name, "terrain_raster"
         )
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
