@@ -55,6 +55,7 @@ from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import layer_status
+from .misc.lcw_conflict import generate_lcw_conflict_data
 
 
 @api_security_check(allowed_methods="POST")
@@ -1176,4 +1177,24 @@ def layer_status_dashboard(request):
         )
     except Exception as e:
         print("Exception in layer_staus_dashboard api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_lcw_to_gee(request):
+    print("Inside generate_lcw_conflict_data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id").lower()
+        generate_lcw_conflict_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_lcw_conflict_data api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
