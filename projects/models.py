@@ -9,7 +9,7 @@ class AppType(models.TextChoices):
     WATERSHED = "watershed", "Watershed Planning"
     WATERBODY_REJ = "waterbody", "Waterbody Rejuvenation"
     COMMUNITY_ENGAGEMENT = "community_engagement", "Community Engagement"
-    
+
     # More types as apps are added in future
 
 
@@ -21,7 +21,7 @@ class Project(models.Model):
     )
     description = models.TextField(blank=True, null=True)
     geojson_path = models.CharField(max_length=512, blank=True, null=True)
-    state = models.ForeignKey(State, on_delete=models.CASCADE, null=True)
+    state = models.ForeignKey(State, on_delete=models.CASCADE, null=True, blank=True)
     district = models.ForeignKey(
         District, on_delete=models.CASCADE, null=True, blank=True
     )
