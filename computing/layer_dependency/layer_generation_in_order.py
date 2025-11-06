@@ -53,11 +53,11 @@ def layer_generate_map(
     end_year=None,
 ):
     """
-    This function take state, district,block and map_order(map to trigger, it can be map_1, map_2, map_3, map_4). One map trigger more numbers of pipeline.
+    This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
     """
     # checking:- is mws layer generated?
     try:
-        if map_order in ["map_2", "map_3", "map_4"]:
+        if map_order in ["map_2_1", "map_2_2", "map_3", "map_4"]:
             layer = Layer.objects.get(
                 layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
             )

@@ -8,7 +8,7 @@ map_1 = [
     }
 ]
 
-map_2 = [
+map_2_1 = [
     {
         "name": "generate_hydrology",
         "use_global_args": True,
@@ -18,6 +18,9 @@ map_2 = [
         "args": {"is_annual": True},
         "use_global_args": True,
     },
+]
+
+map_2_2 = [
     {
         "name": "clip_lulc_v3",
         "use_global_args": True,
@@ -135,6 +138,12 @@ map_4 = [
 end_year_rules = {
     "calculate_drought": 2022,
     "drought_causality": 2022,
+    "tree_health_ch_raster": 2022,
+    "tree_health_ch_vector": 2022,
+    "tree_health_ccd_raster": 2022,
+    "tree_health_ccd_vector": 2022,
+    "tree_health_overall_change_raster": 2022,
+    "tree_health_overall_change_vector": 2022,
     "clip_lulc_v3": 2023,
     "vectorise_lulc": 2023,
     "generate_cropping_intensity": 2023,
