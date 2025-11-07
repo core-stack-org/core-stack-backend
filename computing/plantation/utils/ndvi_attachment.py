@@ -1,13 +1,25 @@
 import ee
 from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
+from computing.plantation.utils.hls_ndvi import get_hls_interpolated_ndvi
 from utilities.gee_utils import (
     check_task_status,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    ee_initialize,
 )
 
 
-def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
+def get_ndvi_data():  # suitability_vector, start_year, end_year, description, asset_id):
+    ee_initialize(1)
+    suitability_vector = ee.FeatureCollection(
+        "projects/ee-corestackdev/assets/apps/plantation/cfpt/infosys/CFPT_Infosys"
+    )
+    start_year = 2017
+    end_year = 2017
+    description = "ndvi_hls_test"
+    asset_id = (
+        "projects/ee-corestackdev/assets/apps/plantation/cfpt/infosys/" + description
+    )
     """
     Extracts and exports NDVI data for a set of features by aggregating NDVI values
     into a per-feature dictionary {date: NDVI} over the specified time range.
@@ -41,7 +53,24 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
             ee.data.deleteAsset(ndvi_asset_id)
 
         # Get NDVI image collection (with 'gapfilled_NDVI_lsc' band)
-        ndvi = Get_Padded_NDVI_TS_Image(
+        # ndvi = Get_Padded_NDVI_TS_Image(
+        #     start_date, end_date, suitability_vector.bounds()
+        # )
+
+        # hls = (
+        #     ee.ImageCollection("NASA/HLS/HLSL30/v002")
+        #     .filterDate(start_date, end_date)
+        #     .filterBounds(suitability_vector.bounds())
+        # )
+        # # hls = hls.map(lambda image: image.clip(suitability_vector.bounds()))
+        #
+        # def add_ndvi_ndwi(image):
+        #     ndvi_band = image.normalizedDifference(["B5", "B4"]).rename("NDVI")
+        #     # ndwi = image.normalizedDifference(["B3", "B5"]).rename("NDWI")
+        #     return image.addBands(ndvi_band).float()  # .addBands(ndwi).float()
+        #
+        # ndvi = hls.map(add_ndvi_ndwi)
+        ndvi = get_hls_interpolated_ndvi(
             start_date, end_date, suitability_vector.bounds()
         )
 
@@ -52,15 +81,20 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
             reduced = image.reduceRegions(
                 collection=suitability_vector,
                 reducer=ee.Reducer.mean(),
-                scale=10,
+                scale=30,
             )
 
             # Add NDVI value and image date to each feature
             def annotate(feature):
+                # ndvi_val = ee.Algorithms.If(
+                #     ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
+                #     -9999,
+                #     feature.get("gapfilled_NDVI_lsc"),
+                # )
                 ndvi_val = ee.Algorithms.If(
-                    ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
+                    ee.Algorithms.IsEqual(feature.get("NDVI"), None),
                     -9999,
-                    feature.get("gapfilled_NDVI_lsc"),
+                    feature.get("NDVI"),
                 )
                 return feature.set("ndvi_date", date_str).set("ndvi", ndvi_val)
 
@@ -116,7 +150,12 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
     check_task_status(task_ids)
 
     # Merge year-wise outputs into a single collection
-    return merge_assets_chunked_on_year(asset_ids)
+    # return merge_assets_chunked_on_year(asset_ids)
+    task = export_vector_asset_to_gee(
+        merge_assets_chunked_on_year(asset_ids),
+        "test_hls_ndvi_merged",
+        f"{asset_id}_hls_sndvi_merged",
+    )
 
 
 def merge_assets_chunked_on_year(chunk_assets):

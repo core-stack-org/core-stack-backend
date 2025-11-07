@@ -33,13 +33,13 @@ logger = setup_logger(__name__)
 @app.task(bind=True)
 def site_suitability(
     self,
-    gee_account_id,
-    project_id,
-    start_year,
-    end_year,
+    project_id=None,
+    start_year=None,
+    end_year=None,
     state=None,
     district=None,
     block=None,
+    gee_account_id=None,
 ):
     """
     Main task for site suitability analysis using Google Earth Engine.
@@ -55,7 +55,6 @@ def site_suitability(
     """
     # Initialize Earth Engine connection for the project
     ee_initialize(gee_account_id)
-
     if project_id:
         project = Project.objects.get(
             id=project_id, app_type=AppType.PLANTATION, enabled=True
@@ -100,6 +99,7 @@ def site_suitability(
             start_year=start_year,
             end_year=end_year,
             have_new_sites=have_new_sites,
+            gee_account_id=gee_account_id,
         )
         # Sync the results to GeoServer for visualization
         sync_suitability_to_geoserver(
@@ -121,6 +121,7 @@ def site_suitability(
             block=block,
             start_year=start_year,
             end_year=end_year,
+            gee_account_id=gee_account_id,
         )
 
         # Sync the results to GeoServer for visualization
