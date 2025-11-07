@@ -16,7 +16,9 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 
 @app.task(bind=True)
-def get_change_detection(self, state, district, block, start_year, end_year, gee_account_id):
+def get_change_detection(
+    self, state, district, block, start_year, end_year, gee_account_id
+):
     # Initialize the Earth Engine
     ee_initialize(gee_account_id)
     param_dict = {
@@ -87,7 +89,7 @@ def get_change_detection(self, state, district, block, start_year, end_year, gee
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)
 
-    layer_id = None
+    layer_at_geoserver = False
     for param in param_dict.keys():
         asset_id = (
             get_gee_asset_path(state, district, block) + description + "_" + param
@@ -107,9 +109,9 @@ def get_change_detection(self, state, district, block, start_year, end_year, gee
             )
             make_asset_public(asset_id)
 
-    layer_at_geoserver = sync_to_gcs_geoserver(
-        state, district, block, description, param_dict.keys(), layer_id
-    )
+            layer_at_geoserver = sync_to_gcs_geoserver(
+                state, district, block, description, param_dict.keys(), layer_id
+            )
     return layer_at_geoserver
 
 
