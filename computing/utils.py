@@ -269,9 +269,9 @@ def save_layer_info_to_db(
     asset_id,
     dataset_name,
     sync_to_geoserver=False,
-    layer_version=1.0,
+    layer_version="1.0",
     algorithm=None,
-    algorithm_version=1.0,
+    algorithm_version="1.0",
     misc=None,
     is_override=False,
 ):
@@ -309,7 +309,7 @@ def save_layer_info_to_db(
     if existing_layer:
         if existing_layer.algorithm_version != algorithm_version:
             # Algorithm version changed --> create new record with incremented layer_version
-            new_layer_version = float(existing_layer.layer_version) + 1
+            new_layer_version = str(float(existing_layer.layer_version) + 1)
             print(
                 f"Algorithm version changed. Creating new layer version: {new_layer_version}"
             )
