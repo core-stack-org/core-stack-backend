@@ -144,11 +144,4 @@ end_year_rules = {
     "tree_health_ccd_vector": 2022,
     "tree_health_overall_change_raster": 2022,
     "tree_health_overall_change_vector": 2022,
-    "clip_lulc_v3": 2023,
-    "vectorise_lulc": 2023,
-    "generate_cropping_intensity": 2023,
-    "generate_swb_layer": 2023,
-    "get_change_detection": 2023,
-    "lulc_on_slope_cluster": 2023,
-    "lulc_on_plain_cluster": 2023,
 }
