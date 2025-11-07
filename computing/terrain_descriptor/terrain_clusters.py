@@ -371,7 +371,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
             asset_id=asset_id,
             dataset_name="Terrain Vector",
             algorithm="FABDEM",
-            algorithm_version=2.0,
+            algorithm_version="2.0",
         )
         make_asset_public(asset_id)
     return layer_id

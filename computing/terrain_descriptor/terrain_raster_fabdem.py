@@ -86,7 +86,7 @@ def generate_terrain_raster_clip(
             asset_id,
             "Terrain Raster",
             algorithm="FABDEM",
-            algorithm_version=2.0,
+            algorithm_version="2.0",
         )
 
         res = sync_raster_gcs_to_geoserver(
