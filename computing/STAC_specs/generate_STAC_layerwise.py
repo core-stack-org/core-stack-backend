@@ -37,7 +37,6 @@ import pystac
 
 import sys
 sys.path.append('..')
-# import constants
 from computing.STAC_specs import constants
 
 # %%
@@ -120,7 +119,14 @@ def read_raster_data(raster_url):
 
     #when reading from geoserver
     response = requests.get(raster_url, verify=False)
-    response.raise_for_status()
+
+    #exception handling: scenario 1: when fetching data from geoserver
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        # Whoops it wasn't a 200
+        return "Error: " + str(e) + "when fetching data from geoserver for STAC generation"
+
     raster_data = BytesIO(response.content)
 
     #read the data and fetch the metadata
@@ -241,8 +247,12 @@ def parse_raster_style_file(style_file_url,
     if not os.path.exists(style_file_local_path):
             #TODO: try statement
             os.makedirs(os.path.dirname(style_file_local_path), exist_ok=True)
-            urllib.request.urlretrieve(style_file_url,
-                                       style_file_local_path)       
+            try:
+                urllib.request.urlretrieve(style_file_url,
+                                           style_file_local_path)  
+            #exception handling: scenario 2: when fetching style file from github
+            except Exception as e:
+                print("Could not retrieve style file from github. Error: " + str(e))
     
     tree = ET.parse(style_file_local_path)
     root = tree.getroot()
@@ -415,8 +425,8 @@ def generate_raster_item(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
-                         layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+                         layer_map_csv_path,
+                         layer_desc_csv_path,
                          start_year='',
                          end_year=''
                          ):    
@@ -442,7 +452,6 @@ def generate_raster_item(state,
     geoserver_url = generate_raster_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
-    print(geoserver_url)
     
     #4. create raster item
     #updated layer title and layer id
@@ -716,14 +725,18 @@ def generate_vector_url(workspace,
 def read_vector_data(vector_url,
                      target_crs='4326'
                      ):
-    vector_gdf = gpd.read_file(vector_url)
+    try:
+        vector_gdf = gpd.read_file(vector_url)
+    except Exception as e:
+        print("Could not fetch vector data from url. Error: " + str(e))
+
     vector_gdf = vector_gdf.to_crs(epsg=target_crs)
     #TODO: remove such constants like here in crs. make it standard. available in constants. 
     bounds = vector_gdf.total_bounds
     bbox = [float(b) for b in bounds] #footprint also in vector
-    geom = mapping(vector_gdf.union_all())
-    
+    geom = mapping(vector_gdf.union_all())    
     return (vector_gdf,bounds,bbox,geom)
+
 
 # %%
 def create_vector_item(vector_url,
@@ -869,8 +882,11 @@ def parse_vector_style_file(style_file_url,
     if not os.path.exists(style_file_local_path):
             #TODO: try statement
             os.makedirs(os.path.dirname(style_file_local_path), exist_ok=True)
-            urllib.request.urlretrieve(style_file_url,
-                                       style_file_local_path)       
+            try:
+                urllib.request.urlretrieve(style_file_url,
+                                           style_file_local_path)
+            except Exception as e:
+                print("Could not retrieve style file from url. Error: " + str(e))
     
     try:
         tree = ET.parse(style_file_local_path)
@@ -1096,9 +1112,9 @@ def generate_vector_item(state,
                          layer_desc_csv_path,
                          column_desc_csv_path,
                          ):    
-    print(layer_map_csv_path)
-    print(layer_desc_csv_path)
-    print(column_desc_csv_path)
+    # print(layer_map_csv_path)
+    # print(layer_desc_csv_path)
+    # print(column_desc_csv_path)
     #1. read layer description
     layer_description = read_layer_description(filepath=layer_desc_csv_path,
                                                layer_name=layer_name)
@@ -1249,9 +1265,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='drainage_lines_vector',
-#                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
-#                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
-#                     #  column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'
+#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                     #  column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'
 #                      )
 
 # %%
@@ -1259,9 +1275,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='aquifer_vector',
-#                      # column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv',
-#                      # layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
-#                      # layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+#                      # column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv',
+#                      # layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+#                      # layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
 #                  )
 
 # %%
@@ -1269,8 +1285,8 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='tree_canopy_height_raster',
-#                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
-#                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
 #                      start_year='2019'
 #                      )
 
