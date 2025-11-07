@@ -398,45 +398,55 @@ def BuildDesiltingLayer(project_id):
 
 
 @shared_task()
-def BuildGeojson(swb2_asset, desilting_point_asset, layer_name, project_name):
-    ee_initialize()
+def BuildGeojson(
+    swb2_asset,
+    layer_name,
+    state=None,
+    district=None,
+    block=None,
+    project_name=None,
+    desilting_point_asset=None,
+    gee_account_id=None,
+):
+    ee_initialize(gee_account_id)
     # Load the FeatureCollections and Image
     waterbodies = ee.FeatureCollection(
         swb2_asset
     )  # Replace with your actual table2 asset
-    desiltingPoints = ee.FeatureCollection(
-        desilting_point_asset
-    )  # Replace with your actual table asset
+    if desilting_point_asset:
+        desiltingPoints = ee.FeatureCollection(
+            desilting_point_asset
+        )  # Replace with your actual table asset
 
-    # Map over waterbodies to attach intersecting point geometry and properties
-    def attach_matching_point(feature):
-        # Filter points that intersect (fall inside) the polygon
-        contained_points = desiltingPoints.filterBounds(feature.geometry())
+        # Map over waterbodies to attach intersecting point geometry and properties
+        def attach_matching_point(feature):
+            # Filter points that intersect (fall inside) the polygon
+            contained_points = desiltingPoints.filterBounds(feature.geometry())
 
-        # Get the first matching point (optional: you can use reduceToCollection or something else if needed)
-        point = contained_points.first()
+            # Get the first matching point (optional: you can use reduceToCollection or something else if needed)
+            point = contained_points.first()
 
-        # Check if any point was found
-        return ee.Algorithms.If(
-            point,
-            ee.Feature(feature).copyProperties(point).set("matched", True),
-            feature.set("matched", False),
+            # Check if any point was found
+            return ee.Algorithms.If(
+                point,
+                ee.Feature(feature).copyProperties(point).set("matched", True),
+                feature.set("matched", False),
+            )
+
+        # Apply the function to each waterbody polygon
+        joined = waterbodies.map(attach_matching_point)
+        matched_polygons = ee.FeatureCollection(joined).filter(
+            ee.Filter.eq("matched", True)
         )
-
-    # Apply the function to each waterbody polygon
-    joined = waterbodies.map(attach_matching_point)
-    matched_polygons = ee.FeatureCollection(joined).filter(
-        ee.Filter.eq("matched", True)
-    )
-    asset_id_desilt = get_filtered_mws_layer_name(project_name, layer_name)
-    delete_asset_on_GEE(asset_id_desilt)
-    point_tasks = ee.batch.Export.table.toAsset(
-        collection=matched_polygons,
-        description="water_rej_desilting_point_tasks",
-        assetId=asset_id_desilt,
-    )
-    point_tasks.start()
-    wait_for_task_completion(point_tasks)
+        asset_id_desilt = get_filtered_mws_layer_name(project_name, layer_name)
+        delete_asset_on_GEE(asset_id_desilt)
+        point_tasks = ee.batch.Export.table.toAsset(
+            collection=matched_polygons,
+            description="water_rej_desilting_point_tasks",
+            assetId=asset_id_desilt,
+        )
+        point_tasks.start()
+        wait_for_task_completion(point_tasks)
 
     sync_project_fc_to_geoserver(matched_polygons, project_name, layer_name, "waterrej")
     return asset_id_desilt
