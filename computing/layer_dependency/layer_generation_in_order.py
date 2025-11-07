@@ -58,8 +58,12 @@ def layer_generate_map(
     # checking:- is mws layer generated?
     try:
         if map_order in ["map_2_1", "map_2_2", "map_3", "map_4"]:
-            layer = Layer.objects.get(
-                layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+            layer = (
+                Layer.objects.filter(
+                    layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+                )
+                .order_by("-layer_version")
+                .first()
             )
             if not layer:
                 return f"check mws layer for {district}_{block}"
