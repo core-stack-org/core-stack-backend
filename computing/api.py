@@ -1162,7 +1162,7 @@ def generate_layer_in_order(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
+@api_view(["POST"])
 @schema(None)
 def layer_status_dashboard(request):
     print("inside layer_staus_dashboard")
