@@ -9,6 +9,11 @@
 # Common functions between raster and vector wherever possible
 
 # %%
+
+import sys
+sys.path.append('..')
+from computing.STAC_specs import constants
+
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -34,10 +39,6 @@ from matplotlib.colors import ListedColormap, Normalize
 from shapely.geometry import mapping, box, Polygon
 
 import pystac
-
-import sys
-sys.path.append('..')
-from computing.STAC_specs import constants
 
 # %%
 # !pip install fsspec s3fs
@@ -79,6 +80,9 @@ LAYER_DESC_GITHUB_URL = constants.LAYER_DESC_GITHUB_URL
 # %%
 VECTOR_COLUMN_DESC_GITHUB_URL = constants.VECTOR_COLUMN_DESC_GITHUB_URL
 # VECTOR_COLUMN_DESC_GITHUB_URL
+
+# %%
+layer_STAC_generated = False #output flag
 
 # %% [markdown]
 # ### Raster flow
@@ -427,8 +431,8 @@ def generate_raster_item(state,
                          layer_name,
                          layer_map_csv_path,
                          layer_desc_csv_path,
-                         start_year='',
-                         end_year=''
+                         start_year,
+                         end_year
                          ):    
     
     #1. read layer description
@@ -696,7 +700,8 @@ def update_STAC_files(state,
         print("created root catalog")
     root_catalog.add_child(state_collection)
     root_catalog.normalize_and_save(STAC_FILES_DIR, catalog_type=pystac.CatalogType.SELF_CONTAINED)
-    return
+    layer_STAC_generated = True 
+    return layer_STAC_generated
 
 # %% [markdown]
 # ### Vector flow
@@ -1212,10 +1217,13 @@ def generate_vector_stac(state,
                                        layer_map_csv_path,
                                        layer_desc_csv_path,
                                        column_desc_csv_path)
-    update_STAC_files(state,
-                      district,
-                      block,
-                      STAC_item=vector_item)
+    
+    layer_STAC_generated = update_STAC_files(state,
+                                             district,
+                                             block,
+                                             STAC_item=vector_item)
+    
+    return layer_STAC_generated
 
 # %%
 def generate_raster_stac(state,
@@ -1236,11 +1244,14 @@ def generate_raster_stac(state,
                                        start_year,
                                        end_year)
     
-    update_STAC_files(state,
-                      district,
-                      block,
-                      STAC_item=raster_item
-                      )
+    layer_STAC_generated = update_STAC_files(state,
+                                             district,
+                                             block,
+                                             STAC_item=raster_item)
+    
+    return layer_STAC_generated
+    
+
 
 # %% [markdown]
 # Test the raster and vector flow 
@@ -1265,9 +1276,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='drainage_lines_vector',
-#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
-#                     #  column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'
+#                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+#                     #  column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'
 #                      )
 
 # %%
@@ -1275,9 +1286,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='aquifer_vector',
-#                      # column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv',
-#                      # layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-#                      # layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+#                      # column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv',
+#                      # layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+#                      # layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                  )
 
 # %%
@@ -1285,9 +1296,9 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='tree_canopy_height_raster',
-#                     #  layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-#                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
-#                      start_year='2019'
+#                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
+#                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
+#                      start_year='2021'
 #                      )
 
 
