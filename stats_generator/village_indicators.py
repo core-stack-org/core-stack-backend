@@ -65,7 +65,7 @@ def get_generate_filter_data_village(state, district, block):
                 else:
                     total_assets = 0
             else:
-                total_assets = 0
+                total_assets = -1
 
             # Extract basic indicators
             total_population = village_id_data.get("total_population_count", None).iloc[
