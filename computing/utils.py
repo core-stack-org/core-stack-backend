@@ -8,8 +8,6 @@ from utilities.gee_utils import (
     check_task_status,
     get_geojson_from_gcs,
     is_gee_asset_exists,
-    valid_gee_text,
-    get_gee_asset_path,
     get_gee_dir_path,
     export_vector_asset_to_gee,
     is_asset_public,
@@ -116,6 +114,7 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
 
 
 def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
+    geo = Geoserver()
     state_dir = os.path.join("data/fc_to_shape", shp_folder)
     if not os.path.exists(state_dir):
         os.mkdir(state_dir)
@@ -126,13 +125,7 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-    # delete layer if already exist
-    geo = Geoserver()
-    layers = geo.get_layers(workspace)
-    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
-    if layer_name in layer_names:
-        geo.delete_layer(layer_name)
-        print(f"deleted {layer_name} from geoserver")
+    geo.delete_vector_store(workspace=workspace, store=layer_name)
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
@@ -146,15 +139,8 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         check_task_status([task_id])
 
         geojson_fc = get_geojson_from_gcs(layer_name)
-
-    # delete layer if already exist
     geo = Geoserver()
-    layers = geo.get_layers(workspace)
-    layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
-    if layer_name in layer_names:
-        geo.delete_layer(layer_name)
-        print(f"deleted {layer_name} from geoserver")
-
+    geo.delete_vector_store(workspace=workspace, store=layer_name)
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
@@ -174,7 +160,6 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
         res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
         if style_name:
-            geo = Geoserver()
             style_res = geo.publish_style(
                 layer_name=layer_name, style_name=style_name, workspace=workspace
             )
@@ -284,11 +269,14 @@ def save_layer_info_to_db(
     asset_id,
     dataset_name,
     sync_to_geoserver=False,
-    layer_version=1.0,
+    layer_version="1.0",
+    algorithm=None,
+    algorithm_version="1.0",
     misc=None,
     is_override=False,
 ):
-    print("inside the save_layer_info_to_db function ")
+    print("inside the save_layer_info_to_db function")
+
     dataset = Dataset.objects.get(name=dataset_name)
 
     try:
@@ -302,28 +290,79 @@ def save_layer_info_to_db(
     except Exception as e:
         print("Error fetching in state district block:", e)
         return
+
     is_public = is_asset_public(asset_id)
 
-    layer_obj, created = Layer.objects.update_or_create(
-        dataset=dataset,
-        layer_name=layer_name,
-        state=state_obj,
-        district=district_obj,
-        block=block_obj,
-        layer_version=layer_version,
-        defaults={
-            "is_sync_to_geoserver": sync_to_geoserver,
-            "is_public_gee_asset": is_public,
-            "is_override": is_override,
-            "misc": misc,
-            "gee_asset_path": asset_id,
-        },
+    # Check if there’s an existing layer
+    existing_layer = (
+        Layer.objects.filter(
+            dataset=dataset,
+            layer_name=layer_name,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+        )
+        .order_by("-layer_version")
+        .first()
     )
-    if layer_obj:
-        print("found layer object and updated")
-    else:
-        print("layer object not found so, created new one")
 
+    if existing_layer:
+        if existing_layer.algorithm_version != algorithm_version:
+            # Algorithm version changed --> create new record with incremented layer_version
+            new_layer_version = str(float(existing_layer.layer_version) + 1)
+            print(
+                f"Algorithm version changed. Creating new layer version: {new_layer_version}"
+            )
+            layer_obj = Layer.objects.create(
+                dataset=dataset,
+                layer_name=layer_name,
+                state=state_obj,
+                district=district_obj,
+                block=block_obj,
+                layer_version=new_layer_version,
+                algorithm=algorithm,
+                algorithm_version=algorithm_version,
+                is_sync_to_geoserver=sync_to_geoserver,
+                is_public_gee_asset=is_public,
+                is_override=is_override,
+                misc=misc,
+                gee_asset_path=asset_id,
+            )
+        else:
+            # Algorithm version is same --> update existing layer
+            print("Algorithm version same. Updating existing layer.")
+            for field, value in {
+                "algorithm": algorithm,
+                "algorithm_version": algorithm_version,
+                "is_sync_to_geoserver": sync_to_geoserver,
+                "is_public_gee_asset": is_public,
+                "is_override": is_override,
+                "misc": misc,
+                "gee_asset_path": asset_id,
+            }.items():
+                setattr(existing_layer, field, value)
+            existing_layer.save()
+            layer_obj = existing_layer
+    else:
+        # No existing record --> create a new one
+        print("No existing layer found. Creating new one.")
+        layer_obj = Layer.objects.create(
+            dataset=dataset,
+            layer_name=layer_name,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_version=layer_version,
+            algorithm=algorithm,
+            algorithm_version=algorithm_version,
+            is_sync_to_geoserver=sync_to_geoserver,
+            is_public_gee_asset=is_public,
+            is_override=is_override,
+            misc=misc,
+            gee_asset_path=asset_id,
+        )
+
+    print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
     return layer_obj.id
 
 
@@ -354,3 +393,19 @@ def get_existing_end_year(dataset_name, layer_name):
     existing_end_date = layer_obj.misc["end_year"]
     print("existing_end_date", existing_end_date)
     return existing_end_date
+
+
+def get_layer_object(state, district, block, layer_name, dataset_name):
+    state_obj = StateSOI.objects.get(state_name__iexact=state)
+    district_obj = DistrictSOI.objects.get(
+        district_name__iexact=district, state=state_obj
+    )
+    block_obj = TehsilSOI.objects.get(tehsil_name__iexact=block, district=district_obj)
+    layer_obj = Layer.objects.get(
+        state=state_obj,
+        district=district_obj,
+        block=block_obj,
+        layer_name=layer_name,
+        dataset__name=dataset_name,
+    )
+    return layer_obj

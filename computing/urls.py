@@ -2,6 +2,7 @@ from tkinter.font import names
 
 from django.urls import path
 from . import api
+from .views import layer_status
 
 urlpatterns = [
     path("create_workspace/", api.create_workspace, name="create_workspace"),
@@ -19,6 +20,7 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
+    path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
     path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
@@ -103,4 +105,10 @@ urlpatterns = [
         api.generate_layer_in_order,
         name="generate_layer_in_order",
     ),
+    path(
+        "layer_status_dashboard/",
+        api.layer_status_dashboard,
+        name="layer_staus_dashboard",
+    ),
+    path("generate_lcw_data/", api.generate_lcw_to_gee, name="generate_lcw_to_gee"),
 ]

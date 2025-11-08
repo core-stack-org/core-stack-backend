@@ -65,7 +65,7 @@ def mws_layer(self, state, district, block, gee_account_id):
             layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
             asset_id=asset_id,
             dataset_name="MWS",
-            layer_version=2.0,
+            algorithm_version="1.1",
         )
         layer_generated = True
     return layer_generated

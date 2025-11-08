@@ -102,7 +102,8 @@ response_param = openapi.Parameter(
 
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_admin_details_by_latlon",
+    operation_summary="Get Admin Details by Lat Lon",
     operation_description="""
     Retrieve admin data based on given latitude and longitude coordinates.
     
@@ -136,8 +137,9 @@ response_param = openapi.Parameter(
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
-@api_security_check(auth_type="Api_key")
+@api_security_check(auth_type="API_key")
 def get_admin_details_by_lat_lon(request):
     """
     Retrieve admin data based on given latitude and longitude coordinates.
@@ -187,7 +189,8 @@ def get_admin_details_by_lat_lon(request):
 ######### Get Mws Id by lat lon #########
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_mwsid_by_latlon",
+    operation_summary="Get MWSID by Lat Lon",
     operation_description="""
     Retrieve MWS ID data based on given latitude and longitude coordinates.
     
@@ -223,6 +226,7 @@ def get_admin_details_by_lat_lon(request):
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
 @api_security_check(auth_type="Auth_free")
 def get_mws_by_lat_lon(request):
@@ -268,7 +272,8 @@ def get_mws_by_lat_lon(request):
 ########## Get MWS Data by MWS ID  ##########
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_mws_data",
+    operation_summary="Get MWS Data",
     operation_description="""
     Retrieve MWS data for a given state, district, tehsil, and MWS ID.
     
@@ -339,6 +344,7 @@ def get_mws_by_lat_lon(request):
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
 @api_security_check(auth_type="API_key")
 def get_mws_json_by_stats_excel(request):
@@ -408,7 +414,8 @@ def get_mws_json_by_stats_excel(request):
 ######### Get MWS DATA by Admin Details  ##########
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_tehsil_data",
+    operation_summary="Get Tehsil Data",
     operation_description="""
     Retrieve tehsil-level JSON data for a given state, district, and tehsil.
     
@@ -462,6 +469,7 @@ def get_mws_json_by_stats_excel(request):
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
 @api_security_check(auth_type="API_key")
 def generate_tehsil_data(request):
@@ -540,7 +548,8 @@ def generate_tehsil_data(request):
 ########### Get KYL Data based on MWS ID  ###############
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_mws_kyl_indicators",
+    operation_summary="Get MWS KYL Indicators",
     operation_description="""
     Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.
     
@@ -602,6 +611,7 @@ def generate_tehsil_data(request):
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
 @api_security_check(auth_type="API_key")
 def get_mws_json_by_kyl_indicator(request):
@@ -671,7 +681,8 @@ def get_mws_json_by_kyl_indicator(request):
 #############  Get Generated Layers Urls  ##################
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_generated_layer_urls",
+    operation_summary="Get Generated Layer Url",
     operation_description="""
     Retrieve generated layer URLs for a given state, district, and tehsil.
     
@@ -721,6 +732,7 @@ def get_mws_json_by_kyl_indicator(request):
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
 @api_security_check(auth_type="API_key")
 def get_generated_layer_urls(request):
@@ -769,7 +781,8 @@ def get_generated_layer_urls(request):
 #############  Get MWS Report Urls  ##################
 @swagger_auto_schema(
     method="get",
-    operation_id="Requirements",
+    operation_id="get_mws_report",
+    operation_summary="Get MWS Report url",
     operation_description="""
     Retrieve MWS report url for a given state, district, tehsil and mws_id.
     
@@ -805,6 +818,7 @@ def get_generated_layer_urls(request):
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
+    tags=["Dataset APIs"],
 )
 @api_security_check(auth_type="API_key")
 def get_mws_report_urls(request):

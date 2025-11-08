@@ -3,7 +3,6 @@ import ee
 from nrm_app.celery import app
 import geopandas as gpd
 from geojson import Feature, FeatureCollection
-from shapely import wkt
 from shapely.geometry import mapping
 from computing.utils import (
     generate_shape_files,
@@ -11,14 +10,11 @@ from computing.utils import (
 )
 from utilities.gee_utils import (
     ee_initialize,
-    check_task_status,
     valid_gee_text,
     get_gee_asset_path,
-    geojson_to_ee_featurecollection,
     is_gee_asset_exists,
     create_gee_directory,
     upload_shp_to_gee,
-    export_vector_asset_to_gee,
     make_asset_public,
 )
 from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
@@ -27,7 +23,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
-    ee_initialize(gee_account_id)
+    ee_initialize()
     description = (
         "admin_boundary_"
         + valid_gee_text(district.lower())
@@ -38,30 +34,10 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
 
     collection, state_dir = clip_block_from_admin_boundary(state, district, block)
 
-    if not is_gee_asset_exists(asset_id):
-        task_id = sync_admin_boundary_to_ee(
-            collection, description, state, district, block
-        )
-
-        task_id_list = check_task_status([task_id]) if task_id else []
-        print("task_id", task_id_list)
-
     layer_id = None
-    if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
-            asset_id=asset_id,
-            dataset_name="Admin Boundary",
-        )
-        make_asset_public(asset_id)
-
     # Generate shape files and sync to geoserver
-    shp_path, layer_at_geoserver = sync_admin_boundry_to_geoserver(
-        collection, state_dir, district, block, layer_id
-    )
+    shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
+    create_gee_directory(state, district, block)
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
@@ -72,11 +48,28 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
         )
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         upload_shp_to_gee(layer_path, layer_name, asset_id)
+
+    if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+            asset_id=asset_id,
+            dataset_name="Admin Boundary",
+        )
+
+    res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
+    layer_at_geoserver = False
+    if res["status_code"] == 201 and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print("sync to geoserver flag updated")
+        layer_at_geoserver = True
     return layer_at_geoserver
 
 
-def sync_admin_boundry_to_geoserver(collection, state_dir, district, block, layer_id):
+def create_shp_files(collection, state_dir, district, block, layer_id):
     print("sync_admin_boundry_to_geoserver")
     path = os.path.join(
         str(state_dir),
@@ -89,28 +82,7 @@ def sync_admin_boundry_to_geoserver(collection, state_dir, district, block, laye
         except Exception as e:
             print(e)
     path = generate_shape_files(path)
-    res = push_shape_to_geoserver(path, workspace="panchayat_boundaries")
-    layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag updated")
-        layer_at_geoserver = True
-    return path, layer_at_geoserver
-
-
-def sync_admin_boundary_to_ee(collection, description, state, district, block):
-    create_gee_directory(state, district, block)
-
-    fc = geojson_to_ee_featurecollection(collection)
-    try:
-        # Export an ee.FeatureCollection as an Earth Engine asset.
-        task = export_vector_asset_to_gee(
-            fc, description, get_gee_asset_path(state, district, block) + description
-        )
-        return task
-    except Exception as e:
-        print(f"Error occurred in running admin_boundary_task: {e}")
-        return None
+    return path
 
 
 def clip_block_from_admin_boundary(state, district, block):
@@ -166,7 +138,7 @@ def clip_block_from_admin_boundary(state, district, block):
                 )
             )
 
-    if admin_boundary_data is not  None:
+    if admin_boundary_data is not None:
         for index, row in admin_boundary_data.iterrows():
             features.append(
                 Feature(

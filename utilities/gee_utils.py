@@ -6,10 +6,7 @@ from nrm_app.settings import (
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH,
-    BASE_DIR,
-    GEE_DEFAULT_ACCOUNT_ID
+    GEE_DEFAULT_ACCOUNT_ID,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -25,9 +22,10 @@ from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
 from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
+import tempfile
 
 
-def ee_initialize(account_id = GEE_DEFAULT_ACCOUNT_ID):
+def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
     account = GEEAccount.objects.get(pk=account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
     credentials = service_account.Credentials.from_service_account_info(
@@ -67,16 +65,26 @@ def ee_initialize(account_id = GEE_DEFAULT_ACCOUNT_ID):
 #         print("Exception in gee connection", e)
 
 
-def gcs_config():
+def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
     from google.oauth2 import service_account
 
     # # Authenticate Earth Engine
     # ee_initialize()
 
     # Authenticate Google Cloud Storage
-    credentials = service_account.Credentials.from_service_account_file(
-        GEE_SERVICE_ACCOUNT_KEY_PATH,
-        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    # credentials = service_account.Credentials.from_service_account_file(
+    #     GEE_SERVICE_ACCOUNT_KEY_PATH,
+    #     scopes=["https://www.googleapis.com/auth/cloud-platform"],
+    # )
+
+    account = GEEAccount.objects.get(pk=gee_account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+    credentials = service_account.Credentials.from_service_account_info(
+        key_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/earthengine",
+            "https://www.googleapis.com/auth/devstorage.full_control",
+        ],
     )
 
     # Create Storage Client
@@ -107,7 +115,7 @@ def download_gee_layer(state, district, block):
 
 
 def check_gee_task_status(task_id):
-    ee_initialize()
+    ee_initialize(1)
     try:
         gee_tasks = ee.data.getTaskStatus(task_id)
         print(gee_tasks)
@@ -397,12 +405,13 @@ def sync_raster_to_gcs(image, scale, layer_name):
 
 def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
     print("inside sync_raster_to_geoserver")
+    geo = Geoserver()
+    geo.delete_raster_store(workspace=workspace, store=layer_name)
     bucket = gcs_config()
 
     blob = bucket.blob("nrm_raster/" + gcs_file_name + ".tif")
     tif_content = blob.download_as_bytes()
 
-    geo = Geoserver()
     file_upload_res = geo.upload_raster(tif_content, workspace, layer_name)
     print("File response:", file_upload_res)
     if style_name:
@@ -587,11 +596,19 @@ def extract_task_id(command_output):
     return None
 
 
-def gcs_to_gee_asset_cli(gcs_uri, asset_id):
+def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
+    account = GEEAccount.objects.get(pk=gee_account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+
+    # Write credentials to a temp JSON file
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False) as f:
+        json.dump(key_dict, f)
+        service_account_file = f.name
+
     """Use earthengine CLI to upload from GCS to GEE asset"""
     command = [
         "earthengine",
-        f"--service_account_file={GEE_SERVICE_ACCOUNT_KEY_PATH}",
+        f"--service_account_file={service_account_file}",
         "upload",
         "table",
         f"--asset_id={asset_id}",
@@ -614,7 +631,20 @@ def gcs_to_gee_asset_cli(gcs_uri, asset_id):
         return None
 
 
-def upload_shp_to_gee(shapefile_path, file_name, asset_id):
+def upload_shp_to_gee(
+    shapefile_path, file_name, asset_id, gee_account_id=GEE_DEFAULT_ACCOUNT_ID
+):
+    """
+    Upload a shapefile to GEE asset from GCS using CLI commands
+    Args:
+        shapefile_path:
+        file_name:
+        asset_id:
+        gee_account_id:
+
+    Returns:
+
+    """
     gcs_blob_name = f"shapefiles/{file_name}/{file_name}.shp"
 
     # Make sure all shapefile components (.shp, .dbf, .shx, .prj) are uploaded
@@ -630,7 +660,7 @@ def upload_shp_to_gee(shapefile_path, file_name, asset_id):
     gcs_uri = f"gs://core_stack/{gcs_blob_name}"
 
     # Upload from GCS to GEE
-    task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id)
+    task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id)
     if task_id:
         check_task_status([task_id], 100)
 

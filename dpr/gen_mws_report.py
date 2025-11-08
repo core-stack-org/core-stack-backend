@@ -5,10 +5,14 @@ import pandas as pd
 import numpy as np
 import pymannkendall as mk
 
+import json
+
 from datetime import datetime
 from shapely.geometry import Polygon, MultiPolygon, Point, LineString
 from shapely.ops import unary_union
 from scipy.spatial.distance import jensenshannon
+
+from .models import Overpass_Block_Details
 
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import OVERPASS_URL
@@ -25,7 +29,7 @@ logger = setup_logger(__name__)
 DATA_DIR_TEMP = env("EXCEL_DIR")
 
 
-# MARK: HELPER FUNCTIONS
+# ? MARK: HELPER FUNCTIONS
 def get_geojson(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
     geojson_url = f"{GEOSERVER_URL}/{workspace}/ows?service=WFS&version=1.0.0&request=GetFeature&typeName={workspace}:{layer_name}&outputFormat=application/json"
@@ -159,7 +163,6 @@ def format_date_monsoon_onset(date_list):
     return min_date.strftime("%m-%d"), max_date.strftime("%m-%d")
 
 
-# The Start_only is for case 2023-2024 , so when true it will return 2023 if false then return 2023 and 2024 both
 def extract_years(items, *, start_only=True):
     years = []
     seen = set()
@@ -187,7 +190,7 @@ def extract_years(items, *, start_only=True):
 
     return sorted(years, key=int)
 
-# For columns like "drysp_unit_4_weeks_2018"
+
 def extract_years_single(items):
     years, seen = [], set()
     for s in map(str, items):
@@ -197,7 +200,8 @@ def extract_years_single(items):
                 seen.add(y)
                 years.append(y)
     return sorted(years, key=int) 
- 
+
+
 def get_rainfall_type(rainfall):
     if rainfall < 740:
         return "Semi-arid"
@@ -211,9 +215,28 @@ def get_rainfall_type(rainfall):
         return "Very high"
 
 
-# ? MAIN SECTION
+# ? MARK: MAIN SECTION
 def get_osm_data(state, district, block, uid):
     try:
+        # * Area of the Tehsil
+        excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
+
+        df = pd.read_excel(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            sheet_name="terrain",
+        )
+        df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
+
+        total_area = df["area_in_ha"].sum()
+
         region_gdf = gpd.read_file(
             get_geojson(
                 "mws_layers", "deltaG_well_depth" + "_" + district + "_" + block
@@ -230,58 +253,73 @@ def get_osm_data(state, district, block, uid):
         overpass_query = f"""
         [out:json];
         (
-        way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
-        way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
-        way["natural"="wood"]({miny},{minx},{maxy},{maxx});
+            way["landuse"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest"]({miny},{minx},{maxy},{maxx});
+            way["boundary"="forest_compartment"]({miny},{minx},{maxy},{maxx});
+            way["natural"="wood"]({miny},{minx},{maxy},{maxx});
 
-        way["natural"="water"]({miny},{minx},{maxy},{maxx});
-        way["water"="lake"]({miny},{minx},{maxy},{maxx});
-        way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
+            way["natural"="water"]({miny},{minx},{maxy},{maxx});
+            way["water"="lake"]({miny},{minx},{maxy},{maxx});
+            way["water"="reservoir"]({miny},{minx},{maxy},{maxx});
 
-        relation["natural"="water"]({miny},{minx},{maxy},{maxx});
+            relation["natural"="water"]({miny},{minx},{maxy},{maxx});
 
-        node["natural"="hill"]({miny},{minx},{maxy},{maxx});
-        way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
-        
-        node["place"="city"]({miny},{minx},{maxy},{maxx});
-        node["place"="town"]({miny},{minx},{maxy},{maxx});
+            node["natural"="hill"]({miny},{minx},{maxy},{maxx});
+            way["natural"="ridge"]({miny},{minx},{maxy},{maxx});
 
-        way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
-        way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
-        way["highway"="residential"]({miny},{minx},{maxy},{maxx});
-        way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
-        way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
-        way["highway"="track"]({miny},{minx},{maxy},{maxx});
-        way["highway"="road"]({miny},{minx},{maxy},{maxx});
-        way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
-        way["highway"="construction"]({miny},{minx},{maxy},{maxx});
-        way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
+            node["place"="city"]({miny},{minx},{maxy},{maxx});
+            node["place"="town"]({miny},{minx},{maxy},{maxx});
+
+            way["highway"="motorway"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary"]({miny},{minx},{maxy},{maxx});
+            way["highway"="unclassified"]({miny},{minx},{maxy},{maxx});
+            way["highway"="residential"]({miny},{minx},{maxy},{maxx});
+            way["highway"="motorway_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="trunk_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="primary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="secondary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="tertiary_link"]({miny},{minx},{maxy},{maxx});
+            way["highway"="living_street"]({miny},{minx},{maxy},{maxx});
+            way["highway"="track"]({miny},{minx},{maxy},{maxx});
+            way["highway"="road"]({miny},{minx},{maxy},{maxx});
+            way["highway"="proposed"]({miny},{minx},{maxy},{maxx});
+            way["highway"="construction"]({miny},{minx},{maxy},{maxx});
+            way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
         );
         out body;
         >;
         out skel qt;
         """
 
-        #print("API response start time", datetime.now())
-
         response = {}
-        try:
-            response = requests.get(OVERPASS_URL, params={"data": overpass_query})
-            response = response.json()
-        except Exception as e:
-            logger.info("Not able to fetch the Overpass API Info", e)
+        block_detail = Overpass_Block_Details.objects.filter(location=f"{district}_{block}").first()
 
-        #print("API response end time", datetime.now())
+        if block_detail:
+            logger.info(f"Using cached response for location: {district}_{block}")
+            response = block_detail.overpass_response
+        else:
+            logger.info(f"No cached data found. Fetching from Overpass API for location: {district}_{block}")
+            
+            try:
+                response = requests.get(OVERPASS_URL, params={"data": overpass_query})
+                response = response.json()
+                
+                # if DEBUG: 
+                    # Save to file (locally)
+                    # with open('overpass_response.json', 'w', encoding='utf-8') as f:
+                    #     json.dump(response, f, indent=2, ensure_ascii=False)
 
+                block_detail = Overpass_Block_Details.objects.create(
+                    location = f"{district}_{block}",
+                    overpass_response = response
+                )
+                logger.info(f"Response saved to DB for location: {district}_{block}")
+            
+            except Exception as e:
+                logger.info("Not able to fetch the Overpass API Info", e)
 
         #print("Data Processing", datetime.now())
         
@@ -657,8 +695,11 @@ def get_osm_data(state, district, block, uid):
             final_data["river_mws"] = calculate_river_length(river_lines)
             final_data["river_mws"] += calculate_river_length(filtered_river_gdf)
 
+        # Minimum area threshold (1 hectare = 10,000 square meters)
+        MIN_AREA_THRESHOLD = 10000  # 1 hectare in square meters
+
         # ? Block Parameters
-        #parameter_block = f"The Tehsil {block}"
+
         parameter_block = f""
 
         if final_data["cities"]:
@@ -679,37 +720,43 @@ def get_osm_data(state, district, block, uid):
             parameter_block += f". Key natural features such as {temp} shape the Tehsil landscape and impact water flow"
 
         if final_data["forests"]:
-            parameter_block += (
-                f". Part of {final_data['forests'][0]['name']}, covering roughly "
-                f"{round(final_data['forests'][0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
-            )
+            large_forests = [f for f in final_data["forests"] if f["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            if large_forests:
+                parameter_block += (
+                    f". Part of {large_forests[0]['name']}, covering roughly "
+                    f"{round(large_forests[0]['area_sq_m'] / 10000, 1)} hectares, lies within the Tehsil supporting local wildlife and promoting biodiversity"
+                )
 
         if final_data["lakes"] or final_data["reservoirs"]:
-            rname = [temp["name"] for temp in final_data["lakes"]]
-            rname += [temp["name"] for temp in final_data["reservoirs"]]
-            rarea = [
-                str(round(temp["area_sq_m"] / 10000, 1)) for temp in final_data["lakes"]
-            ]
-            rarea += [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["reservoirs"]
-            ]
+            large_lakes = [lake for lake in final_data["lakes"] if lake["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            large_reservoirs = [res for res in final_data["reservoirs"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            
+            if large_lakes or large_reservoirs:
+                rname = [temp["name"] for temp in large_lakes]
+                rname += [temp["name"] for temp in large_reservoirs]
+                rarea = [
+                    str(round(temp["area_sq_m"] / 10000, 1)) for temp in large_lakes
+                ]
+                rarea += [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_reservoirs
+                ]
 
-            parameter_block += f". Additionally, large water bodies such as "
-            if len(rname) == 1:
-                parameter_block += rname[0]
-            elif len(rname) == 2:
-                parameter_block += " and ".join(rname)
-            else:
-                parameter_block += ", ".join(rname[:-1]) + ", and " + rname[-1]
-            parameter_block += f" span about "
-            if len(rname) == 1:
-                parameter_block += rarea[0]
-            elif len(rname) == 2:
-                parameter_block += " and ".join(rarea)
-            else:
-                parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_block += f"  hectares  respectively within the Tehsil"
+                parameter_block += f". Additionally, large water bodies such as "
+                if len(rname) == 1:
+                    parameter_block += rname[0]
+                elif len(rname) == 2:
+                    parameter_block += " and ".join(rname)
+                else:
+                    parameter_block += ", ".join(rname[:-1]) + ", and " + rname[-1]
+                parameter_block += f" span about "
+                if len(rname) == 1:
+                    parameter_block += rarea[0]
+                elif len(rname) == 2:
+                    parameter_block += " and ".join(rarea)
+                else:
+                    parameter_block += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
+                parameter_block += f"  hectares  respectively within the Tehsil"
 
         if final_data["river"]:
             rname = [temp["name"] for temp in final_data["river"]]
@@ -739,7 +786,6 @@ def get_osm_data(state, district, block, uid):
             )
 
         # ? MWS Parameters
-        #parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}"
         parameter_mws = f""
 
         if final_data["cities_mws"]:
@@ -758,38 +804,44 @@ def get_osm_data(state, district, block, uid):
             parameter_mws += f". Key natural features such as {temp} shape the micro-watershed landscape and impact water flow"
 
         if final_data["forests_mws"]:
-            parameter_mws += (
-                f". Part of {final_data['forests_mws'][0]['name']}, covering roughly "
-                f"{(round(final_data['forests_mws'][0]['area_sq_m'] / 10000))} hectares, lies within the micro-watershed supporting local wildlife and promoting biodiversity"
-            )
+            large_forests_mws = [f for f in final_data["forests_mws"] if f["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            if large_forests_mws:
+                parameter_mws += (
+                    f". Part of {large_forests_mws[0]['name']}, covering roughly "
+                    f"{(round(large_forests_mws[0]['area_sq_m'] / 10000))} hectares, lies within the micro-watershed supporting local wildlife and promoting biodiversity"
+                )
 
         if final_data["lakes_mws"] or final_data["reservoirs_mws"]:
-            rname = [temp["name"] for temp in final_data["lakes_mws"]]
-            rname += [temp["name"] for temp in final_data["reservoirs_mws"]]
-            rarea = [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["lakes_mws"]
-            ]
-            rarea += [
-                str(round(temp["area_sq_m"] / 10000, 1))
-                for temp in final_data["reservoirs_mws"]
-            ]
+            large_lakes_mws = [lake for lake in final_data["lakes_mws"] if lake["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            large_reservoirs_mws = [res for res in final_data["reservoirs_mws"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
+            
+            if large_lakes_mws or large_reservoirs_mws:
+                rname = [temp["name"] for temp in large_lakes_mws]
+                rname += [temp["name"] for temp in large_reservoirs_mws]
+                rarea = [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_lakes_mws
+                ]
+                rarea += [
+                    str(round(temp["area_sq_m"] / 10000, 1))
+                    for temp in large_reservoirs_mws
+                ]
 
-            parameter_mws += f". Additionally, large water bodies such as "
-            if len(rname) == 1:
-                parameter_mws += rname[0]
-            elif len(rname) == 2:
-                parameter_mws += " and ".join(rname)
-            else:
-                parameter_mws += ", ".join(rname[:-1]) + ", and " + rname[-1]
-            parameter_mws += f" span about "
-            if len(rname) == 1:
-                parameter_mws += rarea[0]
-            elif len(rname) == 2:
-                parameter_mws += " and ".join(rarea)
-            else:
-                parameter_mws += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
-            parameter_mws += f"  hectares  respectively within the micro-watershed, providing essential resources for irrigation, fishing, and drinking water"
+                parameter_mws += f". Additionally, large water bodies such as "
+                if len(rname) == 1:
+                    parameter_mws += rname[0]
+                elif len(rname) == 2:
+                    parameter_mws += " and ".join(rname)
+                else:
+                    parameter_mws += ", ".join(rname[:-1]) + ", and " + rname[-1]
+                parameter_mws += f" span about "
+                if len(rname) == 1:
+                    parameter_mws += rarea[0]
+                elif len(rname) == 2:
+                    parameter_mws += " and ".join(rarea)
+                else:
+                    parameter_mws += ", ".join(rarea[:-1]) + ", and " + rarea[-1]
+                parameter_mws += f"  hectares  respectively within the micro-watershed, providing essential resources for irrigation, fishing, and drinking water"
 
         if final_data["river_mws"]:
             rname = [temp["name"] for temp in final_data["river_mws"]]
@@ -822,14 +874,12 @@ def get_osm_data(state, district, block, uid):
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_block = f"The Tehsil {block}" + parameter_block
+            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
 
         if parameter_mws == "":
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws
-
-        #print("Data Processing End", datetime.now())
+            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws + "."
 
         return parameter_block, parameter_mws
 
@@ -1177,6 +1227,11 @@ def get_cropping_intensity(state, district, block, uid):
 
         filtered_df_inten = df.loc[df["UID"] == uid, selected_columns_inten]
 
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         if not filtered_df_inten.empty:
 
             inten_parameter_1 = f""
@@ -1188,13 +1243,39 @@ def get_cropping_intensity(state, district, block, uid):
             avg_inten = sum(filtered_df_inten.values[0]) / len(filtered_df_inten.values[0])
             
             if result.trend == "increasing":
-                inten_parameter_1 += f"The cropping intensity of the micro-watershed has increased over the last eight years from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
+                inten_parameter_1 += (
+                    f"The cropping intensity of the micro-watershed has increased over the years {year_range_text} "
+                    f"from {min(filtered_df_inten.values[0])} to {max(filtered_df_inten.values[0])} "
+                    f"compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                    f"over the years in the Tehsil. "
+                )
             else:
                 if result.trend == "decreasing":
-                    inten_parameter_1 += f"The cropping intensity of this area has reduced over time from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
+                    inten_parameter_1 += (
+                        f"The cropping intensity of this area has reduced over the years {year_range_text} "
+                        f"from {max(filtered_df_inten.values[0])} to {min(filtered_df_inten.values[0])} "
+                        f"compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                        f"over the years in the Tehsil. "
+                    )
                 else :
-                    inten_parameter_1 += f"The cropping intensity of this area has stayed steady at {round(avg_inten, 2)} compared to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds over the years in the Tehsil. "
-
+                    if avg_inten > block_avg:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"more than the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
+                    elif avg_inten < block_avg:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"less than the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
+                    else:
+                        inten_parameter_1 += (
+                            f"The cropping intensity of this area shows no definite trend. The average cropping intensity over the years is {round(avg_inten, 2)}, "
+                            f"similar to the average cropping intensity of {round(block_avg, 2)} across the micro watersheds "
+                            f"in the Tehsil. "
+                        )
                 if avg_inten < 1.5:
                     inten_parameter_1 += f"It might be possible to improve cropping intensity through more strategic placement, while keeping equity in mind, of rainwater harvesting or groundwater recharge structures. "
             
@@ -1248,11 +1329,8 @@ def get_cropping_intensity(state, district, block, uid):
             
             formatted_years = format_years(drought_years)
 
-            if abs(drought_inten - non_drought_inten) > 0.2:
+            if (non_drought_inten - drought_inten) > 0.2 and len(drought_years):
                 inten_parameter_2 += f"Cropping intensity is reduced by {round(abs(drought_inten - non_drought_inten), 2)} during the drought years (AAA and BBB), as compared to non-drought years, and reveals a marked sensitivity of agricultural productivity to water scarcity. This decline underscores the critical need for farmers to adopt drought-resilient practices, such as constructing water harvesting structures. By capturing and storing rainwater, these structures can provide a crucial buffer against drought periods, helping to stabilize cropping intensity and sustain productivity even in water-stressed conditions."
-
-            else :
-                inten_parameter_2 += f"The observed {round(abs(drought_inten - non_drought_inten), 2)} reduction in the cropping intensity during drought years (AAA and BBB), compared to non-drought years, reveals a marked sensitivity of agricultural productivity to water scarcity. This decline underscores the critical need for farmers to adopt drought-resilient practices, such as constructing water harvesting structures. By capturing and storing rainwater, these structures can provide a crucial buffer against drought periods, helping to stabilize cropping intensity and sustain productivity even in water-stressed conditions."
 
             inten_parameter_2 = inten_parameter_2.replace("AAA and BBB",formatted_years)
 
@@ -1347,6 +1425,13 @@ def get_double_cropping_area(state, district, block, uid):
         filtered_df_double = df.loc[df["UID"] == uid, selected_columns_double].values[0]
         filtered_df_triple = df.loc[df["UID"] == uid, selected_columns_triple].values[0]
 
+        current_years = extract_years(selected_columns_single)
+
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         double_cropping_percent = []
 
         for index, area in enumerate(filtered_df_single):
@@ -1373,7 +1458,7 @@ def get_double_cropping_area(state, district, block, uid):
         else:
             parameter_double_crop += f"This microwatershed area has a high percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is more than 60% of the total agricultural land being cultivated twice a year."
 
-        return parameter_double_crop
+        return parameter_double_crop, year_range_text
 
     except Exception as e:
         logger.info(
@@ -1381,7 +1466,7 @@ def get_double_cropping_area(state, district, block, uid):
             district,
             block
         )
-        return ""
+        return "", ""
 
 
 def get_surface_Water_bodies_data(state, district, block, uid):
@@ -1418,6 +1503,11 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
         current_years = extract_years(selected_columns)
 
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
         parameter_swb_1 = f""
         parameter_swb_2 = f""
         parameter_swb_3 = f""
@@ -1449,8 +1539,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             elif result.trend == "decreasing":
                 parameter_swb_1 = f"Surface water presence has decreased by {round(result.slope, 2)} hectares per year during 2017-22.Siltation could be a cause for decrease in surface water presence and therefore may require repair and maintenance of surface water bodies. Waterbody analysis can help identify waterbodies that may need such treatment."
             else:
-                parameter_swb_1 = f"The surface water presence has remained steady during 2017-22."
-
+                parameter_swb_1 = f"The surface water availability shows no definite trend over the years {year_range_text}."
 
             #? Drought Years SWB
             mws_drought_moderate = df_drought.loc[df_drought["UID"] == uid, selected_columns_moderate].values[0]
@@ -1952,11 +2041,21 @@ def get_drought_data(state, district, block, uid):
                     non_drought_years.append(match_exp.group(0))
 
         parameter_drought = f""
-        original_string = "An analysis of identified drought years — XXX, YYY and ZZZ reveals significant insights into the underlying rainfall patterns such as dry spells and deviations from normal precipitation. "
-        formatted_years = format_years(drought_years)
-        parameter_drought += original_string.replace(
-            "XXX, YYY and ZZZ", formatted_years
-        )
+
+        current_years = extract_years(selected_columns_mild)
+
+        if current_years and len(current_years) > 0:
+            year_range_text = f"{current_years[0]} to {current_years[-1]}"
+        else:
+            year_range_text = ""
+
+        if len(drought_years):
+            original_string = "An analysis of identified drought years — XXX, YYY and ZZZ reveals significant insights into the underlying rainfall patterns such as dry spells and deviations from normal precipitation. "
+            formatted_years = format_years(drought_years)
+            parameter_drought += original_string.replace("XXX, YYY and ZZZ", formatted_years)
+        
+        else :
+            parameter_drought = f"Refer to the following graph and see how the intensity of drought has changed in this microwatershed over the years {year_range_text}"
         
         #? Get all the Dryspell for data for Graph
         selected_columns_drysp_all = [col for col in df.columns if col.startswith("drysp_unit_4_weeks")]

@@ -126,11 +126,11 @@ def generate_dpr(request):
         for ids in mws_Ids:
             try:
                 report_html_url = (
-                    f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+                    f"https://geoserver.core-stack.org/api/v1/download_mws_report/"
                     f"?state={state}&district={district}&block={block}&uid={ids}"
                 )
-                mws_report = render_pdf_with_firefox(report_html_url)
-                mws_reports.append(mws_report)
+                #mws_report = render_pdf_with_firefox(report_html_url)
+                mws_reports.append(report_html_url)
                 successful_mws_ids.append(ids)
             except Exception as e:
                 logger.error(f"Failed to generate MWS report for ID {ids}: {e}")
@@ -232,7 +232,7 @@ def generate_mws_report(request):
         )
 
         # ? Double Cropping Description Generation
-        double_crop_des = get_double_cropping_area(
+        double_crop_des, year_range_text = get_double_cropping_area(
             result["state"], result["district"], result["block"], result["uid"]
         )
 
@@ -313,6 +313,7 @@ def generate_mws_report(request):
             "urbanization": urbanization,
             "restore_desc": restore_desc,
             "double_crop_des": double_crop_des,
+            "year_range_text" : year_range_text,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,

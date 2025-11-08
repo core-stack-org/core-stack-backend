@@ -33,9 +33,9 @@ logger = setup_logger(__name__)
 @app.task(bind=True)
 def site_suitability(
     self,
-    project_id=None,
-    start_year=None,
-    end_year=None,
+    project_id,
+    start_year,
+    end_year,
     state=None,
     district=None,
     block=None,
@@ -55,12 +55,17 @@ def site_suitability(
     """
     # Initialize Earth Engine connection for the project
     ee_initialize(gee_account_id)
+
     if project_id:
-        project = Project.objects.get(
-            id=project_id, app_type=AppType.PLANTATION, enabled=True
-        )
-        organization = project.organization.name
-        project_name = project.name
+        try:
+            project = Project.objects.get(
+                id=project_id, app_type=AppType.PLANTATION, enabled=True
+            )
+            organization = project.organization.name
+            project_name = project.name
+        except Project.DoesNotExist:
+            print("Project {} not found".format(project_id))
+            return
 
         kml_files_obj = KMLFile.objects.filter(project=project)
         have_new_sites = False

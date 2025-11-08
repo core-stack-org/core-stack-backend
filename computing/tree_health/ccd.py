@@ -48,7 +48,7 @@ def tree_health_ccd_raster(
 
         # Skip if asset already exists
         if is_gee_asset_exists(asset_id):
-            return
+            return True
 
         # Define the path for CCD data based on start year
         if year == 2016 or year == 2022:

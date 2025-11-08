@@ -134,14 +134,32 @@ def send_dpr_email(
         doc_bytes = buffer.getvalue()
         buffer.close()
 
-        email_body = f"""
-        Hi,
-        Find attached the Detailed Project Report for {plan_name} and MWS Report for MWSs: {", ".join(mws_Ids)}.
-        The Link to Resource Report : {resource_report_url}.
+        # Create MWS links section
+        mws_links_html = ""
+        if mws_reports and mws_Ids:
+            mws_links_html = "<p><strong>MWS Reports:</strong></p><ul>"
+            for mws_id, report_url in zip(mws_Ids, mws_reports):
+                mws_links_html += f'<li>{mws_id}: <a href="{report_url}">View Report</a></li>'
+            mws_links_html += "</ul>"
 
-        Thanks and Regards,
-        CoRE Stack Team
+        email_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">
+                <p>Hi,</p>
+                
+                <p>Please find attached the Detailed Project Report for <strong>{plan_name}</strong>.</p>
+                
+                {mws_links_html}
+                
+                <p><strong>Resource Report:</strong> <a href="{resource_report_url}">View Report</a></p>
+                
+                <br>
+                <p>Thanks and Regards,<br>
+                <strong>CoRE Stack Team</strong></p>
+            </body>
+        </html>
         """
+
 
         backend = EmailBackend(
             host=EMAIL_HOST,
@@ -161,32 +179,14 @@ def send_dpr_email(
             connection=backend,
         )
 
+        # Set content type to HTML
+        email.content_subtype = "html"
+
         email.attach(
             f"DPR_{plan_name}.docx",
             doc_bytes,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
-
-        # Attach each PDF from mws_reports
-        for i, item in enumerate(mws_reports, start=1):
-            filename = f"MWS_Report_{mws_Ids[i - 1]}.pdf"
-            content = item
-
-            if isinstance(item, (list, tuple)) and len(item) >= 2:
-                filename, content = (item[0] or filename), item[1]
-            elif isinstance(item, dict):
-                filename = item.get("filename") or item.get("name") or filename
-                content = item.get("data") or item.get("content") or item.get("bytes")
-
-            if isinstance(content, str):
-                content = base64.b64decode(content)
-
-            if not isinstance(content, (bytes, bytearray)):
-                raise TypeError(
-                    "Each mws_reports entry must be PDF bytes or base64 string."
-                )
-
-            email.attach(filename, content, "application/pdf")
 
         if resource_report is not None:
             email.attach(
@@ -1568,7 +1568,7 @@ def add_section_g(doc, plan, mws):
             row_cells[8].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
-            row_cells[7].text = (
+            row_cells[9].text = (
                 "{:.6f}".format(record.longitude) if record.longitude else "NA"
             )
 
@@ -1607,6 +1607,6 @@ def add_section_g(doc, plan, mws):
             row_cells[8].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
-            row_cells[7].text = (
+            row_cells[9].text = (
                 "{:.6f}".format(record.longitude) if record.longitude else "NA"
             )

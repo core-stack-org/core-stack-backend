@@ -81,6 +81,13 @@
             margin-right: 5px;
             border-radius: 2px;
         }
+        .legend-note {
+            color: #6c757d;       /* gray */
+            text-align: center;
+            font-size: 0.9rem;
+            font-style: italic;
+            margin: 6px 0 0;      /* tight spacing under legend */
+        }
         footer {
             margin-top: 40px;
             border-top: 1px solid #ddd;
@@ -268,7 +275,53 @@
             <h2>Well Overview</h2>
             <div id="wellMap" class="map"></div>
         </section>
-
+        <p class="legend-note">Note: Well Demands on Stream Order Raster</p>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f7fbff;"></div>
+                <span>1</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #e4eff9;"></div>
+                <span>2</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d1e2f3;"></div>
+                <span>3</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #bad6eb;"></div>
+                <span>4</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #9ac8e0;"></div>
+                <span>5</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #73b2d8;"></div>
+                <span>6</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #529dcc;"></div>
+                <span>7</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #3585bf;"></div>
+                <span>8</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #1d6cb1;"></div>
+                <span>9</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #08519c;"></div>
+                <span>10</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #08306b;"></div>
+                <span>11</span>
+            </div>
+        </div>
     </div>
 
     <div class="container">
@@ -433,14 +486,30 @@
 
     const wellMap = new ol.Map({
         target: 'wellMap',
-        layers: [new ol.layer.Tile({
+        layers: [
+        new ol.layer.Tile({
                     source: new ol.source.XYZ({
                         url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
                         maxZoom: 30,
                         transition: 500,
                     }),
                     preload: 4,
-                })],
+                }),
+                    new ol.layer.Image({
+                        source : new ol.source.ImageWMS({
+                            url : 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                            params : {
+                                'LAYERS': "stream_order:stream_order_{{district}}_{{block}}_raster",
+                                'STYLES' : "stream_order"
+                            },
+                            ratio : 1,
+                            serverType: 'geoserver',
+                        }),
+                        visible : true,
+                        name : 'stream_raster',
+                        opacity: 0.7
+                    })
+                ],
         view: new ol.View({
             center: [78.9, 23.6],
             zoom: 10,
@@ -846,7 +915,7 @@
             const IrrigationLayer = new ol.layer.Vector({
                 source: vectorSourceIrr,
                 style: (feature) => {
-                    const name = (feature.get('TYPE_OF_WO') || '').toString();
+                    const name = (feature.get('TYPE_OF_WO') || feature.get('work_type') ||'').toString();
                     return new ol.style.Style({
                         image: new ol.style.Icon({
                             src: IrrigationIconsUrl,
@@ -913,7 +982,7 @@
             demandStructureMap.addLayer(RechargeLayer);
             const arr = vectorSourceRechr.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            demandStructureMap.getView().setZoom(16)
+            demandStructureMap.getView().setZoom(15)
             demandStructureMap.getView().setCenter(mapcenter);
         } catch (error) {
             console.log(error)

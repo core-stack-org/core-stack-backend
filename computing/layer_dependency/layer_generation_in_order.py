@@ -1,3 +1,4 @@
+from nrm_app.celery import app
 import json
 from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
@@ -21,11 +22,21 @@ from computing.terrain_descriptor.terrain_clusters import generate_terrain_clust
 from computing.lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
 from computing.lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from computing.misc.soge_vector import generate_soge_vector
+from computing.misc.stream_order import generate_stream_order
 from computing.misc.drainage_lines import clip_drainage_lines
 from computing.clart.clart import generate_clart_layer
+from computing.tree_health.canopy_height import tree_health_ch_raster
+from computing.tree_health.canopy_height_vector import tree_health_ch_vector
+from computing.tree_health.ccd import tree_health_ccd_raster
+from computing.tree_health.ccd_vector import tree_health_ccd_vector
+from computing.tree_health.overall_change import tree_health_overall_change_raster
+from computing.tree_health.overall_change_vector import (
+    tree_health_overall_change_vector,
+)
+from utilities.gee_utils import valid_gee_text
 from .layer_map import *
 from nrm_app.celery import app
-from .models import Layer
+from computing.models import Layer
 
 status = {}
 
@@ -42,14 +53,18 @@ def layer_generate_map(
     end_year=None,
 ):
     """
-
-    This function take state, district,block and map_order(map to trigger, it can be map_1, map_2, map_3, map_4). One map trigger more numbers of pipeline.
-
+    This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
     """
-    # checking:- is mws layer is generated?
+    # checking:- is mws layer generated?
     try:
-        if map_order in ["map_2", "map_3", "map_4"]:
-            layer = Layer.objects.get(layer_name=f"mws_{district}_{block}")
+        if map_order in ["map_2_1", "map_2_2", "map_3", "map_4"]:
+            layer = (
+                Layer.objects.filter(
+                    layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+                )
+                .order_by("-layer_version")
+                .first()
+            )
             if not layer:
                 return f"check mws layer for {district}_{block}"
     except Exception as e:
@@ -80,7 +95,7 @@ def layer_generate_map(
         )
 
         # triggering map at children level
-        if "children" in func:
+        if status.get(parent_function, False) and "children" in func:
             for child in func["children"]:
                 child_function = child["name"]
                 child_func = globals().get(child_function)
@@ -101,7 +116,7 @@ def layer_generate_map(
                 )
 
                 # triggering map at sub children level
-                if "children" in child:
+                if status.get(child_function, False) and "children" in child:
                     for sub_child in child["children"]:
                         sub_child_function = sub_child["name"]
                         sub_child_func = globals().get(sub_child_function)
@@ -128,17 +143,17 @@ def run_layer_with_dependency(
     deps, node_func_name, node_func_obj, state, district, block, args
 ):
     """
-
     This function checks dependency of layer if it is generated or not and call the pipeline functions and maintain status of each function,
-
     """
     for dep in deps:
         if dep == "clip_lulc_v3":
-            l = Layer.objects.filter(layer_name__icontains=f"_{block}_level_")
+            l = Layer.objects.filter(
+                layer_name__icontains=f"_{valid_gee_text(block.lower())}_level_"
+            )
             if len(l) == 21:
-                status[node_func_name] = True
+                status[dep] = True
             else:
-                status[node_func_name] = False
+                status[dep] = False
         if not status.get(dep, False):
             print(
                 f"Skipping {node_func_name} because dependency {dep} failed or not executed."
@@ -146,41 +161,39 @@ def run_layer_with_dependency(
             status[node_func_name] = False
             break
     else:
-        print(
-            f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
-        )
-        # try:
-        result = (
-            node_func_obj(state, district, block, **args)
-            if args
-            else node_func_obj(state, district, block)
-        )
-        if result:
-            print(f"{node_func_name} is completed...")
-            status[node_func_name] = True
-        else:
-            print(f"check the {node_func_name}")
+        try:
+            if node_func_name in end_year_rules:
+                args["end_year"] = end_year_rules[node_func_name]
+            print(
+                f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
+            )
+            result = (
+                node_func_obj(state, district, block, **args)
+                if args
+                else node_func_obj(state, district, block)
+            )
+            if result:
+                print(f"{node_func_name} is completed...")
+                status[node_func_name] = True
+            else:
+                print(f"check the {node_func_name}")
+                status[node_func_name] = False
+            print(f"{result = }")
+        except Exception as e:
+            print(f"{node_func_name} raised an error: {e}")
             status[node_func_name] = False
-        print(f"{result = }")
-        # except Exception as e:
-        #     print(f"{node_func_name} raised an error: {e}")
-        #     status[node_func_name] = False
 
 
 def get_args(iterator_name, global_args, gee_account_id):
     """
-
     This function merge the global agrs and local args(define in json maps) return combination of both.
-
     """
+    arg = iterator_name.get("args", {})
+    args = {"gee_account_id": gee_account_id, **arg}
     if iterator_name.get("use_global_args", False):
         args = {
             **global_args,
             "gee_account_id": gee_account_id,
-            **iterator_name.get("args", {}),
+            **args,
         }
-    elif iterator_name.get("use_multiple_gee", False):
-        args = {"gee_account_id": gee_account_id, **iterator_name.get("args", {})}
-    else:
-        args = iterator_name.get("args", {})
     return args
