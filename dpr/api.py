@@ -34,6 +34,7 @@ from .gen_multi_mws_report import (
 )
 from .gen_mws_report import (
     get_change_detection_data,
+    get_land_conflict_industrial_data,
     get_cropping_intensity,
     get_double_cropping_area,
     get_drought_data,
@@ -299,6 +300,9 @@ def generate_mws_report(request):
             )
         )
 
+        # ? LCW and Industrial Data Description
+        lcw_desc = get_land_conflict_industrial_data(result["state"], result["district"], result["block"], result["uid"])
+
         context = {
             "district": result["district"],
             "block": result["block"],
@@ -360,6 +364,7 @@ def generate_mws_report(request):
             "wb_years": json.dumps(wb_years),
             "drysp_all": json.dumps(drysp_all),
             "dg_years": json.dumps(dg_years),
+            "lcw_desc" : lcw_desc
         }
 
         # print("Api Processing End 1", datetime.now())

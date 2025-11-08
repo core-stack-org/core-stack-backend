@@ -885,12 +885,11 @@ def get_osm_data(state, district, block, uid):
 
     except Exception as e:
         logger.info("The geojson is empty !", e)
-        return ""
+        return "", ""
 
 
 def get_terrain_data(state, district, block, uid):
     try:
-
         excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
 
         df = pd.read_excel(
@@ -1208,6 +1207,33 @@ def get_change_detection_data(state, district, block, uid):
             e,
         )
         return "", "", "", ""
+
+
+def get_land_conflict_industrial_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="lcw_conflict")
+
+        filtered_title = df.loc[df["UID"] == uid, "title_of_conflict"]
+        filtered_link = df.loc[df["UID"] == uid, "link_to_conflict"]
+
+        titles = filtered_title.tolist()
+        links = filtered_link.tolist()
+
+        conflicts = [
+            {"title": title, "link": link} 
+            for title, link in zip(titles, links)
+        ]
+
+        return conflicts
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Land Conflict",
+            district,
+            block,
+            e,
+        )
+        return []
 
 
 def get_cropping_intensity(state, district, block, uid):
@@ -2114,7 +2140,7 @@ def get_drought_data(state, district, block, uid):
 
 def get_village_data(state, district, block, uid):
     try:
-        df = pd.read_excel(
+        file_path = (
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -2123,45 +2149,47 @@ def get_village_data(state, district, block, uid):
             + district.lower()
             + "_"
             + block.lower()
-            + ".xlsx",
-            sheet_name="mws_intersect_villages",
+            + ".xlsx"
         )
-        df_village = pd.read_excel(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            sheet_name="nrega_assets_village",
-        )
-        df_socio = pd.read_excel(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            sheet_name="social_economic_indicator",
-        )
+        
+        # Check available sheets
+        excel_file = pd.ExcelFile(file_path)
+        available_sheets = excel_file.sheet_names
+        
+        # Check if mws_intersect_villages sheet is present (mandatory)
+        if "mws_intersect_villages" not in available_sheets:
+            logger.info(
+                "mws_intersect_villages sheet not found for %s district, %s block",
+                district,
+                block
+            )
+            return [], [], [], [], [], [], [], [], [], [], []
+        
+        # Load the main sheet
+        df = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
+        
+        # Check for optional sheets
+        has_nrega = "nrega_assets_village" in available_sheets
+        has_socio = "social_economic_indicator" in available_sheets
+        
+        # Load optional sheets if available
+        df_village = None
+        df_socio = None
+        
+        if has_nrega:
+            df_village = pd.read_excel(file_path, sheet_name="nrega_assets_village")
+        
+        if has_socio:
+            df_socio = pd.read_excel(file_path, sheet_name="social_economic_indicator")
 
         selected_columns_ids = [
             col for col in df.columns if col.startswith("Village IDs")
         ]
-        # select only the columns you care about
         matching = df.loc[df["MWS UID"] == uid, selected_columns_ids]
 
         if matching.empty:
-            # no rows found for this uid
             villages = []
         else:
-            # take the first (and presumably only) matching row
             villages = matching.iloc[0].tolist()
 
         villages_name = []
@@ -2180,166 +2208,217 @@ def get_village_data(state, district, block, uid):
         if len(villages) > 0:
             villages = eval(villages[0])
             for id in villages:
-                village_name_col = [
-                    col for col in df_village.columns if col.startswith("vill_name")
-                ]
-                name = (
-                    df_village.loc[df_village["vill_id"] == id, village_name_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_name.append(name[0])
+                village_name = None
+                
+                # Try to get village name from NREGA sheet first
+                if has_nrega and df_village is not None:
+                    village_name_col = [
+                        col for col in df_village.columns if col.startswith("vill_name")
+                    ]
+                    if len(village_name_col) > 0:
+                        village_match = df_village.loc[df_village["vill_id"] == id, village_name_col]
+                        if not village_match.empty:
+                            name = village_match.values[0].tolist()
+                            village_name = name[0] if name else None
+                
+                # Fallback to socio-economic sheet if name not found
+                if village_name is None and has_socio and df_socio is not None:
+                    village_name_col = [
+                        col for col in df_socio.columns if col.startswith("village_name")
+                    ]
+                    if len(village_name_col) > 0:
+                        village_match = df_socio.loc[df_socio["village_id"] == id, village_name_col]
+                        if not village_match.empty:
+                            name = village_match.values[0].tolist()
+                            village_name = name[0] if name else None
+                
+                villages_name.append(village_name)
 
-                swc_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Soil and water conservation")
-                ]
-                df_village[swc_cols] = df_village[swc_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                swc_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, swc_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                # Process NREGA data if available
+                if has_nrega and df_village is not None:
+                    # Process all NREGA work categories
+                    swc_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Soil and water conservation")
+                    ]
+                    if len(swc_cols) > 0:
+                        df_village[swc_cols] = df_village[swc_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, swc_cols]
+                        if not village_match.empty:
+                            swc_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            swc_works.append(0)
+                    else:
+                        swc_works.append(0)
 
-                lr_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Land restoration")
-                ]
-                df_village[lr_cols] = df_village[lr_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                lr_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, lr_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    lr_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Land restoration")
+                    ]
+                    if len(lr_cols) > 0:
+                        df_village[lr_cols] = df_village[lr_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, lr_cols]
+                        if not village_match.empty:
+                            lr_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            lr_works.append(0)
+                    else:
+                        lr_works.append(0)
 
-                plant_cols = [
-                    col for col in df_village.columns if col.startswith("Plantations")
-                ]
-                df_village[plant_cols] = df_village[plant_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                plantation_work.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, plant_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    plant_cols = [
+                        col for col in df_village.columns if col.startswith("Plantations")
+                    ]
+                    if len(plant_cols) > 0:
+                        df_village[plant_cols] = df_village[plant_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, plant_cols]
+                        if not village_match.empty:
+                            plantation_work.append(sum(village_match.values[0].tolist()))
+                        else:
+                            plantation_work.append(0)
+                    else:
+                        plantation_work.append(0)
 
-                iof_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Irrigation on farms")
-                ]
-                df_village[iof_cols] = df_village[iof_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                iof_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, iof_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    iof_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Irrigation on farms")
+                    ]
+                    if len(iof_cols) > 0:
+                        df_village[iof_cols] = df_village[iof_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, iof_cols]
+                        if not village_match.empty:
+                            iof_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            iof_works.append(0)
+                    else:
+                        iof_works.append(0)
 
-                ofl_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Off-farm livelihood assets")
-                ]
-                df_village[ofl_cols] = df_village[ofl_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                ofl_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, ofl_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    ofl_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Off-farm livelihood assets")
+                    ]
+                    if len(ofl_cols) > 0:
+                        df_village[ofl_cols] = df_village[ofl_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, ofl_cols]
+                        if not village_match.empty:
+                            ofl_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            ofl_works.append(0)
+                    else:
+                        ofl_works.append(0)
 
-                ca_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Community assets_count")
-                ]
-                df_village[ca_cols] = df_village[ca_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                ca_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, ca_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    ca_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Community assets_count")
+                    ]
+                    if len(ca_cols) > 0:
+                        df_village[ca_cols] = df_village[ca_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, ca_cols]
+                        if not village_match.empty:
+                            ca_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            ca_works.append(0)
+                    else:
+                        ca_works.append(0)
 
-                ofw_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Other farm works")
-                ]
-                df_village[ofw_cols] = df_village[ofw_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                ofw_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, ofw_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    ofw_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Other farm works")
+                    ]
+                    if len(ofw_cols) > 0:
+                        df_village[ofw_cols] = df_village[ofw_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, ofw_cols]
+                        if not village_match.empty:
+                            ofw_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            ofw_works.append(0)
+                    else:
+                        ofw_works.append(0)
+                else:
+                    # If NREGA sheet not available, append default values
+                    swc_works.append(0)
+                    lr_works.append(0)
+                    plantation_work.append(0)
+                    iof_works.append(0)
+                    ofl_works.append(0)
+                    ca_works.append(0)
+                    ofw_works.append(0)
 
-                sc_percent_col = [
-                    col for col in df_socio.columns if col.startswith("SC_percent")
-                ]
-                df_socio[sc_percent_col] = df_socio[sc_percent_col].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                sc_percent = (
-                    df_socio.loc[df_socio["village_id"] == id, sc_percent_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_sc.append(round(sc_percent[0], 2))
+                # Process socio-economic data if available
+                if has_socio and df_socio is not None:
+                    sc_percent_col = [
+                        col for col in df_socio.columns if col.startswith("SC_percent")
+                    ]
+                    if len(sc_percent_col) > 0:
+                        df_socio[sc_percent_col] = df_socio[sc_percent_col].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_socio.loc[df_socio["village_id"] == id, sc_percent_col]
+                        if not village_match.empty:
+                            sc_percent = village_match.values[0].tolist()
+                            villages_sc.append(round(sc_percent[0], 2))
+                        else:
+                            villages_sc.append(None)
+                    else:
+                        villages_sc.append(None)
 
-                st_percent_col = [
-                    col for col in df_socio.columns if col.startswith("ST_percent")
-                ]
-                df_socio[st_percent_col] = df_socio[st_percent_col].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                st_percent = (
-                    df_socio.loc[df_socio["village_id"] == id, st_percent_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_st.append(round(st_percent[0], 2))
+                    st_percent_col = [
+                        col for col in df_socio.columns if col.startswith("ST_percent")
+                    ]
+                    if len(st_percent_col) > 0:
+                        df_socio[st_percent_col] = df_socio[st_percent_col].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_socio.loc[df_socio["village_id"] == id, st_percent_col]
+                        if not village_match.empty:
+                            st_percent = village_match.values[0].tolist()
+                            villages_st.append(round(st_percent[0], 2))
+                        else:
+                            villages_st.append(None)
+                    else:
+                        villages_st.append(None)
 
-                pop_col = [
-                    col
-                    for col in df_socio.columns
-                    if col.startswith("total_population")
-                ]
-                df_socio[pop_col] = df_socio[pop_col].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                total_pop = (
-                    df_socio.loc[df_socio["village_id"] == id, pop_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_pop.append(total_pop[0])
+                    pop_col = [
+                        col
+                        for col in df_socio.columns
+                        if col.startswith("total_population")
+                    ]
+                    if len(pop_col) > 0:
+                        df_socio[pop_col] = df_socio[pop_col].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_socio.loc[df_socio["village_id"] == id, pop_col]
+                        if not village_match.empty:
+                            total_pop = village_match.values[0].tolist()
+                            villages_pop.append(total_pop[0])
+                        else:
+                            villages_pop.append(None)
+                    else:
+                        villages_pop.append(None)
+                else:
+                    # If socio-economic sheet not available, append default values
+                    villages_sc.append(None)
+                    villages_st.append(None)
+                    villages_pop.append(None)
 
         return (
             villages_name,
@@ -2357,8 +2436,9 @@ def get_village_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for village data",
+            "Error accessing excel for %s district, %s block: %s",
             district,
-            block
+            block,
+            str(e)
         )
-        return [],[],[],[],[],[],[],[],[],[],[]
+        return [], [], [], [], [], [], [], [], [], [], []
