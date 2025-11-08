@@ -139,7 +139,7 @@ def generate_dpr(request):
         resource_report = None
         resource_html_url = (
             f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
-            f"?district={district}&block={block}&plan_id={plan_id}"
+            f"?district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
         )
 
         try:
@@ -496,6 +496,7 @@ def generate_resource_report(request):
             "district": result["district"],
             "block": result["block"],
             "plan_id": result["plan_id"],
+            "plan_name" : result["plan_name"]
         }
 
         return render(request, "resource-report.html", context)
