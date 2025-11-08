@@ -634,12 +634,12 @@
         demandStructureMap.addLayer(mwsLayer);
 
         // Center on MWS extent
-        // const arr = vectorSource.getExtent();
-        // const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-        // mainMap.getView().setCenter(mapcenter);
-        // wellMap.getView().setCenter(mapcenter);
-        // waterStructureMap.getView().setCenter(mapcenter);
-        // demandStructureMap.getView().setCenter(mapcenter);
+        const arr = vectorSource.getExtent();
+        const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+        mainMap.getView().setCenter(mapcenter);
+        wellMap.getView().setCenter(mapcenter);
+        waterStructureMap.getView().setCenter(mapcenter);
+        demandStructureMap.getView().setCenter(mapcenter);
     }
 
     async function addVillageBoundary () {

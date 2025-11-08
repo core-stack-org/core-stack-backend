@@ -169,6 +169,72 @@
         }
 
         .doc-button:hover { background-color: #005a9e; }
+
+        /* Land Conflict Styles */
+        .conflict-list {
+            margin-top: 20px;
+        }
+
+        .conflict-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #e74c3c;
+            border-radius: 4px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .conflict-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .conflict-number {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .conflict-content {
+            flex: 1;
+        }
+
+        .conflict-title {
+            margin: 0 0 8px 0;
+            font-size: 1em;
+            color: #2c3e50;
+            line-height: 1.4;
+        }
+
+        .conflict-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #3498db;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .conflict-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+
+        .conflict-link svg {
+            width: 12px;
+            height: 12px;
+        }
         
         @media print { 
             .doc-button { display: none; }   
@@ -284,8 +350,29 @@
         tfoot {
             display: table-footer-group;
         }
+
+
+      /* Print styles for conflicts */
+          .conflict-item {
+            background-color: #f8f9fa !important;
+            border-left: 4px solid #e74c3c !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            page-break-inside: avoid;
+        }
+        
+        .conflict-number {
+            background-color: #e74c3c !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        
+        .conflict-link {
+            color: #3498db !important;
+        }
       }
-      
+
     </style>
 </head>
 <body>
@@ -513,8 +600,35 @@
             </section>
         {% endif %}
 
+        {% if lcw_desc %}
         <section class="section">
-            <h4>Cropping Intensity</h4>
+            <h3>Land Conflicts and Industrialization</h3>
+            <h4>Land Conflicts</h4>
+            <p>The following land conflict{{ lcw_desc|length|pluralize }} {{ lcw_desc|length|pluralize:"has,have" }} been observed in this micro watershed:</p>
+            
+            <div class="conflict-list">
+                {% for conflict in lcw_desc %}
+                <div class="conflict-item">
+                    <div class="conflict-number">{{ forloop.counter }}</div>
+                    <div class="conflict-content">
+                        <h4 class="conflict-title">{{ conflict.title }}</h4>
+                        <a href="{{ conflict.link }}" target="_blank" class="conflict-link">
+                            View Details
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="section">
+            <h3>Cropping Intensity</h3>
             <p>{{inten_desc1}}</p>
             <p>{{inten_desc2}}</p>
 
@@ -526,7 +640,7 @@
         </section>
 
         <section class="section">
-            <h4>Average percentage of double cropped area</h4>
+            <h3>Average percentage of double cropped area</h3>
             <p>{{double_crop_des}}</p>
             
             <div class="map-group">
@@ -565,7 +679,7 @@
         </section>
 
         <section class="section">
-            <h4>Surface Water Availability</h4>
+            <h3>Surface Water Availability</h3>
             <p>{{swb_desc}}</p>
 
             <p>{{trend_desc}}</p>
@@ -601,7 +715,7 @@
         </section>
 
         <section class="section">
-            <h4>Water Balance</h4>
+            <h3>Water Balance</h3>
             <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominantly through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
 
             <p>{{wb_desc}}</p>
@@ -629,7 +743,7 @@
 
         {% if soge_desc %}
         <section class="section">
-            <h4>State of groundwater extraction</h4>
+            <h3>State of groundwater extraction</h3>
 
             <p>The state of groundwater extraction refers to the current level or intensity at which groundwater is being withdrawn from aquifers compared to its natural replenishment rate. Based on this ratio, agencies like the Central Ground Water Board (CGWB) in India classify areas into categories indicating the extent of extraction.</p>
             
@@ -663,7 +777,7 @@
         {% endif %}
 
         <section class="section">
-            <h4>Drought Analysis</h4>
+            <h3>Drought Analysis</h3>
             <p>{{drought_desc}}</p>
 
             <p>A Drought year is declared if the total number of weeks under severe intensity drought and moderate intensity drought exceed 5, which means that the rainfall deficit was more than 25% for more than 5 weeks during the monsoon of that year.</p>
