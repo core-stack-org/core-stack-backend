@@ -89,7 +89,7 @@ def get_change_detection(
     task_id_list = check_task_status(task_list)
     print("Change detection task_id_list", task_id_list)
 
-    layer_at_geoserver = False
+    layer_ids = {}
     for param in param_dict.keys():
         asset_id = (
             get_gee_asset_path(state, district, block) + description + "_" + param
@@ -107,11 +107,12 @@ def get_change_detection(
                     "end_year": end_year,
                 },
             )
+            layer_ids[param] = layer_id
             make_asset_public(asset_id)
 
-            layer_at_geoserver = sync_to_gcs_geoserver(
-                state, district, block, description, param, layer_id
-            )
+    layer_at_geoserver = sync_to_gcs_geoserver(
+        state, district, block, description, param_dict.keys(), layer_ids
+    )
     return layer_at_geoserver
 
 
@@ -412,25 +413,30 @@ def change_cropping_intensity(roi_boundary, l1_asset):
     return change_far
 
 
-def sync_to_gcs_geoserver(state, district, block, description, param, layer_id):
+def sync_to_gcs_geoserver(state, district, block, description, param_list, layer_ids):
     task_list = []
-    image = ee.Image(
-        get_gee_asset_path(state, district, block) + description + "_" + param
-    )
-    task_id = sync_raster_to_gcs(image, 10, description + "_" + param)
-    task_list.append(task_id)
+    for change in param_list:
+        image = ee.Image(
+            get_gee_asset_path(state, district, block) + description + "_" + change
+        )
+        task_id = sync_raster_to_gcs(image, 10, description + "_" + change)
+        task_list.append(task_id)
     task_id_list = check_task_status(task_list)
     print("task_id sync to gcs ", task_id_list)
 
-    layer_at_geoserver = False
-    res = sync_raster_gcs_to_geoserver(
-        "change_detection",
-        description + "_" + param,
-        description + "_" + param,
-        param.lower(),
-    )
-    if res and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag updated")
-        layer_at_geoserver = True
-    return layer_at_geoserver
+    layer_at_geoserver = []
+    for change in param_list:
+        res = sync_raster_gcs_to_geoserver(
+            "change_detection",
+            description + "_" + change,
+            description + "_" + change,
+            change.lower(),
+        )
+        if res and layer_ids[change]:
+            sync_status = update_layer_sync_status(
+                layer_id=layer_ids[change], sync_to_geoserver=True
+            )
+            print("sync to geoserver flag updated")
+            if sync_status:
+                layer_at_geoserver.append(sync_status)
+    return len(layer_at_geoserver) == len(param_list)
