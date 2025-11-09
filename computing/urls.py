@@ -111,4 +111,9 @@ urlpatterns = [
         name="layer_staus_dashboard",
     ),
     path("generate_lcw_data/", api.generate_lcw_to_gee, name="generate_lcw_to_gee"),
+    path(
+        "generate_landslide_layer/",
+        api.generate_landslide_layer,
+        name="generate_landslide_layer",
+    ),
 ]
