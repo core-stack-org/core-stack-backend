@@ -140,18 +140,19 @@ def tree_health_ch_raster(
             res = sync_raster_gcs_to_geoserver(
                 "canopy_height", layer_name, layer_name, "ch_style"
             )
-
-            generate_STAC_layerwise.generate_raster_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name='tree_canopy_height_raster',
-                start_year=year
-            )
-            
+           
             # if res and layer_id:
             #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             #     print("sync to geoserver flag is updated")
             if res:
+                layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                state=state,
+                district=district,
+                block=block,
+                layer_name='tree_canopy_height_raster',
+                start_year=year)
+
+                # update_layer_sync_status(layer_id=layer_id,
+                #                          is_stac_specs_generated=layer_STAC_generated)
                 layer_at_geoserver = True
     return layer_at_geoserver
