@@ -8,9 +8,16 @@ from computing.utils import (
     calculate_precipitation_season,
     get_season_key,
     get_agri_year_key,
+    update_dashboard_geojson,
 )
 from constants.pan_india_path import CATCHMENT_AREA, STREAM_ORDER_RASTER
-from geoadmin.models import District
+from geoadmin.models import (
+    District,
+    State_Disritct_Block_Properties,
+    StateSOI,
+    DistrictSOI,
+    TehsilSOI,
+)
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -20,6 +27,8 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
 )
+
+
 from waterrejuvenation.utils import calculate_zoi_area, wait_for_task_completion
 
 
@@ -294,6 +303,9 @@ def GenerateWaterBalanceGeoJson(
     )
     fc = ee.FeatureCollection(asset_id_cathment_streamoder)
     layer_name = f"{state}_{district}_{block}_wb"
+    workspace_name = "waterrej"
+    update_dashboard_geojson(state, district, block, layer_name, workspace_name)
+
     sync_fc_to_geoserver(fc, state, layer_name, "waterrej")
 
 
@@ -361,6 +373,8 @@ def GenerateZoiGeoJson(
     merged_fc = join_ndmi.map(merge_ndmi_props)
 
     layer_name = f"{state}_{district}_{block}_zoi"
+    workspace_name = "waterrej"
+    update_dashboard_geojson(state, district, block, layer_name, workspace_name)
     sync_fc_to_geoserver(merged_fc, state, layer_name, "waterrej")
 
 
@@ -471,6 +485,8 @@ def GenerateMWSGeoJson(
         return ee.Feature(merged.geometry(), merged.toDictionary(prop_names))
 
     merged_fc = joined.map(merge_drought_props)
+    workspace_name = "waterrej"
     print(layer_name)
     # --- Push to GeoServer (or save) ---
+    update_dashboard_geojson(state, district, block, layer_name, workspace_name)
     sync_fc_to_geoserver(merged_fc, state, layer_name, "waterrej")

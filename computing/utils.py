@@ -5,7 +5,12 @@ import fiona
 import copy
 
 from computing.models import Layer, Dataset
-from geoadmin.models import TehsilSOI, DistrictSOI, StateSOI
+from geoadmin.models import (
+    TehsilSOI,
+    DistrictSOI,
+    StateSOI,
+    State_Disritct_Block_Properties,
+)
 from projects.models import Project
 from utilities.gee_utils import (
     ee_initialize,
@@ -715,3 +720,58 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
         dataset__name=dataset_name,
     )
     return layer_obj
+
+
+def update_dashboard_geojson(state, district, block, layer_name, workspace_name):
+    print(f"🔄 Updating GeoJSON for {state}, {district}, {block}")
+
+    # Get related objects
+    state_obj = StateSOI.objects.get(state_name=state)
+    district_obj = DistrictSOI.objects.get(district_name=district)
+    tehsil_obj = TehsilSOI.objects.get(tehsil_name=block)  # fixed typo
+
+    # Get or create main record
+    obj, created = State_Disritct_Block_Properties.objects.get_or_create(
+        state=state_obj, district=district_obj, tehsil=tehsil_obj
+    )
+
+    # Map suffix to json_key
+    suffix_to_key = {
+        "wb": "wb_geojson",
+        "zoi": "zoi_geojson",
+        "mws": "mws_geojson",
+    }
+
+    # Detect which key this layer corresponds to
+    json_key = None
+    for suffix, key in suffix_to_key.items():
+        if layer_name == f"{state}_{district}_{block}_{suffix}":
+            json_key = key
+            break
+
+    if not json_key:
+        print(f"⚠️ Layer name {layer_name} did not match any known type.")
+        return
+
+    # Construct GeoServer URL
+    waterrej_url = (
+        f"https://geoserver.core-stack.org:8443/geoserver/waterrej/ows?"
+        f"service=WFS&version=1.0.0&request=GetFeature&typeName={workspace_name}:{layer_name}"
+        f"&outputFormat=application%2Fjson"
+    )
+
+    # Load existing dashboard_geojson or create new
+    misc = obj.dashboard_geojson or {}
+
+    # Ensure waterrej section exists
+    if "waterrej" not in misc:
+        misc["waterrej"] = {}
+
+    # Update or add this specific json_key
+    misc["waterrej"][json_key] = waterrej_url
+
+    # Save the updated JSON field
+    obj.dashboard_geojson = misc
+    obj.save()
+
+    print(f"✅ Added/Updated {json_key} for {state}, {district}, {block}")
