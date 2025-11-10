@@ -56,6 +56,7 @@ from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import layer_status
 from .misc.lcw_conflict import generate_lcw_conflict_data
+from .landslide.landslide_vector import vectorise_landslide
 
 
 @api_security_check(allowed_methods="POST")
@@ -1198,3 +1199,38 @@ def generate_lcw_to_gee(request):
     except Exception as e:
         print("Exception in generate_lcw_conflict_data api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_landslide_layer(request):
+    """Generate landslide susceptibility vectors for a tehsil.
+    
+    POST params:
+        state: State name
+        district: District name
+        block: Block/Tehsil name
+        gee_account_id: GEE account ID for authentication
+    """
+    print("Inside generate_landslide_layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        
+        vectorise_landslide.apply_async(
+            args=[state, district, block, gee_account_id],
+            queue="nrm"
+        )
+        
+        return Response(
+            {"Success": "Landslide susceptibility generation initiated"},
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_landslide_layer api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
