@@ -172,11 +172,12 @@ def generate_landslide_vectors(state, district, block, description, asset_id, fc
             crs=landslide_clipped.projection()
         )
         
-        # Convert from m² to hectares and add as property
+        # Convert from m² to hectares and add as property, then remove "sum"
         def add_area_ha(feature):
             area_m2 = feature.get("sum")
             area_ha = ee.Number(area_m2).divide(10000)
-            return feature.set(f"{class_name}_area_ha", area_ha)
+            # Remove "sum" property after storing area to avoid overwrites in next iteration
+            return feature.set(f"{class_name}_area_ha", area_ha).remove("sum")
         
         fc = fc.map(add_area_ha)
     

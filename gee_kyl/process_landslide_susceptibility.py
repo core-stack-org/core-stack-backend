@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import json
 import argparse
-import sys
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -69,8 +68,6 @@ def init_ee(force: bool = False):
 
 def load_aoi_from_geojson(path: str) -> ee.Geometry:
     """Load AOI local geojson and return an ee.Geometry."""
-    import json
-
     with open(path, "r") as fh:
         gj = json.load(fh)
 

@@ -55,7 +55,7 @@ def example_validate_outputs():
     print("=== Example 2: Validate Outputs ===\n")
     
     # Initialize GEE
-    ee_initialize(gee_account_id=1)
+    ee_initialize()
     
     # Asset to validate
     asset_id = "users/corestack/jharkhand_ranchi_landslide_vector"
@@ -94,7 +94,7 @@ def example_generate_statistics():
     print("=== Example 3: Generate Statistics ===\n")
     
     # Initialize GEE
-    ee_initialize(gee_account_id=1)
+    ee_initialize()
     
     asset_id = "users/corestack/jharkhand_ranchi_landslide_vector"
     
@@ -129,7 +129,7 @@ def example_generate_report():
     print("=== Example 4: Generate Validation Report ===\n")
     
     # Initialize GEE
-    ee_initialize(gee_account_id=1)
+    ee_initialize()
     
     asset_id = "users/corestack/jharkhand_ranchi_landslide_vector"
     aoi = ee.Geometry.Point([85.3, 23.3]).buffer(50000)
@@ -160,7 +160,7 @@ def example_demo_susceptibility():
     print("=== Example 5: Generate Demo Susceptibility ===\n")
     
     # Initialize GEE
-    ee_initialize(gee_account_id=1)
+    ee_initialize()
     
     print("Generating demo susceptibility map from slope...\n")
     

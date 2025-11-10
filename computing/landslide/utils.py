@@ -1,7 +1,7 @@
 """Utility functions for landslide susceptibility processing."""
 
 import ee
-from typing import Dict, List, Tuple
+from typing import Dict
 
 
 def get_susceptibility_statistics(fc: ee.FeatureCollection) -> Dict:

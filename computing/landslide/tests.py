@@ -1,8 +1,7 @@
 """Tests for landslide susceptibility module."""
 
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-import ee
+from unittest.mock import Mock, patch
 
 
 class TestLandslideVectorization(unittest.TestCase):
