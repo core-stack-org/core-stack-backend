@@ -401,11 +401,15 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
         district_name__iexact=district, state=state_obj
     )
     block_obj = TehsilSOI.objects.get(tehsil_name__iexact=block, district=district_obj)
-    layer_obj = Layer.objects.get(
-        state=state_obj,
-        district=district_obj,
-        block=block_obj,
-        layer_name=layer_name,
-        dataset__name=dataset_name,
+    layer_obj = (
+        Layer.objects.filter(
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_name=layer_name,
+            dataset__name=dataset_name,
+        )
+        .order_by("-layer_version")
+        .first()
     )
     return layer_obj
