@@ -46,6 +46,11 @@ from computing.STAC_specs import constants
 
 # %%
 # !pip install fsspec s3fs
+from nrm_app.settings import S3_ACCESS_KEY, S3_SECRET_KEY
+
+aws_creds = {}
+aws_creds['aws_access_key_id'] = S3_ACCESS_KEY
+aws_creds['aws_secret_access_key'] = S3_SECRET_KEY
 
 # %%
 GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
@@ -90,9 +95,6 @@ S3_STAC_BUCKET_NAME = constants.S3_STAC_BUCKET_NAME
 
 # %%
 layer_STAC_generated = False #output flag
-
-# %% [markdown]
-# ### Raster flow
 
 # %%
 def read_layer_description(filepath,
@@ -1243,13 +1245,6 @@ def create_aws_client(
         region_name=region_name,
         aws_session_token=aws_session_token,
     )
-
-# %%
-AWS_CREDS_FILEPATH = constants.AWS_CREDS_FILEPATH
-
-# %%
-with open(AWS_CREDS_FILEPATH) as src:
-    aws_creds = json.load(src)
 
 # %%
 def upload_file_to_s3(
