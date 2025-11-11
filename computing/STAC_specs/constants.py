@@ -39,4 +39,4 @@ VECTOR_COLUMN_DESC_GITHUB_URL = 'https://github.com/core-stack-org/layers_metada
 S3_STAC_BUCKET_URL='https://spatio-temporal-asset-catalog.s3.ap-south-1.amazonaws.com/'
 S3_STAC_BUCKET_NAME='spatio-temporal-asset-catalog'
 
-AWS_CREDS_FILEPATH='/home/nirzaree/Documents/.aws_credentials.json'
+
