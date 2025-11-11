@@ -50,7 +50,7 @@ def generate_terrain_raster_clip(
     )
 
     task = export_raster_asset_to_gee(
-        image=pan_india_raster.clip(roi.geometry()),
+        image=pan_india_raster.clip(roi.union().geometry()),
         description=description,
         asset_id=asset_id,
         scale=30,
@@ -63,6 +63,7 @@ def generate_terrain_raster_clip(
 
     # Check if asset was created
     layer_id = None
+    layer_at_geoserver = False
 
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
@@ -74,7 +75,7 @@ def generate_terrain_raster_clip(
             + "_terrain_raster"
         )
 
-        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, description)
+        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
 
