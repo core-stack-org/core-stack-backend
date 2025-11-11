@@ -35,10 +35,14 @@ from shapely.geometry import mapping, box, Polygon
 
 import pystac
 
+import boto3
+import json
+import tqdm
+import glob
+
 import sys
 sys.path.append('..')
 from computing.STAC_specs import constants
-# import constants
 
 # %%
 # !pip install fsspec s3fs
@@ -48,8 +52,12 @@ GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
 # GEOSERVER_BASE_URL
 
 # %%
-GITHUB_DATA_URL = constants.GITHUB_DATA_URL
-# GITHUB_DATA_URL
+# THUMBNAIL_DATA_URL = constants.GITHUB_DATA_URL
+THUMBNAIL_DATA_URL = constants.S3_STAC_BUCKET_URL
+
+# %%
+# STAC_S3_BUCKET_URL=constants.S3_STAC_BUCKET_URL
+# STAC_S3_BUCKET_URL
 
 # %%
 LOCAL_DATA_DIR = 'computing/STAC_specs/data/'
@@ -59,19 +67,14 @@ STYLE_FILE_DIR = os.path.join(LOCAL_DATA_DIR,'input/style_files/')
 
 # %%
 THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR,
-                             'STAC_output_prod')
+                             'STAC_output_exception_handling')
 # THUMBNAIL_DIR
-
 
 # %%
 STAC_FILES_DIR = os.path.join(
     LOCAL_DATA_DIR,
-    'CorestackCatalogs_prod' #test folder
+    'CorestackCatalogs_exception_handling' #test folder
 )
-
-# STAC_FILES_DIR = 's3://spatio-temporal-asset-catalog/CorestackCatalogs_prod'
-
-# STAC_FILES_DIR
 
 # %%
 LAYER_DESC_GITHUB_URL = constants.LAYER_DESC_GITHUB_URL
@@ -80,6 +83,10 @@ LAYER_DESC_GITHUB_URL = constants.LAYER_DESC_GITHUB_URL
 # %%
 VECTOR_COLUMN_DESC_GITHUB_URL = constants.VECTOR_COLUMN_DESC_GITHUB_URL
 # VECTOR_COLUMN_DESC_GITHUB_URL
+
+# %%
+S3_STAC_BUCKET_NAME = constants.S3_STAC_BUCKET_NAME
+# S3_STAC_BUCKET_NAME
 
 # %%
 layer_STAC_generated = False #output flag
@@ -127,9 +134,10 @@ def read_raster_data(raster_url):
     #exception handling: scenario 1: when fetching data from geoserver
     try:
         response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        # Whoops it wasn't a 200
-        return "Error: " + str(e) + "when fetching data from geoserver for STAC generation"
+    except Exception as e:
+         print("STAC_Error: " + str(e) + "when fetching geoserver data")
+         print("exiting STAC pipeline")
+         return layer_STAC_generated
 
     raster_data = BytesIO(response.content)
 
@@ -256,7 +264,9 @@ def parse_raster_style_file(style_file_url,
                                            style_file_local_path)  
             #exception handling: scenario 2: when fetching style file from github
             except Exception as e:
-                print("Could not retrieve style file from github. Error: " + str(e))
+                print("STAC_Error: Could not retrieve style file from github. Error: " + str(e))
+                print("exiting STAC pipeline")
+                return layer_STAC_generated
     
     tree = ET.parse(style_file_local_path)
     root = tree.getroot()
@@ -370,11 +380,13 @@ def generate_raster_thumbnail(raster_data,
 def add_thumbnail_asset(STAC_item,
                         THUMBNAIL_PATH,
                         LOCAL_DATA_DIR, #TODO
-                        GITHUB_DATA_URL
+                        THUMBNAIL_DATA_URL
                         ):
     STAC_item.add_asset("thumbnail", pystac.Asset(
-        href=os.path.join(GITHUB_DATA_URL, os.path.relpath(THUMBNAIL_PATH,
+        href=os.path.join(THUMBNAIL_DATA_URL, os.path.relpath(THUMBNAIL_PATH,
                                                            start=LOCAL_DATA_DIR)),
+        # href=os.path.join(THUMBNAIL_DATA_URL, os.path.relpath(THUMBNAIL_PATH,
+        #                                                    start=LOCAL_DATA_DIR)),
         media_type=pystac.MediaType.PNG,
         roles=["thumbnail"],
         title="Thumbnail"
@@ -522,7 +534,7 @@ def generate_raster_item(state,
         STAC_item=raster_item,
         THUMBNAIL_PATH=THUMBNAIL_PATH,
         LOCAL_DATA_DIR=LOCAL_DATA_DIR,
-        GITHUB_DATA_URL=GITHUB_DATA_URL
+        THUMBNAIL_DATA_URL=THUMBNAIL_DATA_URL
     )
 
     return raster_item
@@ -735,8 +747,16 @@ def read_vector_data(vector_url,
                      ):
     try:
         vector_gdf = gpd.read_file(vector_url)
+    except requests.exceptions.RequestException as e:
+        # Handle specific requests exceptions (e.g., network issues, invalid URL)
+        print(f"STAC_Error: Network or URL error: {e} when fetching vector data from geoserver")
+        print("exiting STAC pipeline")
+        return layer_STAC_generated
     except Exception as e:
-        print("Could not fetch vector data from url. Error: " + str(e))
+        # Handle other general GeoPandas/GDAL-related exceptions (e.g., file format issues)
+        print(f"STAC_Error: unexpected error : {e} when fetching vector data from geoserver")
+        print("exiting STAC pipeline")
+        return layer_STAC_generated
 
     vector_gdf = vector_gdf.to_crs(epsg=target_crs)
     #TODO: remove such constants like here in crs. make it standard. available in constants. 
@@ -753,7 +773,12 @@ def create_vector_item(vector_url,
                        layer_description,
                        column_desc_csv_path
                        ):
-    vector_gdf, bounds, bbox, geom = read_vector_data(vector_url=vector_url)
+    try:
+        vector_gdf, bounds, bbox, geom = read_vector_data(vector_url=vector_url)
+    except Exception as e:
+        print(f"STAC_Error: {e} when fetching vector data from geoserver")
+        print("exiting STAC pipeline")
+        return layer_STAC_generated
 
     vector_item = pystac.Item(
         id=id,
@@ -1137,14 +1162,15 @@ def generate_vector_item(state,
                         #    end_year=end_year
                            )
     
-    print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    print(f"geoserver_layer_name={geoserver_layer_name}")
-    print(f"style file url = {style_file_url}")
+    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    # print(f"geoserver_layer_name={geoserver_layer_name}")
+    # print(f"style file url = {style_file_url}")
 
     #3. generate geoserver url
     geoserver_url = generate_vector_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
+    # print(f"geoserver url={geoserver_url}")
     
     #4. create vector item
     layer_title = layer_display_name
@@ -1194,10 +1220,95 @@ def generate_vector_item(state,
         STAC_item=vector_item,
         THUMBNAIL_PATH=THUMBNAIL_PATH,
         LOCAL_DATA_DIR=LOCAL_DATA_DIR,
-        GITHUB_DATA_URL=GITHUB_DATA_URL
+        THUMBNAIL_DATA_URL=THUMBNAIL_DATA_URL
     )
 
     return vector_item
+
+# %% [markdown]
+# Upload folders to S3
+
+# %%
+def create_aws_client(
+    service_name:str,
+    aws_access_key_id:str,
+    aws_secret_access_key:str,
+    region_name:str='ap-south-1',
+    aws_session_token=None,
+):
+    return boto3.client(
+        service_name=service_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        region_name=region_name,
+        aws_session_token=aws_session_token,
+    )
+
+# %%
+AWS_CREDS_FILEPATH = constants.AWS_CREDS_FILEPATH
+
+# %%
+with open(AWS_CREDS_FILEPATH) as src:
+    aws_creds = json.load(src)
+
+# %%
+def upload_file_to_s3(
+    aws_creds,
+    filepath,
+    s3_bucket,
+    s3_prefix,
+):
+    if s3_bucket is None :
+        raise Exception(
+            "'s3_folderpath'" + \
+            "should be non None."
+        )
+  
+    s3_client = create_aws_client(
+        service_name='s3',
+        aws_access_key_id=aws_creds['aws_access_key_id'],
+        aws_secret_access_key=aws_creds['aws_secret_access_key'],
+        region_name='ap-south-1',
+        # aws_session_token=aws_creds.aws_session_token,
+    )
+
+    # print('---------------------')
+    # print('File set to upload:')
+    # print('---------------------')
+    # print('filepath :', filepath)
+    # print('bucket   :', s3_bucket)
+    # print('prefix   :', s3_prefix)
+    # print('---------------------')
+
+    s3_client.upload_file(
+        filepath,
+        s3_bucket,
+        s3_prefix,
+        ExtraArgs={'ACL': 'bucket-owner-full-control'},
+    )
+
+    return (s3_bucket,s3_prefix)
+
+# %%
+def get_all_files_in_folder(folderpath:str):
+    # https://stackoverflow.com/questions/18394147/how-to-do-a-recursive-sub-folder-search-and-return-files-in-a-list
+    return [y for x in os.walk(folderpath) for y in glob.glob(os.path.join(x[0], '*')) if os.path.isfile(y)]
+
+# %%
+def upload_folder_to_s3(
+    aws_creds,
+    folderpath,
+    s3_bucket
+):
+    filepaths = get_all_files_in_folder(folderpath=folderpath)
+    for filepath in tqdm.tqdm(filepaths):
+        s3_prefix = filepath.split('data/')[1]
+        upload_file_to_s3(
+            aws_creds=aws_creds,
+            filepath=filepath,
+            s3_bucket=s3_bucket,
+            s3_prefix=s3_prefix
+        )
 
 # %% [markdown]
 # Making a combined function to generate raster/vector STAC : 
@@ -1212,19 +1323,29 @@ def generate_vector_stac(state,
                          layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
                          column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'):
     # print(layer_map_csv_path)
-    
+
     vector_item = generate_vector_item(state,
-                                       district,
-                                       block,
-                                       layer_name,
-                                       layer_map_csv_path,
-                                       layer_desc_csv_path,
-                                       column_desc_csv_path)
-    
+                                        district,
+                                        block,
+                                        layer_name,
+                                        layer_map_csv_path,
+                                        layer_desc_csv_path,
+                                        column_desc_csv_path)
+
     layer_STAC_generated = update_STAC_files(state,
                                              district,
                                              block,
                                              STAC_item=vector_item)
+    
+    upload_folder_to_s3(
+    aws_creds=aws_creds,
+    folderpath=STAC_FILES_DIR,
+    s3_bucket=S3_STAC_BUCKET_NAME)
+
+    upload_folder_to_s3(
+    aws_creds=aws_creds,
+    folderpath=THUMBNAIL_DIR,
+    s3_bucket=S3_STAC_BUCKET_NAME)
     
     return layer_STAC_generated
 
@@ -1252,8 +1373,17 @@ def generate_raster_stac(state,
                                              block,
                                              STAC_item=raster_item)
     
-    return layer_STAC_generated
+    upload_folder_to_s3(
+    aws_creds=aws_creds,
+    folderpath=STAC_FILES_DIR,
+    s3_bucket=S3_STAC_BUCKET_NAME)
+
+    upload_folder_to_s3(
+    aws_creds=aws_creds,
+    folderpath=THUMBNAIL_DIR,
+    s3_bucket=S3_STAC_BUCKET_NAME)
     
+    return layer_STAC_generated   
 
 
 # %% [markdown]
@@ -1280,6 +1410,11 @@ def generate_raster_stac(state,
 # block='badlapur'
 
 # %%
+# state='gujarat'
+# district='mahisagar'
+# block='virpur'
+
+# %%
 # generate_vector_stac(state=state,
 #                      district=district,
 #                      block=block,
@@ -1287,7 +1422,7 @@ def generate_raster_stac(state,
 #                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
 #                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                     #  column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'
-#                      )
+#                     )
 
 # %%
 # generate_vector_stac(state=state,
@@ -1308,5 +1443,19 @@ def generate_raster_stac(state,
 #                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                      start_year='2021'
 #                      )
+
+# %%
+# upload_folder_to_s3(
+#     aws_creds=aws_creds,
+#     folderpath='computing/STAC_specs/data/CorestackCatalogs_exception_handling',
+#     s3_bucket='spatio-temporal-asset-catalog'
+# )
+
+# %%
+# upload_folder_to_s3(
+#     aws_creds=aws_creds,
+#     folderpath='computing/STAC_specs/data/STAC_output_exception_handling',
+#     s3_bucket='spatio-temporal-asset-catalog'
+# )
 
 
