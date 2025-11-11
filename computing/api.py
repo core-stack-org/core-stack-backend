@@ -1192,7 +1192,7 @@ def generate_lcw_to_gee(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_lcw_conflict_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -1212,7 +1212,7 @@ def generate_agroecological_to_gee(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_agroecological_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -1232,7 +1232,7 @@ def generate_factory_csr_to_gee(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_factory_csr_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -1252,7 +1252,7 @@ def generate_green_credit_to_gee(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_green_credit_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -1272,7 +1272,7 @@ def generate_mining_to_gee(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_mining_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
