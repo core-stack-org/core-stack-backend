@@ -81,6 +81,9 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         "aquifer_vector": -1,
         "soge_vector": -1,
         "lcw_conflict": -1,
+        "factory_csr": -1,
+        "mining": -1,
+        "green_credit": -1,
     }
 
     try:
@@ -666,6 +669,45 @@ def get_generate_filter_mws_data(state, district, block, file_type):
         except Exception as e:
             lcw_conflict = -1
 
+        ################## mining  ######################
+        ## if count is 0 then Areas with no mining else Areas with mining
+        try:
+            mining_count = sheets["mining"][
+                sheets["mining"]["UID"] == specific_mws_id
+            ].shape[0]
+            if mining_count == 0:
+                mining = 0
+            else:
+                mining = 1
+        except Exception as e:
+            mining = -1
+
+        ################## green credit  ######################
+        ## if count is 0 then Areas with no green credit else Areas with green credit
+        try:
+            green_credit_count = sheets["green_credit"][
+                sheets["green_credit"]["UID"] == specific_mws_id
+            ].shape[0]
+            if green_credit_count == 0:
+                green_credit = 0
+            else:
+                green_credit = 1
+        except Exception as e:
+            green_credit = -1
+
+        ################## factory csr  ######################
+        ## if count is 0 then Areas with no factory else Areas with factory
+        try:
+            factory_csr_count = sheets["factory_csr"][
+                sheets["factory_csr"]["UID"] == specific_mws_id
+            ].shape[0]
+            if factory_csr_count == 0:
+                factory_csr = 0
+            else:
+                factory_csr = 1
+        except Exception as e:
+            factory_csr = -1
+
         results.append(
             {
                 "mws_id": specific_mws_id,
@@ -699,6 +741,9 @@ def get_generate_filter_mws_data(state, district, block, file_type):
                 "aquifer_class": aquifer_class,
                 "soge_class": soge_class,
                 "lcw_conflict": lcw_conflict,
+                "mining": mining,
+                "green_credit": green_credit,
+                "factory_csr": factory_csr,
             }
         )
 
