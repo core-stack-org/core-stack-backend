@@ -42,6 +42,7 @@ def well_depth(
                 "layer not found for welldepth. So, reading the column name from asset_id"
             )
         db_end_date = None
+        last_date = None
         if layer_obj:
             db_end_date = layer_obj.misc["end_date"]
             # else:

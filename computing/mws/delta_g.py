@@ -61,22 +61,8 @@ def delta_g(
             existing_end_date = datetime.datetime.strptime(
                 existing_end_date, "%Y-%m-%d"
             )
-            # else:
-            #     fc = ee.FeatureCollection(asset_id)
-            #     col_names = fc.first().propertyNames().getInfo()
-            #     filtered_col = [col for col in col_names if col.startswith("20")]
-            #     filtered_col.sort()
-            #     existing_end_date = filtered_col[-1]
-            #
-            #     if is_annual:
-            #         existing_end_date = existing_end_date + datetime.timedelta(days=364)
-            #     else:
-            #         existing_end_date = datetime.datetime.strptime(
-            #             filtered_col[-1], "%Y-%m-%d"
-            #         )
-            #         existing_end_date = existing_end_date + datetime.timedelta(days=14)
-
             end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+            last_date = str(end_date.date())
 
             if existing_end_date.year < end_date.year:
                 new_start_date = existing_end_date
@@ -86,7 +72,7 @@ def delta_g(
                 new_description = f"{description}_{new_start_date}_{end_date}"
 
                 if not is_gee_asset_exists(new_asset_id):
-                    task_id, new_asset_id = _generate_data(
+                    task_id, new_asset_id, last_date = _generate_data(
                         roi,
                         new_asset_id,
                         asset_path,
@@ -102,7 +88,7 @@ def delta_g(
                 # Check if data for new year is generated, if yes then merge it in existing asset
                 if is_gee_asset_exists(new_asset_id):
                     merge_fc_into_existing_fc(asset_id, description, new_asset_id)
-            return None, asset_id
+            return None, asset_id, last_date
         else:
             ee.data.deleteAsset(asset_id)
 
@@ -180,4 +166,4 @@ def _generate_data(
         start_date = str(f_start_date.date())
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
-    return task_id, asset_id
+    return task_id, asset_id, start_date
