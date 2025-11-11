@@ -5,6 +5,7 @@ from utilities.gee_utils import valid_gee_text
 from .layer_status.layer_mapping import workspace_config
 import xml.etree.ElementTree as ET
 from nrm_app.celery import app
+from computing.models import *
 
 
 @app.task(bind=True)
@@ -37,6 +38,9 @@ def layer_status(self, state, district, block):
             layer_name_parts = [prefix, district, block, suffix]
         layer_name = "_".join(part for part in layer_name_parts if part)
 
+        total_features = None
+        end_date = None
+        start_date = None
         # checking for vector layer
         if layer_type == "vector":
             server_url = get_url(GEOSERVER_URL, workspace, layer_name)
@@ -47,6 +51,18 @@ def layer_status(self, state, district, block):
                 try:
                     data = res_server.json()
                     status_code = 200 if data.get("totalFeatures") > 0 else 400
+                    total_features = data.get("totalFeatures")
+                    layer = (
+                        Layer.objects.filter(layer_name=layer_name)
+                        .order_by("-layer_version")
+                        .first()
+                    )
+                    end_date = (
+                        layer.misc.get("end_date") if layer and layer.misc else None
+                    )
+                    start_date = (
+                        layer.misc.get("start_date") if layer and layer.misc else None
+                    )
                 except ValueError:
                     print("Invalid JSON.")
                     status_code = 400
@@ -72,6 +88,9 @@ def layer_status(self, state, district, block):
             "workspace": workspace,
             "layer_name": layer_name,
             "status_code": status_code,
+            "totalFeature": total_features,
+            "endDate": end_date,
+            "startDate": start_date,
         }
 
     return all_workspace_statuses
