@@ -158,6 +158,8 @@ def sync_asset_to_db_and_geoserver(
                 district=district,
                 block=block,
                 layer_name='surface_water_bodies_vector')
+            update_layer_sync_status(layer_id=layer_id,
+                                     is_stac_specs_generated=layer_STAC_generated)
 
             layer_at_geoserver = True
     return layer_at_geoserver
