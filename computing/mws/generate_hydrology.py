@@ -150,7 +150,7 @@ def generate_hydrology(
             )
             print("save Run Off info at the gee level...")
 
-    dg_task_id, delta_g_asset_id = delta_g(
+    dg_task_id, delta_g_asset_id, g_last_date = delta_g(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -166,7 +166,7 @@ def generate_hydrology(
     layer_name = "deltaG_fortnight_" + asset_suffix
 
     if is_annual:
-        wd_task_id, wd_asset_id, w_last_date = well_depth(
+        wd_task_id, wd_asset_id, g_last_date = well_depth(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
             app_type=app_type,
@@ -189,7 +189,7 @@ def generate_hydrology(
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    asset_id, g_last_date = calculate_g(
+    asset_id = calculate_g(
         delta_g_asset_id,
         asset_folder_list,
         asset_suffix,
