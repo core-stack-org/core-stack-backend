@@ -2,6 +2,7 @@ import ee
 import datetime
 from dateutil.relativedelta import relativedelta
 
+from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
@@ -30,10 +31,12 @@ def net_value(
         print("Net value asset already exists")
         layer_obj = None
         try:
-            dataset = Dataset.objects.get(name="Hydrology")
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=f"deltaG_well_depth_{asset_suffix}",
+                dataset_name="Hydrology",
             )
         except Exception as e:
             print(

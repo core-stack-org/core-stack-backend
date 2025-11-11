@@ -4,6 +4,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from computing.mws.utils import get_last_date
+from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
@@ -40,14 +41,15 @@ def delta_g(
         print("DeltaG asset already exists")
         layer_obj = None
         try:
-            dataset = Dataset.objects.get(name="Hydrology")
             layer_name = (
                 "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
             ) + asset_suffix
-
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=layer_name,
+                dataset_name="Hydrology",
             )
         except Exception as e:
             print(
@@ -129,19 +131,17 @@ def _generate_data(
         asset_path + "ET_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # et feature collection
 
+    col_names = prec.first().propertyNames().getInfo()
+    col_names = [col for col in col_names if col.startswith("20")]
+    col_names.sort()
+
     keys = ["Precipitation", "RunOff", "ET", "DeltaG"]
-    f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    # f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
-    while f_start_date <= end_date:
-        if is_annual:
-            f_end_date = f_start_date + datetime.timedelta(days=364)
-        else:
-            f_end_date = f_start_date + datetime.timedelta(days=14)
-            if f_end_date > end_date:
-                break
+    for col_date in col_names:
 
-        def res(feat):
+        def get_delta_g(feat):
             uid = feat.get("uid")
             p = ee.Feature(prec.filter(ee.Filter.eq("uid", uid)).first())
             q = ee.Feature(runoff.filter(ee.Filter.eq("uid", uid)).first())
@@ -153,17 +153,11 @@ def _generate_data(
             g = p.subtract(q).subtract(e)
             values = [p, q, e, g]
             d = ee.Dictionary.fromLists(keys, values)
-            col_date = (
-                str(f_start_date.year) + "_" + str(f_start_date.year + 1)
-                if is_annual
-                else start_date
-            )
             feat = feat.set(ee.String(col_date), ee.String.encodeJSON(d))
             return feat
 
-        roi = roi.map(res)
-        f_start_date = f_end_date
-        start_date = str(f_start_date.date())
+        roi = roi.map(get_delta_g)
+        start_date = col_date
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id, asset_id, start_date
