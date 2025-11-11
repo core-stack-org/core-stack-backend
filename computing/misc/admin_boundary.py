@@ -75,13 +75,9 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
             block=block,
             layer_name='admin_boundaries_vector'
         )
-        if (layer_STAC_generated == True):
-            update_layer_sync_status(layer_id=layer_id,
-                                     is_stac_specs_generated=layer_STAC_generated)
-            print("STAC Spec generated")
-        else:
-            update_layer_sync_status(layer_id=layer_id,
-                                     is_stac_specs_generated=False)
+        update_layer_sync_status(layer_id=layer_id,
+                                 is_stac_specs_generated=layer_STAC_generated)
+
         layer_at_geoserver = True
     return layer_at_geoserver
 
