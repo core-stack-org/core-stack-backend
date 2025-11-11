@@ -34,7 +34,6 @@ def calculate_g(
         + layer_name
     )
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    last_date = None
     if is_gee_asset_exists(asset_id):
         dataset = Dataset.objects.get(name="Hydrology")
         layer_obj = None
@@ -55,48 +54,27 @@ def calculate_g(
             filtered_col.sort()
             db_end_date = filtered_col[-1]  # .split("-")[0].split("_")[-1]
 
-        # db_end_date = f"{db_end_date}-06-30"
         db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
-        # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-        last_date = str(db_end_date.date())
         if db_end_date.year < end_date.year:
-            # end_date = end_date.strftime("%Y-%m-%d")
             ee.data.deleteAsset(asset_id)
         else:
-            return asset_id, last_date
+            return asset_id
 
-    fc = ee.FeatureCollection(delta_g_asset_id).getInfo()
+    fc = ee.FeatureCollection(delta_g_asset_id)
+    deltaG_col_names = fc.first().propertyNames().getInfo()
+    deltaG_col_names = [col for col in deltaG_col_names if col.startswith("20")]
+    deltaG_col_names.sort()
+    fc = fc.getInfo()
     features = fc["features"]
-    # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
     for f in features:
         properties = f["properties"]
-        # n_start_date = start_date
-        f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-        l_start_date = None
+        l_col_date = None
 
-        while f_start_date <= end_date:
-            if is_annual:
-                f_end_date = f_start_date + datetime.timedelta(days=364)
-            else:
-                f_end_date = f_start_date + datetime.timedelta(days=14)
-                if f_end_date > end_date:
-                    break
-
-            col_date = (
-                str(f_start_date.year) + "_" + str(f_start_date.year + 1)
-                if is_annual
-                else f_start_date.strftime("%Y-%m-%d")
-            )
-
+        for col_date in deltaG_col_names:
             curr_prop = json.loads(properties[col_date])
             prev_g = 0
-            if l_start_date:
-                l_col_date = (
-                    str(l_start_date.year) + "_" + str(l_start_date.year + 1)
-                    if is_annual
-                    else l_start_date.strftime("%Y-%m-%d")
-                )
+            if l_col_date:
                 last_prop = json.loads(properties[l_col_date])
                 prev_g = last_prop.get("G", 0)
 
@@ -104,13 +82,9 @@ def calculate_g(
 
             # Store the full dict as a string
             properties[col_date] = json.dumps(curr_prop)
-
-            l_start_date = f_start_date
-            f_start_date = f_end_date
-            # n_start_date = f_start_date.strftime("%Y-%m-%d")
+            l_col_date = col_date
 
         f["properties"] = properties
-        last_date = str(f_start_date.date())
 
     try:
         # Rewrap into ee.FeatureCollection with valid geometry
@@ -151,4 +125,4 @@ def calculate_g(
             print("path", path)
             upload_shp_to_gee(path, layer_name, asset_id, gee_account_id)
 
-    return asset_id, last_date
+    return asset_id
