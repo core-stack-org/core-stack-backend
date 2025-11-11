@@ -3,6 +3,8 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import json
 import os
+
+from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS, MERGE_MWS_PATH
 from utilities.gee_utils import (
     get_gee_dir_path,
@@ -35,12 +37,14 @@ def calculate_g(
     )
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     if is_gee_asset_exists(asset_id):
-        dataset = Dataset.objects.get(name="Hydrology")
         layer_obj = None
         try:
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=layer_name,
+                dataset_name="Hydrology",
             )
         except Exception as e:
             print("layer not found. So, reading the column name from asset_id.")
@@ -91,7 +95,7 @@ def calculate_g(
         ee_features = [
             ee.Feature(ee.Geometry(f["geometry"]), f["properties"]) for f in features
         ]
-        # task_id = export_vector_asset_to_gee(fc, layer_name, asset_id)
+
         task = ee.batch.Export.table.toAsset(
             collection=ee.FeatureCollection(ee_features),
             description=layer_name,
