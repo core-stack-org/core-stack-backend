@@ -161,6 +161,7 @@ def _generate_data(
         roi = roi.map(get_delta_g)
         start_date = col_date
 
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     if is_annual:
         last_date = start_date + datetime.timedelta(days=364)
     else:
