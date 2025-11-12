@@ -9,7 +9,6 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
 )
-from computing.models import Layer, Dataset
 
 
 def net_value(
@@ -46,13 +45,6 @@ def net_value(
         db_end_date = None
         if layer_obj:
             db_end_date = layer_obj.misc["end_date"]
-            # else:
-            # fc = ee.FeatureCollection(asset_id)
-            # col_names = fc.first().propertyNames().getInfo()
-            # filtered_col = [col for col in col_names if col.startswith("20")]
-            # filtered_col.sort()
-            # db_end_date = filtered_col[-1]
-
             db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
 
         if not db_end_date or db_end_date < end_date:

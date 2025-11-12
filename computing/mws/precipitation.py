@@ -1,8 +1,6 @@
 import ee
 import datetime
 
-from dateutil.relativedelta import relativedelta
-
 from computing.mws.utils import get_last_date
 from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
@@ -13,7 +11,6 @@ from utilities.gee_utils import (
     check_task_status,
     merge_fc_into_existing_fc,
 )
-from computing.models import Layer, Dataset
 
 
 def precipitation(

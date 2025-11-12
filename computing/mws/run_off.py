@@ -1,11 +1,9 @@
 import ee
 import datetime
-from dateutil.relativedelta import relativedelta
 
 from computing.mws.utils import get_last_date
 from computing.utils import create_chunk, merge_chunks, get_layer_object
 from gee_computing.models import GEEAccount
-from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -18,7 +16,6 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
     build_gee_helper_paths,
 )
-from computing.models import Layer, Dataset
 
 
 def run_off(
