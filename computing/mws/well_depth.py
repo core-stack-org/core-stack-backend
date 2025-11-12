@@ -45,16 +45,14 @@ def well_depth(
                 "layer not found for welldepth. So, reading the column name from asset_id"
             )
         db_end_date = None
-        last_date = None
         if layer_obj:
             db_end_date = layer_obj.misc["end_date"]
             db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
-            last_date = str(db_end_date.date())
 
         if not db_end_date or db_end_date.year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
-            return None, asset_id, last_date
+            return None, asset_id
 
     return _generate_data(
         asset_id, asset_path, description, asset_suffix, start_date, end_date
@@ -67,7 +65,7 @@ def _generate_data(
     principal_aquifers = ee.FeatureCollection(
         "projects/ee-anz208490/assets/principalAquifer"
     )
-    slopes = ee.FeatureCollection(
+    delta_g = ee.FeatureCollection(
         asset_path + "filtered_delta_g_annual_" + asset_suffix + "_uid"
     )
     yeild__ = ee.List(principal_aquifers.aggregate_array("yeild__"))
@@ -142,16 +140,16 @@ def _generate_data(
         weighted_avg_yeild = mapped_filtered_aquifers.aggregate_sum("weighted_yeild")
         return mws.set("weighted_avg_yeild", weighted_avg_yeild)
 
-    shape = slopes.map(fun2)
+    shape = delta_g.map(fun2)
     keys = ["Precipitation", "RunOff", "ET", "DeltaG", "WellDepth"]
-    # year of interest
-    f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    while f_start_date <= end_date:
-        f_end_date = f_start_date + datetime.timedelta(days=364)
+
+    col_names = delta_g.first().propertyNames().getInfo()
+    col_names = [col for col in col_names if col.startswith("20")]
+    col_names.sort()
+
+    for col_date in col_names:
 
         def res(n):
-            col_date = str(f_start_date.year) + "_" + str(f_start_date.year + 1)
             d = ee.Dictionary(ee.String(n.get(str(col_date))).decodeJSON())
             p = d.get("Precipitation")
             q = d.get("RunOff")
@@ -167,9 +165,7 @@ def _generate_data(
             return n
 
         shape = shape.map(res)
-        f_start_date = f_end_date
-        start_date = f_start_date
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(shape, description, asset_id)
-    return task_id, asset_id, start_date
+    return task_id, asset_id

@@ -1,9 +1,5 @@
 import ee
 import datetime
-
-from dateutil.relativedelta import relativedelta
-
-from computing.mws.utils import get_last_date
 from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -13,7 +9,6 @@ from utilities.gee_utils import (
     check_task_status,
     merge_fc_into_existing_fc,
 )
-from computing.models import Layer, Dataset
 
 
 def delta_g(
@@ -135,9 +130,10 @@ def _generate_data(
     col_names = [col for col in col_names if col.startswith("20")]
     col_names.sort()
 
+    if start_date in col_names and col_names[0] != start_date:
+        col_names = col_names[col_names.index(start_date) :]
+
     keys = ["Precipitation", "RunOff", "ET", "DeltaG"]
-    # f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
 
     for col_date in col_names:
 
@@ -147,17 +143,29 @@ def _generate_data(
             q = ee.Feature(runoff.filter(ee.Filter.eq("uid", uid)).first())
             e = ee.Feature(et.filter(ee.Filter.eq("uid", uid)).first())
 
-            p = ee.Number(p.get(start_date))
-            q = ee.Number(q.get(start_date))
-            e = ee.Number(e.get(start_date))
+            p = ee.Number(p.get(col_date))
+            q = ee.Number(q.get(col_date))
+            e = ee.Number(e.get(col_date))
             g = p.subtract(q).subtract(e)
             values = [p, q, e, g]
             d = ee.Dictionary.fromLists(keys, values)
-            feat = feat.set(ee.String(col_date), ee.String.encodeJSON(d))
+            g_col_date = datetime.datetime.strptime(col_date, "%Y-%m-%d")
+            g_col_date = (
+                str(g_col_date.year) + "_" + str(g_col_date.year + 1)
+                if is_annual
+                else col_date
+            )
+            feat = feat.set(ee.String(g_col_date), ee.String.encodeJSON(d))
             return feat
 
         roi = roi.map(get_delta_g)
         start_date = col_date
+
+    if is_annual:
+        last_date = start_date + datetime.timedelta(days=364)
+    else:
+        last_date = start_date + datetime.timedelta(days=14)
+
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
-    return task_id, asset_id, start_date
+    return task_id, asset_id, last_date
