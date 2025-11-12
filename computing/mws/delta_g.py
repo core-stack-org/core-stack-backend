@@ -169,4 +169,4 @@ def _generate_data(
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)
-    return task_id, asset_id, last_date
+    return task_id, asset_id, str(last_date.date())
