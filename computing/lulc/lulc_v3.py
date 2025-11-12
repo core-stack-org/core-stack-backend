@@ -19,6 +19,7 @@ from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
+from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account_id):
@@ -133,9 +134,12 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
     layer_at_geoserver = sync_lulc_to_geoserver(
         final_output_filename_array_new,
         l1_asset_new,
+        state,
+        district,
         block,
         layer_ids,
     )
+
     return layer_at_geoserver
 
 
@@ -159,6 +163,8 @@ def sync_lulc_to_gcs(
 def sync_lulc_to_geoserver(
     final_output_filename_array_new,
     l1_asset_new,
+    state_name,
+    district_name,
     block_name,
     layer_ids,
 ):
@@ -188,6 +194,19 @@ def sync_lulc_to_geoserver(
             )
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
+
+                layer_STAC_generated = False
+                layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                    state=state_name,
+                    district=district_name,
+                    block=block_name,
+                    layer_name='land_use_land_cover_raster',
+                    start_year=name_arr[1],
+                    end_year=(name_arr[1]+1)
+                    )
+                update_layer_sync_status(layer_id=layer_ids[i],
+                                         is_stac_specs_generated=layer_STAC_generated)
+
                 print("geoserver flag is updated")
                 layer_at_geoserver = True
     return layer_at_geoserver
