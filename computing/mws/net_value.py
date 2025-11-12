@@ -47,7 +47,7 @@ def net_value(
             db_end_date = layer_obj.misc["end_date"]
             db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
 
-        if not db_end_date or db_end_date < end_date:
+        if not db_end_date or db_end_date.year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
             return None, asset_id
