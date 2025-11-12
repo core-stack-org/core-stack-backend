@@ -1147,9 +1147,9 @@ def generate_vector_item(state,
                          layer_desc_csv_path,
                          column_desc_csv_path,
                          ):    
-    # print(layer_map_csv_path)
-    # print(layer_desc_csv_path)
-    # print(column_desc_csv_path)
+    print(layer_map_csv_path)
+    print(layer_desc_csv_path)
+    print(column_desc_csv_path)
     #1. read layer description
     layer_description = read_layer_description(filepath=layer_desc_csv_path,
                                                layer_name=layer_name)
@@ -1164,15 +1164,15 @@ def generate_vector_item(state,
                         #    end_year=end_year
                            )
     
-    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    # print(f"geoserver_layer_name={geoserver_layer_name}")
-    # print(f"style file url = {style_file_url}")
+    print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    print(f"geoserver_layer_name={geoserver_layer_name}")
+    print(f"style file url = {style_file_url}")
 
     #3. generate geoserver url
     geoserver_url = generate_vector_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
-    # print(f"geoserver url={geoserver_url}")
+    print(f"geoserver url={geoserver_url}")
     
     #4. create vector item
     layer_title = layer_display_name
@@ -1186,6 +1186,7 @@ def generate_vector_item(state,
                                                     layer_description = layer_description,
                                                     column_desc_csv_path = column_desc_csv_path
                                                     )
+    print("vector item generated")
     
     #5. add vector data asset
     vector_item = add_vector_data_asset(vector_item,
@@ -1318,7 +1319,7 @@ def generate_vector_stac(state,
                          layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
                          column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'):
     # print(layer_map_csv_path)
-
+    print("triggering vector stac pipeline")
     vector_item = generate_vector_item(state,
                                         district,
                                         block,
@@ -1353,7 +1354,7 @@ def generate_raster_stac(state,
                          layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
                          start_year='',
                          end_year=''):
-    
+    print("triggering raster stac pipeline")
     raster_item = generate_raster_item(state,
                                        district,
                                        block,
