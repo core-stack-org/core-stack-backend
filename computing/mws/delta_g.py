@@ -59,7 +59,7 @@ def delta_g(
                 existing_end_date, "%Y-%m-%d"
             )
             end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-            last_date = str(end_date.date())
+            last_date = str(existing_end_date.date())
 
             if existing_end_date.year < end_date.year:
                 new_start_date = existing_end_date
