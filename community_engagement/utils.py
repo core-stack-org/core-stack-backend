@@ -2,7 +2,7 @@ from .models import Media_type, Community, Location, LocationLevel
 from geoadmin.models import State, District, Block
 from django.db.models import Q
 from django.utils.timezone import now, localtime
-
+from projects.models import Project
 
 
 def get_media_type(param):
@@ -20,10 +20,12 @@ def get_media_type(param):
 
 def get_community_summary_data(community_id):
     community = Community.objects.get(id=community_id)
-    return {"community_id": community_id,
-            "name": str(community.project.name),
-            "description": str(community.project.description),
-            "organization": str(community.project.organization)}
+    return {
+        "community_id": community_id,
+        "name": str(community.project.name),
+        "description": str(community.project.description),
+        "organization": str(community.project.organization),
+    }
 
 
 def get_communities(state_name, district_name, block_name):
@@ -38,16 +40,28 @@ def get_communities(state_name, district_name, block_name):
     elif block_obj and not state_obj and not district_obj:
         communities = Community.objects.filter(locations__block=block_obj)
     elif state_obj and district_obj and not block_obj:
-        communities1 = Community.objects.filter(locations__state=state_obj, locations__district=district_obj).distinct()
-        communities2 = Community.objects.filter(locations__state=state_obj, locations__district__isnull=True, locations__block__isnull=True).distinct()
+        communities1 = Community.objects.filter(
+            locations__state=state_obj, locations__district=district_obj
+        ).distinct()
+        communities2 = Community.objects.filter(
+            locations__state=state_obj,
+            locations__district__isnull=True,
+            locations__block__isnull=True,
+        ).distinct()
         communities = communities1 | communities2
     elif state_obj and block_obj and not district_obj:
         communities = Community.objects.filter(locations__state=state_obj)
     elif district_obj and block_obj and not state_obj:
         communities = Community.objects.filter(locations__district=district_obj)
     elif block_obj and district_obj and state_obj:
-        communities1 = Community.objects.filter(locations__state=state_obj, locations__district=district_obj).distinct()
-        communities2 = Community.objects.filter(locations__state=state_obj, locations__district__isnull=True, locations__block__isnull=True).distinct()
+        communities1 = Community.objects.filter(
+            locations__state=state_obj, locations__district=district_obj
+        ).distinct()
+        communities2 = Community.objects.filter(
+            locations__state=state_obj,
+            locations__district__isnull=True,
+            locations__block__isnull=True,
+        ).distinct()
         communities = communities1 | communities2
     else:
         # communities = Community.objects.all()
@@ -57,7 +71,21 @@ def get_communities(state_name, district_name, block_name):
     return data
 
 
-def create_community_for_project(project):
+def create_community_for_project(project_data):
+    project = Project.objects.create(
+        name=project_data.get("name"),
+        description=project_data.get("description"),
+        organization_id=project_data.get("organization_id"),
+        state_id=project_data.get("state_id"),
+        district_id=project_data.get("district_id"),
+        block_id=project_data.get("block_id"),
+        created_by_id=project_data.get("created_by"),
+        updated_by_id=project_data.get("updated_by"),
+        app_type=project_data.get("app_type", "community_engagement"),
+        enabled=True,
+    )
+    print(f"Project created: {project.name}")
+
     if project.block_id:
         level = LocationLevel.BLOCK
     elif project.district_id:
@@ -73,9 +101,12 @@ def create_community_for_project(project):
         district_id=project.district_id,
         block_id=project.block_id,
     )
+    print(f"Location {'created' if created else 'found'}: {location}")
 
     community = Community.objects.create(project=project)
     community.locations.add(location)
+    print(f"Community created: {community.id}")
+
     return community
 
 
