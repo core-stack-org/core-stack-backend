@@ -16,7 +16,7 @@ from utilities.gee_utils import (
 )
 from nrm_app.celery import app
 from computing.models import *
-
+from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def vectorise_lulc(self, state, district, block, start_year, end_year, gee_account_id):
@@ -219,6 +219,19 @@ def sync_to_db_and_geoserver(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+
+            #stac specs generation block
+            layer_STAC_generated = False
+            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                state=state,
+                district=district,
+                block=block,
+                layer_name='land_use_land_cover_vector')
+            
+            update_layer_sync_status(layer_id=layer_id,
+                                 is_stac_specs_generated=layer_STAC_generated)
+            
             layer_at_geoserver = True
+            
         return layer_at_geoserver
     return False
