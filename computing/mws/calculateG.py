@@ -1,6 +1,5 @@
 import ee
 import datetime
-from dateutil.relativedelta import relativedelta
 import json
 import os
 
@@ -13,7 +12,6 @@ from utilities.gee_utils import (
     check_task_status,
 )
 import geopandas as gpd
-from computing.models import Layer, Dataset
 
 
 def calculate_g(
