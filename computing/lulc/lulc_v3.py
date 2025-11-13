@@ -195,17 +195,17 @@ def sync_lulc_to_geoserver(
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
 
-                layer_STAC_generated = False
-                layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                    state=state_name,
-                    district=district_name,
-                    block=block_name,
-                    layer_name='land_use_land_cover_raster',
-                    start_year=name_arr[1],
-                    end_year=(name_arr[1]+1)
-                    )
-                update_layer_sync_status(layer_id=layer_ids[i],
-                                         is_stac_specs_generated=layer_STAC_generated)
+                if (workspace == "LULC_level_3"):
+                    layer_STAC_generated = False
+                    layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                        state=state_name,
+                        district=district_name,
+                        block=block_name,
+                        layer_name='land_use_land_cover_raster',
+                        start_year=name_arr[1],
+                        end_year=(name_arr[1]+1))
+                    update_layer_sync_status(layer_id=layer_ids[i],
+                                            is_stac_specs_generated=layer_STAC_generated)
 
                 print("geoserver flag is updated")
                 layer_at_geoserver = True
