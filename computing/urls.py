@@ -112,23 +112,8 @@ urlpatterns = [
     ),
     path("generate_lcw_data/", api.generate_lcw_to_gee, name="generate_lcw_to_gee"),
     path(
-        "generate_agroecological_data/",
-        api.generate_agroecological_to_gee,
-        name="generate_agroecological_data",
-    ),
-    path(
-        "generate_factory_csr_data/",
-        api.generate_factory_csr_to_gee,
-        name="generate_factory_csr_data",
-    ),
-    path(
-        "generate_green_credit_data/",
-        api.generate_green_credit_to_gee,
-        name="generate_green_credit_data",
-    ),
-    path(
-        "generate_mining_data/",
-        api.generate_mining_to_gee,
-        name="generate_mining_data",
+        "generate_landslide_layer/",
+        api.generate_landslide_layer,
+        name="generate_landslide_layer",
     ),
 ]

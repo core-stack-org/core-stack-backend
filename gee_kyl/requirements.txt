@@ -1,0 +1,6 @@
+earthengine-api>=0.1.346
+numpy
+requests
+geopandas
+rasterio
+shapely

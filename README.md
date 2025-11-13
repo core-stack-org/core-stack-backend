@@ -75,7 +75,8 @@ chmod +x install.sh
 | 27 | Water structure planning | Lithology                       | /computing/clart/lithology.py                                         |
 | 28 | Water structure planning | Drainage lines                  | /computing/misc/drainage_lines.py                                     |
 | 29 | Water structure planning | Stream order raster             | /computing/misc/stream_order.py                                       |
-| 30 | Water structure planning | CLART                           | /computing/clart/clart.py                                             |                                                                                                                    |
+| 30 | Water structure planning | CLART                           | /computing/clart/clart.py                                             |
+| 31 | Disaster Risk            | Landslide Susceptibility        | /computing/landslide/landslide_vector.py                              |
 
 ### Integrating custom pipelines on CoREStack 
 We have prepared a [detailed guide](https://docs.google.com/document/d/1lfx2hJKndmzVp55ZHIIFYqRTz-8fZCWc9QikUDQpTN0/edit?usp=sharing) on how to integrate custom pipelines on the CoREStack backend. 
