@@ -15,7 +15,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
-
+from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def tree_health_overall_change_raster(self, state, district, block, gee_account_id):
@@ -136,9 +136,21 @@ def tree_health_overall_change_raster(self, state, district, block, gee_account_
         res = sync_raster_gcs_to_geoserver(
             "tree_overall_ch", layer_name, layer_name, "tree_overall_ch_style"
         )
+
+        layer_STAC_generated = False
+        layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+            state=state,
+            district=district,
+            block=block,
+            layer_name='tree_cover_change_raster')
+        
+        # update_layer_sync_status(layer_id=layer_id,
+        #                          is_stac_specs_generated=layer_STAC_generated)
+
         # if res and layer_id:
         #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         #     print("sync to geoserver flag is updated")
+        
         if res:
             return True
     return False
