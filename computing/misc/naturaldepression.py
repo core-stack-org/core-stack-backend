@@ -80,7 +80,10 @@ def natural_depression_raster_generation(
             )
             make_asset_public(raster_asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "natural_depression", description + "_raster", description + "_raster"
+                "natural_depression",
+                description + "_raster",
+                description + "_raster",
+                style_name="natural_depression",
             )
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")

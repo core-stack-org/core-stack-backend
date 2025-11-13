@@ -76,10 +76,10 @@ def catchment_area_raster_generation(state, district, block, description, roi, r
             )
             make_asset_public(raster_asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "catchment_area",
+                "catchment_area_singleflow",
                 description + "_raster",
                 description + "_raster",
-                "stream_order",
+                "catchment_area_singleflow",
             )
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")

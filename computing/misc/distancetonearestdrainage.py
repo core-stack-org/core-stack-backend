@@ -26,7 +26,7 @@ def generate_distance_to_nearest_drainage_line(
 ):
     ee_initialize(gee_account_id)
     description = (
-        "distance_to_drainage_line"
+        "distance_to_drainage_line_"
         + valid_gee_text(district)
         + "_"
         + valid_gee_text(block)
@@ -90,9 +90,10 @@ def distance_to_drainage_line_raster_generation(
             )
             make_asset_public(raster_asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "distace_to_drainage_line",
+                "distance_nearest_upstream_DL",
                 description + "_raster",
                 description + "_raster",
+                style_name="distance_nearest_upstream_DL",
             )
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")
