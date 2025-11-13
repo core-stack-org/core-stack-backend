@@ -29,7 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("SECRET_KEY")
-
+VERIFY_TOKEN = env("VERIFY_TOKEN")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
@@ -38,6 +38,11 @@ DEBUG = env("DEBUG")
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
 
+
+# Whatsapp Bot
+
+TWILIO_SID = env("TWILIO_SID")
+TWILIO_TOKEN = env("TWILIO_AUTH_TOKEN")
 # MARK: ODK Sync Creds
 ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
 ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
@@ -59,6 +64,8 @@ ALLOWED_HOSTS = [
     "0.0.0.0",
     "api-doc.core-stack.org",
     "0cb52a0325c7.ngrok-free.app",
+    "unrecognizably-deft-aimee.ngrok-free.dev",
+    "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
 
 # MARK: Django Apps
@@ -114,6 +121,8 @@ else:
         "http://127.0.0.1",
         "http://localhost:3000",
         "http://localhost:3001",
+        "https://unrecognizably-deft-aimee.ngrok-free.dev",
+        "unrecognizably-deft-aimee.ngrok-free.dev",
     ]
 
 
