@@ -370,6 +370,8 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
             layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_cluster",
             asset_id=asset_id,
             dataset_name="Terrain Vector",
+            algorithm="FABDEM",
+            algorithm_version="2.0",
         )
         make_asset_public(asset_id)
     return layer_id

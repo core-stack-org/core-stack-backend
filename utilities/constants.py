@@ -167,6 +167,9 @@ GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 
+GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
+
+
 GEE_PATHS = {
     "MWS": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/mws/",

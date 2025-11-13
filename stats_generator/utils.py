@@ -10,7 +10,8 @@ from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
 import numpy as np
 from shapely.geometry import Point, shape
 from .models import LayerInfo
-from shapely.geometry.base import BaseGeometry
+
+# from shapely.geometry.base import BaseGeometry
 
 
 def fetch_layers_for_excel_generation():
@@ -104,12 +105,15 @@ def get_vector_layer_geoserver(state, district, block):
                     start_year,
                     end_year,
                 )
-                fetch_village_asset_count(
-                    state, district, block, writer, xlsx_file, start_year, end_year
-                )
-                create_excel_mws_inters_villages(
-                    mws_geojson_datas, xlsx_file, writer, district, block
-                )
+                try:
+                    fetch_village_asset_count(
+                        state, district, block, writer, xlsx_file, start_year, end_year
+                    )
+                except Exception as e:
+                    print("Exception as e", str(e))
+                # create_excel_mws_inters_villages(
+                #     mws_geojson_datas, xlsx_file, writer, district, block
+                # )
                 # create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
 
             elif workspace == "crop_intensity":
@@ -126,6 +130,12 @@ def get_vector_layer_geoserver(state, district, block):
             ):
                 parsed_data_annual_mws = parse_geojson_annual_mws(geojson_data)
                 create_excel_annual_mws(parsed_data_annual_mws, xlsx_file, writer)
+                try:
+                    create_excel_mws_inters_villages(
+                        geojson_data, xlsx_file, writer, district, block
+                    )
+                except Exception as e:
+                    print("Exception", str(e))
             elif (
                 workspace == "mws_layers"
                 and layer_name == f"deltaG_fortnight_{district}_{block}"
@@ -191,10 +201,124 @@ def get_vector_layer_geoserver(state, district, block):
                 create_excel_for_aquifer(geojson_data, xlsx_file, writer)
             elif workspace == "soge":
                 create_excel_for_soge(geojson_data, xlsx_file, writer)
+            elif workspace == "lcw":
+                create_excel_for_lcw(geojson_data, writer)
+            elif workspace == "agroecological":
+                create_excel_for_agroecological(geojson_data, writer)
+            elif workspace == "factory_csr":
+                create_excel_for_factory_csr(geojson_data, writer)
+            elif workspace == "green_credit":
+                create_excel_for_green_credit(geojson_data, writer)
+            elif workspace == "mining":
+                create_excel_for_mining(geojson_data, writer)
 
             results.append({"layer": layer_name, "status": "success"})
 
     return results
+
+
+def create_excel_for_mining(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "division": properties["company_na"],
+            "proposal": properties["proposal"],
+            "sector_moefcc": properties["sector_moe"],
+            "village": properties["village"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="mining", index=False)
+    print("Excel file created for mining")
+
+
+def create_excel_for_green_credit(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "division": properties["division"],
+            "parcel_id": properties["parcel_id"],
+            "land_info": properties["land_info"],
+            "kml_url": properties["kml_url"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="green_credit", index=False)
+    print("Excel file created for green_credit")
+
+
+def create_excel_for_factory_csr(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "Company_Name": properties["COMPANY NA"],
+            "ADDRESS": properties["ADDRESS"],
+            "LOCATION T": properties["LOCATION T"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="factory_csr", index=False)
+    print("Excel file created for factory_csr")
+
+
+def create_excel_for_agroecological(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "organization_name": properties["organization_name"],
+            "organization_type": properties["organization_type"],
+            "created_at": properties["created_at"],
+            "contact_person": properties["contact_person"],
+            "email": properties["email"],
+            "domains": properties["domains"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="agroecological", index=False)
+    print("Excel file created for agroecological")
+
+
+def create_excel_for_lcw(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "title_of_conflict": properties["Title of Conflict"],
+            "link_to_conflict": properties["Link to conflict"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="lcw_conflict", index=False)
+    print("Excel file created for lcw_conflict")
 
 
 def create_excel_for_soge(data, xlsx_file, writer):
@@ -920,7 +1044,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
         parts = uid.split("_")
         num_uid_parts_is = [
-            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            f"{parts[i]}_{parts[i+1]}" for i in range(0, len(parts) - 1, 2)
         ]
         if len(parts) % 2 == 1:  # Check for an unpaired last part
             num_uid_parts_is.append(parts[-1])
@@ -932,7 +1056,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             row = {"UID": num_uid_part}
 
             for year in years:
-                short_year = f"{str(year)[-2:]}-{str(year + 1)[-2:]}"
+                short_year = f"{str(year)[-2:]}-{str(year+1)[-2:]}"
 
                 # Construct keys dynamically using the shortened year format
                 total_area_key = f"area_{short_year}"
@@ -947,16 +1071,16 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
                 zaid_percentage = properties.get(zaid_key, 0)
 
                 # Calculate areas
-                row[f"total_area_in_ha_{year}-{year + 1}"] = total_area / len(
+                row[f"total_area_in_ha_{year}-{year+1}"] = total_area / len(
                     num_uid_parts_is
                 )
-                row[f"kharif_area_in_ha_{year}-{year + 1}"] = calculate_area(
+                row[f"kharif_area_in_ha_{year}-{year+1}"] = calculate_area(
                     total_area, kharif_percentage
                 ) / len(num_uid_parts_is)
-                row[f"rabi_area_in_ha_{year}-{year + 1}"] = calculate_area(
+                row[f"rabi_area_in_ha_{year}-{year+1}"] = calculate_area(
                     total_area, rabi_percentage
                 ) / len(num_uid_parts_is)
-                row[f"zaid_area_in_ha_{year}-{year + 1}"] = calculate_area(
+                row[f"zaid_area_in_ha_{year}-{year+1}"] = calculate_area(
                     total_area, zaid_percentage
                 ) / len(num_uid_parts_is)
 
