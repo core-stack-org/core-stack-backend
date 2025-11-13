@@ -196,7 +196,7 @@ def sync_lulc_to_geoserver(
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
 
                 layer_STAC_generated = False
-                layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
                     state=state_name,
                     district=district_name,
                     block=block_name,
