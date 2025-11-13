@@ -44,13 +44,11 @@ import sys
 sys.path.append('..')
 from computing.STAC_specs import constants
 
-# %%
-# !pip install fsspec s3fs
 from nrm_app.settings import S3_ACCESS_KEY, S3_SECRET_KEY
-
 aws_creds = {}
 aws_creds['aws_access_key_id'] = S3_ACCESS_KEY
 aws_creds['aws_secret_access_key'] = S3_SECRET_KEY
+
 
 # %%
 GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
@@ -80,6 +78,7 @@ STAC_FILES_DIR = os.path.join(
     LOCAL_DATA_DIR,
     'CorestackCatalogs_exception_handling' #test folder
 )
+#'CorestackCatalogs_exception_handling'
 
 # %%
 LAYER_DESC_GITHUB_URL = constants.LAYER_DESC_GITHUB_URL
@@ -95,6 +94,9 @@ S3_STAC_BUCKET_NAME = constants.S3_STAC_BUCKET_NAME
 
 # %%
 layer_STAC_generated = False #output flag
+
+# %% [markdown]
+# ### Raster flow
 
 # %%
 def read_layer_description(filepath,
@@ -540,9 +542,6 @@ def generate_raster_item(state,
     )
 
     return raster_item
-
-# %%
-# fs = fsspec.filesystem('s3') 
 
 # %%
 def update_STAC_files(state,
@@ -1147,9 +1146,9 @@ def generate_vector_item(state,
                          layer_desc_csv_path,
                          column_desc_csv_path,
                          ):    
-    print(layer_map_csv_path)
-    print(layer_desc_csv_path)
-    print(column_desc_csv_path)
+    # print(layer_map_csv_path)
+    # print(layer_desc_csv_path)
+    # print(column_desc_csv_path)
     #1. read layer description
     layer_description = read_layer_description(filepath=layer_desc_csv_path,
                                                layer_name=layer_name)
@@ -1164,15 +1163,15 @@ def generate_vector_item(state,
                         #    end_year=end_year
                            )
     
-    print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    print(f"geoserver_layer_name={geoserver_layer_name}")
-    print(f"style file url = {style_file_url}")
+    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    # print(f"geoserver_layer_name={geoserver_layer_name}")
+    # print(f"style file url = {style_file_url}")
 
     #3. generate geoserver url
     geoserver_url = generate_vector_url(workspace=geoserver_workspace_name,
                                         layer_name=geoserver_layer_name,
                                         geoserver_base_url=GEOSERVER_BASE_URL)
-    print(f"geoserver url={geoserver_url}")
+    # print(f"geoserver url={geoserver_url}")
     
     #4. create vector item
     layer_title = layer_display_name
@@ -1186,7 +1185,6 @@ def generate_vector_item(state,
                                                     layer_description = layer_description,
                                                     column_desc_csv_path = column_desc_csv_path
                                                     )
-    print("vector item generated")
     
     #5. add vector data asset
     vector_item = add_vector_data_asset(vector_item,
@@ -1317,9 +1315,12 @@ def generate_vector_stac(state,
                          layer_name,
                          layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
                          layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
-                         column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'):
-    # print(layer_map_csv_path)
+                         column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv',
+                         upload_to_s3=True
+                         ):
     print("triggering vector stac pipeline")
+    # print(layer_map_csv_path)
+
     vector_item = generate_vector_item(state,
                                         district,
                                         block,
@@ -1333,15 +1334,16 @@ def generate_vector_stac(state,
                                              block,
                                              STAC_item=vector_item)
     
-    upload_folder_to_s3(
-    aws_creds=aws_creds,
-    folderpath=STAC_FILES_DIR,
-    s3_bucket=S3_STAC_BUCKET_NAME)
+    if (upload_to_s3):
+        upload_folder_to_s3(
+        aws_creds=aws_creds,
+        folderpath=STAC_FILES_DIR,
+        s3_bucket=S3_STAC_BUCKET_NAME)
 
-    upload_folder_to_s3(
-    aws_creds=aws_creds,
-    folderpath=THUMBNAIL_DIR,
-    s3_bucket=S3_STAC_BUCKET_NAME)
+        upload_folder_to_s3(
+        aws_creds=aws_creds,
+        folderpath=THUMBNAIL_DIR,
+        s3_bucket=S3_STAC_BUCKET_NAME)
     
     return layer_STAC_generated
 
@@ -1353,8 +1355,11 @@ def generate_raster_stac(state,
                          layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
                          layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
                          start_year='',
-                         end_year=''):
+                         end_year='',
+                         upload_to_s3=True
+                         ):
     print("triggering raster stac pipeline")
+    
     raster_item = generate_raster_item(state,
                                        district,
                                        block,
@@ -1369,16 +1374,17 @@ def generate_raster_stac(state,
                                              block,
                                              STAC_item=raster_item)
     
-    upload_folder_to_s3(
-    aws_creds=aws_creds,
-    folderpath=STAC_FILES_DIR,
-    s3_bucket=S3_STAC_BUCKET_NAME)
+    if (upload_to_s3):
+        upload_folder_to_s3(
+        aws_creds=aws_creds,
+        folderpath=STAC_FILES_DIR,
+        s3_bucket=S3_STAC_BUCKET_NAME)
 
-    upload_folder_to_s3(
-    aws_creds=aws_creds,
-    folderpath=THUMBNAIL_DIR,
-    s3_bucket=S3_STAC_BUCKET_NAME)
-    
+        upload_folder_to_s3(
+        aws_creds=aws_creds,
+        folderpath=THUMBNAIL_DIR,
+        s3_bucket=S3_STAC_BUCKET_NAME)
+        
     return layer_STAC_generated   
 
 
@@ -1415,6 +1421,7 @@ def generate_raster_stac(state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='drainage_lines_vector',
+#                      upload_to_s3=True
 #                     #  layer_map_csv_path='computing/STAC_specs/data/input/metadata/layer_mapping.csv',
 #                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                     #  column_desc_csv_path='computing/STAC_specs/data/input/metadata/vector_column_descriptions.csv'
@@ -1439,19 +1446,4 @@ def generate_raster_stac(state,
 #                     #  layer_desc_csv_path='computing/STAC_specs/data/input/metadata/layer_descriptions.csv',
 #                      start_year='2021'
 #                      )
-
-# %%
-# upload_folder_to_s3(
-#     aws_creds=aws_creds,
-#     folderpath='computing/STAC_specs/data/CorestackCatalogs_exception_handling',
-#     s3_bucket='spatio-temporal-asset-catalog'
-# )
-
-# %%
-# upload_folder_to_s3(
-#     aws_creds=aws_creds,
-#     folderpath='computing/STAC_specs/data/STAC_output_exception_handling',
-#     s3_bucket='spatio-temporal-asset-catalog'
-# )
-
 
