@@ -21,11 +21,16 @@
     <link href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.css" rel="stylesheet">
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
             color: #333;
+            overflow-x: hidden;
         }
         .container {
             width: 90%;
@@ -57,12 +62,18 @@
             width: 100%;
             margin: 20px 0;
             border: 1px solid #ddd;
+            max-width: 100%;
         }
         .chart-container {
             position: relative;
             height: 300px;
-            width: 70vw;
+            width: 100%;
+            max-width: 100%;
             margin: 20px 0 10px 0;
+        }
+        .chart-container canvas {
+            max-width: 100% !important;
+            height: auto !important;
         }
         .legend {
             display: flex;
@@ -91,14 +102,22 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 0.85em;
+            table-layout: fixed;
         }
         th, td {
             border: 1px solid black;
-            padding: 8px;
+            padding: 6px;
             text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         th {
             background-color: #f2f2f2;
+            font-size: 0.9em;
+        }
+        .village-section {
+            overflow-x: auto;
         }
         .legend-note {
             color: #6c757d;       /* gray */
@@ -150,6 +169,72 @@
         }
 
         .doc-button:hover { background-color: #005a9e; }
+
+        /* Land Conflict Styles */
+        .conflict-list {
+            margin-top: 20px;
+        }
+
+        .conflict-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #e74c3c;
+            border-radius: 4px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .conflict-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .conflict-number {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .conflict-content {
+            flex: 1;
+        }
+
+        .conflict-title {
+            margin: 0 0 8px 0;
+            font-size: 1em;
+            color: #2c3e50;
+            line-height: 1.4;
+        }
+
+        .conflict-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #3498db;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .conflict-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+
+        .conflict-link svg {
+            width: 12px;
+            height: 12px;
+        }
         
         @media print { 
             .doc-button { display: none; }   
@@ -169,21 +254,27 @@
 
        /* Print-specific styles */
        @media print {
+        * {
+            box-sizing: border-box;
+        }
+        
         html, body {
           width: 100%;
           height: 100%;
           margin: 0;
           padding: 0;
+          overflow: visible;
         }
         #map {
-          width: 100vw;
-          height: 100vh;
+          width: 100%;
+          height: auto;
         }
 
         .container {
-            width: 100vw;
-            max-width: none;
-            padding: 0;
+            width: 100%;
+            max-width: 100%;
+            padding: 10px;
+            margin: 0;
         }
 
         header {
@@ -196,7 +287,25 @@
 
         .chart-container {
             height: 250px !important;
-            width: 80vw !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 10px 0 !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            overflow: visible;
+        }
+
+        .map {
+            max-width: 100% !important;
+            width: 100% !important;
+            height: 400px !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .map-group {
+            width: 100% !important;
+            max-width: 100% !important;
             page-break-inside: avoid;
             break-inside: avoid;
             margin-top: 1em;
@@ -211,13 +320,59 @@
 
         /* Ensure charts render properly */
         canvas {
+            max-width: 100% !important;
             height: auto !important;
-            max-width: auto !important;
+        }
+
+        table {
+            width: 100% !important;
+            page-break-inside: auto;
+            font-size: 0.7em !important;
+            table-layout: fixed !important;
+        }
+
+        th, td {
+            padding: 4px !important;
+            font-size: 0.75em !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+        }
+
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+
+        thead {
+            display: table-header-group;
+        }
+
+        tfoot {
+            display: table-footer-group;
         }
 
 
+      /* Print styles for conflicts */
+          .conflict-item {
+            background-color: #f8f9fa !important;
+            border-left: 4px solid #e74c3c !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            page-break-inside: avoid;
+        }
+        
+        .conflict-number {
+            background-color: #e74c3c !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        
+        .conflict-link {
+            color: #3498db !important;
+        }
       }
-      
+
     </style>
 </head>
 <body>
@@ -308,7 +463,7 @@
             </div>
 
             <p class="legend-note">
-                Note: We used NASA’s SRTM Digital Elevation Model at 30m resolution to generate landform classification.
+                Note: We used NASA's SRTM Digital Elevation Model at 30m resolution to generate landform classification.
             </p>
         </section>
 
@@ -340,74 +495,76 @@
             <p class="legend-note">Note: Data remotely sensed from satellites including LandSat-7, LandSat-8, Sentinel-2, Sentinel-1, MODIS and Dynamic World.</p>
         </section>
 
-        {% if land_degrad %}
+        {% if land_degrad or tree_degrad %}
             <section class="section">
-                <h4>Degradation of land</h4>
-                <p>{{land_degrad}}</p>
-
-                <div class="map-group">
-                    <div id="degradLandMap" class="map"></div>
-                    <div id="compMap3" class="map"></div>
-                </div>
-
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Crops - Crops</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Crops - Built Up</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Crops - Barren</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Crops - Shrubs and Scrubs</span>
-                    </div>
-                </div>
-
-                <p class="legend-note">Note: The degradation in cropping is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from farmland to barren land, shrubs, human settlements (built-up) are computed</p>
-            </section>
-        {% endif %}
-
-        {% if tree_degrad %}
-            <section class="section">
-                <h4>Reduction in tree cover</h4>
-                <p>{{tree_degrad}}</p>
-
-                <div class="map-group">
-                    <div id="treeReduceMap" class="map"></div>
-                    <div id="compMap4" class="map"></div>
-                </div>
+                <h3>Degradation</h3>
                 
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #73bb53;"></div>
-                        <span>Trees - Trees</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Trees - Built Up</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Trees - Crops</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Trees - Barren</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Trees - Shrubs and Scrubs</span>
-                    </div>
-                </div>
-                <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
+                {% if land_degrad %}
+                    <h4>Degradation of land</h4>
+                    <p>{{land_degrad}}</p>
 
-                <p>{{restore_desc}}</p>
+                    <div class="map-group">
+                        <div id="degradLandMap" class="map"></div>
+                        <div id="compMap3" class="map"></div>
+                    </div>
+
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #eee05d;"></div>
+                            <span>Crops - Crops</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ff0000;"></div>
+                            <span>Crops - Built Up</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                            <span>Crops - Barren</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                            <span>Crops - Shrubs and Scrubs</span>
+                        </div>
+                    </div>
+
+                    <p class="legend-note">Note: The degradation in cropping is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from farmland to barren land, shrubs, human settlements (built-up) are computed</p>
+                {% endif %}
+
+                {% if tree_degrad %}
+                    <h4>Reduction in Tree-Cover</h4>
+                    <p>{{tree_degrad}}</p>
+
+                    <div class="map-group">
+                        <div id="treeReduceMap" class="map"></div>
+                        <div id="compMap4" class="map"></div>
+                    </div>
+                    
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #73bb53;"></div>
+                            <span>Trees - Trees</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ff0000;"></div>
+                            <span>Trees - Built Up</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #eee05d;"></div>
+                            <span>Trees - Crops</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                            <span>Trees - Barren</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                            <span>Trees - Shrubs and Scrubs</span>
+                        </div>
+                    </div>
+                    <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are computed.</p>
+
+                    <p>{{restore_desc}}</p>
+                {% endif %}
             </section>
         {% endif %}
 
@@ -443,8 +600,35 @@
             </section>
         {% endif %}
 
+        {% if lcw_desc %}
         <section class="section">
-            <h4>Cropping Intensity</h4>
+            <h3>Land Conflicts and Industrialization</h3>
+            <h4>Land Conflicts</h4>
+            <p>The following land conflict{{ lcw_desc|length|pluralize }} {{ lcw_desc|length|pluralize:"has,have" }} been observed in this micro watershed:</p>
+            
+            <div class="conflict-list">
+                {% for conflict in lcw_desc %}
+                <div class="conflict-item">
+                    <div class="conflict-number">{{ forloop.counter }}</div>
+                    <div class="conflict-content">
+                        <h4 class="conflict-title">{{ conflict.title }}</h4>
+                        <a href="{{ conflict.link }}" target="_blank" class="conflict-link">
+                            View Details
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <section class="section">
+            <h3>Cropping Intensity</h3>
             <p>{{inten_desc1}}</p>
             <p>{{inten_desc2}}</p>
 
@@ -452,11 +636,11 @@
                 <canvas id="barChart-intensity"></canvas>
             </div>
 
-            <p class="legend-note">Note: We use annual land use land cover (LULC), to identify areas under single cropping, double cropping and triple cropping using pixels which are classified as single kharif, single non-kharif, double and triple classes of LULC classifier to determine cropping intensity.</p>
+            <p class="legend-note">Note: We use annual land use land cover (LULC), to identify areas under single cropping, double cropping and triple cropping using pixels which are classified as single kharif, single non-kharif, double and triple classes of LULC classifier to determine cropping intensity.  The data used is from {{year_range_text}}.</p>
         </section>
 
         <section class="section">
-            <h4>Average percentage of double cropped area</h4>
+            <h3>Average percentage of double cropped area</h3>
             <p>{{double_crop_des}}</p>
             
             <div class="map-group">
@@ -490,12 +674,12 @@
                 </div>
             </div>
             <p class="legend-note">
-                Note: The Resolution of LULC image is 10 meter.
+                Note: The Resolution of LULC image is 10 meter. The data used is from {{year_range_text}}.
             </p>
         </section>
 
         <section class="section">
-            <h4>Surface water bodies</h4>
+            <h3>Surface Water Availability</h3>
             <p>{{swb_desc}}</p>
 
             <p>{{trend_desc}}</p>
@@ -507,6 +691,21 @@
             </div>
 
             <div id="swbMap" class="map"></div>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ADD8E6;"></div>
+                    <span>Kharif</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #6495ED;"></div>
+                    <span>Kharif and Rabi</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #0000FF;"></div>
+                    <span>Kharif, Rabi, Zaid</span>
+                </div>
+            </div>
 
             <p class="legend-note">
                 Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif season and Dynamic World to detect water pixels in Rabi and Zaid seasons.
@@ -516,7 +715,7 @@
         </section>
 
         <section class="section">
-            <h4>Water Balance</h4>
+            <h3>Water Balance</h3>
             <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is predominantly through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
 
             <p>{{wb_desc}}</p>
@@ -528,7 +727,7 @@
                 <canvas id="lineChart-water"></canvas>
             </div>
             <p class="legend-note">
-                Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP) dataset available on Google Earth Engine’s data catalogue. GSMaP provides a global precipitation in mm/hr at spatial resolution of approximately 11km.
+                Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP) dataset available on Google Earth Engine's data catalogue. GSMaP provides a global precipitation in mm/hr at spatial resolution of approximately 11km.
                 Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m resolution). For further information on the computation, refer our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a>.
             </p>
             <div class="chart-container">
@@ -544,7 +743,7 @@
 
         {% if soge_desc %}
         <section class="section">
-            <h4>State of groundwater extraction</h4>
+            <h3>State of groundwater extraction</h3>
 
             <p>The state of groundwater extraction refers to the current level or intensity at which groundwater is being withdrawn from aquifers compared to its natural replenishment rate. Based on this ratio, agencies like the Central Ground Water Board (CGWB) in India classify areas into categories indicating the extent of extraction.</p>
             
@@ -578,7 +777,7 @@
         {% endif %}
 
         <section class="section">
-            <h4>Drought Analysis</h4>
+            <h3>Drought Analysis</h3>
             <p>{{drought_desc}}</p>
 
             <p>A Drought year is declared if the total number of weeks under severe intensity drought and moderate intensity drought exceed 5, which means that the rainfall deficit was more than 25% for more than 5 weeks during the monsoon of that year.</p>
@@ -601,7 +800,7 @@
         <section class="section">
             <div class="village-section">
             <h2>Village Profile</h2>
-            <p>There are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
+            <p>These are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
             <ul id="village-names"></ul>
 
             <h4>MGNREGA works</h4>
@@ -640,7 +839,6 @@
             </p>
         </div>
     </footer>
-
     <script>
 
         const baseLayer = new ol.layer.Tile({
@@ -1408,6 +1606,7 @@
         const triple = JSON.parse('{{triple|safe}}')
         const uncrop = JSON.parse('{{uncrop|safe}}')
         const cropYears = JSON.parse('{{crop_years|safe}}')
+        const precipData = JSON.parse('{{precip_data|safe}}')
 
         const barChart_cropping = new Chart(document.getElementById('barChart-intensity'), {
             type: 'bar',
@@ -1472,7 +1671,6 @@
         });
 
         // WaterBalance Graphs and descriptions
-        const precipData = JSON.parse('{{precip_data|safe}}')
         const runoffData = JSON.parse('{{runoff_data|safe}}')
         const etData = JSON.parse('{{et_data|safe}}')
         const dgData = JSON.parse('{{dg_data|safe}}')
@@ -1618,28 +1816,28 @@
         const drysp_all = JSON.parse('{{drysp_all|safe}}')
         const dg_years = JSON.parse('{{dg_years|safe}}')
 
-       const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'),{
+        const barChart_weeks = new Chart(document.getElementById('Chart-drought-weeks'),{
             type: 'bar',
             data: {
             labels: dg_years,
             datasets: [
                 {
-                label: 'Moderate Weeks',
-                data: mod_weeks,
-                backgroundColor: '#EB984E',
-                stack: 'ms',           // <-- stack group A (Moderate+Severe)
+                    label: 'Moderate Weeks',
+                    data: mod_weeks,
+                    backgroundColor: '#EB984E',
+                    stack: 'ms',           // <-- stack group A (Moderate+Severe)
                 },
                 {
-                label: 'Severe Weeks',
-                data: sev_weeks,
-                backgroundColor: '#E74C3C',
-                stack: 'ms',           // <-- same stack as Moderate
+                    label: 'Severe Weeks',
+                    data: sev_weeks,
+                    backgroundColor: '#E74C3C',
+                    stack: 'ms',           // <-- same stack as Moderate
                 },
                 {
-                label: 'Dryspell Weeks',
-                data: drysp_all,
-                backgroundColor: '#8884d8',
-                stack: 'dry',          // <-- separate stack = separate bar
+                    label: 'Dryspell Weeks',
+                    data: drysp_all,
+                    backgroundColor: '#8884d8',
+                    stack: 'dry',          // <-- separate stack = separate bar
                 },
             ],
             },

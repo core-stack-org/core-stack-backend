@@ -1,6 +1,4 @@
 from django.db import models
-from pygments.lexer import default
-
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
 

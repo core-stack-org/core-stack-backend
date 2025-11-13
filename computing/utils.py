@@ -269,11 +269,14 @@ def save_layer_info_to_db(
     asset_id,
     dataset_name,
     sync_to_geoserver=False,
-    layer_version=1.0,
+    layer_version="1.0",
+    algorithm=None,
+    algorithm_version="1.0",
     misc=None,
     is_override=False,
 ):
-    print("inside the save_layer_info_to_db function ")
+    print("inside the save_layer_info_to_db function")
+
     dataset = Dataset.objects.get(name=dataset_name)
 
     try:
@@ -287,28 +290,79 @@ def save_layer_info_to_db(
     except Exception as e:
         print("Error fetching in state district block:", e)
         return
+
     is_public = is_asset_public(asset_id)
 
-    layer_obj, created = Layer.objects.update_or_create(
-        dataset=dataset,
-        layer_name=layer_name,
-        state=state_obj,
-        district=district_obj,
-        block=block_obj,
-        layer_version=layer_version,
-        defaults={
-            "is_sync_to_geoserver": sync_to_geoserver,
-            "is_public_gee_asset": is_public,
-            "is_override": is_override,
-            "misc": misc,
-            "gee_asset_path": asset_id,
-        },
+    # Check if there’s an existing layer
+    existing_layer = (
+        Layer.objects.filter(
+            dataset=dataset,
+            layer_name=layer_name,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+        )
+        .order_by("-layer_version")
+        .first()
     )
-    if layer_obj:
-        print("found layer object and updated")
-    else:
-        print("layer object not found so, created new one")
 
+    if existing_layer:
+        if existing_layer.algorithm_version != algorithm_version:
+            # Algorithm version changed --> create new record with incremented layer_version
+            new_layer_version = str(float(existing_layer.layer_version) + 1)
+            print(
+                f"Algorithm version changed. Creating new layer version: {new_layer_version}"
+            )
+            layer_obj = Layer.objects.create(
+                dataset=dataset,
+                layer_name=layer_name,
+                state=state_obj,
+                district=district_obj,
+                block=block_obj,
+                layer_version=new_layer_version,
+                algorithm=algorithm,
+                algorithm_version=algorithm_version,
+                is_sync_to_geoserver=sync_to_geoserver,
+                is_public_gee_asset=is_public,
+                is_override=is_override,
+                misc=misc,
+                gee_asset_path=asset_id,
+            )
+        else:
+            # Algorithm version is same --> update existing layer
+            print("Algorithm version same. Updating existing layer.")
+            for field, value in {
+                "algorithm": algorithm,
+                "algorithm_version": algorithm_version,
+                "is_sync_to_geoserver": sync_to_geoserver,
+                "is_public_gee_asset": is_public,
+                "is_override": is_override,
+                "misc": misc,
+                "gee_asset_path": asset_id,
+            }.items():
+                setattr(existing_layer, field, value)
+            existing_layer.save()
+            layer_obj = existing_layer
+    else:
+        # No existing record --> create a new one
+        print("No existing layer found. Creating new one.")
+        layer_obj = Layer.objects.create(
+            dataset=dataset,
+            layer_name=layer_name,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_version=layer_version,
+            algorithm=algorithm,
+            algorithm_version=algorithm_version,
+            is_sync_to_geoserver=sync_to_geoserver,
+            is_public_gee_asset=is_public,
+            is_override=is_override,
+            misc=misc,
+            gee_asset_path=asset_id,
+        )
+
+    print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
     return layer_obj.id
 
 
@@ -354,11 +408,15 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
         district_name__iexact=district, state=state_obj
     )
     block_obj = TehsilSOI.objects.get(tehsil_name__iexact=block, district=district_obj)
-    layer_obj = Layer.objects.get(
-        state=state_obj,
-        district=district_obj,
-        block=block_obj,
-        layer_name=layer_name,
-        dataset__name=dataset_name,
+    layer_obj = (
+        Layer.objects.filter(
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_name=layer_name,
+            dataset__name=dataset_name,
+        )
+        .order_by("-layer_version")
+        .first()
     )
     return layer_obj

@@ -77,6 +77,16 @@ lulcClasses = {
     "Snow and ice": 8,
 }
 
+lulcClassesIndiaSat = {
+    "Forest": [6],
+    "Grassland": [12],
+    "Flooded vegetation": [6],
+    "Cropland": [5, 8, 9, 10, 11],
+    "Shrub and scrub": [12],
+    "Bare ground": [7],
+    "Snow and ice": [],
+}
+
 aspect = {
     "North": ["0 - 22.5", "337.5 - 360"],
     "Northeast": "22.5 - 67.5",
@@ -95,7 +105,8 @@ class_mappings = {
     "drainage": drainageClasses,
     "aspect": aspect,
     "AWC": awcClasses,
-    "LULC": lulcClasses,
+    # "LULC": lulcClasses,
+    "LULC": lulcClassesIndiaSat,
 }
 
 
@@ -271,6 +282,29 @@ def generate_labels_and_classes(input_string, variable):
                     labels.append("0")
 
         labels = ",".join(labels)
+    elif variable == "LULC":
+        ideal_classes = input_string.split(", ")
+        # Build reverse mapping (numeric code -> list of classes)
+        code_to_classes = {}
+        for cls, codes in lulcClassesIndiaSat.items():
+            for c in codes:
+                code_to_classes.setdefault(c, []).append(cls)
+
+        # Assign labels
+        class_list = []
+        label_list = []
+
+        for code, mapped_classes in code_to_classes.items():
+            # Label = 1 if any mapped class is in ideal_classes
+            label = 1 if any(cls in ideal_classes for cls in mapped_classes) else 0
+            class_list.append(str(code))
+            label_list.append(str(label))
+
+        classes = ",".join(class_list)
+        labels = ",".join(label_list)
+
+        # print("Classes:", classes)
+        # print("Labels:", labels)
     else:
         classes = ",".join(map(str, classDict.values()))
 

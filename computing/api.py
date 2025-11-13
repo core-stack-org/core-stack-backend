@@ -12,6 +12,8 @@ from computing.change_detection.change_detection_vector import (
 from .lulc.lulc_vector import vectorise_lulc
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
+from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
+from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
 from .lulc.v4.lulc_v4 import generate_lulc_v4
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order
@@ -28,7 +30,7 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from .terrain_descriptor.terrain_raster import terrain_raster
+from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from computing.misc.drainage_lines import clip_drainage_lines
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
@@ -53,6 +55,11 @@ from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import layer_status
+from .misc.lcw_conflict import generate_lcw_conflict_data
+from .misc.agroecological_space import generate_agroecological_data
+from .misc.factory_csr import generate_factory_csr_data
+from .misc.green_credit import generate_green_credit_data
+from .misc.mining_data import generate_mining_data
 
 
 @api_security_check(allowed_methods="POST")
@@ -250,6 +257,41 @@ def generate_annual_hydrology(request):
         )
     except Exception as e:
         print("Exception in generate_annual_hydrology api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def lulc_for_tehsil(request):
+    print("Inside lulc_v3 api.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        version = request.data.get("version")
+        if version == "v2":
+            generate_lulc_v2_tehsil.apply_async(
+                args=[state, district, block, start_year, end_year, gee_account_id],
+                queue="nrm",
+            )
+            return Response(
+                {"Success": "generate_lulc_v2_tehsil task initiated"},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            generate_lulc_v3_tehsil.apply_async(
+                args=[state, district, block, start_year, end_year, gee_account_id],
+                queue="nrm",
+            )
+            return Response(
+                {"Success": "generate_lulc_v3_tehsil task initiated"},
+                status=status.HTTP_200_OK,
+            )
+    except Exception as e:
+        print("Exception in lulc_for_tehsil api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -513,17 +555,15 @@ def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
         state = request.data.get("state")
-        print(state)
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        terrain_raster.apply_async(
+        generate_terrain_raster_clip.apply_async(
             kwargs={
-                "gee_account_id": gee_account_id,
-                "roi_path": None,
                 "state": state,
                 "district": district,
                 "block": block,
+                "gee_account_id": gee_account_id,
             },
             queue="nrm",
         )
@@ -918,8 +958,11 @@ def fes_clart_upload_layer(request):
         filename = f'{district.strip().replace(" ", "_")}_{block.strip().replace(" ", "_")}_clart_fes{file_extension}'
 
         temp_upload_dir = os.path.join(
-            BASE_DIR, "data", "fes_clart_file", state.strip().replace(" ", "_"),
-            district.strip().replace(" ", "_")
+            BASE_DIR,
+            "data",
+            "fes_clart_file",
+            state.strip().replace(" ", "_"),
+            district.strip().replace(" ", "_"),
         )
         os.makedirs(temp_upload_dir, exist_ok=True)
         file_path = os.path.join(temp_upload_dir, filename)
@@ -1123,9 +1166,9 @@ def generate_layer_in_order(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(["GET"])
+@api_view(["POST"])
 @schema(None)
-def layer_staus_dashboard(request):
+def layer_status_dashboard(request):
     print("inside layer_staus_dashboard")
     try:
         state = request.data.get("state").lower()
@@ -1138,4 +1181,104 @@ def layer_staus_dashboard(request):
         )
     except Exception as e:
         print("Exception in layer_staus_dashboard api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_lcw_to_gee(request):
+    print("Inside generate_lcw_conflict_data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_lcw_conflict_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_lcw_conflict_data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_agroecological_to_gee(request):
+    print("Inside generate_agroecological_data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_agroecological_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_agroecological_data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_factory_csr_to_gee(request):
+    print("Inside generate_factory_csr_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_factory_csr_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_factory_csr_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_green_credit_to_gee(request):
+    print("Inside generate_green_credit_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_green_credit_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_green_credit_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_mining_to_gee(request):
+    print("Inside generate_mining_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_mining_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mining_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

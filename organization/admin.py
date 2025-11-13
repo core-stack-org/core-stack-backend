@@ -21,6 +21,7 @@ class OrganizationAdmin(admin.ModelAdmin):
     list_filter = ("created_at", "created_by__username", "updated_at")
     search_fields = ("name", "description", "created_by__username", "updated_by")
     readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("created_by",)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)

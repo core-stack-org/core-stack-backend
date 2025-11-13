@@ -20,6 +20,7 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
+    path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
     path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
@@ -105,8 +106,29 @@ urlpatterns = [
         name="generate_layer_in_order",
     ),
     path(
-        "layer_staus_dashboard/",
-        api.layer_staus_dashboard,
+        "layer_status_dashboard/",
+        api.layer_status_dashboard,
         name="layer_staus_dashboard",
+    ),
+    path("generate_lcw_data/", api.generate_lcw_to_gee, name="generate_lcw_to_gee"),
+    path(
+        "generate_agroecological_data/",
+        api.generate_agroecological_to_gee,
+        name="generate_agroecological_data",
+    ),
+    path(
+        "generate_factory_csr_data/",
+        api.generate_factory_csr_to_gee,
+        name="generate_factory_csr_data",
+    ),
+    path(
+        "generate_green_credit_data/",
+        api.generate_green_credit_to_gee,
+        name="generate_green_credit_data",
+    ),
+    path(
+        "generate_mining_data/",
+        api.generate_mining_to_gee,
+        name="generate_mining_data",
     ),
 ]

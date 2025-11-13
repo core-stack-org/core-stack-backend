@@ -60,15 +60,10 @@ def clip_nrega_district_block(
         aws_secret_access_key=S3_SECRET_KEY,
     )
 
-    formatted_state_name = state_name.title()
-    formatted_district_name = district_name.title()
-    if " " in formatted_state_name:
-        formatted_state_name = formatted_state_name.replace(" ", "_")
-    if " " in district_name:
-        formatted_district_name = district_name.replace(" ", "_")
+    formatted_state_name = valid_gee_text(state_name)
 
     nrega_dist_file = (
-        f"{formatted_state_name.upper()}/{formatted_district_name.upper()}.geojson"
+        f"{formatted_state_name.upper()}/{valid_gee_text(district_name).upper()}.geojson"
     )
 
     try:
@@ -158,7 +153,7 @@ def clip_nrega_district_block(
     path = os.path.join(
         NREGA_ASSETS_OUTPUT_DIR,
         formatted_state_name,
-        f"""{"_".join(district_name.split())}_{"_".join(block_name.split())}""",
+        f"""{"_".join(valid_gee_text(district_name).split())}_{"_".join(valid_gee_text(block_name).split())}""",
     )
     output_directory = os.path.dirname(path)
     os.makedirs(output_directory, exist_ok=True)

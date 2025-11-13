@@ -336,25 +336,29 @@ def get_pss(
     # This rounding is specific to a binary score output
     # Round off Plantation Score to 0 or 1 on each pixel and mask
     if is_default_profile:
-        # For five suitability classes
-        final_plantation_score = (
-            ee.Image(0)
-            .where(final_layer.lt(1.5), 1)
-            .where(final_layer.gte(1.5).And(final_layer.lt(2.5)), 2)
-            .where(final_layer.gte(2.5).And(final_layer.lt(3.5)), 3)
-            .where(final_layer.gte(3.5).And(final_layer.lt(4.5)), 4)
-            .where(final_layer.gte(4.5), 5)
-            .clip(roi.geometry())
-        )
+        if project:
+            # Mapping 5 suitability classes to 2 in case of project level assessment
+            final_plantation_score = ee.Image(1).where(final_layer.gte(3), 0)
+        else:
+            # For five suitability classes
+            final_plantation_score = (
+                ee.Image(0)
+                .where(final_layer.lt(1.5), 1)
+                .where(final_layer.gte(1.5).And(final_layer.lt(2.5)), 2)
+                .where(final_layer.gte(2.5).And(final_layer.lt(3.5)), 3)
+                .where(final_layer.gte(3.5).And(final_layer.lt(4.5)), 4)
+                .where(final_layer.gte(4.5), 5)
+                .clip(roi.geometry())
+            )
     else:
         # Pixels with score <= 0.5 are considered unsuitable
         final_plantation_score = ee.Image(1).where(final_layer.lte(0.5), 0)
 
-    # Apply LULC (Land Use/Land Cover) mask to filter suitable areas
-    # Considers specific LULC classes as potentially suitable
-    # Classes to be masked for in IndiaSat LULC v3 - 5 (Croplands), 6 (Trees/forests),
-    # 7 (Barren lands), 8 (Single Kharif Cropping), 9 (Single Non Kharif Cropping),
-    # 10 (Double Cropping), 11 (Triple Cropping), 12 (Shrub and Scrub)
+    """ 
+    Apply LULC (Land Use/Land Cover) mask to filter suitable areas
+    Classes to be masked for in IndiaSat LULC v3 - 5 (Croplands), 6 (Trees/forests), 7 (Barren lands), 
+    8 (Single Kharif Cropping), 9 (Single Non Kharif Cropping), 10 (Double Cropping), 11 (Triple Cropping), 12 (Shrub and Scrub)
+    """
     lulc = get_dataset("LULC", state, roi, start_year, end_year)
     if is_default_profile:
         lulc_mask = lulc.eq(5).Or(lulc.gte(7))
@@ -474,7 +478,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
     # Distance to Roads
     if variable == "distToRoad":
         dataset_collection = ee.FeatureCollection(
-            f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
+            f"projects/ext-datasets/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
         )
         dataset = dataset_collection.reduceToImage(
             properties=["STATE_ID"], reducer=ee.Reducer.first()

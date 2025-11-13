@@ -45,19 +45,21 @@ def get_site_properties(roi, state, start_year, end_year):
                     feature.geometry(), ee.Reducer.mean(), scale, raster.projection()
                 )
                 prop_value = vectors.first().get("mean")
-                prop_value = round_to(ee.Number(prop_value), 4)
+                prop_value = ee.Algorithms.If(
+                    prop_value, round_to(prop_value, 4), prop_value
+                )
 
             prop_value = get_mapping(data_key, data_value, prop_value)
 
             vectorized_props[label] = prop_value
 
         # Distance to the nearest road
-        vectorized_props["Distance to Road (m)"] = vectorize_dataset(
+        vectorized_props["Distance to Roads (m)"] = vectorize_dataset(
             state_dist_to_road, feature, 10
         )
 
         # Distance to the nearest settlement
-        vectorized_props["Distance to Settlement (m)"] = vectorize_dataset(
+        vectorized_props["Distance to Settlements (m)"] = vectorize_dataset(
             dist_to_settlement, feature, 10
         )
 
@@ -73,7 +75,7 @@ def get_site_properties(roi, state, start_year, end_year):
 
 def get_dist_to_road(state):
     dataset_collection = ee.FeatureCollection(
-        f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
+        f"projects/ext-datasets/assets/datasets/Road_DRRP/{valid_gee_text(state.lower())}"
     )
     dataset = dataset_collection.reduceToImage(
         properties=["STATE_ID"], reducer=ee.Reducer.first()
