@@ -598,7 +598,7 @@ def update_STAC_files(state,
     else:
         block_catalog = pystac.Catalog(
             id=block,
-            title=f"STAC for {block}",
+            title=f"{block}",
             description=f"STAC catalog for {block} block data in {district}, {state}")
 
         print("created block catalog")
@@ -1326,7 +1326,7 @@ def generate_vector_stac(state,
     state = valid_gee_text(state.lower())
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
-    
+
     vector_item = generate_vector_item(state,
                                         district,
                                         block,
