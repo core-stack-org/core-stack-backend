@@ -36,6 +36,7 @@ import numpy as np
 
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
     layer_name = (
         "nrega_"
@@ -62,9 +63,7 @@ def clip_nrega_district_block(
 
     formatted_state_name = valid_gee_text(state_name)
 
-    nrega_dist_file = (
-        f"{formatted_state_name.upper()}/{valid_gee_text(district_name).upper()}.geojson"
-    )
+    nrega_dist_file = f"{formatted_state_name.upper()}/{valid_gee_text(district_name).upper()}.geojson"
 
     try:
         file_obj = s3.Object(NREGA_BUCKET, nrega_dist_file).get()
@@ -211,10 +210,12 @@ def clip_nrega_district_block(
                 state=state_name,
                 district=district_name,
                 block=block_name,
-                layer_name='nrega_vector')
-            
-            update_layer_sync_status(layer_id=layer_id,
-                                     is_stac_specs_generated=layer_STAC_generated)       
+                layer_name="nrega_vector",
+            )
+
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
             layer_at_geoserver = True
             print("sync to geoserver flag is updated")
     return layer_at_geoserver

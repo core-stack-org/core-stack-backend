@@ -16,6 +16,7 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def generate_terrain_clusters(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
@@ -397,11 +398,10 @@ def sync_to_geoserver(state, district, block, asset_id, layer_id):
 
         layer_STAC_generated = False
         layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name='terrain_vector')
-        update_layer_sync_status(layer_id=layer_id,
-                                 is_stac_specs_generated=layer_STAC_generated)
+            state=state, district=district, block=block, layer_name="terrain_vector"
+        )
+        update_layer_sync_status(
+            layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+        )
         layer_at_geoserver = True
     return layer_at_geoserver

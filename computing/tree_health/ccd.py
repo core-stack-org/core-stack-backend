@@ -14,6 +14,7 @@ from utilities.gee_utils import (
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def tree_health_ccd_raster(
     self, state, district, block, start_year, end_year, gee_account_id
@@ -126,14 +127,15 @@ def tree_health_ccd_raster(
             #     print("sync to geoserver flag is updated")
             if res:
                 layer_at_geoserver = True
-                            #stac specs generation block
+                # stac specs generation block
                 layer_STAC_generated = False
                 layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
                     state=state,
                     district=district,
                     block=block,
-                    layer_name='tree_canopy_cover_density_raster',
-                    start_year=year)
+                    layer_name="tree_canopy_cover_density_raster",
+                    start_year=year,
+                )
                 # update_layer_sync_status(layer_id=layer_id,
                 #                          is_stac_specs_generated=layer_STAC_generated)
     return layer_at_geoserver

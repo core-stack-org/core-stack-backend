@@ -17,6 +17,7 @@ from computing.utils import (
 )
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def generate_aquifer_vector(self, state, district, block, gee_account_id):
     """Aquifer vector layer generation."""
@@ -173,12 +174,11 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
 
             layer_STAC_generated = False
             layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name='aquifer_vector')
-            update_layer_sync_status(layer_id=layer_id,
-                                     is_stac_specs_generated=layer_STAC_generated)
-            
+                state=state, district=district, block=block, layer_name="aquifer_vector"
+            )
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
+
             layer_at_geoserver = True
     return layer_at_geoserver

@@ -12,15 +12,9 @@
     },
     {
       "rel": "child",
-      "href": "./bihar/collection.json",
+      "href": "./uttar_pradesh/collection.json",
       "type": "application/json",
-      "title": "bihar"
-    },
-    {
-      "rel": "child",
-      "href": "./odisha/collection.json",
-      "type": "application/json",
-      "title": "odisha"
+      "title": "uttar_pradesh"
     }
   ],
   "title": "CoREStack Spatio Temporal Asset Catalog"

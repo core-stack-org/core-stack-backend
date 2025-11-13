@@ -22,6 +22,7 @@ from utilities.geoserver_utils import Geoserver
 from dataclasses import dataclass
 from typing import Optional
 from computing.STAC_specs import generate_STAC_layerwise
+
 geo = Geoserver()
 
 
@@ -388,8 +389,10 @@ def save_to_db_and_sync_to_geoserver(config: LayerConfig):
             state=config.state,
             district=config.district,
             block=config.block,
-            layer_name='cropping_intensity_vector')
-        update_layer_sync_status(layer_id=layer_id,
-                                 is_stac_specs_generated=layer_STAC_generated)       
+            layer_name="cropping_intensity_vector",
+        )
+        update_layer_sync_status(
+            layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+        )
         layer_at_geoserver = True
     return layer_at_geoserver

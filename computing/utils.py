@@ -366,19 +366,19 @@ def save_layer_info_to_db(
     return layer_obj.id
 
 
-def update_layer_sync_status(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
+def update_layer_sync_status(
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+):
     try:
         layer_obj = Layer.objects.filter(id=layer_id)
         if sync_to_geoserver is not None:
-            updated_count = layer_obj.update(
-                is_sync_to_geoserver=sync_to_geoserver
-            )
+            updated_count = layer_obj.update(is_sync_to_geoserver=sync_to_geoserver)
 
             if updated_count > 0:
                 print(
                     f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
                 )
-            
+
         if is_stac_specs_generated is not None:
             updated_count = layer_obj.update(
                 is_stac_specs_generated=is_stac_specs_generated

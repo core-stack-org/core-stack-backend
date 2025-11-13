@@ -67,16 +67,17 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
-        
+
         layer_STAC_generated = False
         layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
             state=state,
             district=district,
             block=block,
-            layer_name='admin_boundaries_vector'
+            layer_name="admin_boundaries_vector",
         )
-        update_layer_sync_status(layer_id=layer_id,
-                                 is_stac_specs_generated=layer_STAC_generated)
+        update_layer_sync_status(
+            layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+        )
 
         layer_at_geoserver = True
     return layer_at_geoserver

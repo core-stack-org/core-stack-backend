@@ -36,7 +36,9 @@ def get_column_name(base_name, year):
 
 
 @app.task(bind=True)
-def tree_health_ch_vector(self, state, district, block, start_year, end_year, gee_account_id):
+def tree_health_ch_vector(
+    self, state, district, block, start_year, end_year, gee_account_id
+):
     """Process canopy height data for multiple years and combine into a single GeoServer layer."""
     ee_initialize(gee_account_id)
     # Get the reference MWS features
@@ -180,6 +182,7 @@ def tree_health_ch_vector(self, state, district, block, start_year, end_year, ge
         #     print("sync to geoserver flag is updated")
         if sync_res["status_code"] == 201:
             layer_at_geoserver = True
+
     except Exception as e:
         print(f"Error syncing combined data to GeoServer: {e}")
         raise

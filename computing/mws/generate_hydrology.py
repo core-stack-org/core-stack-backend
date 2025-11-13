@@ -24,6 +24,7 @@ from computing.utils import (
 )
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def generate_hydrology(
     self,
@@ -226,18 +227,20 @@ def generate_hydrology(
             print("sync to geoserver flag is updated")
 
             if is_annual:
-                        layer_STAC_generated = False
-                        layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                            state=state,
-                            district=district,
-                            block=block,
-                            layer_name='change_in_well_depth_vector'
-                        )
-                        update_layer_sync_status(layer_id=layer_id,
-                                                 is_stac_specs_generated=layer_STAC_generated)
+                layer_STAC_generated = False
+                layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                    state=state,
+                    district=district,
+                    block=block,
+                    layer_name="change_in_well_depth_vector",
+                )
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+                )
             else:
-                 update_layer_sync_status(layer_id=layer_id,
-                                                 is_stac_specs_generated=False)
-         
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=False
+                )
+
             layer_at_geoserver = True
     return layer_at_geoserver

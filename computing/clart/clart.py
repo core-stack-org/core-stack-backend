@@ -19,6 +19,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def generate_clart_layer(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
@@ -248,12 +249,11 @@ def clart_layer(state, district, block):
 
             layer_STAC_generated = False
             layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name='clart_raster')
-            update_layer_sync_status(layer_id=layer_id, 
-                                     is_stac_specs_generated=layer_STAC_generated)
-                        
+                state=state, district=district, block=block, layer_name="clart_raster"
+            )
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
+
             layer_at_geoserver = True
     return layer_at_geoserver

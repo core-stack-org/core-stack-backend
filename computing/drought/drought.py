@@ -21,6 +21,7 @@ from .merge_layers import (
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def calculate_drought(
     self,
@@ -159,9 +160,10 @@ def calculate_drought(
                 state=state,
                 district=district,
                 block=block,
-                layer_name='drought_frequency_vector') #we only intend to run 
-            #stac for drought frequency as it has style file. so please double check
+                layer_name="drought_frequency_vector",
+            )  # we only intend to run
+            # stac for drought frequency as it has style file. so please double check
             # if this data is only of drought frequency and not additionally containing
-            #drought causalty data
+            # drought causalty data
 
     return layer_at_geoserver

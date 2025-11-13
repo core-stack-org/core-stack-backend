@@ -54,7 +54,7 @@ class Layer(models.Model):
     is_sync_to_geoserver = models.BooleanField(default=False)
     is_override = models.BooleanField(default=False)
     is_stac_specs_generated = models.BooleanField(default=False)
-    
+
     class Meta:
         verbose_name = "Layer"
         verbose_name_plural = "Layers"
