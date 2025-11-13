@@ -45,6 +45,8 @@ sys.path.append('..')
 from computing.STAC_specs import constants
 
 from nrm_app.settings import S3_ACCESS_KEY, S3_SECRET_KEY
+from utilities.gee_utils import valid_gee_text
+
 aws_creds = {}
 aws_creds['aws_access_key_id'] = S3_ACCESS_KEY
 aws_creds['aws_secret_access_key'] = S3_SECRET_KEY
@@ -1321,6 +1323,10 @@ def generate_vector_stac(state,
     print("triggering vector stac pipeline")
     # print(layer_map_csv_path)
 
+    state = valid_gee_text(state.lower())
+    district = valid_gee_text(district.lower())
+    block = valid_gee_text(block.lower())
+    
     vector_item = generate_vector_item(state,
                                         district,
                                         block,
@@ -1358,8 +1364,12 @@ def generate_raster_stac(state,
                          end_year='',
                          upload_to_s3=True
                          ):
-    print("triggering raster stac pipeline")
     
+    print("triggering raster stac pipeline")
+    state = valid_gee_text(state.lower())
+    district = valid_gee_text(district.lower())
+    block = valid_gee_text(block.lower())
+
     raster_item = generate_raster_item(state,
                                        district,
                                        block,
