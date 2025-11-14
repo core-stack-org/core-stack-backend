@@ -14,35 +14,63 @@ from utilities.gee_utils import (
     make_asset_public,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    get_gee_dir_path,
 )
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
 def clip_drainage_lines(
     self,
-    state,
-    district,
-    block,
-        gee_account_id
+    state=None,
+    district=None,
+    block=None,
+    roi_path=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type="MWS",
+    start_year=None,
+    end_year=None,
+    gee_account_id=None,
 ):
+
     ee_initialize(gee_account_id)
+    if state and district and block:
+        asset_suffix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
+        description = f"drainage_lines_{asset_suffix}"
+
+        asset_id = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
+        )
+        roi = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
+    else:
+        description = f"drainage_lines_{asset_suffix}"
+        asset_id = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
+        )
+        roi = ee.FeatureCollection(roi_path)
     pan_india_drainage = ee.FeatureCollection(
         GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
-    clipped_drainage = pan_india_drainage.filterBounds(roi.geometry())
 
-    description = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-    asset_id = get_gee_asset_path(state, district, block) + description
+    clipped_drainage = pan_india_drainage.filterBounds(roi.geometry())
 
     task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
 

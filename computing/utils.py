@@ -486,6 +486,7 @@ def get_directory_size(path):
 def generate_geojson_with_ci_ndvi_ndmi(
     zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id
 ):
+
     # Load project
     proj_obj = Project.objects.get(pk=proj_id)
 

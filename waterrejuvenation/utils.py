@@ -632,3 +632,26 @@ def generate_zoi_ring_layer(zoi_fc, proj_id):
     delete_asset_on_GEE(zoi_ring_asset)
     export_and_wait(zoi_rings, "zoi_single_ring_export", zoi_ring_asset)
     return zoi_ring_asset
+
+
+def add_on_drainage_flag(swb_asset_id, dl_asset_id):
+    """
+    Adds a boolean flag 'on_drainage_line' to each feature in swb_fc
+    indicating whether it intersects with any feature in dl_fc.
+
+    Args:
+        swb_fc (ee.FeatureCollection): SWB polygons/points/lines
+        dl_fc (ee.FeatureCollection): Drainage line geometries
+
+    Returns:
+        ee.FeatureCollection: SWB FC with added property 'on_drainage_line'
+    """
+    swb_fc = ee.FeatureCollection(swb_asset_id)
+    dl_fc = ee.FeatureCollection(dl_asset_id)
+
+    # Map over each SWB feature
+    def set_flag(feature):
+        intersects = dl_fc.filterBounds(feature.geometry()).size().gt(0)
+        return feature.set("on_drainage_line", intersects)
+
+    return swb_fc.map(set_flag)
