@@ -442,8 +442,7 @@ def read_layer_mapping(
     layer_name,
     district,  #
     block,
-    start_year="",
-    end_year="",
+    start_year=""
 ):
     layer_mapping_df = pd.read_csv(layer_map_csv_path)
     layer_display_name = layer_mapping_df[layer_mapping_df["layer_name"] == layer_name][
@@ -469,12 +468,14 @@ def read_layer_mapping(
     ].iloc[0]
 
     if layer_name == "land_use_land_cover_raster":
-        start_year = str(
+        start_year_modified = str(
             int(start_year) % 100
         )  # keep only last 2 digits of the full year
-        end_year = str(int(end_year) % 100)
+        end_year_modified = str((int(start_year) + 1) % 100)
+        print("start_year_modified=",start_year_modified)
+        print("end_year_modified=",end_year_modified)
         geoserver_layer_name = geoserver_layer_name.format(
-            start_year=start_year, end_year=end_year, block=block
+            start_year=start_year_modified, end_year=end_year_modified, block=block
         )
     # print(geoserver_workspace_name,geoserver_layer_name)
     elif (layer_name == "tree_canopy_cover_density_raster") | (
@@ -505,9 +506,9 @@ def generate_raster_item(
     layer_name,
     layer_map_csv_path,
     layer_desc_csv_path,
-    start_year,
-    end_year,
+    start_year
 ):
+    print("start_year=",start_year)
 
     # 1. read layer description
     layer_description = read_layer_description(
@@ -527,8 +528,7 @@ def generate_raster_item(
         district=district,
         block=block,
         layer_name=layer_name,
-        start_year=start_year,
-        end_year=end_year,
+        start_year=start_year
     )
     print(f"geoserver_workspace_name={geoserver_workspace_name}")
     print(f"geoserver_layer_name={geoserver_layer_name}")
@@ -552,16 +552,13 @@ def generate_raster_item(
     if start_year != "":
         layer_title = f"{layer_display_name} : {start_year}"
         layer_id = f"{state}_{district}_{block}_{layer_name}_{start_year}"
-        start_date = start_year + "-" + constants.AGRI_YEAR_START_DATE
+        start_date = str(start_year) + "-" + constants.AGRI_YEAR_START_DATE
         start_date = pd.to_datetime(start_date)
-        if end_year == "":  # like in tree layers
-            end_date = str(int(start_year) + 1) + "-" + constants.AGRI_YEAR_END_DATE
-            end_date = pd.to_datetime(end_date)
-    if end_year != "":
-        end_date = end_year + "-" + constants.AGRI_YEAR_END_DATE
+        end_date = str(int(start_year) + 1) + "-" + constants.AGRI_YEAR_END_DATE
         end_date = pd.to_datetime(end_date)
-    print(f"start_date = {start_date}")
-    print(f"end_date = {end_date}")
+
+        print(f"start_date = {start_date}")
+        print(f"end_date = {end_date}")
     raster_item, raster_data = create_raster_item(
         geoserver_url,
         #  id=f"{layer_name}_{block}",
@@ -1333,8 +1330,6 @@ def generate_vector_item(
         district=district,
         block=block,
         layer_name=layer_name,
-        #    start_year=start_year,
-        #    end_year=end_year
     )
 
     # print(f"geoserver_workspace_name={geoserver_workspace_name}")
@@ -1544,7 +1539,6 @@ def generate_raster_stac(
     layer_map_csv_path="data/STAC_specs/input/metadata/layer_mapping.csv",
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     start_year="",
-    end_year="",
     upload_to_s3=True,
 ):
 
@@ -1560,8 +1554,7 @@ def generate_raster_stac(
         layer_name,
         layer_map_csv_path,
         layer_desc_csv_path,
-        start_year,
-        end_year,
+        start_year
     )
 
     layer_STAC_generated = update_STAC_files(
