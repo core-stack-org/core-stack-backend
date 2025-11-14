@@ -83,33 +83,28 @@ def generate_kyl_data_excel(request):
         block = valid_gee_text(request.query_params.get("block", "").lower())
         file_type = request.query_params.get("file_type", "").lower().strip()
 
-        # Generate data for the file
-        creating_kyl_data = get_generate_filter_mws_data(
-            state, district, block, file_type
-        )
-        print("Data generated in the file")
         excel_file = download_KYL_filter_data(state, district, block, file_type)
-        logging.info(f"Download function returned: {excel_file}")
+
+        if not excel_file:
+            get_generate_filter_mws_data(state, district, block, file_type)
+            print("Data generated in the file")
+            excel_file = download_KYL_filter_data(state, district, block, file_type)
+
         if excel_file:
-            if isinstance(excel_file, str) and os.path.exists(excel_file):
-                with open(excel_file, "rb") as file:
-                    response = HttpResponse(
-                        file.read(),
-                        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-                    response["Content-Disposition"] = (
-                        f"attachment; filename={district}_{block}_KYL_filter_data.{file_type}"
-                    )
-                    return response
-            else:
-                raise ValueError(
-                    "Invalid file format received from download_KYL_filter_data."
+            with open(excel_file, "rb") as file:
+                response = HttpResponse(
+                    file.read(),
+                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
+                response["Content-Disposition"] = (
+                    f"attachment; filename={district}_{block}_KYL_filter_data.{file_type}"
+                )
+                return response
+
         else:
-            raise ValueError("Failed to download the KYL filter data file")
+            print("Failed to download the KYL filter data file")
 
     except Exception as e:
-        logging.error(f"Validation error: {str(e)}")
         return Response(
             {"status": "error", "message": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
