@@ -17,6 +17,7 @@ from utilities.gee_utils import (
 )
 from nrm_app.celery import app
 from utilities.constants import GEE_DATASET_PATH
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -96,5 +97,14 @@ def generate_terrain_raster_clip(
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+
+            layer_STAC_generated = False
+            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                state=state, district=district, block=block, layer_name="terrain_raster"
+            )
+
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
             layer_at_geoserver = True
     return layer_at_geoserver

@@ -10,7 +10,8 @@ from utilities.gee_utils import (
     make_asset_public,
     create_gee_dir,
     get_gee_dir_path,
-    export_vector_asset_to_gee, build_gee_helper_paths,
+    export_vector_asset_to_gee,
+    build_gee_helper_paths,
 )
 
 
@@ -90,7 +91,7 @@ def generate_drought_layers(
     chunk_size,
     gee_account_id,
 ):
-    gee_obj = GEEAccount.objects.get(pk = gee_account_id)
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
     task_ids = []
     asset_ids = []
 
@@ -100,9 +101,7 @@ def generate_drought_layers(
     print("parts=", parts)
     ee_initialize(gee_obj.helper_account.id)
     helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
-    create_gee_dir(
-        asset_folder_list, helper_account_path
-    )
+    create_gee_dir(asset_folder_list, helper_account_path)
     for part in range(parts + 1):
         start = part * chunk_size
         end = start + chunk_size
@@ -128,7 +127,7 @@ def generate_drought_layers(
                 asset_suffix,
                 asset_folder_list,
                 app_type,
-                gee_account_id
+                gee_account_id,
             )
 
     print("Done iterating")
@@ -150,15 +149,12 @@ def drought_chunk(
     asset_suffix,
     asset_folder_list,
     app_type,
-    gee_account_id
+    gee_account_id,
 ):
-    gee_obj = GEEAccount.objects.get(pk = gee_account_id)
-    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name )
+    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, helper_account_path
-        )
-        + block_name_for_parts
+        get_gee_dir_path(asset_folder_list, helper_account_path) + block_name_for_parts
     )
 
     if is_gee_asset_exists(asset_id):
