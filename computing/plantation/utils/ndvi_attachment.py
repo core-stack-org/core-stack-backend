@@ -1,6 +1,8 @@
 import ee
-from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
-from computing.plantation.utils.hls_ndvi import get_hls_interpolated_ndvi
+
+from computing.plantation.utils.hls_ndvi import Get_Padded_NDVI_TS_Image
+
+# from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from utilities.gee_utils import (
     check_task_status,
     is_gee_asset_exists,
@@ -13,6 +15,9 @@ def get_ndvi_data():  # suitability_vector, start_year, end_year, description, a
     ee_initialize(1)
     suitability_vector = ee.FeatureCollection(
         "projects/ee-corestackdev/assets/apps/plantation/cfpt/infosys/CFPT_Infosys"
+    )
+    suitability_vector = suitability_vector.filter(
+        ee.Filter.eq("uid", "7d26c0171afef0167be935df98b53dcb")
     )
     start_year = 2017
     end_year = 2017
@@ -70,7 +75,7 @@ def get_ndvi_data():  # suitability_vector, start_year, end_year, description, a
         #     return image.addBands(ndvi_band).float()  # .addBands(ndwi).float()
         #
         # ndvi = hls.map(add_ndvi_ndwi)
-        ndvi = get_hls_interpolated_ndvi(
+        ndvi = Get_Padded_NDVI_TS_Image(
             start_date, end_date, suitability_vector.bounds()
         )
 
@@ -86,16 +91,16 @@ def get_ndvi_data():  # suitability_vector, start_year, end_year, description, a
 
             # Add NDVI value and image date to each feature
             def annotate(feature):
-                # ndvi_val = ee.Algorithms.If(
-                #     ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
-                #     -9999,
-                #     feature.get("gapfilled_NDVI_lsc"),
-                # )
                 ndvi_val = ee.Algorithms.If(
-                    ee.Algorithms.IsEqual(feature.get("NDVI"), None),
+                    ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
                     -9999,
-                    feature.get("NDVI"),
+                    feature.get("gapfilled_NDVI_lsc"),
                 )
+                # ndvi_val = ee.Algorithms.If(
+                #     ee.Algorithms.IsEqual(feature.get("NDVI"), None),
+                #     -9999,
+                #     feature.get("NDVI"),
+                # )
                 return feature.set("ndvi_date", date_str).set("ndvi", ndvi_val)
 
             return reduced.map(annotate)
@@ -133,29 +138,29 @@ def get_ndvi_data():  # suitability_vector, start_year, end_year, description, a
 
         # Apply feature-wise aggregation
         merged_fc = ee.FeatureCollection(uids.map(build_feature))
-
+        print(merged_fc.getInfo())
         # Export as single-row-per-feature collection
-        try:
-            task = export_vector_asset_to_gee(
-                merged_fc, ndvi_description, ndvi_asset_id
-            )
-            print(f"Started export for {start_year}")
-            asset_ids.append(ndvi_asset_id)
-            task_ids.append(task)
-        except Exception as e:
-            print("Export error:", e)
-
+        # try:
+        #     task = export_vector_asset_to_gee(
+        #         merged_fc, ndvi_description, ndvi_asset_id
+        #     )
+        #     print(f"Started export for {start_year}")
+        #     asset_ids.append(ndvi_asset_id)
+        #     task_ids.append(task)
+        # except Exception as e:
+        #     print("Export error:", e)
+        #
         start_year += 1
 
-    check_task_status(task_ids)
+    # check_task_status(task_ids)
 
     # Merge year-wise outputs into a single collection
     # return merge_assets_chunked_on_year(asset_ids)
-    task = export_vector_asset_to_gee(
-        merge_assets_chunked_on_year(asset_ids),
-        "test_hls_ndvi_merged",
-        f"{asset_id}_hls_sndvi_merged",
-    )
+    # task = export_vector_asset_to_gee(
+    #     merge_assets_chunked_on_year(asset_ids),
+    #     "test_hls_ndvi_merged",
+    #     f"{asset_id}_hls_sndvi_merged",
+    # )
 
 
 def merge_assets_chunked_on_year(chunk_assets):
