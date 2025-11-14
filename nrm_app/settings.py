@@ -59,6 +59,7 @@ ALLOWED_HOSTS = [
     "0.0.0.0",
     "api-doc.core-stack.org",
     "0cb52a0325c7.ngrok-free.app",
+    "odk.core-stack.org"
 ]
 
 # MARK: Django Apps
