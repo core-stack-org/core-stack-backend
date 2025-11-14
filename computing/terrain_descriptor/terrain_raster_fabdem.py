@@ -19,6 +19,7 @@ from nrm_app.celery import app
 from utilities.constants import GEE_DATASET_PATH
 from computing.STAC_specs import generate_STAC_layerwise
 
+
 @app.task(bind=True)
 def generate_terrain_raster_clip(
     self, state=None, district=None, block=None, gee_account_id=None

@@ -82,7 +82,9 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
                     intersection_area_ha = ee.Number(intersection_geom.area(10)).divide(
                         10000
                     )
-                    return soge_feature.set({"intersection_area_ha": intersection_area_ha})
+                    return soge_feature.set(
+                        {"intersection_area_ha": intersection_area_ha}
+                    )
 
                 soge_with_intersections = soge_within_mws.map(calculate_intersection)
                 largest_soge = soge_with_intersections.sort(
@@ -90,7 +92,9 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
                 ).first()
                 largest_intersection_area = largest_soge.get("intersection_area_ha")
                 pct_area = (
-                    ee.Number(largest_intersection_area).divide(mws_area_ha).multiply(100)
+                    ee.Number(largest_intersection_area)
+                    .divide(mws_area_ha)
+                    .multiply(100)
                 )
 
                 return ee.Feature(

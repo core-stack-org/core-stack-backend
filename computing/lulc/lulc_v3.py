@@ -200,7 +200,9 @@ def sync_lulc_to_geoserver(
                 print("STAC: Name array check", name_arr[1])
 
                 if workspace == "LULC_level_3":
-                    start_year_STAC = "20" + str(s_year) #TODO: these are temp fixes, based on current implementations of the pipelines
+                    start_year_STAC = "20" + str(
+                        s_year
+                    )  # TODO: these are temp fixes, based on current implementations of the pipelines
                     layer_STAC_generated = False
                     layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
                         state=state_name,

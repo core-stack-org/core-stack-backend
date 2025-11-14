@@ -442,7 +442,7 @@ def read_layer_mapping(
     layer_name,
     district,  #
     block,
-    start_year=""
+    start_year="",
 ):
     layer_mapping_df = pd.read_csv(layer_map_csv_path)
     layer_display_name = layer_mapping_df[layer_mapping_df["layer_name"] == layer_name][
@@ -472,8 +472,8 @@ def read_layer_mapping(
             int(start_year) % 100
         )  # keep only last 2 digits of the full year
         end_year_modified = str((int(start_year) + 1) % 100)
-        print("start_year_modified=",start_year_modified)
-        print("end_year_modified=",end_year_modified)
+        print("start_year_modified=", start_year_modified)
+        print("end_year_modified=", end_year_modified)
         geoserver_layer_name = geoserver_layer_name.format(
             start_year=start_year_modified, end_year=end_year_modified, block=block
         )
@@ -506,9 +506,9 @@ def generate_raster_item(
     layer_name,
     layer_map_csv_path,
     layer_desc_csv_path,
-    start_year
+    start_year,
 ):
-    print("start_year=",start_year)
+    print("start_year=", start_year)
 
     # 1. read layer description
     layer_description = read_layer_description(
@@ -528,7 +528,7 @@ def generate_raster_item(
         district=district,
         block=block,
         layer_name=layer_name,
-        start_year=start_year
+        start_year=start_year,
     )
     print(f"geoserver_workspace_name={geoserver_workspace_name}")
     print(f"geoserver_layer_name={geoserver_layer_name}")
@@ -1554,7 +1554,7 @@ def generate_raster_stac(
         layer_name,
         layer_map_csv_path,
         layer_desc_csv_path,
-        start_year
+        start_year,
     )
 
     layer_STAC_generated = update_STAC_files(
