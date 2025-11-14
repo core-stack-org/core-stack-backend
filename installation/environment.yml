@@ -386,3 +386,4 @@ dependencies:
           - SpeechRecognition
           - emoji
           - webdriver-manager
+          - pystac==1.13.0

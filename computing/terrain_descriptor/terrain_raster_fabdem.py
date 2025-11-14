@@ -17,6 +17,7 @@ from utilities.gee_utils import (
 )
 from nrm_app.celery import app
 from utilities.constants import GEE_DATASET_PATH
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -50,7 +51,7 @@ def generate_terrain_raster_clip(
     )
 
     task = export_raster_asset_to_gee(
-        image=pan_india_raster.clip(roi.geometry()),
+        image=pan_india_raster.clip(roi.union().geometry()),
         description=description,
         asset_id=asset_id,
         scale=30,
@@ -63,6 +64,7 @@ def generate_terrain_raster_clip(
 
     # Check if asset was created
     layer_id = None
+    layer_at_geoserver = False
 
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
@@ -74,7 +76,7 @@ def generate_terrain_raster_clip(
             + "_terrain_raster"
         )
 
-        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, description)
+        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
 
@@ -95,5 +97,14 @@ def generate_terrain_raster_clip(
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+
+            layer_STAC_generated = False
+            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                state=state, district=district, block=block, layer_name="terrain_raster"
+            )
+
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
             layer_at_geoserver = True
     return layer_at_geoserver

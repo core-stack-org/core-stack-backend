@@ -2,13 +2,13 @@ import ee
 import datetime
 from dateutil.relativedelta import relativedelta
 
+from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
 )
-from computing.models import Layer, Dataset
 
 
 def net_value(
@@ -30,10 +30,12 @@ def net_value(
         print("Net value asset already exists")
         layer_obj = None
         try:
-            dataset = Dataset.objects.get(name="Hydrology")
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=f"deltaG_well_depth_{asset_suffix}",
+                dataset_name="Hydrology",
             )
         except Exception as e:
             print(
@@ -43,16 +45,9 @@ def net_value(
         db_end_date = None
         if layer_obj:
             db_end_date = layer_obj.misc["end_date"]
-            # else:
-            # fc = ee.FeatureCollection(asset_id)
-            # col_names = fc.first().propertyNames().getInfo()
-            # filtered_col = [col for col in col_names if col.startswith("20")]
-            # filtered_col.sort()
-            # db_end_date = filtered_col[-1]
-
             db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
 
-        if not db_end_date or db_end_date < end_date:
+        if not db_end_date or db_end_date.year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
             return None, asset_id

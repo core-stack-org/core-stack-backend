@@ -22,6 +22,7 @@ from computing.utils import (
     sync_layer_to_geoserver,
     update_layer_sync_status,
 )
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -43,7 +44,7 @@ def generate_hydrology(
 
     sys.setrecursionlimit(6000)
 
-    end_year = end_year if is_annual else end_year + 1
+    end_year = end_year + 1
     task_list = []
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
@@ -150,7 +151,7 @@ def generate_hydrology(
             )
             print("save Run Off info at the gee level...")
 
-    dg_task_id, delta_g_asset_id = delta_g(
+    dg_task_id, delta_g_asset_id, g_last_date = delta_g(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -159,14 +160,14 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
-
+    print("g_last_date", g_last_date)
     task_id_list = check_task_status([dg_task_id]) if dg_task_id else []
     print("dg task_id_list", task_id_list)
 
     layer_name = "deltaG_fortnight_" + asset_suffix
 
     if is_annual:
-        wd_task_id, wd_asset_id, w_last_date = well_depth(
+        wd_task_id, wd_asset_id = well_depth(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
             app_type=app_type,
@@ -189,7 +190,7 @@ def generate_hydrology(
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    asset_id, g_last_date = calculate_g(
+    asset_id = calculate_g(
         delta_g_asset_id,
         asset_folder_list,
         asset_suffix,
@@ -224,5 +225,22 @@ def generate_hydrology(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+
+            if is_annual:
+                layer_STAC_generated = False
+                layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                    state=state,
+                    district=district,
+                    block=block,
+                    layer_name="change_in_well_depth_vector",
+                )
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+                )
+            else:
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=False
+                )
+
             layer_at_geoserver = True
     return layer_at_geoserver

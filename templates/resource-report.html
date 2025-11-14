@@ -211,20 +211,22 @@
 </head>
 <body>
     <header>
-        <div class="container">
-            <h1>Resource and Demand Map Report</h1>
-            <button class="print-button" onclick="printReport()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                    <rect x="6" y="14" width="12" height="8"></rect>
-                </svg>
-                Save as PDF
-            </button>
+    <div class="container">
+        <h1>Resource and Demand Map Report</h1>
+        <div style="margin-top: 15px; font-size: 1.1em; opacity: 0.95;">
+            <div><strong>Plan Name:</strong> {{plan_name}}</div>
+            <div style="margin-top: 5px;"><strong>Plan ID:</strong> {{plan_id}}</div>
         </div>
-
-
-    </header>
+        <button class="print-button" onclick="printReport()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Save as PDF
+        </button>
+    </div>
+</header>
 
     <div class="container">
 
@@ -263,7 +265,7 @@
     <div class="container">
 
         <section class="section">
-            <h2>Settlement Overview</h2>
+            <h2>Settlement Overview for <strong>Plan :</strong> {{plan_name}}</h2>
             <div id="mainMap" class="map"></div>
         </section>
 
@@ -272,7 +274,7 @@
     <div class="container">
 
         <section class="section">
-            <h2>Well Overview</h2>
+            <h2>Well Overview for <strong>Plan :</strong> {{plan_name}}</h2>
             <div id="wellMap" class="map"></div>
         </section>
         <p class="legend-note">Note: Well Demands on Stream Order Raster</p>
@@ -327,7 +329,7 @@
     <div class="container">
 
         <section class="section">
-            <h2>Water Structures Overview</h2>
+            <h2>Water Structures Overview for <strong>Plan :</strong> {{plan_name}}</h2>
             <div id="waterStructureMap" class="map"></div>
         </section>
         <div class="legend">
@@ -357,7 +359,7 @@
     <div class="container">
 
         <section class="section">
-            <h2>Demands Overview</h2>
+            <h2>Demands Overview for <strong>Plan :</strong> {{plan_name}}</h2>
             <div id="demandStructureMap" class="map"></div>
         </section>
         <div class="legend">
@@ -634,12 +636,12 @@
         demandStructureMap.addLayer(mwsLayer);
 
         // Center on MWS extent
-        // const arr = vectorSource.getExtent();
-        // const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-        // mainMap.getView().setCenter(mapcenter);
-        // wellMap.getView().setCenter(mapcenter);
-        // waterStructureMap.getView().setCenter(mapcenter);
-        // demandStructureMap.getView().setCenter(mapcenter);
+        const arr = vectorSource.getExtent();
+        const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+        mainMap.getView().setCenter(mapcenter);
+        wellMap.getView().setCenter(mapcenter);
+        waterStructureMap.getView().setCenter(mapcenter);
+        demandStructureMap.getView().setCenter(mapcenter);
     }
 
     async function addVillageBoundary () {

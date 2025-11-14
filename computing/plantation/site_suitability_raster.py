@@ -478,7 +478,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
     # Distance to Roads
     if variable == "distToRoad":
         dataset_collection = ee.FeatureCollection(
-            f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
+            f"projects/ext-datasets/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
         )
         dataset = dataset_collection.reduceToImage(
             properties=["STATE_ID"], reducer=ee.Reducer.first()
