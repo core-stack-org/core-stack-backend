@@ -110,7 +110,7 @@ def terrain_raster(
             print("sync to geoserver flag is updated")
 
             layer_STAC_generated = False
-            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
                 state=state, district=district, block=block, layer_name="terrain_raster"
             )
 
