@@ -77,7 +77,7 @@ def merge_yearly_layers(
 
     def get_collection_path(year: int) -> str:
         """Get the full path for a year's collection."""
-        asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        asset_path = GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         return f"{get_gee_dir_path(asset_folder_list, asset_path=asset_path)}drought_{asset_suffix}_{year}"
 
     # Get base feature collection
