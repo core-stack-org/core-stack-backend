@@ -21,10 +21,15 @@ from constants.pan_india_urls import CATCHMETN_AREA, NATURAL_DEPRESSION
 
 
 @app.task(bind=True)
-def generate_natural_depression(self, state, district, block, gee_account_id):
+def generate_distance_to_nearest_drainage_line(
+    self, state, district, block, gee_account_id
+):
     ee_initialize(gee_account_id)
     description = (
-        "natural_depression_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+        "distance_to_drainage_line_"
+        + valid_gee_text(district)
+        + "_"
+        + valid_gee_text(block)
     )
 
     roi = ee.FeatureCollection(
@@ -40,12 +45,12 @@ def generate_natural_depression(self, state, district, block, gee_account_id):
     raster = natural_depression.clip(roi.geometry())
 
     # Generate raster Layer
-    natural_depression_raster_generation(
+    distance_to_drainage_line_raster_generation(
         state, district, block, description, roi, raster
     )
 
 
-def natural_depression_raster_generation(
+def distance_to_drainage_line_raster_generation(
     state, district, block, description, roi, raster
 ):
     raster_asset_id = (
@@ -60,8 +65,13 @@ def natural_depression_raster_generation(
                 scale=30,
                 region=roi.geometry(),
             )
-            natural_depression_task_id_list = check_task_status([task_id])
-            print("natural depression task_id list", natural_depression_task_id_list)
+            distance_to_nearest_drainage_line__task_id_list = check_task_status(
+                [task_id]
+            )
+            print(
+                "Distance to nearest drainage line task_id list",
+                distance_to_nearest_drainage_line__task_id_list,
+            )
 
             """ Sync image to google cloud storage and then to geoserver"""
             image = ee.Image(raster_asset_id)
@@ -76,14 +86,14 @@ def natural_depression_raster_generation(
                 block,
                 layer_name=description + "_raster",
                 asset_id=raster_asset_id,
-                dataset_name="Natural Depression",
+                dataset_name="Distance to Drainage Line",
             )
             make_asset_public(raster_asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "natural_depression",
+                "distance_nearest_upstream_DL",
                 description + "_raster",
                 description + "_raster",
-                style_name="natural_depression",
+                style_name="distance_nearest_upstream_DL",
             )
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")

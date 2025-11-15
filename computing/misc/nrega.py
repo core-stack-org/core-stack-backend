@@ -19,7 +19,7 @@ from utilities.constants import (
 from unidecode import unidecode
 import boto3
 from io import BytesIO
-from nrm_app.settings import NREGA_BUCKET, NREGA_ACCESS_KEY, NREGA_SECRET_KEY
+from nrm_app.settings import NREGA_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY
 from utilities.gee_utils import (
     gdf_to_ee_fc,
     export_vector_asset_to_gee,
@@ -33,6 +33,8 @@ from utilities.gee_utils import (
 )
 import ee
 import numpy as np
+
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
@@ -55,15 +57,13 @@ def clip_nrega_district_block(
     s3 = boto3.resource(
         service_name="s3",
         region_name="ap-south-1",
-        aws_access_key_id=NREGA_ACCESS_KEY,
-        aws_secret_access_key=NREGA_SECRET_KEY,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
     )
 
     formatted_state_name = valid_gee_text(state_name)
 
-    nrega_dist_file = (
-        f"{formatted_state_name.upper()}/{valid_gee_text(district_name).upper()}.geojson"
-    )
+    nrega_dist_file = f"{formatted_state_name.upper()}/{valid_gee_text(district_name).upper()}.geojson"
 
     try:
         file_obj = s3.Object(NREGA_BUCKET, nrega_dist_file).get()
@@ -205,6 +205,17 @@ def clip_nrega_district_block(
         res = push_shape_to_geoserver(path, workspace="nrega_assets")
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            layer_STAC_generated = False
+            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                state=state_name,
+                district=district_name,
+                block=block_name,
+                layer_name="nrega_vector",
+            )
+
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
             layer_at_geoserver = True
             print("sync to geoserver flag is updated")
     return layer_at_geoserver

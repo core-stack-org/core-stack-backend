@@ -1,7 +1,5 @@
 import ee
-from utilities.constants import (
-    GEE_DATASET_PATH
-)
+from utilities.constants import GEE_DATASET_PATH
 
 
 def mask_s2cloud(image):

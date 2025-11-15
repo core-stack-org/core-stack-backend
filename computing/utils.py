@@ -728,24 +728,31 @@ def save_layer_info_to_db(
     return layer_obj.id
 
 
-def update_layer_sync_status(layer_id, sync_to_geoserver=True):
+def update_layer_sync_status(
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+):
     try:
-        updated_count = Layer.objects.filter(id=layer_id).update(
-            is_sync_to_geoserver=sync_to_geoserver
-        )
+        layer_obj = Layer.objects.filter(id=layer_id)
+        if sync_to_geoserver is not None:
+            updated_count = layer_obj.update(is_sync_to_geoserver=sync_to_geoserver)
 
-        if updated_count > 0:
-            print(
-                f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
+            if updated_count > 0:
+                print(
+                    f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
+                )
+
+        if is_stac_specs_generated is not None:
+            updated_count = layer_obj.update(
+                is_stac_specs_generated=is_stac_specs_generated
             )
-            return True
-        else:
-            print(f"Layer with ID {layer_id} not found")
-            return False
+
+            if updated_count > 0:
+                print(
+                    f"Updated sync status to {is_stac_specs_generated} for layer ID: {layer_id}"
+                )
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
-        return False
 
 
 def get_existing_end_year(dataset_name, layer_name):
@@ -763,12 +770,16 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
         district_name__iexact=district, state=state_obj
     )
     block_obj = TehsilSOI.objects.get(tehsil_name__iexact=block, district=district_obj)
-    layer_obj = Layer.objects.get(
-        state=state_obj,
-        district=district_obj,
-        block=block_obj,
-        layer_name=layer_name,
-        dataset__name=dataset_name,
+    layer_obj = (
+        Layer.objects.filter(
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_name=layer_name,
+            dataset__name=dataset_name,
+        )
+        .order_by("-layer_version")
+        .first()
     )
     return layer_obj
 

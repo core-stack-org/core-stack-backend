@@ -19,6 +19,8 @@ from .swb1 import vectorize_water_pixels
 from .swb2 import waterbody_mws_intersection
 from .swb3 import waterbody_wbc_intersection
 
+from computing.STAC_specs import generate_STAC_layerwise
+
 
 @app.task(bind=True)
 def generate_swb_layer(
@@ -150,5 +152,17 @@ def sync_asset_to_db_and_geoserver(
         if res.get("status_code") == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
+
+            layer_STAC_generated = False
+            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                state=state,
+                district=district,
+                block=block,
+                layer_name="surface_water_bodies_vector",
+            )
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
+
             layer_at_geoserver = True
     return layer_at_geoserver

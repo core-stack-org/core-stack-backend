@@ -17,14 +17,14 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from constants.pan_india_urls import CATCHMETN_AREA, NATURAL_DEPRESSION
+from constants.pan_india_urls import CATCHMETN_AREA
 
 
 @app.task(bind=True)
-def generate_natural_depression(self, state, district, block, gee_account_id):
+def generate_catchment_area_singleflow(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
     description = (
-        "natural_depression_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+        "catchment_area_" + valid_gee_text(district) + "_" + valid_gee_text(block)
     )
 
     roi = ee.FeatureCollection(
@@ -36,18 +36,14 @@ def generate_natural_depression(self, state, district, block, gee_account_id):
         + "_uid"
     )
 
-    natural_depression = ee.Image(NATURAL_DEPRESSION)
-    raster = natural_depression.clip(roi.geometry())
+    catchment_area_raster = ee.Image(CATCHMETN_AREA)
+    raster = catchment_area_raster.clip(roi.geometry())
 
     # Generate raster Layer
-    natural_depression_raster_generation(
-        state, district, block, description, roi, raster
-    )
+    catchment_area_raster_generation(state, district, block, description, roi, raster)
 
 
-def natural_depression_raster_generation(
-    state, district, block, description, roi, raster
-):
+def catchment_area_raster_generation(state, district, block, description, roi, raster):
     raster_asset_id = (
         get_gee_asset_path(state, district, block) + description + "_raster"
     )
@@ -60,8 +56,8 @@ def natural_depression_raster_generation(
                 scale=30,
                 region=roi.geometry(),
             )
-            natural_depression_task_id_list = check_task_status([task_id])
-            print("natural depression task_id list", natural_depression_task_id_list)
+            catchment_area_task_id_list = check_task_status([task_id])
+            print("catchmenta area task_id list", catchment_area_task_id_list)
 
             """ Sync image to google cloud storage and then to geoserver"""
             image = ee.Image(raster_asset_id)
@@ -76,14 +72,14 @@ def natural_depression_raster_generation(
                 block,
                 layer_name=description + "_raster",
                 asset_id=raster_asset_id,
-                dataset_name="Natural Depression",
+                dataset_name="Catchment Area",
             )
             make_asset_public(raster_asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "natural_depression",
+                "catchment_area_singleflow",
                 description + "_raster",
                 description + "_raster",
-                style_name="natural_depression",
+                "catchment_area_singleflow",
             )
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")

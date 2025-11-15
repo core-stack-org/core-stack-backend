@@ -1,9 +1,8 @@
 import ee
 import datetime
 
-from dateutil.relativedelta import relativedelta
-
 from computing.mws.utils import get_last_date
+from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
@@ -12,7 +11,6 @@ from utilities.gee_utils import (
     check_task_status,
     merge_fc_into_existing_fc,
 )
-from computing.models import Layer, Dataset
 
 
 def precipitation(
@@ -36,10 +34,12 @@ def precipitation(
         layer_obj = None
         try:
             layer_name_suffix = "annual" if is_annual else "fortnight"
-            dataset = Dataset.objects.get(name="Hydrology Precipitation")
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
+                dataset_name="Hydrology Precipitation",
             )
         except Exception as e:
             print(
@@ -91,8 +91,9 @@ def _generate_data(roi, asset_id, description, start_date, end_date, is_annual):
             f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
             f_end_date = f_start_date + datetime.timedelta(days=14)
-            if f_end_date > end_date:
-                break
+
+        if f_end_date > end_date:
+            break
 
         dataset = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(
             ee.Filter.date(f_start_date, f_end_date)

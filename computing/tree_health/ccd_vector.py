@@ -40,7 +40,9 @@ def get_mws_features(state, district, block):
 
 
 @app.task(bind=True)
-def tree_health_ccd_vector(self, state, district, block, start_year, end_year, gee_account_id):
+def tree_health_ccd_vector(
+    self, state, district, block, start_year, end_year, gee_account_id
+):
     ee_initialize(gee_account_id)
 
     mws_features = get_mws_features(state, district, block)

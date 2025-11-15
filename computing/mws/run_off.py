@@ -1,11 +1,9 @@
 import ee
 import datetime
-from dateutil.relativedelta import relativedelta
 
 from computing.mws.utils import get_last_date
-from computing.utils import create_chunk, merge_chunks
+from computing.utils import create_chunk, merge_chunks, get_layer_object
 from gee_computing.models import GEEAccount
-from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -18,7 +16,6 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
     build_gee_helper_paths,
 )
-from computing.models import Layer, Dataset
 
 
 def run_off(
@@ -40,10 +37,12 @@ def run_off(
         layer_obj = None
         try:
             layer_name_suffix = "annual" if is_annual else "fortnight"
-            dataset = Dataset.objects.get(name="Hydrology Run Off")
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
+                dataset_name="Hydrology Run Off",
             )
         except Exception as e:
             print(
@@ -207,8 +206,9 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
             f_end_date = f_start_date + datetime.timedelta(days=14)
-            if f_end_date > end_date:
-                break
+
+        if f_end_date > end_date:
+            break
         lulc = lulc_img.filterDate(f_start_date, f_end_date)
         classification = lulc.select("label")
 

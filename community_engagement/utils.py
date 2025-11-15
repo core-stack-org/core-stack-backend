@@ -2,7 +2,7 @@ from .models import Media_type, Community, Location, LocationLevel
 from geoadmin.models import State, District, Block
 from django.db.models import Q
 from django.utils.timezone import now, localtime
-
+from projects.models import Project
 
 def get_media_type(param):
     param = param.lower()
@@ -70,7 +70,21 @@ def get_communities(state_name, district_name, block_name):
     return data
 
 
-def create_community_for_project(project):
+def create_community_for_project(project_data):
+    project = Project.objects.create(
+        name=project_data.get("name"),
+        description=project_data.get("description"),
+        organization_id=project_data.get("organization_id"),
+        state_id=project_data.get("state_id"),
+        district_id=project_data.get("district_id"),
+        block_id=project_data.get("block_id"),
+        created_by_id=project_data.get("created_by"),
+        updated_by_id=project_data.get("updated_by"),
+        app_type=project_data.get("app_type", "community_engagement"),
+        enabled=True,
+    )
+    print(f"Project created: {project.name}")
+
     if project.block_id:
         level = LocationLevel.BLOCK
     elif project.district_id:
@@ -86,9 +100,12 @@ def create_community_for_project(project):
         district_id=project.district_id,
         block_id=project.block_id,
     )
+    print(f"Location {'created' if created else 'found'}: {location}")
 
     community = Community.objects.create(project=project)
     community.locations.add(location)
+    print(f"Community created: {community.id}")
+
     return community
 
 
