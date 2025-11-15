@@ -92,8 +92,9 @@ def _generate_data(roi, asset_id, description, start_date, end_date, is_annual):
             f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
             f_end_date = f_start_date + datetime.timedelta(days=14)
-            if f_end_date > end_date:
-                break
+
+        if f_end_date > end_date:
+            break
 
         dataset = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(
             ee.Filter.date(f_start_date, f_end_date)
