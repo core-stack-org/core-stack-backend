@@ -75,12 +75,12 @@ LOCAL_DATA_DIR = "data/STAC_specs/"
 STYLE_FILE_DIR = os.path.join(LOCAL_DATA_DIR, "input/style_files/")
 
 # %%
-THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR, "STAC_output_exception_handling")
+THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR, "STAC_output")
 # THUMBNAIL_DIR
 
 # %%
 STAC_FILES_DIR = os.path.join(
-    LOCAL_DATA_DIR, "CorestackCatalogs_exception_handling"  # test folder
+    LOCAL_DATA_DIR, "CorestackCatalogs"  # test folder
 )
 #'CorestackCatalogs_exception_handling'
 
