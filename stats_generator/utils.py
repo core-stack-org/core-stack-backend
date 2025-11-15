@@ -10,8 +10,9 @@ from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
 import numpy as np
 from shapely.geometry import Point, shape
 from .models import LayerInfo
-
-# from shapely.geometry.base import BaseGeometry
+from django.http import HttpResponse
+from rest_framework import status
+from pathlib import Path
 
 
 def fetch_layers_for_excel_generation():
@@ -111,9 +112,6 @@ def get_vector_layer_geoserver(state, district, block):
                     )
                 except Exception as e:
                     print("Exception as e", str(e))
-                # create_excel_mws_inters_villages(
-                #     mws_geojson_datas, xlsx_file, writer, district, block
-                # )
                 # create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
 
             elif workspace == "crop_intensity":
@@ -430,8 +428,6 @@ def create_excel_for_aquifer(data, xlsx_file, writer):
                 max_percentage = percentage
                 max_aquifer = aquifer
 
-        # Set aquifer_class based on the dominant aquifer
-        # If the dominant aquifer is Alluvium, class is Alluvium, otherwise Hard Rock
         aquifer_class = "Alluvium" if max_aquifer == "Alluvium" else "Hard Rock"
 
         # Combine all data for this UID
@@ -1717,43 +1713,59 @@ def create_excel_for_village_boun(old_geojson, writer):
 
 
 def download_layers_excel_file(state, district, block):
-    state_folder = state.replace(" ", "_").upper()
-    district_folder = district.replace(" ", "_").upper()
-    base_path = EXCEL_PATH + "data/stats_excel_files/"
-
-    state_path = os.path.join(base_path, state_folder)
-    if not os.path.exists(state_path):
-        os.makedirs(state_path)
-
-    district_path = os.path.join(state_path, district_folder)
-    if not os.path.exists(district_path):
-        os.makedirs(district_path)
-
+    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
+    state_path = os.path.join(base_path, state.upper())
+    district_path = os.path.join(state_path, district.upper())
     filename = f"{district}_{block}.xlsx"
     file_path = os.path.join(district_path, filename)
-    if os.path.exists(file_path):
-        return file_path
+
+    output_dir = Path(file_path).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not os.path.exists(file_path):
+        try:
+            if not get_vector_layer_geoserver(state, district, block):
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Failed to generate vector layer from GeoServer.",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            if not os.path.exists(file_path):
+                return Response(
+                    {"status": "error", "message": "Failed to generate Excel file."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": "error",
+                    "message": f"Error during file generation: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     else:
-        return None
+        print(f"Excel file already exists at: {file_path}")
 
-
-def read_tehsil_excel_to_json(state, district, block):
-    file_path = download_layers_excel_file(state, district, block)
-
-    if not file_path:
-        return {"error": "Excel file not found."}
-
-    try:
-        xls = pd.read_excel(file_path, sheet_name=None)
-        result = {}
-
-        for sheet_name, df in xls.items():
-            df.columns = [col.strip().lower() for col in df.columns]
-            df.replace([np.inf, -np.inf], np.nan, inplace=True)
-            df = df.where(pd.notnull(df), None)
-            result[sheet_name] = df.to_dict(orient="records")
-
-        return result
-
-    except Exception as e:
-        return {"error": str(e)}
+    # Single file reading logic - only written once!
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "rb") as file:
+                response = HttpResponse(
+                    file.read(),
+                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                response["Content-Disposition"] = f"attachment; filename={filename}"
+                return response
+        except Exception as e:
+            return Response(
+                {"status": "error", "message": f"Error reading file: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    else:
+        return Response(
+            {"status": "error", "message": "Failed to locate Excel file."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
