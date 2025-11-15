@@ -206,8 +206,9 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
             f_end_date = f_start_date + datetime.timedelta(days=14)
-            if f_end_date > end_date:
-                break
+
+        if f_end_date > end_date:
+            break
         lulc = lulc_img.filterDate(f_start_date, f_end_date)
         classification = lulc.select("label")
 

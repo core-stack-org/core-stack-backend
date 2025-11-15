@@ -207,6 +207,8 @@ def et_fldas(
     while f_start_date < end_date:
         if is_annual:
             f_end_date = f_start_date + datetime.timedelta(days=363)
+            if f_end_date > end_date:
+                break
             image_path = (
                 "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_annual/ET_"
                 + str(s_year)
