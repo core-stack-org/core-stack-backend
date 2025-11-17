@@ -42,6 +42,8 @@ import json
 import tqdm
 import glob
 
+import re
+
 import sys
 
 sys.path.append("..")
@@ -79,9 +81,7 @@ THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR, "STAC_output")
 # THUMBNAIL_DIR
 
 # %%
-STAC_FILES_DIR = os.path.join(
-    LOCAL_DATA_DIR, "CorestackCatalogs"  # test folder
-)
+STAC_FILES_DIR = os.path.join(LOCAL_DATA_DIR, "CorestackCatalogs")
 #'CorestackCatalogs_exception_handling'
 
 # %%
@@ -99,16 +99,16 @@ S3_STAC_BUCKET_NAME = constants.S3_STAC_BUCKET_NAME
 # %%
 layer_STAC_generated = False  # output flag
 
-# %% [markdown]
 # ### Raster flow
 
 
 # %%
-def read_layer_description(filepath, layer_name):
-    if os.path.exists(filepath):
+def read_layer_description(filepath, layer_name, overwrite_existing):
+    if (os.path.exists(filepath)) and (not overwrite_existing):
         layer_desc_df = pd.read_csv(filepath)
     else:
         # download and save
+        print("STAC:downloading layer description csv from github")
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         layer_desc_df = pd.read_csv(LAYER_DESC_GITHUB_URL)
         layer_desc_df.to_csv(filepath)
@@ -443,6 +443,7 @@ def read_layer_mapping(
     district,  #
     block,
     start_year="",
+    #    end_year = ''
 ):
     layer_mapping_df = pd.read_csv(layer_map_csv_path)
     layer_display_name = layer_mapping_df[layer_mapping_df["layer_name"] == layer_name][
@@ -477,6 +478,7 @@ def read_layer_mapping(
         geoserver_layer_name = geoserver_layer_name.format(
             start_year=start_year_modified, end_year=end_year_modified, block=block
         )
+    # prin
     # print(geoserver_workspace_name,geoserver_layer_name)
     elif (layer_name == "tree_canopy_cover_density_raster") | (
         layer_name == "tree_canopy_height_raster"
@@ -507,12 +509,15 @@ def generate_raster_item(
     layer_map_csv_path,
     layer_desc_csv_path,
     start_year,
+    #  end_year,
+    overwrite_existing,
 ):
-    print("start_year=", start_year)
 
     # 1. read layer description
     layer_description = read_layer_description(
-        filepath=layer_desc_csv_path, layer_name=layer_name
+        filepath=layer_desc_csv_path,
+        layer_name=layer_name,
+        overwrite_existing=overwrite_existing,
     )
 
     # 2. get geoserver url parameters from the layer details
@@ -529,6 +534,7 @@ def generate_raster_item(
         block=block,
         layer_name=layer_name,
         start_year=start_year,
+        #    end_year=end_year
     )
     print(f"geoserver_workspace_name={geoserver_workspace_name}")
     print(f"geoserver_layer_name={geoserver_layer_name}")
@@ -557,8 +563,9 @@ def generate_raster_item(
         end_date = str(int(start_year) + 1) + "-" + constants.AGRI_YEAR_END_DATE
         end_date = pd.to_datetime(end_date)
 
-        print(f"start_date = {start_date}")
-        print(f"end_date = {end_date}")
+        # print(f"start_date = {start_date}")
+        # print(f"end_date = {end_date}")
+
     raster_item, raster_data = create_raster_item(
         geoserver_url,
         #  id=f"{layer_name}_{block}",
@@ -907,11 +914,16 @@ def add_vector_data_asset(vector_item, geoserver_url):
 
 # %%
 def add_tabular_extension(
-    vector_item, vector_data_gdf, column_desc_csv_path, ee_layer_name
+    vector_item,
+    vector_data_gdf,
+    column_desc_csv_path,
+    ee_layer_name,
+    overwrite_existing=False,
 ):
-    if os.path.exists(column_desc_csv_path):
+    if (os.path.exists(column_desc_csv_path)) and (not overwrite_existing):
         vector_column_desc_gdf = pd.read_csv(column_desc_csv_path)
     else:
+        print("STAC:downloading column descriptions csv from github")
         os.makedirs(os.path.dirname(column_desc_csv_path), exist_ok=True)
         vector_column_desc_gdf = pd.read_csv(VECTOR_COLUMN_DESC_GITHUB_URL)
         vector_column_desc_gdf.to_csv(column_desc_csv_path)
@@ -1308,13 +1320,16 @@ def generate_vector_item(
     layer_map_csv_path,
     layer_desc_csv_path,
     column_desc_csv_path,
+    overwrite_existing,
 ):
     # print(layer_map_csv_path)
     # print(layer_desc_csv_path)
     # print(column_desc_csv_path)
     # 1. read layer description
     layer_description = read_layer_description(
-        filepath=layer_desc_csv_path, layer_name=layer_name
+        filepath=layer_desc_csv_path,
+        layer_name=layer_name,
+        overwrite_existing=overwrite_existing,
     )
 
     # 2. get geoserver url parameters from the layer details
@@ -1330,6 +1345,8 @@ def generate_vector_item(
         district=district,
         block=block,
         layer_name=layer_name,
+        #    start_year=start_year,
+        #    end_year=end_year
     )
 
     # print(f"geoserver_workspace_name={geoserver_workspace_name}")
@@ -1367,6 +1384,7 @@ def generate_vector_item(
         vector_data_gdf=vector_data_gdf,
         column_desc_csv_path=column_desc_csv_path,
         ee_layer_name=ee_layer_name,
+        overwrite_existing=overwrite_existing,
     )
 
     # 7. add style file asset
@@ -1417,7 +1435,6 @@ def create_aws_client(
         region_name=region_name,
         aws_session_token=aws_session_token,
     )
-
 
 # %%
 def upload_file_to_s3(
@@ -1494,13 +1511,17 @@ def generate_vector_stac(
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     column_desc_csv_path="data/STAC_specs/input/metadata/vector_column_descriptions.csv",
     upload_to_s3=True,
+    overwrite_existing=False,
 ):
-    print("triggering vector stac pipeline")
+    print("STAC: triggering vector STAC pipeline")
     # print(layer_map_csv_path)
-
     state = valid_gee_text(state.lower())
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
+
+    # print("state=",state)
+    # print("district=",district)
+    # print("block=",block)
 
     vector_item = generate_vector_item(
         state,
@@ -1510,6 +1531,7 @@ def generate_vector_stac(
         layer_map_csv_path,
         layer_desc_csv_path,
         column_desc_csv_path,
+        overwrite_existing,
     )
 
     layer_STAC_generated = update_STAC_files(
@@ -1539,13 +1561,19 @@ def generate_raster_stac(
     layer_map_csv_path="data/STAC_specs/input/metadata/layer_mapping.csv",
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     start_year="",
+    #  end_year='',
     upload_to_s3=True,
+    overwrite_existing=False,
 ):
+    print("STAC: triggering raster STAC pipeline")
 
-    print("triggering raster stac pipeline")
     state = valid_gee_text(state.lower())
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
+
+    # print("state=",state)
+    # print("district=",district)
+    # print("block=",block)
 
     raster_item = generate_raster_item(
         state,
@@ -1555,6 +1583,8 @@ def generate_raster_stac(
         layer_map_csv_path,
         layer_desc_csv_path,
         start_year,
+        #    end_year,
+        overwrite_existing,
     )
 
     layer_STAC_generated = update_STAC_files(
@@ -1604,11 +1634,17 @@ def generate_raster_stac(
 # block='virpur'
 
 # %%
+# state='Uttar Pradesh'
+# district='Jaunpur'
+# block='Badlapur'
+
+# %%
 # generate_vector_stac(state=state,
 #                      district=district,
 #                      block=block,
 #                      layer_name='drainage_lines_vector',
-#                      upload_to_s3=True
+#                      upload_to_s3=True,
+#                      overwrite_existing=True
 #                     #  layer_map_csv_path='data/STAC_specs/input/metadata/layer_mapping.csv',
 #                     #  layer_desc_csv_path='data/STAC_specs/input/metadata/layer_descriptions.csv',
 #                     #  column_desc_csv_path='data/STAC_specs/input/metadata/vector_column_descriptions.csv'
@@ -1633,3 +1669,19 @@ def generate_raster_stac(
 #                     #  layer_desc_csv_path='data/STAC_specs/input/metadata/layer_descriptions.csv',
 #                      start_year='2021'
 #                      )
+
+# %%
+# upload_folder_to_s3(
+#     aws_creds=aws_creds,
+#     folderpath='data/STAC_specs/CorestackCatalogs_exception_handling',
+#     s3_bucket='spatio-temporal-asset-catalog'
+# )
+
+# %%
+# upload_folder_to_s3(
+#     aws_creds=aws_creds,
+#     folderpath='data/STAC_specs/STAC_output_exception_handling',
+#     s3_bucket='spatio-temporal-asset-catalog'
+# )
+
+# %%
