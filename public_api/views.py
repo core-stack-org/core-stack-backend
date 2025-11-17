@@ -6,7 +6,6 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
 )
-from datetime import datetime
 from rest_framework.response import Response
 from rest_framework import status
 from nrm_app.settings import EXCEL_PATH
@@ -14,11 +13,9 @@ import json
 import pandas as pd
 import numpy as np
 from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
-import json
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 
-from stats_generator.models import LayerInfo
-from computing.models import Layer, Dataset, LayerType
+from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 
@@ -264,3 +261,27 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
 
     except Exception as e:
         return {"error": f"Error reading or processing file: {str(e)}"}
+
+
+def get_tehsil_json(file_path):
+    json_path = file_path.replace(".xlsx", ".json")
+
+    if os.path.exists(json_path):
+        with open(json_path, "r") as f:
+            return json.load(f)
+
+    print(f"Generating JSON from Excel: {file_path}")
+    xls = pd.read_excel(file_path, sheet_name=None)
+    json_data = {}
+
+    for sheet_name, df in xls.items():
+        df.columns = [col.strip().lower() for col in df.columns]
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df = df.where(pd.notnull(df), None)
+        json_data[sheet_name] = df.to_dict(orient="records")
+
+    # Save JSON file
+    with open(json_path, "w") as f:
+        json.dump(json_data, f)
+
+    return json_data

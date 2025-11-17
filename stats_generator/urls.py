@@ -5,8 +5,18 @@ from . import api
 urlpatterns = [
     path(
         "download_excel_layer/",
-        api.generate_excel_file_layer,
-        name="generate_excel_file_layer",
+        api.download_stats_excel_file,
+        name="download_excel_layer",
+    ),
+    path(
+        "generate_stats_excel_file/",
+        api.generate_stats_excel_file_data,
+        name="generate_stats_excel_file",
+    ),
+    path(
+        "add_new_layer_data_to_excel/",
+        api.add_sheets_in_stats_excel,
+        name="add_new_layer_data_to_excel",
     ),
     path(
         "download_kyl_data/",
