@@ -18,6 +18,7 @@ from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
+from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
 
 # Create your views here.
 
@@ -41,7 +42,7 @@ def excel_file_exists(state, district, tehsil):
     district_path = os.path.join(state_path, district.upper())
     filename = f"{district}_{tehsil}.xlsx"
     file_path = os.path.join(district_path, filename)
-    return os.path.exists(file_path)
+    return file_path, os.path.exists(file_path)
 
 
 def raster_tiff_download_url(workspace, layer_name):
@@ -68,9 +69,6 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         layer_type = dataset.layer_type
         layer_name = layer.layer_name
         gee_asset_path = layer.gee_asset_path
-
-        # Safely get misc data
-        misc = dataset.misc or {}
         style_url = dataset.style_name
 
         if layer_type in [LayerType.VECTOR, LayerType.POINT]:
@@ -158,21 +156,7 @@ def get_mws_id_by_lat_lon(lon, lat):
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-def get_mws_json_from_stats_excel(state, district, tehsil, mws_id):
-    state_folder = state.replace(" ", "_").upper()
-    district_folder = district.replace(" ", "_").upper()
-    file_xl_path = (
-        EXCEL_PATH
-        + "data/stats_excel_files/"
-        + state_folder
-        + "/"
-        + district_folder
-        + "/"
-        + district
-        + "_"
-        + tehsil
-    )
-    xlsx_file = file_xl_path + ".xlsx"
+def get_mws_json_from_stats_excel(state, district, tehsil, mws_id, xlsx_file):
 
     sheets = {
         "hydrological_annual": -1,
@@ -263,7 +247,8 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         return {"error": f"Error reading or processing file: {str(e)}"}
 
 
-def get_tehsil_json(file_path):
+def get_tehsil_json(state, district, tehsil):
+    file_path, file_exists = excel_file_exists(state, district, tehsil)
     json_path = file_path.replace(".xlsx", ".json")
 
     if os.path.exists(json_path):
@@ -285,3 +270,37 @@ def get_tehsil_json(file_path):
         json.dump(json_data, f)
 
     return json_data
+
+
+def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
+    ee_initialize(GEE_HELPER_ACCOUNT_ID)
+    asset_path = get_gee_asset_path(state, district, tehsil)
+    mws_asset_id = asset_path + f"filtered_mws_{district}_{tehsil}_uid"
+
+    if not is_gee_asset_exists(mws_asset_id):
+        return None, Response(
+            {"error": "Mws Layer not found for the given location."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Filter feature collection by MWS ID
+    mws_fc = ee.FeatureCollection(mws_asset_id)
+    matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
+
+    if matching_feature is None or matching_feature.getInfo() is None:
+        return None, Response(
+            {"error": "Data not found for the given mws_id"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Check if Excel file exists
+    if not excel_file_exists(state, district, tehsil):
+        return None, Response(
+            {"Message": "Data not found for this state, district, tehsil."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Generate report URL
+    report_url = f"{base_url}/api/v1/generate_mws_report/?state={state}&district={district}&block={tehsil}&uid={mws_id}"
+
+    return {"Mws_report_url": report_url}, None
