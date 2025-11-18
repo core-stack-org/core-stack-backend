@@ -4,3 +4,6 @@ from django.apps import AppConfig
 class GeoadminConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "geoadmin"
+
+    def ready(self):
+        import geoadmin.signals
