@@ -1190,7 +1190,7 @@ def layer_status_dashboard(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_lcw(request):
+def generate_lcw_to_gee(request):
     print("Inside generate_lcw_conflict_data API.")
     try:
         state = request.data.get("state").lower()
