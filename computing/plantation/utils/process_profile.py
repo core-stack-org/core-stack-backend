@@ -67,6 +67,7 @@ drainageClasses = {
     "Very poorly drained": 7,
 }
 awcClasses = {"150": 1, "125": 2, "100": 3, "75": 4, "50": 5, "15": 6, "0": 7}
+
 lulcClasses = {
     "Forest": 1,
     "Grassland": 2,

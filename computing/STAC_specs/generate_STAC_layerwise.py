@@ -79,9 +79,7 @@ THUMBNAIL_DIR = os.path.join(LOCAL_DATA_DIR, "STAC_output")
 # THUMBNAIL_DIR
 
 # %%
-STAC_FILES_DIR = os.path.join(
-    LOCAL_DATA_DIR, "CorestackCatalogs"  # test folder
-)
+STAC_FILES_DIR = os.path.join(LOCAL_DATA_DIR, "CorestackCatalogs")  # test folder
 #'CorestackCatalogs_exception_handling'
 
 # %%
@@ -166,6 +164,12 @@ def read_raster_data(raster_url):
             ]
         )
         data = r.read(1)  # TODO: wouldn't work if there are multiple bands
+        # read a downsampled version for thumbnail
+        thumbnail_size = 256  # pixels
+        scale_x = r.width / thumbnail_size
+        scale_y = r.height / thumbnail_size
+
+        data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
 
         # id = os.path.basename(raster_url) #works when data is local
         # id = layer_name
@@ -405,6 +409,8 @@ def generate_raster_thumbnail(raster_data, style_info, output_path):
         cmap = "gray"
         norm = None
     plt.figure(figsize=(3, 3), dpi=100)
+    # h, w = raster_data.shape
+    # plt.figure(figsize=(w / 100, h / 100), dpi=100)
 
     plt.imshow(raster_data, cmap=cmap, norm=norm, interpolation="none")
     plt.axis("off")

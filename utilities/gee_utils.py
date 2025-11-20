@@ -686,13 +686,14 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
     task_list = check_task_status([task_id])
     print("merge task completed.", task_list)
 
-    # Delete existing asset
-    ee.data.deleteAsset(asset_id)
-    ee.data.deleteAsset(new_asset_id)
-    # Rename new asset with existing asset's name
-    ee.data.copyAsset(f"{asset_id}_merge", asset_id)
-    # Delete new asset
-    ee.data.deleteAsset(f"{asset_id}_merge")
+    if is_gee_asset_exists(f"{asset_id}_merge"):
+        # Delete existing asset
+        ee.data.deleteAsset(asset_id)
+        ee.data.deleteAsset(new_asset_id)
+        # Rename new asset with existing asset's name
+        ee.data.copyAsset(f"{asset_id}_merge", asset_id)
+        # Delete new asset
+        ee.data.deleteAsset(f"{asset_id}_merge")
 
 
 def build_gee_helper_paths(app_type, helper_project):
