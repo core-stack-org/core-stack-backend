@@ -1190,7 +1190,7 @@ def layer_status_dashboard(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_lcw_to_gee(request):
+def generate_lcw(request):
     print("Inside generate_lcw_conflict_data API.")
     try:
         state = request.data.get("state").lower()
@@ -1210,7 +1210,7 @@ def generate_lcw_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_agroecological_to_gee(request):
+def generate_agroecological(request):
     print("Inside generate_agroecological_data API.")
     try:
         state = request.data.get("state").lower()
@@ -1230,7 +1230,7 @@ def generate_agroecological_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_factory_csr_to_gee(request):
+def generate_factory_csr(request):
     print("Inside generate_factory_csr_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1250,7 +1250,7 @@ def generate_factory_csr_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_green_credit_to_gee(request):
+def generate_green_credit(request):
     print("Inside generate_green_credit_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1270,7 +1270,7 @@ def generate_green_credit_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_mining_to_gee(request):
+def generate_mining(request):
     print("Inside generate_mining_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1290,7 +1290,7 @@ def generate_mining_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_natural_depression_to_gee(request):
+def generate_natural_depression(request):
     print("Inside generate_natural_depression_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1310,7 +1310,7 @@ def generate_natural_depression_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_distance_nearest_upstream_DL_to_gee(request):
+def generate_distance_nearest_upstream_DL(request):
     print("Inside generate_distance_nearest_upstream_DL_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1330,7 +1330,7 @@ def generate_distance_nearest_upstream_DL_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_catchment_area_SF_to_gee(request):
+def generate_catchment_area_SF(request):
     print("Inside generate_catchment_area_SF_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1350,7 +1350,7 @@ def generate_catchment_area_SF_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_slope_percentage_to_gee(request):
+def generate_slope_percentage(request):
     print("Inside generate_slope_percentage_to_gee API.")
     try:
         state = request.data.get("state").lower()
