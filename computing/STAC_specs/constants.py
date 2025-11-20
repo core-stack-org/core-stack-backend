@@ -16,8 +16,8 @@ GITHUB_DATA_URL = "https://raw.githubusercontent.com/core-stack-org/core-stack-b
 
 
 STAC_VERSION = "1.0.0"
-ROOT_CATALOG_TITLE = "CoREStack Spatio Temporal Asset Catalog"
-ROOT_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoREStack (https://core-stack.org/). The data layers are generated at an administrative block level, and some layers are available for Pan India."
+ROOT_CATALOG_TITLE = "CoRE Stack Spatio Temporal Asset Catalog"
+ROOT_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoRE Stack (https://core-stack.org/). The data layers are generated at an administrative block level, and some layers are available for Pan India."
 
 GEOSERVER_BASE_URL = "https://geoserver.core-stack.org:8443/geoserver"
 
