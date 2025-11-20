@@ -44,6 +44,8 @@ from .gen_mws_report import (
     get_terrain_data,
     get_village_data,
     get_water_balance_data,
+    get_factory_data,
+    get_mining_data
 )
 from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email
@@ -302,6 +304,8 @@ def generate_mws_report(request):
 
         # ? LCW and Industrial Data Description
         lcw_desc = get_land_conflict_industrial_data(result["state"], result["district"], result["block"], result["uid"])
+        factory_desc = get_factory_data(result["state"], result["district"], result["block"], result["uid"])
+        mining_desc = get_mining_data(result["state"], result["district"], result["block"], result["uid"])
 
         context = {
             "district": result["district"],
@@ -364,7 +368,9 @@ def generate_mws_report(request):
             "wb_years": json.dumps(wb_years),
             "drysp_all": json.dumps(drysp_all),
             "dg_years": json.dumps(dg_years),
-            "lcw_desc" : lcw_desc
+            "lcw_desc" : lcw_desc,
+            "factory_desc" : factory_desc,
+            "mining_desc" : mining_desc
         }
 
         # print("Api Processing End 1", datetime.now())
