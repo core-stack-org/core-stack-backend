@@ -131,4 +131,24 @@ urlpatterns = [
         api.generate_mining_to_gee,
         name="generate_mining_data",
     ),
+    path(
+        "generate_natural_depression_data/",
+        api.generate_natural_depression_to_gee,
+        name="generate_natural_depression_data",
+    ),
+    path(
+        "generate_distance_nearest_DL_data/",
+        api.generate_distance_nearest_upstream_DL_to_gee,
+        name="generate_distance_nearest_DL_data",
+    ),
+    path(
+        "generate_catchment_area_singleflow_data/",
+        api.generate_catchment_area_SF_to_gee,
+        name="generate_catchment_area_singleflow_data",
+    ),
+    path(
+        "generate_slope_percentage/",
+        api.generate_slope_percentage_to_gee,
+        name="generate_slope_percentage",
+    ),
 ]

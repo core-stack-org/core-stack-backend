@@ -72,7 +72,7 @@ def generate_factory_csr_data(self, state, district, block, gee_account_id):
             block,
             layer_name=description,
             asset_id=asset_id,
-            dataset_name="factory_csr",
+            dataset_name="Factory CSR",
         )
         make_asset_public(asset_id)
 
