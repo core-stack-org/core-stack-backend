@@ -47,7 +47,9 @@ def create_geojson_for_all_mws(existing_geojson_path, df, new_geojson_path):
         json.dump(new_feature_collection, f)
 
 
-def generate_mws_data_for_kyl_filters(state, district, block, file_type):
+def generate_mws_data_for_kyl_filters(
+    state, district, block, file_type, regenerate=None
+):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
     file_xl_path = (
@@ -61,8 +63,10 @@ def generate_mws_data_for_kyl_filters(state, district, block, file_type):
         + "_"
         + block
     )
-
-    file_path = get_mws_KYL_filter_data(state, district, block, file_type)
+    if regenerate:
+        file_path = None
+    else:
+        file_path = get_mws_KYL_filter_data(state, district, block, file_type)
     if not file_path:
         try:
             sheets = {

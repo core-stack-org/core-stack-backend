@@ -79,8 +79,11 @@ def generate_mws_data_for_kyl(request):
         district = valid_gee_text(request.query_params.get("district", "").lower())
         block = valid_gee_text(request.query_params.get("block", "").lower())
         file_type = request.query_params.get("file_type", "").lower().strip()
+        regenerate = request.query_params.get("regenerate", "").lower()
 
-        return generate_mws_data_for_kyl_filters(state, district, block, file_type)
+        return generate_mws_data_for_kyl_filters(
+            state, district, block, file_type, regenerate
+        )
 
     except Exception as e:
         return Response(
@@ -98,8 +101,9 @@ def generate_village_data_for_kyl(request):
         state = valid_gee_text(request.query_params.get("state", "").lower())
         district = valid_gee_text(request.query_params.get("district", "").lower())
         block = valid_gee_text(request.query_params.get("block", "").lower())
+        regenerate = request.query_params.get("regenerate", "")
 
-        return get_generate_filter_data_village(state, district, block)
+        return get_generate_filter_data_village(state, district, block, regenerate)
 
     except Exception as e:
         return Response(
