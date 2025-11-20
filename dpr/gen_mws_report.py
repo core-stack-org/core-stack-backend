@@ -235,7 +235,7 @@ def get_osm_data(state, district, block, uid):
         )
         df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
 
-        total_area = df["area_in_ha"].sum()
+        total_area = int(df["area_in_ha"].sum())
 
         region_gdf = gpd.read_file(
             get_geojson(
@@ -1236,6 +1236,64 @@ def get_land_conflict_industrial_data(state, district, block, uid):
         return []
 
 
+def get_factory_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="factory_csr")
+
+        filtered_names = df.loc[df["UID"] == uid, "Company_Name"]
+        filtered_address = df.loc[df["UID"] == uid, "ADDRESS"]
+        filtered_type = df.loc[df["UID"] == uid, "LOCATION T"]
+
+        names = filtered_names.tolist()
+        addresses = filtered_address.tolist()
+        types = filtered_type.tolist()
+
+        factories = [
+            {"name": name, "address": address, "type": type_val} 
+            for name, address, type_val in zip(names, addresses, types)
+        ]
+
+        return factories
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Factory Data",
+            district,
+            block,
+            e,
+        )
+        return []
+
+
+def get_mining_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="mining")
+
+        filtered_names = df.loc[df["UID"] == uid, "division"]
+        filtered_address = df.loc[df["UID"] == uid, "sector_moefcc"]
+        filtered_type = df.loc[df["UID"] == uid, "village"]
+
+        names = filtered_names.tolist()
+        sectors = filtered_address.tolist()
+        villages = filtered_type.tolist()
+
+        mining_sites = [
+            {"division": division, "sector": sector, "village": village} 
+            for division, sector, village in zip(names, sectors, villages)
+        ]
+
+        return mining_sites
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Mining Data",
+            district,
+            block,
+            e,
+        )
+        return []
+
+
 def get_cropping_intensity(state, district, block, uid):
     try:
         df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="croppingIntensity_annual")
@@ -1677,7 +1735,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
         else:
             parameter_swb_1 += (
-                f"The MicrowaterShed doesn't have any surface water of its own."
+                f"No surface water bodies were detected through remote sensing in this micro-watershed."
             )
 
         return (
