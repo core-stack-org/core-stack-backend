@@ -25,6 +25,7 @@ from .swagger_schemas import (
     tehsil_data_schema,
     generated_layer_urls_schema,
     mws_report_urls_schema,
+    kyl_indicators_schema,
 )
 
 
@@ -231,8 +232,8 @@ def generate_tehsil_data(request):
 
 
 ########### Get KYL Data based on MWS ID  ###############
+@swagger_auto_schema(**kyl_indicators_schema)
 @api_security_check(auth_type="API_key")
-@schema(None)
 def get_mws_json_by_kyl_indicator(request):
     """
     Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.

@@ -72,7 +72,7 @@ def generate_green_credit_data(self, state, district, block, gee_account_id):
             block,
             layer_name=description,
             asset_id=asset_id,
-            dataset_name="green_credit",
+            dataset_name="Green Credit",
         )
         make_asset_public(asset_id)
 

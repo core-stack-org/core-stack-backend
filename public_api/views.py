@@ -210,7 +210,6 @@ def get_mws_json_from_stats_excel(state, district, tehsil, mws_id, xlsx_file):
 
 
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
-    generate_mws_data_for_kyl_filters(state, district, tehsil, "xlsx")
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
     file_xl_path = (
@@ -224,19 +223,21 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         + "_"
         + tehsil
     )
-    xlsx_file = file_xl_path + "_KYL_filter_data.xlsx"
+    json_file = file_xl_path + "_KYL_filter_data.json"
 
     try:
-        df = pd.read_excel(xlsx_file)
+        with open(json_file, "r") as f:
+            data = json.load(f)
+
+        df = pd.DataFrame(data)
         df.columns = [col.strip().lower() for col in df.columns]
 
         if "mws_id" not in df.columns:
-            return {"error": "'mws_id' column not found in Excel file."}
+            return {"error": "'mws_id' column not found in JSON file."}
 
         filtered_df = df[df["mws_id"] == mws_id]
         filtered_df = filtered_df.replace([np.inf, -np.inf], np.nan)
 
-        # Convert to dict with null-safe serialization
         json_compatible = json.loads(
             filtered_df.to_json(orient="records", default_handler=str)
         )
