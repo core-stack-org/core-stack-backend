@@ -1,4 +1,3 @@
-from tkinter import image_names
 
 import requests
 from dpr.utils import get_url
