@@ -813,7 +813,7 @@ def generate_mws_data_for_kyl_filters(state, district, block, file_type):
                     results_df,
                     file_xl_path + "_KYL_filter_data.geojson",
                 )
-            file_path = download_KYL_filter_data(state, district, block, file_type)
+            file_path = get_mws_KYL_filter_data(state, district, block, file_type)
 
         except Exception as e:
             return Response(
