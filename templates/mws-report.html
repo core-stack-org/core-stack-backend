@@ -448,6 +448,109 @@
         .mining-sector strong {
             color: #2c3e50;
         }
+
+        /* Green Credit Section Styles */
+        .green-credit-section {
+            margin-top: 40px;
+        }
+
+        .green-credit-section h3 {
+            font-size: 1.3em;
+            color: #34495e;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 8px;
+        }
+
+        .green-credit-section p {
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        /* Green Credit List Styles */
+        .green-credit-list {
+            margin-top: 20px;
+        }
+
+        .green-credit-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #27ae60;
+            border-radius: 4px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .green-credit-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .green-credit-number {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            background-color: #27ae60;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .green-credit-content {
+            flex: 1;
+        }
+
+        .green-credit-name {
+            margin: 0 0 12px 0;
+            font-size: 1em;
+            color: #2c3e50;
+            line-height: 1.4;
+            font-weight: 600;
+        }
+
+        .green-credit-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .green-credit-detail-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .green-credit-detail-row svg {
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #7f8c8d;
+        }
+
+        .green-credit-info {
+            line-height: 1.5;
+        }
+
+        .green-credit-info strong {
+            color: #2c3e50;
+        }
+
+        /* Show more button for green credit */
+        .show-more-button.green-credit-btn {
+            background-color: #27ae60;
+        }
+
+        .show-more-button.green-credit-btn:hover {
+            background-color: #229954;
+        }
+
         /* Collapsible sections */
         .collapsible-list {
             position: relative;
@@ -869,7 +972,27 @@
                 print-color-adjust: exact !important;
             }
 
+            .green-credit-section h3 {
+                border-bottom: 2px solid #27ae60 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
             
+            .green-credit-item {
+                display: flex !important;
+                background-color: #f8f9fa !important;
+                border-left: 4px solid #27ae60 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                page-break-inside: avoid;
+            }
+            
+            .green-credit-number {
+                background-color: #27ae60 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
 
             /* Collapsible sections - hide buttons */
             .show-more-button {
@@ -1159,7 +1282,7 @@
             {% if factory_desc %}
             <div class="factory-section">
                 <h3>Industries in this Microwatershed</h3>
-                <p>The following {{ factory_desc|length }} factor{{ factory_desc|length|pluralize:"y,ies" }} {{ factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
+                <p>The following {{ factory_desc|length }} Industr{{ factory_desc|length|pluralize:"y,ies" }} {{ factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
                 
                 <div class="factory-list collapsible-list" id="factoryList">
                     {% for factory in factory_desc %}
@@ -1236,6 +1359,61 @@
             </div>
             {% endif %}
         </section>
+        {% endif %}
+
+        {% if green_credit_desc %}
+        <div class="green-credit-section">
+            <h3>Green Credit Sites in this Microwatershed</h3>
+            <p>The following {{ green_credit_desc|length }} green credit site{{ green_credit_desc|length|pluralize }} {{ green_credit_desc|length|pluralize:"is,are" }} registered in this micro watershed:</p>
+            
+            <div class="green-credit-list collapsible-list" id="greenCreditList">
+                {% for credit in green_credit_desc %}
+                <div class="green-credit-item {% if forloop.counter > 10 %}hidden-item{% endif %}">
+                    <div class="green-credit-number">{{ forloop.counter }}</div>
+                    <div class="green-credit-content">
+                        <h4 class="green-credit-name">{{ credit.division }}</h4>
+                        <div class="green-credit-details">
+                            <div class="green-credit-detail-row">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="green-credit-info"><strong>Registration No:</strong> {{ credit.registration_no }}</span>
+                            </div>
+                            <div class="green-credit-detail-row">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                                    <line x1="9" y1="21" x2="9" y2="9"></line>
+                                </svg>
+                                <span class="green-credit-info"><strong>Total Area:</strong> {{ credit.total_area }}</span>
+                            </div>
+                            <div class="green-credit-detail-row">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 11 12 14 22 4"></polyline>
+                                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+                                </svg>
+                                <span class="green-credit-info"><strong>Selected Area:</strong> {{ credit.selected_area }}</span>
+                            </div>
+                            <div class="green-credit-detail-row">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                <span class="green-credit-info"><strong>Available Area:</strong> {{ credit.available_area }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if green_credit_desc|length > 10 %}
+            <button class="show-more-button green-credit-btn" onclick="toggleList('greenCreditList', this)">
+                Show More ({{ green_credit_desc|length|add:"-10" }} more)
+            </button>
+            {% endif %}
+            <p class="legend-note">Note: Green credit data is sourced from the Ministry of Environment, Forest and Climate Change (MoEFCC) Green Credit Program registry.</p>
+        </div>
         {% endif %}
 
         <section class="section">
