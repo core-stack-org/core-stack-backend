@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tehsil Analysis Report</title>
+
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.4.0/ol.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.4.0/dist/ol.js"></script>
+
+    <!-- OpenLayers-ext JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.js"></script>
+
+    <!-- OpenLayers-ext CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.css" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            overflow-x: hidden;
+        }
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+        .map {
+            height: 400px;
+            width: 100%;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            max-width: 100%;
+            position: relative;
+        }
+
+        .map-group{
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            max-width: 100%;
+            margin: 20px 0 10px 0;
+        }
+        .chart-container canvas {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 2px;
+        }
+        footer {
+            margin-top: 40px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            text-align: center;
+            color: #7f8c8d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 6px;
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-size: 0.9em;
+        }
+        .village-section {
+            overflow-x: auto;
+        }
+        .legend-note {
+            color: #6c757d;       /* gray */
+            text-align: center;
+            font-size: 0.9rem;
+            font-style: italic;
+            margin: 6px 0 0;      /* tight spacing under legend */
+        }
+
+        /* Print Button Styles */
+        .print-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+        
+        .print-button:hover {
+            background-color: #2ecc71;
+        }
+        
+        .print-button svg {
+            margin-right: 5px;
+        }
+        
+        .doc-button {
+            position: absolute;
+            top: 20px;
+            right: 140px; /* shift left of the PDF button */
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .doc-button:hover { background-color: #005a9e; }
+
+        /* Land Conflict Section Styles */
+        .conflict-section {
+            margin-top: 20px;
+        }
+
+        .conflict-section h3 {
+            font-size: 1.3em;
+            color: #34495e;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #e74c3c;
+            padding-bottom: 8px;
+        }
+
+        .conflict-section p {
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        /* Land Conflict List Styles */
+        .conflict-list {
+            margin-top: 20px;
+        }
+
+        .conflict-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #e74c3c;
+            border-radius: 4px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .conflict-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .conflict-number {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            background-color: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .conflict-content {
+            flex: 1;
+        }
+
+        .conflict-title {
+            margin: 0 0 8px 0;
+            font-size: 1em;
+            color: #2c3e50;
+            line-height: 1.4;
+        }
+
+        .conflict-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: #3498db;
+            text-decoration: none;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .conflict-link:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+
+        .conflict-link svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        /* Factory Section Styles */
+        .factory-section {
+            margin-top: 40px;
+        }
+
+        .factory-section h3 {
+            font-size: 1.3em;
+            color: #34495e;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+
+        .factory-section p {
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        /* Factory List Styles */
+        .factory-list {
+            margin-top: 20px;
+        }
+
+        .factory-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .factory-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .factory-number {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .factory-content {
+            flex: 1;
+        }
+
+        .factory-name {
+            margin: 0 0 12px 0;
+            font-size: 1em;
+            color: #2c3e50;
+            line-height: 1.4;
+            font-weight: 600;
+        }
+
+        .factory-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .factory-detail-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .factory-detail-row svg {
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #7f8c8d;
+        }
+
+        .factory-address {
+            line-height: 1.5;
+        }
+
+        .factory-type {
+            line-height: 1.5;
+        }
+
+        .factory-type strong {
+            color: #2c3e50;
+        }
+
+        /* Mining Section Styles */
+        .mining-section {
+            margin-top: 40px;
+        }
+
+        .mining-section h3 {
+            font-size: 1.3em;
+            color: #34495e;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #f39c12;
+            padding-bottom: 8px;
+        }
+
+        .mining-section p {
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        /* Mining List Styles */
+        .mining-list {
+            margin-top: 20px;
+        }
+
+        .mining-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #f39c12;
+            border-radius: 4px;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .mining-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .mining-number {
+            flex-shrink: 0;
+            width: 30px;
+            height: 30px;
+            background-color: #f39c12;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .mining-content {
+            flex: 1;
+        }
+
+        .mining-name {
+            margin: 0 0 12px 0;
+            font-size: 1em;
+            color: #2c3e50;
+            line-height: 1.4;
+            font-weight: 600;
+        }
+
+        .mining-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mining-detail-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .mining-detail-row svg {
+            flex-shrink: 0;
+            margin-top: 2px;
+            color: #7f8c8d;
+        }
+
+        .mining-village,
+        .mining-sector {
+            line-height: 1.5;
+        }
+
+        .mining-village strong,
+        .mining-sector strong {
+            color: #2c3e50;
+        }
+        /* Collapsible sections */
+        .collapsible-list {
+            position: relative;
+        }
+
+        .show-more-button {
+            display: block;
+            margin: 15px auto 0;
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .show-more-button:hover {
+            background-color: #2980b9;
+        }
+
+        .show-more-button.conflict-btn {
+            background-color: #e74c3c;
+        }
+
+        .show-more-button.conflict-btn:hover {
+            background-color: #c0392b;
+        }
+
+        .show-more-button.factory-btn {
+            background-color: #3498db;
+        }
+
+        .show-more-button.factory-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .show-more-button.mining-btn {
+            background-color: #f39c12;
+        }
+
+        .show-more-button.mining-btn:hover {
+            background-color: #e67e22;
+        }
+
+        .hidden-item {
+            display: none;
+        }
+                
+        @media print { 
+            .doc-button { display: none; }   
+            .legend-note {
+                margin-top: 3em;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            } 
+            
+            .show-more-button {
+                display: none !important;
+            }
+            .print-button {
+                display: none;
+            }
+            .hidden-item {
+                display: none !important;
+            }
+        }
+
+       /* Print-specific styles */
+       /* Print-specific styles */
+        @media print {
+            * {
+                box-sizing: border-box;
+            }
+            
+            html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow: visible;
+            }
+
+            .container {
+                width: 100%;
+                max-width: 100%;
+                padding: 10px;
+                margin: 0;
+            }
+
+            header {
+                background-color: #2c3e50 !important;
+                color: white !important;
+                padding: 15px 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .chart-container {
+                height: 250px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 10px 0 !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                overflow: visible;
+            }
+
+            /* AGGRESSIVE MAP PRINT STYLES */
+            .map {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+                max-height: 500px !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                position: relative !important;
+                overflow: visible !important;
+                margin: 20px 0 !important;
+            }
+
+            /* Target all OpenLayers elements inside maps */
+            .map,
+            .map > div,
+            .map .ol-viewport,
+            .map .ol-overlaycontainer,
+            .map .ol-overlaycontainer-stopevent {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+                max-height: 500px !important;
+            }
+
+            /* Force canvas to respect container size during print */
+            .map canvas,
+            .map .ol-layer canvas {
+                width: 100% !important;
+                height: 500px !important;
+                max-width: none !important;
+                max-height: none !important;
+                min-width: 100% !important;
+                min-height: 500px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .map-group {
+                width: 100% !important;
+                max-width: 100% !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin: 20px 0 40px 0 !important;
+                display: flex !important;
+                flex-direction: row !important;
+                gap: 10px !important;
+            }
+
+            .map-group .map {
+                width: 48% !important;
+                flex: 1 1 48% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+                max-height: 400px !important;
+            }
+
+            .map-group .map,
+            .map-group .map > div,
+            .map-group .map .ol-viewport,
+            .map-group .map .ol-overlaycontainer,
+            .map-group .map .ol-overlaycontainer-stopevent {
+                height: 400px !important;
+                min-height: 400px !important;
+                max-height: 400px !important;
+            }
+
+            .map-group .map canvas,
+            .map-group .map .ol-layer canvas {
+                height: 400px !important;
+                min-height: 400px !important;
+                max-height: 400px !important;
+                max-width: none !important;
+            }
+
+            /* Target specific map IDs */
+            #mainMap,
+            #mainMap > div,
+            #mainMap .ol-viewport {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+            }
+
+            #mainMap canvas,
+            #swbMap canvas {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+            }
+
+            #terrainMap, #compMap1,
+            #terrainMap > div, #compMap1 > div,
+            #terrainMap .ol-viewport, #compMap1 .ol-viewport {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #terrainMap canvas, #compMap1 canvas {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #lulcMap, #compMap2,
+            #lulcMap > div, #compMap2 > div,
+            #lulcMap .ol-viewport, #compMap2 .ol-viewport {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #lulcMap canvas, #compMap2 canvas {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #degradLandMap, #compMap3,
+            #degradLandMap > div, #compMap3 > div,
+            #degradLandMap .ol-viewport, #compMap3 .ol-viewport {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #degradLandMap canvas, #compMap3 canvas {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #treeReduceMap, #compMap4,
+            #treeReduceMap > div, #compMap4 > div,
+            #treeReduceMap .ol-viewport, #compMap4 .ol-viewport {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #treeReduceMap canvas, #compMap4 canvas {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #urbanMap, #compMap5,
+            #urbanMap > div, #compMap5 > div,
+            #urbanMap .ol-viewport, #compMap5 .ol-viewport {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #urbanMap canvas, #compMap5 canvas {
+                width: 100% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+            }
+
+            #swbMap,
+            #swbMap > div,
+            #swbMap .ol-viewport {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+            }
+
+            /* Force OpenLayers viewport to match container */
+            .ol-viewport {
+                position: absolute !important;
+                width: 100% !important;
+                height: 100% !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+            
+            /* Ensure canvas fills the viewport */
+            .ol-layer canvas {
+                position: absolute !important;
+                width: 100% !important;
+                height: 100% !important;
+                transform: none !important;
+            }
+
+            .map .ol-viewport {
+                height: 500px !important;
+            }
+
+            .map-group .map .ol-viewport {
+                height: 400px !important;
+            }
+
+            /* Ensure no transform interference */
+            .map .ol-layer {
+                width: 100% !important;
+                height: 100% !important;
+            }
+
+            .legend-color {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                background-clip: content-box !important;
+            }
+
+            canvas {
+                max-width: 100% !important;
+                image-rendering: -webkit-optimize-contrast !important;
+            }
+
+            table {
+                width: 100% !important;
+                page-break-inside: auto;
+                font-size: 0.7em !important;
+                table-layout: fixed !important;
+            }
+
+            th, td {
+                padding: 4px !important;
+                font-size: 0.75em !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            thead {
+                display: table-header-group;
+            }
+
+            tfoot {
+                display: table-footer-group;
+            }
+
+            /* Land Conflict Section Styles */
+            .conflict-section h3 {
+                border-bottom: 2px solid #e74c3c !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .conflict-item {
+                display: flex !important;
+                background-color: #f8f9fa !important;
+                border-left: 4px solid #e74c3c !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                page-break-inside: avoid;
+            }
+            
+            .conflict-number {
+                background-color: #e74c3c !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .conflict-link {
+                color: #3498db !important;
+            }
+
+            /* Factory Section Styles */
+            .factory-section h3 {
+                border-bottom: 2px solid #3498db !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .factory-item {
+                display: flex !important;
+                background-color: #f8f9fa !important;
+                border-left: 4px solid #3498db !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                page-break-inside: avoid;
+            }
+            
+            .factory-number {
+                background-color: #3498db !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Mining Section Styles */
+            .mining-section h3 {
+                border-bottom: 2px solid #f39c12 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .mining-item {
+                display: flex !important;
+                background-color: #f8f9fa !important;
+                border-left: 4px solid #f39c12 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                page-break-inside: avoid;
+            }
+            
+            .mining-number {
+                background-color: #f39c12 !important;
+                color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            
+
+            /* Collapsible sections - hide buttons */
+            .show-more-button {
+                display: none !important;
+            }
+
+            .doc-button, .print-button { 
+                display: none; 
+            }   
+            
+            .legend-note {
+                margin-top: 1em;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Page setup for better printing */
+            @page {
+                size: A4 portrait;
+                margin: 1cm;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Tehsil Data Analysis Report</h1>
+            <p>Spatial and Temporal Analysis of Key Metrics</p>
+            <button class="print-button" onclick="printReport()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Save as PDF
+            </button>
+        </div>
+
+
+    </header>
+
+    <div class="container">
+        <section class="section">
+            <h2>Overview of Tehsil characteristics</h2>
+            <p>{{block_osm}}</p>
+        </section>
+
+        <section class="section">
+            <h3>Agriculture</h3>
+            <p>This is just an Dummy Text for Tehsil Report. </p>
+
+            <div class="map-group">
+                <div id="agriMap" class="map"></div>
+                <div id="compMap1" class="map"></div>
+            </div>
+
+        </section>
+
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
+            <p>Refer to our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a> for more details on how data was collected and processed.</p>
+            <p>
+                Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
+                <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
+            </p>
+        </div>
+    </footer>
+    <script>
+        const tempView1 = new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+
+        const AgricultureMap = new ol.Map({
+            target: 'agriMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view : tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ComparisonMap1 = new ol.Map({
+            target: 'compMap1',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+        
+        // Extract Feature
+        fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                let strokeColor = 'black'; // Default stroke color
+                let fillColor = 'rgba(135, 206, 235, 0.2)'; // Default fill color with 0.4 opacity
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 1.5,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+            ComparisonMap1.addLayer(vectorLayer);
+
+            const arr = vectorSource.getExtent();
+            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+            ComparisonMap1.getView().setCenter(mapcenter);
+            AgricultureMap.getView().setCenter(mapcenter);
+        })
+        .catch(error => console.error('Error fetching GeoJSON:', error));
+
+
+
+    </script>
+</body>
+</html>
