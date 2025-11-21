@@ -132,6 +132,11 @@ urlpatterns = [
         name="generate_mining_data",
     ),
     path(
+        "get_layers_in_workspace/",
+        api.get_layers_for_workspace,
+        name="get_layers_in_workspace",
+    ),
+    path(
         "generate_natural_depression/",
         api.generate_natural_depression,
         name="generate_natural_depression_data",
