@@ -84,7 +84,7 @@ More generally, combine all of the above and describe the most important changes
   - Cropping intensity by micro-watershed notebook ([Colab](https://colab.research.google.com/drive/1zv9TWdzfaEanE_i1kKw2Cr2snoCEhuIg?usp=sharing))
 - STAC specs organized by state/district/tehsil also provide relevant metadata: https://stac.core-stack.org/
 
-The very first API you should try is XXX to get the list of locations for which CoRE stack data is already populated. You can begin with these. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data for you. 
+The very first API you should try is [get active locaton api](https://geoserver.core-stack.org/api/v1/get_active_locations/) to get the list of locations for which CoRE stack data is already populated. You can begin with these. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data for you. 
 
 ---
 
@@ -100,7 +100,7 @@ Submissions will be scored on:
 ---
 
 ## 8. Submission guidelines
-- Submit via the provided form (XXX) with repo and demo links. Attach `metadata.json` and point to the main notebook(s).
+- Submit via the provided [form](https://forms.gle/7aoMeWgG2H19nsoK6) with repo and demo links. Attach `metadata.json` and point to the main notebook(s).
 - All code should be open-source; include a LICENSE and clear run instructions. If you cannot publish certain external datasets for legal/privacy reasons, include a small synthetic dataset to let reviewers run the analysis.
 - Provide at least one reproducible entrypoint (notebook or script) that downloads and processes CoRE Stack data automatically.
 
@@ -128,7 +128,7 @@ Judges will review code and run at least one primary notebook per submission to 
 ---
 
 ## 12. Contact & support
-For discussions and help, join the XXX or Slack/Discord for questions, plus scheduled developer community calls for API onboarding and data orientation.
+For discussions and help regarding the challenge, please join our Discord channel using this [link](https://discord.com/channels/1359790694289641472/1441300233513603132) and participate in our scheduled developer community calls. To stay updated with the latest announcements, please join our forum using this [link](https://discord.com/channels/1359790694289641472/1441368011536597034).
 
 ---
 
