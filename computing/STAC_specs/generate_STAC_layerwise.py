@@ -126,11 +126,12 @@ def read_layer_description(filepath, layer_name, overwrite_existing):
 def generate_raster_url(
     workspace, layer_name, geoserver_base_url, output_format="geotiff"
 ):
+    print("generating raster url...")
     wcs_url = (
         f"{geoserver_base_url}/{workspace}/wcs?"
         f"service=WCS&version=2.0.1&request=GetCoverage&"
         f"CoverageId={workspace}:{layer_name}&"
-        f"format={output_format}"
+        f"format={output_format}&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
     )
     print("Raster URL:", wcs_url)
     return wcs_url
@@ -165,8 +166,13 @@ def read_raster_data(raster_url):
                 [bounds.right, bounds.bottom],
             ]
         )
-        data = r.read(1)  # TODO: wouldn't work if there are multiple bands
+        # data = r.read(1)  # TODO: wouldn't work if there are multiple bands
+        # read a downsampled version for thumbnail
+        thumbnail_size = 256  # pixels
+        scale_x = r.width / thumbnail_size
+        scale_y = r.height / thumbnail_size
 
+        data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
         # id = os.path.basename(raster_url) #works when data is local
         # id = layer_name
         # gsd = 10
@@ -405,6 +411,8 @@ def generate_raster_thumbnail(raster_data, style_info, output_path):
         cmap = "gray"
         norm = None
     plt.figure(figsize=(3, 3), dpi=100)
+    # h, w = raster_data.shape
+    # plt.figure(figsize=(w / 100, h / 100), dpi=100)
 
     plt.imshow(raster_data, cmap=cmap, norm=norm, interpolation="none")
     plt.axis("off")
@@ -1435,6 +1443,7 @@ def create_aws_client(
         region_name=region_name,
         aws_session_token=aws_session_token,
     )
+
 
 # %%
 def upload_file_to_s3(
