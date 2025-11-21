@@ -44,7 +44,11 @@ from .gen_mws_report import (
     get_terrain_data,
     get_village_data,
     get_water_balance_data,
+    get_factory_data,
+    get_mining_data,
+    get_green_credit_data
 )
+from .gen_tehsil_report import (get_tehsil_data, get_pattern_intensity, get_agriculture_data)
 from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email
 
@@ -302,6 +306,10 @@ def generate_mws_report(request):
 
         # ? LCW and Industrial Data Description
         lcw_desc = get_land_conflict_industrial_data(result["state"], result["district"], result["block"], result["uid"])
+        factory_desc = get_factory_data(result["state"], result["district"], result["block"], result["uid"])
+        mining_desc = get_mining_data(result["state"], result["district"], result["block"], result["uid"])
+
+        green_credits = get_green_credit_data(result["state"], result["district"], result["block"], result["uid"])
 
         context = {
             "district": result["district"],
@@ -364,116 +372,15 @@ def generate_mws_report(request):
             "wb_years": json.dumps(wb_years),
             "drysp_all": json.dumps(drysp_all),
             "dg_years": json.dumps(dg_years),
-            "lcw_desc" : lcw_desc
+            "lcw_desc" : lcw_desc,
+            "factory_desc" : factory_desc,
+            "mining_desc" : mining_desc,
+            "green_credit_desc" : green_credits
         }
 
         # print("Api Processing End 1", datetime.now())
 
         return render(request, "mws-report.html", context)
-
-    except Exception as e:
-        logger.exception("Exception in generate_mws_report api :: ", e)
-        return render(request, "error-page.html", {})
-
-
-@api_view(["POST"])
-@auth_free
-@schema(None)
-def generate_multi_report(request):
-    try:
-        # ? district, block
-        params = request.GET
-        result = {}
-
-        for key, value in params.items():
-            result[key] = value
-
-        data = json.loads(request.body)
-
-        # Extract the two lists
-        filters = data.get("filters", [])
-        mwsList = data.get("mwsList", [])
-
-        # ? Block Overview of selected MWS and filter
-        mws_desc = get_mws_data(
-            result["state"], result["district"], result["block"], mwsList, filters
-        )
-
-        # ? Terrain Overview
-        terrain_desc = get_terrain_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? LULC Overview
-        lulc_desc = get_lulc_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? Land Degradtion Overview
-        land_degrad_desc = get_degrad_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? Tree Cover Reduction Overview
-        tree_reduce_desc = get_reduction_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? Urbanization Overview
-        urban_desc = get_urban_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? Cropping Intensity
-        inten_desc1, inten_desc2, inten_desc3, single, double, triple, uncrop = (
-            get_cropping_mws_data(
-                result["state"], result["district"], result["block"], mwsList
-            )
-        )
-
-        # ? Surface Water bodies Overview
-        swb_desc, rabi_desc, kh_desc_1, kh_desc_2, kh_desc_3 = get_surface_wb_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? Water balance Overview
-        deltag_desc, good_rainfall_desc, bad_rainfall_desc = get_water_balance_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        # ? Drought Overview
-        get_drought_mws_data(
-            result["state"], result["district"], result["block"], mwsList
-        )
-
-        context = {
-            "district": result["district"],
-            "block": result["block"],
-            "mwsList": json.dumps(mwsList),
-            "block_osm": mws_desc,
-            "terrain_desc": terrain_desc,
-            "lulc_desc": lulc_desc,
-            "land_degrad_desc": land_degrad_desc,
-            "tree_reduce_desc": tree_reduce_desc,
-            "urban_desc": urban_desc,
-            "inten_desc1": inten_desc1,
-            "inten_desc2": inten_desc2,
-            "inten_desc3": inten_desc3,
-            "single": json.dumps(single),
-            "double": json.dumps(double),
-            "triple": json.dumps(triple),
-            "uncrop": json.dumps(uncrop),
-            "swb_desc": swb_desc,
-            "rabi_desc": rabi_desc,
-            "kh_desc_1": kh_desc_1,
-            "kh_desc_2": kh_desc_2,
-            "kh_desc_3": kh_desc_3,
-            "deltag_desc": deltag_desc,
-            "good_rainfall_desc": good_rainfall_desc,
-            "bad_rainfall_desc": bad_rainfall_desc,
-        }
-
-        return render(request, "multi-mws-report.html", context)
 
     except Exception as e:
         logger.exception("Exception in generate_mws_report api :: ", e)
@@ -525,3 +432,45 @@ def download_mws_report(request):
     resp = HttpResponse(pdf_bytes, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+
+@api_view(["GET"])
+@auth_free
+@schema(None)
+# @api_security_check(auth_type="Auth_free")
+def generate_tehsil_report(request):
+    try:
+        # ? district, block, mwsId
+        params = request.GET
+        result = {}
+
+        for key, value in params.items():
+            result[key] = value
+        
+        # ? Total number of patterns are hardcoded and need to be updated everytime a new pattern is added to update the intensity values
+        current_pattern_count = 11
+        
+        mws_pattern_intensity = {}
+        
+        # ? OSM description generation
+        parameter_block = get_tehsil_data(
+            result["state"], result["district"], result["block"]
+        )
+
+        #? Pattern intensity
+        mws_pattern_intensity = get_pattern_intensity(result["state"], result["district"], result["block"], mws_pattern_intensity, current_pattern_count)
+
+        # ? Agriculture data
+        agriculture_data = get_agriculture_data(result["state"], result["district"], result["block"])
+
+        context = {
+            "district": result["district"],
+            "block": result["block"],
+            "block_osm": parameter_block,
+        }
+
+        return render(request, "block-report.html", context)
+
+    except Exception as e:
+        logger.exception("Exception in generate_tehsil_report api :: ", e)
+        return render(request, "error-page.html", {})

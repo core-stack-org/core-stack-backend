@@ -235,7 +235,7 @@ def get_osm_data(state, district, block, uid):
         )
         df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
 
-        total_area = df["area_in_ha"].sum()
+        total_area = int(df["area_in_ha"].sum())
 
         region_gdf = gpd.read_file(
             get_geojson(
@@ -1236,6 +1236,122 @@ def get_land_conflict_industrial_data(state, district, block, uid):
         return []
 
 
+import re
+
+def get_factory_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="factory_csr")
+
+        # Filter by UID
+        filtered_df = df[df["UID"] == uid]
+        
+        names = filtered_df["Company_Name"].tolist()
+        addresses = filtered_df["ADDRESS"].tolist()
+        types = filtered_df["LOCATION T"].tolist()
+
+        def clean_address(address):
+            if pd.isna(address):
+                return ""
+            
+            address = str(address)
+            
+            # Remove everything after "Fax :", "Email :", or "Internet :"
+            address = re.sub(r'\s*(?:Fax|Email|Internet)\s*:.*$', '', address, flags=re.IGNORECASE)
+            
+            return address.strip()
+
+        factories = [
+            {"name": name, "address": clean_address(address), "type": type_val} 
+            for name, address, type_val in zip(names, addresses, types)
+        ]
+
+        return factories
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Factory Data: %s",
+            district,
+            block,
+            e,
+        )
+        return []
+
+
+def get_mining_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="mining")
+
+        # Filter by UID first
+        filtered_df = df[df["UID"] == uid]
+        
+        # Remove rows where division is "unknown"
+        filtered_df = filtered_df[filtered_df["division"].str.lower() != "unknown"]
+        
+        # Remove duplicate entries based on "division" column
+        filtered_df = filtered_df.drop_duplicates(subset=["division"])
+        
+        # Extract the data
+        names = filtered_df["division"].tolist()
+        sectors = filtered_df["sector_moefcc"].tolist()
+        villages = filtered_df["village"].tolist()
+
+        mining_sites = [
+            {"division": division, "sector": sector, "village": village} 
+            for division, sector, village in zip(names, sectors, villages)
+        ]
+
+        return mining_sites
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Mining Data: %s",
+            district,
+            block,
+            e,
+        )
+        return []
+
+
+def get_green_credit_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="green_credit")
+
+        # Filter by UID
+        filtered_df = df[df["UID"] == uid]
+
+        division = filtered_df["division"].tolist()
+        land_info = filtered_df["land_info"].tolist()
+
+        green_credits = []
+
+        for div, info in zip(division, land_info):
+            if pd.isna(info) or pd.isna(div):
+                continue
+            
+            # Split the land_info by "|"
+            parts = [part.strip() for part in str(info).split("|")]
+            
+            if len(parts) >= 4:
+                green_credits.append({
+                    "division": div,
+                    "registration_no": parts[0],
+                    "total_area": parts[1],
+                    "selected_area": parts[2],
+                    "available_area": parts[3]
+                })
+        
+        return green_credits
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Green Credit Data: %s",
+            district,
+            block,
+            e,
+        )
+        return []
+
+
 def get_cropping_intensity(state, district, block, uid):
     try:
         df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="croppingIntensity_annual")
@@ -1677,7 +1793,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
         else:
             parameter_swb_1 += (
-                f"The MicrowaterShed doesn't have any surface water of its own."
+                f"No surface water bodies were detected through remote sensing in this micro-watershed."
             )
 
         return (

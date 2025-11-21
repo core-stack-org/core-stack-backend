@@ -55,12 +55,16 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from .views import layer_status
+from .views import layer_status, get_layers_of_workspace
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
 from .misc.green_credit import generate_green_credit_data
 from .misc.mining_data import generate_mining_data
+from .misc.slope_percentage import generate_slope_percentage
+from .misc.naturaldepression import generate_natural_depression
+from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
+from .misc.catchment_area import generate_catchment_area_singleflow
 
 
 @api_security_check(allowed_methods="POST")
@@ -1187,7 +1191,7 @@ def layer_status_dashboard(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_lcw_to_gee(request):
+def generate_lcw(request):
     print("Inside generate_lcw_conflict_data API.")
     try:
         state = request.data.get("state").lower()
@@ -1207,7 +1211,7 @@ def generate_lcw_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_agroecological_to_gee(request):
+def generate_agroecological(request):
     print("Inside generate_agroecological_data API.")
     try:
         state = request.data.get("state").lower()
@@ -1227,7 +1231,7 @@ def generate_agroecological_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_factory_csr_to_gee(request):
+def generate_factory_csr(request):
     print("Inside generate_factory_csr_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1247,7 +1251,7 @@ def generate_factory_csr_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_green_credit_to_gee(request):
+def generate_green_credit(request):
     print("Inside generate_green_credit_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1267,7 +1271,7 @@ def generate_green_credit_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_mining_to_gee(request):
+def generate_mining(request):
     print("Inside generate_mining_to_gee API.")
     try:
         state = request.data.get("state").lower()
@@ -1282,6 +1286,99 @@ def generate_mining_to_gee(request):
         )
     except Exception as e:
         print("Exception in generate_mining_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def get_layers_for_workspace(request):
+    print("inside get_layers_of_workspace API")
+    try:
+        workspace = request.query_params.get("workspace").lower()
+        result = get_layers_of_workspace(workspace)
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_layers_for_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_natural_depression(request):
+    print("Inside generate_natural_depression_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_natural_depression.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_natural_depression_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_distance_nearest_upstream_DL(request):
+    print("Inside generate_distance_nearest_upstream_DL_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_distance_to_nearest_drainage_line.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_distance_nearest_upstream_DL_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_catchment_area_SF(request):
+    print("Inside generate_catchment_area_SF_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_catchment_area_singleflow.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_catchment_area_SF_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_slope_percentage(request):
+    print("Inside generate_slope_percentage_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_slope_percentage.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_slope_percentage_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

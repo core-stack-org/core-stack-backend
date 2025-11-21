@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from django.http import HttpRequest
 from rest_framework import status
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, schema
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 
@@ -2174,6 +2174,7 @@ def get_items_status(request):
 
 
 @api_view(["POST"])
+@schema(None)
 @auth_free
 def create_community(request):
     try:

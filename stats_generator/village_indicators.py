@@ -4,15 +4,16 @@ import json
 from rest_framework.response import Response
 import pandas as pd
 import numpy as np
-from shapely.geometry import Point, shape
 from .utils import get_url
 from nrm_app.settings import EXCEL_PATH
+from django.http import HttpResponse
+from rest_framework import status
 
 
-def get_generate_filter_data_village(state, district, block):
-    # Clean up folder names
+def get_generate_filter_data_village(state, district, block, regenerate=False):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
+
     file_xl_path = os.path.join(
         EXCEL_PATH,
         "data/stats_excel_files",
@@ -20,11 +21,22 @@ def get_generate_filter_data_village(state, district, block):
         district_folder,
         f"{district}_{block}",
     )
+
     xlsx_file = file_xl_path + ".xlsx"
+    json_path = file_xl_path + "_KYL_village_data.json"
+    excel_output = file_xl_path + "_KYL_village_data.xlsx"
 
-    print("File path:", xlsx_file)
+    if not regenerate and os.path.exists(json_path):
+        with open(json_path, "rb") as file:
+            response = HttpResponse(
+                file.read(),
+                content_type="application/json",
+            )
+            response["Content-Disposition"] = (
+                f"attachment; filename={district}_{block}_KYL_village_data.json"
+            )
+            return response
 
-    # Try to load required sheets
     try:
         df_soc_eco_indi = pd.read_excel(
             xlsx_file, sheet_name="social_economic_indicator"
@@ -41,47 +53,38 @@ def get_generate_filter_data_village(state, district, block):
 
     results = []
 
-    # Process villages even if NREGA data is missing
     if not df_soc_eco_indi.empty:
-        for specific_village_id in df_soc_eco_indi["village_id"].unique():
-            # Get village socio-economic data
-            village_id_data = df_soc_eco_indi[
-                df_soc_eco_indi["village_id"] == specific_village_id
-            ]
+        for v_id in df_soc_eco_indi["village_id"].unique():
+            village_row = df_soc_eco_indi[df_soc_eco_indi["village_id"] == v_id]
 
-            # Try to get NREGA data for this village
+            # total assets (if NREGA present)
             if not df_nrega_village.empty:
-                village_nrega_data = df_nrega_village[
-                    df_nrega_village["vill_id"] == specific_village_id
-                ]
-                if not village_nrega_data.empty:
-                    total_assets = int(
-                        village_nrega_data.drop(
+                nrega_row = df_nrega_village[df_nrega_village["vill_id"] == v_id]
+                total_assets = (
+                    int(
+                        nrega_row.drop(
                             columns=["vill_id", "vill_name"], errors="ignore"
                         )
                         .sum(axis=1)
                         .sum()
                     )
-                else:
-                    total_assets = 0
+                    if not nrega_row.empty
+                    else 0
+                )
             else:
-                total_assets = -1
+                total_assets = -1  # indicator of no NREGA data
 
-            # Extract basic indicators
-            total_population = village_id_data.get("total_population_count", None).iloc[
-                0
-            ]
-            SC_percentage = round(village_id_data.get("SC_percent", None).iloc[0], 4)
-            ST_percentage = round(village_id_data.get("ST_percent", None).iloc[0], 4)
-            literacy_rate = round(
-                village_id_data.get("literacy_rate_percent", None).iloc[0], 4
-            )
+            # extract indicators
+            total_population = village_row["total_population_count"].iloc[0]
+            SC_percentage = round(village_row["SC_percent"].iloc[0], 4)
+            ST_percentage = round(village_row["ST_percent"].iloc[0], 4)
+            literacy_rate = round(village_row["literacy_rate_percent"].iloc[0], 4)
 
-            # Skip invalid IDs
-            if specific_village_id != 0:
+            # skip invalid IDs
+            if v_id != 0:
                 results.append(
                     {
-                        "village_id": specific_village_id,
+                        "village_id": v_id,
                         "total_population": total_population,
                         "percent_st_population": ST_percentage,
                         "percent_sc_population": SC_percentage,
@@ -90,53 +93,53 @@ def get_generate_filter_data_village(state, district, block):
                     }
                 )
 
-    # Save results (empty or filled)
     results_df = pd.DataFrame(results)
-    json_path = file_xl_path + "_KYL_village_data.json"
-    excel_path = file_xl_path + "_KYL_village_data.xlsx"
+    results_df.to_excel(excel_output, index=False)
 
-    results_df.to_excel(excel_path, index=False)
     results_list = results_df.to_dict(orient="records")
 
-    with open(json_path, "w") as json_file:
-        json.dump(results_list, json_file, indent=4)
+    with open(json_path, "w") as f:
+        json.dump(results_list, f, indent=4)
 
-    # Skip geojson merge if no data
-    if not results_list:
-        print("No data found for villages.")
-        return json_path
+    if results_list:
+        layer_name = f"{district}_{block}"
+        url = get_url("panchayat_boundaries", layer_name)
 
-    # Merge data into Panchayat GeoJSON
-    layer_name = district + "_" + block
-    panchayat_bound_geojson = get_url("panchayat_boundaries", layer_name)
+        try:
+            r = requests.get(url)
+            r.raise_for_status()
+            geojson_data = r.json()
 
-    try:
-        response = requests.get(panchayat_bound_geojson)
-        response.raise_for_status()
-        geojson_data = response.json()
+            for feature in geojson_data["features"]:
+                vill_id = feature["properties"].get("vill_ID")
 
-        for feature in geojson_data["features"]:
-            vill_id = feature["properties"].get("vill_ID")
-            village_data = next(
-                (item for item in results_list if item["village_id"] == vill_id), None
-            )
-
-            if village_data:
-                feature["properties"].update(
-                    {
-                        "total_population": village_data["total_population"],
-                        "percent_st_population": village_data["percent_st_population"],
-                        "percent_sc_population": village_data["percent_sc_population"],
-                        "literacy_level": village_data["literacy_level"],
-                        "total_assets": village_data["total_assets"],
-                    }
+                match = next(
+                    (item for item in results_list if item["village_id"] == vill_id),
+                    None,
                 )
 
-        deltaG_geojson = file_xl_path + "_panchayat_boundaries_nw.geojson"
-        with open(deltaG_geojson, "w") as f:
-            json.dump(geojson_data, f)
+                if match:
+                    feature["properties"].update(match)
 
-    except Exception as e:
-        print("Failed to fetch or update GeoJSON:", e)
+            out_geojson = file_xl_path + "_panchayat_boundaries_nw.geojson"
+            with open(out_geojson, "w") as f:
+                json.dump(geojson_data, f)
 
-    return json_path if os.path.exists(json_path) else None
+        except Exception as e:
+            print("Failed updating GeoJSON:", e)
+
+    if os.path.exists(json_path):
+        with open(json_path, "rb") as file:
+            response = HttpResponse(
+                file.read(),
+                content_type="application/json",
+            )
+            response["Content-Disposition"] = (
+                f"attachment; filename={district}_{block}_KYL_village_data.json"
+            )
+            return response
+
+    return Response(
+        {"status": "error", "message": "Failed to generate village data file"},
+        status=status.HTTP_404_NOT_FOUND,
+    )

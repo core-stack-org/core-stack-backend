@@ -72,7 +72,7 @@ def generate_lcw_conflict_data(self, state, district, block, gee_account_id):
             block,
             layer_name=description,
             asset_id=asset_id,
-            dataset_name="lcw_conflict",
+            dataset_name="LCW Conflict",
         )
         make_asset_public(asset_id)
 
