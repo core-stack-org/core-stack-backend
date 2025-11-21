@@ -1436,6 +1436,7 @@ def create_aws_client(
         aws_session_token=aws_session_token,
     )
 
+
 # %%
 def upload_file_to_s3(
     aws_creds,
@@ -1510,7 +1511,7 @@ def generate_vector_stac(
     layer_map_csv_path="data/STAC_specs/input/metadata/layer_mapping.csv",
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     column_desc_csv_path="data/STAC_specs/input/metadata/vector_column_descriptions.csv",
-    upload_to_s3=True,
+    upload_to_s3=False,
     overwrite_existing=False,
 ):
     print("STAC: triggering vector STAC pipeline")
@@ -1562,7 +1563,7 @@ def generate_raster_stac(
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     start_year="",
     #  end_year='',
-    upload_to_s3=True,
+    upload_to_s3=False,
     overwrite_existing=False,
 ):
     print("STAC: triggering raster STAC pipeline")
