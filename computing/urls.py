@@ -131,4 +131,9 @@ urlpatterns = [
         api.generate_mining_to_gee,
         name="generate_mining_data",
     ),
+    path(
+        "generate_ndvi_timeseries/",
+        api.generate_ndvi_timeseries,
+        name="generate_ndvi_timeseries",
+    ),
 ]

@@ -1,36 +1,50 @@
-import json
-
 import ee
 import datetime
+import json
+
+from gee_computing.models import GEEAccount
+from nrm_app.celery import app
 
 from computing.misc.hls_interpolated_ndvi import get_padded_ndvi_ts_image
-from computing.utils import get_layer_object
+from computing.utils import (
+    get_layer_object,
+    save_layer_info_to_db,
+    sync_layer_to_geoserver,
+    update_layer_sync_status,
+    sync_fc_to_geoserver,
+)
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_dir_path,
     export_vector_asset_to_gee,
-    get_gee_asset_path,
     check_task_status,
     is_gee_asset_exists,
     merge_fc_into_existing_fc,
+    make_asset_public,
+    create_gee_dir,
+    build_gee_helper_paths,
 )
 
 
+@app.task(bind=True)
 def ndvi_timeseries(
-    state="bihar",  # None,
-    district="gaya",  # None,
-    block="mohanpur",  # None,
+    self,
+    state=None,
+    district=None,
+    block=None,
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
+    start_year=None,
+    end_year=None,
     app_type="MWS",
-    start_year=2017,  # None,
-    end_year=2021,  # None,
-    gee_account_id=1,
+    gee_account_id=None,
 ):
+    print(f"{gee_account_id=}")
     ee_initialize(gee_account_id)
+
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
@@ -46,7 +60,7 @@ def ndvi_timeseries(
             + "_"
             + valid_gee_text(block.lower())
             + "_uid"
-        ).limit(1)
+        )
 
     description = f"ndvi_timeseries_{asset_suffix}"
     asset_id = (
@@ -57,10 +71,11 @@ def ndvi_timeseries(
     )
 
     start_date = f"{start_year}-07-01"
-    end_date = f"{end_year}-06-30"
+    end_date = f"{end_year+1}-06-30"
 
     start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    layer_at_geoserver = False
 
     if is_gee_asset_exists(asset_id):
         layer_obj = None
@@ -74,27 +89,27 @@ def ndvi_timeseries(
             )
         except Exception as e:
             print(
-                f"layer not found for precipitation. So, reading the column name from asset_id."
+                f"ndvi_timeseries layer not found in DB. So, reading the column name from asset_id."
             )
         existing_end_date = get_last_date(asset_id, layer_obj)
 
-        # end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
         print("existing_end_date", existing_end_date)
         print("end_date", end_date)
         new_start_date = existing_end_date
         last_date = str(existing_end_date.date())
 
-        # new_asset_id = f"{asset_id}_{last_date}_{str(end_date.date())}"
+        new_asset_id = f"{asset_id}_{last_date}_{str(end_date.date())}"
         new_description = f"{description}_{last_date}_{str(end_date.date())}"
-        task_id, new_asset_id = _generate_data(
+        task_id, new_asset_id, last_date = _generate_data(
             app_type,
             asset_folder_list,
-            asset_id,
+            new_asset_id,
             asset_suffix,
             new_description,
             new_start_date,
             end_date,
             roi,
+            gee_account_id,
         )
         check_task_status([task_id])
 
@@ -102,7 +117,7 @@ def ndvi_timeseries(
         if is_gee_asset_exists(new_asset_id):
             merge_fc_into_existing_fc(asset_id, description, new_asset_id)
     else:
-        task_id, new_asset_id = _generate_data(
+        task_id, new_asset_id, last_date = _generate_data(
             app_type,
             asset_folder_list,
             asset_id,
@@ -111,7 +126,36 @@ def ndvi_timeseries(
             start_date,
             end_date,
             roi,
+            gee_account_id,
         )
+
+    if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=description,
+            asset_id=asset_id,
+            dataset_name="NDVI Timeseries",
+            misc={
+                "start_date": start_date,
+                "end_date": last_date,
+            },
+        )
+
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(
+            fc, asset_suffix, description, workspace="ndvi_timeseries"
+        )
+        print(res)
+
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+
+            layer_at_geoserver = True
+    return layer_at_geoserver
 
 
 def _generate_data(
@@ -123,24 +167,36 @@ def _generate_data(
     start_date,
     end_date,
     roi,
+    gee_account_id,
 ):
     print("f_start_date>>>", start_date)
     print("end_date>>>", end_date)
     task_ids = []
     asset_ids = []
     f_start_date = start_date
+    year_count = end_date.year - start_date.year
+    last_date = None
+
+    if year_count > 1:
+        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+        ee_initialize(gee_obj.helper_account.id)
+
     while f_start_date <= end_date:
         f_end_date = f_start_date + datetime.timedelta(days=364)
         print("f_end_date>>>", f_end_date)
-        # if f_end_date > end_date:
-        #     break
+        if f_end_date > end_date:
+            break
 
         f_end_date_str = str(f_end_date.date())
         f_start_date_str = str(f_start_date.date())
 
         # Define export task details
         ndvi_description = f"{description}_{f_start_date_str}_{f_end_date_str}"
-        ndvi_asset_id = f"{asset_id}_{f_start_date_str}_{f_end_date_str}"
+        ndvi_asset_id = (
+            f"{asset_id}_{f_start_date_str}_{f_end_date_str}"
+            if year_count > 1
+            else asset_id
+        )
 
         lulc = ee.Image(
             get_gee_dir_path(
@@ -243,14 +299,21 @@ def _generate_data(
             print("Export error:", e)
 
         f_start_date = f_end_date
+        last_date = str(f_start_date.date())
+
     check_task_status(task_ids)
-    # Merge year-wise outputs into a single collection
-    task_id = export_vector_asset_to_gee(
-        merge_assets_chunked_on_year(asset_ids),
-        description,
-        asset_id,
-    )
-    return task_id, asset_id
+
+    ee_initialize(gee_account_id)
+    print(asset_ids)
+    if len(asset_ids) > 1:
+        # Merge year-wise outputs into a single collection
+        task_id = export_vector_asset_to_gee(
+            merge_assets_chunked_on_year(asset_ids),
+            description,
+            asset_id,
+        )
+        return task_id, asset_id, last_date
+    return None, asset_id, last_date
 
 
 def merge_assets_chunked_on_year(chunk_assets):

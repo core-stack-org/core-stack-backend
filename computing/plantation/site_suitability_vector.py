@@ -65,7 +65,7 @@ def check_site_suitability(
     layer_id = None
 
     # Create a unique asset name for the suitability analysis
-    gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+    # gee_obj = GEEAccount.objects.get(pk=gee_account_id)
 
     if project:
         project_name = valid_gee_text(project.name)
@@ -83,7 +83,7 @@ def check_site_suitability(
         # GEE_HELPER = GEE_HELPER_PATH
         app_type = "MWS"
 
-    GEE_HELPER = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
+    # GEE_HELPER = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
 
     # Generate Plantation Site Suitability raster
     # Here, kept start_year=end_year-2 as in this site assessment script, we are taking into account the data of the latest three years only.
@@ -132,6 +132,7 @@ def check_site_suitability(
         rois, descs = create_chunk(roi, description, chunk_size)
         gee_obj = GEEAccount.objects.get(pk=gee_account_id)
         ee_initialize(gee_obj.helper_account.id)
+        GEE_HELPER = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
         create_gee_dir(path_list, gee_project_path=GEE_HELPER)
 
         tasks = []
