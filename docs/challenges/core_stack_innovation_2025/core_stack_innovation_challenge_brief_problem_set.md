@@ -86,7 +86,7 @@ More generally, combine all of the above and describe the most important changes
 
 The very first API you should try is [get active locations](https://geoserver.core-stack.org/api/v1/get_active_locations/) to get the list of tehsils for which CoRE stack data is already populated. You can begin with these locations. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data. 
 
-We want to keep the challenge itself collaborative. So if in the process you feel you need other APIs then let us know and we will try to build them out quickly. 
+We want to keep the challenge itself collaborative. So if in the process you feel you need other APIs then let us know and we will try to build them out quickly. Likewise, do expect bonus points for reporting bugs, and even more if you help fix them!
 
 ---
 
