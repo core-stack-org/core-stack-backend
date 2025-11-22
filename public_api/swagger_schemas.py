@@ -167,30 +167,32 @@ mws_by_latlon_schema = {
 }
 
 # MWS Data Schema
-mws_data_schema = {
+get_mws_data_schema = {
     "method": "get",
     "operation_id": "get_mws_data",
-    "operation_summary": "Get MWS Data",
+    "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS data for a given state, district, tehsil, and MWS ID.
+    Retrieve MWS (Managed Water Storage) time series data including ET, Runoff, and Precipitation for a given state, district, tehsil, and MWS ID.
     
     **Response dataset details:**
     ```
-    [
-        {
-            "hydrological_annual": [
-                {
-                    "uid": "MWS_id",
-                    "et_in_mm_2017-2018": "Evapotranspiration for year in mm",
-                    "runoff_in_mm_2017-2018": "Runoff for year in mm",
-                    "g_in_mm_2017-2018": "Groundwater for year in mm",
-                    "deltag_in_mm_2017-2018": "Change in groundwater for year in mm",
-                    "precipitation_in_mm_2017-2018": "Precipitation for year in mm",
-                    "welldepth_in_m_2017-2018": "Well Depth for year in m"
-                }
-            ]
-        }
-    ]
+    {
+        "mws_id": "12_208104",
+        "time_series": [
+            {
+                "date": "2024-01-01",
+                "et": 2.5,
+                "runoff": 1.3,
+                "precipitation": 10.2
+            },
+            {
+                "date": "2024-01-15",
+                "et": 3.1,
+                "runoff": 0.8,
+                "precipitation": 5.4
+            }
+        ]
+    }
     ```
     """,
     "manual_parameters": [
@@ -202,30 +204,50 @@ mws_data_schema = {
     ],
     "responses": {
         200: openapi.Response(
-            description="Success - It will return JSON data for the mws_id.",
+            description="Success - Returns MWS time series data",
             examples={
                 "application/json": {
-                    "hydrological_annual": [
+                    "mws_id": "12_208104",
+                    "time_series": [
                         {
-                            "uid": "12_234647",
-                            "et_in_mm_2017-2018": 894.1,
-                            "runoff_in_mm_2017-2018": 148.57,
-                            "g_in_mm_2017-2018": -321.06,
-                            "deltag_in_mm_2017-2018": -321.06,
-                            "precipitation_in_mm_2017-2018": 721.62,
-                            "welldepth_in_m_2017-2018": -1.78,
-                        }
+                            "date": "2024-01-01",
+                            "et": 2.5,
+                            "runoff": 1.3,
+                            "precipitation": 10.2,
+                        },
+                        {
+                            "date": "2024-01-15",
+                            "et": 3.1,
+                            "runoff": 0.8,
+                            "precipitation": 5.4,
+                        },
                     ],
                 }
             },
         ),
-        400: bad_request_response,
-        401: unauthorized_response,
-        404: not_found_response,
-        500: internal_error_response,
+        400: openapi.Response(
+            description="Bad Request - Missing required parameters or invalid format",
+            examples={
+                "application/json": {
+                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                }
+            },
+        ),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(
+            description="Not Found - MWS ID not found",
+            examples={
+                "application/json": {"error": "Data not found for the given mws_id"}
+            },
+        ),
+        500: openapi.Response(
+            description="Internal Server Error",
+            examples={"application/json": {"Exception": "Error message details"}},
+        ),
     },
     "tags": ["Dataset APIs"],
 }
+
 
 # Tehsil Data Schema
 tehsil_data_schema = {
@@ -465,6 +487,57 @@ mws_report_urls_schema = {
             description="Not Found - Data not found for the given mws_id OR Data not found for this state, district, tehsil. OR Mws Layer not found for the given location."
         ),
         500: openapi.Response(description="Internal Server Error"),
+    },
+    "tags": ["Dataset APIs"],
+}
+
+
+### Get active locations
+generate_active_locations_schema = {
+    "method": "get",
+    "operation_id": "generate_active_locations",
+    "operation_summary": "Get Active Locations",
+    "operation_description": """
+    Return activated locations data.
+    
+    **Response dataset details:**
+    ```
+    {
+        "state_name": {
+            "districts": {
+                "district_name": {
+                    "tehsils": ["tehsil1", "tehsil2"]
+                }
+            }
+        }
+    }
+    ```
+    """,
+    "manual_parameters": [
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - Returns activated locations data",
+            examples={
+                "application/json": {
+                    "uttar_pradesh": {
+                        "districts": {
+                            "bara_banki": {"tehsils": ["fatehpur", "nawabganj"]},
+                            "lucknow": {"tehsils": ["mohanlalganj", "malihabad"]},
+                        }
+                    },
+                    "jharkhand": {
+                        "districts": {"deoghar": {"tehsils": ["devipur", "sarwan"]}}
+                    },
+                }
+            },
+        ),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        500: openapi.Response(
+            description="Internal Server Error",
+            examples={"application/json": {"Exception": "Error message details"}},
+        ),
     },
     "tags": ["Dataset APIs"],
 }
