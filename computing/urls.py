@@ -156,4 +156,9 @@ urlpatterns = [
         api.generate_slope_percentage,
         name="generate_slope_percentage",
     ),
+    path(
+        "generate_ndvi_timeseries/",
+        api.generate_ndvi_timeseries,
+        name="generate_ndvi_timeseries",
+    ),
 ]

@@ -248,6 +248,7 @@ def create_excel_for_mining(data, writer):
 
         df_data.append(row)
     df = pd.DataFrame(df_data)
+    df.replace("", "unknown", inplace=True)
     df = df.sort_values(["UID"])
     df.to_excel(writer, sheet_name="mining", index=False)
     print("Excel file created for mining")

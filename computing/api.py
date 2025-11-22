@@ -15,6 +15,7 @@ from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
 from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
 from .lulc.v4.lulc_v4 import generate_lulc_v4
+from .misc.ndvi_time_series import ndvi_timeseries
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
@@ -1378,4 +1379,36 @@ def generate_slope_percentage(request):
         )
     except Exception as e:
         print("Exception in generate_slope_percentage_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_ndvi_timeseries(request):
+    print("Inside generate_ndvi_timeseries API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        ndvi_timeseries.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_ndvi_timeseries"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_ndvi_timeseries api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

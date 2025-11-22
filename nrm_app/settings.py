@@ -59,7 +59,7 @@ ALLOWED_HOSTS = [
     "0.0.0.0",
     "api-doc.core-stack.org",
     "0cb52a0325c7.ngrok-free.app",
-    "odk.core-stack.org"
+    "odk.core-stack.org",
 ]
 
 # MARK: Django Apps
@@ -186,6 +186,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
 ]
 
 ROOT_URLCONF = "nrm_app.urls"
@@ -348,7 +349,7 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 
-#S3 access keys
+# S3 access keys
 S3_SECRET_KEY = env("S3_SECRET_KEY")
 S3_ACCESS_KEY = env("S3_ACCESS_KEY")
 
