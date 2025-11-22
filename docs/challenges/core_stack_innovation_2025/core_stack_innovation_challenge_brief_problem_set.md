@@ -84,7 +84,7 @@ More generally, combine all of the above and describe the most important changes
   - Cropping intensity by micro-watershed notebook ([Colab](https://colab.research.google.com/drive/1zv9TWdzfaEanE_i1kKw2Cr2snoCEhuIg?usp=sharing))
 - STAC specs organized by state/district/tehsil also provide relevant metadata: https://stac.core-stack.org/ (check STAC specs for Jharkhand and Odisha)
 
-The very first API you should try is [get active locations](https://geoserver.core-stack.org/api/v1/get_active_locations/) to get the list of tehsils for which CoRE stack data is already populated. You can begin with these locations. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data for you. 
+The very first API you should try is [get active locations](https://geoserver.core-stack.org/api/v1/get_active_locations/) to get the list of tehsils for which CoRE stack data is already populated. You can begin with these locations. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data. 
 
 We want to keep the challenge itself collaborative. So if in the process you feel you need other APIs then let us know and we will try to build them out quickly. 
 
