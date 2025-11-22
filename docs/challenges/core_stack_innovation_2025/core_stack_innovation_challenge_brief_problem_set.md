@@ -130,7 +130,7 @@ Judges will review code and run at least one primary notebook per submission to 
 ---
 
 ## 12. Contact & support
-For discussions and help regarding the challenge, please join the Discord channel using this [link](https://discord.com/channels/1359790694289641472/1441300233513603132) and participate in the scheduled developer community calls every Friday from 3-4pm. You can further join the [core-stack-dev email list](https://groups.google.com/u/2/g/core-stack-dev) to stay engaged on a long-term basis and contribute to the CoRE stack. And the [core-stack-nrm email list](https://groups.google.com/g/core-stack-nrm/) to participate in innovation and research discussions about the latest happenings in environment monitoring and modeling.
+For discussions and help regarding the challenge, please join the Discord channel using this [link](https://discord.gg/FpMArraM2X) and participate in the scheduled developer community calls every Friday from 3-4pm. You can further join the [core-stack-dev email list](https://groups.google.com/u/2/g/core-stack-dev) to stay engaged on a long-term basis and contribute to the CoRE stack. And the [core-stack-nrm email list](https://groups.google.com/g/core-stack-nrm/) to participate in innovation and research discussions about the latest happenings in environment monitoring and modeling.
 
 ---
 
