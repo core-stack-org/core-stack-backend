@@ -172,7 +172,7 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS (Managed Water Storage) time series data including ET, Runoff, and Precipitation for a given state, district, tehsil, and MWS ID.
+    Retrieve MWS time series data, including ET, Runoff, and Precipitation for a given state, district, tehsil, and MWS ID.
     
     **Response dataset details:**
     ```
