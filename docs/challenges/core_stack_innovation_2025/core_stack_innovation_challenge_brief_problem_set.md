@@ -1,5 +1,5 @@
 
-# CoRE Stack Innovation Challenge: Nov 2025
+# CoRE Stack Innovation Challenge: Nov-Dec 2025
 
 Inviting ecologists, water-security researchers, geospatial programmers, and community practitioners to build open-source solutions, analyses, and tools using the CoRE Stack datasets and APIs to improve socio-ecological resilience and support community-led landscape action.
 
@@ -25,10 +25,10 @@ Participants are encouraged to form interdisciplinary teams that combine domain 
 
 ---
 
-## 3. Deliverables (examples)
+## 3. Deliverables
 A valid submission should include:
 1. A public Git repository (GitHub/GitLab) with source code, scripts, notebooks, and documentation.
-2. At least one reproducible notebook or script that demonstrates fetching CoRE Stack data via the CoRE APIs and produces the core analysis or visualization.
+2. At least one reproducible notebook or script that demonstrates fetching CoRE Stack data via the APIs and produces the analysis or visualization.
 3. A short demo video (3–6 minutes) showing the tool/analysis and the main findings. Or, a short PDF report with sample outputs and conclusions from the analysis. 
 4. README with clear setup and run instructions, license (prefer permissive open-source license), and a short project summary.
 
@@ -37,7 +37,7 @@ Each submission should also include a `metadata.json` (one-page) with: team name
 ---
 
 ## 4. Challenge types
-Teams can submit entries for multiple types of challenges but clearly separate out the different pieces:
+Teams can submit entries for multiple types of challenges but clearly separate out the different pieces in their Git repo:
 
 ### A. Data Exploration & Insights
 Use CoRE Stack layers to answer concrete landscape questions (comparative analyses, trend detection, counterfactuals). Deliver reproducible notebooks, maps, and concise interpretative notes for practitioners. Several such problems are outlined in the next section. 
@@ -50,7 +50,7 @@ Create user-facing dashboards, chatbots, WhatsApp-shareable slide generators, or
 
 ---
 
-## 5. Example problem statements for Challenge Type A - Data Exploration and Insights. Pick / adapt any
+## 5. Example problem statements for Challenge Type A - Data Exploration and Insights. Pick / adapt any and think of new ideas
 > _Note: Participants should first carefully examine the data and build an intuition for the CoRE stack approach, and then begin solving._
 
 ### Bring boundary flexibility
@@ -62,14 +62,14 @@ More generally, combine all of the above and describe the most important changes
 
 ### Problems needing composition of multiple layers
 4. Rank micro-watersheds in a tehsil by sensitivity of cropping to drought (compare cropping intensity during identified drought years vs non-drought years to find the micro-watersheds most sensitive to drought).
-5. Find the top 5 micro-watersheds most similar to a reference micro-watershed based on terrain, drought frequency, and land-use (use a distance function or propensity score matching methods to identify counterfactual micro-watersheds). Compare their water availability and cropping intensity and water balance indicators. Use this to identify micro-watersheds that are the positive deviants in their tehsil and are worth investigating further on what practices the local communities could be using to be in a better social-ecological position. 
+5. Find the top 5 micro-watersheds most similar to a reference micro-watershed based on terrain, drought frequency, and land-use (use a distance function or propensity score matching methods to identify counterfactual micro-watersheds). Compare their water availability and cropping intensity and water balance indicators. Use this to identify micro-watersheds that are the positive deviants in their tehsil and are worth investigating further on what practices the local communities could be using to be in a better social-ecological position as compared to other similar micro-watersheds. 
 6. For each micro-watershed in a tehsil, position them in a four-quadrant classification using mean cropping intensity (high/low) and mean runoff (high/low) of the micro-watersheds. This can potentially help identify priority micro-watersheds for sustainable cropping intensification: Areas with low cropping intensity but significant surplus runoff could benefit from rainwater harvesting structures to conserve water during the monsoons and utilize it for a second crop later. 
-7. In a tehsil, compare % SC/ST population of a village against the number/volume of NREGA works done in the village, and visualize potential marginalized villages where NREGA is not very actively used but can benefit the communities substantially.
+7. In a tehsil, compare % SC/ST population of a village against the number/volume of NREGA works done in the village, and visualize potential marginalized villages where NREGA is not very actively used. Narrow down this list by further prioritizing areas that are drought stressed or have degraded in recent years where appropriate NREGA and other landscape interventions can benefit the communities substantially.
 
 ### Problems requiring integration with external data
-8. Using an external dataset of market locations (e.g., APMC mandi points), analyze whether proximity to markets correlates with cropping intensity and produce visualizations and statistical tests.
-9. The CoRE stack itself provides many other datasets that have not been integrated into APIs as yet. For example, the connectivity graph of micro-watersheds (which micro-watersheds drain into which one) and stream-ordering of areas can be analyzed against deforestation occurrences to understand if deforestation is happening more in low-lying areas that are suitable for agriculture or in upland areas where trees might be cut for logging.
-10. On similar lines, recent global datasets released on identifying natural forests can be used to study the extent of deforestation or degradation within natural forest ecosystems or outside.  
+8. Using external data of agricultural market locations (e.g., APMC mandis), analyze whether proximity to markets correlates with cropping intensity and produce visualizations and statistical tests. If you can identify the time when new markets came up, this can become a potential natural experiment to study the interaction between market proximity and cropping pattern changes. 
+9. The CoRE stack itself provides many other datasets that have not been integrated into APIs as yet. For example, the connectivity graph of micro-watersheds (which micro-watersheds drain into which one) and stream-ordering of areas can be analyzed against deforestation occurrences to understand if deforestation is happening more in low-lying areas (that are suitable for agriculture) or in upland areas (where trees might be cut for logging). This can help determine precise policy action for an area.
+10. On similar lines, recent global datasets released on identifying natural forests can be used to study the extent of deforestation or degradation within natural forest ecosystems or outside. Assessments on forest cover changes are otherwise hard to validate due to varying definitions of what constitutes a forest. 
  
 ---
 
@@ -82,9 +82,11 @@ More generally, combine all of the above and describe the most important changes
 - A few example notebooks (API + plotting examples) have been provided:
   - Rainfall/ET/runoff water-balance notebook ([Colab](https://colab.research.google.com/drive/1uZH1KZFbe0TUIgCECOz_2cQ1jUfZglsA?usp=sharing))
   - Cropping intensity by micro-watershed notebook ([Colab](https://colab.research.google.com/drive/1zv9TWdzfaEanE_i1kKw2Cr2snoCEhuIg?usp=sharing))
-- STAC specs organized by state/district/tehsil also provide relevant metadata: https://stac.core-stack.org/
+- STAC specs organized by state/district/tehsil also provide relevant metadata: https://stac.core-stack.org/ (check STAC specs for Jharkhand and Odisha)
 
-The very first API you should try is [get active locaton api](https://geoserver.core-stack.org/api/v1/get_active_locations/) to get the list of locations for which CoRE stack data is already populated. You can begin with these. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data for you. 
+The very first API you should try is [get active locations](https://geoserver.core-stack.org/api/v1/get_active_locations/) to get the list of tehsils for which CoRE stack data is already populated. You can begin with these locations. If you are specifically interested in a particular tehsil for your analysis then let us know and we will generate the data for you. 
+
+We want to keep the challenge itself collaborative. So if in the process you feel you need other APIs then let us know and we will try to build them out quickly. 
 
 ---
 
@@ -100,25 +102,25 @@ Submissions will be scored on:
 ---
 
 ## 8. Submission guidelines
-- Submit via the provided [form](https://forms.gle/7aoMeWgG2H19nsoK6) with repo and demo links. Attach `metadata.json` and point to the main notebook(s).
+- Submit via the provided [form](https://forms.gle/7aoMeWgG2H19nsoK6) with a link to your repo. 
 - All code should be open-source; include a LICENSE and clear run instructions. If you cannot publish certain external datasets for legal/privacy reasons, include a small synthetic dataset to let reviewers run the analysis.
 - Provide at least one reproducible entrypoint (notebook or script) that downloads and processes CoRE Stack data automatically.
 
 ---
 
 ## 9. Prizes & support
-- Monetary prizes for top 3 projects per track.
-- Mentorship sessions with domain experts in the CoRE stack network for top finalists.
-- Opportunities to integrate winning work into the CoRE Stack ecosystem and technical support for adoption.
+- TBD.
+- Additionally, mentorship sessions with domain experts in the CoRE stack network for top finalists.
+- And opportunities to integrate winning work into the CoRE Stack ecosystem and technical support for adoption.
 
 ---
 
-## 10. Timeline & milestones (template)
-- Launch & registration opens: `T0`
-- Midway developer community calls / mentorship: `T0 + 3 weeks`
-- Submission deadline: `T0 + 6 weeks`
-- Shortlist & demos: `T0 + 8 weeks`
-- Winners announced & prize distribution: `T0 + 10 weeks`
+## 10. Timeline & milestones
+- Launch: `Nov 22, 2025`
+- Weekly developer community calls / mentorship: `Fridays, 3-4pm`
+- Submission deadline: `Dec 31, 2025`
+- Shortlist & demos: `Jan 15, 2026`
+- Winners announced & prize distribution: `Jan 31, 2026`
 
 ---
 
@@ -127,14 +129,14 @@ Judges will review code and run at least one primary notebook per submission to 
 
 ---
 
-## 12. Contact & support
-For discussions and help regarding the challenge, please join our Discord channel using this [link](https://discord.com/channels/1359790694289641472/1441300233513603132) and participate in our scheduled developer community calls. To stay updated with the latest announcements, please join our forum using this [link](https://discord.com/channels/1359790694289641472/1441368011536597034).
+## 12. Contact and support
+For discussions and help regarding the challenge, please join the Discord channel using this [link](https://discord.com/channels/1359790694289641472/1441300233513603132) and participate in the scheduled developer community calls every Friday from 3-4pm. You can further join the [core-stack-dev email list](https://groups.google.com/u/2/g/core-stack-dev) to stay engaged on a long-term basis and contribute to the CoRE stack. And the [core-stack-nrm email list](https://groups.google.com/g/core-stack-nrm/) to participate in innovation and research discussions about the latest happenings in environment monitoring and modeling.
 
 ---
 
 ## 13. Appendix: Starter ideas for quick wins
 - A small CLI tool that downloads and clips a set of CoRE stack rasters by an uploaded village polygon and returns annual area statistics (cropping intensity, tree cover loss, water bodies area).
 - A mapping widget (static or lightweight web UI) that allows practitioners to toggle layers and export a WhatsApp-friendly slide summarizing the last 5 years of trends for a village.
-- Scan recent emails on the [CoRE stack googlegroup](https://groups.google.com/g/core-stack-nrm/) for many more ideas and join the group to discuss more!
+- Scan recent emails on the [core-stack-nrm email list](https://groups.google.com/g/core-stack-nrm/) for many more ideas!
 
 ---
