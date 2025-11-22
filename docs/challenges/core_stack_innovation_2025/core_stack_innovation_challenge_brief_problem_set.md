@@ -32,7 +32,7 @@ A valid submission should include:
 3. A short demo video (3–6 minutes) showing the tool/analysis and the main findings. Or, a short PDF report with sample outputs and conclusions from the analysis. 
 4. README with clear setup and run instructions, license (prefer permissive open-source license), and a short project summary.
 
-Each submission should also include a `metadata.json` (one-page) with: team name, members, affiliations, contact email, short abstract (max 250 words), problem chosen, and link to the repo and demo video.
+Each submission should also include a [metadata.json](https://github.com/core-stack-org/core-stack-backend/blob/main/docs/challenges/core_stack_innovation_2025/metadata.json) (one-page) with: team name, members, affiliations, contact email, short abstract (max 250 words), problem chosen, and link to the repo and demo video.
 
 ---
 
