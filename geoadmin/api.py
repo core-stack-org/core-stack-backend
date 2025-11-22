@@ -9,7 +9,7 @@ from datetime import timedelta
 
 from .models import Block, District, State
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
-from .utils import transform_data, activated_entities, get_activated_location_json
+from .utils import transform_data, activated_entities
 from utilities.auth_utils import auth_free
 from .models import UserAPIKey
 from utilities.auth_check_decorator import api_security_check
@@ -122,30 +122,6 @@ def proposed_blocks(request):
         response_data = activated_entities()
         transformed_data = transform_data(data=response_data)
         return Response(transformed_data, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in proposed_blocks api :: ", e)
-        return Response(
-            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_security_check(auth_type="API_key")
-@schema(None)
-def generate_active_locations(request):
-    """
-    Return proposed blocks data from get_activated_location_json if available,
-    otherwise generate and store the data
-    """
-    try:
-        activated_locations_data = get_activated_location_json()
-
-        if activated_locations_data is not None:
-            return Response(activated_locations_data, status=status.HTTP_200_OK)
-
-        response_data = activated_entities()
-        transformed_data = transform_data(data=response_data)
-        return Response(transformed_data, status=status.HTTP_200_OK)
-
     except Exception as e:
         print("Exception in proposed_blocks api :: ", e)
         return Response(
