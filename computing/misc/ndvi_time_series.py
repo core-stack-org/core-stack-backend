@@ -209,79 +209,89 @@ def _generate_data(
             + str(f_start_date.year + 1)
             + "-06-30_LULCmap_10m"
         )
+
+        # NDVI image collection, already padded etc.
         ndvi = get_padded_ndvi_ts_image(f_start_date_str, f_end_date_str, roi, 14)
 
-        # Masks
+        # Clip NDVI images once to ROI geometry (big speed-up on large geoms)
+        ndvi = ndvi.map(lambda img: img.clip(roi.geometry()))
+
+        # Cropped: classes 8, 9, 10, 11
         crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
-        tree_mask = lulc.remap([6], [1], 0)
-        shrub_mask = lulc.remap([12], [1], 0)
 
-        # NDVI masked by LULC class
-        ndvi_crop = ndvi.map(lambda img: img.updateMask(crop_mask))
-        ndvi_tree = ndvi.map(lambda img: img.updateMask(tree_mask))
-        ndvi_shrub = ndvi.map(lambda img: img.updateMask(shrub_mask))
+        # Tree: class 6
+        tree_mask = lulc.eq(6)
 
-        # Function converts each image to (uid, date, ndvi)
-        def extract_ts(image):
+        # Shrub: class 12
+        shrub_mask = lulc.eq(12)
+
+        def add_lulc_ndvi_bands(image):
+            base_ndvi = image.select("gapfilled_NDVI_lsc")
+
+            crop_band = base_ndvi.updateMask(crop_mask).rename("ndvi_crop")
+            tree_band = base_ndvi.updateMask(tree_mask).rename("ndvi_tree")
+            shrub_band = base_ndvi.updateMask(shrub_mask).rename("ndvi_shrub")
+
+            # Keep original band + add 3 class-specific NDVI bands
+            return image.addBands([crop_band, tree_band, shrub_band]).copyProperties(
+                image, image.propertyNames()
+            )
+
+        ndvi_lulc = ndvi.map(add_lulc_ndvi_bands)
+
+        # Per-image reduction: single reduceRegions for 3 bands
+        def extract_per_image(image):
             date_str = image.date().format("YYYY-MM-dd")
 
-            # Compute mean NDVI for all features at once
-            reduced = image.reduceRegions(
-                collection=roi,
+            # Reduce only the 3 masked NDVI bands
+            reduced = image.select(
+                ["ndvi_crop", "ndvi_tree", "ndvi_shrub"]
+            ).reduceRegions(
+                collection=roi.select(["uid"]),  # only geometry + uid to reduce payload
                 reducer=ee.Reducer.mean(),
                 scale=30,
             )
 
-            # Add NDVI value and image date to each feature
-            def annotate(feature):
-                ndvi_val = ee.Algorithms.If(
-                    ee.Algorithms.IsEqual(feature.get("gapfilled_NDVI_lsc"), None),
-                    -9999,
-                    feature.get("gapfilled_NDVI_lsc"),
-                )
-                return feature.set("ndvi_date", date_str).set("ndvi", ndvi_val)
+            # Attach date string to each feature
+            def annotate(f):
+                return f.set("ndvi_date", date_str)
 
             return reduced.map(annotate)
 
-        # Extract time-series per category
-        fc_crop = ndvi_crop.map(extract_ts).flatten()
-        fc_tree = ndvi_tree.map(extract_ts).flatten()
-        fc_shrub = ndvi_shrub.map(extract_ts).flatten()
+        # One flattened FeatureCollection for all images in this year
+        all_ndvi = ndvi_lulc.map(extract_per_image).flatten()
 
         # Extract all unique UIDs from the input feature collection
         uids = roi.aggregate_array("uid")
 
         # For each UID, filter NDVI features and aggregate to dict
         def build_feature(uid):
-            """
-            Reconstruct a single feature by merging its NDVI values across all images
-            into one property NDVI_<year> as a JSON dictionary {date: value}.
-            """
-            # Get the geometry and properties of the original feature
-            feature_geom = ee.Feature(roi.filter(ee.Filter.eq("uid", uid)).first())
+            uid = ee.Number(uid)
 
-            # CROPPED
-            f1 = fc_crop.filter(ee.Filter.eq("uid", uid))
-            list1 = f1.aggregate_array("ndvi_date").zip(f1.aggregate_array("ndvi"))
-            ndvi_crop_dict = ee.Dictionary(list1.flatten())
-            ndvi_crop_json = ee.String.encodeJSON(ndvi_crop_dict)
+            # Feature geometry + original properties from ROI
+            base_feature = ee.Feature(roi.filter(ee.Filter.eq("uid", uid)).first())
 
-            # TREE
-            f2 = fc_tree.filter(ee.Filter.eq("uid", uid))
-            list2 = f2.aggregate_array("ndvi_date").zip(f2.aggregate_array("ndvi"))
-            ndvi_tree_dict = ee.Dictionary(list2.flatten())
-            ndvi_tree_json = ee.String.encodeJSON(ndvi_tree_dict)
+            # Filter time-series records for this UID
+            filtered = all_ndvi.filter(ee.Filter.eq("uid", uid))
 
-            # SHRUB
-            f3 = fc_shrub.filter(ee.Filter.eq("uid", uid))
-            list3 = f3.aggregate_array("ndvi_date").zip(f3.aggregate_array("ndvi"))
-            ndvi_shrub_dict = ee.Dictionary(list3.flatten())
-            ndvi_shrub_json = ee.String.encodeJSON(ndvi_shrub_dict)
+            dates = filtered.aggregate_array("ndvi_date")
+            crop_vals = filtered.aggregate_array("ndvi_crop")
+            tree_vals = filtered.aggregate_array("ndvi_tree")
+            shrub_vals = filtered.aggregate_array("ndvi_shrub")
+
+            # Convert to dictionary and encode as JSON string
+            crop_dict = ee.Dictionary(dates.zip(crop_vals).flatten())
+            tree_dict = ee.Dictionary(dates.zip(tree_vals).flatten())
+            shrub_dict = ee.Dictionary(dates.zip(shrub_vals).flatten())
+
+            crop_json = ee.String.encodeJSON(crop_dict)
+            tree_json = ee.String.encodeJSON(tree_dict)
+            shrub_json = ee.String.encodeJSON(shrub_dict)
 
             return (
-                feature_geom.set(f"NDVI_crop_{f_start_date.year}", ndvi_crop_json)
-                .set(f"NDVI_tree_{f_start_date.year}", ndvi_tree_json)
-                .set(f"NDVI_shrub_{f_start_date.year}", ndvi_shrub_json)
+                base_feature.set(f"NDVI_crop_{f_start_date.year}", crop_json)
+                .set(f"NDVI_tree_{f_start_date.year}", tree_json)
+                .set(f"NDVI_shrub_{f_start_date.year}", shrub_json)
             )
 
         # Apply feature-wise aggregation

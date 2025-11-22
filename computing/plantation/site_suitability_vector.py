@@ -100,6 +100,9 @@ def check_site_suitability(
         block=block,
     )
 
+    if not project:
+        return None, None, None
+
     print("is_default_profile= ", is_default_profile)
 
     # Prepare asset description and path
