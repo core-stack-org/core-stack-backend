@@ -62,7 +62,7 @@ from .misc.factory_csr import generate_factory_csr_data
 from .misc.green_credit import generate_green_credit_data
 from .misc.mining_data import generate_mining_data
 from .misc.slope_percentage import generate_slope_percentage
-from .misc.naturaldepression import generate_natural_depression
+from .misc.naturaldepression import generate_natural_depression_data
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
 from .misc.catchment_area import generate_catchment_area_singleflow
 
@@ -1311,7 +1311,7 @@ def generate_natural_depression(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_natural_depression.apply_async(
+        generate_natural_depression_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(

@@ -21,7 +21,7 @@ from constants.pan_india_urls import CATCHMETN_AREA, NATURAL_DEPRESSION
 
 
 @app.task(bind=True)
-def generate_natural_depression(self, state, district, block, gee_account_id):
+def generate_natural_depression_data(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
     description = (
         "natural_depression_" + valid_gee_text(district) + "_" + valid_gee_text(block)
