@@ -8,7 +8,7 @@ from .models import *
 class LayerAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     search_fields = ("layer_name",)
-    list_display = ["misc", "state", "dataset", "layer_name", "layer_version"]
+    list_display = ["state", "layer_name", "dataset", "layer_version", "misc"]
     list_filter = [
         "is_stac_specs_generated",
         "is_sync_to_geoserver",
@@ -20,5 +20,5 @@ class LayerAdmin(admin.ModelAdmin):
 @admin.register(Dataset)
 class LayerAdmin(admin.ModelAdmin):
     search_fields = ("name",)
-    list_display = ["layer_type", "name", "workspace"]
+    list_display = ["name", "layer_type", "workspace"]
     list_filter = ["layer_type"]
