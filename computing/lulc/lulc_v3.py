@@ -1,4 +1,5 @@
 import datetime
+import time
 from datetime import timedelta
 import ee
 from dateutil.relativedelta import relativedelta
@@ -17,7 +18,11 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import (
+    save_layer_info_to_db,
+    update_layer_sync_status,
+    get_layer_object,
+)
 
 from computing.STAC_specs import generate_STAC_layerwise
 
@@ -35,7 +40,7 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
         + "_uid"
     ).union()
 
-    start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
+    start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
 
     filename_prefix = (
         valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
@@ -47,15 +52,34 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
     final_output_filename_array_new = []
     final_output_assetid_array_new = []
 
+    layer_obj = None
+    try:
+        layer_obj = get_layer_object(
+            state,
+            district,
+            block,
+            layer_name=f"LULC_17_18_{valid_gee_text(block.lower())}_level_3",
+            dataset_name="LULC_level_3",
+        )
+    except Exception as e:
+        print("DB layer not found for lulc.")
+
+    if layer_obj:
+        existing_end_year = int(layer_obj.misc["end_year"])
+        loop_start = str(existing_end_year) + "-07-01"
+
     scale = 10
+
+    loop_start = datetime.strptime(loop_start, "%Y-%m-%d")
+    loop_end = datetime.strptime(loop_end, "%Y-%m-%d")
     print(loop_start, loop_end)
 
-    while loop_start < loop_end:
-        curr_start_date = datetime.strptime(loop_start, "%Y-%m-%d")
+    while loop_start <= loop_end:
+        print("loop_start", loop_start)
+        curr_start_date = loop_start  # datetime.strptime(loop_start, "%Y-%m-%d")
         curr_end_date = curr_start_date + relativedelta(years=1) - timedelta(days=1)
 
-        loop_start = (curr_start_date + relativedelta(years=1)).strftime("%Y-%m-%d")
-
+        loop_start = curr_start_date + relativedelta(years=1)  # .strftime("%Y-%m-%d")
         curr_start_date = curr_start_date.strftime("%Y-%m-%d")
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
         curr_filename = filename_prefix + "_" + curr_start_date + "_" + curr_end_date
@@ -78,16 +102,22 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
     task_list = []
     geometry = roi.geometry()
     for i in range(0, len(l1_asset_new)):
-        if not is_gee_asset_exists(final_output_assetid_array_new[i]):
-            task_id = export_raster_asset_to_gee(
-                image=l1_asset_new[i].clip(geometry),
-                description=final_output_filename_array_new[i],
-                asset_id=final_output_assetid_array_new[i],
-                scale=scale,
-                region=geometry,
-                pyramiding_policy={"predicted_label": "mode"},
+        if is_gee_asset_exists(final_output_assetid_array_new[i]):
+            ee.data.copyAsset(
+                final_output_assetid_array_new[i],
+                f"{final_output_assetid_array_new[i]}_old",
             )
-            task_list.append(task_id)
+            time.sleep(10)
+            ee.data.deleteAsset(final_output_assetid_array_new[i])
+        task_id = export_raster_asset_to_gee(
+            image=l1_asset_new[i].clip(geometry),
+            description=final_output_filename_array_new[i],
+            asset_id=final_output_assetid_array_new[i],
+            scale=scale,
+            region=geometry,
+            pyramiding_policy={"predicted_label": "mode"},
+        )
+        task_list.append(task_id)
 
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)

@@ -692,6 +692,7 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
         ee.data.deleteAsset(new_asset_id)
         # Rename new asset with existing asset's name
         ee.data.copyAsset(f"{asset_id}_merge", asset_id)
+        time.sleep(10)
         # Delete new asset
         ee.data.deleteAsset(f"{asset_id}_merge")
 
