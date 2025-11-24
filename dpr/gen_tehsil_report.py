@@ -1,4 +1,5 @@
 import re
+import os
 import requests
 import geopandas as gpd
 import pandas as pd
@@ -24,6 +25,9 @@ env = environ.Env()
 environ.Env.read_env()
 
 logger = setup_logger(__name__)
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+JSON_FILE_PATH = os.path.join(os.path.dirname(CURRENT_DIR), 'dpr/utils', 'block_patterns.json')
 
 # TODO: fix the path issue <> shiv and ksheetiz
 DATA_DIR_TEMP = env("EXCEL_DIR")
@@ -114,6 +118,18 @@ def check_point_position(region_gdf, city_point):  # relative position of point
             return "centre"
     return "Invalid region geometry"
 
+
+def load_block_patterns(): # read the json file wherever needed
+    try:
+        with open(JSON_FILE_PATH, 'r') as file:
+            block_patterns = json.load(file)
+        return block_patterns
+    except FileNotFoundError:
+        logger.error(f"JSON file not found at {JSON_FILE_PATH}")
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding JSON: {e}")
+        return {}
 
 # ? MARK: MAIN SECTION
 def get_tehsil_data(state, district, block):
@@ -645,43 +661,10 @@ def get_tehsil_data(state, district, block):
 def get_pattern_intensity(state, district, block, mws_pattern_intensity, pattern_count):
     try:
         file_path = DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx"
+
+        block_patterns = load_block_patterns()
+
         
-        #? All DF's in the Excel
-        df_agri = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-
-        #? Get all UIDs from the column and initialize them in the map
-        for uid in df_agri["UID"]:
-            mws_pattern_intensity[uid] = 0.0
-
-        #? First Pattern - Double Crop Analysis
-        selected_column_double_crop = [col for col in df_agri.columns if col.startswith("doubly_cropped_area_in_ha_")]
-        
-        # Convert columns to numeric
-        df_agri[selected_column_double_crop] = df_agri[selected_column_double_crop].apply(pd.to_numeric, errors="coerce")
-        df_agri["sum_area_in_ha"] = pd.to_numeric(df_agri["sum_area_in_ha"], errors="coerce")
-
-        for index, row in df_agri.iterrows():
-            uid = row["UID"]
-            sum_area = row["sum_area_in_ha"]
-            
-            # Skip if sum_area is 0 or NaN
-            if sum_area == 0 or pd.isna(sum_area):
-                continue
-            
-            # Calculate percentages for all years
-            percentages = []
-            for col in selected_column_double_crop:
-                doubly_area = row[col]
-                if not pd.isna(doubly_area):
-                    percent = (doubly_area / sum_area) * 100
-                    percentages.append(percent)
-            
-            # Calculate average percentage
-            avg_percent = sum(percentages) / len(percentages) if percentages else 0
-            
-            # If average percentage is less than 30, assign the value
-            if avg_percent < 30:
-                mws_pattern_intensity[uid] = 100 / pattern_count
         
         return mws_pattern_intensity
 

@@ -1,0 +1,51 @@
+{
+    "Agriculture" : [
+        {
+            "Name" : "low_rainfed_agri_resilience",
+            "values" : [
+                {
+                    "sheet_name" : "croppingIntensity_annual",
+                    "type" : 4,
+                    "column" : ["doubly_cropped_area_in_ha_","sum_area_in_ha"]
+                }
+            ]
+        },
+        {
+            "Name" : "groundwater_stress",
+            "values" : [
+                {
+                    "sheet_name" : "soge_vector",
+                    "type" : 2,
+                    "column" : "class_name"
+                },
+                {
+                    "sheet_name" : "hydrological_annual",
+                    "type" : 3,
+                    "column" : "G_in_mm_"
+                }
+            ]
+        }
+    ],
+    "Livestock" : [
+        {
+            "Name" : "overgrazing",
+            "values" : [
+                {
+                    "sheet_name" : "change_detection_deforestation",
+                    "type" : 2,
+                    "column" : "total_deforestation_area_in_ha"
+                }
+            ]
+        },
+        {
+            "Name" : "water scarcity",
+            "values" : [
+                {
+                    "sheet_name" : "surfaceWaterBodies_annual",
+                    "type" : 4,
+                    "column" : ["rabi_area_in_ha_", "rabi_area_in_ha_"]
+                }
+            ]
+        }    
+    ]
+}

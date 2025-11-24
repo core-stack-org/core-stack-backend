@@ -34,6 +34,9 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
+# TMP File location
+TMP_LOCATION = env("TMP_LOCATION")
+
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
