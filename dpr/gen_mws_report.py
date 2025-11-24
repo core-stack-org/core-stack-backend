@@ -1236,8 +1236,6 @@ def get_land_conflict_industrial_data(state, district, block, uid):
         return []
 
 
-import re
-
 def get_factory_data(state, district, block, uid):
     try:
         df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="factory_csr")
