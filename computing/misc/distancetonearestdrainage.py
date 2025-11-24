@@ -1,9 +1,7 @@
 import ee
 from nrm_app.celery import app
 from computing.utils import (
-    sync_layer_to_geoserver,
     save_layer_info_to_db,
-    update_layer_sync_status,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -11,13 +9,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from constants.pan_india_urls import CATCHMETN_AREA, NATURAL_DEPRESSION
+from constants.pan_india_urls import DISTANCE_TO_UPSTREAM_DL
 
 
 @app.task(bind=True)
@@ -41,8 +38,8 @@ def generate_distance_to_nearest_drainage_line(
         + "_uid"
     )
 
-    natural_depression = ee.Image(NATURAL_DEPRESSION)
-    raster = natural_depression.clip(roi.geometry())
+    distance_upsream_dl = ee.Image(DISTANCE_TO_UPSTREAM_DL)
+    raster = distance_upsream_dl.clip(roi.geometry())
 
     # Generate raster Layer
     distance_to_drainage_line_raster_generation(
