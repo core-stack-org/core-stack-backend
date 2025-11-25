@@ -63,6 +63,7 @@ def get_pss(
     Returns:
         Asset ID of the generated suitability raster
     """
+    print("Inside generate PSS raster")
     # Initialize base image with a constant value of 1
     all_layers = ee.Image(1)
     is_default_profile = True
@@ -100,317 +101,326 @@ def get_pss(
         )
 
     # Remove existing asset if it exists to prevent conflicts
+    do_generate = True
     if is_gee_asset_exists(asset_id):
         if have_new_sites:
-            ee.data.deleteAsset(asset_id)
+            ee.data.deleteAsset(
+                asset_id
+            )  # TODO Add site raster in existing raster instead of generating whole new
+            do_generate = True
         else:
-            return asset_id, is_default_profile
+            do_generate = False
+        #     return asset_id, is_default_profile
 
-    # Define analysis layers and their processing functions
-    # Each subsequent section follows a similar pattern:
-    # 1. Define variables
-    # 2. Set weights
-    # 3. Create sub-layers
-    # 4. Combine layers with weighted expression
-    # 5. Add to all_layers
+    if do_generate:
+        # Define analysis layers and their processing functions
+        # Each subsequent section follows a similar pattern:
+        # 1. Define variables
+        # 2. Set weights
+        # 3. Create sub-layers
+        # 4. Combine layers with weighted expression
+        # 5. Add to all_layers
 
-    ############### Climate Layer ################
-    climate_variables = [
-        "annualPrecipitation",
-        "meanAnnualTemperature",
-        "aridityIndex",
-        "referenceEvapoTranspiration",
-    ]
+        ############### Climate Layer ################
+        climate_variables = [
+            "annualPrecipitation",
+            "meanAnnualTemperature",
+            "aridityIndex",
+            "referenceEvapoTranspiration",
+        ]
 
-    # Create climate sub-layers by classifying each variable
-    climate_sub_layers = create_classification(
-        project_variables, climate_variables, roi, state, start_year, end_year
-    )
-
-    # Prepare weighted expression for climate layer
-    climate_expr_vars = {
-        "annualPrecip": climate_sub_layers.select(["annualPrecipitation"]),
-        "meanAnnualTemp": climate_sub_layers.select(["meanAnnualTemperature"]),
-        "aridityIndex": climate_sub_layers.select(["aridityIndex"]),
-        "refEvapoTransp": climate_sub_layers.select(["referenceEvapoTranspiration"]),
-    }
-
-    climate_expr_weights = {
-        "w1": ee.Number(project_weights["annualPrecipitation"]),
-        "w2": ee.Number(project_weights["meanAnnualTemperature"]),
-        "w3": ee.Number(project_weights["aridityIndex"]),
-        "w4": ee.Number(project_weights["referenceEvapoTranspiration"]),
-    }
-
-    # Combine climate variables with weighted expression
-    climate_layer = climate_sub_layers.expression(
-        "w1 * annualPrecip + w2 * meanAnnualTemp + w3 * aridityIndex + w4 * refEvapoTransp",
-        {**climate_expr_vars, **climate_expr_weights},
-    ).rename("Climate")
-
-    logger.info("------------Climate layer done---------------")
-
-    all_layers = all_layers.addBands(climate_layer)
-
-    ############### Soil Layer ################
-
-    # First we take weighted mean of topsoilNutrients, subsoilNutrients and
-    # rootingCondition, then combine them along with AWC and drainage in the final layer
-    soil_variables = [
-        "topsoilPH",
-        "topsoilCEC",
-        "topsoilOC",
-        "topsoilTexture",
-        "topsoilBD",
-        "subsoilPH",
-        "subsoilCEC",
-        "subsoilOC",
-        "subsoilTexture",
-        "subsoilBD",
-        "drainage",
-        "AWC",
-    ]
-
-    soil_sub_layers = create_classification(
-        project_variables, soil_variables, roi, state, start_year, end_year
-    )
-
-    # Topsoil Nutrient Layer
-    topsoil_nutrient_layer = soil_sub_layers.expression(
-        "w1 * topsoilPH + w2 * topsoilOC + w3 * topsoilCEC + w4 * topsoilTexture",
-        {
-            "topsoilPH": soil_sub_layers.select(["topsoilPH"]),
-            "w1": ee.Number(project_weights["tnTopsoilPH"]),
-            "topsoilOC": soil_sub_layers.select(["topsoilOC"]),
-            "w2": ee.Number(project_weights["tnTopsoilOC"]),
-            "topsoilCEC": soil_sub_layers.select(["topsoilCEC"]),
-            "w3": ee.Number(project_weights["tnTopsoilCEC"]),
-            "topsoilTexture": soil_sub_layers.select(["topsoilTexture"]),
-            "w4": ee.Number(project_weights["tnTopsoilTexture"]),
-        },
-    )
-    topsoil_nutrient_layer = topsoil_nutrient_layer.rename("topsoilNutrient")
-    logger.info("--------------topsoil_nutrient_layer------------")
-    soil_sub_layers = soil_sub_layers.addBands(topsoil_nutrient_layer)
-
-    ################# Subsoil Nutrient Layer ######################
-    subsoil_nutrient_layer = soil_sub_layers.expression(
-        "w1 * subsoilPH + w2 * subsoilOC + w3 * subsoilCEC + w4 * subsoilTexture",
-        {
-            "subsoilPH": soil_sub_layers.select(["subsoilPH"]),
-            "w1": ee.Number(project_weights["snSubsoilPH"]),
-            "subsoilOC": soil_sub_layers.select(["subsoilOC"]),
-            "w2": ee.Number(project_weights["snSubsoilOC"]),
-            "subsoilCEC": soil_sub_layers.select(["subsoilCEC"]),
-            "w3": ee.Number(project_weights["snSubsoilCEC"]),
-            "subsoilTexture": soil_sub_layers.select(["subsoilTexture"]),
-            "w4": ee.Number(project_weights["snSubsoilTexture"]),
-        },
-    )
-    subsoil_nutrient_layer = subsoil_nutrient_layer.rename("subsoilNutrient")
-    soil_sub_layers = soil_sub_layers.addBands(subsoil_nutrient_layer)
-
-    ################ Rooting Condition Layer  ##########################
-    rooting_condition_layer = soil_sub_layers.expression(
-        "w1 * topsoilPH + w2 * topsoilBD + w3 * subsoilPH + w4 * subsoilBD",
-        {
-            "topsoilPH": soil_sub_layers.select(["topsoilPH"]),
-            "w1": ee.Number(project_weights["rcTopsoilPH"]),
-            "topsoilBD": soil_sub_layers.select(["topsoilBD"]),
-            "w2": ee.Number(project_weights["rcTopsoilBD"]),
-            "subsoilPH": soil_sub_layers.select(["subsoilPH"]),
-            "w3": ee.Number(project_weights["rcSubsoilPH"]),
-            "subsoilBD": soil_sub_layers.select(["subsoilBD"]),
-            "w4": ee.Number(project_weights["rcSubsoilBD"]),
-        },
-    )
-    rooting_condition_layer = rooting_condition_layer.rename("rootingCondition")
-    logger.info("---------------rooting_condition_layer-----------------------")
-    soil_sub_layers = soil_sub_layers.addBands(rooting_condition_layer)
-
-    ##################### Final Soil Layer###########################
-
-    soil_layer = soil_sub_layers.expression(
-        "w1 * topsoilNutrient + w2 * subsoilNutrient + w3 * rootingCondition + w4 * drainage + w5 * AWC",
-        {
-            "topsoilNutrient": soil_sub_layers.select(["topsoilNutrient"]),
-            "w1": ee.Number(project_weights["topsoilNutrient"]),
-            "subsoilNutrient": soil_sub_layers.select(["subsoilNutrient"]),
-            "w2": ee.Number(project_weights["subsoilNutrient"]),
-            "rootingCondition": soil_sub_layers.select(["rootingCondition"]),
-            "w3": ee.Number(project_weights["rootingCondition"]),
-            "drainage": soil_sub_layers.select(["drainage"]),
-            "w4": ee.Number(project_weights["drainage"]),
-            "AWC": soil_sub_layers.select(["AWC"]),
-            "w5": ee.Number(project_weights["AWC"]),
-        },
-    )
-    soil_layer = soil_layer.rename("Soil")
-    logger.info("------------soil_layer----------------")
-    all_layers = all_layers.addBands(soil_layer)
-
-    ######################## Socioeconomic Layer  ############################
-    socioeconomic_variables = ["distToRoad", "distToDrainage", "distToSettlements"]
-
-    socioeconomic_sub_layers = create_classification(
-        project_variables, socioeconomic_variables, roi, state, start_year, end_year
-    )
-
-    socioeconomic_layer = socioeconomic_sub_layers.expression(
-        "w1 * distToRoad + w2 * distToDrainage + w3 * distToSettlements",
-        {
-            "distToRoad": socioeconomic_sub_layers.select(["distToRoad"]),
-            "w1": ee.Number(project_weights["distToRoad"]),
-            "distToDrainage": socioeconomic_sub_layers.select(["distToDrainage"]),
-            "w2": ee.Number(project_weights["distToDrainage"]),
-            "distToSettlements": socioeconomic_sub_layers.select(["distToSettlements"]),
-            "w3": ee.Number(project_weights["distToSettlements"]),
-        },
-    )
-
-    socioeconomic_layer = socioeconomic_layer.rename("Socioeconomic")
-    logger.info("-------------------socioeconomic_layer---------------")
-    all_layers = all_layers.addBands(socioeconomic_layer)
-
-    ##################### Ecology Layer  ############################
-    ecology_variables = ["NDVI", "LULC"]
-
-    ecology_sub_layers = create_classification(
-        project_variables, ecology_variables, roi, state, start_year, end_year
-    )
-
-    ecology_layer = ecology_sub_layers.expression(
-        "w1 * NDVI + w2 * LULC",
-        {
-            "NDVI": ecology_sub_layers.select(["NDVI"]),
-            "w1": ee.Number(project_weights["NDVI"]),
-            "LULC": ecology_sub_layers.select(["LULC"]),
-            "w2": ee.Number(project_weights["LULC"]),
-        },
-    )
-
-    ecology_layer = ecology_layer.rename("Ecology")
-    all_layers = all_layers.addBands(ecology_layer)
-
-    ########## Topography Layer ###########################
-    topography_variables = ["elevation", "slope", "aspect"]
-
-    topography_sub_layers = create_classification(
-        project_variables, topography_variables, roi, state, start_year, end_year
-    )
-
-    topography_layer = topography_sub_layers.expression(
-        "w1 * elevation + w2 * slope + w3 * aspect",
-        {
-            "elevation": topography_sub_layers.select(["elevation"]),
-            "w1": ee.Number(project_weights["elevation"]),
-            "slope": topography_sub_layers.select(["slope"]),
-            "w2": ee.Number(project_weights["slope"]),
-            "aspect": topography_sub_layers.select(["aspect"]),
-            "w3": ee.Number(project_weights["aspect"]),
-        },
-    )
-
-    topography_layer = topography_layer.rename("Topography")
-    all_layers = all_layers.addBands(topography_layer)
-
-    ############### Final layer calculation  ######################
-    final_layer = all_layers.expression(
-        "w1 * Climate + w2 * Soil + w3 * Topography + w4 * Ecology + w5 * Socioeconomic",
-        {
-            "Climate": all_layers.select(["Climate"]),
-            "w1": ee.Number(project_weights["Climate"]),
-            "Soil": all_layers.select(["Soil"]),
-            "w2": ee.Number(project_weights["Soil"]),
-            "Topography": all_layers.select(["Topography"]),
-            "w3": ee.Number(project_weights["Topography"]),
-            "Ecology": all_layers.select(["Ecology"]),
-            "w4": ee.Number(project_weights["Ecology"]),
-            "Socioeconomic": all_layers.select(["Socioeconomic"]),
-            "w5": ee.Number(project_weights["Socioeconomic"]),
-        },
-    )
-
-    final_layer = final_layer.rename("Final")
-
-    # This rounding is specific to a binary score output
-    # Round off Plantation Score to 0 or 1 on each pixel and mask
-    if is_default_profile:
-        if project:
-            # Mapping 5 suitability classes to 2 in case of project level assessment
-            final_plantation_score = ee.Image(1).where(final_layer.gte(3), 0)
-        else:
-            # For five suitability classes
-            final_plantation_score = (
-                ee.Image(0)
-                .where(final_layer.lt(1.5), 1)
-                .where(final_layer.gte(1.5).And(final_layer.lt(2.5)), 2)
-                .where(final_layer.gte(2.5).And(final_layer.lt(3.5)), 3)
-                .where(final_layer.gte(3.5).And(final_layer.lt(4.5)), 4)
-                .where(final_layer.gte(4.5), 5)
-                .clip(roi.geometry())
-            )
-    else:
-        # Pixels with score <= 0.5 are considered unsuitable
-        final_plantation_score = ee.Image(1).where(final_layer.lte(0.5), 0)
-
-    """ 
-    Apply LULC (Land Use/Land Cover) mask to filter suitable areas
-    Classes to be masked for in IndiaSat LULC v3 - 5 (Croplands), 6 (Trees/forests), 7 (Barren lands), 
-    8 (Single Kharif Cropping), 9 (Single Non Kharif Cropping), 10 (Double Cropping), 11 (Triple Cropping), 12 (Shrub and Scrub)
-    """
-    lulc = get_dataset("LULC", state, roi, start_year, end_year)
-    if is_default_profile:
-        lulc_mask = lulc.eq(5).Or(lulc.gte(7))
-    else:
-        lulc_mask = lulc.gte(5)
-
-    # Final score with LULC masking and clipping to ROI
-    final_plantation_score = (
-        final_plantation_score.updateMask(lulc_mask)
-        .clip(roi.geometry())
-        .rename("final_score")
-    )  # Changed to a valid band name
-
-    logger.info("---------------final_plantation_score--------------")
-    all_layers = all_layers.addBands(final_plantation_score)
-
-    # Harmonize band types to ensure consistency
-    all_layers = harmonize_band_types(all_layers, "Float")
-
-    # Export to GEE asset
-    try:
-        scale = 30
-        task_id = export_raster_asset_to_gee(
-            image=all_layers.clip(roi.geometry()),
-            description=description,
-            asset_id=asset_id,
-            scale=scale,
-            region=roi.geometry(),
+        # Create climate sub-layers by classifying each variable
+        climate_sub_layers = create_classification(
+            project_variables, climate_variables, roi, state, start_year, end_year
         )
-        check_task_status([task_id])
 
-        if is_gee_asset_exists(asset_id):
-            make_asset_public(asset_id)
-            layer_id = None
-            if state and district and block:
-                layer_id = save_layer_info_to_db(
-                    state,
-                    district,
-                    block,
-                    layer_name=description,
-                    asset_id=asset_id,
-                    dataset_name="Site Suitability",
-                    misc={"start_year": start_year, "end_year": end_year},
+        # Prepare weighted expression for climate layer
+        climate_expr_vars = {
+            "annualPrecip": climate_sub_layers.select(["annualPrecipitation"]),
+            "meanAnnualTemp": climate_sub_layers.select(["meanAnnualTemperature"]),
+            "aridityIndex": climate_sub_layers.select(["aridityIndex"]),
+            "refEvapoTransp": climate_sub_layers.select(
+                ["referenceEvapoTranspiration"]
+            ),
+        }
+
+        climate_expr_weights = {
+            "w1": ee.Number(project_weights["annualPrecipitation"]),
+            "w2": ee.Number(project_weights["meanAnnualTemperature"]),
+            "w3": ee.Number(project_weights["aridityIndex"]),
+            "w4": ee.Number(project_weights["referenceEvapoTranspiration"]),
+        }
+
+        # Combine climate variables with weighted expression
+        climate_layer = climate_sub_layers.expression(
+            "w1 * annualPrecip + w2 * meanAnnualTemp + w3 * aridityIndex + w4 * refEvapoTransp",
+            {**climate_expr_vars, **climate_expr_weights},
+        ).rename("Climate")
+
+        logger.info("------------Climate layer done---------------")
+
+        all_layers = all_layers.addBands(climate_layer)
+
+        ############### Soil Layer ################
+
+        # First we take weighted mean of topsoilNutrients, subsoilNutrients and
+        # rootingCondition, then combine them along with AWC and drainage in the final layer
+        soil_variables = [
+            "topsoilPH",
+            "topsoilCEC",
+            "topsoilOC",
+            "topsoilTexture",
+            "topsoilBD",
+            "subsoilPH",
+            "subsoilCEC",
+            "subsoilOC",
+            "subsoilTexture",
+            "subsoilBD",
+            "drainage",
+            "AWC",
+        ]
+
+        soil_sub_layers = create_classification(
+            project_variables, soil_variables, roi, state, start_year, end_year
+        )
+
+        # Topsoil Nutrient Layer
+        topsoil_nutrient_layer = soil_sub_layers.expression(
+            "w1 * topsoilPH + w2 * topsoilOC + w3 * topsoilCEC + w4 * topsoilTexture",
+            {
+                "topsoilPH": soil_sub_layers.select(["topsoilPH"]),
+                "w1": ee.Number(project_weights["tnTopsoilPH"]),
+                "topsoilOC": soil_sub_layers.select(["topsoilOC"]),
+                "w2": ee.Number(project_weights["tnTopsoilOC"]),
+                "topsoilCEC": soil_sub_layers.select(["topsoilCEC"]),
+                "w3": ee.Number(project_weights["tnTopsoilCEC"]),
+                "topsoilTexture": soil_sub_layers.select(["topsoilTexture"]),
+                "w4": ee.Number(project_weights["tnTopsoilTexture"]),
+            },
+        )
+        topsoil_nutrient_layer = topsoil_nutrient_layer.rename("topsoilNutrient")
+        logger.info("--------------topsoil_nutrient_layer------------")
+        soil_sub_layers = soil_sub_layers.addBands(topsoil_nutrient_layer)
+
+        ################# Subsoil Nutrient Layer ######################
+        subsoil_nutrient_layer = soil_sub_layers.expression(
+            "w1 * subsoilPH + w2 * subsoilOC + w3 * subsoilCEC + w4 * subsoilTexture",
+            {
+                "subsoilPH": soil_sub_layers.select(["subsoilPH"]),
+                "w1": ee.Number(project_weights["snSubsoilPH"]),
+                "subsoilOC": soil_sub_layers.select(["subsoilOC"]),
+                "w2": ee.Number(project_weights["snSubsoilOC"]),
+                "subsoilCEC": soil_sub_layers.select(["subsoilCEC"]),
+                "w3": ee.Number(project_weights["snSubsoilCEC"]),
+                "subsoilTexture": soil_sub_layers.select(["subsoilTexture"]),
+                "w4": ee.Number(project_weights["snSubsoilTexture"]),
+            },
+        )
+        subsoil_nutrient_layer = subsoil_nutrient_layer.rename("subsoilNutrient")
+        soil_sub_layers = soil_sub_layers.addBands(subsoil_nutrient_layer)
+
+        ################ Rooting Condition Layer  ##########################
+        rooting_condition_layer = soil_sub_layers.expression(
+            "w1 * topsoilPH + w2 * topsoilBD + w3 * subsoilPH + w4 * subsoilBD",
+            {
+                "topsoilPH": soil_sub_layers.select(["topsoilPH"]),
+                "w1": ee.Number(project_weights["rcTopsoilPH"]),
+                "topsoilBD": soil_sub_layers.select(["topsoilBD"]),
+                "w2": ee.Number(project_weights["rcTopsoilBD"]),
+                "subsoilPH": soil_sub_layers.select(["subsoilPH"]),
+                "w3": ee.Number(project_weights["rcSubsoilPH"]),
+                "subsoilBD": soil_sub_layers.select(["subsoilBD"]),
+                "w4": ee.Number(project_weights["rcSubsoilBD"]),
+            },
+        )
+        rooting_condition_layer = rooting_condition_layer.rename("rootingCondition")
+        logger.info("---------------rooting_condition_layer-----------------------")
+        soil_sub_layers = soil_sub_layers.addBands(rooting_condition_layer)
+
+        ##################### Final Soil Layer###########################
+
+        soil_layer = soil_sub_layers.expression(
+            "w1 * topsoilNutrient + w2 * subsoilNutrient + w3 * rootingCondition + w4 * drainage + w5 * AWC",
+            {
+                "topsoilNutrient": soil_sub_layers.select(["topsoilNutrient"]),
+                "w1": ee.Number(project_weights["topsoilNutrient"]),
+                "subsoilNutrient": soil_sub_layers.select(["subsoilNutrient"]),
+                "w2": ee.Number(project_weights["subsoilNutrient"]),
+                "rootingCondition": soil_sub_layers.select(["rootingCondition"]),
+                "w3": ee.Number(project_weights["rootingCondition"]),
+                "drainage": soil_sub_layers.select(["drainage"]),
+                "w4": ee.Number(project_weights["drainage"]),
+                "AWC": soil_sub_layers.select(["AWC"]),
+                "w5": ee.Number(project_weights["AWC"]),
+            },
+        )
+        soil_layer = soil_layer.rename("Soil")
+        logger.info("------------soil_layer----------------")
+        all_layers = all_layers.addBands(soil_layer)
+
+        ######################## Socioeconomic Layer  ############################
+        socioeconomic_variables = ["distToRoad", "distToDrainage", "distToSettlements"]
+
+        socioeconomic_sub_layers = create_classification(
+            project_variables, socioeconomic_variables, roi, state, start_year, end_year
+        )
+
+        socioeconomic_layer = socioeconomic_sub_layers.expression(
+            "w1 * distToRoad + w2 * distToDrainage + w3 * distToSettlements",
+            {
+                "distToRoad": socioeconomic_sub_layers.select(["distToRoad"]),
+                "w1": ee.Number(project_weights["distToRoad"]),
+                "distToDrainage": socioeconomic_sub_layers.select(["distToDrainage"]),
+                "w2": ee.Number(project_weights["distToDrainage"]),
+                "distToSettlements": socioeconomic_sub_layers.select(
+                    ["distToSettlements"]
+                ),
+                "w3": ee.Number(project_weights["distToSettlements"]),
+            },
+        )
+
+        socioeconomic_layer = socioeconomic_layer.rename("Socioeconomic")
+        logger.info("-------------------socioeconomic_layer---------------")
+        all_layers = all_layers.addBands(socioeconomic_layer)
+
+        ##################### Ecology Layer  ############################
+        ecology_variables = ["NDVI", "LULC"]
+
+        ecology_sub_layers = create_classification(
+            project_variables, ecology_variables, roi, state, start_year, end_year
+        )
+
+        ecology_layer = ecology_sub_layers.expression(
+            "w1 * NDVI + w2 * LULC",
+            {
+                "NDVI": ecology_sub_layers.select(["NDVI"]),
+                "w1": ee.Number(project_weights["NDVI"]),
+                "LULC": ecology_sub_layers.select(["LULC"]),
+                "w2": ee.Number(project_weights["LULC"]),
+            },
+        )
+
+        ecology_layer = ecology_layer.rename("Ecology")
+        all_layers = all_layers.addBands(ecology_layer)
+
+        ########## Topography Layer ###########################
+        topography_variables = ["elevation", "slope", "aspect"]
+
+        topography_sub_layers = create_classification(
+            project_variables, topography_variables, roi, state, start_year, end_year
+        )
+
+        topography_layer = topography_sub_layers.expression(
+            "w1 * elevation + w2 * slope + w3 * aspect",
+            {
+                "elevation": topography_sub_layers.select(["elevation"]),
+                "w1": ee.Number(project_weights["elevation"]),
+                "slope": topography_sub_layers.select(["slope"]),
+                "w2": ee.Number(project_weights["slope"]),
+                "aspect": topography_sub_layers.select(["aspect"]),
+                "w3": ee.Number(project_weights["aspect"]),
+            },
+        )
+
+        topography_layer = topography_layer.rename("Topography")
+        all_layers = all_layers.addBands(topography_layer)
+
+        ############### Final layer calculation  ######################
+        final_layer = all_layers.expression(
+            "w1 * Climate + w2 * Soil + w3 * Topography + w4 * Ecology + w5 * Socioeconomic",
+            {
+                "Climate": all_layers.select(["Climate"]),
+                "w1": ee.Number(project_weights["Climate"]),
+                "Soil": all_layers.select(["Soil"]),
+                "w2": ee.Number(project_weights["Soil"]),
+                "Topography": all_layers.select(["Topography"]),
+                "w3": ee.Number(project_weights["Topography"]),
+                "Ecology": all_layers.select(["Ecology"]),
+                "w4": ee.Number(project_weights["Ecology"]),
+                "Socioeconomic": all_layers.select(["Socioeconomic"]),
+                "w5": ee.Number(project_weights["Socioeconomic"]),
+            },
+        )
+
+        final_layer = final_layer.rename("Final")
+
+        # This rounding is specific to a binary score output
+        # Round off Plantation Score to 0 or 1 on each pixel and mask
+        if is_default_profile:
+            if project:
+                # Mapping 5 suitability classes to 2 in case of project level assessment
+                final_plantation_score = ee.Image(1).where(final_layer.gte(3), 0)
+            else:
+                # For five suitability classes
+                final_plantation_score = (
+                    ee.Image(0)
+                    .where(final_layer.lt(1.5), 1)
+                    .where(final_layer.gte(1.5).And(final_layer.lt(2.5)), 2)
+                    .where(final_layer.gte(2.5).And(final_layer.lt(3.5)), 3)
+                    .where(final_layer.gte(3.5).And(final_layer.lt(4.5)), 4)
+                    .where(final_layer.gte(4.5), 5)
+                    .clip(roi.geometry())
                 )
-                print("save site suitability info at the gee level...")
+        else:
+            # Pixels with score <= 0.5 are considered unsuitable
+            final_plantation_score = ee.Image(1).where(final_layer.lte(0.5), 0)
 
-            sync_to_gcs_geoserver(asset_id, description, scale, layer_id)
-            return asset_id, is_default_profile
+        """ 
+        Apply LULC (Land Use/Land Cover) mask to filter suitable areas
+        Classes to be masked for in IndiaSat LULC v3 - 5 (Croplands), 6 (Trees/forests), 7 (Barren lands), 
+        8 (Single Kharif Cropping), 9 (Single Non Kharif Cropping), 10 (Double Cropping), 11 (Triple Cropping), 12 (Shrub and Scrub)
+        """
+        lulc = get_dataset("LULC", state, roi, start_year, end_year)
+        if is_default_profile:
+            lulc_mask = lulc.eq(5).Or(lulc.gte(7))
+        else:
+            lulc_mask = lulc.gte(5)
 
-    except Exception as e:
-        logger.exception(f"Export failed: {str(e)}")
-        raise
+        # Final score with LULC masking and clipping to ROI
+        final_plantation_score = (
+            final_plantation_score.updateMask(lulc_mask)
+            .clip(roi.geometry())
+            .rename("final_score")
+        )  # Changed to a valid band name
+
+        logger.info("---------------final_plantation_score--------------")
+        all_layers = all_layers.addBands(final_plantation_score)
+
+        # Harmonize band types to ensure consistency
+        all_layers = harmonize_band_types(all_layers, "Float")
+
+        # Export to GEE asset
+        try:
+            task_id = export_raster_asset_to_gee(
+                image=all_layers.clip(roi.geometry()),
+                description=description,
+                asset_id=asset_id,
+                scale=30,
+                region=roi.geometry(),
+            )
+            check_task_status([task_id])
+
+        except Exception as e:
+            logger.exception(f"Export failed: {str(e)}")
+            raise
+
+    if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
+        if state and district and block:
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=description,
+                asset_id=asset_id,
+                dataset_name="Site Suitability",
+                misc={"start_year": start_year, "end_year": end_year},
+            )
+            print("save site suitability info at the gee level...")
+
+            sync_to_gcs_geoserver(asset_id, description, 30, layer_id)
+
+    return asset_id, is_default_profile
 
 
 # Helper functions for dataset retrieval and classification
