@@ -57,7 +57,7 @@ def generate_catchment_area_singleflow(
 
     else:
         roi_boundary = ee.FeatureCollection(roi_path)
-        description = "catchment_area_" + asset_suffix + "_raster"
+        description = "catchment_area_" + asset_suffix
 
         asset_id = (
             get_gee_dir_path(
@@ -94,11 +94,10 @@ def catchment_area_raster_generation(
     app_type=None,
     asset_id=None,
 ):
+    workspacename = "catchment_area_singleflow"
     if proj_id:
         proj_obj = Project.objects.get(pk=proj_id)
-        workspacename = proj_obj.app_type
-    else:
-        workspacename = "catchment_area_singleflow"
+
     if not is_gee_asset_exists(asset_id):
         try:
             task_id = export_raster_asset_to_gee(
