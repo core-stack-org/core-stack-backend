@@ -74,7 +74,7 @@ def Upload_Desilting_Points(
 
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
 
-    project_id = ee_initialize(gee_project_id)
+    ee_initialize(gee_project_id)
     merged_features = []
 
     # Initialize objects for given parameters
@@ -91,7 +91,7 @@ def Upload_Desilting_Points(
         + description
     )
     # Since we wanted to build all the layer new everytime some one upload We are deleting asset first
-    delete_asset_on_GEE(mws_asset_id)
+    # delete_asset_on_GEE(mws_asset_id)
 
     if wb_obj.process:
         logger.warning("file already processed. Skipping and not processing")
@@ -194,7 +194,7 @@ def Upload_Desilting_Points(
         except Exception as e:
             logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
     Generate_water_balance_indicator(
-        mws_asset_id, project_id, gee_account_id=gee_project_id
+        mws_asset_id, proj_id=proj_obj.id, gee_account_id=gee_project_id
     )
     asset_suffix_swb4 = f"swb4_{proj_obj.name}+{proj_obj.id}"
     asset_id_swb = (
@@ -208,7 +208,7 @@ def Upload_Desilting_Points(
     )
 
 
-@shared_task
+@shared_task()
 def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None):
 
     print(f"project id {gee_account_id}")
