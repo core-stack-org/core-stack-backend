@@ -33,7 +33,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
     ).filter(ee.Filter.eq("objectid", basin_object_id))
 
     filename_prefix = (
-        str(basin_object_id) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
+            str(basin_object_id) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
     )
 
     loop_start = start_date
@@ -139,8 +139,8 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
         scale = 10
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m_v2"
         final_output_assetid = (
-            "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
-            + final_output_filename
+                "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
+                + final_output_filename
         )
 
         # Setup the task

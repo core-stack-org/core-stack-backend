@@ -161,4 +161,9 @@ urlpatterns = [
         api.generate_ndvi_timeseries,
         name="generate_ndvi_timeseries",
     ),
+    path(
+        "generate_zoi_data/",
+        api.generate_zoi_to_gee,
+        name="generate_mining_data",
+    ),
 ]

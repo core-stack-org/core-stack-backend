@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     "community_engagement",
     "bot_interface",
     "gee_computing",
+    "waterrejuvenation",
 ]
 
 # MARK: CORS Settings
@@ -119,7 +120,6 @@ else:
         "http://localhost:3000",
         "http://localhost:3001",
     ]
-
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -277,7 +277,6 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,  # keep Django's default loggers
@@ -321,7 +320,6 @@ LOGGING = {
         },
     },
 }
-
 
 # MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
@@ -372,3 +370,15 @@ BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
 
 FERNET_KEY = env("FERNET_KEY")
+
+
+lulc_years = [
+    "2017_2018",
+    "2018_2019",
+    "2019_2020",
+    "2020_2021",
+    "2021_2022",
+    "2022_2023",
+    "2023_2024",
+]
+water_classes = [2, 3, 4]

@@ -141,14 +141,14 @@ def tree_health_ch_vector(
     # Sync to GeoServer with a name that indicates the year range
     geo_filename = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_tree_health_ch_vector_{start_year}_{end_year}"
     description = (
-        "tree_health_ch_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
-        + "_"
-        + str(start_year)
-        + "_"
-        + str(end_year)
+            "tree_health_ch_vector_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
+            + "_"
+            + str(start_year)
+            + "_"
+            + str(end_year)
     )
     # Create the final feature collection
     final_fc = ee.FeatureCollection(final_features)

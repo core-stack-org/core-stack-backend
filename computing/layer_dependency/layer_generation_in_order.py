@@ -43,14 +43,14 @@ status = {}
 
 @app.task(bind=True)
 def layer_generate_map(
-    self,
-    state,
-    district,
-    block,
-    map_order,
-    gee_account_id,
-    start_year=None,
-    end_year=None,
+        self,
+        state,
+        district,
+        block,
+        map_order,
+        gee_account_id,
+        start_year=None,
+        end_year=None,
 ):
     """
     This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
@@ -140,7 +140,7 @@ def layer_generate_map(
 
 
 def run_layer_with_dependency(
-    deps, node_func_name, node_func_obj, state, district, block, args
+        deps, node_func_name, node_func_obj, state, district, block, args
 ):
     """
     This function checks dependency of layer if it is generated or not and call the pipeline functions and maintain status of each function,

@@ -55,6 +55,7 @@ def terrain_raster(
             + "_uid"
         )
     else:
+        print("inside terrain raster")
         description = "terrain_raster_" + asset_suffix
 
         asset_id = (
@@ -87,20 +88,23 @@ def terrain_raster(
         make_asset_public(asset_id)
 
         """ Sync image to google cloud storage and then to geoserver"""
-        layer_name = (
-            valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_terrain_raster"
-        )
-        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
+        if state and district and block:
+            layer_name = (
+                valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
+                + "_terrain_raster"
+            )
+            task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
 
-        task_id_list = check_task_status([task_id])
-        print("task_id_list sync to gcs ", task_id_list)
+            task_id_list = check_task_status([task_id])
+            print("task_id_list sync to gcs ", task_id_list)
 
-        layer_id = save_layer_info_to_db(
-            state, district, block, layer_name, asset_id, "Terrain Raster"
-        )
+            layer_id = save_layer_info_to_db(
+                state, district, block, layer_name, asset_id, "Terrain Raster"
+            )
+        else:
+            layer_name = f"{asset_suffix}_terrain_raster"
 
         res = sync_raster_gcs_to_geoserver(
             "terrain", layer_name, layer_name, "terrain_raster"
@@ -110,13 +114,17 @@ def terrain_raster(
             print("sync to geoserver flag is updated")
 
             layer_STAC_generated = False
-            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                state=state, district=district, block=block, layer_name="terrain_raster"
-            )
+            if state and district and block:
+                layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                    state=state,
+                    district=district,
+                    block=block,
+                    layer_name="terrain_raster",
+                )
 
-            update_layer_sync_status(
-                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-            )
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+                )
 
             layer_at_geoserver = True
     return layer_at_geoserver

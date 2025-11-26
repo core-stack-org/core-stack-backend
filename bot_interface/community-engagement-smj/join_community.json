@@ -158,7 +158,7 @@
               "field": "misc"
             },
             {
-              "state": "SendDistrict", 
+              "state": "SendDistrict",
               "field": "misc"
             }
           ]
@@ -222,12 +222,16 @@
     ],
     "postAction": [],
     "transition": [
-        {
-            "COMPLETE": ["success"]
-        },
-        {
-            "JoinSuccess": ["failure"]
-        }
+      {
+        "COMPLETE": [
+          "success"
+        ]
+      },
+      {
+        "JoinSuccess": [
+          "failure"
+        ]
+      }
     ]
   }
 ]

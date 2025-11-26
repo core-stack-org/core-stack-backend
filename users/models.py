@@ -65,12 +65,12 @@ class User(AbstractUser):
 
         # org admin should have permission for all the projects in their org
         if (
-            self.organization
-            and project
-            and project.organization == self.organization
-            and self.groups.filter(
-                name_in=["Organization Admin", "Org Admin", "Administrator"]
-            ).exists()
+                self.organization
+                and project
+                and project.organization == self.organization
+                and self.groups.filter(
+            name_in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
         ):
             return True
 

@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from django.apps import apps
 
+
 class GenericInterface:
     def __init__(self) -> None:
         pass
@@ -53,13 +54,13 @@ class GenericInterface:
         user_session.current_state = data_dict.get("state")
         user_session.current_smj = bot_interface.models.SMJ.objects.get(
             id=data_dict.get("smj_id"))
-        
+
         print("DATA DICT IN moveForward : ", data_dict)
-        
+
         # Store button selection data in session for later retrieval
         current_state = data_dict.get("state")
         event_data = data_dict.get("event_data", {})
-        
+
         # Initialize session structure if needed
         current_session = user_session.current_session
         if not current_session:
@@ -68,12 +69,12 @@ class GenericInterface:
             current_session = [{}]
         elif len(current_session) == 0:
             current_session = [{}]
-            
+
         # Store state data including button selections
         if current_state and event_data:
             if current_state not in current_session[0]:
                 current_session[0][current_state] = {}
-            
+
             # Store relevant event data - especially misc field for button values
             current_session[0][current_state].update({
                 "data": event_data.get("data", ""),
@@ -81,15 +82,15 @@ class GenericInterface:
                 "type": event_data.get("type", ""),
                 "timestamp": event_data.get("timestamp", "")
             })
-            
+
             print(f"Stored session data for state '{current_state}': {current_session[0][current_state]}")
-        
+
         user_session.current_session = current_session
         user_session.save()
-        
+
         # Instead of creating a new Celery task, prepare internal transition data
         event = data_dict["event"] if data_dict.get("event") else "success"
-        
+
         # Store transition data in data_dict for the state machine to handle internally
         data_dict["_internal_transition"] = {
             "action": "continue",
@@ -101,9 +102,9 @@ class GenericInterface:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "message_id": data_dict.get("message_id", "")
         }
-        
+
         print("INTERNAL TRANSITION DATA IN moveForward : ", data_dict["_internal_transition"])
-        
+
         # Return success to indicate the transition is prepared
         return "internal_transition_prepared"
 
@@ -154,4 +155,3 @@ class GenericInterface:
         user_session.current_smj = None
         user_session.misc_data = ""
         user_session.save()
-

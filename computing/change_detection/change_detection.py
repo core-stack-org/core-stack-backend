@@ -30,10 +30,10 @@ def get_change_detection(
         "CropIntensity": change_cropping_intensity,
     }
     description = (
-        "change_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+            "change_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
     )
     l1_asset = []
     s_year = start_year
@@ -66,10 +66,10 @@ def get_change_detection(
 
     for change_detection_key, change_detection_values in param_dict.items():
         asset_id = (
-            get_gee_asset_path(state, district, block)
+                get_gee_asset_path(state, district, block)
             + description
             + "_"
-            + change_detection_key
+                + change_detection_key
         )
         if not is_gee_asset_exists(asset_id):
             print(f"{asset_id} doesn't exist")
@@ -93,7 +93,7 @@ def get_change_detection(
     layer_ids = {}
     for param in param_dict.keys():
         asset_id = (
-            get_gee_asset_path(state, district, block) + description + "_" + param
+                get_gee_asset_path(state, district, block) + description + "_" + param
         )
         if is_gee_asset_exists(asset_id):
             layer_id = save_layer_info_to_db(

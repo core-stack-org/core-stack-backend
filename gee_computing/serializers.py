@@ -6,7 +6,6 @@ from .models import GEEAccount
 class GeeAccountSerializers(serializers.ModelSerializer):
     """Serializer for user details."""
 
-
     class Meta:
         model = GEEAccount
         fields = [

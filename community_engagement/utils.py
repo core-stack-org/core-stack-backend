@@ -4,7 +4,6 @@ from django.db.models import Q
 from django.utils.timezone import now, localtime
 from projects.models import Project
 
-
 def get_media_type(param):
     param = param.lower()
     if "image" in param:

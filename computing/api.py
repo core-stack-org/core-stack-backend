@@ -55,7 +55,7 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from .views import layer_status, get_layers_of_workspace
+from .views import layer_status
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
@@ -65,6 +65,7 @@ from .misc.slope_percentage import generate_slope_percentage
 from .misc.naturaldepression import generate_natural_depression_data
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
 from .misc.catchment_area import generate_catchment_area_singleflow
+from .zoi_layers.zoi import generate_zoi
 
 
 @api_security_check(allowed_methods="POST")
@@ -1411,4 +1412,24 @@ def generate_ndvi_timeseries(request):
         )
     except Exception as e:
         print("Exception in generate_ndvi_timeseries api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_zoi_to_gee(request):
+    print("Inside generate zoi layers")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_zoi.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mining_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

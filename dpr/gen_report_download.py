@@ -23,15 +23,14 @@ GECKODRIVER_LOG = os.environ.get("GECKODRIVER_LOG", "geckodriver.log")
 
 
 def render_pdf_with_firefox(
-    url: str,
-    *,
-    page_load_timeout: int = 120,
-    ready_timeout: int = 180,
-    viewport_width: int = 1600,
-    viewport_height: int = 1200,
-    print_landscape: bool = True,
+        url: str,
+        *,
+        page_load_timeout: int = 120,
+        ready_timeout: int = 180,
+        viewport_width: int = 1600,
+        viewport_height: int = 1200,
+        print_landscape: bool = True,
 ) -> bytes:
-
     opts = FirefoxOptions()
     opts.add_argument("-headless")
     opts.add_argument("--no-remote")  # isolate profiles on shared hosts
@@ -72,11 +71,11 @@ def render_pdf_with_firefox(
 
     # ---- sanitize environment to avoid Conda/GTK/NSS conflicts ----
     for var in (
-        "LD_LIBRARY_PATH",
-        "DYLD_LIBRARY_PATH",
-        "GTK_PATH",
-        "GTK_DATA_PREFIX",
-        "MOZ_GMP_PATH",
+            "LD_LIBRARY_PATH",
+            "DYLD_LIBRARY_PATH",
+            "GTK_PATH",
+            "GTK_DATA_PREFIX",
+            "MOZ_GMP_PATH",
     ):
         if os.environ.get(var):
             logger.warning("PDF: unsetting %s to avoid binary/lib conflicts", var)

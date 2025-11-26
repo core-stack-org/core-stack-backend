@@ -6,6 +6,7 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+from projects.models import Project
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -14,75 +15,103 @@ from utilities.gee_utils import (
     make_asset_public,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
+    get_gee_dir_path,
 )
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
-def clip_drainage_lines(self, state, district, block, gee_account_id):
+def clip_drainage_lines(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    asset_suffix=None,
+    asset_folder=None,
+    gee_account_id=None,
+    roi_path=None,
+    app_type="MWS",
+    proj_id=None,
+):
     ee_initialize(gee_account_id)
     pan_india_drainage = ee.FeatureCollection(
         GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+    workspacename = "drainage"
+    if state and district and block:
+        roi = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
+        asset_suffix = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        asset_id = get_gee_asset_path(state, district, block) + asset_suffix
+        layer_name = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
+        )
+
+        state_name = state
+
+    else:
+        proj_obj = Project.objects.get(pk=proj_id)
+        state_name = proj_obj.name
+        roi = ee.FeatureCollection(roi_path)
+
+        asset_id = gee_asset_path = (
+            get_gee_dir_path(
+                asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix
+        )
+        layer_name = valid_gee_text(proj_obj.name.lower()) + "_" + str(proj_obj.id)
+
+        state = proj_obj.name
     clipped_drainage = pan_india_drainage.filterBounds(roi.geometry())
 
-    description = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-    asset_id = get_gee_asset_path(state, district, block) + description
-
-    task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
+    task = export_vector_asset_to_gee(clipped_drainage, asset_suffix, asset_id)
 
     task_id_list = check_task_status([task])
     print("task_id_list", task_id_list)
-
+    make_asset_public(asset_id)
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
-            asset_id=asset_id,
-            dataset_name="Drainage",
-        )
-
-        make_asset_public(asset_id)
+        if state and district and block:
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+                asset_id=asset_id,
+                dataset_name="Drainage",
+            )
 
         try:
             # Load feature collection from Earth Engine
             fc = ee.FeatureCollection(asset_id)
-            res = sync_fc_to_geoserver(
-                fc,
-                state,
-                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
-                "drainage",
-            )
+            res = sync_fc_to_geoserver(fc, state_name, layer_name, workspacename)
             print("Drainage line synced to geoserver:", res)
             if res["status_code"] == 201 and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("sync to geoserver flag is updated")
 
                 layer_STAC_generated = False
-                layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                    state=state,
-                    district=district,
-                    block=block,
-                    layer_name="drainage_lines_vector",
-                )
-                update_layer_sync_status(
-                    layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-                )
+                if state and district and block:
+                    layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                        state=state,
+                        district=district,
+                        block=block,
+                        layer_name="drainage_lines_vector",
+                    )
+                    update_layer_sync_status(
+                        layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+                    )
 
-                layer_at_geoserver = True
+                    layer_at_geoserver = True
 
         except Exception as e:
             print("Exception in syncing Drainage line to geoserver", e)

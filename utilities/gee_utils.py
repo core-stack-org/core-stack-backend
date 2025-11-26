@@ -11,6 +11,7 @@ from nrm_app.settings import (
 from utilities.constants import (
     GEE_ASSET_PATH,
     GCS_BUCKET_NAME,
+    GEE_PATHS,
 )
 import ee, geetools
 import time
@@ -22,6 +23,7 @@ from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
 from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
+import numpy as np
 import tempfile
 
 
@@ -72,19 +74,9 @@ def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
     # ee_initialize()
 
     # Authenticate Google Cloud Storage
-    # credentials = service_account.Credentials.from_service_account_file(
-    #     GEE_SERVICE_ACCOUNT_KEY_PATH,
-    #     scopes=["https://www.googleapis.com/auth/cloud-platform"],
-    # )
-
-    account = GEEAccount.objects.get(pk=gee_account_id)
-    key_dict = json.loads(account.get_credentials().decode("utf-8"))
-    credentials = service_account.Credentials.from_service_account_info(
-        key_dict,
-        scopes=[
-            "https://www.googleapis.com/auth/earthengine",
-            "https://www.googleapis.com/auth/devstorage.full_control",
-        ],
+    credentials = service_account.Credentials.from_service_account_file(
+        GEE_SERVICE_ACCOUNT_KEY_PATH,
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
     )
 
     # Create Storage Client
@@ -198,18 +190,30 @@ def create_gee_folder(folder_path, gee_project_path=GEE_ASSET_PATH):
         print("Error:", e)
 
 
-def create_gee_directory(state, district, block, gee_project_path=GEE_ASSET_PATH):
-    folder_path = valid_gee_text(state.lower()) + "/" + valid_gee_text(district.lower())
-    create_gee_folder(folder_path, gee_project_path)
+def create_gee_directory(
+    state=None,
+    district=None,
+    block=None,
+    folder_path=None,
+    gee_project_path=GEE_ASSET_PATH,
+):
+    if state and district and block:
+        folder_path = (
+            valid_gee_text(state.lower()) + "/" + valid_gee_text(district.lower())
+        )
+        create_gee_folder(folder_path, gee_project_path)
 
-    folder_path = (
-        valid_gee_text(state.lower())
-        + "/"
-        + valid_gee_text(district.lower())
-        + "/"
-        + valid_gee_text(block.lower())
-    )
-    create_gee_folder(folder_path, gee_project_path)
+        folder_path = (
+            valid_gee_text(state.lower())
+            + "/"
+            + valid_gee_text(district.lower())
+            + "/"
+            + valid_gee_text(block.lower())
+        )
+        create_gee_folder(folder_path, gee_project_path)
+    else:
+        print("inside else")
+        create_gee_folder(folder_path, gee_project_path)
 
 
 def get_gee_asset_path(state, district=None, block=None, asset_path=GEE_ASSET_PATH):
@@ -698,6 +702,29 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
 
 
 def build_gee_helper_paths(app_type, helper_project):
+
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
-    GEE_HELPER_PATH = f"{gee_helper_base_path}/{app_type.lower()}/"
+    GEE_HELPER_PATH = (
+        f"{gee_helper_base_path}/{GEE_PATHS[app_type]["GEE_ASSET_FOLDER"]}"
+    )
     return GEE_HELPER_PATH
+
+
+def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371
+    return c * r * 1000
+
+
+def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
+    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+    r = 6371
+    return c * r * 1000

@@ -245,7 +245,7 @@ def _get_feedback_config() -> Dict[str, Dict[str, Any]]:
 
 
 def _validate_sync_request(
-    request, resource_type: str = None, work_type: str = None, feedback_type: str = None
+        request, resource_type: str = None, work_type: str = None, feedback_type: str = None
 ) -> Optional[Response]:
     """Validate the sync request parameters and content type."""
 
@@ -301,7 +301,7 @@ def _validate_sync_request(
 
 
 def _sync_to_odk(
-    xml_string: str, config: Dict[str, Any], bearer_token: str
+        xml_string: str, config: Dict[str, Any], bearer_token: str
 ) -> Response:
     """Handle the actual sync to ODK for a specific resource or work type."""
     try:

@@ -51,12 +51,12 @@ def vectorise_change_detection(self, state, district, block, gee_account_id):
     layer_at_geoserver = False
     for param in param_list:
         description = (
-            "change_vector_"
-            + valid_gee_text(district)
-            + "_"
-            + valid_gee_text(block)
-            + "_"
-            + param
+                "change_vector_"
+                + valid_gee_text(district)
+                + "_"
+                + valid_gee_text(block)
+                + "_"
+                + param
         )
         asset_id = get_gee_asset_path(state, district, block) + description
         if is_gee_asset_exists(asset_id):
