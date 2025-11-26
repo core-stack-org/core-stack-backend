@@ -82,7 +82,7 @@ def Upload_Desilting_Points(
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
     mws_asset_suffix = f"{proj_obj.name}_{proj_obj.id}"
-    asset_folder = [proj_obj.name]
+    asset_folder = [proj_obj.name.lower()]
     description = "mws_" + mws_asset_suffix
     mws_asset_id = (
         get_gee_dir_path(
@@ -187,7 +187,7 @@ def Upload_Desilting_Points(
                     gee_account_id=gee_project_id,
                     roi_path=mws_asset_id,
                     asset_folder=asset_folder,
-                    asset_suffix=f"{proj_obj.name}_{proj_obj.id}",
+                    asset_suffix=f"{proj_obj.name}_{proj_obj.id}".lower(),
                     app_type="WATER_REJ",
                 )
                 logger.info("luc Task finished for lulc")
