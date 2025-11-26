@@ -191,18 +191,21 @@ def clip_nrega_district_block(
 
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
+        layer_name = f"{valid_gee_text(district_name.lower())}_{valid_gee_text(block_name.lower())}"
         layer_id = save_layer_info_to_db(
             state_name,
             district_name,
             block_name,
-            layer_name=f"{valid_gee_text(district_name.lower())}_{valid_gee_text(block_name.lower())}",
+            layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="NREGA Assets",
         )
         print("save nrega_assets layer info at the gee level...")
         make_asset_public(asset_id)
 
-        res = push_shape_to_geoserver(path, workspace="nrega_assets")
+        res = push_shape_to_geoserver(
+            path, workspace="nrega_assets", layer_name=layer_name
+        )
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_STAC_generated = False

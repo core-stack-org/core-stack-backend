@@ -60,9 +60,11 @@ def convert_to_zip(dir_name, file_type):
         return shutil.make_archive(dir_name, "zip", dir_name + "/")
 
 
-def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="shp"):
+def push_shape_to_geoserver(
+    path, store_name=None, workspace=None, layer_name=None, file_type="shp"
+):
     geo = Geoserver()
-
+    geo.delete_vector_store(workspace=workspace, store=layer_name)
     zip_path = convert_to_zip(path, file_type)
     print(path)
     print(store_name)
