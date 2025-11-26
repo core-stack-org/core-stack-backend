@@ -26,12 +26,12 @@ urlpatterns = [
     # Endpoint to trigger generation (GET or POST as your function supports)
     # Example: GET /plantations/generate_waterbodies_data/?state=RAJASTHAN&district=alwar&tehsil=alwar
     path(
-        "getWaterbodiesByLocation/",
+        "get_waterbodies_by_location/",
         get_waterbodies_by_admin_and_uid,
         name="generate_waterbodies_data",
     ),
     path(
-        "getWaterbodyByUid/",
+        "get_waterbody_by_uid/",
         get_waterbodies_by_admin_and_uid,
         name="generate_waterbodies_data",
     ),
