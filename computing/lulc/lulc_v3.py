@@ -4,6 +4,7 @@ from datetime import timedelta
 import ee
 from dateutil.relativedelta import relativedelta
 
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -13,7 +14,7 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     make_asset_public,
     export_raster_asset_to_gee,
-    is_gee_asset_exists,
+    is_gee_asset_exists, get_gee_dir_path,
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
@@ -54,6 +55,8 @@ def clip_lulc_v3(
         ).union()
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
+
+    if state and district and block:
 
         filename_prefix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
