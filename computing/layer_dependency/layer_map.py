@@ -135,6 +135,18 @@ map_4 = [
     },
 ]
 
+map_5 = [
+    {"name": "generate_natural_depression_data"},
+    {"name": "generate_distance_to_nearest_drainage_line"},
+    {"name": "generate_catchment_area_singleflow"},
+    {"name": "generate_slope_percentage"},
+    {"name": "generate_lcw_conflict_data"},
+    {"name": "generate_agroecological_data"},
+    {"name": "generate_factory_csr_data"},
+    {"name": "generate_green_credit_data"},
+    {"name": "generate_mining_data"},
+]
+
 end_year_rules = {
     "calculate_drought": 2022,
     "drought_causality": 2022,

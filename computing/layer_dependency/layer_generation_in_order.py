@@ -33,6 +33,18 @@ from computing.tree_health.overall_change import tree_health_overall_change_rast
 from computing.tree_health.overall_change_vector import (
     tree_health_overall_change_vector,
 )
+from computing.misc.naturaldepression import generate_natural_depression_data
+from computing.misc.distancetonearestdrainage import (
+    generate_distance_to_nearest_drainage_line,
+)
+from computing.misc.catchment_area import generate_catchment_area_singleflow
+from computing.misc.slope_percentage import generate_slope_percentage
+from computing.misc.lcw_conflict import generate_lcw_conflict_data
+from computing.misc.agroecological_space import generate_agroecological_data
+from computing.misc.factory_csr import generate_factory_csr_data
+from computing.misc.green_credit import generate_green_credit_data
+from computing.misc.mining_data import generate_mining_data
+from computing.plantation.site_suitability import site_suitability
 from utilities.gee_utils import valid_gee_text
 from .layer_map import *
 from nrm_app.celery import app
@@ -57,7 +69,7 @@ def layer_generate_map(
     """
     # checking:- is mws layer generated?
     try:
-        if map_order in ["map_2_1", "map_2_2", "map_3", "map_4"]:
+        if map_order in ["map_2_1", "map_2_2", "map_3", "map_4", "map_5"]:
             layer = (
                 Layer.objects.filter(
                     layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
