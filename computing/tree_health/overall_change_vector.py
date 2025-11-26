@@ -29,10 +29,10 @@ def tree_health_overall_change_vector(self, state, district, block, gee_account_
         + "_uid"
     )
     description = (
-        "tree_health_overall_change_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
+            "tree_health_overall_change_vector_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
     )
     task_list = [
         overall_vector(roi, state, district, block),

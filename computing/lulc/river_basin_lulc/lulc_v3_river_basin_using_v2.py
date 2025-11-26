@@ -28,7 +28,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
     ).filter(ee.Filter.eq("objectid", basin_object_id))
 
     filename_prefix = (
-        str(basin_object_id) + "_" + roi_boundary.first().get("ba_name").getInfo()
+            str(basin_object_id) + "_" + roi_boundary.first().get("ba_name").getInfo()
     )
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
@@ -57,8 +57,8 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         )
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = (
-            "projects/corestack-datasets/assets/datasets/lulc_v3/"
-            + final_output_filename
+                "projects/corestack-datasets/assets/datasets/lulc_v3/"
+                + final_output_filename
         )
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
@@ -228,7 +228,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         )
 
     def process_conditions(
-        before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
+            before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
     ):
 
         cond1 = (

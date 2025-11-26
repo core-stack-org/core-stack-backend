@@ -15,7 +15,7 @@ from utilities.gee_utils import (
 def lat_to_pixel_y(lat, zoom):
     sin_lat = math.sin(math.radians(lat))
     pixel_y = (0.5 - math.log((1 + sin_lat) / (1 - sin_lat)) / (4 * math.pi)) * (
-        2 ** (zoom + 8)
+            2 ** (zoom + 8)
     )
     return pixel_y
 
@@ -76,7 +76,7 @@ def get_n_boxes(lat, lon, n, zoom, scale):
 def latlon_to_tile_xy(lat, lon, zoom):
     """Converts lat/lon to tile x/y at given zoom level"""
     lat_rad = math.radians(lat)
-    n = 2.0**zoom
+    n = 2.0 ** zoom
     tile_x = int((lon + 180.0) / 360.0 * n)
     tile_y = int(
         (1.0 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2.0 * n
@@ -86,7 +86,7 @@ def latlon_to_tile_xy(lat, lon, zoom):
 
 def tile_xy_to_latlon(tile_x, tile_y, zoom):
     """Converts top-left corner of tile x/y at given zoom level to lat/lon"""
-    n = 2.0**zoom
+    n = 2.0 ** zoom
     lon_deg = tile_x / n * 360.0 - 180.0
     lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * tile_y / n)))
     lat_deg = math.degrees(lat_rad)

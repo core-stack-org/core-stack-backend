@@ -29,12 +29,12 @@ def get_column_name(base_name, year):
 
 def get_mws_features(state, district, block):
     asset_id = (
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
     )
     return ee.FeatureCollection(asset_id)
 
@@ -131,14 +131,14 @@ def tree_health_ccd_vector(
 
     geo_filename = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_tree_health_ccd_vector_{start_year}_{end_year}"
     description = (
-        "tree_health_ccd_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
-        + "_"
-        + str(start_year)
-        + "_"
-        + str(end_year)
+            "tree_health_ccd_vector_"
+            + valid_gee_text(district)
+            + "_"
+            + valid_gee_text(block)
+            + "_"
+            + str(start_year)
+            + "_"
+            + str(end_year)
     )
     asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(final_fc, description, asset_id)

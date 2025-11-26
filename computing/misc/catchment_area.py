@@ -5,6 +5,8 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+from projects.models import Project
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -16,43 +18,92 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
+    get_gee_dir_path,
 )
 from constants.pan_india_urls import CATCHMETN_AREA
 
 
 @app.task(bind=True)
-def generate_catchment_area_singleflow(self, state, district, block, gee_account_id):
+def generate_catchment_area_singleflow(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    gee_account_id=None,
+    proj_id=None,
+    roi_path=None,
+    asset_suffix=None,
+    asset_folder=None,
+    app_type="MWS",
+):
     ee_initialize(gee_account_id)
-    description = (
-        "catchment_area_" + valid_gee_text(district) + "_" + valid_gee_text(block)
-    )
+    if state and district and block:
+        description = (
+            "catchment_area"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_raster"
+        )
+        asset_id = get_gee_asset_path(state, district, block) + description
+        roi_boundary = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
 
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+    else:
+        roi_boundary = ee.FeatureCollection(roi_path)
+        description = "catchment_area_" + asset_suffix
+
+        asset_id = (
+            get_gee_dir_path(
+                asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
+        )
 
     catchment_area_raster = ee.Image(CATCHMETN_AREA)
-    raster = catchment_area_raster.clip(roi.geometry())
+    raster = catchment_area_raster.clip(roi_boundary.geometry())
 
     # Generate raster Layer
-    catchment_area_raster_generation(state, district, block, description, roi, raster)
-
-
-def catchment_area_raster_generation(state, district, block, description, roi, raster):
-    raster_asset_id = (
-        get_gee_asset_path(state, district, block) + description + "_raster"
+    catchment_area_raster_generation(
+        asset_id=asset_id,
+        state=state,
+        district=district,
+        block=block,
+        asset_suffix=description,
+        roi=roi_boundary,
+        raster=raster,
+        proj_id=proj_id,
     )
-    if not is_gee_asset_exists(raster_asset_id):
+
+
+def catchment_area_raster_generation(
+    raster,
+    roi,
+    proj_id=None,
+    state=None,
+    district=None,
+    block=None,
+    asset_suffix=None,
+    asset_folder=None,
+    app_type=None,
+    asset_id=None,
+):
+    workspacename = "catchment_area_singleflow"
+    if proj_id:
+        proj_obj = Project.objects.get(pk=proj_id)
+
+    if not is_gee_asset_exists(asset_id):
         try:
             task_id = export_raster_asset_to_gee(
                 image=raster,
-                description=description + "_raster",
-                asset_id=raster_asset_id,
+                description=asset_suffix + "_raster",
+                asset_id=asset_id,
                 scale=30,
                 region=roi.geometry(),
             )
@@ -60,25 +111,25 @@ def catchment_area_raster_generation(state, district, block, description, roi, r
             print("catchmenta area task_id list", catchment_area_task_id_list)
 
             """ Sync image to google cloud storage and then to geoserver"""
-            image = ee.Image(raster_asset_id)
-            task_id = sync_raster_to_gcs(image, 30, description + "_raster")
+            image = ee.Image(asset_id)
+            task_id = sync_raster_to_gcs(image, 30, asset_suffix + "_raster")
 
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to gcs ", task_id_list)
-
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description + "_raster",
-                asset_id=raster_asset_id,
-                dataset_name="Catchment Area",
-            )
-            make_asset_public(raster_asset_id)
+            if state and district and block:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=asset_suffix + "_raster",
+                    asset_id=asset_id,
+                    dataset_name="Catchment Area",
+                )
+            make_asset_public(asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "catchment_area_singleflow",
-                description + "_raster",
-                description + "_raster",
+                workspacename,
+                asset_suffix + "_raster",
+                asset_suffix + "_raster",
                 "catchment_area_singleflow",
             )
         except Exception as e:

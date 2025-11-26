@@ -11,6 +11,7 @@ from .interface.whatsapp import WhatsAppInterface
 
 logger = logging.getLogger(__name__)
 
+
 # Add debug print to confirm signal registration
 # print("bot_interface.signals module loaded - registering post_save signal")
 
@@ -23,12 +24,12 @@ def async_process_work_demand(user_log_id):
         # Initialize WhatsApp interface and process the work demand
         whatsapp_interface = WhatsAppInterface()
         whatsapp_interface.process_and_submit_work_demand(user_log_id)
-        
+
         logger.info(f"Successfully processed work demand for UserLogs ID: {user_log_id}")
-        
+
     except Exception as e:
         logger.error(f"Error in async_process_work_demand for UserLogs ID {user_log_id}: {e}")
-        
+
         # Update UserLogs with error status
         try:
             user_log = UserLogs.objects.get(id=user_log_id)
@@ -56,19 +57,19 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
     """
     # Add debug logging to track signal firing
     logger.info(f"Signal fired for UserLogs ID: {instance.id}, created: {created}")
-    
+
     if not created:
         logger.info(f"Skipping non-new record for UserLogs ID: {instance.id}")
         return  # Only process new records
-    
+
     # Check if this is a work demand completion log
-    if (instance.key1 == "useraction" and 
-        instance.value1 == "work_demand" and 
-        instance.misc and 
-        "work_demand_data" in instance.misc):
-        
+    if (instance.key1 == "useraction" and
+            instance.value1 == "work_demand" and
+            instance.misc and
+            "work_demand_data" in instance.misc):
+
         logger.info(f"Work demand completion detected for UserLogs ID: {instance.id}")
-        
+
         # Process asynchronously to avoid blocking the SMJ flow
         thread = threading.Thread(
             target=async_process_work_demand,
@@ -78,4 +79,5 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
         thread.start()
         logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")
     else:
-        logger.info(f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}")
+        logger.info(
+            f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}")

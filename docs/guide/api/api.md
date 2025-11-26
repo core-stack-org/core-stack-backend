@@ -304,9 +304,11 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Permissions**: Super admin or organization admin
 
 #### For Regular Users (Organization Members)
+
 Regular users create projects under their own organization automatically.
 
 **Request Body**:
+
 ```json
 {
   "name": "Project Name",
@@ -322,9 +324,11 @@ Regular users create projects under their own organization automatically.
 ```
 
 #### For Superadmins
+
 Superadmins must specify the organization ID since they can create projects for any organization.
 
 **Request Body**:
+
 ```json
 {
   "name": "Project Name",
@@ -340,7 +344,8 @@ Superadmins must specify the organization ID since they can create projects for 
 }
 ```
 
-**Notes**: 
+**Notes**:
+
 - For regular users, the organization is automatically set to the user's organization
 - For superadmins, the organization field is required and must be provided
 - `district` and `block` fields are optional for both user types
@@ -476,12 +481,13 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Method**: GET
 - **Description**: List watershed plans for a specific project
 - **Authentication**: Required
-- **Permissions**: 
-  - Superadmins: Can access any project
-  - Org Admins: Can access projects in their organization
-  - App Users: Can access assigned projects only
+- **Permissions**:
+    - Superadmins: Can access any project
+    - Org Admins: Can access projects in their organization
+    - App Users: Can access assigned projects only
 
 ### List Watershed Plans (Organization Level)
+
 - **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/`
 - **Method**: GET
 - **Description**: List all watershed plans for a specific organization
@@ -489,35 +495,38 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Permissions**: Superadmins only
 
 ### List Watershed Plans (Global Level)
+
 - **URL**: `/api/v1/watershed/plans/`
 - **Method**: GET
 - **Description**: List all watershed plans across all organizations and projects
 - **Authentication**: Required
 - **Permissions**: Superadmins only
 - **Query Parameters**:
-  - `block`: Filter plans by block ID (e.g., `?block=311011`)
-  - `district`: Filter plans by district ID (e.g., `?district=3110101`)
-  - `state`: Filter plans by state ID (e.g., `?state=69`)
+    - `block`: Filter plans by block ID (e.g., `?block=311011`)
+    - `district`: Filter plans by district ID (e.g., `?district=3110101`)
+    - `state`: Filter plans by state ID (e.g., `?state=69`)
 
 ### Create Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/`
 - **Method**: POST
 - **Description**: Create a new watershed plan for a specific project
 - **Authentication**: Required
-- **Permissions**: 
-  - Superadmins: Can create plans in any project
-  - Org Admins: Can create plans in their organization's projects
-  - Project Users: Must have 'add_watershed' permission for the project
+- **Permissions**:
+    - Superadmins: Can create plans in any project
+    - Org Admins: Can create plans in their organization's projects
+    - Project Users: Must have 'add_watershed' permission for the project
 
 #### Required Fields:
+
 - `plan` (string): Name of the watershed plan
 - `state` (integer): State ID from geoadmin
-- `district` (integer): District ID from geoadmin  
+- `district` (integer): District ID from geoadmin
 - `block` (integer): Block ID from geoadmin
 - `village_name` (string): Name of the village
 - `gram_panchayat` (string): Name of the gram panchayat
 
 #### Optional Fields:
+
 - `facilitator_name` (string): Name of the plan facilitator
 - `enabled` (boolean): Whether the plan is enabled (default: true)
 - `is_completed` (boolean): Whether the plan is completed (default: false)
@@ -526,6 +535,7 @@ Superadmins must specify the organization ID since they can create projects for 
 - `is_dpr_approved` (boolean): Whether DPR is approved (default: false)
 
 #### Auto-set Fields:
+
 - `project`: Set automatically from URL parameter
 - `organization`: Set automatically from project's organization
 - `created_by`: Set automatically from authenticated user
@@ -534,6 +544,7 @@ Superadmins must specify the organization ID since they can create projects for 
 #### Request Examples:
 
 **Minimal Plan Creation:**
+
 ```json
 {
   "plan": "Basic Watershed Plan 2025",
@@ -546,6 +557,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ```
 
 **Complete Plan Creation:**
+
 ```json
 {
   "plan": "Comprehensive Watershed Management Plan 2025",
@@ -564,6 +576,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ```
 
 #### Response:
+
 ```json
 {
   "plan_data": {
@@ -607,15 +620,16 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Method**: PUT/PATCH
 - **Description**: Update an existing watershed plan
 - **Authentication**: Required
-- **Permissions**: 
-  - Superadmins: Can update any plan in any project
-  - Org Admins: Can update plans in their organization's projects
-  - Project Users: Must have 'change_watershed' permission for the project
+- **Permissions**:
+    - Superadmins: Can update any plan in any project
+    - Org Admins: Can update plans in their organization's projects
+    - Project Users: Must have 'change_watershed' permission for the project
 
 #### Updatable Fields:
+
 - `plan` (string): Name of the watershed plan
 - `state` (integer): State ID from geoadmin
-- `district` (integer): District ID from geoadmin  
+- `district` (integer): District ID from geoadmin
 - `block` (integer): Block ID from geoadmin
 - `village_name` (string): Name of the village
 - `gram_panchayat` (string): Name of the gram panchayat
@@ -627,6 +641,7 @@ Superadmins must specify the organization ID since they can create projects for 
 - `is_dpr_approved` (boolean): Whether DPR is approved
 
 #### Non-updatable Fields:
+
 - `project`: Cannot be changed after creation
 - `organization`: Cannot be changed after creation
 - `created_by`, `created_at`: Cannot be modified
@@ -635,6 +650,7 @@ Superadmins must specify the organization ID since they can create projects for 
 #### Update Methods:
 
 **PATCH (Partial Update)** - Update only specific fields:
+
 ```json
 {
   "is_completed": true,
@@ -644,6 +660,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ```
 
 **PUT (Full Update)** - Provide all required fields:
+
 ```json
 {
   "plan": "Updated Watershed Management Plan 2025",
@@ -662,6 +679,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ```
 
 #### Response:
+
 ```json
 {
   "plan_data": {
@@ -762,7 +780,7 @@ These endpoints are maintained for backward compatibility:
 ### KML File Upload Process
 
 1. Create a project (if not already created):
-   
+
    **For Regular Users:**
    ```bash
    curl -X POST http://api.example.com/api/v1/projects/ \
@@ -819,7 +837,7 @@ These endpoints are maintained for backward compatibility:
 ### Creating a Watershed Plan
 
 1. Create a project (if not already created):
-   
+
    **For Regular Users:**
    ```bash
    curl -X POST http://api.example.com/api/v1/projects/ \
@@ -856,40 +874,40 @@ These endpoints are maintained for backward compatibility:
    ```
 
 3. Create a watershed plan:
-   3. Create a watershed plan for the project:
-      ```bash
-      # Minimal required fields
-      curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
-        -H "Authorization: Bearer {access_token}" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "plan": "Basic Watershed Plan 2025",
-          "state": 69,
-          "district": 3110101,
-          "block": 311011,
-          "village_name": "Example Village",
-          "gram_panchayat": "Example GP"
-        }'
-   
-      # Complete plan with all optional fields
-      curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
-        -H "Authorization: Bearer {access_token}" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "plan": "Comprehensive Watershed Management Plan 2025",
-          "state": 69,
-          "district": 3110101,
-          "block": 311011,
-          "village_name": "Hauz Khas Village",
-          "gram_panchayat": "Hauz Khas Gram Panchayat",
-          "facilitator_name": "Dr. Rajesh Kumar",
-          "enabled": true,
-          "is_completed": false,
-          "is_dpr_generated": false,
-          "is_dpr_reviewed": false,
-          "is_dpr_approved": false
-        }'
-      ```
+    3. Create a watershed plan for the project:
+       ```bash
+       # Minimal required fields
+       curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
+         -H "Authorization: Bearer {access_token}" \
+         -H "Content-Type: application/json" \
+         -d '{
+           "plan": "Basic Watershed Plan 2025",
+           "state": 69,
+           "district": 3110101,
+           "block": 311011,
+           "village_name": "Example Village",
+           "gram_panchayat": "Example GP"
+         }'
+    
+       # Complete plan with all optional fields
+       curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
+         -H "Authorization: Bearer {access_token}" \
+         -H "Content-Type: application/json" \
+         -d '{
+           "plan": "Comprehensive Watershed Management Plan 2025",
+           "state": 69,
+           "district": 3110101,
+           "block": 311011,
+           "village_name": "Hauz Khas Village",
+           "gram_panchayat": "Hauz Khas Gram Panchayat",
+           "facilitator_name": "Dr. Rajesh Kumar",
+           "enabled": true,
+           "is_completed": false,
+           "is_dpr_generated": false,
+           "is_dpr_reviewed": false,
+           "is_dpr_approved": false
+         }'
+       ```
 
 4. View the created watershed plans:
    ```bash
@@ -1028,22 +1046,22 @@ Below are ASCII diagrams showing the permission hierarchy and capabilities for d
 
 ### Permission Comparison Table
 
-| Capability                    | Superadmin | Org Admin | Project Manager | App User |
-|-------------------------------|------------|-----------|----------------|----------|
-| Access all organizations      | ✓          | ✗         | ✗              | ✗        |
-| Access organization projects  | ✓          | ✓         | ✗              | ✗        |
-| Access assigned projects      | ✓          | ✓         | ✓              | ✓        |
-| Create organizations          | ✓          | ✗         | ✗              | ✗        |
-| Create projects               | ✓          | ✓         | ✗              | ✗        |
-| Edit project details          | ✓          | ✓         | ✓              | ✗        |
-| Manage all users              | ✓          | ✗         | ✗              | ✗        |
-| Manage org users              | ✓          | ✓         | ✗              | ✗        |
-| Manage project users          | ✓          | ✓         | ✓              | ✗        |
-| Upload project data           | ✓          | ✓         | ✓              | ✓        |
-| Delete project data           | ✓          | ✓         | ✓              | ✗        |
-| Assign superadmin role        | ✓          | ✗         | ✗              | ✗        |
-| Assign org admin role         | ✓          | ✗         | ✗              | ✗        |
-| Assign project roles          | ✓          | ✓         | ✓              | ✗        |
-| View global watershed plans   | ✓          | ✗         | ✗              | ✗        |
-| View org watershed plans      | ✓          | ✗         | ✗              | ✗        |
-| Filter plans by geography     | ✓          | ✗         | ✗              | ✗        |
+| Capability                   | Superadmin | Org Admin | Project Manager | App User |
+|------------------------------|------------|-----------|-----------------|----------|
+| Access all organizations     | ✓          | ✗         | ✗               | ✗        |
+| Access organization projects | ✓          | ✓         | ✗               | ✗        |
+| Access assigned projects     | ✓          | ✓         | ✓               | ✓        |
+| Create organizations         | ✓          | ✗         | ✗               | ✗        |
+| Create projects              | ✓          | ✓         | ✗               | ✗        |
+| Edit project details         | ✓          | ✓         | ✓               | ✗        |
+| Manage all users             | ✓          | ✗         | ✗               | ✗        |
+| Manage org users             | ✓          | ✓         | ✗               | ✗        |
+| Manage project users         | ✓          | ✓         | ✓               | ✗        |
+| Upload project data          | ✓          | ✓         | ✓               | ✓        |
+| Delete project data          | ✓          | ✓         | ✓               | ✗        |
+| Assign superadmin role       | ✓          | ✗         | ✗               | ✗        |
+| Assign org admin role        | ✓          | ✗         | ✗               | ✗        |
+| Assign project roles         | ✓          | ✓         | ✓               | ✗        |
+| View global watershed plans  | ✓          | ✗         | ✗               | ✗        |
+| View org watershed plans     | ✓          | ✗         | ✗               | ✗        |
+| Filter plans by geography    | ✓          | ✗         | ✗               | ✗        |

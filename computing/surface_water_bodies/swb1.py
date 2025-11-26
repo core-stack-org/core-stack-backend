@@ -17,6 +17,7 @@ def vectorize_water_pixels(
     app_type=None,
     start_date=None,
     end_date=None,
+    is_all_classes=False,
 ):
     """
     Analyzes water body presence and characteristics over time.
@@ -33,6 +34,7 @@ def vectorize_water_pixels(
         Task ID if successful, None if asset already exists
     """
     # Generate description and asset ID for the analysis
+    print(f"is all classes :{is_all_classes}")
     description = "swb1_" + asset_suffix
     asset_id = (
         get_gee_dir_path(
@@ -143,6 +145,17 @@ def vectorize_water_pixels(
         # Calculate seasonal percentages
         kharif_percentage, rabi_percentage, zaid_percentage = [], [], []
         j = 0
+        if is_all_classes:
+            print("if all classes")
+            cropland_percentage = []
+            tree_precentage = []
+            barren_land_percentage = []
+            single_kharif_percentage = []
+            single_no_kharif_percentage = []
+            double_cropping_percentage = []
+            tripple_cropping_percentage = []
+            shrubs_percentage = []
+            build_up_precentage = []
         while j < len(lulc_collec):
             binary_collection = lulc_collec[j]
 
@@ -151,10 +164,24 @@ def vectorize_water_pixels(
             binary_image1 = binary_collection.eq(2)  # Kharif
             binary_image2 = binary_collection.eq(3)  # Kharif+Rabi
             binary_image3 = binary_collection.eq(4)  # Kharif+Rabi+Zaid
+            binary_images = [binary_image0, binary_image1, binary_image2, binary_image3]
+            if is_all_classes:
+                binary_images.extend(
+                    [
+                        binary_collection.eq(5),  # Cropland
+                        binary_collection.eq(6),  # Tree/Forest
+                        binary_collection.eq(7),  # Barren land
+                        binary_collection.eq(8),  # Single kharif
+                        binary_collection.eq(9),  # Single non-kharif
+                        binary_collection.eq(10),  # Double cropping
+                        binary_collection.eq(11),  # Triple cropping
+                        binary_collection.eq(12),  # Shrubs
+                    ]
+                )
 
             # Calculate areas for each class
             counts = []
-            for img in [binary_image0, binary_image1, binary_image2, binary_image3]:
+            for img in binary_images:
                 clipped = img.clip(feature.geometry())
                 count = clipped.reduceRegion(
                     reducer=ee.Reducer.sum(),
@@ -169,7 +196,34 @@ def vectorize_water_pixels(
             # Calculate percentages for each season
             count1 = counts[1].add(counts[2]).add(counts[3])
             count2 = counts[2].add(counts[3])
-
+            if is_all_classes:
+                build_up_precentage.append(
+                    (counts[0].divide(total_ored_area)).multiply(100)
+                )
+                cropland_percentage.append(
+                    (counts[4].divide(total_ored_area)).multiply(100)
+                )
+                tree_precentage.append(
+                    (counts[5].divide(total_ored_area)).multiply(100)
+                )
+                barren_land_percentage.append(
+                    (counts[6].divide(total_ored_area)).multiply(100)
+                )
+                single_kharif_percentage.append(
+                    (counts[7].divide(total_ored_area)).multiply(100)
+                )
+                single_no_kharif_percentage.append(
+                    (counts[8].divide(total_ored_area)).multiply(100)
+                )
+                double_cropping_percentage.append(
+                    (counts[9].divide(total_ored_area)).multiply(100)
+                )
+                tripple_cropping_percentage.append(
+                    (counts[10].divide(total_ored_area)).multiply(100)
+                )
+                shrubs_percentage.append(
+                    (counts[11].divide(total_ored_area)).multiply(100)
+                )
             # Store percentages
             # p1.append((counts[0].divide(total_ored_area)).multiply(100))
             kharif_percentage.append((count1.divide(total_ored_area)).multiply(100))
@@ -207,6 +261,42 @@ def vectorize_water_pixels(
             properties[f"k_{year}"] = kharif_percentage[i]  # Kharif
             properties[f"kr_{year}"] = rabi_percentage[i]  # Kharif+Rabi
             properties[f"krz_{year}"] = zaid_percentage[i]  # Kharif+Rabi+Zaid
+            if is_all_classes:
+                properties[f"cropland_{year}"] = cropland_percentage[i]
+                properties[f"tree_{year}"] = (
+                    tree_precentage[i]
+                    if tree_precentage and i < len(tree_precentage)
+                    else 0
+                )
+                properties[f"barren_land_{year}"] = (
+                    barren_land_percentage[i] if i < len(barren_land_percentage) else 0
+                )
+                properties[f"single_kharif_{year}"] = (
+                    single_kharif_percentage[i]
+                    if i < len(single_kharif_percentage)
+                    else 0
+                )
+                properties[f"single_kharif_no_{year}"] = (
+                    single_no_kharif_percentage[i]
+                    if i < len(single_no_kharif_percentage)
+                    else 0
+                )
+                properties[f"double_cropping_{year}"] = (
+                    double_cropping_percentage[i]
+                    if i < len(double_cropping_percentage)
+                    else 0
+                )
+                properties[f"tripple_cropping_{year}"] = (
+                    tripple_cropping_percentage[i]
+                    if i < len(tripple_cropping_percentage)
+                    else 0
+                )
+                properties[f"shrubs_{year}"] = (
+                    shrubs_percentage[i] if i < len(shrubs_percentage) else 0
+                )
+                properties[f"build_up_{year}"] = (
+                    build_up_precentage[i] if i < len(build_up_precentage) else 0
+                )
 
             i += 1
             loop_start = (curr_start_date + relativedelta(years=1)).strftime("%Y-%m-%d")

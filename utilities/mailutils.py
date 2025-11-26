@@ -23,12 +23,13 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+
 def send_email(
-    subject: str,
-    text_body: str,
-    to_emails: list,
-    html_body: str = None,
-    attachments: list = None,
+        subject: str,
+        text_body: str,
+        to_emails: list,
+        html_body: str = None,
+        attachments: list = None,
 ):
     """
     Send email via SMTP (supports HTML + plain text + attachments).

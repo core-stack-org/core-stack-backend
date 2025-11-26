@@ -34,11 +34,11 @@ def crop_grids_lulc(state, district, block):
 
     # Generate crop tiles
     description = (
-        "crop_gridXlulc_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_with_uid_16ha"
+            "crop_gridXlulc_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_with_uid_16ha"
     )
 
     asset_id = get_gee_asset_path(state, district, block) + description

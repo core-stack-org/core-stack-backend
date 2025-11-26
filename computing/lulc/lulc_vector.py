@@ -173,6 +173,13 @@ def generate_vector(
 
     fc = ee.FeatureCollection(fc)
 
+    description = (
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(fc, description, asset_id)
     task_status = check_task_status([task])
     print("Task completed - ", task_status)

@@ -17,7 +17,7 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def tree_health_ch_raster(
-    self, state, district, block, start_year, end_year, gee_account_id
+        self, state, district, block, start_year, end_year, gee_account_id
 ):
     ee_initialize(gee_account_id)
     print("Inside process tree_health_ch_raster")

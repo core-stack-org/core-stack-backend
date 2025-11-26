@@ -12,18 +12,18 @@ from utilities.gee_utils import (
 
 
 def net_value(
-    asset_suffix=None,
-    asset_folder_list=None,
-    app_type=None,
-    start_date=None,
-    end_date=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        app_type=None,
+        start_date=None,
+        end_date=None,
 ):
     description = "well_depth_net_value_" + asset_suffix
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + description
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
     )
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     if is_gee_asset_exists(asset_id):
@@ -53,11 +53,11 @@ def net_value(
             return None, asset_id
 
     well_depth_fc = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
         + "well_depth_annual_"
-        + asset_suffix
+            + asset_suffix
     )
     shape = ee.FeatureCollection(well_depth_fc)
 

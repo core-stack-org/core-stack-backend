@@ -30,7 +30,6 @@ chastainCoeffDict = {
     "ETM_OLI": [oliETMSlopes, oliETMIntercepts, 0],
 }
 
-
 """
 Function to mask cloudy pixels in Landsat-7
 """
@@ -213,7 +212,7 @@ def Get_NDVI_image_datewise(harmonized_LS_ic, roi_boundary):
 
 
 def Get_LS_16Day_NDVI_TimeSeries(
-    inputStartDate, inputEndDate, harmonized_LS_ic, roi_boundary
+        inputStartDate, inputEndDate, harmonized_LS_ic, roi_boundary
 ):
     startDate = datetime.strptime(inputStartDate, "%Y-%m-%d")
     endDate = datetime.strptime(inputEndDate, "%Y-%m-%d")
@@ -491,9 +490,8 @@ studyarea ---> geometry of region of interest
 
 # Function to get distances as required from each pixel to each cluster centroid
 def Get_Euclidean_Distance(
-    cluster_centroids, roi_timeseries_img, input_bands, roi_boundary
+        cluster_centroids, roi_timeseries_img, input_bands, roi_boundary
 ):
-
     def wrapper(curr_centroid):
         temp_img = ee.Image()
         curr_centroid = ee.Feature(curr_centroid).setGeometry(roi_boundary)

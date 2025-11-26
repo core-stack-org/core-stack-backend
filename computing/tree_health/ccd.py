@@ -17,7 +17,7 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def tree_health_ccd_raster(
-    self, state, district, block, start_year, end_year, gee_account_id
+        self, state, district, block, start_year, end_year, gee_account_id
 ):
     print("Inside process Tree health ccd raster")
     ee_initialize(gee_account_id)
@@ -96,12 +96,12 @@ def tree_health_ccd_raster(
 
         # Sync image to Google Cloud Storage and Geoserver
         layer_name = (
-            "tree_health_ccd_raster_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_"
-            + str(year)
+                "tree_health_ccd_raster_"
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
+                + "_"
+                + str(year)
         )
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
