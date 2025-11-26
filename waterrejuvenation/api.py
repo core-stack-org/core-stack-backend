@@ -9,7 +9,7 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from .utils import get_merged_waterbodies_with_zoi
-
+from nrm_app.settings import DEPLOYMENT_DIR
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
 
@@ -18,108 +18,104 @@ from drf_yasg.utils import swagger_auto_schema
 @api_security_check(auth_type="Auth_free")
 def get_waterbodies_by_admin_and_uid(request):
     """
-    Retrieve merged waterbody + ZOI data for a given administrative area (state, district, tehsil/block).
-    If `uid` is provided, return only that UID's entry.
-    Query params:
-      - state (required)
-      - district (required)
-      - tehsil or block (required)
-      - uid (optional)
+    Retrieve merged waterbody + ZOI data for a given administrative area.
+    Uses cached merged file if available; otherwise auto-generates using
+    get_merged_waterbodies_with_zoi().
     """
     try:
-
         state = request.query_params.get("state")
         district = request.query_params.get("district")
-        # allow either 'tehsil' or 'block' param name
         block = request.query_params.get("tehsil") or request.query_params.get("block")
         uid = request.query_params.get("uid")
 
-        # Validate required params
+        # Required params check
         if not state or not district or not block:
             return Response(
                 {
-                    "error": "'state' and 'district' and 'tehsil' (or 'block') parameters are required."
+                    "error": "'state', 'district' and 'tehsil' (or 'block') parameters are required."
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Normalize names just like the generator does
-        state_norm = str(state).upper()
-        district_l = str(district).lower()
-        block_l = str(block).lower()
+        # Normalize
+        state_norm = state.upper()
+        district_l = district.lower()
+        block_l = block.lower()
 
-        # Determine merged file path (same convention used by generator)
-        base_dir = "data/states_excel_files"
+        base_dir = "{DEPLOYMENT_DIR}/data/stats_excel_file"
+        out_dir = os.path.join(base_dir, state_norm, district.upper())
         merged_fname = f"{district_l}_{block_l}_merged_data.json"
-        merged_path = os.path.join(
-            base_dir, state_norm, district_l.upper(), merged_fname
-        )
+        merged_path = os.path.join(out_dir, merged_fname)
 
         merged_data = None
 
-        # If cached merged file exists -> load it
+        # 1️⃣ **If cached merged file exists → load**
         if os.path.exists(merged_path):
             try:
                 with open(merged_path, "r", encoding="utf-8") as fh:
+                    print("Serving cached merged:", merged_path)
                     merged_data = json.load(fh)
             except Exception as e:
-                # If reading cache fails, attempt to regenerate
+                print("Error reading cached file:", e)
                 merged_data = None
-                print(f"Failed to read cached merged file ({merged_path}): {e}")
 
-        # If not cached, try to generate using your merge function
+        # 2️⃣ **If file NOT found OR failed to read → generate using your merge function**
         if merged_data is None:
             try:
+                print("Generating merged data...")
                 merged_data = get_merged_waterbodies_with_zoi(
-                    state=state_norm, district=district_l, block=block_l
+                    state=state_norm,
+                    district=district_l,
+                    block=block_l,
                 )
             except Exception as e:
                 print(f"Error generating merged data: {e}")
                 return Response(
-                    {"status": "error", "message": "Failed to generate merged data."},
+                    {"status": "error", "message": "Failed to generate merged dataset."},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
+        # If still None → problem with WFS fetch
         if merged_data is None:
             return Response(
                 {
                     "status": "error",
-                    "message": "Merged data not available for given area.",
+                    "message": "Merged dataset not available for given area.",
                 },
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        # If uid provided -> return only that entry
+        # 3️⃣ **If UID provided, return only that item**
         if uid:
-            # try several key forms
-            item = merged_data.get(uid) or merged_data.get(str(uid))
-            if item is None:
-                # try numeric form if possible
-                try:
-                    if str(uid).isdigit():
-                        item = merged_data.get(int(uid))
-                except Exception:
-                    item = None
+            uid_str = str(uid)
+
+            # Try direct key match
+            item = merged_data.get(uid_str)
+
+            # Try integer key
+            if item is None and uid_str.isdigit():
+                item = merged_data.get(int(uid_str))
 
             if item is None:
                 return Response(
                     {
-                        "detail": f"UID '{uid}' not found for state={state_norm} district={district_l} tehsil={block_l}."
+                        "detail": f"UID '{uid}' not found for state={state_norm}, district={district_l}, block={block_l}."
                     },
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            return Response({str(uid): item}, status=status.HTTP_200_OK)
+            return Response({uid_str: item}, status=status.HTTP_200_OK)
 
-        # Otherwise return full merged dataset
+        # 4️⃣ **Return full merged data**
         return Response(merged_data, status=status.HTTP_200_OK)
 
     except Exception as e:
-        print(f"Unexpected error in get_waterbodies_by_admin_and_uid: {e}")
+        print("Unexpected error:", e)
         return Response(
             {
                 "status": "error",
-                "message": "Unable to retrieve waterbody data for the given parameters.",
+                "message": "Internal server error while retrieving waterbody data.",
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+

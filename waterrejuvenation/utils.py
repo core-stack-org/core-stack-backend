@@ -16,7 +16,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
 )
 import numpy as np
-
+from nrm_app.settings import DEPLOYMENT_DIR
 
 WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
 WATER_REJ_TEST_GEE_ASSET = "projects/ee-kapil-test/assets/apps/waterbody/"
@@ -702,7 +702,7 @@ def get_merged_waterbodies_with_zoi(
     district_l = str(district).lower()
     block_l = str(block).lower()
 
-    base_dir = "data/states_excel_files"
+    base_dir = f"{DEPLOYMENT_DIR}\data\stats_excel_file"
     out_dir = os.path.join(base_dir, state, district.upper())
     os.makedirs(out_dir, exist_ok=True)
 

@@ -74,7 +74,10 @@ def merge_yearly_layers(
     # Create export asset path (must be constant for export)
     description = f"drought_{asset_suffix}_{start_year}_{end_year}"
     print(description)
-    asset_id = f"{get_gee_dir_path(asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])}{description}"
+    gee_asset = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    asset_id = f"{gee_asset}{description}"
     print(asset_id)
 
     # Check if asset already exists
