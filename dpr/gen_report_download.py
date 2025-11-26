@@ -12,6 +12,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.firefox import GeckoDriverManager
 
+from nrm_app.settings import TMP_LOCATION
+
 from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -78,7 +80,7 @@ def render_pdf_with_firefox(
         if os.environ.get(var):
             logger.warning("PDF: unsetting %s to avoid binary/lib conflicts", var)
             os.environ.pop(var, None)
-    os.environ.setdefault("XDG_RUNTIME_DIR", "/tmp")
+    os.environ.setdefault("XDG_RUNTIME_DIR", TMP_LOCATION)
 
     # ---- optionally force a fresh, writable profile to /tmp ----
     profile_dir = tempfile.mkdtemp(prefix="ffprof_")

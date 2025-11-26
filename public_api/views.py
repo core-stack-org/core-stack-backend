@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from nrm_app.settings import EXCEL_PATH
 import json
+import requests
 import pandas as pd
 import numpy as np
 from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
@@ -156,61 +157,56 @@ def get_mws_id_by_lat_lon(lon, lat):
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-def get_mws_json_from_stats_excel(state, district, tehsil, mws_id, xlsx_file):
+def get_mws_time_series_data(state, district, tehsil, mws_id):
+    base_url = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows"
 
-    sheets = {
-        "hydrological_annual": -1,
-        "terrain": -1,
-        "croppingIntensity_annual": -1,
-        "surfaceWaterBodies_annual": -1,
-        "croppingDrought_kharif": -1,
-        "nrega_annual": -1,
-        "mws_intersect_villages": -1,
-        "change_detection_degradation": -1,
-        "change_detection_afforestation": -1,
-        "change_detection_deforestation": -1,
-        "change_detection_urbanization": -1,
-        "change_detection_cropintensity": -1,
-        "terrain_lulc_slope": -1,
-        "terrain_lulc_plain": -1,
-        "restoration_vector": -1,
-        "aquifer_vector": -1,
-        "soge_vector": -1,
+    params = {
+        "service": "WFS",
+        "version": "1.0.0",
+        "request": "GetFeature",
+        "typeName": f"mws_layers:deltaG_fortnight_{district}_{tehsil}",
+        "outputFormat": "application/json",
+        "CQL_FILTER": f"uid='{mws_id}'",
     }
 
-    result = {}
-
     try:
-        xls = pd.ExcelFile(xlsx_file)
+        response = requests.get(base_url, params=params, verify=True, timeout=10)
+        response.raise_for_status()
+        geojson = response.json()
+
+        if not geojson["features"]:
+            return {"error": f"MWS ID {mws_id} not found"}
+
+        properties = geojson["features"][0]["properties"]
+
+        # Helper function to round values
+        def roundoff_value(value):
+            return round(value, 2) if value is not None else None
+
+        # Build time series
+        time_series = []
+        for date, data in sorted(properties.items()):
+
+            try:
+                values = json.loads(data)
+                time_series.append(
+                    {
+                        "date": date,
+                        "et": roundoff_value(values.get("ET")),
+                        "runoff": roundoff_value(values.get("RunOff")),
+                        "precipitation": roundoff_value(values.get("Precipitation")),
+                    }
+                )
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        return {"mws_id": mws_id, "time_series": time_series}
+
     except Exception as e:
-        return {"error": f"Failed to read Excel file: {str(e)}"}
-
-    for sheet_name in sheets:
-        if sheet_name not in xls.sheet_names:
-            print(sheet_name, "is not available for this location")
-            continue
-
-        try:
-            df = xls.parse(sheet_name)
-            df.columns = [col.strip().lower() for col in df.columns]
-            if sheet_name == "nrega_annual":
-                filtered_df = df[df["mws_id"] == mws_id]
-            elif sheet_name == "mws_intersect_villages":
-                filtered_df = df[df["mws uid"] == mws_id]
-            else:
-                filtered_df = df[df["uid"] == mws_id]
-
-            if not filtered_df.empty:
-                result[sheet_name] = filtered_df.to_dict(orient="records")
-
-        except Exception as e:
-            result[sheet_name] = {"error": f"Error processing sheet: {str(e)}"}
-
-    return result
+        return {"Error in get mws data": str(e)}
 
 
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
-    generate_mws_data_for_kyl_filters(state, district, tehsil, "xlsx")
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
     file_xl_path = (
@@ -224,19 +220,21 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         + "_"
         + tehsil
     )
-    xlsx_file = file_xl_path + "_KYL_filter_data.xlsx"
+    json_file = file_xl_path + "_KYL_filter_data.json"
 
     try:
-        df = pd.read_excel(xlsx_file)
+        with open(json_file, "r") as f:
+            data = json.load(f)
+
+        df = pd.DataFrame(data)
         df.columns = [col.strip().lower() for col in df.columns]
 
         if "mws_id" not in df.columns:
-            return {"error": "'mws_id' column not found in Excel file."}
+            return {"error": "'mws_id' column not found in JSON file."}
 
         filtered_df = df[df["mws_id"] == mws_id]
         filtered_df = filtered_df.replace([np.inf, -np.inf], np.nan)
 
-        # Convert to dict with null-safe serialization
         json_compatible = json.loads(
             filtered_df.to_json(orient="records", default_handler=str)
         )
@@ -248,6 +246,9 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
 
 
 def get_tehsil_json(state, district, tehsil):
+    from datetime import datetime
+
+    print("start ", datetime.now())
     file_path, file_exists = excel_file_exists(state, district, tehsil)
     json_path = file_path.replace(".xlsx", ".json")
 
@@ -269,6 +270,7 @@ def get_tehsil_json(state, district, tehsil):
     with open(json_path, "w") as f:
         json.dump(json_data, f)
 
+    print("end ", datetime.now())
     return json_data
 
 

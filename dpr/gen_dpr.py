@@ -31,6 +31,7 @@ from nrm_app.settings import (
     EMAIL_TIMEOUT,
     EMAIL_USE_SSL,
     GEOSERVER_URL,
+    TMP_LOCATION
 )
 from plans.models import PlanApp
 from utilities.logger import setup_logger
@@ -116,7 +117,7 @@ def create_dpr_document(plan):
     # MARK: local save /tmp/dpr/
     # operations on the document
     if DEBUG:
-        file_path = "/tmp/dpr/"
+        file_path = TMP_LOCATION + "dpr/"
 
         if not os.path.exists(file_path):
             os.makedirs(file_path)

@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 
-from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
+from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC, TMP_LOCATION
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.constants import (
@@ -88,7 +88,7 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = "/tmp/" + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
 
     odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
 
@@ -136,7 +136,7 @@ def add_works(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = "/tmp/" + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = TMP_LOCATION + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
 
     odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
 

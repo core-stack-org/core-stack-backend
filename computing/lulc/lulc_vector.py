@@ -32,10 +32,10 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
         + "_uid"
     )
     description = (
-            "lulc_vector_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
     asset_id = get_gee_asset_path(state, district, block) + description
     if is_gee_asset_exists(asset_id):
@@ -104,7 +104,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
 
 
 def generate_vector(
-        start_year, end_year, state, district, block, description, asset_id, fc
+    start_year, end_year, state, district, block, description, asset_id, fc
 ):
     lulc_list = []
     s_year = start_year  # START_YEAR
@@ -174,10 +174,10 @@ def generate_vector(
     fc = ee.FeatureCollection(fc)
 
     description = (
-            "lulc_vector_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
     asset_id = get_gee_asset_path(state, district, block) + description
     task = export_vector_asset_to_gee(fc, description, asset_id)
@@ -186,7 +186,7 @@ def generate_vector(
 
 
 def sync_to_db_and_geoserver(
-        asset_id, state, district, block, description, start_year, end_year
+    asset_id, state, district, block, description, start_year, end_year
 ):
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)

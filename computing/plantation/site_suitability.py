@@ -130,7 +130,7 @@ def site_suitability(
         )
 
         # Sync the results to GeoServer for visualization
-        sync_suitability_to_geoserver(vector_asset_id, state, asset_name, layer_id)
+        # sync_suitability_to_geoserver(vector_asset_id, state, asset_name, layer_id)
 
 
 def merge_new_kmls(asset_id, description, project_name, kml_files_obj, have_new_sites):

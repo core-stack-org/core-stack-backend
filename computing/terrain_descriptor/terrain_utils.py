@@ -2,9 +2,14 @@ import ee
 
 
 def generate_terrain_classified_raster(feature):
-    dem = ee.Image("USGS/SRTMGL1_003")
+    # dem = ee.Image("USGS/SRTMGL1_003")
+    fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
+    dem = (
+        fabdem.mosaic().setDefaultProjection("EPSG:3857", None, 30).rename("elevation")
+    )
     studyArea = feature.geometry()
     demClipped = dem.clip(studyArea)
+
     dem_std = demClipped.reduceRegion(reducer=ee.Reducer.stdDev(), bestEffort=True).get(
         "elevation"
     )

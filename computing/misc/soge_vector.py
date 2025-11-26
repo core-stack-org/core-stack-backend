@@ -33,9 +33,6 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
     soge_fc = ee.FeatureCollection(GEE_DATASET_PATH + "/SOGE_vector_2020")
 
     if not is_gee_asset_exists(asset_id):
-        print(f"Asset already exists: {asset_id}")
-        return True
-
         mws_asset_id = (
             asset_path
             + f"filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid"
