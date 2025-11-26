@@ -1,6 +1,6 @@
 import ee
 from computing.utils import (
-    sync_layer_to_geoserver,
+    sync_fc_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
@@ -35,31 +35,43 @@ def tree_health_overall_change_vector(self, state, district, block, gee_account_
         + valid_gee_text(block)
     )
     task_list = [
-        overall_vector(roi, state, district, block),
+        generate_vector(roi, state, district, block),
     ]
 
-    print(task_list)
     task_id_list = check_task_status(task_list)
-    print(
-        "Tree health overall change vector task completed - task_id_list:", task_id_list
-    )
+    print(task_id_list)
+
     asset_id = get_gee_asset_path(state, district, block) + description
     # layer_id = None
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
-        # layer_id = save_layer_info_to_db(
-        #     state,
-        #     district,
-        #     block,
-        #     f"tree_health_overall_change_vector_{district.lower()}_{block.lower()}",
-        #     asset_id,
-        #     "Tree Overall Change Vector",
-        # )
-    layer_at_geoserver = sync_change_to_geoserver(block, district, state)
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            f"tree_health_overall_change_vector_{district.lower()}_{block.lower()}",
+            asset_id,
+            "Tree Overall Change Vector",
+        )
+    try:
+        layer_at_geoserver = False
+        merged_fc = ee.FeatureCollection(asset_id)
+        sync_res = sync_fc_to_geoserver(
+            merged_fc, state, description, "tree_overall_ch"
+        )
+        if sync_res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+
+    except Exception as e:
+        print(f"Error syncing combined data to GeoServer: {e}")
+        raise
     return layer_at_geoserver
 
 
-def overall_vector(roi, state, district, block):
+def generate_vector(roi, state, district, block):
+
     args = [
         {"value": 0, "label": "Deforestation"},
         {"value": 1, "label": "Degradation"},
@@ -68,12 +80,8 @@ def overall_vector(roi, state, district, block):
         {"value": 4, "label": "Afforestation"},
         {"value": 5, "label": "Partially_Degraded"},
         {"value": 6, "label": "Missing Data"},
-    ]  # Classes in afforestation raster layer
+    ]
 
-    return generate_vector(roi, args, state, district, block)
-
-
-def generate_vector(roi, args, state, district, block):
     raster = ee.Image(
         get_gee_asset_path(state, district, block)
         + "tree_health_overall_change_raster_"
@@ -113,32 +121,3 @@ def generate_vector(roi, args, state, district, block):
         fc, description, get_gee_asset_path(state, district, block) + description
     )
     return task
-
-
-def sync_change_to_geoserver(block, district, state):
-    asset_id = (
-        get_gee_asset_path(state, district, block)
-        + "tree_health_overall_change_vector_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-
-    fc = ee.FeatureCollection(asset_id).getInfo()
-    fc = {"features": fc["features"], "type": fc["type"]}
-    res = sync_layer_to_geoserver(
-        state,
-        fc,
-        "tree_health_overall_change_vector_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower()),
-        "tree_overall_ch",
-    )
-    layer_at_geoserver = False
-    # if res["status_code"] == 201 and layer_id:
-    #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-    #     print("sync to geoserver flag is updated")
-    if res["status_code"] == 201:
-        layer_at_geoserver = True
-    return layer_at_geoserver
