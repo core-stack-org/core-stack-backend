@@ -64,7 +64,9 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
     geo = Geoserver()
 
     zip_path = convert_to_zip(path, file_type)
-
+    print(path)
+    print(store_name)
+    print(workspace)
     response = geo.create_shp_datastore(
         path=zip_path,
         store_name=store_name,
@@ -74,7 +76,7 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
     # if response["status_code"] in [200, 201, 202]:
     #     os.remove(zip_path)
     #     shutil.rmtree(shape_path_dir)
-    return response["response_text"]
+    return response
 
 
 def kml_to_geojson(state_name, district_name, block_name, kml_path):
@@ -139,7 +141,7 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
     return push_shape_to_geoserver(path, workspace=workspace)
 
 
-def sync_fc_to_geoserver(fc, state_name, layer_name, workspace):
+def sync_fc_to_geoserver(fc, state_name=None, layer_name=None, workspace=None):
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -212,7 +214,9 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
         print("pushed to geoserver")
-        return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        return push_shape_to_geoserver(
+            path, workspace, workspace=workspace, file_type="gpkg"
+        )
     else:
         print("no features found")
         return
@@ -330,9 +334,9 @@ def get_agri_year_key(season_key):
 
 
 def calculate_precipitation_season(
-    geojson_filepath, draught_asset_id, proj_id, start_year=2017, end_year=2024
+    geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
 ):
-    proj_obj = Project.objects.get(pk=proj_id)
+
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
         feature_collection = json.load(f)
@@ -410,8 +414,7 @@ def calculate_precipitation_season(
         return left.copyProperties(right)
 
     final_fc = ee.FeatureCollection(joined.map(merge_features))
-    layer_name = "WaterRejapp_mws_" + str(proj_obj.name) + "_" + str(proj_obj.id)
-    sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, "waterrej")
+    return final_fc
 
 
 def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
@@ -490,25 +493,12 @@ def generate_geojson_with_ci_ndvi_ndmi(
     # Load project
     proj_obj = Project.objects.get(pk=proj_id)
 
-    # Build asset paths
-    asset_path_ci = (
-        get_gee_dir_path([proj_obj.name], GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"])
-        + ci_asset
-    )
-    asset_path_ndvi = (
-        get_gee_dir_path([proj_obj.name], GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"])
-        + ndvi_asset
-    )
-    # asset_path_ndmi = get_gee_dir_path([proj_obj.name], GEE_PATHS['WATER_REJ']["GEE_ASSET_PATH"]) + ndmi_asset
-
-    # Load FeatureCollections
-
     zoi = ee.FeatureCollection(zoi_asset)
     print("Number of features zoi:", zoi.size().getInfo())
 
-    ci = ee.FeatureCollection(asset_path_ci)
+    ci = ee.FeatureCollection(ci_asset)
     print("Number of features zoi:", ci.size().getInfo())
-    ndvi = ee.FeatureCollection(asset_path_ndvi)
+    ndvi = ee.FeatureCollection(ndmi_asset)
     print("Number of features zoi:", ndvi.size().getInfo())
     ndmi = ee.FeatureCollection(ndmi_asset)
     print("Number of features zoi:", ndmi.size().getInfo())
@@ -784,18 +774,28 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
     return layer_obj
 
 
-def update_dashboard_geojson(state, district, block, layer_name, workspace_name):
-    print(f"🔄 Updating GeoJSON for {state}, {district}, {block}")
+def update_dashboard_geojson(
+    state=None,
+    district=None,
+    block=None,
+    layer_name=None,
+    workspace_name=None,
+    proj_id=None,
+):
+    if state and block and block:
+        print(f"🔄 Updating GeoJSON for {state}, {district}, {block}")
 
-    # Get related objects
-    state_obj = StateSOI.objects.get(state_name=state)
-    district_obj = DistrictSOI.objects.get(district_name=district)
-    tehsil_obj = TehsilSOI.objects.get(tehsil_name=block)  # fixed typo
+        # Get related objects
+        state_obj = StateSOI.objects.get(state_name=state)
+        district_obj = DistrictSOI.objects.get(district_name=district)
+        tehsil_obj = TehsilSOI.objects.get(tehsil_name=block)  # fixed typo
 
-    # Get or create main record
-    obj, created = State_Disritct_Block_Properties.objects.get_or_create(
-        state=state_obj, district=district_obj, tehsil=tehsil_obj
-    )
+        # Get or create main record
+        obj, created = State_Disritct_Block_Properties.objects.get_or_create(
+            state=state_obj, district=district_obj, tehsil=tehsil_obj
+        )
+    else:
+        obj = Project.objects.get(pk=proj_id)
 
     # Map suffix to json_key
     suffix_to_key = {
@@ -823,7 +823,10 @@ def update_dashboard_geojson(state, district, block, layer_name, workspace_name)
     )
 
     # Load existing dashboard_geojson or create new
-    misc = obj.dashboard_geojson or {}
+    if proj_id:
+        misc = obj.dashboard_geojson or {}
+    else:
+        misc = obj.geojson_path or {}
 
     # Ensure waterrej section exists
     if "waterrej" not in misc:
@@ -837,3 +840,59 @@ def update_dashboard_geojson(state, district, block, layer_name, workspace_name)
     obj.save()
 
     print(f"✅ Added/Updated {json_key} for {state}, {district}, {block}")
+
+
+def generate_swb_layer_with_max_so_catchment(
+    roi=None,
+    app_type="MWS",
+    asset_suffix=None,
+    asset_folder=None,
+    gee_account_id=None,
+):
+    ee_initialize(gee_account_id)
+    asset_suffix_so = "stream_order_" + asset_suffix + "_raster"
+    asset_suffix_ca = f"catchment_area_{asset_suffix}_raster"
+    asset_id_ca = (
+        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
+        + asset_suffix_ca
+    )
+    asset_id_so = (
+        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
+        + asset_suffix_so
+    )
+
+    # Load the raster image (must contain 'SR_B1' or your band)
+    catchemnt_area_raster = ee.Image(asset_id_ca)  # Replace with your image ID
+    catchment_band = catchemnt_area_raster.select(
+        "b1"
+    )  # Adjust based on the band you need
+    stream_order_raster = ee.Image(asset_id_so)
+    stream_order_band = stream_order_raster.select("b1")
+
+    # Function to compute max B1 inside each feature
+    def make_compute_max(so_band, cm_band, band_name="b1"):
+        def compute_max(feature):
+            max_val_so = so_band.reduceRegion(
+                reducer=ee.Reducer.max(),
+                geometry=feature.geometry(),
+                scale=30,
+                maxPixels=1e13,
+            ).get(band_name)
+
+            max_val_cm = cm_band.reduceRegion(
+                reducer=ee.Reducer.max(),
+                geometry=feature.geometry(),
+                scale=30,
+                maxPixels=1e13,
+            ).get(band_name)
+
+            return feature.set(
+                {"max_catchment_area": max_val_cm, "max_stream_order": max_val_so}
+            )
+
+        return compute_max
+
+    # Apply the function to each polygon in the collection
+    compute_max = make_compute_max(stream_order_band, catchment_band)
+    swb_with_max = roi.map(compute_max)
+    return swb_with_max

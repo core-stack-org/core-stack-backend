@@ -60,6 +60,7 @@ from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
 from .misc.green_credit import generate_green_credit_data
 from .misc.mining_data import generate_mining_data
+from .zoi_layers.zoi import generate_zoi
 
 
 @api_security_check(allowed_methods="POST")
@@ -1274,6 +1275,26 @@ def generate_mining_to_gee(request):
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
         generate_mining_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mining_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_zoi_to_gee(request):
+    print("Inside generate zoi layers")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_zoi.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(

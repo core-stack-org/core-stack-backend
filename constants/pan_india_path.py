@@ -10,3 +10,4 @@ CATCHMENT_AREA = "projects/ext-datasets/assets/datasets/catchment_area_singleflo
 
 PAN_INDIA_LULC_PATH = "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
 PAN_INDIA_MWS_PATH = "projects/corestack-datasets/assets/datasets/India_mws_UID_Merged"
+PAN_INDIA_SO = "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"

@@ -24,23 +24,23 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def calculate_drought(
-        self,
-        state=None,
-        district=None,
-        block=None,
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type="MWS",
-        start_year=None,
-        end_year=None,
-        gee_account_id=None,
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi_path=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type="MWS",
+    start_year=None,
+    end_year=None,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
     if state and district and block:
         asset_suffix = (
-                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -55,17 +55,15 @@ def calculate_drought(
             + "_uid"
         )
 
-    dst_filename = (
-            "drought_" + asset_suffix + "_" + str(start_year) + "_" + str(end_year)
-    )
+    dst_filename = asset_suffix + "_" + str(start_year) + "_" + str(end_year)
 
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + dst_filename
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + dst_filename
     )
-    roi = ee.FeatureCollection(roi)
+    roi = ee.FeatureCollection(roi_path)
     layer_name = asset_suffix + "_drought"
 
     if not is_gee_asset_exists(asset_id):
@@ -78,11 +76,11 @@ def calculate_drought(
         while current_year <= end_year:
             print("current_year", current_year)
             yearly_drought = (
-                    get_gee_dir_path(
-                        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-                    )
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
                 + "drought_"
-                    + asset_suffix
+                + asset_suffix
                 + "_"
                 + str(current_year)
             )

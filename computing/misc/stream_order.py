@@ -1,10 +1,14 @@
 import ee
+
+from constants.pan_india_path import PAN_INDIA_SO
 from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+from projects.models import Project
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -16,32 +20,82 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
+    get_gee_dir_path,
 )
 
 
 @app.task(bind=True)
-def generate_stream_order(self, state, district, block, gee_account_id):
+def generate_stream_order(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    gee_account_id=None,
+    proj_id=None,
+    roi_path=None,
+    asset_suffix=None,
+    asset_folder=None,
+    app_type="MWS",
+):
+
     ee_initialize(gee_account_id)
-    description = (
-        "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
-    )
+    if state and district and block:
+        description = (
+            "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+        )
 
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+        roi = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
+        asset_id_raster = (
+            get_gee_asset_path(state, district, block) + description + "_raster"
+        )
+        asset_id_vector = (
+            get_gee_asset_path(state, district, block) + description + "_vector"
+        )
+    else:
+        proj_obj = Project.objects.get(pk=proj_id)
+        description = (
+            "stream_order_"
+            + valid_gee_text(proj_obj.name)
+            + "_"
+            + valid_gee_text(str(proj_id))
+        )
 
-    stream_order_raster = ee.Image(
-        "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
-    )
+        roi = ee.FeatureCollection(roi_path)
+        asset_id_raster = (
+            get_gee_dir_path(
+                [proj_obj.name], asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
+            + "_raster"
+        )
+
+        asset_id_vector = (
+            get_gee_dir_path(
+                [proj_obj.name], asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
+            + "_vector"
+        )
+    stream_order_raster = ee.Image(PAN_INDIA_SO)
     raster = stream_order_raster.clip(roi.geometry())
 
     # Generate raster Layer
-    stream_order_raster_generation(state, district, block, description, roi, raster)
+    stream_order_raster_generation(
+        raster,
+        state=None,
+        district=None,
+        block=None,
+        description=description,
+        roi=roi,
+        raster_asset_id=asset_id_raster,
+    )
     args = [
         {"value": 1, "label": "1"},
         {"value": 2, "label": "2"},
@@ -59,15 +113,28 @@ def generate_stream_order(self, state, district, block, gee_account_id):
     fc = calculate_pixel_area(args, roi, raster)
     # Generate vector Layer
     layer_at_geoserver = stream_order_vector_generation(
-        state, district, block, description, fc
+        raster,
+        state=state,
+        district=district,
+        block=block,
+        description=description,
+        roi=roi,
+        vector_asset_id=asset_id_vector,
     )
     return layer_at_geoserver
 
 
-def stream_order_raster_generation(state, district, block, description, roi, raster):
-    raster_asset_id = (
-            get_gee_asset_path(state, district, block) + description + "_raster"
-    )
+def stream_order_raster_generation(
+    raster,
+    state=None,
+    district=None,
+    block=None,
+    description=None,
+    roi=None,
+    raster_asset_id=None,
+    proj_id=None,
+):
+
     if not is_gee_asset_exists(raster_asset_id):
         try:
             task_id = export_raster_asset_to_gee(
@@ -86,18 +153,25 @@ def stream_order_raster_generation(state, district, block, description, roi, ras
 
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to gcs ", task_id_list)
+            if state and district and block:
+                save_layer_info_to_db(
+                    state,
+                    district,
+                    block,
+                    layer_name=description + "_raster",
+                    asset_id=raster_asset_id,
+                    dataset_name="Stream Order",
+                )
+                state_name = state
+                workspace_name = ("stream_order",)
 
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description + "_raster",
-                asset_id=raster_asset_id,
-                dataset_name="Stream Order",
-            )
+            else:
+                proj_obj = Project.objects.get(pk=proj_id)
+                state_name = proj_obj.name
+                workspace_name = proj_obj.app_type
             make_asset_public(raster_asset_id)
             res = sync_raster_gcs_to_geoserver(
-                "stream_order",
+                workspace_name,
                 description + "_raster",
                 description + "_raster",
                 "stream_order",
@@ -107,28 +181,42 @@ def stream_order_raster_generation(state, district, block, description, roi, ras
     return False
 
 
-def stream_order_vector_generation(state, district, block, description, fc):
-    vector_asset_id = (
-            get_gee_asset_path(state, district, block) + description + "_vector"
-    )
+def stream_order_vector_generation(
+    fc,
+    state=None,
+    district=None,
+    block=None,
+    description=None,
+    roi=None,
+    vector_asset_id=None,
+    proj_id=None,
+):
+
     task = export_vector_asset_to_gee(fc, description + "_vector", vector_asset_id)
     check_task_status([task])
     if is_gee_asset_exists(vector_asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=description + "_vector",
-            asset_id=vector_asset_id,
-            dataset_name="Stream Order",
-        )
+        if state and district and block:
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=description + "_vector",
+                asset_id=vector_asset_id,
+                dataset_name="Stream Order",
+            )
+            workspace_name = "stream_order"
+            state_name = state
+        else:
+            proj_obj = Project.objects.get(pk=proj_id)
+            workspace_name = proj_obj.name
+            state_name = proj_obj.name
         make_asset_public(vector_asset_id)
 
         # Sync to geoserver
         fc = ee.FeatureCollection(vector_asset_id).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
         res = sync_layer_to_geoserver(
-            state, fc, description + "_vector", "stream_order"
+            state_name, fc, description + "_vector", workspace_name
         )
         print(res)
         layer_at_geoserver = False

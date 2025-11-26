@@ -11,6 +11,7 @@ from nrm_app.settings import (
 from utilities.constants import (
     GEE_ASSET_PATH,
     GCS_BUCKET_NAME,
+    GEE_PATHS,
 )
 import ee, geetools
 import time
@@ -189,18 +190,30 @@ def create_gee_folder(folder_path, gee_project_path=GEE_ASSET_PATH):
         print("Error:", e)
 
 
-def create_gee_directory(state, district, block, gee_project_path=GEE_ASSET_PATH):
-    folder_path = valid_gee_text(state.lower()) + "/" + valid_gee_text(district.lower())
-    create_gee_folder(folder_path, gee_project_path)
+def create_gee_directory(
+    state=None,
+    district=None,
+    block=None,
+    folder_path=None,
+    gee_project_path=GEE_ASSET_PATH,
+):
+    if state and district and block:
+        folder_path = (
+            valid_gee_text(state.lower()) + "/" + valid_gee_text(district.lower())
+        )
+        create_gee_folder(folder_path, gee_project_path)
 
-    folder_path = (
-        valid_gee_text(state.lower())
-        + "/"
-        + valid_gee_text(district.lower())
-        + "/"
-        + valid_gee_text(block.lower())
-    )
-    create_gee_folder(folder_path, gee_project_path)
+        folder_path = (
+            valid_gee_text(state.lower())
+            + "/"
+            + valid_gee_text(district.lower())
+            + "/"
+            + valid_gee_text(block.lower())
+        )
+        create_gee_folder(folder_path, gee_project_path)
+    else:
+        print("inside else")
+        create_gee_folder(folder_path, gee_project_path)
 
 
 def get_gee_asset_path(state, district=None, block=None, asset_path=GEE_ASSET_PATH):
@@ -687,8 +700,11 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
 
 
 def build_gee_helper_paths(app_type, helper_project):
+
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
-    GEE_HELPER_PATH = f"{gee_helper_base_path}/{app_type.lower()}/"
+    GEE_HELPER_PATH = (
+        f"{gee_helper_base_path}/{GEE_PATHS[app_type]["GEE_ASSET_FOLDER"]}"
+    )
     return GEE_HELPER_PATH
 
 

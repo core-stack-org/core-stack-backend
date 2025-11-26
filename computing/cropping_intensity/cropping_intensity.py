@@ -28,22 +28,23 @@ geo = Geoserver()
 
 @app.task(bind=True)
 def generate_cropping_intensity(
-        self,
-        state=None,
-        district=None,
-        block=None,
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type="MWS",
-        start_year=None,
-        end_year=None,
-        gee_account_id=None,
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type="MWS",
+    start_year=None,
+    end_year=None,
+    gee_account_id=None,
+    zoi_ci_asset=None,
 ):
     ee_initialize(gee_account_id)
     if state and district and block:
         asset_suffix = (
-                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -58,18 +59,25 @@ def generate_cropping_intensity(
             + "_uid"
         )
     layer_name = f"{asset_suffix}_intensity"
-    description = "cropping_intensity_" + asset_suffix
+    if zoi_ci_asset:
+        description = "cropping_intensity_zoi_" + asset_suffix
+        layer_name = f"{asset_suffix}_intensity_ZOI"
+    else:
+        description = "cropping_intensity" + asset_suffix
+        layer_name = f"{asset_suffix}_intensity"
     print(f"{description=}")
+
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + description
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
+
     print(f"{asset_id=}")
     if is_gee_asset_exists(asset_id):
         existing_end_date = get_existing_end_year(
-            "Cropping Intensity", f"{asset_suffix}_intensity"
+            "Cropping Intensity ZOI", f"{asset_suffix}_intensity_ZOI"
         )
         print("end_year", end_year)
         if existing_end_date < end_year:
@@ -84,6 +92,7 @@ def generate_cropping_intensity(
                     app_type,
                     new_start_year,
                     end_year,
+                    zoi=zoi_ci_asset,
                 )
                 if new_task_id:
                     check_task_status([new_task_id])
@@ -115,7 +124,13 @@ def generate_cropping_intensity(
             return True
 
     task_id, asset_id = generate_gee_asset(
-        roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
+        roi,
+        asset_suffix,
+        asset_folder_list,
+        app_type,
+        start_year,
+        end_year,
+        zoi=zoi_ci_asset,
     )
     if task_id:
         task_id_list = check_task_status([task_id])
@@ -138,24 +153,43 @@ def generate_cropping_intensity(
 
 
 def generate_gee_asset(
-        roi, asset_suffix, asset_folder_list, app_type, start_year, end_year
+    roi,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
+    start_year,
+    end_year,
+    zoi=None,
 ):
     print("inside generate_gee_asset function ")
-    filename = (
-        "cropping_intensity_"
-        + asset_suffix
-        + "_"
-        + str(start_year)
-        + "-"
-        + str(end_year % 100)
-    )
-    asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + filename
-    )
+    print(f"zoi ci {zoi}")
 
+    if not zoi:
+        filename = (
+            "cropping_intensity_"
+            + asset_suffix
+            + "_"
+            + str(start_year)
+            + "-"
+            + str(end_year % 100)
+        )
+    else:
+        filename = (
+            "cropping_intensity_zoi_"
+            + asset_suffix
+            + "_"
+            + str(start_year)
+            + "-"
+            + str(end_year % 100)
+        )
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + filename
+    )
+    print(f"final asset id {asset_id}")
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
@@ -352,7 +386,7 @@ def save_to_db_and_sync_to_geoserver(config: LayerConfig):
     print("inside save_to_db_and_sync_to_geoserver")
     layer_id = None
     if (
-            config.state and config.district and config.block
+        config.state and config.district and config.block
     ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
         layer_id = save_layer_info_to_db(
             state=config.state,
@@ -379,7 +413,7 @@ def save_to_db_and_sync_to_geoserver(config: LayerConfig):
     print(res)
     layer_at_geoserver = False
     if (
-            res["status_code"] == 201 and layer_id
+        res["status_code"] == 201 and layer_id
     ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")

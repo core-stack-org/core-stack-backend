@@ -13,24 +13,25 @@ from functools import reduce
 
 
 def merge_drought_layers_chunks(
-        roi,
-        asset_suffix,
-        asset_folder_list,
-        app_type,
-        current_year,
-        chunk_size,
-        gee_account_id,
+    roi,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
+    current_year,
+    chunk_size,
+    gee_account_id,
 ):
+    print("app type {app_type}")
     ee_initialize(gee_account_id)
     gee_obj = GEEAccount.objects.get(pk=gee_account_id)
 
     helper_layer_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     dst_filename = "drought_" + asset_suffix + "_" + str(current_year)
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + dst_filename
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + dst_filename
     )
 
     size = roi.size().getInfo()
@@ -40,7 +41,7 @@ def merge_drought_layers_chunks(
         start = part * chunk_size
         end = start + chunk_size
         block_name_for_parts = (
-                asset_suffix
+            asset_suffix
             + "_drought_"
             + str(start)
             + "-"
@@ -49,8 +50,8 @@ def merge_drought_layers_chunks(
             + str(current_year)
         )
         src_asset_id = (
-                get_gee_dir_path(asset_folder_list, asset_path=helper_layer_path)
-                + block_name_for_parts
+            get_gee_dir_path(asset_folder_list, asset_path=helper_layer_path)
+            + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
@@ -61,15 +62,20 @@ def merge_drought_layers_chunks(
 
 
 def merge_yearly_layers(
-        asset_suffix, asset_folder_list, app_type, start_year, end_year, gee_account_id
+    asset_suffix, asset_folder_list, app_type, start_year, end_year, gee_account_id
 ):
+    print(asset_suffix)
+    print(asset_folder_list)
+    print(f"merge yearly layers {app_type}")
     # Create required GEE asset path components
     ee_initialize(gee_account_id)
     gee_obj = GEEAccount.objects.get(pk=gee_account_id)
     helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
     # Create export asset path (must be constant for export)
     description = f"drought_{asset_suffix}_{start_year}_{end_year}"
-    asset_id = f"{get_gee_dir_path(asset_folder_list)}{description}"
+    print(description)
+    asset_id = f"{get_gee_dir_path(asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])}{description}"
+    print(asset_id)
 
     # Check if asset already exists
     if is_gee_asset_exists(asset_id):

@@ -5,7 +5,12 @@ from computing.utils import sync_project_fc_to_geoserver
 from gee_computing.utils import extract_ndmis, classify_checkdams, mask_landsat_clouds
 from nrm_app.celery import app
 from projects.models import Project
-from utilities.gee_utils import ee_initialize, get_distance_between_two_lan_long
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    ee_initialize,
+    get_distance_between_two_lan_long,
+    get_gee_dir_path,
+)
 from constants.pan_india_path import PAN_INDIA_LULC_PATH, PAN_INDIA_MWS_PATH
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -280,9 +285,15 @@ def compute_water_score(feature):
     return feature.set({"water_score": best_score, "water_year": best_year})
 
 
-def get_lulc_asset_from_year(year, proj_name):
-    lulc_asset_id_base = get_filtered_mws_layer_name(
-        proj_name, "clipped_lulc_filtered_mws"
+def get_lulc_asset_from_year(
+    year, asset_suffix=None, asset_folder_list=None, app_type="MWS"
+):
+    proj_obj = Project.objects.get(pk=proj_id)
+    asset_folder = [proj_obj.name]
+    asset_suffix = (f"lulc_{proj_obj.name}_{proj_obj.id}",)
+    gee_asset_path = (
+        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
+        + asset_suffix
     )
     start_date_ndmi, end_date_ndmi = (
         "20" + year.split("-")[0] + "-07-01",
@@ -292,7 +303,7 @@ def get_lulc_asset_from_year(year, proj_name):
         "20" + year.split("-")[0] + "-07-01",
         "20" + year.split("-")[1] + "-06-30",
     )
-    asset_id = f"{lulc_asset_id_base}_{start_date}_{end_date}_LULCmap_10m"
+    asset_id = f"{gee_asset_path}_{start_date}_{end_date}"
     return str(asset_id), start_date_ndmi, end_date_ndmi
 
 
@@ -357,7 +368,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
     top_feature = scored_fc.sort("water_score", False).first()
     lulc_year = top_feature.getInfo()["properties"]["water_year"]
     lulc_asset_id, start_date, end_date = get_lulc_asset_from_year(
-        lulc_year, proj_obj.name
+        lulc_year, proj_obj.id, app_type="WATER_REJ"
     )
     landsat_collection = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
@@ -522,7 +533,7 @@ def generate_ndmi_layer(swb_asset_id, proj_id):
 
     # Step 2: Prepare Input Layers
     lulc_asset_id, start_date, end_date = get_lulc_asset_from_year(
-        lulc_year, proj_obj.name
+        lulc_year, proj_obj.id, app_type="WATER_REJ"
     )
     landsat = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
@@ -533,17 +544,24 @@ def generate_ndmi_layer(swb_asset_id, proj_id):
 
     # Step 3: NDMI Computation at Centroid of waterbody
     swb_centroids = swb_fc.map(get_centroid_point)
-    ndmi_asset = get_filtered_mws_layer_name(proj_obj.name, "ndmi_layer")
+    asset_folder = [proj_obj.name]
+    asset_suffix_ndmi = f"ndmi_{proj_obj.name}_{proj_obj.id}"
+    asset_id_ndmi = (
+        get_gee_dir_path(
+            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + asset_suffix_ndmi
+    )
     try:
-        delete_asset_on_GEE(ndmi_asset)
+        delete_asset_on_GEE(asset_id_ndmi)
     except Exception:
         print("NDMI asset not present, skipping delete.")
 
     ndmi_computed_fc = swb_centroids.map(
         wrap_compute_metrics(elevation, ndmi_img, cropping_mask)
     )
-    export_and_wait(ndmi_computed_fc, "waterej_ndmi_calc", ndmi_asset)
-    return ndmi_asset
+    export_and_wait(ndmi_computed_fc, asset_suffix_ndmi, asset_id_ndmi)
+    return asset_id_ndmi
 
 
 def export_and_wait(collection, description, asset_id):

@@ -20,7 +20,6 @@ class ExcelFileSerializer(serializers.ModelSerializer):
             "uploaded_by",
             "uploaded_by_username",
             "created_at",
+            "gee_account_id",
         ]
         read_only_fields = ["id", "uploaded_by", "created_at"]
-
-

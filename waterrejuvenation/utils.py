@@ -30,6 +30,11 @@ from nrm_app.settings import lulc_years, water_classes
 import pandas as pd
 import math
 
+import os
+import requests
+import json
+
+
 years = [
     "2017_2018",
     "2018_2019",
@@ -529,19 +534,23 @@ def merge_assets_chunked_on_year(chunk_assets):
     return merged_fc
 
 
-def get_ndvi_for_zoi(zoi_asset_path, asset_suffix, asset_folder, app_type="WATER_REJ"):
+def get_ndvi_for_zoi(
+    zoi_asset_path, asset_suffix, asset_folder, proj_id=None, app_type="WATER_REJ"
+):
+    proj_obj = Project.objects.get(pk=proj_id)
+    asset_suffix_ndvi = f"zoi_ndvi_{proj_obj.name}_{proj_obj.id}"
     ndvi_asset_path = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
         )
-        + "ndmi"
+        + asset_suffix_ndvi
     )
 
     zoi_collections = ee.FeatureCollection(zoi_asset_path)
 
-    fc = get_ndvi_data(zoi_collections, 2017, 2024, "ndmi", ndvi_asset_path)
+    fc = get_ndvi_data(zoi_collections, 2017, 2024, asset_suffix_ndvi, ndvi_asset_path)
     task = ee.batch.Export.table.toAsset(
-        collection=fc, description="export_ndvi_waterrej_task", assetId=ndvi_asset_path
+        collection=fc, description=asset_suffix_ndvi, assetId=ndvi_asset_path
     )
     task.start()
     wait_for_task_completion(task)
@@ -614,27 +623,40 @@ def generate_zoi_ring_layer(zoi_fc, proj_id):
     from computing.water_rejuvenation.water_rejuventation import export_and_wait
 
     proj_obj = Project.objects.get(pk=proj_id)
+    asset_folder = [proj_obj.name]
     zoi_fc = ee.FeatureCollection(zoi_fc)
-    zoi_asset = get_filtered_mws_layer_name(proj_obj.name, "zoi_layer")
+    asset_suffix_zoi = f"zoi_layer_{proj_obj.name}_{proj_obj.id}"
+    zoi_asset_id = (
+        get_gee_dir_path(
+            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + asset_suffix_zoi
+    )
     try:
-        delete_asset_on_GEE(zoi_asset)
+        delete_asset_on_GEE(zoi_asset_id)
     except Exception:
         print("ZOI asset not present, skipping delete.")
-    export_and_wait(zoi_fc, "zoi_ndmi_export", zoi_asset)
+    export_and_wait(zoi_fc, asset_suffix_zoi, zoi_asset_id)
 
     # Step 7: Create ZOI Rings
     zoi_rings = (
-        ee.FeatureCollection(zoi_asset)
+        ee.FeatureCollection(zoi_asset_id)
         .filter(ee.Filter.gt("zoi_wb", 0))
         .map(create_ring)
     )
-    zoi_ring_asset = get_filtered_mws_layer_name(proj_obj.name, "swb_zoi_ring")
-    delete_asset_on_GEE(zoi_ring_asset)
-    export_and_wait(zoi_rings, "zoi_single_ring_export", zoi_ring_asset)
-    return zoi_ring_asset
+    asset_suffix_zoi_ring = f"zoi_ring_{proj_obj.name}_{proj_obj.id}"
+    zoi_ring_asset_id = (
+        get_gee_dir_path(
+            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + asset_suffix_zoi_ring
+    )
+    delete_asset_on_GEE(zoi_ring_asset_id)
+    export_and_wait(zoi_rings, "zoi_single_ring_export", zoi_ring_asset_id)
+    return zoi_ring_asset_id
 
 
-def add_on_drainage_flag(swb_asset_id, dl_asset_id):
+def add_on_drainage_flag(swb_fc, dl_asset_id):
     """
     Adds a boolean flag 'on_drainage_line' to each feature in swb_fc
     indicating whether it intersects with any feature in dl_fc.
@@ -646,7 +668,7 @@ def add_on_drainage_flag(swb_asset_id, dl_asset_id):
     Returns:
         ee.FeatureCollection: SWB FC with added property 'on_drainage_line'
     """
-    swb_fc = ee.FeatureCollection(swb_asset_id)
+
     dl_fc = ee.FeatureCollection(dl_asset_id)
 
     # Map over each SWB feature
@@ -655,3 +677,144 @@ def add_on_drainage_flag(swb_asset_id, dl_asset_id):
         return feature.set("on_drainage_line", intersects)
 
     return swb_fc.map(set_flag)
+
+
+def get_merged_waterbodies_with_zoi(
+    state=None, district=None, block=None, max_features=50000
+):
+    """
+    Fetch standard and ZOI waterbodies layers, merge by UID and save single JSON.
+
+    - standard layer: workspace `water_bodies`, layer `surface_waterbodies_{district}_{block}`
+    - zoi layer:       workspace `water_bodies`, layer `waterbodies_zoi_{district}_{block}`
+
+    Output file:
+      data/states_excel_files/{STATE}/{DISTRICT}/{district}_{block}_merged_data.json
+
+    Returns:
+      merged_dict  (UID -> { ...waterbody props..., "zoi_properties": {...} })
+    """
+    if not district or not block:
+        raise ValueError("district and block are required!")
+
+    # normalize
+    state = (state or "UNKNOWN_STATE").upper()
+    district_l = str(district).lower()
+    block_l = str(block).lower()
+
+    base_dir = "data/states_excel_files"
+    out_dir = os.path.join(base_dir, state, district.upper())
+    os.makedirs(out_dir, exist_ok=True)
+
+    merged_fname = f"{district_l}_{block_l}_merged_data.json"
+    merged_path = os.path.join(out_dir, merged_fname)
+
+    # helper: build WFS url
+    def build_wfs(workspace, layer, maxf):
+        return (
+            f"https://geoserver.core-stack.org:8443/geoserver/{workspace}/ows"
+            f"?service=WFS&version=1.0.0&request=GetFeature"
+            f"&typeName={workspace}:{layer}"
+            f"&maxFeatures={maxf}&outputFormat=application/json"
+        )
+
+    standard_layer = f"surface_waterbodies_{district_l}_{block_l}"
+    zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
+
+    standard_wfs = build_wfs("water_bodies", standard_layer, max_features)
+    zoi_wfs = build_wfs("water_bodies", zoi_layer, max_features)
+
+    # fetch and return uid->props dict
+    def fetch_uid_props(wfs_url, generate_from_props=False):
+        try:
+            resp = requests.get(wfs_url, timeout=60)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception:
+            return None  # caller handles None
+
+        uid_map = {}
+        for feat in data.get("features", []):
+            props = feat.get("properties", {}) or {}
+
+            # find UID (case-insensitive)
+            uid = None
+            for candidate in ("UID", "uid", "Uid", "ID", "id", "Id"):
+                if candidate in props and props[candidate] not in (None, ""):
+                    uid = props[candidate]
+                    break
+            # fallback: any key that endswith 'uid' or 'wb_id'
+            if not uid:
+                for k, v in props.items():
+                    if k.lower().endswith("uid") and v not in (None, ""):
+                        uid = v
+                        break
+
+            if not uid:
+                # optionally skip - we don't generate synthetic IDs here
+                continue
+
+            # store original properties (do not remove uid from ZOI properties;
+            # for waterbody props we'll keep the original keys as-is)
+            uid_map[str(uid)] = props
+
+        return uid_map
+
+    # Try to use cached merged if exists
+    if os.path.exists(merged_path):
+        try:
+            with open(merged_path, "r", encoding="utf-8") as f:
+                print("Serving cached merged data")
+                return json.load(f)
+        except Exception:
+            # fallthrough and re-generate
+            pass
+
+    # Fetch both layers
+    print(f"Attempting standard layer: {standard_wfs}")
+    standard_map = fetch_uid_props(standard_wfs)
+
+    print(f"Attempting ZOI layer: {zoi_wfs}")
+    zoi_map = fetch_uid_props(zoi_wfs)
+
+    # If both failed, return None
+    if standard_map is None and zoi_map is None:
+        print("❌ Both standard and ZOI fetch failed.")
+        return None
+
+    # Merge: union of UIDs from both maps
+    merged = {}
+    uids = set()
+    if standard_map:
+        uids.update(standard_map.keys())
+    if zoi_map:
+        uids.update(zoi_map.keys())
+
+    for uid in sorted(uids):
+        wb_props = standard_map.get(uid) if standard_map else None
+        zoi_props = zoi_map.get(uid) if zoi_map else None
+
+        if wb_props is None:
+            # If waterbody does not exist but ZOI does, create entry with only zoi_properties
+            merged[uid] = {}
+            # you may wish to preserve original uid inside properties; optional
+        else:
+            # copy waterbody properties (shallow copy)
+            merged[uid] = dict(wb_props)
+
+        # attach zoi_properties: if exists attach object, else None
+        merged[uid]["zoi_properties"] = (
+            dict(zoi_props) if zoi_props is not None else None
+        )
+
+        # Optionally remove UID key from inside properties to avoid duplication:
+        # for k in list(merged[uid].keys()):
+        #     if k.lower() == "uid":
+        #         merged[uid].pop(k, None)
+
+    # Save merged file
+    with open(merged_path, "w", encoding="utf-8") as f:
+        json.dump(merged, f, indent=2, ensure_ascii=False)
+
+    print(f"Saved merged → {merged_path} ({len(merged)} UIDs)")
+    return merged

@@ -14,6 +14,8 @@ from users.permissions import IsOrganizationMember, HasProjectPermission
 from utilities.gee_utils import valid_gee_text
 from .models import WaterbodiesFileUploadLog
 from .serializers import ExcelFileSerializer
+from rest_framework.views import APIView
+from .utils import get_merged_waterbodies_with_zoi
 
 
 class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
@@ -41,6 +43,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         print("inside create api")
+        print(request.data)
         """Create new excel files - supports both single and multiple file uploads"""
         project_id = self.kwargs.get("project_pk")
         print("Project: " + str(project_id))
@@ -113,6 +116,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 "name": request.data.get("name", valid_gee_text(uploaded_file.name)),
                 "file": uploaded_file,
                 "project": project.id,
+                "gee_account_id": request.data.get("gee_account_id"),
             }
             print(data)
             serializer = self.get_serializer(data=data)
@@ -125,6 +129,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                         project=project,
                         uploaded_by=request.user,
                         excel_hash=excel_hash,
+                        gee_account_id=request.data.get("gee_account_id"),
                     )
 
                     # # Convert KML to GeoJSON
@@ -162,3 +167,6 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         )
 
         return Response(response_data, status=status_code)
+
+
+# Import your merging function (adjust path as needed)

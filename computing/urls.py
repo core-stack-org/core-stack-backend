@@ -131,4 +131,9 @@ urlpatterns = [
         api.generate_mining_to_gee,
         name="generate_mining_data",
     ),
+    path(
+        "generate_zoi_data/",
+        api.generate_zoi_to_gee,
+        name="generate_mining_data",
+    ),
 ]
