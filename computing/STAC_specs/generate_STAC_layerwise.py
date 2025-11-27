@@ -1521,44 +1521,49 @@ def generate_vector_stac(
     column_desc_csv_path="data/STAC_specs/input/metadata/vector_column_descriptions.csv",
     upload_to_s3=False,
     overwrite_existing=False,
+    generate_stac=False,
 ):
     print("STAC: triggering vector STAC pipeline")
-    # print(layer_map_csv_path)
-    state = valid_gee_text(state.lower())
-    district = valid_gee_text(district.lower())
-    block = valid_gee_text(block.lower())
+    if generate_stac:
+        # print(layer_map_csv_path)
+        state = valid_gee_text(state.lower())
+        district = valid_gee_text(district.lower())
+        block = valid_gee_text(block.lower())
 
-    # print("state=",state)
-    # print("district=",district)
-    # print("block=",block)
+        # print("state=",state)
+        # print("district=",district)
+        # print("block=",block)
 
-    vector_item = generate_vector_item(
-        state,
-        district,
-        block,
-        layer_name,
-        layer_map_csv_path,
-        layer_desc_csv_path,
-        column_desc_csv_path,
-        overwrite_existing,
-    )
-
-    layer_STAC_generated = update_STAC_files(
-        state, district, block, STAC_item=vector_item
-    )
-
-    if upload_to_s3:
-        upload_folder_to_s3(
-            aws_creds=aws_creds,
-            folderpath=STAC_FILES_DIR,
-            s3_bucket=S3_STAC_BUCKET_NAME,
+        vector_item = generate_vector_item(
+            state,
+            district,
+            block,
+            layer_name,
+            layer_map_csv_path,
+            layer_desc_csv_path,
+            column_desc_csv_path,
+            overwrite_existing,
         )
 
-        upload_folder_to_s3(
-            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+        layer_STAC_generated = update_STAC_files(
+            state, district, block, STAC_item=vector_item
         )
 
-    return layer_STAC_generated
+        if upload_to_s3:
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=STAC_FILES_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=THUMBNAIL_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+        return layer_STAC_generated
+    return False
 
 
 # %%
@@ -1573,45 +1578,49 @@ def generate_raster_stac(
     #  end_year='',
     upload_to_s3=False,
     overwrite_existing=False,
+    generate_stac=False,
 ):
     print("STAC: triggering raster STAC pipeline")
+    if generate_stac:
+        state = valid_gee_text(state.lower())
+        district = valid_gee_text(district.lower())
+        block = valid_gee_text(block.lower())
 
-    state = valid_gee_text(state.lower())
-    district = valid_gee_text(district.lower())
-    block = valid_gee_text(block.lower())
+        # print("state=",state)
+        # print("district=",district)
+        # print("block=",block)
 
-    # print("state=",state)
-    # print("district=",district)
-    # print("block=",block)
-
-    raster_item = generate_raster_item(
-        state,
-        district,
-        block,
-        layer_name,
-        layer_map_csv_path,
-        layer_desc_csv_path,
-        start_year,
-        #    end_year,
-        overwrite_existing,
-    )
-
-    layer_STAC_generated = update_STAC_files(
-        state, district, block, STAC_item=raster_item
-    )
-
-    if upload_to_s3:
-        upload_folder_to_s3(
-            aws_creds=aws_creds,
-            folderpath=STAC_FILES_DIR,
-            s3_bucket=S3_STAC_BUCKET_NAME,
+        raster_item = generate_raster_item(
+            state,
+            district,
+            block,
+            layer_name,
+            layer_map_csv_path,
+            layer_desc_csv_path,
+            start_year,
+            #    end_year,
+            overwrite_existing,
         )
 
-        upload_folder_to_s3(
-            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+        layer_STAC_generated = update_STAC_files(
+            state, district, block, STAC_item=raster_item
         )
 
-    return layer_STAC_generated
+        if upload_to_s3:
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=STAC_FILES_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=THUMBNAIL_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+        return layer_STAC_generated
+    return False
 
 
 # %% [markdown]
