@@ -163,15 +163,22 @@ def drought_chunk(
     chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY").select("precipitation")
     chirps_available_from_year = 1981  # it is available from 1981-01-01
     # chirps_scale = 5566
-    modis_ndvi = ee.ImageCollection("MODIS/MOD09GA_006_NDVI").select("NDVI")
-    modis_ndvi_scale = 464
-    modis_ndvi_available_from_year = 2000  # it is available from 2000-02-24
-    modis_ndwi = ee.ImageCollection("MODIS/MOD09GA_006_NDWI").select("NDWI")
-    # modis_ndwi_scale = 464
-    modis_ndwi_available_from_year = 2000  # it is available from 2000-02-24
+    # modis_ndvi = ee.ImageCollection("MODIS/MOD09GA_006_NDVI").select("NDVI")
+    # modis_ndvi_scale = 464
+    # modis_ndvi_available_from_year = 2000  # it is available from 2000-02-24
+    # modis_ndwi = ee.ImageCollection("MODIS/MOD09GA_006_NDWI").select("NDWI")
+    # # modis_ndwi_scale = 464
+    # modis_ndwi_available_from_year = 2000  # it is available from 2000-02-24
+
+    ndvi_ndwi = modis_ndvi_ndwi()
+    modis_ndvi = ndvi_ndwi.select("NDVI")
+    modis_ndwi = ndvi_ndwi.select("NDWI")
+
     modis = ee.ImageCollection("MODIS/061/MOD16A2GF").select(["ET", "PET"])
+
     modis_scale = 500
-    # modis_available_from_year = 2000  # it is available from 2000-01-01
+    modis_available_from_year = 2000
+
     lulc_path = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -800,8 +807,8 @@ def drought_chunk(
 
         starting_day_of_year = get_day_of_year(start_date)
 
-        years_ndvi = ee.List.sequence(modis_ndvi_available_from_year, current_year)
-        years_ndwi = ee.List.sequence(modis_ndwi_available_from_year, current_year)
+        years_ndvi = ee.List.sequence(modis_available_from_year, current_year)
+        years_ndwi = ee.List.sequence(modis_available_from_year, current_year)
 
         start = starting_day_of_year
         end = start.add(delta)
@@ -870,8 +877,8 @@ def drought_chunk(
         vci = ee.Image(vci).multiply(cropping_mask)
         vci = vci.multiply(100)
 
-        roi = vci.reduceRegions(roi, ee.Reducer.sum(), modis_ndvi_scale)
-        pc = cropping_mask.reduceRegions(roi, ee.Reducer.sum(), modis_ndvi_scale)
+        roi = vci.reduceRegions(roi, ee.Reducer.sum(), modis_scale)
+        pc = cropping_mask.reduceRegions(roi, ee.Reducer.sum(), modis_scale)
 
         def inner(feature):
             pkid = feature.get("uid")
@@ -1509,3 +1516,21 @@ def drought_chunk(
     if task_id:
         task_ids.append(task_id)
         asset_ids.append(asset_id)
+
+
+def modis_ndvi_ndwi():
+    mod09a1 = ee.ImageCollection("MODIS/061/MOD09A1").select(
+        ["sur_refl_b01", "sur_refl_b02", "sur_refl_b04"]  # Red  # NIR  # Green
+    )
+
+    # Compute NDVI
+    def add_ndvi(img):
+        ndvi = img.normalizedDifference(["sur_refl_b02", "sur_refl_b01"]).rename("NDVI")
+        return img.addBands(ndvi)
+
+    # Compute NDWI
+    def add_ndwi(img):
+        ndwi = img.normalizedDifference(["sur_refl_b04", "sur_refl_b02"]).rename("NDWI")
+        return img.addBands(ndwi)
+
+    return mod09a1.map(add_ndvi).map(add_ndwi)
