@@ -37,7 +37,7 @@ def generate_catchment_area_singleflow(
     ee_initialize(gee_account_id)
     if state and district and block:
         description = (
-            "catchment_area"
+            "catchment_area_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
@@ -73,7 +73,7 @@ def generate_catchment_area_singleflow(
         state=state,
         district=district,
         block=block,
-        asset_suffix=description,
+        description=description,
         roi=roi_boundary,
         raster=raster,
         proj_id=proj_id,
@@ -89,9 +89,7 @@ def catchment_area_raster_generation(
     state=None,
     district=None,
     block=None,
-    asset_suffix=None,
-    asset_folder=None,
-    app_type=None,
+    description=None,
     asset_id=None,
 ):
     workspacename = "catchment_area_singleflow"
@@ -101,7 +99,7 @@ def catchment_area_raster_generation(
     if not is_gee_asset_exists(asset_id):
         task_id = export_raster_asset_to_gee(
             image=raster,
-            description=asset_suffix + "_raster",
+            description=description,
             asset_id=asset_id,
             scale=30,
             region=roi.geometry(),
@@ -114,7 +112,7 @@ def catchment_area_raster_generation(
     if is_gee_asset_exists(asset_id):
         """Sync image to google cloud storage and then to geoserver"""
         image = ee.Image(asset_id)
-        task_id = sync_raster_to_gcs(image, 30, asset_suffix + "_raster")
+        task_id = sync_raster_to_gcs(image, 30, description)
 
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
@@ -123,15 +121,15 @@ def catchment_area_raster_generation(
                 state,
                 district,
                 block,
-                layer_name=asset_suffix + "_raster",
+                layer_name=description,
                 asset_id=asset_id,
                 dataset_name="Catchment Area",
             )
         make_asset_public(asset_id)
         res = sync_raster_gcs_to_geoserver(
             workspacename,
-            asset_suffix + "_raster",
-            asset_suffix + "_raster",
+            description,
+            description,
             "catchment_area_singleflow",
         )
         if res and layer_id:
