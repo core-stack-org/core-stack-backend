@@ -18,7 +18,7 @@ from constants.pan_india_urls import SLOPE_PERCENTAGE
 
 
 @app.task(bind=True)
-def generate_slope_percentage(self, state, district, block, gee_account_id):
+def generate_slope_percentage_data(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
     description = (
         valid_gee_text(district) + "_" + valid_gee_text(block) + "_slope_percentage"
@@ -47,39 +47,37 @@ def slope_percentage_raster_generation(
         get_gee_asset_path(state, district, block) + description + "_raster"
     )
     if not is_gee_asset_exists(raster_asset_id):
-        try:
-            task_id = export_raster_asset_to_gee(
-                image=raster,
-                description=description + "_raster",
-                asset_id=raster_asset_id,
-                scale=30,
-                region=roi.geometry(),
-            )
-            slope_percentage_task_id_list = check_task_status([task_id])
-            print("slope percentage task_id list", slope_percentage_task_id_list)
+        task_id = export_raster_asset_to_gee(
+            image=raster,
+            description=description + "_raster",
+            asset_id=raster_asset_id,
+            scale=30,
+            region=roi.geometry(),
+        )
+        slope_percentage_task_id_list = check_task_status([task_id])
+        print("slope percentage task_id list", slope_percentage_task_id_list)
 
-            """ Sync image to google cloud storage and then to geoserver"""
-            image = ee.Image(raster_asset_id)
-            task_id = sync_raster_to_gcs(image, 30, description + "_raster")
+    """ Sync image to google cloud storage and then to geoserver"""
+    if is_gee_asset_exists(raster_asset_id):
+        image = ee.Image(raster_asset_id)
+        task_id = sync_raster_to_gcs(image, 30, description + "_raster")
 
-            task_id_list = check_task_status([task_id])
-            print("task_id_list sync to gcs ", task_id_list)
+        task_id_list = check_task_status([task_id])
+        print("task_id_list sync to gcs ", task_id_list)
 
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description + "_raster",
-                asset_id=raster_asset_id,
-                dataset_name="Slope Percentage",
-            )
-            make_asset_public(raster_asset_id)
-            res = sync_raster_gcs_to_geoserver(
-                "slope_percentage",
-                description + "_raster",
-                description + "_raster",
-                "slope_percentage",
-            )
-        except Exception as e:
-            print(f"Error occurred in running slope percentage: {e}")
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=description + "_raster",
+            asset_id=raster_asset_id,
+            dataset_name="Slope Percentage",
+        )
+        make_asset_public(raster_asset_id)
+        res = sync_raster_gcs_to_geoserver(
+            "slope_percentage",
+            description + "_raster",
+            description + "_raster",
+            "slope_percentage",
+        )
     return False

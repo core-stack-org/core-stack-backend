@@ -54,44 +54,40 @@ def distance_to_drainage_line_raster_generation(
         get_gee_asset_path(state, district, block) + description + "_raster"
     )
     if not is_gee_asset_exists(raster_asset_id):
-        try:
-            task_id = export_raster_asset_to_gee(
-                image=raster,
-                description=description + "_raster",
-                asset_id=raster_asset_id,
-                scale=30,
-                region=roi.geometry(),
-            )
-            distance_to_nearest_drainage_line__task_id_list = check_task_status(
-                [task_id]
-            )
-            print(
-                "Distance to nearest drainage line task_id list",
-                distance_to_nearest_drainage_line__task_id_list,
-            )
+        task_id = export_raster_asset_to_gee(
+            image=raster,
+            description=description + "_raster",
+            asset_id=raster_asset_id,
+            scale=30,
+            region=roi.geometry(),
+        )
+        distance_to_nearest_drainage_line__task_id_list = check_task_status([task_id])
+        print(
+            "Distance to nearest drainage line task_id list",
+            distance_to_nearest_drainage_line__task_id_list,
+        )
 
-            """ Sync image to google cloud storage and then to geoserver"""
-            image = ee.Image(raster_asset_id)
-            task_id = sync_raster_to_gcs(image, 30, description + "_raster")
+    if is_gee_asset_exists(raster_asset_id):
+        """Sync image to google cloud storage and then to geoserver"""
+        image = ee.Image(raster_asset_id)
+        task_id = sync_raster_to_gcs(image, 30, description + "_raster")
 
-            task_id_list = check_task_status([task_id])
-            print("task_id_list sync to gcs ", task_id_list)
+        task_id_list = check_task_status([task_id])
+        print("task_id_list sync to gcs ", task_id_list)
 
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description + "_raster",
-                asset_id=raster_asset_id,
-                dataset_name="Distance to Drainage Line",
-            )
-            make_asset_public(raster_asset_id)
-            res = sync_raster_gcs_to_geoserver(
-                "distance_nearest_upstream_DL",
-                description + "_raster",
-                description + "_raster",
-                style_name="distance_nearest_upstream_DL",
-            )
-        except Exception as e:
-            print(f"Error occurred in running stream order: {e}")
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=description + "_raster",
+            asset_id=raster_asset_id,
+            dataset_name="Distance to Drainage Line",
+        )
+        make_asset_public(raster_asset_id)
+        res = sync_raster_gcs_to_geoserver(
+            "distance_nearest_upstream_DL",
+            description + "_raster",
+            description + "_raster",
+            style_name="distance_nearest_upstream_DL",
+        )
     return False

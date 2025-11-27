@@ -99,39 +99,37 @@ def catchment_area_raster_generation(
         proj_obj = Project.objects.get(pk=proj_id)
 
     if not is_gee_asset_exists(asset_id):
-        try:
-            task_id = export_raster_asset_to_gee(
-                image=raster,
-                description=asset_suffix + "_raster",
+        task_id = export_raster_asset_to_gee(
+            image=raster,
+            description=asset_suffix + "_raster",
+            asset_id=asset_id,
+            scale=30,
+            region=roi.geometry(),
+        )
+        catchment_area_task_id_list = check_task_status([task_id])
+        print("catchmenta area task_id list", catchment_area_task_id_list)
+
+    if is_gee_asset_exists(asset_id):
+        """Sync image to google cloud storage and then to geoserver"""
+        image = ee.Image(asset_id)
+        task_id = sync_raster_to_gcs(image, 30, asset_suffix + "_raster")
+
+        task_id_list = check_task_status([task_id])
+        print("task_id_list sync to gcs ", task_id_list)
+        if state and district and block:
+            save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=asset_suffix + "_raster",
                 asset_id=asset_id,
-                scale=30,
-                region=roi.geometry(),
+                dataset_name="Catchment Area",
             )
-            catchment_area_task_id_list = check_task_status([task_id])
-            print("catchmenta area task_id list", catchment_area_task_id_list)
-
-            """ Sync image to google cloud storage and then to geoserver"""
-            image = ee.Image(asset_id)
-            task_id = sync_raster_to_gcs(image, 30, asset_suffix + "_raster")
-
-            task_id_list = check_task_status([task_id])
-            print("task_id_list sync to gcs ", task_id_list)
-            if state and district and block:
-                save_layer_info_to_db(
-                    state,
-                    district,
-                    block,
-                    layer_name=asset_suffix + "_raster",
-                    asset_id=asset_id,
-                    dataset_name="Catchment Area",
-                )
-            make_asset_public(asset_id)
-            res = sync_raster_gcs_to_geoserver(
-                workspacename,
-                asset_suffix + "_raster",
-                asset_suffix + "_raster",
-                "catchment_area_singleflow",
-            )
-        except Exception as e:
-            print(f"Error occurred in running stream order: {e}")
+        make_asset_public(asset_id)
+        res = sync_raster_gcs_to_geoserver(
+            workspacename,
+            asset_suffix + "_raster",
+            asset_suffix + "_raster",
+            "catchment_area_singleflow",
+        )
     return False
