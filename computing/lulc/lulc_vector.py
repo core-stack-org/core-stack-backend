@@ -172,6 +172,7 @@ def generate_vector(
             fc = fc.map(res)
 
     fc = ee.FeatureCollection(fc)
+    
     task = export_vector_asset_to_gee(fc, description, asset_id)
     task_status = check_task_status([task])
     print("Task completed - ", task_status)
