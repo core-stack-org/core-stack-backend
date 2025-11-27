@@ -9,7 +9,7 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from .utils import get_merged_waterbodies_with_zoi
-from nrm_app.settings import DEPLOYMENT_DIR
+
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
 
@@ -43,7 +43,7 @@ def get_waterbodies_by_admin_and_uid(request):
         district_l = district.lower()
         block_l = block.lower()
 
-        base_dir = "{DEPLOYMENT_DIR}/data/stats_excel_file"
+        base_dir = "stats_excel_file"
         out_dir = os.path.join(base_dir, state_norm, district.upper())
         merged_fname = f"{district_l}_{block_l}_merged_data.json"
         merged_path = os.path.join(out_dir, merged_fname)
