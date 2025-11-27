@@ -1,11 +1,14 @@
 """
 Django signals for bot interface events
 """
+
 import threading
 import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
+
+from community_engagement.api import item_type
 from .models import UserLogs
 from .interface.whatsapp import WhatsAppInterface
 
@@ -16,19 +19,25 @@ logger = logging.getLogger(__name__)
 # print("bot_interface.signals module loaded - registering post_save signal")
 
 
-def async_process_work_demand(user_log_id):
+def async_process_work_demand(user_log_id, item_type="WORK_DEMAND"):
     """
     Async function to process work demand without blocking the main thread
     """
     try:
         # Initialize WhatsApp interface and process the work demand
         whatsapp_interface = WhatsAppInterface()
-        whatsapp_interface.process_and_submit_work_demand(user_log_id)
+        whatsapp_interface.process_and_submit_work_demand(
+            user_log_id, item_type=item_type
+        )
 
-        logger.info(f"Successfully processed work demand for UserLogs ID: {user_log_id}")
+        logger.info(
+            f"Successfully processed work demand for UserLogs ID: {user_log_id}"
+        )
 
     except Exception as e:
-        logger.error(f"Error in async_process_work_demand for UserLogs ID {user_log_id}: {e}")
+        logger.error(
+            f"Error in async_process_work_demand for UserLogs ID {user_log_id}: {e}"
+        )
 
         # Update UserLogs with error status
         try:
@@ -49,7 +58,7 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
     """
     Signal handler to automatically process work demand when UserLogs is created
     with work_demand data.
-    
+
     Args:
         sender: The UserLogs model class
         instance: The UserLogs instance that was saved
@@ -63,21 +72,38 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
         return  # Only process new records
 
     # Check if this is a work demand completion log
-    if (instance.key1 == "useraction" and
-            instance.value1 == "work_demand" and
-            instance.misc and
-            "work_demand_data" in instance.misc):
+    if (
+        instance.key1 == "useraction"
+        and instance.value1 == "work_demand"
+        and instance.misc
+        and "work_demand_data" in instance.misc
+    ):
 
         logger.info(f"Work demand completion detected for UserLogs ID: {instance.id}")
 
         # Process asynchronously to avoid blocking the SMJ flow
         thread = threading.Thread(
-            target=async_process_work_demand,
-            args=(instance.id,),
-            daemon=True
+            target=async_process_work_demand, args=(instance.id,), daemon=True
         )
         thread.start()
         logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")
-    else:
-        logger.info(
-            f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}")
+
+    if (
+        instance.key1 == "useraction"
+        and instance.value1 == "story"
+        and instance.misc
+        and "work_demand_data" in instance.misc
+    ):
+
+        logger.info(f"story completion detected for UserLogs ID: {instance.id}")
+
+        # Process asynchronously to avoid blocking the SMJ flow
+        thread = threading.Thread(
+            target=async_process_work_demand, args=(instance.id, "story"), daemon=True
+        )
+        thread.start()
+        logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")
+
+    logger.info(
+        f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}"
+    )

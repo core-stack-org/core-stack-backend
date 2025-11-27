@@ -372,6 +372,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def sendButton(self, bot_instance_id, data_dict):
         print("in sendButton")
         logger.info("data_dict in sendButton: %s", data_dict)
+        logger.info("bot instance id: %s", bot_instance_id)
         bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
         if bot_instance:
             print("bot_instance", bot_instance.language)
@@ -2760,6 +2761,212 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Error in log_work_demand_completion: {e}")
             return "failure"
 
+    def log_story_completion(self, bot_instance_id, data_dict):
+        """
+        Log complete work demand data to UserLogs when RequestPhotos transitions to ThankYou.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        print("in log story completion")
+
+        try:
+            # Get bot instance with better error handling
+            try:
+                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            except bot_interface.models.Bot.DoesNotExist:
+                print(
+                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
+                )
+                bot_instance = bot_interface.models.Bot.objects.first()
+                if not bot_instance:
+                    print("No bot instances found in database")
+                    return "failure"
+
+            user_id = data_dict.get("user_id")
+            if isinstance(user_id, str):
+                user_id = int(user_id)
+
+            # Get user session with better error handling
+            try:
+                user = bot_interface.models.UserSessions.objects.get(
+                    user=user_id, bot=bot_instance
+                )
+            except bot_interface.models.UserSessions.DoesNotExist:
+                print(
+                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
+                )
+                try:
+                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
+                    print(
+                        f"Found user session for user_id: {user_id} without bot constraint"
+                    )
+                except bot_interface.models.UserSessions.DoesNotExist:
+                    print(f"No user session found for user_id: {user_id}")
+                    return "failure"
+
+            # Get BotUsers object for UserLogs
+            try:
+                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            except bot_interface.models.BotUsers.DoesNotExist:
+                print(f"BotUser not found for user_id: {user_id}")
+                return "failure"
+
+            # Get work_demand SMJ for reference
+            try:
+                smj = bot_interface.models.SMJ.objects.get(id=data_dict.get("smj_id"))
+            except bot_interface.models.SMJ.DoesNotExist:
+                print(f"SMJ not found for smj_id: {data_dict.get('smj_id')}")
+                smj = None
+
+            # Collect work demand data from misc_data
+            work_demand_data = {}
+            if user.misc_data and "work_demand" in user.misc_data:
+                work_demand_data = user.misc_data["work_demand"]
+
+                # Log photo paths to confirm HDPI paths are captured
+                if "photos" in work_demand_data:
+                    print(f"Photo paths being logged: {work_demand_data['photos']}")
+                    # Add explicit note about HDPI paths in the data
+                    work_demand_data["photos_note"] = (
+                        "Photo paths are HDPI processed images from WhatsApp media"
+                    )
+
+            # Collect community context
+            community_context = {}
+            active_community_id = (
+                user.misc_data.get("active_community_id") if user.misc_data else None
+            )
+
+            if active_community_id:
+                try:
+                    from community_engagement.models import Community
+
+                    community = Community.objects.get(id=active_community_id)
+
+                    # Get community details
+                    community_context = {
+                        "community_id": active_community_id,
+                        "community_name": (
+                            community.project.name if community.project else "Unknown"
+                        ),
+                        "organization": (
+                            community.project.organization.name
+                            if community.project and community.project.organization
+                            else "Unknown"
+                        ),
+                    }
+
+                    # Get location hierarchy from community locations
+                    location_hierarchy = {}
+                    for location in community.locations.all():
+                        if location.state:
+                            location_hierarchy["state"] = location.state.state_name
+                        if location.district:
+                            location_hierarchy["district"] = (
+                                location.district.district_name
+                            )
+                        if location.block:
+                            location_hierarchy["block"] = location.block.block_name
+
+                    community_context["location_hierarchy"] = location_hierarchy
+
+                except Exception as e:
+                    print(f"Error getting community context: {e}")
+                    community_context = {
+                        "community_id": active_community_id,
+                        "error": "Failed to load community details",
+                    }
+
+            # Prepare comprehensive misc data
+            from datetime import datetime
+
+            comprehensive_misc_data = {
+                "work_demand_data": work_demand_data,
+                "community_context": community_context,
+                "flow_metadata": {
+                    "smj_name": "work_demand",
+                    "completion_timestamp": datetime.now().isoformat(),
+                    "user_number": (
+                        bot_user.user.username if bot_user.user else "unknown"
+                    ),
+                    "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
+                    "app_type": user.app_type,
+                },
+            }
+
+            # Create UserLogs entry with specified structure
+            user_log = bot_interface.models.UserLogs.objects.create(
+                app_type=user.app_type,
+                bot=bot_instance,
+                user=bot_user,
+                key1="useraction",
+                value1="story",
+                key2="upload",
+                value2="",
+                key3="retries",
+                value3="",
+                key4="",  # Leave empty as not specified
+                misc=comprehensive_misc_data,
+                smj=smj,
+            )
+
+            print(
+                f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}"
+            )
+            print(
+                f"Work demand data logged for user {user_id} in community {active_community_id}"
+            )
+
+            # Additional logging for HDPI path verification
+            if "photos" in work_demand_data:
+                print(
+                    f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}"
+                )
+
+            # Process and submit work demand to Community Engagement API
+            try:
+                import threading
+
+                def async_submit():
+                    try:
+                        # Check if already processed (avoid duplicate processing from signal)
+                        user_log.refresh_from_db()
+                        if (
+                            user_log.value2
+                        ):  # If value2 is not empty, it's already been processed
+                            print(
+                                f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission"
+                            )
+                            return
+
+                        self.process_and_submit_work_demand(user_log.id)
+                        print(
+                            f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}"
+                        )
+                    except Exception as e:
+                        print(
+                            f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}"
+                        )
+
+                # Run in background thread to avoid blocking SMJ flow
+                thread = threading.Thread(target=async_submit, daemon=True)
+                thread.start()
+                print(
+                    f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}"
+                )
+
+            except Exception as e:
+                print(f"❌ Failed to start work demand processing: {e}")
+
+            return "success"
+
+        except Exception as e:
+            print(f"Error in log_work_demand_completion: {e}")
+            return "failure"
+
     def log_grievance_completion(self, bot_instance_id, data_dict):
         """
         Log complete grievance data to UserLogs when RequestPhotos transitions to ThankYou.
@@ -3159,7 +3366,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             traceback.print_exc()
             return "failure"
 
-    def process_and_submit_work_demand(self, user_log_id):
+    def process_and_submit_work_demand(self, user_log_id, item_type="WORK_DEMAND"):
         """
         Processes work demand data from UserLogs and submits to Community Engagement API.
 
@@ -3308,13 +3515,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Prepare API payload
             payload = {
-                "item_type": "WORK_DEMAND",
+                "item_type": item_type,
                 "coordinates": json.dumps(coordinates) if coordinates else "",
                 "number": contact_number,
                 "community_id": community_id,
                 "source": "BOT",
                 "bot_id": user_log.bot.id,
-                "title": "Work Demand Request",  # Auto-generated if not provided
+                "title": f"{item_type}",  # Auto-generated if not provided
                 "transcript": work_demand_data.get(
                     "description", ""
                 ),  # If any description exists

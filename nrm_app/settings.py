@@ -39,8 +39,9 @@ TMP_LOCATION = env("TMP_LOCATION")
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
+AUTH_TOKEN_FB_META = env("AUTH_TOKEN_FB_META")
 ODK_PASSWORD = env("ODK_PASSWORD")
-
+DEPLOYMENT_DIR = env("DEPLOYMENT_DIR")
 # MARK: ODK Sync Creds
 ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
 ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
@@ -63,6 +64,7 @@ ALLOWED_HOSTS = [
     "api-doc.core-stack.org",
     "0cb52a0325c7.ngrok-free.app",
     "odk.core-stack.org",
+    "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
 
 # MARK: Django Apps

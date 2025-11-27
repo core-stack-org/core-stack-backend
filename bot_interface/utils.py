@@ -1219,7 +1219,7 @@ def convert_image_hdpi(filepath):
     hdpi_fixed_width_in_pixel = 480
     wpercent = hdpi_fixed_width_in_pixel / float(width_0)
     hsize = int(float(height_0) * float(wpercent))
-    img.resize((hdpi_fixed_width_in_pixel, hsize), Image.ANTIALIAS).save(im_hdpi_file)
+    img.resize((800, 800), Image.Resampling.LANCZOS).save(im_hdpi_file)
     return im_hdpi_file
 
 
