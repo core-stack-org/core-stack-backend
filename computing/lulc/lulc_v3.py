@@ -45,6 +45,8 @@ def clip_lulc_v3(
 ):
     ee_initialize(gee_account_id)
     print("Inside lulc_river_basin")
+    start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
+
     if state and district and block:
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -55,18 +57,12 @@ def clip_lulc_v3(
             + "_uid"
         ).union()
 
-    start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
-
-    if state and district and block:
-
         filename_prefix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         gee_asset_path = get_gee_asset_path(state, district, block)
     else:
         roi = ee.FeatureCollection(roi_path).union()
-
-        start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
         filename_prefix = valid_gee_text(asset_suffix)
 
