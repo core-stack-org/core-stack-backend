@@ -1,8 +1,6 @@
 import ee
 from nrm_app.celery import app
-from computing.utils import (
-    save_layer_info_to_db,
-)
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -37,7 +35,10 @@ def generate_slope_percentage_data(self, state, district, block, gee_account_id)
     raster = slope_percentage_raster.clip(roi.geometry())
 
     # Generate raster Layer
-    slope_percentage_raster_generation(state, district, block, description, roi, raster)
+    layer_status = slope_percentage_raster_generation(
+        state, district, block, description, roi, raster
+    )
+    return layer_status
 
 
 def slope_percentage_raster_generation(
@@ -58,6 +59,8 @@ def slope_percentage_raster_generation(
         print("slope percentage task_id list", slope_percentage_task_id_list)
 
     """ Sync image to google cloud storage and then to geoserver"""
+    layer_id = None
+    layer_at_geoserver = False
     if is_gee_asset_exists(raster_asset_id):
         image = ee.Image(raster_asset_id)
         task_id = sync_raster_to_gcs(image, 30, description + "_raster")
@@ -65,7 +68,7 @@ def slope_percentage_raster_generation(
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
 
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
@@ -80,4 +83,8 @@ def slope_percentage_raster_generation(
             description + "_raster",
             "slope_percentage",
         )
-    return False
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver

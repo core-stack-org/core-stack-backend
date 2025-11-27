@@ -2,9 +2,7 @@ import ee
 
 from constants.pan_india_path import PAN_INDIA_SO
 from nrm_app.celery import app
-from computing.utils import (
-    save_layer_info_to_db,
-)
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from projects.models import Project
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -107,6 +105,8 @@ def stream_order_raster_generation(
         stream_order_task_id_list = check_task_status([task_id])
         print("steam order task_id list", stream_order_task_id_list)
 
+    layer_id = None
+    layer_at_geoserver = False
     if is_gee_asset_exists(raster_asset_id):
         """Sync image to google cloud storage and then to geoserver"""
         image = ee.Image(raster_asset_id)
@@ -115,7 +115,7 @@ def stream_order_raster_generation(
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
         if state and district and block:
-            save_layer_info_to_db(
+            layer_id = save_layer_info_to_db(
                 state,
                 district,
                 block,
@@ -129,10 +129,14 @@ def stream_order_raster_generation(
             proj_obj = Project.objects.get(pk=proj_id)
             workspace_name = proj_obj.app_type
         make_asset_public(raster_asset_id)
-        sync_raster_gcs_to_geoserver(
+        res = sync_raster_gcs_to_geoserver(
             workspace_name,
             description + "_raster",
             description + "_raster",
             "stream_order",
         )
-    return False
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+            layer_at_geoserver = True
+    return layer_at_geoserver
