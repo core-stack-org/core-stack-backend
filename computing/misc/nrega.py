@@ -39,10 +39,10 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
     layer_name = (
-            "nrega_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        "nrega_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
     layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
     upload_shp_to_gee(layer_path, layer_name, asset_id, gee_account_id)
@@ -78,9 +78,9 @@ def clip_nrega_district_block(
 
     # If geometry is missing but lat/lon present, build Point geometry
     if (
-            "geometry" not in district_gdf.columns
-            and "lon" in district_gdf.columns
-            and "lat" in district_gdf.columns
+        "geometry" not in district_gdf.columns
+        and "lon" in district_gdf.columns
+        and "lat" in district_gdf.columns
     ):
         print("Creating geometry from lat/lon...")
         district_gdf["geometry"] = [
@@ -92,9 +92,9 @@ def clip_nrega_district_block(
 
     # If GeoJSON was loaded but has no geometry, create Point geometries from lat/lon
     if (
-            "geometry" not in district_gdf.columns
-            and "lon" in district_gdf.columns
-            and "lat" in district_gdf.columns
+        "geometry" not in district_gdf.columns
+        and "lon" in district_gdf.columns
+        and "lat" in district_gdf.columns
     ):
         district_gdf["geometry"] = [
             Point(xy) for xy in zip(district_gdf["lon"], district_gdf["lat"])
@@ -120,21 +120,21 @@ def clip_nrega_district_block(
             f"No matching boundary found for state={state_name}, district={district_name}, block={block_name}"
         )
         block_metadata_df = district_gdf.iloc[
-                            0:0
-                            ].copy()  # Empty dataframe with same schema
+            0:0
+        ].copy()  # Empty dataframe with same schema
 
     elif not district_gdf.empty and "geometry" in district_gdf.columns:
         block_metadata_df = district_gdf[district_gdf.geometry.within(block_bounds)]
         if block_metadata_df.empty:
             print("No NREGA assets found within the block boundary")
             block_metadata_df = district_gdf.iloc[
-                                0:0
-                                ].copy()  # Empty dataframe with same schema
+                0:0
+            ].copy()  # Empty dataframe with same schema
     else:
         print("Using empty dataframe due to missing data or geometry")
         block_metadata_df = district_gdf.iloc[
-                            0:0
-                            ].copy()  # Empty dataframe with same schema
+            0:0
+        ].copy()  # Empty dataframe with same schema
 
     # Apply unidecode to string columns
     string_columns = block_metadata_df.select_dtypes(
@@ -160,8 +160,8 @@ def clip_nrega_district_block(
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
 
     block_metadata_df = block_metadata_df.loc[
-                        :, ~block_metadata_df.columns.str.contains("^Unnamed")
-                        ]
+        :, ~block_metadata_df.columns.str.contains("^Unnamed")
+    ]
     block_metadata_df.columns = [
         col.strip().replace(" ", "_").replace(".", "_")
         for col in block_metadata_df.columns
@@ -169,10 +169,10 @@ def clip_nrega_district_block(
     block_metadata_df = block_metadata_df.replace({np.nan: None})
 
     description = (
-            "nrega_"
-            + valid_gee_text(district_name.lower())
-            + "_"
-            + valid_gee_text(block_name.lower())
+        "nrega_"
+        + valid_gee_text(district_name.lower())
+        + "_"
+        + valid_gee_text(block_name.lower())
     )
     asset_id = get_gee_asset_path(state_name, district_name, block_name) + description
 
@@ -191,18 +191,21 @@ def clip_nrega_district_block(
 
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
+        layer_name = f"{valid_gee_text(district_name.lower())}_{valid_gee_text(block_name.lower())}"
         layer_id = save_layer_info_to_db(
             state_name,
             district_name,
             block_name,
-            layer_name=f"{valid_gee_text(district_name.lower())}_{valid_gee_text(block_name.lower())}",
+            layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="NREGA Assets",
         )
         print("save nrega_assets layer info at the gee level...")
         make_asset_public(asset_id)
 
-        res = push_shape_to_geoserver(path, workspace="nrega_assets")
+        res = push_shape_to_geoserver(
+            path, workspace="nrega_assets", layer_name=layer_name
+        )
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_STAC_generated = False
