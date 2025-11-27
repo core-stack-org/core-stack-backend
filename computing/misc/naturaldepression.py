@@ -62,29 +62,30 @@ def natural_depression_raster_generation(
             )
             natural_depression_task_id_list = check_task_status([task_id])
             print("natural depression task_id list", natural_depression_task_id_list)
-
-            """ Sync image to google cloud storage and then to geoserver"""
-            image = ee.Image(raster_asset_id)
-            task_id = sync_raster_to_gcs(image, 30, description + "_raster")
-
-            task_id_list = check_task_status([task_id])
-            print("task_id_list sync to gcs ", task_id_list)
-
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=description + "_raster",
-                asset_id=raster_asset_id,
-                dataset_name="Natural Depression",
-            )
-            make_asset_public(raster_asset_id)
-            res = sync_raster_gcs_to_geoserver(
-                "natural_depression",
-                description + "_raster",
-                description + "_raster",
-                style_name="natural_depression",
-            )
         except Exception as e:
             print(f"Error occurred in running stream order: {e}")
+
+            """ Sync image to google cloud storage and then to geoserver"""
+    image = ee.Image(raster_asset_id)
+    task_id = sync_raster_to_gcs(image, 30, description + "_raster")
+
+    task_id_list = check_task_status([task_id])
+    print("task_id_list sync to gcs ", task_id_list)
+
+    save_layer_info_to_db(
+        state,
+        district,
+        block,
+        layer_name=description + "_raster",
+        asset_id=raster_asset_id,
+        dataset_name="Natural Depression",
+    )
+    make_asset_public(raster_asset_id)
+    res = sync_raster_gcs_to_geoserver(
+        "natural_depression",
+        description + "_raster",
+        description + "_raster",
+        style_name="natural_depression",
+    )
+
     return False

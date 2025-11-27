@@ -58,13 +58,6 @@ def tree_health_ccd_vector(
         task_id_list = check_task_status([task_id])
         print("task_id_list ", task_id_list)
 
-        year_asset_id = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + f"ccd_vector_{asset_suffix}_{year}"
-        )
-
         if is_gee_asset_exists(year_asset_id):
             yearly_assets.append(year_asset_id)
 

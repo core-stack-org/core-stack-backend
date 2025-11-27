@@ -4,6 +4,7 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -12,36 +13,52 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     make_asset_public,
+    get_gee_dir_path,
 )
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
-def tree_health_overall_change_vector(self, state, district, block, gee_account_id):
+def tree_health_overall_change_vector(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type="MWS",
+    gee_account_id=None,
+):
     ee_initialize(gee_account_id)
     print("Inside process tree_health_overall_change_vector")
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+    if state and district and block:
+        asset_suffix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
+
+        roi = ee.FeatureCollection(
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + "filtered_mws_"
+            + asset_suffix
+            + "_uid"
+        )
+
     description = (
-        "tree_health_overall_change_vector_"
+        "overall_change_vector_"
         + valid_gee_text(district)
         + "_"
         + valid_gee_text(block)
     )
-    task_list = [
-        generate_vector(roi, state, district, block),
-    ]
+    asset_id, task_id = overall_change_vector(
+        roi, asset_folder_list, asset_suffix, app_type
+    )
+    task_id_list = check_task_status([task_id])
+    print("task_id_list ", task_id_list)
 
-    task_id_list = check_task_status(task_list)
-    print(task_id_list)
-
-    asset_id = get_gee_asset_path(state, district, block) + description
     # layer_id = None
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
@@ -49,7 +66,7 @@ def tree_health_overall_change_vector(self, state, district, block, gee_account_
             state,
             district,
             block,
-            f"tree_health_overall_change_vector_{district.lower()}_{block.lower()}",
+            f"overall_change_vector_{district.lower()}_{block.lower()}",
             asset_id,
             "Tree Overall Change Vector",
         )
@@ -70,7 +87,7 @@ def tree_health_overall_change_vector(self, state, district, block, gee_account_
     return layer_at_geoserver
 
 
-def generate_vector(roi, state, district, block):
+def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
 
     args = [
         {"value": 0, "label": "Deforestation"},
@@ -83,12 +100,11 @@ def generate_vector(roi, state, district, block):
     ]
 
     raster = ee.Image(
-        get_gee_asset_path(state, district, block)
-        + "tree_health_overall_change_raster_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )  # Change detection raster layer
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + f"overall_change_raster_{asset_suffix}"
+    )
 
     fc = roi
     for arg in args:
@@ -111,13 +127,12 @@ def generate_vector(roi, state, district, block):
 
     fc = ee.FeatureCollection(fc)
 
-    description = (
-        "tree_health_overall_change_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
+    description = f"overall_change_vector_{asset_suffix}"
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
-    task = export_vector_asset_to_gee(
-        fc, description, get_gee_asset_path(state, district, block) + description
-    )
-    return task
+    task_id = export_vector_asset_to_gee(fc, description, asset_id)
+    return asset_id, task_id

@@ -5,6 +5,7 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -13,6 +14,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     make_asset_public,
+    get_gee_dir_path,
 )
 
 from computing.mws.evapotranspiration import merge_assets_chunked_on_year
@@ -20,38 +22,50 @@ from computing.mws.evapotranspiration import merge_assets_chunked_on_year
 
 @app.task(bind=True)
 def tree_health_ch_vector(
-    self, state, district, block, start_year, end_year, gee_account_id
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=None,
+    end_year=None,
+    app_type="MWS",
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+    if state and district and block:
+        asset_suffix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
+
+        roi = ee.FeatureCollection(
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + "filtered_mws_"
+            + asset_suffix
+            + "_uid"
+        )
 
     yearly_assets = []
-
     for year in range(start_year, end_year + 1):
         print(f"Processing year {year}")
 
-        task_list = generate_vector(roi, state, district, block, year)
-        task_id_list = check_task_status([task_list])
-        print("task_id_list ", task_id_list)
-
-        year_asset_id = (
-            get_gee_asset_path(state, district, block)
-            + f"tree_health_ch_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{year}"
+        year_asset_id, task_id = ch_vector(
+            roi, year, asset_folder_list, asset_suffix, app_type
         )
+        task_id_list = check_task_status([task_id])
+        print("task_id_list ", task_id_list)
 
         if is_gee_asset_exists(year_asset_id):
             yearly_assets.append(year_asset_id)
 
     description = (
-        "tree_health_ch_vector_"
+        "ch_vector_"
         + valid_gee_text(district)
         + "_"
         + valid_gee_text(block)
@@ -98,7 +112,7 @@ def tree_health_ch_vector(
     return layer_at_geoserver
 
 
-def generate_vector(roi, state, district, block, year):
+def ch_vector(roi, year, asset_folder_list, asset_suffix, app_type):
     """Generate vector data for a specific year based on raster data."""
 
     args = [
@@ -109,43 +123,50 @@ def generate_vector(roi, state, district, block, year):
     ]
 
     raster = ee.Image(
-        get_gee_asset_path(state, district, block)
-        + "tree_health_ch_raster_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_"
-        + str(year)
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + f"ch_raster_{asset_suffix}_{year}"
     )
+
+    lulc = ee.Image(
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
+        )
+        + f"{asset_suffix}_{year}-07-01_{year+1}-06-30_LULCmap_10m"
+    )
+
+    # Apply tree mask to the raster; Tree: class 6
+    tree_mask = lulc.eq(6)
+    raster = raster.updateMask(tree_mask)
 
     fc = roi
     for arg in args:
-        raster = raster.select(["ch_class"])
+        raster_ch = raster.select(["ch_class"])
         mask = raster.eq(ee.Number(arg["value"]))
         pixel_area = ee.Image.pixelArea()
         forest_area = pixel_area.updateMask(mask)
 
         fc = forest_area.reduceRegions(
-            collection=fc, reducer=ee.Reducer.sum(), scale=25, crs=raster.projection()
+            collection=fc,
+            reducer=ee.Reducer.sum(),
+            scale=25,
+            crs=raster_ch.projection(),
         )
 
         def process_feature(feature):
-            value = feature.get("sum")
-            value = ee.Number(value).multiply(0.0001)
-            column_name = f"{arg['label']}_{year}"
-            return feature.set(column_name, value)
+            area_val = ee.Number(feature.get("sum"))
+            area_ha = area_val.multiply(0.0001)  # m² to ha
+            return feature.set(f"{arg['label']}_{year}", area_ha)
 
         fc = fc.map(process_feature)
 
-    description = (
-        "tree_health_ch_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
-        + "_"
-        + str(year)
+    description = f"ch_vector_{asset_suffix}_{year}"
+    year_asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
-    task = export_vector_asset_to_gee(
-        fc, description, get_gee_asset_path(state, district, block) + description
-    )
-    return task
+    task_id = export_vector_asset_to_gee(fc, description, year_asset_id)
+    return year_asset_id, task_id
