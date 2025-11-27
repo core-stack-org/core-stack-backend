@@ -35,11 +35,12 @@ def clip_drainage_lines(
     app_type="MWS",
     proj_id=None,
 ):
+    print("started drainage line")
     ee_initialize(gee_account_id)
     pan_india_drainage = ee.FeatureCollection(
         GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )
-
+    description = f"drainage_lines_{asset_suffix}"
     if state and district and block:
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -53,15 +54,21 @@ def clip_drainage_lines(
             f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         )
         state_name = state
+        asset_id = get_gee_asset_path(state, district, block) + description
 
     else:
         proj_obj = Project.objects.get(pk=proj_id)
         state_name = proj_obj.name
         roi = ee.FeatureCollection(roi_path)
         state = proj_obj.name
+        asset_id = (
+            get_gee_dir_path(
+                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix
+        )
 
-    description = f"drainage_lines_{asset_suffix}"
-    asset_id = get_gee_asset_path(state, district, block) + description
+    print(asset_id)
     clipped_drainage = pan_india_drainage.filterBounds(roi.geometry())
 
     task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
