@@ -55,7 +55,9 @@ def calculate_drought(
             + "_uid"
         )
 
-    dst_filename = asset_suffix + "_" + str(start_year) + "_" + str(end_year)
+    dst_filename = (
+        "drought_" + asset_suffix + "_" + str(start_year) + "_" + str(end_year)
+    )
 
     asset_id = (
         get_gee_dir_path(

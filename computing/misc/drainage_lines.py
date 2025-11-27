@@ -39,7 +39,7 @@ def clip_drainage_lines(
     pan_india_drainage = ee.FeatureCollection(
         GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )
-    workspacename = "drainage"
+
     if state and district and block:
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -49,31 +49,22 @@ def clip_drainage_lines(
             + valid_gee_text(block.lower())
             + "_uid"
         )
-        asset_suffix = f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        asset_id = get_gee_asset_path(state, district, block) + asset_suffix
-        layer_name = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower()),
+        asset_suffix = (
+            f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         )
-
         state_name = state
 
     else:
         proj_obj = Project.objects.get(pk=proj_id)
         state_name = proj_obj.name
         roi = ee.FeatureCollection(roi_path)
-
-        asset_id = gee_asset_path = (
-            get_gee_dir_path(
-                asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + asset_suffix
-        )
-        layer_name = valid_gee_text(proj_obj.name.lower()) + "_" + str(proj_obj.id)
-
         state = proj_obj.name
+
+    description = f"drainage_lines_{asset_suffix}"
+    asset_id = get_gee_asset_path(state, district, block) + description
     clipped_drainage = pan_india_drainage.filterBounds(roi.geometry())
 
-    task = export_vector_asset_to_gee(clipped_drainage, asset_suffix, asset_id)
+    task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
 
     task_id_list = check_task_status([task])
     print("task_id_list", task_id_list)
@@ -85,7 +76,7 @@ def clip_drainage_lines(
                 state,
                 district,
                 block,
-                layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+                layer_name=asset_suffix,
                 asset_id=asset_id,
                 dataset_name="Drainage",
             )
@@ -93,7 +84,7 @@ def clip_drainage_lines(
         try:
             # Load feature collection from Earth Engine
             fc = ee.FeatureCollection(asset_id)
-            res = sync_fc_to_geoserver(fc, state_name, layer_name, workspacename)
+            res = sync_fc_to_geoserver(fc, state_name, asset_suffix, "drainage")
             print("Drainage line synced to geoserver:", res)
             if res["status_code"] == 201 and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)

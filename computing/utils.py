@@ -60,9 +60,12 @@ def convert_to_zip(dir_name, file_type):
         return shutil.make_archive(dir_name, "zip", dir_name + "/")
 
 
-def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="shp"):
+def push_shape_to_geoserver(
+    path, store_name=None, workspace=None, layer_name=None, file_type="shp"
+):
     geo = Geoserver()
-
+    if layer_name:
+        geo.delete_vector_store(workspace=workspace, store=layer_name)
     zip_path = convert_to_zip(path, file_type)
     print(path)
     print(store_name)
@@ -73,9 +76,10 @@ def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="sh
         workspace=workspace,
         file_extension=file_type,
     )
-    # if response["status_code"] in [200, 201, 202]:
-    #     os.remove(zip_path)
-    #     shutil.rmtree(shape_path_dir)
+    if response["status_code"] in [200, 201, 202]:
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)
     return response
 
 
@@ -141,7 +145,7 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
     return push_shape_to_geoserver(path, workspace=workspace)
 
 
-def sync_fc_to_geoserver(fc, state_name=None, layer_name=None, workspace=None):
+def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None):
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -150,9 +154,9 @@ def sync_fc_to_geoserver(fc, state_name=None, layer_name=None, workspace=None):
         check_task_status([task_id])
 
         geojson_fc = get_geojson_from_gcs(layer_name)
-
+    geo = Geoserver()
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", state_name)
+        state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
             os.mkdir(state_dir)
         path = os.path.join(state_dir, f"{layer_name}")
@@ -167,23 +171,15 @@ def sync_fc_to_geoserver(fc, state_name=None, layer_name=None, workspace=None):
 
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
-
-        return push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
-        # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
-        #
-        # state_dir = os.path.join("data/fc_to_shape", state_name)
-        # if not os.path.exists(state_dir):
-        #     os.mkdir(state_dir)
-        # path = os.path.join(state_dir, f"{layer_name}")
-        # # Write the feature collection into json file
-        # with open(path + ".json", "w") as f:
-        #     try:
-        #         f.write(f"{json.dumps(new_fc)}")
-        #     except Exception as e:
-        #         print(e)
-        #
-        # path = generate_shape_files(path)
-        # return push_shape_to_geoserver(path, workspace=workspace)
+        res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        if style_name:
+            style_res = geo.publish_style(
+                layer_name=layer_name, style_name=style_name, workspace=workspace
+            )
+            print("Style response:", style_res)
+        return res
+    else:
+        return "No features in FeatureCollection"
 
 
 def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
