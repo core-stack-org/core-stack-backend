@@ -26,6 +26,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, FileUploadParser]
     # For the HasProjectPermission to work correctly
     app_type = AppType.WATERBODY_REJ
+    schema = None
 
     def get_queryset(self):
         """Filter Excel files by project"""
