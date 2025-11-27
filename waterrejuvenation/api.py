@@ -16,6 +16,7 @@ from drf_yasg.utils import swagger_auto_schema
 
 # @swagger_auto_schema(**admin_by_latlon_schema)
 @api_security_check(auth_type="Auth_free")
+@schema(None)
 def get_waterbodies_by_admin_and_uid(request):
     """
     Retrieve merged waterbody + ZOI data for a given administrative area.
@@ -71,7 +72,10 @@ def get_waterbodies_by_admin_and_uid(request):
             except Exception as e:
                 print(f"Error generating merged data: {e}")
                 return Response(
-                    {"status": "error", "message": "Failed to generate merged dataset."},
+                    {
+                        "status": "error",
+                        "message": "Failed to generate merged dataset.",
+                    },
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
@@ -118,4 +122,3 @@ def get_waterbodies_by_admin_and_uid(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
