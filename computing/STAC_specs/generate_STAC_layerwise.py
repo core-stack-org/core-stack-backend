@@ -131,7 +131,8 @@ def generate_raster_url(
         f"{geoserver_base_url}/{workspace}/wcs?"
         f"service=WCS&version=2.0.1&request=GetCoverage&"
         f"CoverageId={workspace}:{layer_name}&"
-        f"format={output_format}&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
+        f"format={output_format}"
+        # f"format={output_format}&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
     )
     print("Raster URL:", wcs_url)
     return wcs_url
@@ -166,11 +167,14 @@ def read_raster_data(raster_url):
                 [bounds.right, bounds.bottom],
             ]
         )
-        # data = r.read(1)  # TODO: wouldn't work if there are multiple bands
+        data = r.read(1)  # TODO: wouldn't work if there are multiple bands
         # read a downsampled version for thumbnail
-        thumbnail_size = 256  # pixels
-        scale_x = r.width / thumbnail_size
-        scale_y = r.height / thumbnail_size
+
+        # thumbnail_size = 256  # pixels
+        # scale_x = r.width / thumbnail_size
+        # scale_y = r.height / thumbnail_size
+
+        # data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
 
         data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
         # id = os.path.basename(raster_url) #works when data is local
@@ -544,9 +548,9 @@ def generate_raster_item(
         start_year=start_year,
         #    end_year=end_year
     )
-    print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    print(f"geoserver_layer_name={geoserver_layer_name}")
-    print(f"style file url = {style_file_url}")
+    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    # print(f"geoserver_layer_name={geoserver_layer_name}")
+    # print(f"style file url = {style_file_url}")
 
     # 3. generate geoserver url
     geoserver_url = generate_raster_url(
@@ -1357,9 +1361,9 @@ def generate_vector_item(
         #    end_year=end_year
     )
 
-    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    # print(f"geoserver_layer_name={geoserver_layer_name}")
-    # print(f"style file url = {style_file_url}")
+    print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    print(f"geoserver_layer_name={geoserver_layer_name}")
+    print(f"style file url = {style_file_url}")
 
     # 3. generate geoserver url
     geoserver_url = generate_vector_url(
@@ -1367,7 +1371,7 @@ def generate_vector_item(
         layer_name=geoserver_layer_name,
         geoserver_base_url=GEOSERVER_BASE_URL,
     )
-    # print(f"geoserver url={geoserver_url}")
+    print(f"geoserver url={geoserver_url}")
 
     # 4. create vector item
     layer_title = layer_display_name
@@ -1530,9 +1534,9 @@ def generate_vector_stac(
         district = valid_gee_text(district.lower())
         block = valid_gee_text(block.lower())
 
-        # print("state=",state)
-        # print("district=",district)
-        # print("block=",block)
+        print("state=", state)
+        print("district=", district)
+        print("block=", block)
 
         vector_item = generate_vector_item(
             state,
