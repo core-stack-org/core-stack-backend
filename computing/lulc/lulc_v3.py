@@ -1,8 +1,10 @@
 import datetime
+import time
 from datetime import timedelta
 import ee
 from dateutil.relativedelta import relativedelta
 
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -13,57 +15,100 @@ from utilities.gee_utils import (
     make_asset_public,
     export_raster_asset_to_gee,
     is_gee_asset_exists,
+    get_gee_dir_path,
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
 from .misc import clip_lulc_from_river_basin
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import (
+    save_layer_info_to_db,
+    update_layer_sync_status,
+    get_layer_object,
+)
 
 from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
-def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account_id):
+def clip_lulc_v3(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
+    gee_account_id=None,
+    roi_path=None,
+    asset_folder=None,
+    asset_suffix=None,
+    app_type="MWS",
+):
     ee_initialize(gee_account_id)
     print("Inside lulc_river_basin")
-    roi = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    ).union()
+    start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
 
-    start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
+    if state and district and block:
+        roi = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        ).union()
 
-    filename_prefix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
+        filename_prefix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        gee_asset_path = get_gee_asset_path(state, district, block)
+    else:
+        roi = ee.FeatureCollection(roi_path).union()
 
+        filename_prefix = valid_gee_text(asset_suffix)
+
+        gee_asset_path = get_gee_dir_path(
+            asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
     loop_start = start_date
     loop_end = end_date
     l1_asset_new = []
     final_output_filename_array_new = []
     final_output_assetid_array_new = []
 
+    layer_obj = None
+    try:
+        layer_obj = get_layer_object(
+            state,
+            district,
+            block,
+            layer_name=f"LULC_17_18_{valid_gee_text(block.lower())}_level_3",
+            dataset_name="LULC_level_3",
+        )
+    except Exception as e:
+        print("DB layer not found for lulc.")
+
+    if layer_obj:
+        existing_end_year = int(layer_obj.misc["end_year"])
+        loop_start = str(existing_end_year) + "-07-01"
+
     scale = 10
+
+    loop_start = datetime.strptime(loop_start, "%Y-%m-%d")
+    loop_end = datetime.strptime(loop_end, "%Y-%m-%d")
     print(loop_start, loop_end)
 
-    while loop_start < loop_end:
-        curr_start_date = datetime.strptime(loop_start, "%Y-%m-%d")
+    while loop_start <= loop_end:
+        print("loop_start", loop_start)
+        curr_start_date = loop_start  # datetime.strptime(loop_start, "%Y-%m-%d")
         curr_end_date = curr_start_date + relativedelta(years=1) - timedelta(days=1)
 
-        loop_start = (curr_start_date + relativedelta(years=1)).strftime("%Y-%m-%d")
-
+        loop_start = curr_start_date + relativedelta(years=1)  # .strftime("%Y-%m-%d")
         curr_start_date = curr_start_date.strftime("%Y-%m-%d")
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
         curr_filename = filename_prefix + "_" + curr_start_date + "_" + curr_end_date
 
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
-        final_output_assetid = (
-            get_gee_asset_path(state, district, block) + final_output_filename
-        )
+        final_output_assetid = gee_asset_path + final_output_filename
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         river_basin = ee.FeatureCollection(
@@ -78,16 +123,22 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
     task_list = []
     geometry = roi.geometry()
     for i in range(0, len(l1_asset_new)):
-        if not is_gee_asset_exists(final_output_assetid_array_new[i]):
-            task_id = export_raster_asset_to_gee(
-                image=l1_asset_new[i].clip(geometry),
-                description=final_output_filename_array_new[i],
-                asset_id=final_output_assetid_array_new[i],
-                scale=scale,
-                region=geometry,
-                pyramiding_policy={"predicted_label": "mode"},
+        if is_gee_asset_exists(final_output_assetid_array_new[i]):
+            ee.data.copyAsset(
+                final_output_assetid_array_new[i],
+                f"{final_output_assetid_array_new[i]}_old",
             )
-            task_list.append(task_id)
+            time.sleep(10)
+            ee.data.deleteAsset(final_output_assetid_array_new[i])
+        task_id = export_raster_asset_to_gee(
+            image=l1_asset_new[i].clip(geometry),
+            description=final_output_filename_array_new[i],
+            asset_id=final_output_assetid_array_new[i],
+            scale=scale,
+            region=geometry,
+            pyramiding_policy={"predicted_label": "mode"},
+        )
+        task_list.append(task_id)
 
     task_id_list = check_task_status(task_list)
     print("LULC task_id_list", task_id_list)
@@ -99,31 +150,36 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]
         for workspace in lulc_workspaces:
-            suff = workspace.replace("LULC", "")
-            layer_name = (
-                "LULC_"
-                + s_year
-                + "_"
-                + e_year
-                + "_"
-                + valid_gee_text(block.lower())
-                + suff
-            )
-            if is_gee_asset_exists(final_output_assetid_array_new[i]):
-                layer_id = save_layer_info_to_db(
-                    state,
-                    district,
-                    block,
-                    layer_name=layer_name,
-                    asset_id=final_output_assetid_array_new[i],
-                    dataset_name=workspace,
-                    misc={
-                        "start_year": start_year,
-                        "end_year": end_year,
-                    },
+            if not roi_path:
+                suff = workspace.replace("LULC", "")
+                layer_name = (
+                    "LULC_"
+                    + s_year
+                    + "_"
+                    + e_year
+                    + "_"
+                    + valid_gee_text(block.lower())
+                    + suff
                 )
-                layer_ids.append(layer_id)
-                print("saved info to db at the gee level...")
+            else:
+                suff = workspace.replace("LULC", "")
+                layer_name = f"LULC_{s_year}_{e_year}_{asset_suffix}{suff}"
+            if is_gee_asset_exists(final_output_assetid_array_new[i]):
+                if state and district and block:
+                    layer_id = save_layer_info_to_db(
+                        state,
+                        district,
+                        block,
+                        layer_name=layer_name,
+                        asset_id=final_output_assetid_array_new[i],
+                        dataset_name=workspace,
+                        misc={
+                            "start_year": start_year,
+                            "end_year": end_year,
+                        },
+                    )
+                    layer_ids.append(layer_id)
+                    print("saved info to db at the gee level...")
                 make_asset_public(final_output_assetid_array_new[i])
 
     sync_lulc_to_gcs(
@@ -139,6 +195,7 @@ def clip_lulc_v3(self, state, district, block, start_year, end_year, gee_account
         district,
         block,
         layer_ids,
+        asset_suffix,
     )
 
     return layer_at_geoserver
@@ -164,10 +221,11 @@ def sync_lulc_to_gcs(
 def sync_lulc_to_geoserver(
     final_output_filename_array_new,
     l1_asset_new,
-    state_name,
-    district_name,
-    block_name,
-    layer_ids,
+    state_name=None,
+    district_name=None,
+    block_name=None,
+    layer_ids=None,
+    asset_suffix=None,
 ):
     print("Syncing lulc to geoserver")
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
@@ -183,15 +241,19 @@ def sync_lulc_to_geoserver(
         for workspace in lulc_workspaces:
             suff = workspace.replace("LULC", "")
             style = workspace.lower() + "_style"
-            layer_name = (
-                "LULC_"
-                + s_year
-                + "_"
-                + e_year
-                + "_"
-                + valid_gee_text(block_name.lower())
-                + suff
-            )
+            if block_name:
+                layer_name = (
+                    "LULC_"
+                    + s_year
+                    + "_"
+                    + e_year
+                    + "_"
+                    + valid_gee_text(block_name.lower())
+                    + suff
+                )
+            else:
+                layer_name = f"LULC_{s_year}_{e_year}_{asset_suffix}_{suff}"
+
             res = sync_raster_gcs_to_geoserver(
                 workspace, gcs_file_name, layer_name, style
             )
@@ -203,14 +265,17 @@ def sync_lulc_to_geoserver(
                     start_year_STAC = "20" + str(
                         s_year
                     )  # TODO: these are temp fixes, based on current implementations of the pipelines
-                    layer_STAC_generated = False
-                    layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                        state=state_name,
-                        district=district_name,
-                        block=block_name,
-                        layer_name="land_use_land_cover_raster",
-                        start_year=str(start_year_STAC),
-                    )
+                    if state_name and block_name and district_name:
+                        layer_STAC_generated = False
+                        layer_STAC_generated = (
+                            generate_STAC_layerwise.generate_raster_stac(
+                                state=state_name,
+                                district=district_name,
+                                block=block_name,
+                                layer_name="land_use_land_cover_raster",
+                                start_year=str(start_year_STAC),
+                            )
+                        )
                     update_layer_sync_status(
                         layer_id=layer_ids[i],
                         is_stac_specs_generated=layer_STAC_generated,

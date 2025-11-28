@@ -3,6 +3,7 @@ from django.dispatch import receiver
 from .models import Organization
 
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
 from nrm_app.settings import BASE_URL
 from geoadmin.tasks import send_email, send_email_notification
@@ -10,7 +11,7 @@ from geoadmin.tasks import send_email, send_email_notification
 
 @receiver(post_save, sender=Organization)
 def send_email_on_org_creation(sender, instance, created, **kwargs):
-    print ("singla trigger")
+    print("singla trigger")
     if created:  # True only when a new org is created
         subject = f"New Organization Created: {instance.name}"
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
@@ -20,7 +21,7 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
         )
 
         print("super user emai")
-        print (superuser_emails)
+        print(superuser_emails)
         message = f"""
         <html>
   <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; background-color: #f4f4f4; margin: 0; padding: 0;">

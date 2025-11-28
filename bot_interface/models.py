@@ -5,21 +5,23 @@ from bot_interface.interface.whatsapp import WhatsAppInterface
 import json
 
 APP_TYPE_CHOICES = [
-        ("WA", "WhatsApp"),
-        ("TG", "Telegram"),
-        ("FB", "Facebook"),
-    ]
-    
+    ("WA", "WhatsApp"),
+    ("TG", "Telegram"),
+    ("FB", "Facebook"),
+]
+
 LANGUAGE_CHOICES = [
     ("hi", "Hindi"),
     ("en", "English"),
     # Add more languages as needed
 ]
 
+
 class FactoryInterface:
     """
     Factory pattern implementation for creating appropriate interfaces based on app type.
     """
+
     @staticmethod
     def build_interface(app_type):
         """
@@ -89,7 +91,7 @@ class BotUsers(models.Model):
     class Meta:
         verbose_name_plural = "Bot Users"
         unique_together = ('user', 'bot')
-        
+
     def __str__(self):
         return f"{self.user.username} - {self.bot.bot_name}"
 
@@ -103,7 +105,7 @@ class UserSessions(models.Model):
         ("TG", "Telegram"),
         ("FB", "Facebook"),
     ]
-    
+
     RESPONSE_TYPE_CHOICES = [
         ("text", "Text"),
         ("button", "Button"),
@@ -112,7 +114,7 @@ class UserSessions(models.Model):
         ("contact", "Contact"),
         # Add more types as needed
     ]
-    
+
     app_type = models.CharField(max_length=2, choices=APP_TYPE_CHOICES)
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name="sessions")
     user = models.ForeignKey(BotUsers, on_delete=models.CASCADE, related_name="sessions")
@@ -128,7 +130,7 @@ class UserSessions(models.Model):
 
     class Meta:
         verbose_name_plural = "User Sessions"
-        
+
     def __str__(self):
         return f"{self.user.user.username} - {self.bot.bot_name} Session"
 
@@ -155,7 +157,7 @@ class UserLogs(models.Model):
 
     class Meta:
         verbose_name_plural = "User Logs"
-        
+
     def __str__(self):
         return f"{self.user.user.username} - {self.bot.bot_name} Log {self.id}"
 

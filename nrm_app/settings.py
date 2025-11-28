@@ -34,6 +34,9 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")
 
+# TMP File location
+TMP_LOCATION = env("TMP_LOCATION")
+
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 ODK_PASSWORD = env("ODK_PASSWORD")
@@ -59,7 +62,7 @@ ALLOWED_HOSTS = [
     "0.0.0.0",
     "api-doc.core-stack.org",
     "0cb52a0325c7.ngrok-free.app",
-    "odk.core-stack.org"
+    "odk.core-stack.org",
 ]
 
 # MARK: Django Apps
@@ -93,6 +96,7 @@ INSTALLED_APPS = [
     "community_engagement",
     "bot_interface",
     "gee_computing",
+    "waterrejuvenation",
 ]
 
 # MARK: CORS Settings
@@ -116,7 +120,6 @@ else:
         "http://localhost:3000",
         "http://localhost:3001",
     ]
-
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -186,6 +189,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
 ]
 
 ROOT_URLCONF = "nrm_app.urls"
@@ -273,7 +277,6 @@ EXCEL_PATH = env("EXCEL_PATH")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,  # keep Django's default loggers
@@ -318,7 +321,6 @@ LOGGING = {
     },
 }
 
-
 # MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
 
@@ -348,7 +350,7 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 
-#S3 access keys
+# S3 access keys
 S3_SECRET_KEY = env("S3_SECRET_KEY")
 S3_ACCESS_KEY = env("S3_ACCESS_KEY")
 
@@ -368,3 +370,15 @@ BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
 
 FERNET_KEY = env("FERNET_KEY")
+
+
+lulc_years = [
+    "2017_2018",
+    "2018_2019",
+    "2019_2020",
+    "2020_2021",
+    "2021_2022",
+    "2022_2023",
+    "2023_2024",
+]
+water_classes = [2, 3, 4]

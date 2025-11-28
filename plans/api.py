@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 
-from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC
+from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC, TMP_LOCATION
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.constants import (
@@ -88,7 +88,7 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = "/tmp/" + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
 
     odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
 
@@ -136,7 +136,7 @@ def add_works(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = "/tmp/" + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = TMP_LOCATION + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
 
     odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
 
@@ -245,7 +245,7 @@ def _get_feedback_config() -> Dict[str, Dict[str, Any]]:
 
 
 def _validate_sync_request(
-    request, resource_type: str = None, work_type: str = None, feedback_type: str = None
+        request, resource_type: str = None, work_type: str = None, feedback_type: str = None
 ) -> Optional[Response]:
     """Validate the sync request parameters and content type."""
 
@@ -301,7 +301,7 @@ def _validate_sync_request(
 
 
 def _sync_to_odk(
-    xml_string: str, config: Dict[str, Any], bearer_token: str
+        xml_string: str, config: Dict[str, Any], bearer_token: str
 ) -> Response:
     """Handle the actual sync to ODK for a specific resource or work type."""
     try:

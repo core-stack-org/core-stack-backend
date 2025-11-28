@@ -1,15 +1,26 @@
 import os
+
 import geopandas as gpd
 import fiona
+import copy
 
+from computing.models import Layer, Dataset
+from geoadmin.models import (
+    TehsilSOI,
+    DistrictSOI,
+    StateSOI,
+    State_Disritct_Block_Properties,
+)
+from projects.models import Project
 from utilities.gee_utils import (
     ee_initialize,
     sync_vector_to_gcs,
     check_task_status,
     get_geojson_from_gcs,
     is_gee_asset_exists,
+    valid_gee_text,
+    get_gee_asset_path,
     get_gee_dir_path,
-    export_vector_asset_to_gee,
     is_asset_public,
 )
 from utilities.geoserver_utils import Geoserver
@@ -19,14 +30,14 @@ from utilities.constants import (
     SHAPEFILE_DIR,
     GEE_HELPER_PATH,
     GEE_ASSET_PATH,
+    GEE_PATHS,
 )
 import ee
 import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
-from computing.models import Dataset, Layer, LayerType
-from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
+from datetime import datetime, timedelta
 
 
 def generate_shape_files(path):
@@ -49,11 +60,16 @@ def convert_to_zip(dir_name, file_type):
         return shutil.make_archive(dir_name, "zip", dir_name + "/")
 
 
-def push_shape_to_geoserver(path, store_name=None, workspace=None, file_type="shp"):
+def push_shape_to_geoserver(
+    path, store_name=None, workspace=None, layer_name=None, file_type="shp"
+):
     geo = Geoserver()
-
+    if layer_name:
+        geo.delete_vector_store(workspace=workspace, store=layer_name)
     zip_path = convert_to_zip(path, file_type)
-
+    print(path)
+    print(store_name)
+    print(workspace)
     response = geo.create_shp_datastore(
         path=zip_path,
         store_name=store_name,
@@ -113,9 +129,8 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
     os.remove(shapefile_layer_path + ".zip")
 
 
-def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
-    geo = Geoserver()
-    state_dir = os.path.join("data/fc_to_shape", shp_folder)
+def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
+    state_dir = os.path.join("data/fc_to_shape", state_name)
     if not os.path.exists(state_dir):
         os.mkdir(state_dir)
     path = os.path.join(state_dir, f"{layer_name}")
@@ -125,7 +140,7 @@ def sync_layer_to_geoserver(shp_folder, fc, layer_name, workspace):
             f.write(f"{json.dumps(fc)}")
         except Exception as e:
             print(e)
-    geo.delete_vector_store(workspace=workspace, store=layer_name)
+
     path = generate_shape_files(path)
     return push_shape_to_geoserver(path, workspace=workspace)
 
@@ -140,7 +155,6 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
         geojson_fc = get_geojson_from_gcs(layer_name)
     geo = Geoserver()
-    geo.delete_vector_store(workspace=workspace, store=layer_name)
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
@@ -157,7 +171,6 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
-
         res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
         if style_name:
             style_res = geo.publish_style(
@@ -167,21 +180,42 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         return res
     else:
         return "No features in FeatureCollection"
-        # new_fc = {"features": geojson_fc["features"], "type": geojson_fc["type"]}
-        #
-        # state_dir = os.path.join("data/fc_to_shape", state_name)
-        # if not os.path.exists(state_dir):
-        #     os.mkdir(state_dir)
-        # path = os.path.join(state_dir, f"{layer_name}")
-        # # Write the feature collection into json file
-        # with open(path + ".json", "w") as f:
-        #     try:
-        #         f.write(f"{json.dumps(new_fc)}")
-        #     except Exception as e:
-        #         print(e)
-        #
-        # path = generate_shape_files(path)
-        # return push_shape_to_geoserver(path, workspace=workspace)
+
+
+def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
+    print("inside")
+    try:
+        geojson_fc = fc.getInfo()
+    except Exception as e:
+        print("Exception in getInfo()", e)
+        task_id = sync_vector_to_gcs(fc, layer_name, "GeoJSON")
+        check_task_status([task_id])
+
+        geojson_fc = get_geojson_from_gcs(layer_name)
+
+    if len(geojson_fc["features"]) > 0:
+        state_dir = os.path.join("data/fc_to_shape", project_name)
+        if not os.path.exists(state_dir):
+            os.mkdir(state_dir)
+        path = os.path.join(state_dir, f"{layer_name}")
+
+        # Convert to GeoDataFrame
+        gdf = gpd.GeoDataFrame.from_features(geojson_fc["features"])
+
+        # Set CRS (Earth Engine uses EPSG:4326 by default)
+        gdf.crs = "EPSG:4326"
+
+        gdf = fix_invalid_geometry_in_gdf(gdf)
+
+        # Save as GeoPackage
+        gdf.to_file(path + ".gpkg", driver="GPKG")
+        print("pushed to geoserver")
+        return push_shape_to_geoserver(
+            path, workspace, workspace=workspace, file_type="gpkg"
+        )
+    else:
+        print("no features found")
+        return
 
 
 def to_camelcase(text):
@@ -236,8 +270,21 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
-    task_id = export_vector_asset_to_gee(asset, description, asset_id)
-    return task_id
+    try:
+        # Export an ee.FeatureCollection as an Earth Engine asset.
+        task = ee.batch.Export.table.toAsset(
+            **{
+                "collection": asset,
+                "description": description,
+                "assetId": asset_id,
+            }
+        )
+
+        task.start()
+        print("Successfully started the merge chunk", task.status())
+        return task.status()["id"]
+    except Exception as e:
+        print(f"Error occurred in running merge task: {e}")
 
 
 def fix_invalid_geometry_in_gdf(gdf):
@@ -251,6 +298,180 @@ def fix_invalid_geometry_in_gdf(gdf):
     return gdf
 
 
+def get_season_key(date):
+    """Return season key like 'rabi_2017-2018' based on Indian cropping seasons."""
+    month = date.month
+    year = date.year
+    next_year = year + 1
+
+    if month in [1, 2]:
+        return f"rabi_{year - 1}-{year}"  # Jan–Feb → Rabi of previous year
+    elif month in [11, 12]:
+        return f"rabi_{year}-{next_year}"  # Nov–Dec → Rabi starting this year
+    elif month in [3, 4, 5, 6]:
+        return f"zaid_{year}-{next_year}"
+    elif month in [7, 8, 9, 10]:
+        return f"kharif_{year}-{next_year}"
+    else:
+        return None
+
+
+def get_agri_year_key(season_key):
+    """Convert a season key to agricultural year key (e.g., rabi_2017-2018 → 2017-2018)."""
+    season, years = season_key.split("_")
+    start_year, end_year = map(int, years.split("-"))
+
+    if season in ["kharif", "rabi"]:
+        return f"{start_year}-{end_year}"
+    elif season == "zaid":
+        return f"{start_year - 1}-{start_year}"  # Zaid 2018-2019 → Agri year 2017-2018
+    else:
+        return None
+
+
+def calculate_precipitation_season(
+    geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
+):
+
+    # Load the GeoJSON file
+    with open(geojson_filepath, "r") as f:
+        feature_collection = json.load(f)
+
+    features_ee = []
+
+    for feature in feature_collection["features"]:
+        original_props = feature["properties"]
+        new_props = {}
+
+        # Copy UID if available
+        if "uid" in original_props:
+            new_props["uid"] = original_props["uid"]
+
+        agri_year_totals = {}
+
+        for key, val in original_props.items():
+            try:
+                date = datetime.strptime(key, "%Y-%m-%d")
+                season_key = get_season_key(date)
+                if not season_key:
+                    continue
+
+                agri_key = get_agri_year_key(season_key)
+                if not agri_key:
+                    continue
+
+                # Filter by agri year range
+                agri_start = int(agri_key.split("-")[0])
+                if not (start_year <= agri_start <= end_year):
+                    continue
+
+                season = season_key.split("_")[0]  # e.g., 'kharif'
+                full_key = f"{season}_{agri_key}"  # e.g., '2017-2018_kharif'
+
+                agri_year_totals[full_key] = agri_year_totals.get(full_key, 0) + float(
+                    val
+                )
+
+            except Exception:
+                continue  # Skip bad keys/values
+
+        # Add precipitation totals per agri year and season
+        for agri_key, total in agri_year_totals.items():
+            new_props[f"precipitation_{agri_key}"] = total
+
+        # Optional debug
+        print(new_props)
+
+        # Create Earth Engine Feature
+        geom_ee = ee.Geometry(feature["geometry"])
+        feature_ee = ee.Feature(geom_ee, new_props)
+        features_ee.append(feature_ee)
+    mws_fc = ee.FeatureCollection(features_ee)
+    draught_fc = ee.FeatureCollection(draught_asset_id)
+
+    # Define spatial filter (intersects)
+    spatial_filter = ee.Filter.intersects(
+        leftField=".geo",  # geometry field of left collection
+        rightField=".geo",
+        maxError=1,
+    )
+
+    # Define the join
+    join = ee.Join.inner()
+
+    # Apply the join
+    joined = join.apply(mws_fc, draught_fc, spatial_filter)
+
+    # Convert joined result into a proper FeatureCollection
+    # by merging properties from both
+    def merge_features(feature):
+        left = ee.Feature(feature.get("primary"))
+        right = ee.Feature(feature.get("secondary"))
+        return left.copyProperties(right)
+
+    final_fc = ee.FeatureCollection(joined.map(merge_features))
+    return final_fc
+
+
+def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
+    # Load project
+    proj_obj = Project.objects.get(pk=proj_id)
+
+    # Build CI and NDVI asset paths
+    asset_path_ci = (
+        get_gee_dir_path(
+            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + ci_asset
+    )
+
+    asset_path_ndvi = (
+        get_gee_dir_path(
+            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + ndvi_asset
+    )
+
+    # Load FeatureCollections
+    zoi = ee.FeatureCollection(zoi_asset)
+    ci = ee.FeatureCollection(asset_path_ci)
+    ndvi = ee.FeatureCollection(asset_path_ndvi)
+
+    # -------------------------
+    # STEP 1: Join ZOI with Cropping Intensity
+    # -------------------------
+    join = ee.Join.inner()
+    filter = ee.Filter.intersects(leftField=".geo", rightField=".geo")
+    zoi_ci_joined = join.apply(zoi, ci, filter)
+
+    def merge_zoi_ci(pair):
+        zoi_feat = ee.Feature(pair.get("primary"))
+        ci_feat = ee.Feature(pair.get("secondary"))
+        merged_props = zoi_feat.toDictionary().combine(ci_feat.toDictionary(), True)
+        return ee.Feature(zoi_feat.geometry(), merged_props)
+
+    zoi_with_ci = ee.FeatureCollection(zoi_ci_joined.map(merge_zoi_ci))
+
+    # -------------------------
+    # STEP 2: Join ZOI+CI with NDVI
+    # -------------------------
+    zoi_ndvi_joined = join.apply(zoi_with_ci, ndvi, filter)
+
+    def merge_zoi_ci_ndvi(pair):
+        ci_feat = ee.Feature(pair.get("primary"))
+        ndvi_feat = ee.Feature(pair.get("secondary"))
+        merged_props = ci_feat.toDictionary().combine(ndvi_feat.toDictionary(), True)
+        return ee.Feature(ci_feat.geometry(), merged_props)
+
+    final_merged = ee.FeatureCollection(zoi_ndvi_joined.map(merge_zoi_ci_ndvi))
+
+    # -------------------------
+    # STEP 3: Export or Push to GeoServer
+    # -------------------------
+    layer_name = f"WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}"
+    sync_project_fc_to_geoserver(final_merged, proj_obj.name, layer_name, "waterrej")
+
+
 def get_directory_size(path):
     total_size = 0
     for dirpath, dirnames, filenames in os.walk(path):
@@ -259,6 +480,133 @@ def get_directory_size(path):
             if os.path.isfile(file_path):
                 total_size += os.path.getsize(file_path)
     return total_size
+
+
+def generate_geojson_with_ci_ndvi_ndmi(
+    zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id
+):
+
+    # Load project
+    proj_obj = Project.objects.get(pk=proj_id)
+
+    zoi = ee.FeatureCollection(zoi_asset)
+    print("Number of features zoi:", zoi.size().getInfo())
+
+    ci = ee.FeatureCollection(ci_asset)
+    print("Number of features zoi:", ci.size().getInfo())
+    ndvi = ee.FeatureCollection(ndmi_asset)
+    print("Number of features zoi:", ndvi.size().getInfo())
+    ndmi = ee.FeatureCollection(ndmi_asset)
+    print("Number of features zoi:", ndmi.size().getInfo())
+
+    # -------------------------
+    # STEP 1: Join ZOI with CI
+    # -------------------------
+    join = ee.Join.inner()
+    filter = ee.Filter.intersects(leftField=".geo", rightField=".geo")
+    zoi_ci_joined = join.apply(zoi, ci, filter)
+
+    def merge_zoi_ci(pair):
+        zoi_feat = ee.Feature(pair.get("primary"))
+        ci_feat = ee.Feature(pair.get("secondary"))
+        merged_props = zoi_feat.toDictionary().combine(ci_feat.toDictionary(), True)
+        return ee.Feature(zoi_feat.geometry(), merged_props)  # ✅ keep ZOI geom
+
+    zoi_with_ci = ee.FeatureCollection(zoi_ci_joined.map(merge_zoi_ci))
+
+    # -------------------------
+    # STEP 2: Join with NDVI
+    # -------------------------
+    zoi_ndvi_joined = join.apply(zoi_with_ci, ndvi, filter)
+
+    def merge_zoi_ci_ndvi(pair):
+        prev_feat = ee.Feature(pair.get("primary"))
+        ndvi_feat = ee.Feature(pair.get("secondary"))
+        merged_props = prev_feat.toDictionary().combine(ndvi_feat.toDictionary(), True)
+        return ee.Feature(prev_feat.geometry(), merged_props)  # ✅ still ZOI geom
+
+    zoi_ci_ndvi = ee.FeatureCollection(zoi_ndvi_joined.map(merge_zoi_ci_ndvi))
+
+    # -------------------------
+    # STEP 3: Join with NDMI
+    # -------------------------
+    zoi_ndmi_joined = join.apply(zoi_ci_ndvi, ndmi, filter)
+
+    def merge_zoi_ci_ndvi_ndmi(pair):
+        prev_feat = ee.Feature(pair.get("primary"))
+        ndmi_feat = ee.Feature(pair.get("secondary"))
+        merged_props = prev_feat.toDictionary().combine(ndmi_feat.toDictionary(), True)
+        return ee.Feature(prev_feat.geometry(), merged_props)  # ✅ keep ZOI geom
+
+    final_merged = ee.FeatureCollection(zoi_ndmi_joined.map(merge_zoi_ci_ndvi_ndmi))
+
+    # -------------------------
+    # STEP 4: Export or Push to GeoServer
+    # -------------------------
+    layer_name = f"WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}"
+    print(layer_name)
+    sync_project_fc_to_geoserver(final_merged, proj_obj.name, layer_name, "waterrej")
+
+
+def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
+    # Load project
+    proj_obj = Project.objects.get(pk=proj_id)
+
+    # Initialize Earth Engine
+    ee_initialize(4)
+
+    # Load FeatureCollections
+    zoi = ee.FeatureCollection(zoi_asset)
+    ci = ee.FeatureCollection(ci_asset)
+    ndvi = ee.FeatureCollection(ndvi_asset)
+
+    print("ZOI:", zoi.size().getInfo())
+    print("CI:", ci.size().getInfo())
+    print("NDVI:", ndvi.size().getInfo())
+
+    # Common join logic on UID
+    join = ee.Join.inner()
+    uid_filter = ee.Filter.equals(leftField="UID", rightField="UID")
+
+    # --- Join ZOI + CI ---
+    zoi_ci_joined = join.apply(zoi, ci, uid_filter)
+
+    def merge_zoi_ci(pair):
+        zoi_feat = ee.Feature(pair.get("primary"))
+        ci_feat = ee.Feature(pair.get("secondary"))
+        merged_props = zoi_feat.toDictionary().combine(ci_feat.toDictionary(), True)
+        # Keep ZOI geometry only
+        return ee.Feature(zoi_feat.geometry(), merged_props)
+
+    zoi_with_ci = ee.FeatureCollection(zoi_ci_joined.map(merge_zoi_ci))
+
+    # --- Join with NDVI ---
+    zoi_ndvi_joined = join.apply(zoi_with_ci, ndvi, uid_filter)
+
+    def merge_with_ndvi(pair):
+        base_feat = ee.Feature(pair.get("primary"))
+        ndvi_feat = ee.Feature(pair.get("secondary"))
+        merged_props = base_feat.toDictionary().combine(ndvi_feat.toDictionary(), True)
+        # Always retain ZOI geometry
+        return ee.Feature(base_feat.geometry(), merged_props)
+
+    merged_final = ee.FeatureCollection(zoi_ndvi_joined.map(merge_with_ndvi))
+
+    # --- Ensure ZOI geometry retained in all features ---
+    merged_final = merged_final.map(
+        lambda f: ee.Feature(
+            f.setGeometry(
+                ee.Feature(
+                    zoi.filter(ee.Filter.eq("UID", f.get("UID"))).first()
+                ).geometry()
+            )
+        )
+    )
+
+    layer_name = f"WaterRejapp_zoi_{proj_obj.name}_{proj_obj.id}"
+    print(layer_name)
+
+    sync_project_fc_to_geoserver(merged_final, proj_obj.name, layer_name, "waterrej")
 
 
 def save_layer_info_to_db(
@@ -420,3 +768,127 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
         .first()
     )
     return layer_obj
+
+
+def update_dashboard_geojson(
+    state=None,
+    district=None,
+    block=None,
+    layer_name=None,
+    workspace_name=None,
+    proj_id=None,
+):
+    if state and block and block:
+        print(f"🔄 Updating GeoJSON for {state}, {district}, {block}")
+
+        # Get related objects
+        state_obj = StateSOI.objects.get(state_name=state)
+        district_obj = DistrictSOI.objects.get(district_name=district)
+        tehsil_obj = TehsilSOI.objects.get(tehsil_name=block)  # fixed typo
+
+        # Get or create main record
+        obj, created = State_Disritct_Block_Properties.objects.get_or_create(
+            state=state_obj, district=district_obj, tehsil=tehsil_obj
+        )
+    else:
+        obj = Project.objects.get(pk=proj_id)
+
+    # Map suffix to json_key
+    suffix_to_key = {
+        "wb": "wb_geojson",
+        "zoi": "zoi_geojson",
+        "mws": "mws_geojson",
+    }
+
+    # Detect which key this layer corresponds to
+    json_key = None
+    for suffix, key in suffix_to_key.items():
+        if layer_name == f"{state}_{district}_{block}_{suffix}":
+            json_key = key
+            break
+
+    if not json_key:
+        print(f"⚠️ Layer name {layer_name} did not match any known type.")
+        return
+
+    # Construct GeoServer URL
+    waterrej_url = (
+        f"https://geoserver.core-stack.org:8443/geoserver/waterrej/ows?"
+        f"service=WFS&version=1.0.0&request=GetFeature&typeName={workspace_name}:{layer_name}"
+        f"&outputFormat=application%2Fjson"
+    )
+
+    # Load existing dashboard_geojson or create new
+    if proj_id:
+        misc = obj.dashboard_geojson or {}
+    else:
+        misc = obj.geojson_path or {}
+
+    # Ensure waterrej section exists
+    if "waterrej" not in misc:
+        misc["waterrej"] = {}
+
+    # Update or add this specific json_key
+    misc["waterrej"][json_key] = waterrej_url
+
+    # Save the updated JSON field
+    obj.dashboard_geojson = misc
+    obj.save()
+
+    print(f"✅ Added/Updated {json_key} for {state}, {district}, {block}")
+
+
+def generate_swb_layer_with_max_so_catchment(
+    roi=None,
+    app_type="MWS",
+    asset_suffix=None,
+    asset_folder=None,
+    gee_account_id=None,
+):
+    ee_initialize(gee_account_id)
+    asset_suffix_so = "stream_order_" + asset_suffix + "_raster"
+    asset_suffix_ca = f"catchment_area_{asset_suffix}_raster"
+    asset_id_ca = (
+        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
+        + asset_suffix_ca
+    )
+    asset_id_so = (
+        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
+        + asset_suffix_so
+    )
+
+    # Load the raster image (must contain 'SR_B1' or your band)
+    catchemnt_area_raster = ee.Image(asset_id_ca)  # Replace with your image ID
+    catchment_band = catchemnt_area_raster.select(
+        "b1"
+    )  # Adjust based on the band you need
+    stream_order_raster = ee.Image(asset_id_so)
+    stream_order_band = stream_order_raster.select("b1")
+
+    # Function to compute max B1 inside each feature
+    def make_compute_max(so_band, cm_band, band_name="b1"):
+        def compute_max(feature):
+            max_val_so = so_band.reduceRegion(
+                reducer=ee.Reducer.max(),
+                geometry=feature.geometry(),
+                scale=30,
+                maxPixels=1e13,
+            ).get(band_name)
+
+            max_val_cm = cm_band.reduceRegion(
+                reducer=ee.Reducer.max(),
+                geometry=feature.geometry(),
+                scale=30,
+                maxPixels=1e13,
+            ).get(band_name)
+
+            return feature.set(
+                {"max_catchment_area": max_val_cm, "max_stream_order": max_val_so}
+            )
+
+        return compute_max
+
+    # Apply the function to each polygon in the collection
+    compute_max = make_compute_max(stream_order_band, catchment_band)
+    swb_with_max = roi.map(compute_max)
+    return swb_with_max

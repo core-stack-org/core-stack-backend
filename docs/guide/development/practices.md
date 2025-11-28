@@ -1,6 +1,7 @@
 # Python Coding Principles for CoRE Stack Backend
 
-This document outlines the best practices and principles for writing Python code in the Core Stack Backend Django application, focusing on maintainability, readability, and performance.
+This document outlines the best practices and principles for writing Python code in the Core Stack Backend Django
+application, focusing on maintainability, readability, and performance.
 
 ## Table of Contents
 
@@ -1621,7 +1622,8 @@ class WatershedPlanService:
 
 ## Conclusion
 
-These Python coding principles provide a comprehensive framework for writing maintainable, secure, and efficient code in the Core Stack Backend. By following these guidelines:
+These Python coding principles provide a comprehensive framework for writing maintainable, secure, and efficient code in
+the Core Stack Backend. By following these guidelines:
 
 1. **Consistency**: Code becomes more predictable and easier to understand
 2. **Maintainability**: Clear structure and documentation make future changes easier
@@ -1642,4 +1644,5 @@ These Python coding principles provide a comprehensive framework for writing mai
 - Implement security measures at every level
 - Use design patterns to solve common problems elegantly
 
-By adhering to these principles, the Core Stack Backend will remain a robust, maintainable, and secure application that can evolve with changing requirements while maintaining high code quality standards.
+By adhering to these principles, the Core Stack Backend will remain a robust, maintainable, and secure application that
+can evolve with changing requirements while maintaining high code quality standards.

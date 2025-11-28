@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from django.http import HttpRequest
 from rest_framework import status
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, schema
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 
@@ -288,6 +288,7 @@ def handle_media_upload(request, item, user, source, bot_id=None):
     tags=["Community Engagement APIs"],
 )
 @api_security_check(allowed_methods="POST", auth_type="Auth_free")
+@schema(None)
 @parser_classes([MultiPartParser, FormParser])
 def upsert_item(request):
     try:
@@ -475,6 +476,7 @@ def upsert_item(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["POST"])
+@schema(None)
 @auth_free
 @parser_classes([MultiPartParser, FormParser])
 def attach_media_to_item(request):
@@ -606,6 +608,7 @@ def attach_media_to_item(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_community_details(request):
     try:
@@ -721,6 +724,7 @@ def get_community_details(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_communities_by_location(request):
     try:
@@ -837,6 +841,7 @@ def get_communities_by_location(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_communities_by_lat_lon(request):
     try:
@@ -948,6 +953,7 @@ def get_communities_by_lat_lon(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_community_by_user(request):
     try:
@@ -1050,6 +1056,7 @@ def get_community_by_user(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["POST"])
+@schema(None)
 @auth_free
 @parser_classes([MultiPartParser, FormParser])
 def map_users_to_community(request):
@@ -1201,6 +1208,7 @@ def map_users_to_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["POST"])
+@schema(None)
 @auth_free
 @parser_classes([MultiPartParser, FormParser])
 def add_user_to_community(request):
@@ -1349,6 +1357,7 @@ def add_user_to_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["POST"])
+@schema(None)
 @auth_free
 def is_user_in_community(request):
     try:
@@ -1503,6 +1512,7 @@ def is_user_in_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_districts_with_community(request):
     try:
@@ -1629,6 +1639,7 @@ def get_districts_with_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_tehsils_with_community(request):
     try:
@@ -1724,6 +1735,7 @@ def get_tehsils_with_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["POST"])
+@schema(None)
 @auth_free
 def update_last_accessed_community(request):
     try:
@@ -1888,6 +1900,7 @@ def update_last_accessed_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_items_by_community(request):
     try:
@@ -2110,6 +2123,7 @@ def get_items_by_community(request):
     tags=["Community Engagement APIs"],
 )
 @api_view(["GET"])
+@schema(None)
 @auth_free
 def get_items_status(request):
     try:
@@ -2174,6 +2188,7 @@ def get_items_status(request):
 
 
 @api_view(["POST"])
+@schema(None)
 @auth_free
 def create_community(request):
     try:

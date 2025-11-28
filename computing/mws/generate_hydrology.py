@@ -27,18 +27,18 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def generate_hydrology(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    app_type="MWS",
-    start_year=None,
-    end_year=None,
-    is_annual=False,
-    gee_account_id=None,
+        self,
+        state=None,
+        district=None,
+        block=None,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        app_type="MWS",
+        start_year=None,
+        end_year=None,
+        is_annual=False,
+        gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
@@ -51,7 +51,7 @@ def generate_hydrology(
 
     if state and district and block:
         asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 

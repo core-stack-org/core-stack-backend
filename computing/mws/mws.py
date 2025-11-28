@@ -70,7 +70,6 @@ def mws_layer(self, state, district, block, gee_account_id):
         layer_generated = True
     return layer_generated
 
-
 # @app.task(bind=True)
 # def mws_layer(self, state, district, block):
 #     ee_initialize()

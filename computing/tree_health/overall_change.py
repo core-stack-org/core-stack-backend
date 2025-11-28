@@ -110,10 +110,10 @@ def tree_health_overall_change_raster(self, state, district, block, gee_account_
 
     # Sync image to Google Cloud Storage (GCS)
     layer_name = (
-        "tree_health_overall_change_raster_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+            "tree_health_overall_change_raster_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
     )
 
     if is_gee_asset_exists(asset_id):

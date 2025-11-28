@@ -1,50 +1,54 @@
-## CoRE Stack Backend 
+## CoRE Stack Backend
 
 ### Installation
 
-We provide a single installation script that handles everything:  
-- Installs **Miniconda** and sets up the Python environment  
-- Installs & configures **PostgreSQL**  
-- Installs & configures **Apache with mod_wsgi**  
-- Clones the backend repo and applies Django **migrations**  
-- Collects **static files**  
-- Sets up **logs** and **Apache config**  
+We provide a single installation script that handles everything:
+
+- Installs **Miniconda** and sets up the Python environment
+- Installs & configures **PostgreSQL**
+- Installs & configures **Apache with mod_wsgi**
+- Clones the backend repo and applies Django **migrations**
+- Collects **static files**
+- Sets up **logs** and **Apache config**
 
 #### Requirements
 
 Before starting, make sure you have the following installed on your system:
 
-- A **Linux-based operating system** (Ubuntu 20.04+ recommended)  
-- **Git** (to clone the repository)  
-- **Bash** (usually preinstalled on Linux)  
+- A **Linux-based operating system** (Ubuntu 20.04+ recommended)
+- **Git** (to clone the repository)
+- **Bash** (usually preinstalled on Linux)
 
 The installation script will handle the rest (Conda, PostgreSQL, Apache, etc.).
 
-
 #### 1. Clone the repository
+
 ```bash
 git clone https://github.com/core-stack-org/core-stack-backend.git
 cd core-stack-backend/installation
 ```
 
 #### 2. Run the installation script
+
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
-> The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run migrations, and configure Apache.
-
+> The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run
+> migrations, and configure Apache.
 
 #### 3. Open in Browser
+
 - API Docs: [http://localhost](http://localhost)
 - Django Admin: [http://localhost/admin/](http://localhost/admin/)
 
 ---
 
-### Script path 
+### Script path
+
 |    | Theme                    | Variable                        | Script path                                                           |
-| -- | ------------------------ | ------------------------------- | --------------------------------------------------------------------- |
+|----|--------------------------|---------------------------------|-----------------------------------------------------------------------|
 | 1  | Hydrology                | Microwatersheds                 | /computing/mws/mws.py                                                 |
 | 2  | Hydrology                | Precipitation                   | /computing/mws/precipitation.py                                       |
 | 3  | Hydrology                | Runoff                          | /computing/mws/run_off.py                                             |
@@ -77,8 +81,11 @@ chmod +x install.sh
 | 29 | Water structure planning | Stream order raster             | /computing/misc/stream_order.py                                       |
 | 30 | Water structure planning | CLART                           | /computing/clart/clart.py                                             |                                                                                                                    |
 
-### Integrating custom pipelines on CoREStack 
-We have prepared a [detailed guide](https://docs.google.com/document/d/1lfx2hJKndmzVp55ZHIIFYqRTz-8fZCWc9QikUDQpTN0/edit?usp=sharing) on how to integrate custom pipelines on the CoREStack backend. 
+### Integrating custom pipelines on CoREStack
+
+We have prepared
+a [detailed guide](https://docs.google.com/document/d/1lfx2hJKndmzVp55ZHIIFYqRTz-8fZCWc9QikUDQpTN0/edit?usp=sharing) on
+how to integrate custom pipelines on the CoREStack backend.
 
 ### Further references
 - [DB Design](https://github.com/core-stack-org/core-stack-backend/wiki/DB-Design) 

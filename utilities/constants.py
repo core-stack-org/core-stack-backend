@@ -42,7 +42,6 @@ ODK_URL_waterbody = (
 
 ODK_URL_crop = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/crop_form_V1.0.0.svc/Submissions"
 
-
 # Planning Forms
 ODK_URL_gw = (
     ODK_BASE_URL
@@ -154,7 +153,6 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
     + "/forms/nrm_agri_analysis_feedback_form_V1.0.0/submissions"
 )
 
-
 # MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
@@ -183,7 +181,8 @@ GEE_PATHS = {
     },
     "WATER_REJ": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/waterbody/",
-        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/waterbody/",
+        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "waterbody/",
+        "GEE_ASSET_FOLDER": "waterbody/",
     },
 }
 

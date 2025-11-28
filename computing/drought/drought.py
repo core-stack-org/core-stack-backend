@@ -28,7 +28,7 @@ def calculate_drought(
     state=None,
     district=None,
     block=None,
-    roi=None,
+    roi_path=None,
     asset_suffix=None,
     asset_folder_list=None,
     app_type="MWS",
@@ -36,7 +36,6 @@ def calculate_drought(
     end_year=None,
     gee_account_id=None,
 ):
-
     ee_initialize(gee_account_id)
 
     if state and district and block:
@@ -66,7 +65,7 @@ def calculate_drought(
         )
         + dst_filename
     )
-    roi = ee.FeatureCollection(roi)
+    roi = ee.FeatureCollection(roi_path)
     layer_name = asset_suffix + "_drought"
 
     if not is_gee_asset_exists(asset_id):

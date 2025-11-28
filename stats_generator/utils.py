@@ -10,8 +10,9 @@ from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
 import numpy as np
 from shapely.geometry import Point, shape
 from .models import LayerInfo
-
-# from shapely.geometry.base import BaseGeometry
+from django.http import HttpResponse
+from rest_framework import status
+from pathlib import Path
 
 
 def fetch_layers_for_excel_generation():
@@ -31,8 +32,7 @@ def get_url(workspace, layer_name):
     return geojson_url
 
 
-def get_vector_layer_geoserver(state, district, block):
-    """Fetch vector layer data from GeoServer and save it as an Excel file."""
+def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     print(f"Generate Stats excel for {state}_{district}_{block}")
     base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
     district_path = os.path.join(
@@ -41,10 +41,26 @@ def get_vector_layer_geoserver(state, district, block):
     os.makedirs(district_path, exist_ok=True)
     xlsx_file = os.path.join(district_path, f"{district}_{block}.xlsx")
 
+    workspaces_to_process = set(specific_sheets) if specific_sheets else None
+
+    # Handle existing sheets when adding specific workspaces
     results = []
-    with pd.ExcelWriter(xlsx_file, engine="openpyxl") as writer:
+    file_exists = os.path.exists(xlsx_file)
+    mode = "a" if file_exists else "w"
+
+    # Use append mode with if_sheet_exists='replace'
+    with pd.ExcelWriter(
+        xlsx_file,
+        engine="openpyxl",
+        mode=mode,
+        if_sheet_exists="replace" if mode == "a" else None,
+    ) as writer:
         for layer in fetch_layers_for_excel_generation():
             workspace = layer["workspace"]
+
+            if workspaces_to_process and workspace not in workspaces_to_process:
+                continue
+
             start_year = layer.get("start_year")
             end_year = layer.get("end_year")
 
@@ -64,7 +80,9 @@ def get_vector_layer_geoserver(state, district, block):
                 geojson_data = response.json()
             except requests.exceptions.RequestException as e:
                 print(f"Failed to fetch data for {layer_name}: {e}")
-                results.append({"layer": layer_name, "status": "failed"})
+                results.append(
+                    {"layer": layer_name, "status": "failed", "workspace": workspace}
+                )
                 continue
 
             # Process the data based on workspace
@@ -85,7 +103,6 @@ def get_vector_layer_geoserver(state, district, block):
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
             elif workspace == "nrega_assets":
-                mws_file_geojson = os.path.join(district_path, "mws_annual.geojson")
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                 mws_file_url = get_url("mws_layers", mws_lay_name)
 
@@ -111,10 +128,6 @@ def get_vector_layer_geoserver(state, district, block):
                     )
                 except Exception as e:
                     print("Exception as e", str(e))
-                # create_excel_mws_inters_villages(
-                #     mws_geojson_datas, xlsx_file, writer, district, block
-                # )
-                # create_excel_village_inters_mwss(mws_geojson_datas, xlsx_file, writer, district, block)
 
             elif workspace == "crop_intensity":
                 create_excel_crop_inten(
@@ -212,7 +225,9 @@ def get_vector_layer_geoserver(state, district, block):
             elif workspace == "mining":
                 create_excel_for_mining(geojson_data, writer)
 
-            results.append({"layer": layer_name, "status": "success"})
+            results.append(
+                {"layer": layer_name, "status": "success", "workspace": workspace}
+            )
 
     return results
 
@@ -233,6 +248,7 @@ def create_excel_for_mining(data, writer):
 
         df_data.append(row)
     df = pd.DataFrame(df_data)
+    df.replace("", "unknown", inplace=True)
     df = df.sort_values(["UID"])
     df.to_excel(writer, sheet_name="mining", index=False)
     print("Excel file created for mining")
@@ -430,8 +446,6 @@ def create_excel_for_aquifer(data, xlsx_file, writer):
                 max_percentage = percentage
                 max_aquifer = aquifer
 
-        # Set aquifer_class based on the dominant aquifer
-        # If the dominant aquifer is Alluvium, class is Alluvium, otherwise Hard Rock
         aquifer_class = "Alluvium" if max_aquifer == "Alluvium" else "Hard Rock"
 
         # Combine all data for this UID
@@ -1717,43 +1731,128 @@ def create_excel_for_village_boun(old_geojson, writer):
 
 
 def download_layers_excel_file(state, district, block):
-    state_folder = state.replace(" ", "_").upper()
-    district_folder = district.replace(" ", "_").upper()
-    base_path = EXCEL_PATH + "data/stats_excel_files/"
-
-    state_path = os.path.join(base_path, state_folder)
-    if not os.path.exists(state_path):
-        os.makedirs(state_path)
-
-    district_path = os.path.join(state_path, district_folder)
-    if not os.path.exists(district_path):
-        os.makedirs(district_path)
-
+    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
+    state_path = os.path.join(base_path, state.upper())
+    district_path = os.path.join(state_path, district.upper())
     filename = f"{district}_{block}.xlsx"
     file_path = os.path.join(district_path, filename)
-    if os.path.exists(file_path):
-        return file_path
+
+    output_dir = Path(file_path).parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not os.path.exists(file_path):
+        try:
+            if not get_vector_layer_geoserver(state, district, block):
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Failed to generate vector layer from GeoServer.",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            if not os.path.exists(file_path):
+                return Response(
+                    {"status": "error", "message": "Failed to generate Excel file."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": "error",
+                    "message": f"Error during file generation: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     else:
-        return None
+        print(f"Excel file already exists at: {file_path}")
+
+    # Single file reading logic - only written once!
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "rb") as file:
+                response = HttpResponse(
+                    file.read(),
+                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                response["Content-Disposition"] = f"attachment; filename={filename}"
+                return response
+        except Exception as e:
+            return Response(
+                {"status": "error", "message": f"Error reading file: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    else:
+        return Response(
+            {"status": "error", "message": "Failed to locate Excel file."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
 
-def read_tehsil_excel_to_json(state, district, block):
-    file_path = download_layers_excel_file(state, district, block)
-
-    if not file_path:
-        return {"error": "Excel file not found."}
+def generate_stats_excel_file(state, district, block):
+    """
+    Deletes existing Excel layer file and forces regeneration.
+    Then returns the newly generated file.
+    """
+    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
+    state_path = os.path.join(base_path, state.upper())
+    district_path = os.path.join(state_path, district.upper())
+    filename = f"{district}_{block}.xlsx"
+    file_path = os.path.join(district_path, filename)
 
     try:
-        xls = pd.read_excel(file_path, sheet_name=None)
-        result = {}
+        # Create directory if it doesn't exist
+        output_dir = Path(file_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        for sheet_name, df in xls.items():
-            df.columns = [col.strip().lower() for col in df.columns]
-            df.replace([np.inf, -np.inf], np.nan, inplace=True)
-            df = df.where(pd.notnull(df), None)
-            result[sheet_name] = df.to_dict(orient="records")
+        # ALWAYS delete existing file if it exists
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
-        return result
+        get_vector_layer_geoserver(state, district, block)
+
+        if not os.path.exists(file_path):
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Excel file generation completed but file not found.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Return the newly generated file
+        with open(file_path, "rb") as file:
+            response = HttpResponse(
+                file.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = f"attachment; filename={filename}"
+            return response
 
     except Exception as e:
-        return {"error": str(e)}
+        return Response(
+            {"status": "error", "message": f"Failed to generate stats excel: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+def add_sheets_to_excel(state, district, block, sheets):
+    try:
+        sheets_to_add = [sheet.strip() for sheet in sheets.split(",") if sheet.strip()]
+        results = get_vector_layer_geoserver(state, district, block, sheets_to_add)
+
+        successful = [r for r in results if r["status"] == "success"]
+        failed = [r for r in results if r["status"] == "failed"]
+
+        response_data = {
+            "status": "success" if successful else "failed",
+            "message": f"Stats data added info. {len(successful)} successful, {len(failed)} failed.",
+        }
+
+        return response_data
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+        }

@@ -75,7 +75,7 @@ def sync_fc_to_gee(fc, description, asset_id):
 
 # inspired from https://github.com/core-stack-org/core-stack-backend-onprem/blob/latest_common_download/compute/layers/utils.py
 def export_gdf_to_gee_in_chunks(
-    gdf, output_suffix, ee_assets_prefix, description, state, district, block
+        gdf, output_suffix, ee_assets_prefix, description, state, district, block
 ):
     df_size = gdf.shape[0]
     chunk_size = 1000
@@ -86,12 +86,12 @@ def export_gdf_to_gee_in_chunks(
         ee_initialize(project="helper")
         create_gee_directory(state, district, block, GEE_HELPER_PATH)
         for i in range(0, df_size, chunk_size):
-            chunk = gdf.iloc[i : i + chunk_size]
+            chunk = gdf.iloc[i: i + chunk_size]
             fc = geemap.geopandas_to_ee(chunk)
             chunk_output_suffix = f"{output_suffix}_{i}_{i + chunk_size}"
             asset_id = (
-                get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
-                + chunk_output_suffix
+                    get_gee_asset_path(state, district, block, GEE_HELPER_PATH)
+                    + chunk_output_suffix
             )
             asset_ids.append(asset_id)
             assets.append(ee.FeatureCollection(asset_id))
@@ -108,26 +108,26 @@ def export_gdf_to_gee_in_chunks(
 
         ee_initialize()
         asset_id = (
-            get_gee_asset_path(state, district, block, ee_assets_prefix) + output_suffix
+                get_gee_asset_path(state, district, block, ee_assets_prefix) + output_suffix
         )
         sync_fc_to_gee(final_asset, description, asset_id)
     else:
         fc = geemap.geopandas_to_ee(gdf)
         asset_id = (
-            get_gee_asset_path(state, district, block, ee_assets_prefix) + output_suffix
+                get_gee_asset_path(state, district, block, ee_assets_prefix) + output_suffix
         )
         sync_fc_to_gee(fc, description, asset_id)
 
 
 @app.task(bind=True)
 def merge_swb_ponds(
-    self,
-    state,
-    district,
-    block,
-    ee_assets_prefix="projects/ee-corestackdev/assets/apps/mws/",
-    output_suffix="_merged_swb_ponds",
-    target_crs="epsg:4326",
+        self,
+        state,
+        district,
+        block,
+        ee_assets_prefix="projects/ee-corestackdev/assets/apps/mws/",
+        output_suffix="_merged_swb_ponds",
+        target_crs="epsg:4326",
 ):
     """
     module to merge swb and ponds layer
@@ -357,7 +357,7 @@ def merge_swb_ponds(
         # print(merged_geom)
         # case3_gdf.loc[case3_gdf['UID'] == swb,'pond_id'] = np.nan
         for pond in list(
-            swb_ponds_case3_4[swb_ponds_case3_4["UID"] == swb]["pond_id"].iloc[0]
+                swb_ponds_case3_4[swb_ponds_case3_4["UID"] == swb]["pond_id"].iloc[0]
         ):
             merged_geom = shapely.ops.unary_union(
                 [
@@ -394,7 +394,6 @@ def merge_swb_ponds(
         district=district,
         block=block,
     )
-
 
 # example run for a block (gobindpur)
 

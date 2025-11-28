@@ -38,10 +38,10 @@ def clart_layer(state, district, block):
     )
     final_output_assetid = get_gee_asset_path(state, district, block) + description
     layer_name = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_clart"
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_clart"
     )
     if not is_gee_asset_exists(final_output_assetid):
         srtm = ee.Image("USGS/SRTMGL1_003")

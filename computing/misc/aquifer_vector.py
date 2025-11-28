@@ -25,8 +25,8 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
 
     description = f"aquifer_vector_{valid_gee_text(district)}_{valid_gee_text(block)}"
     input_asset_id = (
-        get_gee_asset_path(state, district, block)
-        + f"filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid"
+            get_gee_asset_path(state, district, block)
+            + f"filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid"
     )
     roi = ee.FeatureCollection(input_asset_id)
 

@@ -43,10 +43,10 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
-            "admin_boundary_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+                "admin_boundary_"
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
         )
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         upload_shp_to_gee(layer_path, layer_name, asset_id)

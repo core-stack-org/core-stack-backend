@@ -19,18 +19,18 @@ from utilities.gee_utils import (
 
 
 def run_off(
-    gee_account_id,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    app_type=None,
-    start_date=None,
-    end_date=None,
-    is_annual=False,
+        gee_account_id,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        app_type=None,
+        start_date=None,
+        end_date=None,
+        is_annual=False,
 ):
     description = (
-        "Runoff_annual_" if is_annual else "Runoff_fortnight_"
-    ) + asset_suffix
+                      "Runoff_annual_" if is_annual else "Runoff_fortnight_"
+                  ) + asset_suffix
     asset_id = get_gee_dir_path(asset_folder_list) + description
     if is_gee_asset_exists(asset_id):
         print("inside run off ")
@@ -95,15 +95,15 @@ def run_off(
 
 
 def _generate_layer(
-    roi,
-    app_type,
-    asset_folder_list,
-    asset_id,
-    description,
-    start_date,
-    end_date,
-    is_annual,
-    gee_account_id,
+        roi,
+        app_type,
+        asset_folder_list,
+        asset_id,
+        description,
+        start_date,
+        end_date,
+        is_annual,
+        gee_account_id,
 ):
     gee_obj = GEEAccount.objects.get(pk=gee_account_id)
     helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
@@ -118,8 +118,8 @@ def _generate_layer(
         last_date = None
         for i in range(len(rois)):
             chunk_asset_id = (
-                get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
-                + descs[i]
+                    get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
+                    + descs[i]
             )
 
             if not is_gee_asset_exists(chunk_asset_id):
@@ -206,8 +206,9 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             f_end_date = f_start_date + datetime.timedelta(days=364)
         else:
             f_end_date = f_start_date + datetime.timedelta(days=14)
-            if f_end_date > end_date:
-                break
+
+        if f_end_date > end_date:
+            break
         lulc = lulc_img.filterDate(f_start_date, f_end_date)
         classification = lulc.select("label")
 
