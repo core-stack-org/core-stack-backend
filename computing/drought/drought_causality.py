@@ -15,10 +15,6 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
-    export_vector_asset_to_gee,
-    check_task_status,
-    is_gee_asset_exists,
-    build_gee_helper_paths,
 )
 from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 
@@ -192,9 +188,9 @@ def getWeekVector(fin_df, wkCt, year):
             mD = 1
         if mD == 1:
             if (
-                    vci_class == "severe"
-                    and mai_class == "severe"
-                    and cas_class == "severe"
+                vci_class == "severe"
+                and mai_class == "severe"
+                and cas_class == "severe"
             ):
                 if ds == 1:
                     fin_df.at[index, f"severe_drought_path1_{year}"] += 1
@@ -203,7 +199,7 @@ def getWeekVector(fin_df, wkCt, year):
                 else:
                     fin_df.at[index, f"severe_drought_path3_{year}"] += 1
             elif (
-                    vci_class == "mild" and mai_class == "severe" and cas_class == "severe"
+                vci_class == "mild" and mai_class == "severe" and cas_class == "severe"
             ):
                 if ds == 1:
                     fin_df.at[index, f"moderate_drought_path1_{year}"] += 1
@@ -212,9 +208,9 @@ def getWeekVector(fin_df, wkCt, year):
                 else:
                     fin_df.at[index, f"moderate_drought_path3_{year}"] += 1
             elif (
-                    vci_class == "moderate"
-                    and mai_class == "severe"
-                    and cas_class == "severe"
+                vci_class == "moderate"
+                and mai_class == "severe"
+                and cas_class == "severe"
             ):
                 if ds == 1:
                     fin_df.at[index, f"moderate_drought_path4_{year}"] += 1
@@ -223,7 +219,7 @@ def getWeekVector(fin_df, wkCt, year):
                 else:
                     fin_df.at[index, f"moderate_drought_path6_{year}"] += 1
             elif (
-                    vci_class == "severe" and mai_class == "mild" and cas_class == "severe"
+                vci_class == "severe" and mai_class == "mild" and cas_class == "severe"
             ):
                 if ds == 1:
                     fin_df.at[index, f"moderate_drought_path7_{year}"] += 1
@@ -232,9 +228,9 @@ def getWeekVector(fin_df, wkCt, year):
                 else:
                     fin_df.at[index, f"moderate_drought_path9_{year}"] += 1
             elif (
-                    vci_class == "severe"
-                    and mai_class == "moderate"
-                    and cas_class == "severe"
+                vci_class == "severe"
+                and mai_class == "moderate"
+                and cas_class == "severe"
             ):
                 if ds == 1:
                     fin_df.at[index, f"moderate_drought_path10_{year}"] += 1
@@ -243,7 +239,7 @@ def getWeekVector(fin_df, wkCt, year):
                 else:
                     fin_df.at[index, f"moderate_drought_path12_{year}"] += 1
             elif (
-                    vci_class == "severe" and mai_class == "severe" and cas_class == "mild"
+                vci_class == "severe" and mai_class == "severe" and cas_class == "mild"
             ):
                 if ds == 1:
                     fin_df.at[index, f"moderate_drought_path13_{year}"] += 1
@@ -252,9 +248,9 @@ def getWeekVector(fin_df, wkCt, year):
                 else:
                     fin_df.at[index, f"moderate_drought_path15_{year}"] += 1
             elif (
-                    vci_class == "severe"
-                    and mai_class == "severe"
-                    and cas_class == "moderate"
+                vci_class == "severe"
+                and mai_class == "severe"
+                and cas_class == "moderate"
             ):
                 if ds == 1:
                     fin_df.at[index, f"moderate_drought_path16_{year}"] += 1
@@ -399,13 +395,13 @@ def data_with_column(year, gdf, fin_df):
 
     fin_df.drop(new_cols, axis=1, inplace=True)
     fin_df[f"mild_drought_vci_score_{year}"] = (
-            fin_df[f"mild_drought_vci_score_{year}"] / 6
+        fin_df[f"mild_drought_vci_score_{year}"] / 6
     ).round(2)
     fin_df[f"mild_drought_mai_score_{year}"] = (
-            fin_df[f"mild_drought_mai_score_{year}"] / 6
+        fin_df[f"mild_drought_mai_score_{year}"] / 6
     ).round(2)
     fin_df[f"mild_drought_cropping_area_sown_score_{year}"] = (
-            fin_df[f"mild_drought_cropping_area_sown_score_{year}"] / 6
+        fin_df[f"mild_drought_cropping_area_sown_score_{year}"] / 6
     ).round(2)
     return fin_df
 
@@ -505,7 +501,7 @@ def convert_to_dict(causality_str):
 
 @app.task(bind=True)
 def drought_causality(
-        self, state, district, block, start_year, end_year, gee_account_id, app_type="MWS"
+    self, state, district, block, start_year, end_year, gee_account_id, app_type="MWS"
 ):
     ee_initialize(gee_account_id)
     mws_feature_collection = ee.FeatureCollection(
@@ -526,7 +522,6 @@ def drought_causality(
     combined_uid_data = {}
 
     for year in range(start_year, end_year + 1):
-        helper_account_path = build_gee_helper_paths("mws", gee_obj.helper_account.name)
         asset_path = ee.FeatureCollection(
             get_gee_asset_path(
                 state, district, block, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -620,10 +615,10 @@ def drought_causality(
     layer_at_geoserver = False
     try:
         geo_filename = (
-                valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
-                + "_drought_causality"
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_drought_causality"
         )
         # aggregated_feature_collection = ee.FeatureCollection(final_features)
         # asset_id = get_gee_asset_path(state, district, block) + geo_filename

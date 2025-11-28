@@ -25,11 +25,10 @@ def excel_file_path(instance, filename):
     project_name = instance.project.name
 
     # Create directory if it doesn't exist
-    directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
-    full_path = os.path.join(SITE_DATA_PATH, directory)
-    os.makedirs(full_path, exist_ok=True)
+    directory = f"site_data/{org_name}/{app_type}/{project_id}/{project_name}"
+    file_path = f"{directory}/{filename}"
 
-    return f"{full_path}/{filename}"
+    return file_path
 
 
 class WaterbodiesFileUploadLog(models.Model):

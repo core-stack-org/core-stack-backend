@@ -182,8 +182,8 @@ def Upload_Desilting_Points(
             make_asset_public(mws_asset_id)
             if is_lulc_required:
                 clip_lulc_v3(
-                    start_year="2017",
-                    end_year="2024",
+                    start_year=2017,
+                    end_year=2024,
                     gee_account_id=gee_project_id,
                     roi_path=mws_asset_id,
                     asset_folder=asset_folder,
@@ -214,30 +214,29 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
     print(f"project id {gee_account_id}")
     proj_obj = Project.objects.get(pk=proj_id)
     logger.info("Generating SWB layer for given lat long")
-    asset_suffix_lulc = f"{proj_obj.name}_{proj_obj.id}".lower()
     asset_folder = [str(proj_obj.name).lower()]
-    asset_suffix_drainage = f"drainage_lines_{proj_obj.name}_{proj_obj.id}".lower()
+    asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
     clip_drainage_lines(
         roi_path=mws_asset_id,
-        asset_suffix=asset_suffix_drainage,
+        asset_suffix=asset_suffix,
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
         app_type="WATER_REJ",
     )
-    asset_suffix_catchment = f"{proj_obj.name}_{proj_obj.id}"
+
     generate_catchment_area_singleflow(
         roi_path=mws_asset_id,
-        asset_suffix=asset_suffix_catchment,
+        asset_suffix=asset_suffix,
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
         app_type="WATER_REJ",
     )
-    asset_suffix_so = f"stream_order_{proj_obj.name}_{proj_obj.id}"
+
     generate_stream_order(
         roi_path=mws_asset_id,
-        asset_suffix=asset_suffix_catchment,
+        asset_suffix=asset_suffix,
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
@@ -247,20 +246,20 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
         )
-        + f"swb1_{asset_suffix_lulc}"
+        + f"swb1_{asset_suffix}"
     )
     asset_id_swb2 = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
         )
-        + f"swb2_{asset_suffix_lulc}"
+        + f"swb2_{asset_suffix}"
     )
 
     delete_asset_on_GEE(asset_id_swb1)
     delete_asset_on_GEE(asset_id_swb2)
     generate_swb_layer(
         roi_path=mws_asset_id,
-        asset_suffix=asset_suffix_lulc,
+        asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type="WATER_REJ",
         start_year="2017",
@@ -283,7 +282,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
     roi = ee.FeatureCollection(mws_asset_id)
     hydrology = generate_hydrology(
         roi=roi,
-        asset_suffix=asset_suffix_prec,
+        asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type="WATER_REJ",
         start_year=2017,
@@ -292,10 +291,10 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         gee_account_id=gee_account_id,
     )
     make_asset_public(asset_id_prec)
-    asset_suffix_draught = f"{proj_obj.name}_{proj_obj.id}".lower()
+
     result_d = calculate_drought(
         roi_path=mws_asset_id,
-        asset_suffix=asset_suffix_draught,
+        asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type="WATER_REJ",
         start_year=2017,
