@@ -709,8 +709,8 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
 def build_gee_helper_paths(app_type, helper_project):
 
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
-    gee_asset = GEE_PATHS[app_type]["GEE_ASSET_FOLDER"]
-    GEE_HELPER_PATH = f"{gee_helper_base_path}/{gee_asset}"
+    # gee_asset = GEE_PATHS[app_type]["GEE_ASSET_FOLDER"]
+    GEE_HELPER_PATH = f"{gee_helper_base_path}/{app_type.lower()}/"
     return GEE_HELPER_PATH
 
 
