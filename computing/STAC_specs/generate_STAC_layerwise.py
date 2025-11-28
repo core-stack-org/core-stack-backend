@@ -126,11 +126,13 @@ def read_layer_description(filepath, layer_name, overwrite_existing):
 def generate_raster_url(
     workspace, layer_name, geoserver_base_url, output_format="geotiff"
 ):
+    print("generating raster url...")
     wcs_url = (
         f"{geoserver_base_url}/{workspace}/wcs?"
         f"service=WCS&version=2.0.1&request=GetCoverage&"
         f"CoverageId={workspace}:{layer_name}&"
         f"format={output_format}"
+        # f"format={output_format}&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
     )
     print("Raster URL:", wcs_url)
     return wcs_url
@@ -166,6 +168,13 @@ def read_raster_data(raster_url):
             ]
         )
         data = r.read(1)  # TODO: wouldn't work if there are multiple bands
+        # read a downsampled version for thumbnail
+
+        # thumbnail_size = 256  # pixels
+        # scale_x = r.width / thumbnail_size
+        # scale_y = r.height / thumbnail_size
+
+        # data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
 
         # id = os.path.basename(raster_url) #works when data is local
         # id = layer_name
@@ -405,6 +414,8 @@ def generate_raster_thumbnail(raster_data, style_info, output_path):
         cmap = "gray"
         norm = None
     plt.figure(figsize=(3, 3), dpi=100)
+    # h, w = raster_data.shape
+    # plt.figure(figsize=(w / 100, h / 100), dpi=100)
 
     plt.imshow(raster_data, cmap=cmap, norm=norm, interpolation="none")
     plt.axis("off")
@@ -536,9 +547,9 @@ def generate_raster_item(
         start_year=start_year,
         #    end_year=end_year
     )
-    print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    print(f"geoserver_layer_name={geoserver_layer_name}")
-    print(f"style file url = {style_file_url}")
+    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    # print(f"geoserver_layer_name={geoserver_layer_name}")
+    # print(f"style file url = {style_file_url}")
 
     # 3. generate geoserver url
     geoserver_url = generate_raster_url(
@@ -1349,9 +1360,9 @@ def generate_vector_item(
         #    end_year=end_year
     )
 
-    # print(f"geoserver_workspace_name={geoserver_workspace_name}")
-    # print(f"geoserver_layer_name={geoserver_layer_name}")
-    # print(f"style file url = {style_file_url}")
+    print(f"geoserver_workspace_name={geoserver_workspace_name}")
+    print(f"geoserver_layer_name={geoserver_layer_name}")
+    print(f"style file url = {style_file_url}")
 
     # 3. generate geoserver url
     geoserver_url = generate_vector_url(
@@ -1359,7 +1370,7 @@ def generate_vector_item(
         layer_name=geoserver_layer_name,
         geoserver_base_url=GEOSERVER_BASE_URL,
     )
-    # print(f"geoserver url={geoserver_url}")
+    print(f"geoserver url={geoserver_url}")
 
     # 4. create vector item
     layer_title = layer_display_name
@@ -1436,6 +1447,7 @@ def create_aws_client(
         aws_session_token=aws_session_token,
     )
 
+
 # %%
 def upload_file_to_s3(
     aws_creds,
@@ -1510,46 +1522,51 @@ def generate_vector_stac(
     layer_map_csv_path="data/STAC_specs/input/metadata/layer_mapping.csv",
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     column_desc_csv_path="data/STAC_specs/input/metadata/vector_column_descriptions.csv",
-    upload_to_s3=True,
+    upload_to_s3=False,
     overwrite_existing=False,
+    generate_stac=False,
 ):
     print("STAC: triggering vector STAC pipeline")
-    # print(layer_map_csv_path)
-    state = valid_gee_text(state.lower())
-    district = valid_gee_text(district.lower())
-    block = valid_gee_text(block.lower())
+    if generate_stac:
+        # print(layer_map_csv_path)
+        state = valid_gee_text(state.lower())
+        district = valid_gee_text(district.lower())
+        block = valid_gee_text(block.lower())
 
-    # print("state=",state)
-    # print("district=",district)
-    # print("block=",block)
+        print("state=", state)
+        print("district=", district)
+        print("block=", block)
 
-    vector_item = generate_vector_item(
-        state,
-        district,
-        block,
-        layer_name,
-        layer_map_csv_path,
-        layer_desc_csv_path,
-        column_desc_csv_path,
-        overwrite_existing,
-    )
-
-    layer_STAC_generated = update_STAC_files(
-        state, district, block, STAC_item=vector_item
-    )
-
-    if upload_to_s3:
-        upload_folder_to_s3(
-            aws_creds=aws_creds,
-            folderpath=STAC_FILES_DIR,
-            s3_bucket=S3_STAC_BUCKET_NAME,
+        vector_item = generate_vector_item(
+            state,
+            district,
+            block,
+            layer_name,
+            layer_map_csv_path,
+            layer_desc_csv_path,
+            column_desc_csv_path,
+            overwrite_existing,
         )
 
-        upload_folder_to_s3(
-            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+        layer_STAC_generated = update_STAC_files(
+            state, district, block, STAC_item=vector_item
         )
 
-    return layer_STAC_generated
+        if upload_to_s3:
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=STAC_FILES_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=THUMBNAIL_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+        return layer_STAC_generated
+    return False
 
 
 # %%
@@ -1562,47 +1579,51 @@ def generate_raster_stac(
     layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
     start_year="",
     #  end_year='',
-    upload_to_s3=True,
+    upload_to_s3=False,
     overwrite_existing=False,
+    generate_stac=False,
 ):
     print("STAC: triggering raster STAC pipeline")
+    if generate_stac:
+        state = valid_gee_text(state.lower())
+        district = valid_gee_text(district.lower())
+        block = valid_gee_text(block.lower())
 
-    state = valid_gee_text(state.lower())
-    district = valid_gee_text(district.lower())
-    block = valid_gee_text(block.lower())
+        # print("state=",state)
+        # print("district=",district)
+        # print("block=",block)
 
-    # print("state=",state)
-    # print("district=",district)
-    # print("block=",block)
-
-    raster_item = generate_raster_item(
-        state,
-        district,
-        block,
-        layer_name,
-        layer_map_csv_path,
-        layer_desc_csv_path,
-        start_year,
-        #    end_year,
-        overwrite_existing,
-    )
-
-    layer_STAC_generated = update_STAC_files(
-        state, district, block, STAC_item=raster_item
-    )
-
-    if upload_to_s3:
-        upload_folder_to_s3(
-            aws_creds=aws_creds,
-            folderpath=STAC_FILES_DIR,
-            s3_bucket=S3_STAC_BUCKET_NAME,
+        raster_item = generate_raster_item(
+            state,
+            district,
+            block,
+            layer_name,
+            layer_map_csv_path,
+            layer_desc_csv_path,
+            start_year,
+            #    end_year,
+            overwrite_existing,
         )
 
-        upload_folder_to_s3(
-            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+        layer_STAC_generated = update_STAC_files(
+            state, district, block, STAC_item=raster_item
         )
 
-    return layer_STAC_generated
+        if upload_to_s3:
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=STAC_FILES_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+            upload_folder_to_s3(
+                aws_creds=aws_creds,
+                folderpath=THUMBNAIL_DIR,
+                s3_bucket=S3_STAC_BUCKET_NAME,
+            )
+
+        return layer_STAC_generated
+    return False
 
 
 # %% [markdown]
