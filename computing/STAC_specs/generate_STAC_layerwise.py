@@ -176,7 +176,7 @@ def read_raster_data(raster_url):
 
         # data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
 
-        data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
+        # data = r.read(1, out_shape=(1, int(r.height / scale_y), int(r.width / scale_x)))
         # id = os.path.basename(raster_url) #works when data is local
         # id = layer_name
         # gsd = 10
