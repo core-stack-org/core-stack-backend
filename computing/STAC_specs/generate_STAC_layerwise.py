@@ -1585,6 +1585,11 @@ def generate_raster_stac(
     generate_stac=False,
 ):
     print("STAC: triggering raster STAC pipeline")
+    print("state=",state)
+    print("district=",district)
+    print("block=",block)
+    print("start_year=", start_year)
+    
     if generate_stac:
         state = valid_gee_text(state.lower())
         district = valid_gee_text(district.lower())
