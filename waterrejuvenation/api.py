@@ -8,15 +8,18 @@ from django.http import JsonResponse
 from utilities.gee_utils import (
     valid_gee_text,
 )
+
 from .utils import get_merged_waterbodies_with_zoi
 
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework.decorators import api_view
 
 
-# @swagger_auto_schema(**admin_by_latlon_schema)
-@api_security_check(auth_type="Auth_free")
+@api_view(["GET"])
+# @swagger_auto_schema(**waterbodies_by_admin_schema)
 @schema(None)
+@api_security_check(auth_type="API_key")
 def get_waterbodies_by_admin_and_uid(request):
     """
     Retrieve merged waterbody + ZOI data for a given administrative area.

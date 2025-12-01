@@ -440,62 +440,277 @@ def BuildMWSLayer(
     app_type="MWS",
     block=None,
     district=None,
+    drought_asset_override=None,  # optional: full path to drought asset if you want to override default
+    export_year_range=(2017, 2022),  # for naming drought asset
 ):
-    ee_initialize(gee_account_id)
-    if proj_id:
-        instance = Project.objects.get(pk=proj_id)
-        asset_folder = [instance.name.lower()]
-        asset_suffix = "f{proj_obj.name}_{proj_obj.id}".lower()
+    """
+    Full BuildMWSLayer: builds final MWS waterbody FC, joins drought properties (flat, prefixed),
+    exports merged FeatureCollection to a GEE asset, and syncs to GeoServer.
 
-        mws_geojson_op = "data/fc_to_shape/" + str(instance.name) + "/" + asset_suffix
+    Returns:
+        dict: {
+            "status": "SUCCESS" | "FAILED",
+            "asset_id": asset_id_wb_mws (str),
+            "export_task_id": <task id or None>,
+            "feature_count": <int or None>,
+            "message": <string>
+        }
+    """
 
-    else:
-        asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    try:
+        # initialize GEE
+        ee_initialize(gee_account_id)
+
+        # -------------------------
+        # Build asset suffix & paths
+        # -------------------------
+        if proj_id:
+            instance = Project.objects.get(pk=proj_id)
+            asset_folder = [instance.name.lower()]
+            asset_suffix = f"{instance.name}_{instance.id}".lower()
+            mws_geojson_op = f"data/fc_to_shape/{instance.name}/{asset_suffix}"
+        else:
+            if not (state and district and block):
+                raise ValueError(
+                    "state, district and block required when proj_id is not provided"
+                )
+            asset_suffix = (
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            )
+            asset_folder = [state, district, block]
+            mws_geojson_op = f"data/fc_to_shape/{state}/{asset_suffix}"
+
+        # -------------------------
+        # Load precipitation FC
+        # -------------------------
+        asset_suffix_prec = f"Prec_fortnight_{asset_suffix}"
+        asset_id_prec = (
+            get_gee_dir_path(
+                asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix_prec
         )
-        asset_folder = [state, district, block]
-        mws_geojson_op = "data/fc_to_shape/" + str(state) + "/" + asset_suffix
+        precip = ee.FeatureCollection(asset_id_prec)
 
-    asset_suffix_prec = f"Prec_fortnight_{asset_suffix}"
-    asset_id_prec = (
-        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
-        + asset_suffix_prec
-    )
-    precip = ee.FeatureCollection(asset_id_prec)
-    gdf = geemap.ee_to_gdf(precip)
+        # If precip empty -> fail early
+        if precip.size().getInfo() == 0:
+            msg = f"Precipitation feature collection empty: {asset_id_prec}"
+            logger.warning(msg)
+            return {
+                "status": "FAILED",
+                "message": msg,
+                "asset_id": None,
+                "export_task_id": None,
+                "feature_count": 0,
+            }
 
-    dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
-    draught_asset_id = (
-        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
-        + dst_filename
-    )
-    gdf.to_file(mws_geojson_op, driver="GeoJSON")
-    final_fc = calculate_precipitation_season(
-        mws_geojson_op, draught_asset_id=draught_asset_id
-    )
-    asset_suffix_wb = f"waterbodies_mws_{asset_suffix}".lower()
+        # convert to geodataframe for local processing (as in your flow)
+        gdf = geemap.ee_to_gdf(precip)
 
-    asset_id_wb_mws = (
-        get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        # -------------------------
+        # Drought asset id (default naming)
+        # -------------------------
+        if drought_asset_override:
+            draught_asset_id = drought_asset_override
+        else:
+            start_y, end_y = export_year_range
+            dst_filename = f"drought_{asset_suffix}_{start_y}_{end_y}"
+            draught_asset_id = (
+                get_gee_dir_path(
+                    asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + dst_filename
+            )
+
+        # -------------------------
+        # Save GDF to GeoJSON for custom processing
+        # -------------------------
+        # Ensure parent dir exists on disk (optional, your environment may handle)
+        try:
+            gdf.to_file(mws_geojson_op, driver="GeoJSON")
+        except Exception as e:
+            logger.exception("Failed to write GeoJSON to %s: %s", mws_geojson_op, e)
+            return {
+                "status": "FAILED",
+                "message": f"Error writing GeoJSON: {e}",
+                "asset_id": None,
+                "export_task_id": None,
+                "feature_count": None,
+            }
+
+        # -------------------------
+        # Create final_fc using your domain function
+        # -------------------------
+        final_fc = calculate_precipitation_season(
+            mws_geojson_op, draught_asset_id=draught_asset_id
         )
-        + asset_suffix_wb
-    )
-    point_tasks = ee.batch.Export.table.toAsset(
-        collection=final_fc,
-        description=asset_suffix_wb,
-        assetId=asset_id_wb_mws,
-    )
-    point_tasks.start()
-    wait_for_task_completion(point_tasks)
-    if proj_id:
-        proj_obj = Project.objects.get(pk=proj_id)
-        layer_name = f"waterbodies_mws_{asset_suffix}".lower()
+        final_fc = ee.FeatureCollection(final_fc)
 
-        sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, "mws")
-    else:
-        layer_name = f"waterbodies_mws_{asset_suffix}".lower()
-        res = sync_fc_to_geoserver(final_fc, state, layer_name, "mws")
+        # quick check
+        try:
+            final_count = final_fc.size().getInfo()
+        except Exception:
+            final_count = None
+
+        if final_count == 0:
+            msg = "final_fc is empty after calculate_precipitation_season"
+            logger.warning(msg)
+            return {
+                "status": "FAILED",
+                "message": msg,
+                "asset_id": None,
+                "export_task_id": None,
+                "feature_count": 0,
+            }
+
+        # ------------------------------------------------
+        # JOIN AND FLATTEN DROUGHT PROPERTIES (prefixed)
+        # ------------------------------------------------
+        drought_fc = ee.FeatureCollection(draught_asset_id)
+
+        # It's possible drought asset does not exist or is empty - handle gracefully
+        try:
+            drought_count = drought_fc.size().getInfo()
+        except Exception:
+            drought_count = 0
+
+        if drought_count == 0:
+            # No drought data - keep final_fc as-is (but ensure no non-exportable complex properties)
+            logger.info(
+                "Drought FC not found or empty (%s). Skipping join.", draught_asset_id
+            )
+            merged_fc = final_fc.map(
+                lambda f: ee.Feature(f).select(ee.List(ee.Feature(f).propertyNames()))
+            )  # ensure properties are primitives
+        else:
+            # Use saveFirst to avoid List<Feature> problem
+            join = ee.Join.saveFirst("match")
+            ffilter = ee.Filter.equals(leftField="uid", rightField="uid")
+            joined = join.apply(
+                primary=final_fc, secondary=drought_fc, condition=ffilter
+            )
+
+            def dedupe_by_uid(fc, uid_field="uid"):
+                uids = fc.aggregate_array(uid_field).distinct()
+                return ee.FeatureCollection(
+                    uids.map(
+                        lambda u: ee.Feature(
+                            fc.filter(ee.Filter.eq(uid_field, u)).first()
+                        )
+                    )
+                )
+
+            # Map function to flatten the match's properties prefixed with 'drought_'
+            def _flatten_match(feat):
+                feat = ee.Feature(feat)
+
+                # copy_props will only be executed if feat.get('match') is truthy (exists)
+                def copy_props(_):
+                    match = ee.Feature(
+                        feat.get("match")
+                    )  # safe because only called when match exists
+                    match_props = match.propertyNames()
+
+                    def _setter(prop, acc):
+                        acc = ee.Feature(acc)
+                        prop = ee.String(prop)
+                        val = match.get(prop)
+                        new_name = ee.String("drought_").cat(prop)
+                        return acc.set(new_name, val)
+
+                    merged = ee.Feature(match_props.iterate(_setter, feat))
+                    # remove the temporary 'match' property so exports won't fail
+                    merged = ee.Feature(merged).select(
+                        ee.List(merged.propertyNames()).remove("match")
+                    )
+                    return merged
+
+                # If no match, just remove 'match' (if present) and return original feature
+                def remove_match(_):
+                    return ee.Feature(feat).select(
+                        ee.List(feat.propertyNames()).remove("match")
+                    )
+
+                # ee.Algorithms.If will evaluate the server-side truthiness of feat.get('match')
+                result = ee.Algorithms.If(
+                    feat.get("match"), copy_props(None), remove_match(None)
+                )
+                return ee.Feature(result)
+
+            # Use it as before:
+            merged_fc = ee.FeatureCollection(joined.map(_flatten_match))
+
+        # -------------------------
+        # Prepare export asset id (waterbodies)
+        # -------------------------
+        asset_suffix_wb = f"waterbodies_mws_{asset_suffix}".lower()
+        asset_id_wb_mws = (
+            get_gee_dir_path(
+                asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix_wb
+        )
+
+        # -------------------------
+        # Export merged FC to GEE asset
+        # -------------------------
+        task = ee.batch.Export.table.toAsset(
+            collection=merged_fc,
+            description=asset_suffix_wb,
+            assetId=asset_id_wb_mws,
+        )
+
+        task.start()
+        logger.info("Started export task %s -> %s", task.id, asset_id_wb_mws)
+
+        # Wait for completion (uses your helper)
+        wait_for_task_completion(task)
+
+        # After export, optionally refresh or get info
+        try:
+            exported_count = ee.FeatureCollection(asset_id_wb_mws).size().getInfo()
+        except Exception:
+            exported_count = None
+
+        # -------------------------
+        # Push to GeoServer
+        # -------------------------
+        layer_name = (
+            asset_suffix_wb  # same as f"waterbodies_mws_{asset_suffix}".lower()
+        )
+
+        if proj_id:
+            proj_obj = Project.objects.get(pk=proj_id)
+            sync_project_fc_to_geoserver(merged_fc, proj_obj.name, layer_name, "mws")
+        else:
+            sync_fc_to_geoserver(merged_fc, state, layer_name, "mws")
+
+        return {
+            "status": "SUCCESS",
+            "asset_id": asset_id_wb_mws,
+            "export_task_id": task.id if hasattr(task, "id") else None,
+            "feature_count": exported_count,
+            "message": f"Exported and synced layer {layer_name}",
+        }
+
+    except ee.EEException as ee_err:
+        logger.exception("EarthEngine error in BuildMWSLayer: %s", ee_err)
+        return {
+            "status": "FAILED",
+            "message": f"EE error: {ee_err}",
+            "asset_id": None,
+            "export_task_id": None,
+            "feature_count": None,
+        }
+    except Exception as e:
+        logger.exception("Unexpected error in BuildMWSLayer: %s", e)
+        return {
+            "status": "FAILED",
+            "message": str(e),
+            "asset_id": None,
+            "export_task_id": None,
+            "feature_count": None,
+        }
 
 
 @shared_task()
