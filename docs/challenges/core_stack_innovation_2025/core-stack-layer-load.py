@@ -46,8 +46,9 @@ def download_layer(url, output_file):
         print(f"Failed to download: HTTP {response.status_code}")
 
 # Base URL and API key
+# Add your API key
 base_url = 'https://geoserver.core-stack.org/api/v1/'
-Api_key = 'cH9Rk0j5.9B1vX4LLHzK8I4i1ruVufVVo585QCR3G'
+Api_key = ''
 
 # API endpoint to get list of layers
 tehsil_layers_api_endpoint = 'get_generated_layer_urls/'
@@ -260,5 +261,6 @@ if not df4.empty:
     plt.tight_layout()
     plt.savefig('data/cropping_vs_krk_scatter.png')
     plt.close()
+
 
 
