@@ -90,7 +90,7 @@ internal_error_response = openapi.Response(description="Internal Server Error")
 waterbodies_by_admin_schema = {
     "method": "get",
     "operation_id": "get_waterbodies_by_admin_and_uid",
-    "operation_summary": "Get Waterbodies by admin",
+    "operation_summary": "Get Waterbodies by admin data",
     "operation_description": """
    Retrive all waterbodies of a tehsil. This api accept state, district and tehsil as parameter and return all waterbodies of that tehsil
 
