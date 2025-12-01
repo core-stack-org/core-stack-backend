@@ -8,7 +8,11 @@ from projects.urls import router as projects_router
 # import the two endpoints from your api module
 # - get_merged_waterbodies_with_zoi : function that generates/returns merged JSON (can be called to force regeneration)
 # - get_waterbodies_by_admin_and_uid: decorated DRF function that serves the merged JSON via HTTP (swagger + API key decorator)
-from .api import get_merged_waterbodies_with_zoi, get_waterbodies_by_admin_and_uid
+from .api import (
+    get_merged_waterbodies_with_zoi,
+    get_waterbodies_by_admin_and_uid,
+    get_waterbodies_by_uid,
+)
 
 # Nested router registration (unchanged)
 water_rej_router = routers.NestedSimpleRouter(
@@ -32,7 +36,7 @@ urlpatterns = [
     ),
     path(
         "get_waterbody_data/",
-        get_waterbodies_by_admin_and_uid,
+        get_waterbodies_by_uid,
         name="generate_waterbodies_data",
     ),
 ]
