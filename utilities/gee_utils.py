@@ -707,11 +707,8 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
 
 
 def build_gee_helper_paths(app_type, helper_project):
-
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
-    # gee_asset = GEE_PATHS[app_type]["GEE_ASSET_FOLDER"]
-    GEE_HELPER_PATH = f"{gee_helper_base_path}/{app_type}"
-    return GEE_HELPER_PATH
+    return f"{gee_helper_base_path}/{app_type.lower()}/"
 
 
 def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
