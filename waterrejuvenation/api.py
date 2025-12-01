@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from utilities.gee_utils import (
     valid_gee_text,
 )
-
+from nrm_app.settings import MEDIA_ROOT
 from .utils import get_merged_waterbodies_with_zoi
 
 from utilities.auth_check_decorator import api_security_check
@@ -16,10 +16,10 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import api_view
 
 
-@api_view(["GET"])
-# @swagger_auto_schema(**waterbodies_by_admin_schema)
-@schema(None)
+
 @api_security_check(auth_type="API_key")
+@schema(None)
+
 def get_waterbodies_by_admin_and_uid(request):
     """
     Retrieve merged waterbody + ZOI data for a given administrative area.
@@ -46,11 +46,11 @@ def get_waterbodies_by_admin_and_uid(request):
         district_l = district.lower()
         block_l = block.lower()
 
-        base_dir = "stats_excel_file"
+        base_dir = f"{MEDIA_ROOT}stats_excel_files"
         out_dir = os.path.join(base_dir, state_norm, district.upper())
         merged_fname = f"{district_l}_{block_l}_merged_data.json"
         merged_path = os.path.join(out_dir, merged_fname)
-
+        print(f"file: {merged_path}")
         merged_data = None
 
         # 1️⃣ **If cached merged file exists → load**
