@@ -402,10 +402,10 @@ waterbodies_by_admin_schema = {
 
 waterbodies_by_uuid = {
     "method": "get",
-    "operation_id": "get_waterbodies_by_admin_and_uid",
+    "operation_id": "get_waterbodies_by_uid",
     "operation_summary": "Get Waterbodies by uid",
     "operation_description": """
-   Retrive all waterbodies of a tehsil. This api accept state, district and tehsil as parameter and return all waterbodies of that tehsil
+   Retrive  waterbody data by its unique identifier uid. This api returns all data related to that waterbody
 
    **Response dataset details:**
    ```
