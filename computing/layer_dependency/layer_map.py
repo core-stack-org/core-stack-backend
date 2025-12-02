@@ -36,6 +36,11 @@ map_2_2 = [
             {
                 "name": "generate_swb_layer",
                 "use_global_args": True,
+                "depends_on": [
+                    "generate_catchment_area_singleflow",
+                    "generate_stream_order",
+                    "clip_drainage_lines",
+                ],
             },
             {
                 "name": "calculate_drought",
@@ -65,10 +70,40 @@ map_2_2 = [
 
 map_3 = [
     {
+        "name": "generate_soge_vector",
+    },
+    {
+        "name": "generate_stream_order",
+    },
+    {
         "name": "generate_restoration_opportunity",
     },
     {
         "name": "generate_aquifer_vector",
+    },
+    {"name": "generate_natural_depression_data"},
+    {"name": "generate_distance_to_nearest_drainage_line"},
+    {"name": "generate_catchment_area_singleflow"},
+    {"name": "generate_slope_percentage"},
+    {"name": "generate_lcw_conflict_data"},
+    {"name": "generate_agroecological_data"},
+    {"name": "generate_factory_csr_data"},
+    {"name": "generate_green_credit_data"},
+    {"name": "generate_mining_data"},
+]
+
+map_4 = [
+    {
+        "name": "clip_drainage_lines",
+        "children": [
+            {
+                "name": "generate_clart_layer",
+            }
+        ],
+    },
+    {
+        "name": "site_suitability",
+        "use_global_args": True,
     },
     {
         "name": "terrain_raster",
@@ -86,23 +121,6 @@ map_3 = [
                 "use_global_args": True,
                 "depends_on": ["terrain_raster", "clip_lulc_v3"],
             },
-        ],
-    },
-]
-
-map_4 = [
-    {
-        "name": "generate_soge_vector",
-    },
-    {
-        "name": "generate_stream_order",
-    },
-    {
-        "name": "clip_drainage_lines",
-        "children": [
-            {
-                "name": "generate_clart_layer",
-            }
         ],
     },
     {
@@ -134,6 +152,7 @@ map_4 = [
         ],
     },
 ]
+
 
 end_year_rules = {
     "calculate_drought": 2022,
