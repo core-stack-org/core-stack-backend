@@ -74,9 +74,9 @@ def generate_stream_order(
     # Generate raster Layer
     stream_order_raster_generation(
         raster,
-        state=None,
-        district=None,
-        block=None,
+        state,
+        district,
+        block,
         description=description,
         roi=roi,
         raster_asset_id=asset_id_raster,
@@ -85,9 +85,9 @@ def generate_stream_order(
 
 def stream_order_raster_generation(
     raster,
-    state=None,
-    district=None,
-    block=None,
+    state,
+    district,
+    block,
     description=None,
     roi=None,
     raster_asset_id=None,

@@ -40,7 +40,7 @@ def clip_drainage_lines(
     pan_india_drainage = ee.FeatureCollection(
         GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
     )
-    description = f"drainage_lines_{asset_suffix}"
+    description = ""
     if state and district and block:
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -53,10 +53,12 @@ def clip_drainage_lines(
         asset_suffix = (
             f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         )
+        description = f"drainage_lines_{asset_suffix}"
         state_name = state
         asset_id = get_gee_asset_path(state, district, block) + description
 
     else:
+        description = f"drainage_lines_{asset_suffix}"
         proj_obj = Project.objects.get(pk=proj_id)
         state_name = proj_obj.name
         roi = ee.FeatureCollection(roi_path)

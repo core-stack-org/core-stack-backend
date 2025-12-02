@@ -138,7 +138,7 @@ def sync_asset_to_db_and_geoserver(
     district=None,
     block=None,
     dataset_name="Surface Water Bodies",
-    workspace="water_bodies",
+    workspace="swb",
 ):
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
