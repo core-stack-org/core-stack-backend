@@ -155,8 +155,6 @@ map_4 = [
 
 
 end_year_rules = {
-    "calculate_drought": 2022,
-    "drought_causality": 2022,
     "tree_health_ch_raster": 2022,
     "tree_health_ch_vector": 2022,
     "tree_health_ccd_raster": 2022,
