@@ -123,7 +123,7 @@ def stream_order_raster_generation(
                 asset_id=raster_asset_id,
                 dataset_name="Stream Order",
             )
-            workspace_name = ("stream_order",)
+            workspace_name = "stream_order"
 
         else:
             proj_obj = Project.objects.get(pk=proj_id)
