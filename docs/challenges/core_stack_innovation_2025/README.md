@@ -1,7 +1,7 @@
 
 # CoRE Stack Starter Kit
 
-This repository provides a **hands-on starter kit** to learn and experiment with the **CoRE Stack data structure**, designed especially for participants in the **CoRE Stack Innovation Challenge 2025** [link](https://github.com/core-stack-org/core-stack-backend/blob/main/docs/challenges/core_stack_innovation_2025/core_stack_innovation_challenge_brief_problem_set.md).
+This repository provides a **hands-on starter kit** to learn and experiment with the **CoRE Stack data structure**, designed especially for participants in the **CoRE Stack Innovation Challenge 2025** - [link](https://github.com/core-stack-org/core-stack-backend/blob/main/docs/challenges/core_stack_innovation_2025/core_stack_innovation_challenge_brief_problem_set.md).
 
 The goal is to help researchers, developers, and innovators quickly understand:
 
@@ -32,7 +32,7 @@ A detailed narrative of this structure is available here:
 
 The **Entity-Relationship (ER) diagram** can help visualize this conceptually:
 
-![CoRE Stack ER Diagram](https://core-stack.org/wp-content/uploads/2024/12/Asset-5-5.png)
+![CoRE Stack ER Diagram](https://core-stack.org/wp-content/uploads/2025/11/watershed_erd-1.jpg)
 
 ----------
 
