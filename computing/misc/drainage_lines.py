@@ -42,7 +42,6 @@ def clip_drainage_lines(
     )
     description = ""
     if state and district and block:
-        description = f"drainage_lines_{district}_{block}"
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
@@ -54,6 +53,7 @@ def clip_drainage_lines(
         asset_suffix = (
             f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         )
+        description = f"drainage_lines_{asset_suffix}"
         state_name = state
         asset_id = get_gee_asset_path(state, district, block) + description
 
