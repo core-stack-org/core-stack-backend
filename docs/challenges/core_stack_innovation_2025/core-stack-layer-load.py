@@ -46,9 +46,8 @@ def download_layer(url, output_file):
         print(f"Failed to download: HTTP {response.status_code}")
 
 # Base URL and API key
-# Add your API key
 base_url = 'https://geoserver.core-stack.org/api/v1/'
-Api_key = ''
+Api_key = 'cH9Rk0j5.9B1vX4LLHzK8I4i1ruVufVVo585QCR3G'
 
 # API endpoint to get list of layers
 tehsil_layers_api_endpoint = 'get_generated_layer_urls/'
@@ -59,6 +58,10 @@ tehsil_layers_api_endpoint = 'get_generated_layer_urls/'
 state = "Gujarat"
 district = "Bhavnagar"
 tehsil = "Bhavnagar"
+
+#state = "Karnataka"
+#district = "Raichur"
+#tehsil = "Devadurga"
 
 # Define the HTTP request headers with the API key
 headers = {
@@ -93,12 +96,18 @@ else:
 
 # Build a neat list of layers
 layers_dict = parse_layers(tehsil_layers_response)
+with open(f"data/layers_{state}_{district}_{tehsil}.json", "wb") as f:
+    f.write(json.dumps(layers_dict).encode('utf-8'))
+#exit()
 
 # Set up a tehsil_data object to hold the data
 tehsil_obj = tehsil_data(state, district, tehsil)
 
 # Parse the layers and populate properties
-hydrology_url = layers_dict["Hydrology"][1]["url"]
+hydrology_url = next(
+    (layer["url"] for layer in layers_dict.get("Hydrology", []) if "deltaG_well_depth" in layer.get("url", "")),
+    None
+)
 hydrology_output = f"data/hydrology_{state}_{district}_{tehsil}.geojson"
 download_layer(hydrology_url, hydrology_output)
 with open(hydrology_output) as f:
@@ -261,6 +270,5 @@ if not df4.empty:
     plt.tight_layout()
     plt.savefig('data/cropping_vs_krk_scatter.png')
     plt.close()
-
 
 
