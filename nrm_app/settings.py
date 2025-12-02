@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "bot_interface",
     "gee_computing",
     "waterrejuvenation",
+    "moderation",
 ]
 
 # MARK: CORS Settings
