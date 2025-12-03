@@ -41,7 +41,7 @@ def generate_zoi_ci(
     )
     roi = ee.FeatureCollection(asset_id_zoi)
     generate_cropping_intensity(
-        roi=roi,
+        roi_path=roi,
         zoi_ci_asset=asset_id_ci,
         asset_folder_list=asset_folder_list,
         asset_suffix=asset_suffix,
