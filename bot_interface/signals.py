@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # print("bot_interface.signals module loaded - registering post_save signal")
 
 
-def async_process_work_demand(user_log_id, item_type="WORK_DEMAND"):
+def async_process_work_demand(user_log_id, item_type="Asset Demand"):
     """
     Async function to process work demand without blocking the main thread
     """
@@ -99,7 +99,7 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
 
         # Process asynchronously to avoid blocking the SMJ flow
         thread = threading.Thread(
-            target=async_process_work_demand, args=(instance.id, "story"), daemon=True
+            target=async_process_work_demand, args=(instance.id, "Story"), daemon=True
         )
         thread.start()
         logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")

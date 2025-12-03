@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     """WhatsApp interface implementation for handling WhatsApp Business API interactions"""
 
-    BUCKET_NAME = "your-s3-bucket-name"
+    BUCKET_NAME = "communityengagementstack"
 
     @staticmethod
     def create_event_packet(
@@ -3366,7 +3366,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             traceback.print_exc()
             return "failure"
 
-    def process_and_submit_work_demand(self, user_log_id, item_type="WORK_DEMAND"):
+    def process_and_submit_work_demand(self, user_log_id, item_type="ASSET_DEMAND"):
         """
         Processes work demand data from UserLogs and submits to Community Engagement API.
 
