@@ -67,6 +67,7 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         "run_off",
         "evapotranspiration",
         "precipitation",
+        "MWS",
     ]
     for word in EXCLUDE_LAYER_KEYWORDS:
         layers = layers.exclude(layer_name__icontains=word)
