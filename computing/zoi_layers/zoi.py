@@ -4,8 +4,9 @@ from computing.zoi_layers.zoi3 import get_ndvi_for_zoi
 from projects.models import Project
 from utilities.gee_utils import ee_initialize, valid_gee_text, check_task_status
 from waterrejuvenation.utils import wait_for_task_completion
+from nrm_app.celery import app
 
-
+@app.task()
 def generate_zoi(
     state=None,
     district=None,
@@ -17,7 +18,7 @@ def generate_zoi(
     gee_account_id=None,
     proj_id=None,
 ):
-
+    print (f"gee account id {gee_account_id}")
     ee_initialize(gee_account_id)
     if state and district and block:
         asset_suffix = (
