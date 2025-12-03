@@ -48,7 +48,6 @@ def excel_file_exists(state, district, tehsil):
 
 def raster_tiff_download_url(workspace, layer_name):
     geotiff_url = f"{GEOSERVER_URL}/{workspace}/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId={workspace}:{layer_name}&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
-    print("Geojson url", geotiff_url)
     return geotiff_url
 
 
@@ -62,6 +61,16 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
     tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
+
+    EXCLUDE_LAYER_KEYWORDS = [
+        "run off",
+        "run_off",
+        "evapotranspiration",
+        "precipitation",
+    ]
+    for word in EXCLUDE_LAYER_KEYWORDS:
+        layers = layers.exclude(layer_name__icontains=word)
+
     layer_data = []
 
     for layer in layers:
@@ -124,7 +133,6 @@ def get_location_info_by_lat_lon(lat, lon):
 
 def get_mws_id_by_lat_lon(lon, lat):
     data_dict = get_location_info_by_lat_lon(lat, lon)
-    print("Data dict for the lat lon", data_dict)
     if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
         return Response(
             {"error": "Latitude and longitude is not in SOI boundary."},
@@ -246,9 +254,6 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
 
 
 def get_tehsil_json(state, district, tehsil):
-    from datetime import datetime
-
-    print("start ", datetime.now())
     file_path, file_exists = excel_file_exists(state, district, tehsil)
     json_path = file_path.replace(".xlsx", ".json")
 
@@ -256,7 +261,6 @@ def get_tehsil_json(state, district, tehsil):
         with open(json_path, "r") as f:
             return json.load(f)
 
-    print(f"Generating JSON from Excel: {file_path}")
     xls = pd.read_excel(file_path, sheet_name=None)
     json_data = {}
 
@@ -269,8 +273,6 @@ def get_tehsil_json(state, district, tehsil):
     # Save JSON file
     with open(json_path, "w") as f:
         json.dump(json_data, f)
-
-    print("end ", datetime.now())
     return json_data
 
 
