@@ -42,16 +42,16 @@ map_2_2 = [
                     "clip_drainage_lines",
                 ],
             },
-            {
-                "name": "calculate_drought",
-                "use_global_args": True,
-                "children": [
-                    {
-                        "name": "drought_causality",
-                        "use_global_args": True,
-                    }
-                ],
-            },
+            # {
+            #     "name": "calculate_drought",
+            #     "use_global_args": True,
+            #     "children": [
+            #         {
+            #             "name": "drought_causality",
+            #             "use_global_args": True,
+            #         }
+            #     ],
+            # },
             {
                 "name": "create_crop_grids",
             },
@@ -123,34 +123,34 @@ map_4 = [
             },
         ],
     },
-    {
-        "name": "tree_health_ch_raster",
-        "use_global_args": True,
-        "children": [
-            {
-                "name": "tree_health_ch_vector",
-                "use_global_args": True,
-            }
-        ],
-    },
-    {
-        "name": "tree_health_ccd_raster",
-        "use_global_args": True,
-        "children": [
-            {
-                "name": "tree_health_ccd_vector",
-                "use_global_args": True,
-            }
-        ],
-    },
-    {
-        "name": "tree_health_overall_change_raster",
-        "children": [
-            {
-                "name": "tree_health_overall_change_vector",
-            }
-        ],
-    },
+    # {
+    #     "name": "tree_health_ch_raster",
+    #     "use_global_args": True,
+    #     "children": [
+    #         {
+    #             "name": "tree_health_ch_vector",
+    #             "use_global_args": True,
+    #         }
+    #     ],
+    # },
+    # {
+    #     "name": "tree_health_ccd_raster",
+    #     "use_global_args": True,
+    #     "children": [
+    #         {
+    #             "name": "tree_health_ccd_vector",
+    #             "use_global_args": True,
+    #         }
+    #     ],
+    # },
+    # {
+    #     "name": "tree_health_overall_change_raster",
+    #     "children": [
+    #         {
+    #             "name": "tree_health_overall_change_vector",
+    #         }
+    #     ],
+    # },
 ]
 
 
