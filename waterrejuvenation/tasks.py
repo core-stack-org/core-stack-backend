@@ -66,14 +66,14 @@ def is_nan(value):
 
 @shared_task
 def Upload_Desilting_Points(
-    file_obj_id, is_closest_wp=True, is_lulc_required=True, gee_project_id=None
+    file_obj_id=None, is_closest_wp=True, is_lulc_required=True, gee_project_id=None
 ):
     def get_val(row, key):
         val = row.get(key)
         return val if val not in ("", " ", None) else None
 
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
-
+    print(f"file obj id {file_obj_id}")
     ee_initialize(gee_project_id)
     merged_features = []
 

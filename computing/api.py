@@ -1472,8 +1472,15 @@ def generate_zoi_to_gee(request):
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
         generate_zoi.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+                },
+                    queue="waterbody"
+            )
+
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
