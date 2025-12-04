@@ -947,11 +947,24 @@ def generate_swb_layer_with_max_so_catchment(
     # ----------------------------
     # MAIN FIX: Null-safe reducer
     # ----------------------------
+
+    def safe_geometry(geom, scale):
+        # Compute approx radius of buffer needed (half pixel)
+        buffer_dist = scale / 2
+
+        # If the geometry area is too small compared to one pixel, buffer it
+        return ee.Algorithms.If(
+            geom.area().lt(scale * scale),  # geometry area < 1 pixel area?
+            geom.buffer(buffer_dist),  # buffer to make it cover at least one pixel
+            geom  # otherwise return original
+        )
+
+
     def safe_reduce_max(image, geom, scale=30):
         """Returns max value safely, fallback to 0 instead of null."""
         result = image.reduceRegion(
             reducer=ee.Reducer.max(),
-            geometry=geom,
+            geometry=safe_geometry(geom, scale),
             scale=scale,
             maxPixels=1e13,
             bestEffort=True,
