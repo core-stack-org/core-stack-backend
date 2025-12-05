@@ -84,7 +84,7 @@ map_3 = [
     {"name": "generate_natural_depression_data"},
     {"name": "generate_distance_to_nearest_drainage_line"},
     {"name": "generate_catchment_area_singleflow"},
-    {"name": "generate_slope_percentage"},
+    {"name": "generate_slope_percentage_data"},
     {"name": "generate_lcw_conflict_data"},
     {"name": "generate_agroecological_data"},
     {"name": "generate_factory_csr_data"},
