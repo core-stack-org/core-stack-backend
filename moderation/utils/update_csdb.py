@@ -1,51 +1,17 @@
-"""
-Add a class
-checks for a new submission / editing on the ODK submissions of each form
-returns flag true for is_updated, updated_time or is_edited and form id
-"""
-
-from itertools import count
-
 import requests
 from requests.auth import HTTPBasicAuth
 from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from .utils import *
 from .get_submissions import get_edited_updated_all_submissions
 from .form_mapping import corestack
-
-# class get_edited_updated_submissions:
-#     def __init__(self, username, password, base_url):
-#         self.auth = HTTPBasicAuth(username, password)
-#         self.base_url = base_url
-#
-#     def get_edited_updated_settlement_submissions(
-#         self, project_id, form_id, filter_query
-#     ):
-#         url = f"{self.base_url}/v1/projects/{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
-#         response = requests.get(url, auth=self.auth)
-#         response.raise_for_status()
-#         return response.json().get("value", [])
-
-# def get_edited_and_new_submission(self):
-#     url = "https://odk.core-stack.org/v1/projects/2/forms/Add_Settlements_form%20_V1.0.1.svc/Submissions?$filter=(day(__system/submissionDate) ge 28 and month(__system/submissionDate) ge 11 and year(__system/submissionDate) ge 2025) or (day(__system/updatedAt) ge 28 and month(__system/updatedAt) ge 11 and year(__system/updatedAt) eq 2025)"
-#     username = ODK_USERNAME
-#     password = ODK_PASSWORD
-#     response = requests.get(url, auth=HTTPBasicAuth(username, password))
-#     if response.status_code == 200:
-#         return response.json().get("value", [])
-#     else:
-#         return {
-#             "error": True,
-#             "status_code": response.status_code,
-#             "message": response.text,
-#         }
+from utilities.constants import ODK_BASE_URL
 
 
 def sync_settlement_odk_data(get_edited_updated_all_submissions):
     get_edited_updated_all_submissions = get_edited_updated_all_submissions(
         username=ODK_USERNAME,
         password=ODK_PASSWORD,
-        base_url="https://odk.core-stack.org",
+        base_url=ODK_BASE_URL,
     )
 
     filter_query = (

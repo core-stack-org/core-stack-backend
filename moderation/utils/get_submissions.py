@@ -1,29 +1,40 @@
 import requests
-from requests.auth import HTTPBasicAuth
 from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from plans.utils import fetch_bearer_token
 from .form_mapping import corestack
+from utilities.constants import ODK_BASE_URL
 
 
 class get_edited_updated_all_submissions:
     def __init__(self, username, password, base_url):
-        self.auth = HTTPBasicAuth(username, password)
         self.base_url = base_url
+        self.token = fetch_bearer_token(username, password)
 
     def get_edited_updated_submissions(self, project_id, form_id, filter_query):
-        url = f"{self.base_url}/v1/projects/{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
-        response = requests.get(url, auth=self.auth)
+        url = f"{self.base_url}{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/json",
+        }
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         return response.json().get("value", [])
 
 
-# flag required edited/updated
+def form_submissions_edited_updated_url(form_id, filter_query):
+    """
 
+    Args:
+        form_id:
+        filter_query:
 
-def form_submissions_updated_url(form_id, filter_query):
+    Returns:
+        url for particular form on the basis of particular date
+
+    """
     project_id = 2
     base_url = "https://odk.core-stack.org"
-    url = f"{base_url}/v1/projects/{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
+    url = f"{ODK_BASE_URL}{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
     return url
 
 
@@ -31,285 +42,40 @@ filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.0
 filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
 
 
-class odk_submissions_updated:
+class ODKSubmissionsChecker:
     def __init__(self):
         self.token = fetch_bearer_token(ODK_USERNAME, ODK_PASSWORD)
         self.results = {}
-
-        self.settlement_submissions()
-        self.well_submissions()
-        self.waterbody_submissions()
-        self.groundwater_submissions()
-        self.agri_submissions()
-        self.livelihood_submissions()
-        self.cropping_submissions()
-        self.agri_maintenance_submissions()
-        self.gw_maintenance_submissions()
-        self.swb_maintenance_submissions()
-        self.swb_rs_maintenance_submissions()
+        self.forms = list(corestack.keys())
 
     def _auth_headers(self):
         return {"Authorization": f"Bearer {self.token}"}
 
-    def settlement_submissions(self):
-        form_name = "Settlement Form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
+    def process(self, mode="updated"):
+        """
+        mode = "updated" or "edited"
+        """
+        filter_query = (
+            filter_query_updated if mode == "updated" else filter_query_edited
         )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
+        flag_key = "is_updated" if mode == "updated" else "is_edited"
 
-    def well_submissions(self):
-        form_name = "Well Form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
+        for form_name in self.forms:
+            form_id = corestack.get(form_name)
+            if not form_id:
+                self.results[form_name] = {"error": "Form not found in corestack"}
+                continue
 
-    def waterbody_submissions(self):
-        form_name = "water body form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
+            url = form_submissions_edited_updated_url(form_id, filter_query)
+            self.set_flag(url, form_name, flag_key)
 
-    def groundwater_submissions(self):
-        form_name = "new recharge structure form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
+        return self.results
 
-    def agri_submissions(self):
-        form_name = "new irrigation form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-    def livelihood_submissions(self):
-        form_name = "livelihood form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name]: {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-    def cropping_submissions(self):
-        form_name = "cropping pattern form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-    def agri_maintenance_submissions(self):
-        form_name = "propose maintenance on existing irrigation form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-    def gw_maintenance_submissions(self):
-        form_name = "propose maintenance on water structure form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-    def swb_maintenance_submissions(self):
-        form_name = "propose maintenance on existing water recharge form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-    def swb_rs_maintenance_submissions(self):
-        form_name = "propose maintenance of remotely sensed water structure form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_updated)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_updated": False}
-        else:
-            self.results[form_name] = {"is_updated": True}
-
-
-class odk_submissions_edited:
-    def __init__(self):
-        self.token = fetch_bearer_token(ODK_USERNAME, ODK_PASSWORD)
-        self.results = {}
-
-        self.settlement_submissions()
-        self.well_submissions()
-        self.waterbody_submissions()
-        self.groundwater_submissions()
-        self.agri_submissions()
-        self.livelihood_submissions()
-        self.cropping_submissions()
-        self.agri_maintenance_submissions()
-        self.gw_maintenance_submissions()
-        self.swb_maintenance_submissions()
-        self.swb_rs_maintenance_submissions()
-
-    def _auth_headers(self):
-        return {"Authorization": f"Bearer {self.token}"}
-
-    def settlement_submissions(self):
-        form_name = "Settlement Form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def well_submissions(self):
-        form_name = "Well Form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def waterbody_submissions(self):
-        form_name = "water body form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def groundwater_submissions(self):
-        form_name = "new recharge structure form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def agri_submissions(self):
-        form_name = "new irrigation form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def livelihood_submissions(self):
-        form_name = "livelihood form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def cropping_submissions(self):
-        form_name = "cropping pattern form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def agri_maintenance_submissions(self):
-        form_name = "propose maintenance on existing irrigation form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def gw_maintenance_submissions(self):
-        form_name = "propose maintenance on water structure form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def swb_maintenance_submissions(self):
-        form_name = "propose maintenance on existing water recharge form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
-
-    def swb_rs_maintenance_submissions(self):
-        form_name = "propose maintenance of remotely sensed water structure form"
-        url = form_submissions_updated_url(corestack[form_name], filter_query_edited)
-        response = (
-            requests.get(url, headers=self._auth_headers()).json().get("value", [])
-        )
-        if not response:
-            self.results[form_name] = {"is_edited": False}
-        else:
-            self.results[form_name] = {"is_edited": True}
+    def set_flag(self, url, form_name, flag_key):
+        try:
+            response = (
+                requests.get(url, headers=self._auth_headers()).json().get("value", [])
+            )
+            self.results[form_name] = {flag_key: bool(response)}
+        except Exception as e:
+            self.results[form_name] = {"error": str(e)}
