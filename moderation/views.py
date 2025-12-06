@@ -10,7 +10,7 @@ import requests
 from utilities.constants import ODK_BASE_URL
 
 
-def paginate_queryset(queryset, page=1, per_page=1):
+def paginate_queryset(queryset, page=1, per_page=10):
     paginator = Paginator(queryset, per_page)
 
     try:
@@ -24,6 +24,7 @@ def paginate_queryset(queryset, page=1, per_page=1):
 
     return {
         "page": obj_page.number,
+        "per_page": per_page,
         "total_pages": paginator.num_pages,
         "total_objects": paginator.count,
         "data": data,
