@@ -2631,47 +2631,25 @@ def get_agroforestry_transition_data(state, district, block):
                 if pd.notna(triple_to_single):
                     total_triple_to_single += float(triple_to_single)
         
-        # Prepare Sankey data for cropping intensity transitions
         agroforestry_sankey = {
             "nodes": [
-                {"name": "Double Cropping (Initial)"},
-                {"name": "Single Cropping (Initial)"},
-                {"name": "Triple Cropping (Initial)"},
-                {"name": "Single Cropping (Final)"},
-                {"name": "Double Cropping (Final)"},
-                {"name": "Triple Cropping (Final)"}
+                {"name": "Single Cropping (Initial)", "priority": 0},
+                {"name": "Double Cropping (Initial)", "priority": 1},
+                {"name": "Triple Cropping (Initial)", "priority": 2},
+                {"name": "Single Cropping (Final)", "priority": 0},
+                {"name": "Double Cropping (Final)", "priority": 1},
+                {"name": "Triple Cropping (Final)", "priority": 2}
             ],
             "links": [
-                {
-                    "source": 0,  
-                    "target": 3,  
-                    "value": round(total_double_to_single, 2)
-                },
-                {
-                    "source": 0, 
-                    "target": 5, 
-                    "value": round(total_double_to_triple, 2)
-                },
-                {
-                    "source": 1,  # Single Cropping (Initial)
-                    "target": 4,  # Double Cropping (Final)
-                    "value": round(total_single_to_double, 2)
-                },
-                {
-                    "source": 1,  # Single Cropping (Initial)
-                    "target": 5,  # Triple Cropping (Final)
-                    "value": round(total_single_to_triple, 2)
-                },
-                {
-                    "source": 2,  # Triple Cropping (Initial)
-                    "target": 4,  # Double Cropping (Final)
-                    "value": round(total_triple_to_double, 2)
-                },
-                {
-                    "source": 2,  # Triple Cropping (Initial)
-                    "target": 3,  # Single Cropping (Final)
-                    "value": round(total_triple_to_single, 2)
-                }
+                # Single Cropping (Initial) transitions
+                {"source": 0, "target": 4, "value": round(total_single_to_double, 2)},
+                {"source": 0, "target": 5, "value": round(total_single_to_triple, 2)},
+                # Double Cropping (Initial) transitions
+                {"source": 1, "target": 3, "value": round(total_double_to_single, 2)},
+                {"source": 1, "target": 5, "value": round(total_double_to_triple, 2)},
+                # Triple Cropping (Initial) transitions
+                {"source": 2, "target": 3, "value": round(total_triple_to_single, 2)},
+                {"source": 2, "target": 4, "value": round(total_triple_to_double, 2)}
             ]
         }
         
@@ -2698,4 +2676,4 @@ def get_agroforestry_transition_data(state, district, block):
         }, {
             "nodes": [],
             "links": []
-        }   
+        }
