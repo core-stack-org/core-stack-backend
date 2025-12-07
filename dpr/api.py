@@ -48,7 +48,20 @@ from .gen_mws_report import (
     get_mining_data,
     get_green_credit_data
 )
-from .gen_tehsil_report import (get_tehsil_data, get_pattern_intensity, get_agriculture_data)
+from .gen_tehsil_report import (
+    get_tehsil_data, 
+    get_pattern_intensity, 
+    get_agri_water_stress_data,
+    get_agri_water_drought_data,
+    get_agri_water_irrigation_data,
+    get_agri_low_yield_data,
+    get_forest_degrad_data,
+    get_mining_presence_data,
+    get_socio_economic_caste_data,
+    get_socio_economic_nrega_data,
+    get_fishery_water_potential_data,
+    get_agroforestry_transition_data
+)
 from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email
 
@@ -437,6 +450,7 @@ def download_mws_report(request):
 @api_view(["GET"])
 @auth_free
 @schema(None)
+@api_security_check(auth_type="Auth_free")
 def generate_tehsil_report(request):
     try:
         # ? district, block, mwsId
@@ -446,26 +460,62 @@ def generate_tehsil_report(request):
         for key, value in params.items():
             result[key] = value
         
-        # ? Total number of patterns are hardcoded and need to be updated everytime a new pattern is added to update the intensity values
-        current_pattern_count = 11
-        
-        mws_pattern_intensity = {}
-        
         # ? OSM description generation
         parameter_block = get_tehsil_data(
             result["state"], result["district"], result["block"]
         )
 
         #? Pattern intensity
-        mws_pattern_intensity = get_pattern_intensity(result["state"], result["district"], result["block"], mws_pattern_intensity, current_pattern_count)
+        mws_pattern_intensity = get_pattern_intensity(result["state"], result["district"], result["block"])
 
         # ? Agriculture data
-        agriculture_data = get_agriculture_data(result["state"], result["district"], result["block"])
+        groundwater_stress = get_agri_water_stress_data(result["state"], result["district"], result["block"])
+        high_drought_incidence, weighted_drought_timeline = get_agri_water_drought_data(result["state"], result["district"], result["block"])
+        high_irrigation_risk, irrigation_timeline = get_agri_water_irrigation_data(result["state"], result["district"], result["block"])
+        low_yield, yield_sankey = get_agri_low_yield_data(result["state"], result["district"], result["block"])
+        forest_degradation, forest_sankey = get_forest_degrad_data(result["state"], result["district"], result["block"])
+        mining_presence, mining_pie = get_mining_presence_data(result["state"], result["district"], result["block"])
+        socio_caste, caste_pie = get_socio_economic_caste_data(result["state"], result["district"], result["block"])
+        socio_nrega, nrega_pie = get_socio_economic_nrega_data(result["state"], result["district"], result["block"])
+        fishery_potential, fishery_timeline = get_fishery_water_potential_data(result["state"], result["district"], result["block"])
+        agroforestry_transition, agroforestry_sankey = get_agroforestry_transition_data(result["state"], result["district"], result["block"])
+
 
         context = {
             "district": result["district"],
             "block": result["block"],
             "block_osm": parameter_block,
+
+            "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
+
+            "groundwater_stress_json": json.dumps(groundwater_stress),
+
+            "high_drought_incidence_json": json.dumps(high_drought_incidence),
+            "drought_timeline_json" : json.dumps(weighted_drought_timeline),
+
+            "high_irrigation_risk_json": json.dumps(high_irrigation_risk),
+            "irrigation_timeline_json": json.dumps(irrigation_timeline),
+
+            "low_yield_json": json.dumps(low_yield),
+            "yield_sankey_json": json.dumps(yield_sankey),
+
+            "forest_degradation_json": json.dumps(forest_degradation),
+            "forest_sankey_json": json.dumps(forest_sankey),
+
+            "mining_presence_json": json.dumps(mining_presence),
+            "mining_pie_json": json.dumps(mining_pie),
+
+            "socio_caste_json": json.dumps(socio_caste),
+            "caste_pie_json": json.dumps(caste_pie),
+
+            "socio_nrega_json": json.dumps(socio_nrega),
+            "nrega_pie_json": json.dumps(nrega_pie),
+
+            "fishery_potential_json": json.dumps(fishery_potential),
+            "fishery_timeline_json": json.dumps(fishery_timeline),
+
+            "agroforestry_transition_json": json.dumps(agroforestry_transition),
+            "agroforestry_sankey_json": json.dumps(agroforestry_sankey),
         }
 
         return render(request, "block-report.html", context)
