@@ -1,51 +1,137 @@
 {
     "Agriculture" : [
         {
-            "Name" : "low_rainfed_agri_resilience",
-            "values" : [
-                {
-                    "sheet_name" : "croppingIntensity_annual",
-                    "type" : 4,
-                    "column" : ["doubly_cropped_area_in_ha_","sum_area_in_ha"]
-                }
-            ]
-        },
-        {
             "Name" : "groundwater_stress",
             "values" : [
                 {
                     "sheet_name" : "soge_vector",
                     "type" : 2,
-                    "column" : "class_name"
+                    "column" : "class_name",
+                    "comparison" : "Safe",
+                    "comp_type" : 2
                 },
                 {
                     "sheet_name" : "hydrological_annual",
                     "type" : 3,
-                    "column" : "G_in_mm_"
-                }
-            ]
-        }
-    ],
-    "Livestock" : [
-        {
-            "Name" : "overgrazing",
-            "values" : [
-                {
-                    "sheet_name" : "change_detection_deforestation",
-                    "type" : 2,
-                    "column" : "total_deforestation_area_in_ha"
+                    "column" : "G_in_mm_",
+                    "trend" : -1
                 }
             ]
         },
         {
-            "Name" : "water scarcity",
+            "Name" : "high_drought_incidence",
+            "values" : [
+                {
+                    "sheet_name" : "croppingDrought_kharif",
+                    "type" : 5,
+                    "column" : ["Moderate_in_weeks_", "Severe_in_weeks_"],
+                    "comparison" : 2,
+                    "comp_type" : 5
+                },
+                {
+                    "sheet_name" : "croppingDrought_kharif",
+                    "type" : 1,
+                    "column" : "drysp_unit_4_weeks_",
+                    "comparison" : 2,
+                    "comp_type" : 5
+                }
+            ]
+        },
+        {
+            "Name" : "high_irrigation_risk",
             "values" : [
                 {
                     "sheet_name" : "surfaceWaterBodies_annual",
                     "type" : 4,
-                    "column" : ["rabi_area_in_ha_", "rabi_area_in_ha_"]
+                    "column" : ["total_area_in_ha_","rabi_area_in_ha_"],
+                    "percentage" : "30",
+                    "comp_type" : 4
+                },
+                {
+                    "sheet_name" : "surfaceWaterBodies_annual",
+                    "type" : 3,
+                    "column" : "total_area_in_ha_",
+                    "trend" : -1,
+                    "comp_type" : 1                
                 }
             ]
-        }    
+        },
+        {
+            "Name" : "low_yield",
+            "values" : [
+                {
+                    "sheet_name" : "change_detection_degradation",
+                    "type" : 5,
+                    "column" : ["farm_to_barren_area_in_ha","farm_to_scrub_land_area_in_ha"],
+                    "comparison" : 30,
+                    "comp_type" : 3    
+                },
+                {
+                    "sheet_name" : "change_detection_cropintensity",
+                    "type" : 2,
+                    "column" : "total_change_crop_intensity_area_in_ha",
+                    "comparison" : 30,
+                    "comp_type" : 3                
+                }
+            ]
+        }
+    ],
+    "Forest & Livestock" : [
+        {
+            "Name" : "forest_degradation",
+            "values" : [
+                {
+                    "sheet_name" : "change_detection_deforestation",
+                    "type" : 2,
+                    "column" : "total_deforestation_area_in_ha",
+                    "comparison" : 50,
+                    "comp_type" : 3
+                }
+            ]
+        }
+    ],
+    "Health" : [
+        {
+            "Name" : "mining_presence",
+            "values" : [
+                {
+                    "sheet_name" : "mining",
+                    "type" : 6
+                }
+            ]
+        }
+    ],
+    "Socio-economic" : [
+        {
+            "Name" : "caste",
+            "values" : [
+                {
+                    "sheet_name" : ["mws_intersect_villages","social_economic_indicator"],
+                    "type" : 7,
+                    "column" : [["MWS UID","Village IDs"],["village_id","SC_percent"]],
+                    "comparison" : 17,
+                    "comp_type" : 3
+                },
+                {
+                    "sheet_name" : ["mws_intersect_villages","social_economic_indicator"],
+                    "type" : 7,
+                    "column" : [["MWS UID","Village IDs"],["village_id","ST_percent"]],
+                    "comparison" : 33,
+                    "comp_type" : 3
+                }
+            ]
+        },
+        {
+            "Name" : "nrega",
+            "values" : [
+                {
+                    "sheet_name" : "nrega_annual",
+                    "type" : 8,
+                    "column" : ["mws_id","Soil and water conservation_count_","Land restoration_count_","Plantations_count_","Irrigation on farms_count_","Other farm works_count_","Off-farm livelihood assets_count_","Community assets_count_"],
+                    "comparison" : 100,
+                    "comp_type" : 4
+                }
+            ]
+        }
     ]
 }
