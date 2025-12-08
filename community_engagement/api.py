@@ -180,6 +180,7 @@ def attach_media_files(files, item, user, source, bot=None):
             s3_key = f"{s3_folder}/{uuid.uuid4()}.{extension}"
 
             try:
+                print(f"uploading file to bucket; {S3_BUCKET}")
                 s3_client.upload_fileobj(media_file, S3_BUCKET, s3_key)
             except Exception as e:
                 print(f"Failed to upload {media_file.name} to S3:", e)
@@ -363,7 +364,12 @@ def upsert_item(request):
                 )
 
             return Response(
-                {"success": True, "message": "Item updated", "item_id": item.id},
+                {
+                    "success": True,
+                    "message": "Item updated",
+                    "item_id": item.id,
+                    "item_type": item.item_type,
+                },
                 status=status.HTTP_200_OK,
             )
 

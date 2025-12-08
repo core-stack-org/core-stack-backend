@@ -8,15 +8,17 @@ from bot_interface.models import Bot
 
 # Create your models here.
 class LocationLevel(models.TextChoices):
-    STATE = 'state', 'State'
-    DISTRICT = 'district', 'District'
-    BLOCK = 'block', 'Block'
+    STATE = "state", "State"
+    DISTRICT = "district", "District"
+    BLOCK = "block", "Block"
 
 
 class Location(models.Model):
     level = models.CharField(max_length=10, choices=LocationLevel.choices)
     state = models.ForeignKey(State, on_delete=models.CASCADE)
-    district = models.ForeignKey(District, on_delete=models.CASCADE, null=True, blank=True)
+    district = models.ForeignKey(
+        District, on_delete=models.CASCADE, null=True, blank=True
+    )
     block = models.ForeignKey(Block, on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
@@ -40,7 +42,7 @@ class Community(models.Model):
     id = models.AutoField(primary_key=True)
     project = models.ForeignKey(Project, null=True, on_delete=models.CASCADE)
     bot = models.ForeignKey(Bot, null=True, on_delete=models.SET_NULL)
-    locations = models.ManyToManyField(Location, related_name='communities')
+    locations = models.ManyToManyField(Location, related_name="communities")
 
     def __str__(self):
         return self.project.name
@@ -106,26 +108,26 @@ ITEM_TYPE_STATE_MAP = {
     Item_type.CONTENT: [
         Item_state.UNMODERATED,
         Item_state.PUBLISHED,
-        Item_state.REJECTED
+        Item_state.REJECTED,
     ],
     Item_type.GRIEVANCE: [
         Item_state.UNMODERATED,
         Item_state.INPROGRESS,
         Item_state.RESOLVED,
-        Item_state.REJECTED
+        Item_state.REJECTED,
     ],
     Item_type.ASSET_DEMAND: [
         Item_state.UNMODERATED,
         Item_state.ACCEPTED_STAGE_1,
         Item_state.REJECTED_STAGE_1,
         Item_state.INPROGRESS,
-        Item_state.RESOLVED
+        Item_state.RESOLVED,
     ],
     Item_type.STORY: [
         Item_state.UNMODERATED,
         Item_state.PUBLISHED,
-        Item_state.REJECTED
-    ]
+        Item_state.REJECTED,
+    ],
 }
 
 
@@ -133,7 +135,9 @@ class Item(models.Model):
     id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=255)
     transcript = models.TextField(blank=True, null=True)
-    category = models.ForeignKey(Item_category, blank=True, null=True, on_delete=models.SET_NULL)
+    category = models.ForeignKey(
+        Item_category, blank=True, null=True, on_delete=models.SET_NULL
+    )
     rating = models.PositiveSmallIntegerField(default=0)
     media = models.ManyToManyField(Media, blank=True)
     item_type = models.CharField(max_length=255, choices=Item_type.choices)

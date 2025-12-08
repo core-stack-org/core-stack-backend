@@ -690,15 +690,18 @@
             <div id="mainMap" class="map"></div>
 
             <div class="legend-below-map">
-                <h4>Pattern Intensity</h4>
-                <div class="legend-gradient-container">
-                    <div class="legend-gradient-bar"></div>
-                    <div class="legend-gradient-labels">
-                        <span>Low (<span id="legend-min-value">0</span>)</span>
-                        <span>High (<span id="legend-max-value">0</span>)</span>
-                    </div>
+            <h4>Pattern Intensity</h4>
+            <div class="legend-gradient-container">
+                <div class="legend-gradient-bar"></div>
+                <div class="legend-gradient-labels">
+                    <span>Low (<span id="legend-min-value">0</span>)</span>
+                    <span>High (<span id="legend-max-value">0</span>)</span>
                 </div>
             </div>
+            <p class="legend-note">
+                This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate compounding stresses.
+            </p>
+        </div>
         </section>
 
         <section class="section" id="agriculture-section">
@@ -789,7 +792,7 @@
 
             <div id="nrega-section">
                 <h3>NREGA</h3>
-                <p><span id="nrega-villages"></span> villages have a low number of NREGA works. Positive discrimination in access to NREGA assets should be considered.</p>
+                <p><span id="nrega-villages"></span> villages have a low (less than 100 NREGA work) number of NREGA works. Positive discrimination in access to NREGA assets should be considered.</p>
                 
                 <div class="map-chart-container">
                     <div id="nregaMap" class="map"></div>
@@ -802,7 +805,7 @@
 
         <section class="section" id="fishery-section">
             <h2>Fishery</h2>
-            <p>Up to <span id="fishery-area"></span> area (in hectares) appears to have good potential for fishery.</p>
+            <p>Up to <span id="fishery-area"></span> area (in hectares) appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year.</p>
             
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
@@ -814,7 +817,7 @@
 
         <section class="section" id="agroforestry-section">
             <h2>Agroforestry</h2>
-            <p>Up to <span id="agroforestry-area"></span> area (in hectares) could benefit from agroforestry.</p>
+            <p>Up to <span id="agroforestry-area"></span> area (in hectares) could benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
             
             <div class="map-chart-container">
                 <div id="agroforestryMap" class="map"></div>
@@ -2007,30 +2010,39 @@
             })),
             colorFrom: (c) => {
                 const fromNode = c.dataset.data[c.dataIndex].from;
-                if (fromNode === 'Double Cropping (Initial)') {
-                    return 'rgba(255, 193, 7, 0.8)';  // Amber for double
-                } else if (fromNode === 'Single Cropping (Initial)') {
-                    return 'rgba(244, 67, 54, 0.8)';  // Red for single
+                if (fromNode === 'Single Cropping (Initial)') {
+                    return 'rgba(244, 67, 54, 0.8)';
+                } else if (fromNode === 'Double Cropping (Initial)') {
+                    return 'rgba(255, 193, 7, 0.8)';
                 } else if (fromNode === 'Triple Cropping (Initial)') {
-                    return 'rgba(76, 175, 80, 0.8)';  // Green for triple
+                    return 'rgba(76, 175, 80, 0.8)';
                 }
                 return 'rgba(158, 158, 158, 0.5)';
             },
             colorTo: (c) => {
                 const toNode = c.dataset.data[c.dataIndex].to;
                 if (toNode === 'Single Cropping (Final)') {
-                    return 'rgba(244, 67, 54, 0.8)';  // Red for single (degradation)
+                    return 'rgba(244, 67, 54, 0.8)';
                 } else if (toNode === 'Double Cropping (Final)') {
-                    return 'rgba(255, 193, 7, 0.8)';  // Amber for double
+                    return 'rgba(255, 193, 7, 0.8)';
                 } else if (toNode === 'Triple Cropping (Final)') {
-                    return 'rgba(76, 175, 80, 0.8)';  // Green for triple (improvement)
+                    return 'rgba(76, 175, 80, 0.8)';
                 }
                 return 'rgba(158, 158, 158, 0.5)';
             },
             colorMode: 'gradient',
             size: 'max',
             borderWidth: 1,
-            borderColor: 'white'
+            borderColor: 'white',
+            // Add priority/column information
+            priority: {
+                'Single Cropping (Initial)': 0,
+                'Double Cropping (Initial)': 1,
+                'Triple Cropping (Initial)': 2,
+                'Single Cropping (Final)': 0,
+                'Double Cropping (Final)': 1,
+                'Triple Cropping (Final)': 2
+            }
         }]
     };
 
@@ -2059,10 +2071,24 @@
                         }
                     }
                 }
+            },
+            // Add layout options to control node positioning
+            layout: {
+                nodeSort: (a, b) => {
+                    // Sort by priority
+                    const priorityMap = {
+                        'Single Cropping (Initial)': 0,
+                        'Double Cropping (Initial)': 1,
+                        'Triple Cropping (Initial)': 2,
+                        'Single Cropping (Final)': 3,
+                        'Double Cropping (Final)': 4,
+                        'Triple Cropping (Final)': 5
+                    };
+                    return priorityMap[a.key] - priorityMap[b.key];
+                }
             }
         }
     });
-
     //? Data Check
      function hasSectionData(dataObj) {
         if (!dataObj) return false;
