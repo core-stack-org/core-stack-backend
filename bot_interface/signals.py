@@ -24,11 +24,10 @@ def async_process_work_demand(user_log_id, item_type="Asset Demand"):
     Async function to process work demand without blocking the main thread
     """
     try:
+        print(f"Generating demand for item type {item_type}")
         # Initialize WhatsApp interface and process the work demand
         whatsapp_interface = WhatsAppInterface()
-        whatsapp_interface.process_and_submit_work_demand(
-            user_log_id, item_type=item_type
-        )
+        whatsapp_interface.process_and_submit_work_demand(user_log_id)
 
         logger.info(
             f"Successfully processed work demand for UserLogs ID: {user_log_id}"
@@ -88,22 +87,8 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
         thread.start()
         logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")
 
-    if (
-        instance.key1 == "useraction"
-        and instance.value1 == "story"
-        and instance.misc
-        and "work_demand_data" in instance.misc
-    ):
+    else:
 
-        logger.info(f"story completion detected for UserLogs ID: {instance.id}")
-
-        # Process asynchronously to avoid blocking the SMJ flow
-        thread = threading.Thread(
-            target=async_process_work_demand, args=(instance.id, "Story"), daemon=True
+        logger.info(
+            f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}"
         )
-        thread.start()
-        logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")
-
-    logger.info(
-        f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}"
-    )

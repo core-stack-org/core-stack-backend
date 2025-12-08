@@ -2942,7 +2942,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                             )
                             return
 
-                        self.process_and_submit_work_demand(user_log.id)
+                        self.process_and_submit_story(user_log.id)
                         print(
                             f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}"
                         )
@@ -3093,7 +3093,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 "grievance_data": grievance_data,
                 "community_context": community_context,
                 "flow_metadata": {
-                    "smj_name": "grievance",
+                    "smj_name": "story",
                     "completion_timestamp": datetime.now().isoformat(),
                     "user_number": (
                         bot_user.user.username if bot_user.user else "unknown"
@@ -3366,7 +3366,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             traceback.print_exc()
             return "failure"
 
-    def process_and_submit_work_demand(self, user_log_id, item_type="ASSET_DEMAND"):
+    def process_and_submit_work_demand(self, user_log_id):
         """
         Processes work demand data from UserLogs and submits to Community Engagement API.
 
@@ -3382,6 +3382,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         from django.conf import settings
         from bot_interface.models import UserLogs
 
+        print(f"invoking proces and submit work demand")
         try:
             # Get the UserLogs record
             try:
@@ -3397,7 +3398,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if not work_demand_data:
                 # Try alternative key structure
                 work_demand_data = user_log.misc.get("work_demand", {})
-
+            print(f"workd demand data {work_demand_data}")
             if not work_demand_data:
                 return {
                     "success": False,
@@ -3522,6 +3523,258 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 "source": "BOT",
                 "bot_id": user_log.bot.id,
                 "title": f"{item_type}",  # Auto-generated if not provided
+                "transcript": work_demand_data.get(
+                    "description", ""
+                ),  # If any description exists
+            }
+
+            print(f"API Payload: {payload}")
+            print(f"Files to upload: {list(files.keys())}")
+
+            # Submit to Community Engagement API
+            api_url = f"http://localhost:8000/api/v1/upsert_item/"
+
+            try:
+                response = requests.post(
+                    api_url, data=payload, files=files, timeout=30  # 30 second timeout
+                )
+
+                print(f"API Response Status: {response.status_code}")
+                print(f"API Response: {response.text}")
+
+                if response.status_code == 200 or response.status_code == 201:
+                    result = response.json()
+                    if result.get("success"):
+                        print(
+                            f"Successfully submitted work demand. Item ID: {result.get('item_id')}"
+                        )
+
+                        # Update UserLogs with success status
+                        user_log.value2 = "success"
+                        user_log.value3 = "0"  # No retries needed
+                        user_log.key4 = "response"
+                        user_log.value4 = response.text
+                        user_log.save()
+                        print(f"Updated UserLogs ID {user_log.id} with success status")
+
+                        return result
+                    else:
+                        print(f"API returned success=False: {result}")
+
+                        # Update UserLogs with API failure status
+                        user_log.value2 = "failure"
+                        user_log.value3 = "0"
+                        user_log.key4 = "response"
+                        user_log.value4 = response.text
+                        user_log.save()
+                        print(
+                            f"Updated UserLogs ID {user_log.id} with API failure status"
+                        )
+
+                        return result
+                else:
+                    # Update UserLogs with HTTP error status
+                    user_log.value2 = "failure"
+                    user_log.value3 = "0"
+                    user_log.key4 = "error"
+                    user_log.value4 = f"HTTP {response.status_code}: {response.text}"
+                    user_log.save()
+                    print(f"Updated UserLogs ID {user_log.id} with HTTP error status")
+
+                    return {
+                        "success": False,
+                        "message": f"API call failed with status {response.status_code}: {response.text}",
+                    }
+
+            except requests.exceptions.RequestException as e:
+                print(f"Request error: {e}")
+
+                # Update UserLogs with request error status
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = f"Request error: {e}"
+                user_log.save()
+                print(f"Updated UserLogs ID {user_log.id} with request error status")
+
+                return {"success": False, "message": f"Request error: {e}"}
+
+        except Exception as e:
+            print(f"Error in process_and_submit_work_demand: {e}")
+            import traceback
+
+            traceback.print_exc()
+
+            # Update UserLogs with internal error status
+            try:
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = f"Internal error: {e}"
+                user_log.save()
+                print(f"Updated UserLogs ID {user_log.id} with internal error status")
+            except Exception as save_error:
+                print(f"Failed to update UserLogs: {save_error}")
+
+            return {"success": False, "message": f"Internal error: {e}"}
+
+    def process_and_submit_story(self, user_log_id):
+        """
+        Processes work demand data from UserLogs and submits to Community Engagement API.
+
+        Args:
+            user_log_id (int): ID of the UserLogs record containing work demand data
+
+        Returns:
+            dict: API response from upsert_item endpoint or error dict
+        """
+        import requests
+        import json
+        import os
+        from django.conf import settings
+        from bot_interface.models import UserLogs
+
+        print(f"invoking proces and submit work demand")
+        try:
+            # Get the UserLogs record
+            try:
+                user_log = UserLogs.objects.get(id=user_log_id)
+            except UserLogs.DoesNotExist:
+                return {
+                    "success": False,
+                    "message": f"UserLogs record with id {user_log_id} not found",
+                }
+
+            # Extract work demand data from misc field
+            work_demand_data = user_log.misc.get("work_demand_data", {})
+            if not work_demand_data:
+                # Try alternative key structure
+                work_demand_data = user_log.misc.get("work_demand", {})
+            print(f"workd demand data {work_demand_data}")
+            if not work_demand_data:
+                return {
+                    "success": False,
+                    "message": "No work demand data found in UserLogs.misc",
+                }
+
+            print(f"Processing work demand data: {work_demand_data}")
+
+            # Get user's community context from UserLogs misc data
+            community_id = None
+            try:
+                # Get community_id from community_context in the UserLogs misc field
+                if "community_context" in user_log.misc:
+                    community_context = user_log.misc["community_context"]
+                    community_id = community_context.get("community_id")
+                    print(f"Found community_id in UserLogs: {community_id}")
+
+                if not community_id:
+                    return {
+                        "success": False,
+                        "message": "Could not find community_id in UserLogs data",
+                    }
+
+            except Exception as e:
+                print(f"Error getting community context from UserLogs: {e}")
+                return {
+                    "success": False,
+                    "message": f"Error getting community context: {e}",
+                }
+
+            # Prepare files for upload from local filesystem
+            files = {}
+
+            # Handle audio file - use "audios" key for API
+            if "audio" in work_demand_data:
+                audio_path = work_demand_data["audio"]
+                if audio_path and os.path.exists(audio_path):
+                    try:
+                        with open(audio_path, "rb") as audio_file:
+                            audio_content = audio_file.read()
+                            # Determine file extension
+                            file_ext = os.path.splitext(audio_path)[1] or ".ogg"
+                            mime_type = (
+                                "audio/ogg" if file_ext == ".ogg" else "audio/mpeg"
+                            )
+                            files["audios"] = (
+                                f"audio{file_ext}",
+                                audio_content,
+                                mime_type,
+                            )
+                            print(f"Added audio file: {audio_path}")
+                    except Exception as e:
+                        print(f"Error reading audio file {audio_path}: {e}")
+                else:
+                    print(f"Audio file not found or invalid path: {audio_path}")
+
+            # Handle photo files - use indexed keys for multiple images
+            if "photos" in work_demand_data and isinstance(
+                work_demand_data["photos"], list
+            ):
+                for i, photo_path in enumerate(work_demand_data["photos"]):
+                    if photo_path and os.path.exists(photo_path):
+                        try:
+                            with open(photo_path, "rb") as photo_file:
+                                photo_content = photo_file.read()
+                                # Determine file extension
+                                file_ext = os.path.splitext(photo_path)[1] or ".jpg"
+                                mime_type = (
+                                    "image/jpeg"
+                                    if file_ext.lower() in [".jpg", ".jpeg"]
+                                    else "image/png"
+                                )
+                                files[f"images_{i}"] = (
+                                    f"photo_{i}{file_ext}",
+                                    photo_content,
+                                    mime_type,
+                                )
+                                print(f"Added photo file {i}: {photo_path}")
+                        except Exception as e:
+                            print(f"Error reading photo file {photo_path}: {e}")
+                    else:
+                        print(f"Photo file not found or invalid path: {photo_path}")
+
+            # Prepare coordinates from location data - use lat/lon format
+            coordinates = {}
+            if "location" in work_demand_data:
+                location = work_demand_data["location"]
+                if isinstance(location, dict):
+                    coordinates = {
+                        "lat": location.get("latitude"),
+                        "lon": location.get("longitude"),
+                    }
+                    # Only include if both lat and lon are available
+                    if not (coordinates["lat"] and coordinates["lon"]):
+                        coordinates = {}
+
+            # Get user contact number through proper relationship chain
+            try:
+                # UserLogs.user_id -> BotUsers.id -> BotUsers.user_id -> Users.id -> Users.contact_number
+                bot_user = user_log.user  # This is BotUsers instance
+                actual_user = bot_user.user  # This is Users instance
+                contact_number = actual_user.contact_number
+
+                if not contact_number:
+                    return {
+                        "success": False,
+                        "message": "Could not get user contact number",
+                    }
+
+            except AttributeError as e:
+                return {
+                    "success": False,
+                    "message": f"Could not get user contact number from relationship chain: {e}",
+                }
+
+            # Prepare API payload
+            payload = {
+                "item_type": "Story",
+                "coordinates": json.dumps(coordinates) if coordinates else "",
+                "number": contact_number,
+                "community_id": community_id,
+                "source": "BOT",
+                "bot_id": user_log.bot.id,
+                "title": "Story",  # Auto-generated if not provided
                 "transcript": work_demand_data.get(
                     "description", ""
                 ),  # If any description exists
