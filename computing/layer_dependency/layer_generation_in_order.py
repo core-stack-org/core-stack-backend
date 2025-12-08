@@ -33,6 +33,18 @@ from computing.tree_health.overall_change import tree_health_overall_change_rast
 from computing.tree_health.overall_change_vector import (
     tree_health_overall_change_vector,
 )
+from computing.misc.naturaldepression import generate_natural_depression_data
+from computing.misc.distancetonearestdrainage import (
+    generate_distance_to_nearest_drainage_line,
+)
+from computing.misc.catchment_area import generate_catchment_area_singleflow
+from computing.misc.slope_percentage import generate_slope_percentage_data
+from computing.misc.lcw_conflict import generate_lcw_conflict_data
+from computing.misc.agroecological_space import generate_agroecological_data
+from computing.misc.factory_csr import generate_factory_csr_data
+from computing.misc.green_credit import generate_green_credit_data
+from computing.misc.mining_data import generate_mining_data
+from computing.plantation.site_suitability import site_suitability
 from utilities.gee_utils import valid_gee_text
 from .layer_map import *
 from nrm_app.celery import app
@@ -43,14 +55,14 @@ status = {}
 
 @app.task(bind=True)
 def layer_generate_map(
-        self,
-        state,
-        district,
-        block,
-        map_order,
-        gee_account_id,
-        start_year=None,
-        end_year=None,
+    self,
+    state,
+    district,
+    block,
+    map_order,
+    gee_account_id,
+    start_year=None,
+    end_year=None,
 ):
     """
     This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
@@ -140,7 +152,7 @@ def layer_generate_map(
 
 
 def run_layer_with_dependency(
-        deps, node_func_name, node_func_obj, state, district, block, args
+    deps, node_func_name, node_func_obj, state, district, block, args
 ):
     """
     This function checks dependency of layer if it is generated or not and call the pipeline functions and maintain status of each function,

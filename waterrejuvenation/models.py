@@ -25,11 +25,10 @@ def excel_file_path(instance, filename):
     project_name = instance.project.name
 
     # Create directory if it doesn't exist
-    directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
-    full_path = os.path.join(SITE_DATA_PATH, directory)
-    os.makedirs(full_path, exist_ok=True)
+    directory = f"site_data/{org_name}/{app_type}/{project_id}/{project_name}"
+    file_path = f"{directory}/{filename}"
 
-    return f"{full_path}/{filename}"
+    return file_path
 
 
 class WaterbodiesFileUploadLog(models.Model):
@@ -63,7 +62,16 @@ class WaterbodiesFileUploadLog(models.Model):
             self.excel_hash = file_hash.hexdigest()
 
         super().save(*args, **kwargs)
-        Upload_Desilting_Points.delay(self.id, gee_project_id=self.gee_account_id)
+        Upload_Desilting_Points.apply_async(
+                kwargs={
+                        "file_obj_id": self.id,
+                        "gee_project_id": self.gee_account_id,
+                        "is_closest_wp": True,
+                    "is_lulc_required": True,
+                    },
+                queue="waterbody1"
+            )
+
 
     class Meta:
         ordering = ["-created_at"]

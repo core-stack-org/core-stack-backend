@@ -61,7 +61,7 @@ from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
 from .misc.green_credit import generate_green_credit_data
 from .misc.mining_data import generate_mining_data
-from .misc.slope_percentage import generate_slope_percentage
+from .misc.slope_percentage import generate_slope_percentage_data
 from .misc.naturaldepression import generate_natural_depression_data
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
 from .misc.catchment_area import generate_catchment_area_singleflow
@@ -118,7 +118,13 @@ def generate_drainage_layer(request):
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
         clip_drainage_lines.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -754,16 +760,37 @@ def tree_health_raster(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
         tree_health_ccd_raster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
             queue="nrm",
         )
         tree_health_ch_raster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
             queue="nrm",
         )
         tree_health_overall_change_raster.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
+
         return Response(
             {"Success": "tree_health task initiated"},
             status=status.HTTP_200_OK,
@@ -785,14 +812,34 @@ def tree_health_vector(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
         tree_health_overall_change_vector.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
         tree_health_ch_vector.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
             queue="nrm",
         )
         tree_health_ccd_vector.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
             queue="nrm",
         )
         return Response(
@@ -1372,7 +1419,7 @@ def generate_slope_percentage(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_slope_percentage.apply_async(
+        generate_slope_percentage_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
@@ -1425,8 +1472,15 @@ def generate_zoi_to_gee(request):
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
         generate_zoi.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+                },
+                    queue="waterbody"
+            )
+
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )

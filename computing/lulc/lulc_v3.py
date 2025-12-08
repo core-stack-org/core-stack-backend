@@ -45,6 +45,8 @@ def clip_lulc_v3(
 ):
     ee_initialize(gee_account_id)
     print("Inside lulc_river_basin")
+    start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
+
     if state and district and block:
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -55,18 +57,12 @@ def clip_lulc_v3(
             + "_uid"
         ).union()
 
-    start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
-
-    if state and district and block:
-
         filename_prefix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         gee_asset_path = get_gee_asset_path(state, district, block)
     else:
         roi = ee.FeatureCollection(roi_path).union()
-
-        start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
         filename_prefix = valid_gee_text(asset_suffix)
 
@@ -126,26 +122,27 @@ def clip_lulc_v3(
 
     task_list = []
     geometry = roi.geometry()
-    for i in range(0, len(l1_asset_new)):
-        if is_gee_asset_exists(final_output_assetid_array_new[i]):
-            ee.data.copyAsset(
-                final_output_assetid_array_new[i],
-                f"{final_output_assetid_array_new[i]}_old",
+    if not is_gee_asset_exists(final_output_assetid_array_new[len(l1_asset_new) - 1]):
+        for i in range(0, len(l1_asset_new)):
+            if is_gee_asset_exists(final_output_assetid_array_new[i]):
+                ee.data.copyAsset(
+                    final_output_assetid_array_new[i],
+                    f"{final_output_assetid_array_new[i]}_old",
+                )
+                time.sleep(10)
+                ee.data.deleteAsset(final_output_assetid_array_new[i])
+            task_id = export_raster_asset_to_gee(
+                image=l1_asset_new[i].clip(geometry),
+                description=final_output_filename_array_new[i],
+                asset_id=final_output_assetid_array_new[i],
+                scale=scale,
+                region=geometry,
+                pyramiding_policy={"predicted_label": "mode"},
             )
-            time.sleep(10)
-            ee.data.deleteAsset(final_output_assetid_array_new[i])
-        task_id = export_raster_asset_to_gee(
-            image=l1_asset_new[i].clip(geometry),
-            description=final_output_filename_array_new[i],
-            asset_id=final_output_assetid_array_new[i],
-            scale=scale,
-            region=geometry,
-            pyramiding_policy={"predicted_label": "mode"},
-        )
-        task_list.append(task_id)
+            task_list.append(task_id)
 
-    task_id_list = check_task_status(task_list)
-    print("LULC task_id_list", task_id_list)
+        task_id_list = check_task_status(task_list)
+        print("LULC task_id_list", task_id_list)
 
     layer_ids = []
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]

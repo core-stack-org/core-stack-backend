@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "bot_interface",
     "gee_computing",
     "waterrejuvenation",
+    "apiadmin",
 ]
 
 # MARK: CORS Settings
@@ -192,6 +193,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django.middleware.gzip.GZipMiddleware",
+    # "apiadmin.middleware.ApiHitLoggerMiddleware",
 ]
 
 ROOT_URLCONF = "nrm_app.urls"
