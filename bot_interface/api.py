@@ -713,7 +713,7 @@ def download_image(app_instance_config_id, mime_type, media_id):
         bot_instance_id=app_instance_config_id
     )
     filepath = WHATSAPP_MEDIA_PATH + media_id + ".jpg"
-    url = f"{BSP_URL.split("v24.0")[0] + "v24.0"}/{media_id}"
+    url = BSP_URL.split("v24.0")[0] + "v24.0"+"/" +media_id
     print("url :: ", url)
     r = requests.get(url, headers=HEADERS)
     print("r :: ", r, r.json())
@@ -737,7 +737,7 @@ def download_audio(app_instance_config_id, mime_type, media_id):
         )
 
         # Get media info using proper endpoint
-        media_info_url = f"{BSP_URL.split("v24.0")[0] + "v24.0"}/{media_id}"
+        media_info_url = BSP_URL.split("v24.0")[0] + "v24.0/"+media_id
         print(f"Getting media info from: {media_info_url}")
         r = requests.get(media_info_url, headers=HEADERS, timeout=30)
         print(
