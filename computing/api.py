@@ -690,9 +690,12 @@ def change_detection_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
         vectorise_change_detection.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
         )
         return Response(
             {"Success": "change_detection_vector task initiated"},
@@ -1477,9 +1480,9 @@ def generate_zoi_to_gee(request):
                 "district": district,
                 "block": block,
                 "gee_account_id": gee_account_id,
-                },
-                    queue="waterbody"
-            )
+            },
+            queue="waterbody",
+        )
 
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK

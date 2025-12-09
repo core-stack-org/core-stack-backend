@@ -42,35 +42,27 @@ def tree_health_overall_change_vector(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
-            + "filtered_mws_"
-            + asset_suffix
-            + "_uid"
+            + f"filtered_mws_{asset_suffix}_uid"
         )
 
-    description = (
-        "overall_change_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
-    )
+    description = f"overall_change_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+
     asset_id, task_id = overall_change_vector(
         roi, asset_folder_list, asset_suffix, app_type
     )
     task_id_list = check_task_status([task_id])
     print("task_id_list ", task_id_list)
 
-    # layer_id = None
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            f"overall_change_vector_{district.lower()}_{block.lower()}",
+            description,
             asset_id,
             "Tree Overall Change Vector",
         )
-    try:
         layer_at_geoserver = False
         merged_fc = ee.FeatureCollection(asset_id)
         sync_res = sync_fc_to_geoserver(
@@ -81,10 +73,8 @@ def tree_health_overall_change_vector(
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True
 
-    except Exception as e:
-        print(f"Error syncing combined data to GeoServer: {e}")
-        raise
-    return layer_at_geoserver
+        return layer_at_geoserver
+    return None
 
 
 def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
@@ -104,6 +94,20 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + f"overall_change_raster_{asset_suffix}"
+    )
+
+    degradation = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + f"change_{asset_suffix}_Degradation"
+    )
+
+    afforestation = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + f"change_{asset_suffix}_Afforestation"
     )
 
     fc = roi

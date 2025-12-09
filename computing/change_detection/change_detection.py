@@ -26,14 +26,11 @@ def get_change_detection(
         "Urbanization": built_up,
         "Degradation": change_degradation,
         "Deforestation": change_deforestation,
-        "Afforestation": change_deforestation,
+        "Afforestation": change_afforestation,
         "CropIntensity": change_cropping_intensity,
     }
     description = (
-            "change_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        f"change_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
     l1_asset = []
     s_year = start_year
@@ -65,23 +62,16 @@ def get_change_detection(
     task_list = []
 
     for change_detection_key, change_detection_values in param_dict.items():
-        asset_id = (
-                get_gee_asset_path(state, district, block)
-            + description
-            + "_"
-                + change_detection_key
-        )
+        ch_description = f"{description}_{change_detection_key}_{start_year}_{end_year}"
+        asset_id = get_gee_asset_path(state, district, block) + ch_description
+
         if not is_gee_asset_exists(asset_id):
             print(f"{asset_id} doesn't exist")
 
             result = eval("change_detection_values(roi_boundary, l1_asset)")
-            if change_detection_key == "Deforestation":
-                result = result[0]
-            if change_detection_key == "Afforestation":
-                result = result[1]
             task_id = export_raster_asset_to_gee(
                 image=result,
-                description=description + "_" + change_detection_key,
+                description=ch_description,
                 asset_id=asset_id,
                 scale=10,
                 region=roi_boundary.geometry(),
@@ -92,9 +82,8 @@ def get_change_detection(
 
     layer_ids = {}
     for param in param_dict.keys():
-        asset_id = (
-                get_gee_asset_path(state, district, block) + description + "_" + param
-        )
+        ch_description = f"{description}_{param}_{start_year}_{end_year}"
+        asset_id = get_gee_asset_path(state, district, block) + ch_description
         if is_gee_asset_exists(asset_id):
             layer_id = save_layer_info_to_db(
                 state,
@@ -120,6 +109,8 @@ def get_change_detection(
 def built_up(roi_boundary, l1_asset):
     print("built_up function is runing")
 
+    lulc_projection = l1_asset[0].projection()
+
     # Remap values function
     def remap_values(image):
         return image.remap(
@@ -127,17 +118,17 @@ def built_up(roi_boundary, l1_asset):
             [1, 2, 2, 2, 3, 4, 3, 3, 3, 3, 4],
             0,
             "predicted_label",
-        )
+        ).setDefaultProjection(lulc_projection)
 
     l1_asset_remapped = [remap_values(asset) for asset in l1_asset]
 
     # Create image collections
-    then = ee.ImageCollection(l1_asset_remapped[:3])
-    now = ee.ImageCollection(l1_asset_remapped[3:])
+    then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
-    then = then.mode().clip(roi_boundary.geometry())
-    now = now.mode().clip(roi_boundary.geometry())
+    then = then.clip(roi_boundary.geometry())
+    now = now.clip(roi_boundary.geometry())
 
     # Compute transitions
     trans_bu_bu = then.eq(1).And(now.eq(1))
@@ -146,7 +137,11 @@ def built_up(roi_boundary, l1_asset):
     trans_b_bu = then.eq(4).And(now.eq(1)).multiply(4)
 
     # Create a zero image and add transitions
-    change_bu = ee.Image.constant(0).clip(roi_boundary.geometry())
+    change_bu = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(roi_boundary.geometry())
+    )
     change_bu = (
         change_bu.add(trans_bu_bu).add(trans_w_bu).add(trans_tr_bu).add(trans_b_bu)
     )
@@ -154,6 +149,8 @@ def built_up(roi_boundary, l1_asset):
 
 
 def change_degradation(roi_boundary, l1_asset):
+    lulc_projection = l1_asset[0].projection()
+
     # Remap values function
     def remap_values(image):
         return image.remap(
@@ -161,17 +158,17 @@ def change_degradation(roi_boundary, l1_asset):
             [1, 2, 2, 2, 4, 5, 3, 3, 3, 3, 6],
             0,
             "predicted_label",
-        )
+        ).setDefaultProjection(lulc_projection)
 
     l1_asset_remapped = [remap_values(asset) for asset in l1_asset]
 
     # Create image collections
-    then = ee.ImageCollection(l1_asset_remapped[:3])
-    now = ee.ImageCollection(l1_asset_remapped[3:])
+    then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
-    then = then.mode().clip(roi_boundary.geometry())
-    now = now.mode().clip(roi_boundary.geometry())
+    then = then.clip(roi_boundary.geometry())
+    now = now.clip(roi_boundary.geometry())
 
     trans_f_f = then.eq(3).And(now.eq(3))
     trans_f_bu = then.eq(3).And(now.eq(1)).multiply(2)
@@ -179,17 +176,25 @@ def change_degradation(roi_boundary, l1_asset):
     trans_f_sc = then.eq(3).And(now.eq(6)).multiply(4)
 
     # Create a zero image and add transitions
-    change_deg = ee.Image.constant(0).clip(roi_boundary.geometry())
+    change_deg = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(roi_boundary.geometry())
+    )
     change_deg = (
         change_deg.add(trans_f_f).add(trans_f_bu).add(trans_f_ba).add(trans_f_sc)
     )
     return change_deg
 
 
-def change_deforestation(roi_boundary, l1_asset):
-    print("change_deforestation is runing")
+def change_deforestation_afforestation(roi_boundary, l1_asset, lulc_projection):
+    print("change_deforestation is running")
     # Create an initial zero image
-    zero_image2 = ee.Image.constant(0).clip(l1_asset[0].geometry())
+    zero_image2 = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(l1_asset[0].geometry())
+    )
 
     # for i in range(1, 5):
     for i in range(1, len(l1_asset) - 1):
@@ -316,27 +321,37 @@ def change_deforestation(roi_boundary, l1_asset):
             [1, 2, 2, 2, 3, 5, 4, 4, 4, 4, 6],
             0,
             "predicted_label",
-        )
+        ).setDefaultProjection(lulc_projection)
         return remapped
 
     l1_asset_remapped = [remap_values(asset) for asset in l1_asset_copy]
 
     # Create image collections
-    then = ee.ImageCollection(l1_asset_remapped[:3])
-    now = ee.ImageCollection(l1_asset_remapped[3:])
+    then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
-    then = then.mode().clip(roi_boundary.geometry())
-    now = now.mode().clip(roi_boundary.geometry())
+    then = then.clip(roi_boundary.geometry())
+    now = now.clip(roi_boundary.geometry())
+    return now, then
 
+
+def change_deforestation(roi_boundary, l1_asset):
+    lulc_projection = l1_asset[0].projection()
+    now, then = change_deforestation_afforestation(
+        roi_boundary, l1_asset, lulc_projection
+    )
     trans_fo_fo = then.eq(3).And(now.eq(3))
     trans_fo_bu = then.eq(3).And(now.eq(1)).multiply(2)
     trans_fo_fa = then.eq(3).And(now.eq(4)).multiply(3)
     trans_fo_ba = then.eq(3).And(now.eq(5)).multiply(4)
     trans_sc = then.eq(3).And(now.eq(6)).multiply(5)
-
     # Create a zero image and add transitions
-    change_def = ee.Image.constant(0).clip(roi_boundary.geometry())
+    change_def = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(roi_boundary.geometry())
+    )
     change_def = (
         change_def.add(trans_fo_fo)
         .add(trans_fo_bu)
@@ -344,11 +359,14 @@ def change_deforestation(roi_boundary, l1_asset):
         .add(trans_fo_ba)
         .add(trans_sc)
     )
-    change_aff = afforestation(roi_boundary, then, now)
-    return change_def, change_aff
+    return change_def
 
 
-def afforestation(roi_boundary, then, now):
+def change_afforestation(roi_boundary, l1_asset):
+    lulc_projection = l1_asset[0].projection()
+    now, then = change_deforestation_afforestation(
+        roi_boundary, l1_asset, lulc_projection
+    )
     trans_fo_fo = then.eq(3).And(now.eq(3))
     trans_bu_fo = then.eq(1).And(now.eq(3)).multiply(2)
     trans_fa_fo = then.eq(4).And(now.eq(3)).multiply(3)
@@ -356,7 +374,11 @@ def afforestation(roi_boundary, then, now):
     trans_sc_fo = then.eq(6).And(now.eq(3)).multiply(5)
 
     # Create a zero image and add transitions
-    change_af = ee.Image.constant(0).clip(roi_boundary.geometry())
+    change_af = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(roi_boundary.geometry())
+    )
     change_af = (
         change_af.add(trans_fo_fo)
         .add(trans_bu_fo)
@@ -368,6 +390,8 @@ def afforestation(roi_boundary, then, now):
 
 
 def change_cropping_intensity(roi_boundary, l1_asset):
+    lulc_projection = l1_asset[0].projection()
+
     # Remap values function
     def remap_values(image):
         return image.remap(
@@ -375,17 +399,17 @@ def change_cropping_intensity(roi_boundary, l1_asset):
             [1, 2, 2, 2, 3, 4, 5, 5, 6, 7, 8],
             0,
             "predicted_label",
-        )
+        ).setDefaultProjection(lulc_projection)
 
     l1_asset_remapped = [remap_values(asset) for asset in l1_asset]
 
     # Create image collections
-    then = ee.ImageCollection(l1_asset_remapped[:3])
-    now = ee.ImageCollection(l1_asset_remapped[3:])
+    then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
-    then = then.mode().clip(roi_boundary.geometry())
-    now = now.mode().clip(roi_boundary.geometry())
+    then = then.clip(roi_boundary.geometry())
+    now = now.clip(roi_boundary.geometry())
 
     trans_do_si = then.eq(6).And(now.eq(5))
     trans_tr_si = then.eq(7).And(now.eq(5)).multiply(2)
@@ -401,7 +425,11 @@ def change_cropping_intensity(roi_boundary, l1_asset):
     )
 
     # Create a zero image and add transitions
-    change_far = ee.Image.constant(0).clip(roi_boundary.geometry())
+    change_far = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(roi_boundary.geometry())
+    )
     change_far = (
         change_far.add(trans_do_si)
         .add(trans_tr_si)

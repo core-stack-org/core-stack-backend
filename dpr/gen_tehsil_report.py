@@ -649,7 +649,7 @@ def get_tehsil_data(state, district, block):
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
+            parameter_block = f"The Tehsil {block} having total area {total_area:,} hectares" + parameter_block + "."
 
         return parameter_block
 
@@ -1927,189 +1927,83 @@ def get_socio_economic_caste_data(state, district, block):
     try:
         file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_mws_villages = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
         df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
 
-        mws_pattern = {}
-        mws_intensity = {}
+        village_pattern = {}
+        village_intensity = {}
         
-        # Initialize all UIDs with False and 0 intensity
-        for uid in df_area["UID"]:
-            mws_pattern[uid] = False
-            mws_intensity[uid] = 0.0
+        # Initialize all village IDs with False and 0 intensity
+        for village_id in df_social["village_id"]:
+            village_pattern[village_id] = False
+            village_intensity[village_id] = 0.0
         
         # Define weights for each indicator
         indicator_weights = {
-            'indicator1': 0.5,  # Average SC_percent > 17
-            'indicator2': 0.5   # Average ST_percent > 33
+            'indicator1': 0.5,  # SC_percent > 17
+            'indicator2': 0.5   # ST_percent > 33
         }
         
-        # Indicator 1 (Type 7): Average SC_percent > 17
-        indicator1_uids = set()
+        # Process each village
+        indicator1_villages = set()
+        indicator2_villages = set()
         
-        for index, row in df_mws_villages.iterrows():
-            mws_uid = row['MWS UID']
-            village_ids = row['Village IDs']
+        for index, row in df_social.iterrows():
+            village_id = row['village_id']
+            sc_percent = row.get('SC_percent', 0)
+            st_percent = row.get('ST_percent', 0)
             
-            # Parse village IDs (could be list, array, or string)
-            if pd.notna(village_ids):
-                try:
-                    # Try different parsing methods
-                    if isinstance(village_ids, str):
-                        import ast
-                        import json
-                        try:
-                            village_list = ast.literal_eval(village_ids)
-                        except:
-                            try:
-                                village_list = json.loads(village_ids)
-                            except:
-                                # If it's a comma-separated string
-                                village_list = [v.strip() for v in village_ids.split(',')]
-                    elif isinstance(village_ids, (list, tuple)):
-                        village_list = list(village_ids)
-                    else:
-                        village_list = [village_ids]
-                    
-                    # Get SC_percent for each village
-                    sc_percentages = []
-                    for village_id in village_list:
-                        village_row = df_social[df_social['village_id'] == village_id]
-                        if not village_row.empty:
-                            sc_percent = village_row.iloc[0]['SC_percent']
-                            if pd.notna(sc_percent):
-                                sc_percentages.append(float(sc_percent))
-                    
-                    # Calculate average SC_percent
-                    if len(sc_percentages) > 0:
-                        avg_sc = sum(sc_percentages) / len(sc_percentages)
-                        if avg_sc > 17:
-                            indicator1_uids.add(mws_uid)
-                            
-                except Exception as e:
-                    continue
-        
-        # Indicator 2 (Type 7): Average ST_percent > 33
-        indicator2_uids = set()
-        
-        for index, row in df_mws_villages.iterrows():
-            mws_uid = row['MWS UID']
-            village_ids = row['Village IDs']
+            # Indicator 1: SC_percent > 17
+            if pd.notna(sc_percent) and float(sc_percent) > 17:
+                indicator1_villages.add(village_id)
             
-            # Parse village IDs
-            if pd.notna(village_ids):
-                try:
-                    if isinstance(village_ids, str):
-                        import ast
-                        import json
-                        try:
-                            village_list = ast.literal_eval(village_ids)
-                        except:
-                            try:
-                                village_list = json.loads(village_ids)
-                            except:
-                                village_list = [v.strip() for v in village_ids.split(',')]
-                    elif isinstance(village_ids, (list, tuple)):
-                        village_list = list(village_ids)
-                    else:
-                        village_list = [village_ids]
-                    
-                    # Get ST_percent for each village
-                    st_percentages = []
-                    for village_id in village_list:
-                        village_row = df_social[df_social['village_id'] == village_id]
-                        if not village_row.empty:
-                            st_percent = village_row.iloc[0]['ST_percent']
-                            if pd.notna(st_percent):
-                                st_percentages.append(float(st_percent))
-                    
-                    # Calculate average ST_percent
-                    if len(st_percentages) > 0:
-                        avg_st = sum(st_percentages) / len(st_percentages)
-                        if avg_st > 33:
-                            indicator2_uids.add(mws_uid)
-                            
-                except Exception as e:
-                    continue
+            # Indicator 2: ST_percent > 33
+            if pd.notna(st_percent) and float(st_percent) > 33:
+                indicator2_villages.add(village_id)
         
-        # Calculate intensity for each MWS
-        for uid in mws_intensity.keys():
+        # Calculate intensity for each village
+        for village_id in village_intensity.keys():
             intensity = 0.0
             
             # Add weight if indicator 1 passed
-            if uid in indicator1_uids:
+            if village_id in indicator1_villages:
                 intensity += indicator_weights['indicator1']
             
             # Add weight if indicator 2 passed
-            if uid in indicator2_uids:
+            if village_id in indicator2_villages:
                 intensity += indicator_weights['indicator2']
             
-            mws_intensity[uid] = round(intensity, 2)
+            village_intensity[village_id] = round(intensity, 2)
             
             # Mark as True if ALL indicators passed
             if intensity >= 1.0:
-                mws_pattern[uid] = True
+                village_pattern[village_id] = True
         
-        # Find UIDs that passed BOTH indicators (for population calculation)
-        matched_uids = indicator1_uids.intersection(indicator2_uids)
+        # Find villages that passed BOTH indicators (for population calculation)
+        matched_villages = indicator1_villages.intersection(indicator2_villages)
         
-        # Calculate total population, number of villages, and SC/ST populations
+        # Calculate total population and SC/ST populations for matched villages
         total_population = 0
-        total_villages = set()
         sc_population = 0
         st_population = 0
         
-        for index, row in df_mws_villages.iterrows():
-            mws_uid = row['MWS UID']
+        for index, row in df_social.iterrows():
+            village_id = row['village_id']
             
-            if mws_uid in matched_uids:
-                village_ids = row['Village IDs']
+            if village_id in matched_villages:
+                pop = row.get('total_population', 0)
                 
-                if pd.notna(village_ids):
-                    try:
-                        if isinstance(village_ids, str):
-                            import ast
-                            import json
-                            try:
-                                village_list = ast.literal_eval(village_ids)
-                            except:
-                                try:
-                                    village_list = json.loads(village_ids)
-                                except:
-                                    village_list = [v.strip() for v in village_ids.split(',')]
-                        elif isinstance(village_ids, (list, tuple)):
-                            village_list = list(village_ids)
-                        else:
-                            village_list = [village_ids]
-                        
-                        # Process each village
-                        for village_id in village_list:
-                            # Add to village count (use set to avoid duplicates)
-                            total_villages.add(village_id)
-                            
-                            # Get village data
-                            village_row = df_social[df_social['village_id'] == village_id]
-                            if not village_row.empty:
-                                village_data = village_row.iloc[0]
-                                
-                                # Get total population (assuming column exists)
-                                pop = village_data.get('total_population', 0)
-                                if pd.notna(pop):
-                                    pop_value = float(pop)
-                                    total_population += pop_value
-                                    
-                                    # Calculate SC and ST populations
-                                    sc_percent = village_data.get('SC_percent', 0)
-                                    st_percent = village_data.get('ST_percent', 0)
-                                    
-                                    if pd.notna(sc_percent):
-                                        sc_population += (float(sc_percent) / 100) * pop_value
-                                    if pd.notna(st_percent):
-                                        st_population += (float(st_percent) / 100) * pop_value
-                                        
-                    except Exception as e:
-                        continue
+                if pd.notna(pop):
+                    pop_value = float(pop)
+                    total_population += pop_value
+                    
+                    # Calculate SC and ST populations
+                    sc_percent = row.get('SC_percent', 0)
+                    st_percent = row.get('ST_percent', 0)
+                    
+                    if pd.notna(sc_percent):
+                        sc_population += (float(sc_percent) / 100) * pop_value
+                    if pd.notna(st_percent):
+                        st_population += (float(st_percent) / 100) * pop_value
         
         # Calculate Others population
         others_population = total_population - sc_population - st_population
@@ -2125,10 +2019,10 @@ def get_socio_economic_caste_data(state, district, block):
         }
         
         result = {
-            "mws_pattern": mws_pattern,
-            "mws_intensity": mws_intensity,
+            "village_pattern": village_pattern,
+            "village_intensity": village_intensity,
             "total_population": round(total_population, 0),
-            "total_villages": len(total_villages)
+            "total_villages": len(matched_villages)
         }
         
         return result, caste_pie_chart
@@ -2142,8 +2036,8 @@ def get_socio_economic_caste_data(state, district, block):
         )
 
         return {
-            "mws_pattern": {},
-            "mws_intensity": {},
+            "village_pattern": {},
+            "village_intensity": {},
             "total_population": 0,
             "total_villages": 0
         }, {
@@ -2156,17 +2050,17 @@ def get_socio_economic_nrega_data(state, district, block):
     try:
         file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
         df_nrega = pd.read_excel(file_path, sheet_name="nrega_annual")
         df_mws_villages = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
+        df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
 
-        mws_pattern = {}
-        mws_intensity = {}
+        village_pattern = {}
+        village_intensity = {}
         
-        # Initialize all UIDs with False and 0 intensity
-        for uid in df_area["UID"]:
-            mws_pattern[uid] = False
-            mws_intensity[uid] = 0.0
+        # Initialize all village IDs with False and 0 intensity
+        for village_id in df_social["village_id"]:
+            village_pattern[village_id] = False
+            village_intensity[village_id] = 0.0
         
         base_columns = [
             "Soil and water conservation_count_",
@@ -2180,7 +2074,7 @@ def get_socio_economic_nrega_data(state, district, block):
         
         # Single indicator (Type 8): Total NREGA works < 100
         # Since there's only one indicator, weight is 1.0
-        matched_uids = set()
+        matched_mws_uids = set()
         
         for index, row in df_nrega.iterrows():
             uid = row['mws_id']
@@ -2199,22 +2093,15 @@ def get_socio_economic_nrega_data(state, district, block):
             
             # Check if grand_total < 100 (comp_type 4 = Less than)
             if grand_total < 100:
-                matched_uids.add(uid)
+                matched_mws_uids.add(uid)
         
-        # Calculate intensity for each MWS
-        for uid in mws_intensity.keys():
-            # Since there's only one indicator, intensity is either 0.0 or 1.0
-            if uid in matched_uids:
-                mws_intensity[uid] = 1.0
-                mws_pattern[uid] = True
-        
-        # Count villages associated with matched MWS
-        total_villages = set()
+        # Map MWS to villages and set village intensity
+        matched_villages = set()
         
         for index, row in df_mws_villages.iterrows():
             mws_uid = row['MWS UID']
             
-            if mws_uid in matched_uids:
+            if mws_uid in matched_mws_uids:
                 village_ids = row['Village IDs']
                 
                 if pd.notna(village_ids):
@@ -2234,14 +2121,17 @@ def get_socio_economic_nrega_data(state, district, block):
                         else:
                             village_list = [village_ids]
                         
-                        # Add villages to set
+                        # Add villages to matched set and update intensity
                         for village_id in village_list:
-                            total_villages.add(village_id)
+                            matched_villages.add(village_id)
+                            if village_id in village_intensity:
+                                village_intensity[village_id] = 1.0
+                                village_pattern[village_id] = True
                             
                     except Exception as e:
                         continue
         
-        # Calculate totals for each NREGA work type for pie chart
+        # Calculate totals for each NREGA work type for pie chart (using matched MWS)
         nrega_totals = {
             "Soil and Water Conservation": 0,
             "Land Restoration": 0,
@@ -2265,7 +2155,7 @@ def get_socio_economic_nrega_data(state, district, block):
         for index, row in df_nrega.iterrows():
             uid = row['mws_id']
             
-            if uid in matched_uids:
+            if uid in matched_mws_uids:
                 for base_col, label in base_to_label.items():
                     # Find all columns that start with this base name
                     matching_cols = [col for col in df_nrega.columns if col.startswith(base_col)]
@@ -2282,9 +2172,9 @@ def get_socio_economic_nrega_data(state, district, block):
         }
         
         result = {
-            "mws_pattern": mws_pattern,
-            "mws_intensity": mws_intensity,
-            "total_villages": len(total_villages)
+            "village_pattern": village_pattern,
+            "village_intensity": village_intensity,
+            "total_villages": len(matched_villages)
         }
         
         return result, nrega_pie_chart
@@ -2298,8 +2188,8 @@ def get_socio_economic_nrega_data(state, district, block):
         )
 
         return {
-            "mws_pattern": {},
-            "mws_intensity": {},
+            "village_pattern": {},
+            "village_intensity": {},
             "total_villages": 0
         }, {
             "labels": [],

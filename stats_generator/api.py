@@ -60,7 +60,7 @@ def add_sheets_in_stats_excel(request):
         sheets = request.query_params.get("sheets", "")
 
         response_data = add_sheets_to_excel(state, district, block, sheets)
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response({"status": "success"}, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response(
