@@ -1390,7 +1390,7 @@ def check_user_community_status_direct(bot_number: str) -> tuple[bool, Dict[str,
 
 
 def check_user_community_status_http(
-    user_number: str, base_url: str = "http://localhost:8000/api/v1"
+        user_number: str, base_url: str = "https://geoserver.core-stack.org/api/v1"
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Check if a user (by phone number) is part of any community using HTTP API calls.
@@ -1453,7 +1453,7 @@ def check_user_community_status_http(
 
 
 def get_community_by_lat_lon(
-    lat: str, lon: str, base_url: str = "http://localhost:8000/api/v1"
+    lat: str, lon: str, base_url: str = "https://geoserver.core-stack.org/api/v1"
 ) -> Tuple[bool, Dict[str, Any]]:
     """Get community by latitude and longitude"""
     try:

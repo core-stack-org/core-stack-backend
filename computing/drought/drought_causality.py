@@ -532,6 +532,7 @@ def drought_causality(
             + valid_gee_text(block.lower())
             + "_"
             + str(year)
+            + "_v2"
         )
 
         feature_collection = ee.FeatureCollection(asset_path)
