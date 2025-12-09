@@ -93,10 +93,14 @@ def generate_cropping_intensity(
         if existing_end_year < end_year:
             new_start_year = existing_end_year
             new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
+            new_description = f"{description}_{new_start_year}_{end_year}"
+
             if not is_gee_asset_exists(new_asset_id):
                 print(f"{new_asset_id} doesn't exist")
                 new_task_id, new_asset_id = generate_gee_asset(
                     roi,
+                    new_asset_id,
+                    new_description,
                     asset_suffix,
                     asset_folder_list,
                     app_type,
@@ -115,6 +119,8 @@ def generate_cropping_intensity(
     else:
         task_id, asset_id = generate_gee_asset(
             roi,
+            asset_id,
+            description,
             asset_suffix,
             asset_folder_list,
             app_type,
@@ -141,6 +147,8 @@ def generate_cropping_intensity(
 
 def generate_gee_asset(
     roi,
+    asset_id,
+    description,
     asset_suffix,
     asset_folder_list,
     app_type,
@@ -151,21 +159,6 @@ def generate_gee_asset(
     print("inside generate_gee_asset function ")
     print(f"zoi ci {zoi}")
 
-    filename = (
-        ("cropping_intensity_" if not zoi else "cropping_intensity_zoi_")
-        + asset_suffix
-        + "_"
-        + str(start_year)
-        + "-"
-        + str(end_year % 100)
-    )
-
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + filename
-    )
     print(f"final asset id {asset_id}")
     if is_gee_asset_exists(asset_id):
         return None, asset_id
@@ -330,7 +323,7 @@ def generate_gee_asset(
     roi = ee.FeatureCollection(roi.map(calculate_cropping_intensity))
 
     # Export feature collection to GEE
-    task_id = export_vector_asset_to_gee(roi, filename, asset_id)
+    task_id = export_vector_asset_to_gee(roi, description, asset_id)
     return task_id, asset_id
 
 
@@ -390,7 +383,7 @@ def save_to_db_and_sync_to_geoserver(
 
 def get_last_date(asset_id, layer_obj):
     if layer_obj:
-        existing_end_year = int(layer_obj.misc["end_year"])
+        existing_end_year = layer_obj.misc["end_year"]
     else:
         fc = ee.FeatureCollection(asset_id)
         col_names = fc.first().propertyNames().getInfo()
@@ -402,4 +395,4 @@ def get_last_date(asset_id, layer_obj):
         filtered_col.sort()
         existing_end_year = filtered_col[-1]
 
-    return existing_end_year
+    return int(existing_end_year)

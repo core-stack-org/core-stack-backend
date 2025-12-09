@@ -30,10 +30,7 @@ def get_change_detection(
         "CropIntensity": change_cropping_intensity,
     }
     description = (
-        "change_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+        f"change_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
     l1_asset = []
     s_year = start_year
@@ -65,19 +62,16 @@ def get_change_detection(
     task_list = []
 
     for change_detection_key, change_detection_values in param_dict.items():
-        asset_id = (
-            get_gee_asset_path(state, district, block)
-            + description
-            + "_"
-            + change_detection_key
-        )
+        ch_description = f"{description}_{change_detection_key}_{start_year}_{end_year}"
+        asset_id = get_gee_asset_path(state, district, block) + ch_description
+
         if not is_gee_asset_exists(asset_id):
             print(f"{asset_id} doesn't exist")
 
             result = eval("change_detection_values(roi_boundary, l1_asset)")
             task_id = export_raster_asset_to_gee(
                 image=result,
-                description=description + "_" + change_detection_key,
+                description=ch_description,
                 asset_id=asset_id,
                 scale=10,
                 region=roi_boundary.geometry(),
@@ -88,9 +82,8 @@ def get_change_detection(
 
     layer_ids = {}
     for param in param_dict.keys():
-        asset_id = (
-            get_gee_asset_path(state, district, block) + description + "_" + param
-        )
+        ch_description = f"{description}_{param}_{start_year}_{end_year}"
+        asset_id = get_gee_asset_path(state, district, block) + ch_description
         if is_gee_asset_exists(asset_id):
             layer_id = save_layer_info_to_db(
                 state,
