@@ -221,52 +221,6 @@
     .doc-button:hover { 
         background-color: #005a9e; 
     }
-    /* Collapsible sections */
-    .collapsible-list {
-        position: relative;
-    }
-
-    .show-more-button {
-        display: block;
-        margin: 15px auto 0;
-        padding: 10px 20px;
-        background-color: #3498db;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 0.9em;
-        font-weight: 500;
-        transition: background-color 0.3s ease;
-    }
-
-    .show-more-button:hover {
-        background-color: #2980b9;
-    }
-
-    .show-more-button.conflict-btn {
-        background-color: #e74c3c;
-    }
-
-    .show-more-button.conflict-btn:hover {
-        background-color: #c0392b;
-    }
-
-    .show-more-button.factory-btn {
-        background-color: #3498db;
-    }
-
-    .show-more-button.factory-btn:hover {
-        background-color: #2980b9;
-    }
-
-    .show-more-button.mining-btn {
-        background-color: #f39c12;
-    }
-
-    .show-more-button.mining-btn:hover {
-        background-color: #e67e22;
-    }
 
     .hidden-item {
         display: none;
@@ -298,6 +252,76 @@
     .map-only {
         width: 100%;
         height: 400px;
+    }
+
+    /* Grid Layout for Maps */
+    .maps-grid-section {
+        margin: 40px 0;
+    }
+
+    .maps-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .map-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .map-card-header {
+        background: #34495e;
+        color: white;
+        padding: 12px 15px;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .map-card-body {
+        position: relative;
+        height: 300px;
+        background: #f5f5f5;
+    }
+
+    .map-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .load-map-btn {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 14px;
+        transition: background-color 0.3s;
+    }
+
+    .load-map-btn:hover {
+        background-color: #2980b9;
+    }
+
+    .load-map-btn:disabled {
+        background-color: #95a5a6;
+        cursor: not-allowed;
+    }
+
+    .map-card-body .map {
+        height: 100%;
+        margin: 0;
+        border: none;
     }
 
     /* Responsive - stack on smaller screens */
@@ -456,84 +480,6 @@
 
         #mainMap canvas,
         #swbMap canvas {
-            width: 100% !important;
-            height: 500px !important;
-            min-height: 500px !important;
-        }
-
-        #terrainMap, #compMap1,
-        #terrainMap > div, #compMap1 > div,
-        #terrainMap .ol-viewport, #compMap1 .ol-viewport {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #terrainMap canvas, #compMap1 canvas {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #lulcMap, #compMap2,
-        #lulcMap > div, #compMap2 > div,
-        #lulcMap .ol-viewport, #compMap2 .ol-viewport {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #lulcMap canvas, #compMap2 canvas {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #degradLandMap, #compMap3,
-        #degradLandMap > div, #compMap3 > div,
-        #degradLandMap .ol-viewport, #compMap3 .ol-viewport {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #degradLandMap canvas, #compMap3 canvas {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #treeReduceMap, #compMap4,
-        #treeReduceMap > div, #compMap4 > div,
-        #treeReduceMap .ol-viewport, #compMap4 .ol-viewport {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #treeReduceMap canvas, #compMap4 canvas {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #urbanMap, #compMap5,
-        #urbanMap > div, #compMap5 > div,
-        #urbanMap .ol-viewport, #compMap5 .ol-viewport {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #urbanMap canvas, #compMap5 canvas {
-            width: 100% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-        }
-
-        #swbMap,
-        #swbMap > div,
-        #swbMap .ol-viewport {
             width: 100% !important;
             height: 500px !important;
             min-height: 500px !important;
@@ -704,6 +650,47 @@
         </div>
         </section>
 
+        <!-- Grid Maps Section -->
+        {% comment %} <section class="section maps-grid-section">
+            <h2>Hydrology Maps</h2>
+            <p>Click the "Load Map" button below each map to view it.</p>
+            
+            <div class="maps-grid">
+                <!-- Map Card 1 -->
+                <div class="map-card" id="grid1-map1-card">
+                    <div class="map-card-header">Aquifer Raster</div>
+                    <div class="map-card-body">
+                        <div class="map-placeholder">
+                            <button class="load-map-btn" onclick="loadCustomMap('grid1-map1')">Load Map</button>
+                        </div>
+                        <div id="grid1Map1" class="map" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Map Card 2 -->
+                <div class="map-card" id="grid1-map2-card">
+                    <div class="map-card-header">SOGE Vector</div>
+                    <div class="map-card-body">
+                        <div class="map-placeholder">
+                            <button class="load-map-btn" onclick="loadCustomMap('grid1-map2')">Load Map</button>
+                        </div>
+                        <div id="grid1Map2" class="map" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Map Card 3 -->
+                <div class="map-card" id="grid1-map3-card">
+                    <div class="map-card-header">Waterbalance Vector</div>
+                    <div class="map-card-body">
+                        <div class="map-placeholder">
+                            <button class="load-map-btn" onclick="loadCustomMap('grid1-map3')">Load Map</button>
+                        </div>
+                        <div id="grid1Map3" class="map" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </section> {% endcomment %}
+
         <section class="section" id="agriculture-section">
             <h2>Agriculture</h2>
             
@@ -839,1342 +826,1618 @@
         </div>
     </footer>
     <script>
-    // Parse all data from Django context
-    const mwsPatternIntensity = {{mws_pattern_intensity_json|safe}};
-    const groundwaterStress = {{groundwater_stress_json|safe}};
-    const highDroughtIncidence = {{high_drought_incidence_json|safe}};
-    const highIrrigationRisk = {{high_irrigation_risk_json|safe}};
-    const lowYield = {{low_yield_json|safe}};
-    const droughtTimeline = {{drought_timeline_json|safe}};
-    const yieldSankey = {{yield_sankey_json|safe}};
-    const irrigationTimeline = {{irrigation_timeline_json|safe}};
-    const forestDegradation = {{forest_degradation_json|safe}};
-    const forestSankey = {{forest_sankey_json|safe}};
-    const miningPresence = {{mining_presence_json|safe}};
-    const miningPie = {{mining_pie_json|safe}};
-    const socioCaste = {{socio_caste_json|safe}};
-    const castePie = {{caste_pie_json|safe}};
-    const socioNrega = {{socio_nrega_json|safe}};
-    const nregaPie = {{nrega_pie_json|safe}};
-    const fisheryPotential = {{fishery_potential_json|safe}};
-    const fisheryTimeline = {{fishery_timeline_json|safe}};
-    const agroforestryTransition = {{agroforestry_transition_json|safe}};
-    const agroforestrySankey = {{agroforestry_sankey_json|safe}};
+        // Parse all data from Django context
+        const mwsPatternIntensity = {{mws_pattern_intensity_json|safe}};
+        const groundwaterStress = {{groundwater_stress_json|safe}};
+        const highDroughtIncidence = {{high_drought_incidence_json|safe}};
+        const highIrrigationRisk = {{high_irrigation_risk_json|safe}};
+        const lowYield = {{low_yield_json|safe}};
+        const droughtTimeline = {{drought_timeline_json|safe}};
+        const yieldSankey = {{yield_sankey_json|safe}};
+        const irrigationTimeline = {{irrigation_timeline_json|safe}};
+        const forestDegradation = {{forest_degradation_json|safe}};
+        const forestSankey = {{forest_sankey_json|safe}};
+        const miningPresence = {{mining_presence_json|safe}};
+        const miningPie = {{mining_pie_json|safe}};
+        const socioCaste = {{socio_caste_json|safe}};
+        const castePie = {{caste_pie_json|safe}};
+        const socioNrega = {{socio_nrega_json|safe}};
+        const nregaPie = {{nrega_pie_json|safe}};
+        const fisheryPotential = {{fishery_potential_json|safe}};
+        const fisheryTimeline = {{fishery_timeline_json|safe}};
+        const agroforestryTransition = {{agroforestry_transition_json|safe}};
+        const agroforestrySankey = {{agroforestry_sankey_json|safe}};
 
 
-    const intensityValues = Object.values(mwsPatternIntensity);
-    const minIntensity = Math.min(...intensityValues);
-    const maxIntensity = Math.max(...intensityValues);
+        const intensityValues = Object.values(mwsPatternIntensity);
+        const minIntensity = Math.min(...intensityValues);
+        const maxIntensity = Math.max(...intensityValues);
 
-    document.getElementById('legend-min-value').textContent = minIntensity;
-    document.getElementById('legend-max-value').textContent = maxIntensity;
+        document.getElementById('legend-min-value').textContent = minIntensity;
+        document.getElementById('legend-max-value').textContent = maxIntensity;
 
-    // Update all area texts
-    document.getElementById('groundwater-area').textContent = groundwaterStress.total_area.toFixed(2);
-    document.getElementById('drought-area').textContent = highDroughtIncidence.total_area.toFixed(2);
-    document.getElementById('irrigation-area').textContent = highIrrigationRisk.total_area.toFixed(2);
-    document.getElementById('yield-area').textContent = lowYield.total_area.toFixed(2);
-    document.getElementById('forest-area').textContent = forestDegradation.total_area.toFixed(2);
-    document.getElementById('mining-area').textContent = miningPresence.total_area.toFixed(2);
-    document.getElementById('caste-population').textContent = socioCaste.total_population.toLocaleString();
-    document.getElementById('caste-villages').textContent = socioCaste.total_villages;
-    document.getElementById('nrega-villages').textContent = socioNrega.total_villages;
-    document.getElementById('fishery-area').textContent = fisheryPotential.total_area.toFixed(2);
-    document.getElementById('agroforestry-area').textContent = agroforestryTransition.total_area.toFixed(2);
-    
-
-    function getColorForIntensity(intensity) {
-
-        if (maxIntensity === minIntensity) {
-            return 'rgba(135, 206, 235, 0.6)';
-        }
+        // Update all area texts
+        document.getElementById('groundwater-area').textContent = groundwaterStress.total_area.toFixed(2);
+        document.getElementById('drought-area').textContent = highDroughtIncidence.total_area.toFixed(2);
+        document.getElementById('irrigation-area').textContent = highIrrigationRisk.total_area.toFixed(2);
+        document.getElementById('yield-area').textContent = lowYield.total_area.toFixed(2);
+        document.getElementById('forest-area').textContent = forestDegradation.total_area.toFixed(2);
+        document.getElementById('mining-area').textContent = miningPresence.total_area.toFixed(2);
+        document.getElementById('caste-population').textContent = socioCaste.total_population.toLocaleString();
+        document.getElementById('caste-villages').textContent = socioCaste.total_villages;
+        document.getElementById('nrega-villages').textContent = socioNrega.total_villages;
+        document.getElementById('fishery-area').textContent = fisheryPotential.total_area.toFixed(2);
+        document.getElementById('agroforestry-area').textContent = agroforestryTransition.total_area.toFixed(2);
         
-        const normalized = (intensity - minIntensity) / (maxIntensity - minIntensity);
-        
-        if (normalized < 0.25) {
-            const r = Math.round(100 + normalized * 4 * 155);
-            const g = 200;
-            const b = 100;
-            return `rgba(${r}, ${g}, ${b}, 0.7)`;
-        } else if (normalized < 0.5) {
-            const r = 255;
-            const g = Math.round(200 - (normalized - 0.25) * 4 * 45);
-            const b = 100;
-            return `rgba(${r}, ${g}, ${b}, 0.7)`;
-        } else if (normalized < 0.75) {
-            const r = 255;
-            const g = Math.round(155 - (normalized - 0.5) * 4 * 100);
-            const b = 50;
-            return `rgba(${r}, ${g}, ${b}, 0.7)`;
-        } else {
-            const r = 255;
-            const g = Math.round(55 - (normalized - 0.75) * 4 * 55);
-            const b = 0;
-            return `rgba(${r}, ${g}, ${b}, 0.7)`;
-        }
-    }
 
-    const mainMap = new ol.Map({
-        target: 'mainMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    });
+        function getColorForIntensity(intensity) {
 
-    const AgricultureMap = new ol.Map({
-        target: 'agriMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const AgriDroughtMap = new ol.Map({
-        target: 'agriDroughtMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const AgriIrrigationMap = new ol.Map({
-        target: 'agriIrrigationMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const AgriYieldMap = new ol.Map({
-        target: 'agriYieldMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const ForestDegradMap = new ol.Map({
-        target: 'forestDegradMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const MiningMap = new ol.Map({
-        target: 'miningMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const CasteMap = new ol.Map({
-        target: 'casteMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const NREGAMap = new ol.Map({
-        target: 'nregaMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const FisheryMap = new ol.Map({
-        target: 'fishingMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    const AgroforestryMap = new ol.Map({
-        target: 'agroforestryMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-
-    // Fetch GeoJSON and render all maps
-    const geoJsonUrl = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json";
-    
-    // Function to create style based on pattern data
-    function createStyleFunction(patternData) {
-        return function(feature) {
-            const uid = feature.get('uid');
-            const intensity = patternData.mws_intensity ? (patternData.mws_intensity[uid] || 0.0) : 0.0;
+            if (maxIntensity === minIntensity) {
+                return 'rgba(135, 206, 235, 0.6)';
+            }
             
-            let strokeColor = 'black';
-            let fillColor;
-
-            if (intensity === 0) {
-                fillColor = 'rgba(135, 206, 235, 0.3)';
-            } else if (intensity <= 0.25) {
-                fillColor = 'rgba(100, 200, 100, 0.5)';
-            } else if (intensity <= 0.5) {
-                fillColor = 'rgba(255, 235, 59, 0.6)';
-            } else if (intensity <= 0.75) {
-                fillColor = 'rgba(255, 152, 0, 0.7)';
+            const normalized = (intensity - minIntensity) / (maxIntensity - minIntensity);
+            
+            if (normalized < 0.25) {
+                const r = Math.round(100 + normalized * 4 * 155);
+                const g = 200;
+                const b = 100;
+                return `rgba(${r}, ${g}, ${b}, 0.7)`;
+            } else if (normalized < 0.5) {
+                const r = 255;
+                const g = Math.round(200 - (normalized - 0.25) * 4 * 45);
+                const b = 100;
+                return `rgba(${r}, ${g}, ${b}, 0.7)`;
+            } else if (normalized < 0.75) {
+                const r = 255;
+                const g = Math.round(155 - (normalized - 0.5) * 4 * 100);
+                const b = 50;
+                return `rgba(${r}, ${g}, ${b}, 0.7)`;
             } else {
-                fillColor = 'rgba(244, 67, 54, 0.8)';
+                const r = 255;
+                const g = Math.round(55 - (normalized - 0.75) * 4 * 55);
+                const b = 0;
+                return `rgba(${r}, ${g}, ${b}, 0.7)`;
             }
-            
-            return new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: strokeColor,
-                    width: 1.5,
-                }),
-                fill: new ol.style.Fill({
-                    color: fillColor,
-                }),
-            });
+        }
+
+        const mainMap = new ol.Map({
+            target: 'mainMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        const AgricultureMap = new ol.Map({
+            target: 'agriMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+        
+        const AgriDroughtMap = new ol.Map({
+            target: 'agriDroughtMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const AgriIrrigationMap = new ol.Map({
+            target: 'agriIrrigationMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const AgriYieldMap = new ol.Map({
+            target: 'agriYieldMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ForestDegradMap = new ol.Map({
+            target: 'forestDegradMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const MiningMap = new ol.Map({
+            target: 'miningMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const CasteMap = new ol.Map({
+            target: 'casteMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const NREGAMap = new ol.Map({
+            target: 'nregaMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const FisheryMap = new ol.Map({
+            target: 'fishingMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const AgroforestryMap = new ol.Map({
+            target: 'agroforestryMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        // Grid Maps
+        const loadedGridMaps = {
+            'grid1-map1': false,
+            'grid1-map2': false,
+            'grid1-map3': false,
+            'grid2-map1': false,
+            'grid2-map2': false,
+            'grid2-map3': false
         };
-    }
 
-    fetch(geoJsonUrl)
-    .then(response => response.json())
-    .then(data => {
-        const vectorSource = new ol.source.Vector({
-            features: new ol.format.GeoJSON().readFeatures(data),
-        });
+        const AquiferMap = new ol.Map({
+            target: 'grid1Map1',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+        
+        const SogeMap = new ol.Map({
+            target: 'grid1Map2',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
 
-        const styleFunction = feature => {
-            const uid = feature.get('UID');
-            const intensity = groundwaterIntensity[uid] || 0.0;
-            
-            let fillColor;
-            if (intensity === 0) {
-                fillColor = 'rgba(135, 206, 235, 0.3)';  
-            } else if (intensity < 0.5) {
-                fillColor = 'rgba(255, 235, 59, 0.5)';   
-            } else if (intensity < 1.0) {
-                fillColor = 'rgba(255, 152, 0, 0.7)';   
-            } else {
-                fillColor = 'rgba(244, 67, 54, 0.8)';  
+        const wellDepthMap = new ol.Map({
+            target: 'grid1Map3',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const gridMapConfigs = {
+            'grid1-map1': {
+                mapInstance: AquiferMap,
+                targetDiv: 'grid1Map1',
+                cardId: 'grid1-map1-card'
+            },
+            'grid1-map2': {
+                mapInstance: SogeMap,
+                targetDiv: 'grid1Map2',
+                cardId: 'grid1-map2-card'
+            },
+            'grid1-map3': {
+                mapInstance: wellDepthMap,
+                targetDiv: 'grid1Map3',
+                cardId: 'grid1-map3-card'
             }
-            
-            return new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: 'black',
-                    width: 1.5,
-                }),
-                fill: new ol.style.Fill({
-                    color: fillColor,
-                }),
-            });
         };
 
-        const vectorLayer1 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(groundwaterStress),
-        });
+        // Fetch GeoJSON and render all maps
+        const geoJsonUrl = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json";
+        
+        const villageJsonUrl = "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=	panchayat_boundaries:{{district}}_{{block}}&outputFormat=application/json"
+        
+        // Function to create style based on pattern data
+        function createStyleFunction(patternData) {
+            return function(feature) {
+                const uid = feature.get('uid') || feature.get('UID');
+                
+                // Check for both mws_intensity and village_intensity
+                const intensity = (patternData.mws_intensity && patternData.mws_intensity[uid]) || 
+                                (patternData.village_intensity && patternData.village_intensity[uid]) || 
+                                0.0;
+                
+                let strokeColor = 'black';
+                let fillColor;
 
-        const vectorLayer2 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(highDroughtIncidence),
-        });
-
-        const vectorLayer3 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(highIrrigationRisk),
-        });
-
-        const vectorLayer4 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(lowYield),
-        });
-
-        const vectorLayer5 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(forestDegradation),
-        }); 
-
-        const vectorLayer6 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(miningPresence),
-        }); 
-
-        const vectorLayer7 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(socioCaste),
-        });
-
-        const vectorLayer8 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(socioNrega),
-        }); 
-
-        const vectorLayer9 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(fisheryPotential),
-        }); 
-
-        const vectorLayer10 = new ol.layer.Vector({
-            source: vectorSource,
-            style: createStyleFunction(agroforestryTransition),
-        }); 
-
-        const arr = vectorSource.getExtent();
-        const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-
-        AgricultureMap.addLayer(vectorLayer1);
-        AgriDroughtMap.addLayer(vectorLayer2);
-        AgriIrrigationMap.addLayer(vectorLayer3);
-        AgriYieldMap.addLayer(vectorLayer4);
-        ForestDegradMap.addLayer(vectorLayer5);
-        MiningMap.addLayer(vectorLayer6);
-        CasteMap.addLayer(vectorLayer7);
-        NREGAMap.addLayer(vectorLayer8)
-        FisheryMap.addLayer(vectorLayer9)
-        AgroforestryMap.addLayer(vectorLayer10)
-
-        AgricultureMap.getView().setCenter(mapcenter);
-        AgriDroughtMap.getView().setCenter(mapcenter);
-        AgriIrrigationMap.getView().setCenter(mapcenter);
-        AgriYieldMap.getView().setCenter(mapcenter);
-        ForestDegradMap.getView().setCenter(mapcenter);
-        MiningMap.getView().setCenter(mapcenter);
-        CasteMap.getView().setCenter(mapcenter);
-        NREGAMap.getView().setCenter(mapcenter);
-        FisheryMap.getView().setCenter(mapcenter);
-        AgroforestryMap.getView().setCenter(mapcenter);
-    })
-    .catch(error => console.error('Error fetching GeoJSON for Groundwater:', error));
-
-    
-    // Main Map (Pattern Intensity)
-    fetch(geoJsonUrl)
-    .then(response => response.json())
-    .then(data => {
-        const vectorSource = new ol.source.Vector({
-            features: new ol.format.GeoJSON().readFeatures(data),
-        });
-
-        const styleFunction = feature => {
-            const uid = feature.get('uid');
-            const intensity = mwsPatternIntensity[uid] || 0;
-            const fillColor = getColorForIntensity(intensity);
-            
-            return new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: 'black',
-                    width: 1.5,
-                }),
-                fill: new ol.style.Fill({
-                    color: fillColor,
-                }),
+                if (intensity === 0) {
+                    fillColor = 'rgba(135, 206, 235, 0.3)';
+                } else if (intensity <= 0.25) {
+                    fillColor = 'rgba(100, 200, 100, 0.5)';
+                } else if (intensity <= 0.5) {
+                    fillColor = 'rgba(255, 235, 59, 0.6)';
+                } else if (intensity <= 0.75) {
+                    fillColor = 'rgba(255, 152, 0, 0.7)';
+                } else {
+                    fillColor = 'rgba(244, 67, 54, 0.8)';
+                }
+                
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 1.5,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+        }
+        
+        fetch(geoJsonUrl).then(response => response.json()).then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
             });
+
+            const styleFunction = feature => {
+                const uid = feature.get('UID');
+                const intensity = groundwaterIntensity[uid] || 0.0;
+                
+                let fillColor;
+                if (intensity === 0) {
+                    fillColor = 'rgba(135, 206, 235, 0.3)';  
+                } else if (intensity < 0.5) {
+                    fillColor = 'rgba(255, 235, 59, 0.5)';   
+                } else if (intensity < 1.0) {
+                    fillColor = 'rgba(255, 152, 0, 0.7)';   
+                } else {
+                    fillColor = 'rgba(244, 67, 54, 0.8)';  
+                }
+                
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'black',
+                        width: 1.5,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer1 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(groundwaterStress),
+            });
+
+            const vectorLayer2 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(highDroughtIncidence),
+            });
+
+            const vectorLayer3 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(highIrrigationRisk),
+            });
+
+            const vectorLayer4 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(lowYield),
+            });
+
+            const vectorLayer5 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(forestDegradation),
+            }); 
+
+            const vectorLayer6 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(miningPresence),
+            }); 
+
+            //const vectorLayer8 = new ol.layer.Vector({
+            //    source: vectorSource,
+            //    style: createStyleFunction(socioNrega),
+            //}); 
+
+            const vectorLayer9 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(fisheryPotential),
+            }); 
+
+            const vectorLayer10 = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(agroforestryTransition),
+            }); 
+
+            const arr = vectorSource.getExtent();
+            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+
+            AgricultureMap.addLayer(vectorLayer1);
+            AgriDroughtMap.addLayer(vectorLayer2);
+            AgriIrrigationMap.addLayer(vectorLayer3);
+            AgriYieldMap.addLayer(vectorLayer4);
+            ForestDegradMap.addLayer(vectorLayer5);
+            MiningMap.addLayer(vectorLayer6);
+            //CasteMap.addLayer(vectorLayer7);
+            //NREGAMap.addLayer(vectorLayer8)
+            FisheryMap.addLayer(vectorLayer9)
+            AgroforestryMap.addLayer(vectorLayer10)
+
+            AgricultureMap.getView().setCenter(mapcenter);
+            AgriDroughtMap.getView().setCenter(mapcenter);
+            AgriIrrigationMap.getView().setCenter(mapcenter);
+            AgriYieldMap.getView().setCenter(mapcenter);
+            ForestDegradMap.getView().setCenter(mapcenter);
+            MiningMap.getView().setCenter(mapcenter);
+            //CasteMap.getView().setCenter(mapcenter);
+            //NREGAMap.getView().setCenter(mapcenter);
+            FisheryMap.getView().setCenter(mapcenter);
+            AgroforestryMap.getView().setCenter(mapcenter);
+        }).catch(error => console.error('Error fetching GeoJSON for Groundwater:', error));
+
+        
+        // Main Map (Pattern Intensity)
+        fetch(geoJsonUrl)
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                const intensity = mwsPatternIntensity[uid] || 0;
+                const fillColor = getColorForIntensity(intensity);
+                
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'black',
+                        width: 1.5,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+
+            mainMap.addLayer(vectorLayer);
+
+            const arr = vectorSource.getExtent();
+            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+            mainMap.getView().setCenter(mapcenter);
+        })
+        .catch(error => console.error('Error fetching GeoJSON for Main Map:', error));
+        
+        // Village Map
+        fetch(villageJsonUrl).then(response => response.json()).then(data => {
+            const villageVectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+
+            const villageStyleFunction = feature => {
+                // Try different possible village ID field names
+                const villageId = feature.get('vill_ID')
+
+                
+                const intensity = socioCaste.village_intensity ? (socioCaste.village_intensity[villageId] || 0.0) : 0.0;
+                
+                let strokeColor = 'black';
+                let fillColor;
+
+                if (intensity === 0) {
+                    fillColor = 'rgba(135, 206, 235, 0.3)';
+                } else if (intensity <= 0.25) {
+                    fillColor = 'rgba(100, 200, 100, 0.5)';
+                } else if (intensity <= 0.5) {
+                    fillColor = 'rgba(255, 235, 59, 0.6)';
+                } else if (intensity <= 0.75) {
+                    fillColor = 'rgba(255, 152, 0, 0.7)';
+                } else {
+                    fillColor = 'rgba(244, 67, 54, 0.8)';
+                }
+                
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 1.5,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+
+            };
+
+            const nregaVillageStyleFunction = feature => {
+                const villageId = feature.get('vill_ID')
+                
+                const intensity = socioNrega.village_intensity ? (socioNrega.village_intensity[villageId] || 0.0) : 0.0;
+                
+                let strokeColor = 'black';
+                let fillColor;
+
+                if (intensity === 0) {
+                    fillColor = 'rgba(135, 206, 235, 0.3)';  // Light blue - no pattern
+                } else {
+                    fillColor = 'rgba(244, 67, 54, 0.8)';    // Red - low NREGA works
+                }
+                
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 1.5,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+
+            const villageLayer = new ol.layer.Vector({
+                source: villageVectorSource,
+                style: villageStyleFunction,
+            });
+
+            const nregaVillageLayer = new ol.layer.Vector({
+                source: villageVectorSource,
+                style: nregaVillageStyleFunction,
+            });
+
+            CasteMap.addLayer(villageLayer);
+            NREGAMap.addLayer(nregaVillageLayer);
+
+            const villageExtent = villageVectorSource.getExtent();
+            const villageCenter = [(villageExtent[0] + villageExtent[2]) / 2, (villageExtent[1] + villageExtent[3]) / 2];
+            CasteMap.getView().setCenter(villageCenter);
+            NREGAMap.getView().setCenter(villageCenter);
+
+        }).catch(error => console.error('Error fetching Village Json for Map:', error));
+        
+        
+        // Function to load custom grid map
+        function loadCustomMap(mapId) {
+            // Prevent duplicate loading
+            if (loadedGridMaps[mapId]) {
+                return;
+            }
+
+            const config = gridMapConfigs[mapId];
+            if (!config) {
+                console.error('Map configuration not found for:', mapId);
+                return;
+            }
+
+            const card = document.getElementById(config.cardId);
+            if (!card) {
+                console.error('Card not found:', config.cardId);
+                return;
+            }
+
+            const placeholder = card.querySelector('.map-placeholder');
+            const button = card.querySelector('.load-map-btn');
+            const mapDiv = document.getElementById(config.targetDiv);
+
+            if (!placeholder || !button || !mapDiv) {
+                console.error('Required elements not found for:', mapId);
+                return;
+            }
+
+            // Show loading state
+            button.disabled = true;
+            button.textContent = 'Loading...';
+
+            // Fetch GeoJSON and add vector layer
+            fetch(geoJsonUrl)
+                .then(response => response.json())
+                .then(data => {
+                    const vectorSource = new ol.source.Vector({
+                        features: new ol.format.GeoJSON().readFeatures(data),
+                    });
+
+                    // You can customize the style function for each map here
+                    // For now, using a simple style
+                    const vectorLayer = new ol.layer.Vector({
+                        source: vectorSource,
+                        style: new ol.style.Style({
+                            stroke: new ol.style.Stroke({
+                                color: 'black',
+                                width: 1.5,
+                            }),
+                            fill: new ol.style.Fill({
+                                color: 'rgba(100, 200, 100, 0.5)',
+                            }),
+                        })
+                    });
+
+                    // Add layer to map
+                    config.mapInstance.addLayer(vectorLayer);
+
+                    // Center the map
+                    const extent = vectorSource.getExtent();
+                    const center = [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2];
+                    config.mapInstance.getView().setCenter(center);
+
+                    // Hide placeholder, show map
+                    placeholder.style.display = 'none';
+                    mapDiv.style.display = 'block';
+
+                    // Mark as loaded
+                    loadedGridMaps[mapId] = true;
+
+                    // Update map size to ensure proper rendering
+                    setTimeout(() => {
+                        config.mapInstance.updateSize();
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('Error loading GeoJSON for', mapId, ':', error);
+                    button.textContent = 'Error Loading';
+                    button.style.backgroundColor = '#e74c3c';
+                    button.disabled = false;
+                });
+        }
+
+        //? Graphs Section
+        const droughtYears = Object.keys(droughtTimeline).sort();
+        const droughtValues = droughtYears.map(year => (droughtTimeline[year] * 100).toFixed(2)); // Convert to percentage
+
+        const droughtTimelineChart = new Chart(document.getElementById('weighted_drought_timeline'), {
+            type: 'line',
+            data: {
+                labels: droughtYears,
+                datasets: [{
+                    label: 'Drought Incidence (% of Agricultural Area)',
+                    data: droughtValues,
+                    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                    borderColor: 'rgba(244, 67, 54, 1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,  // Smooth curve
+                    pointRadius: 5,
+                    pointBackgroundColor: 'rgba(244, 67, 54, 1)',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Weighted Average Drought Incidence Over Time',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Percentage of Area Affected (%)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
+                }
+            }
+        });
+
+        const sankeyData = {
+            datasets: [{
+                label: 'Farmland Transition',
+                data: yieldSankey.links.map(link => ({
+                    from: yieldSankey.nodes[link.source].name,
+                    to: yieldSankey.nodes[link.target].name,
+                    flow: link.value
+                })),
+                colorFrom: (c) => {
+                    if (c.dataset.data[c.dataIndex].from === 'Farmlands') {
+                        return 'rgba(76, 175, 80, 0.8)';  // Green for farmlands
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
+                },
+                colorTo: (c) => {
+                    const toNode = c.dataset.data[c.dataIndex].to;
+                    if (toNode === 'Barren Land') {
+                        return 'rgba(244, 67, 54, 0.8)';  // Red for barren
+                    } else if (toNode === 'Scrub Land') {
+                        return 'rgba(255, 152, 0, 0.8)';  // Orange for scrub
+                    } else if (toNode === 'Remaining Farmlands') {
+                        return 'rgba(76, 175, 80, 0.8)';  // Green for remaining
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
+                },
+                colorMode: 'gradient',
+                size: 'max',
+                borderWidth: 1,
+                borderColor: 'white'
+            }]
         };
 
-        const vectorLayer = new ol.layer.Vector({
-            source: vectorSource,
-            style: styleFunction,
+        const yieldSankeyChart = new Chart(document.getElementById('yieldSankeyChart'), {
+            type: 'sankey',
+            data: sankeyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Farmland Transition (Area in Hectares)',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = context.dataset.data[context.dataIndex];
+                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
+                            }
+                        }
+                    }
+                }
+            }
         });
 
-        mainMap.addLayer(vectorLayer);
+        // Seasonal Water Availability Timeline Chart
+        const irrigationYears = Object.keys(irrigationTimeline.kharif).sort();
+        const kharifValues = irrigationYears.map(year => irrigationTimeline.kharif[year]);
+        const rabiValues = irrigationYears.map(year => irrigationTimeline.rabi[year]);
+        const zaidValues = irrigationYears.map(year => irrigationTimeline.zaid[year]);
 
-        const arr = vectorSource.getExtent();
-        const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-        mainMap.getView().setCenter(mapcenter);
-    })
-    .catch(error => console.error('Error fetching GeoJSON for Main Map:', error));
-
-    const droughtYears = Object.keys(droughtTimeline).sort();
-    const droughtValues = droughtYears.map(year => (droughtTimeline[year] * 100).toFixed(2)); // Convert to percentage
-
-    const droughtTimelineChart = new Chart(document.getElementById('weighted_drought_timeline'), {
-        type: 'line',
-        data: {
-            labels: droughtYears,
-            datasets: [{
-                label: 'Drought Incidence (% of Agricultural Area)',
-                data: droughtValues,
-                backgroundColor: 'rgba(244, 67, 54, 0.2)',
-                borderColor: 'rgba(244, 67, 54, 1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4,  // Smooth curve
-                pointRadius: 5,
-                pointBackgroundColor: 'rgba(244, 67, 54, 1)',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Weighted Average Drought Incidence Over Time',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y + '%';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Percentage of Area Affected (%)'
+        const irrigationTimelineChart = new Chart(document.getElementById('seasonal_water_timeline'), {
+            type: 'line',
+            data: {
+                labels: irrigationYears,
+                datasets: [
+                    {
+                        label: 'Kharif (Monsoon)',
+                        data: kharifValues,
+                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'rgba(76, 175, 80, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 7
                     },
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Year'
-                    }
-                }
-            },
-            animation: {
-                duration: 1000
-            }
-        }
-    });
-
-    const sankeyData = {
-        datasets: [{
-            label: 'Farmland Transition',
-            data: yieldSankey.links.map(link => ({
-                from: yieldSankey.nodes[link.source].name,
-                to: yieldSankey.nodes[link.target].name,
-                flow: link.value
-            })),
-            colorFrom: (c) => {
-                if (c.dataset.data[c.dataIndex].from === 'Farmlands') {
-                    return 'rgba(76, 175, 80, 0.8)';  // Green for farmlands
-                }
-                return 'rgba(158, 158, 158, 0.5)';
-            },
-            colorTo: (c) => {
-                const toNode = c.dataset.data[c.dataIndex].to;
-                if (toNode === 'Barren Land') {
-                    return 'rgba(244, 67, 54, 0.8)';  // Red for barren
-                } else if (toNode === 'Scrub Land') {
-                    return 'rgba(255, 152, 0, 0.8)';  // Orange for scrub
-                } else if (toNode === 'Remaining Farmlands') {
-                    return 'rgba(76, 175, 80, 0.8)';  // Green for remaining
-                }
-                return 'rgba(158, 158, 158, 0.5)';
-            },
-            colorMode: 'gradient',
-            size: 'max',
-            borderWidth: 1,
-            borderColor: 'white'
-        }]
-    };
-
-    const yieldSankeyChart = new Chart(document.getElementById('yieldSankeyChart'), {
-        type: 'sankey',
-        data: sankeyData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Farmland Transition (Area in Hectares)',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const item = context.dataset.data[context.dataIndex];
-                            return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    // Seasonal Water Availability Timeline Chart
-    const irrigationYears = Object.keys(irrigationTimeline.kharif).sort();
-    const kharifValues = irrigationYears.map(year => irrigationTimeline.kharif[year]);
-    const rabiValues = irrigationYears.map(year => irrigationTimeline.rabi[year]);
-    const zaidValues = irrigationYears.map(year => irrigationTimeline.zaid[year]);
-
-    const irrigationTimelineChart = new Chart(document.getElementById('seasonal_water_timeline'), {
-        type: 'line',
-        data: {
-            labels: irrigationYears,
-            datasets: [
-                {
-                    label: 'Kharif (Monsoon)',
-                    data: kharifValues,
-                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                    borderColor: 'rgba(76, 175, 80, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: 'rgba(76, 175, 80, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 7
-                },
-                {
-                    label: 'Rabi (Winter)',
-                    data: rabiValues,
-                    backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                    borderColor: 'rgba(33, 150, 243, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: 'rgba(33, 150, 243, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 7
-                },
-                {
-                    label: 'Zaid (Summer)',
-                    data: zaidValues,
-                    backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                    borderColor: 'rgba(255, 152, 0, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: 'rgba(255, 152, 0, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 7
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Seasonal Water Availability (Weighted by Surfacewaterbodies Area)',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Water Availability (%)'
+                    {
+                        label: 'Rabi (Winter)',
+                        data: rabiValues,
+                        backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                        borderColor: 'rgba(33, 150, 243, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'rgba(33, 150, 243, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 7
                     },
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
+                    {
+                        label: 'Zaid (Summer)',
+                        data: zaidValues,
+                        backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                        borderColor: 'rgba(255, 152, 0, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'rgba(255, 152, 0, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 7
                     }
-                },
-                x: {
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
                     title: {
                         display: true,
-                        text: 'Year'
-                    }
-                }
-            },
-            animation: {
-                duration: 1000
-            }
-        }
-    });
-
-
-    const forestSankeyData = {
-        datasets: [{
-            label: 'Forest Cover Transition',
-            data: forestSankey.links.map(link => ({
-                from: forestSankey.nodes[link.source].name,
-                to: forestSankey.nodes[link.target].name,
-                flow: link.value
-            })),
-            colorFrom: (c) => {
-                // All flows come from Forest Cover (dark green)
-                return 'rgba(27, 94, 32, 0.8)';
-            },
-            colorTo: (c) => {
-                const toNode = c.dataset.data[c.dataIndex].to;
-                if (toNode === 'Barren Land') {
-                    return 'rgba(121, 85, 72, 0.8)';  // Brown for barren
-                } else if (toNode === 'Built-up Area') {
-                    return 'rgba(97, 97, 97, 0.8)';  // Gray for built-up
-                } else if (toNode === 'Farmland') {
-                    return 'rgba(139, 195, 74, 0.8)';  // Yellow-green for farmland
-                } else if (toNode === 'Remaining Forest') {
-                    return 'rgba(76, 175, 80, 0.8)';  // Green for remaining forest
-                } else if (toNode === 'Scrub Land') {
-                    return 'rgba(141, 110, 99, 0.8)';  // Light brown for scrub
-                }
-                return 'rgba(158, 158, 158, 0.5)';
-            },
-            colorMode: 'gradient',
-            size: 'max',
-            borderWidth: 1,
-            borderColor: 'white'
-        }]
-    };
-
-    const forestSankeyChart = new Chart(document.getElementById('forestSankeyChart'), {
-        type: 'sankey',
-        data: forestSankeyData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Forest Cover Transition (Area in Hectares)',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const item = context.dataset.data[context.dataIndex];
-                            return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
-                        }
-                    }
-                }
-            }
-        }
-    });
-
-    const miningPieChart = new Chart(document.getElementById('miningPieChart'), {
-        type: 'pie',
-        data: {
-            labels: miningPie.labels,
-            datasets: [{
-                label: 'Number of Mines',
-                data: miningPie.values,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.8)',   // Red
-                    'rgba(54, 162, 235, 0.8)',   // Blue
-                    'rgba(255, 206, 86, 0.8)',   // Yellow
-                    'rgba(75, 192, 192, 0.8)',   // Teal
-                    'rgba(153, 102, 255, 0.8)',  // Purple
-                    'rgba(255, 159, 64, 0.8)',   // Orange
-                    'rgba(199, 199, 199, 0.8)',  // Gray
-                    'rgba(83, 102, 255, 0.8)',   // Indigo
-                    'rgba(255, 99, 255, 0.8)',   // Pink
-                    'rgba(99, 255, 132, 0.8)',   // Light Green
-                ],
-                borderColor: [
-                    'rgba(255, 99, 132, 1)',
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(153, 102, 255, 1)',
-                    'rgba(255, 159, 64, 1)',
-                    'rgba(199, 199, 199, 1)',
-                    'rgba(83, 102, 255, 1)',
-                    'rgba(255, 99, 255, 1)',
-                    'rgba(99, 255, 132, 1)',
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Distribution of Mining Types',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'right',
-                    labels: {
-                        padding: 15,
+                        text: 'Seasonal Water Availability (Weighted by Surfacewaterbodies Area)',
                         font: {
-                            size: 12
+                            size: 16
                         }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return label + ': ' + value + ' mines (' + percentage + '%)';
-                        }
-                    }
-                }
-            },
-            animation: {
-                duration: 1000
-            }
-        }
-    });
-    
-    const castePieChart = new Chart(document.getElementById('castePieChart'), {
-        type: 'pie',
-        data: {
-            labels: castePie.labels,
-            datasets: [{
-                label: 'Population',
-                data: castePie.values,
-                backgroundColor: [
-                    'rgba(244, 67, 54, 0.8)',   // Red for SC
-                    'rgba(255, 152, 0, 0.8)',   // Orange for ST
-                    'rgba(76, 175, 80, 0.8)',   // Green for Others
-                ],
-                borderColor: [
-                    'rgba(244, 67, 54, 1)',
-                    'rgba(255, 152, 0, 1)',
-                    'rgba(76, 175, 80, 1)',
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Population Distribution by Caste Category',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'right',
-                    labels: {
-                        padding: 15,
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return label + ': ' + value.toLocaleString() + ' (' + percentage + '%)';
-                        }
-                    }
-                }
-            },
-            animation: {
-                duration: 1000
-            }
-        }
-    });
-
-    const nregaPieChart = new Chart(document.getElementById('nregaPieChart'), {
-        type: 'pie',
-        data: {
-            labels: nregaPie.labels,
-            datasets: [{
-                label: 'Number of Works',
-                data: nregaPie.values,
-                backgroundColor: [
-                    'rgba(33, 150, 243, 0.8)',   // Blue - Soil and Water Conservation
-                    'rgba(139, 195, 74, 0.8)',   // Light Green - Land Restoration
-                    'rgba(76, 175, 80, 0.8)',    // Green - Plantations
-                    'rgba(3, 169, 244, 0.8)',    // Light Blue - Irrigation on Farms
-                    'rgba(255, 193, 7, 0.8)',    // Amber - Other Farm Works
-                    'rgba(255, 152, 0, 0.8)',    // Orange - Off-farm Livelihood Assets
-                    'rgba(121, 85, 72, 0.8)',    // Brown - Community Assets
-                ],
-                borderColor: [
-                    'rgba(33, 150, 243, 1)',
-                    'rgba(139, 195, 74, 1)',
-                    'rgba(76, 175, 80, 1)',
-                    'rgba(3, 169, 244, 1)',
-                    'rgba(255, 193, 7, 1)',
-                    'rgba(255, 152, 0, 1)',
-                    'rgba(121, 85, 72, 1)',
-                ],
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Distribution of NREGA Work Types',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'right',
-                    labels: {
-                        padding: 10,
-                        font: {
-                            size: 11
-                        }
-                    }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.parsed || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return label + ': ' + value.toLocaleString() + ' works (' + percentage + '%)';
-                        }
-                    }
-                }
-            },
-            animation: {
-                duration: 1000
-            }
-        }
-    });
-
-    const fisheryYears = Object.keys(fisheryTimeline.kharif).sort();
-    const fisheryKharifValues = fisheryYears.map(year => fisheryTimeline.kharif[year]);
-    const fisheryRabiValues = fisheryYears.map(year => fisheryTimeline.rabi[year]);
-    const fisheryZaidValues = fisheryYears.map(year => fisheryTimeline.zaid[year]);
-
-    const fisheryTimelineChart = new Chart(document.getElementById('fisheryTimelineChart'), {
-        type: 'line',
-        data: {
-            labels: fisheryYears,
-            datasets: [
-                {
-                    label: 'Kharif (Monsoon)',
-                    data: fisheryKharifValues,
-                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                    borderColor: 'rgba(76, 175, 80, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: 'rgba(76, 175, 80, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 7
-                },
-                {
-                    label: 'Rabi (Winter)',
-                    data: fisheryRabiValues,
-                    backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                    borderColor: 'rgba(33, 150, 243, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: 'rgba(33, 150, 243, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 7
-                },
-                {
-                    label: 'Zaid (Summer)',
-                    data: fisheryZaidValues,
-                    backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                    borderColor: 'rgba(255, 152, 0, 1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointBackgroundColor: 'rgba(255, 152, 0, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverRadius: 7
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Seasonal Water Availability for Fishery (Weighted by SWB Area)',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Water Availability (%)'
                     },
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
+                            }
                         }
                     }
                 },
-                x: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Water Availability (%)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
+                }
+            }
+        });
+
+        const forestSankeyData = {
+            datasets: [{
+                label: 'Forest Cover Transition',
+                data: forestSankey.links.map(link => ({
+                    from: forestSankey.nodes[link.source].name,
+                    to: forestSankey.nodes[link.target].name,
+                    flow: link.value
+                })),
+                colorFrom: (c) => {
+                    // All flows come from Forest Cover (dark green)
+                    return 'rgba(27, 94, 32, 0.8)';
+                },
+                colorTo: (c) => {
+                    const toNode = c.dataset.data[c.dataIndex].to;
+                    if (toNode === 'Barren Land') {
+                        return 'rgba(121, 85, 72, 0.8)';  // Brown for barren
+                    } else if (toNode === 'Built-up Area') {
+                        return 'rgba(97, 97, 97, 0.8)';  // Gray for built-up
+                    } else if (toNode === 'Farmland') {
+                        return 'rgba(139, 195, 74, 0.8)';  // Yellow-green for farmland
+                    } else if (toNode === 'Remaining Forest') {
+                        return 'rgba(76, 175, 80, 0.8)';  // Green for remaining forest
+                    } else if (toNode === 'Scrub Land') {
+                        return 'rgba(141, 110, 99, 0.8)';  // Light brown for scrub
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
+                },
+                colorMode: 'gradient',
+                size: 'max',
+                borderWidth: 1,
+                borderColor: 'white'
+            }]
+        };
+
+        const forestSankeyChart = new Chart(document.getElementById('forestSankeyChart'), {
+            type: 'sankey',
+            data: forestSankeyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
                     title: {
                         display: true,
-                        text: 'Year'
-                    }
-                }
-            },
-            animation: {
-                duration: 1000
-            }
-        }
-    });
-
-    const agroforestrySankeyData = {
-        datasets: [{
-            label: 'Cropping Intensity Transition',
-            data: agroforestrySankey.links.map(link => ({
-                from: agroforestrySankey.nodes[link.source].name,
-                to: agroforestrySankey.nodes[link.target].name,
-                flow: link.value
-            })),
-            colorFrom: (c) => {
-                const fromNode = c.dataset.data[c.dataIndex].from;
-                if (fromNode === 'Single Cropping (Initial)') {
-                    return 'rgba(244, 67, 54, 0.8)';
-                } else if (fromNode === 'Double Cropping (Initial)') {
-                    return 'rgba(255, 193, 7, 0.8)';
-                } else if (fromNode === 'Triple Cropping (Initial)') {
-                    return 'rgba(76, 175, 80, 0.8)';
-                }
-                return 'rgba(158, 158, 158, 0.5)';
-            },
-            colorTo: (c) => {
-                const toNode = c.dataset.data[c.dataIndex].to;
-                if (toNode === 'Single Cropping (Final)') {
-                    return 'rgba(244, 67, 54, 0.8)';
-                } else if (toNode === 'Double Cropping (Final)') {
-                    return 'rgba(255, 193, 7, 0.8)';
-                } else if (toNode === 'Triple Cropping (Final)') {
-                    return 'rgba(76, 175, 80, 0.8)';
-                }
-                return 'rgba(158, 158, 158, 0.5)';
-            },
-            colorMode: 'gradient',
-            size: 'max',
-            borderWidth: 1,
-            borderColor: 'white',
-            // Add priority/column information
-            priority: {
-                'Single Cropping (Initial)': 0,
-                'Double Cropping (Initial)': 1,
-                'Triple Cropping (Initial)': 2,
-                'Single Cropping (Final)': 0,
-                'Double Cropping (Final)': 1,
-                'Triple Cropping (Final)': 2
-            }
-        }]
-    };
-
-    const agroforestrySankeyChart = new Chart(document.getElementById('agroforestrySankeyChart'), {
-        type: 'sankey',
-        data: agroforestrySankeyData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Cropping Intensity Transitions (Area in Hectares)',
-                    font: {
-                        size: 16
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const item = context.dataset.data[context.dataIndex];
-                            return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
+                        text: 'Forest Cover Transition (Area in Hectares)',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = context.dataset.data[context.dataIndex];
+                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
+                            }
                         }
                     }
                 }
+            }
+        });
+
+        const miningPieChart = new Chart(document.getElementById('miningPieChart'), {
+            type: 'pie',
+            data: {
+                labels: miningPie.labels,
+                datasets: [{
+                    label: 'Number of Mines',
+                    data: miningPie.values,
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.8)',   // Red
+                        'rgba(54, 162, 235, 0.8)',   // Blue
+                        'rgba(255, 206, 86, 0.8)',   // Yellow
+                        'rgba(75, 192, 192, 0.8)',   // Teal
+                        'rgba(153, 102, 255, 0.8)',  // Purple
+                        'rgba(255, 159, 64, 0.8)',   // Orange
+                        'rgba(199, 199, 199, 0.8)',  // Gray
+                        'rgba(83, 102, 255, 0.8)',   // Indigo
+                        'rgba(255, 99, 255, 0.8)',   // Pink
+                        'rgba(99, 255, 132, 0.8)',   // Light Green
+                    ],
+                    borderColor: [
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 159, 64, 1)',
+                        'rgba(199, 199, 199, 1)',
+                        'rgba(83, 102, 255, 1)',
+                        'rgba(255, 99, 255, 1)',
+                        'rgba(99, 255, 132, 1)',
+                    ],
+                    borderWidth: 2
+                }]
             },
-            // Add layout options to control node positioning
-            layout: {
-                nodeSort: (a, b) => {
-                    // Sort by priority
-                    const priorityMap = {
-                        'Single Cropping (Initial)': 0,
-                        'Double Cropping (Initial)': 1,
-                        'Triple Cropping (Initial)': 2,
-                        'Single Cropping (Final)': 3,
-                        'Double Cropping (Final)': 4,
-                        'Triple Cropping (Final)': 5
-                    };
-                    return priorityMap[a.key] - priorityMap[b.key];
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Distribution of Mining Types',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return label + ': ' + value + ' mines (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
                 }
             }
-        }
-    });
-    //? Data Check
-     function hasSectionData(dataObj) {
-        if (!dataObj) return false;
+        });
         
-        // Check for total_area
-        if (dataObj.hasOwnProperty('total_area')) {
-            return dataObj.total_area > 0;
+        const castePieChart = new Chart(document.getElementById('castePieChart'), {
+            type: 'pie',
+            data: {
+                labels: castePie.labels,
+                datasets: [{
+                    label: 'Population',
+                    data: castePie.values,
+                    backgroundColor: [
+                        'rgba(244, 67, 54, 0.8)',   // Red for SC
+                        'rgba(255, 152, 0, 0.8)',   // Orange for ST
+                        'rgba(76, 175, 80, 0.8)',   // Green for Others
+                    ],
+                    borderColor: [
+                        'rgba(244, 67, 54, 1)',
+                        'rgba(255, 152, 0, 1)',
+                        'rgba(76, 175, 80, 1)',
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Population Distribution by Caste Category',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return label + ': ' + value.toLocaleString() + ' (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
+                }
+            }
+        });
+
+        const nregaPieChart = new Chart(document.getElementById('nregaPieChart'), {
+            type: 'pie',
+            data: {
+                labels: nregaPie.labels,
+                datasets: [{
+                    label: 'Number of Works',
+                    data: nregaPie.values,
+                    backgroundColor: [
+                        '#6495ED',   // Blue - Soil and Water Conservation
+                        '#FFA500',   // Light Green - Land Restoration
+                        '#52B69A',    // Green - Plantations
+                        '#1A759F',    // Light Blue - Irrigation on Farms
+                        '#355070',    // Amber - Other Farm Works
+                        '#C2678D',    // Orange - Off-farm Livelihood Assets
+                        '#6D597A',    // Brown - Community Assets
+                    ],
+                    borderColor: [
+                        '#6495ED',
+                        '#FFA500',
+                        '#52B69A',
+                        '#1A759F',
+                        '#355070',
+                        '#C2678D',
+                        '#6D597A',
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Distribution of NREGA Work Types',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'right',
+                        labels: {
+                            padding: 10,
+                            font: {
+                                size: 11
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return label + ': ' + value.toLocaleString() + ' works (' + percentage + '%)';
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
+                }
+            }
+        });
+
+        const fisheryYears = Object.keys(fisheryTimeline.kharif).sort();
+        const fisheryKharifValues = fisheryYears.map(year => fisheryTimeline.kharif[year]);
+        const fisheryRabiValues = fisheryYears.map(year => fisheryTimeline.rabi[year]);
+        const fisheryZaidValues = fisheryYears.map(year => fisheryTimeline.zaid[year]);
+
+        const fisheryTimelineChart = new Chart(document.getElementById('fisheryTimelineChart'), {
+            type: 'line',
+            data: {
+                labels: fisheryYears,
+                datasets: [
+                    {
+                        label: 'Kharif (Monsoon)',
+                        data: fisheryKharifValues,
+                        backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                        borderColor: 'rgba(76, 175, 80, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'rgba(76, 175, 80, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Rabi (Winter)',
+                        data: fisheryRabiValues,
+                        backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                        borderColor: 'rgba(33, 150, 243, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'rgba(33, 150, 243, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 7
+                    },
+                    {
+                        label: 'Zaid (Summer)',
+                        data: fisheryZaidValues,
+                        backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                        borderColor: 'rgba(255, 152, 0, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: 'rgba(255, 152, 0, 1)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverRadius: 7
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Seasonal Water Availability for Fishery (Weighted by SWB Area)',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Water Availability (%)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Year'
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1000
+                }
+            }
+        });
+
+        const agroforestrySankeyData = {
+            datasets: [{
+                label: 'Cropping Intensity Transition',
+                data: agroforestrySankey.links.map(link => ({
+                    from: agroforestrySankey.nodes[link.source].name,
+                    to: agroforestrySankey.nodes[link.target].name,
+                    flow: link.value
+                })),
+                colorFrom: (c) => {
+                    const fromNode = c.dataset.data[c.dataIndex].from;
+                    if (fromNode === 'Single Cropping (Initial)') {
+                        return 'rgba(244, 67, 54, 0.8)';
+                    } else if (fromNode === 'Double Cropping (Initial)') {
+                        return 'rgba(255, 193, 7, 0.8)';
+                    } else if (fromNode === 'Triple Cropping (Initial)') {
+                        return 'rgba(76, 175, 80, 0.8)';
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
+                },
+                colorTo: (c) => {
+                    const toNode = c.dataset.data[c.dataIndex].to;
+                    if (toNode === 'Single Cropping (Final)') {
+                        return 'rgba(244, 67, 54, 0.8)';
+                    } else if (toNode === 'Double Cropping (Final)') {
+                        return 'rgba(255, 193, 7, 0.8)';
+                    } else if (toNode === 'Triple Cropping (Final)') {
+                        return 'rgba(76, 175, 80, 0.8)';
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
+                },
+                colorMode: 'gradient',
+                size: 'max',
+                borderWidth: 1,
+                borderColor: 'white',
+                // Add priority/column information
+                priority: {
+                    'Single Cropping (Initial)': 0,
+                    'Double Cropping (Initial)': 1,
+                    'Triple Cropping (Initial)': 2,
+                    'Single Cropping (Final)': 0,
+                    'Double Cropping (Final)': 1,
+                    'Triple Cropping (Final)': 2
+                }
+            }]
+        };
+
+        const agroforestrySankeyChart = new Chart(document.getElementById('agroforestrySankeyChart'), {
+            type: 'sankey',
+            data: agroforestrySankeyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Cropping Intensity Transitions (Area in Hectares)',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = context.dataset.data[context.dataIndex];
+                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
+                            }
+                        }
+                    }
+                },
+                // Add layout options to control node positioning
+                layout: {
+                    nodeSort: (a, b) => {
+                        // Sort by priority
+                        const priorityMap = {
+                            'Single Cropping (Initial)': 0,
+                            'Double Cropping (Initial)': 1,
+                            'Triple Cropping (Initial)': 2,
+                            'Single Cropping (Final)': 3,
+                            'Double Cropping (Final)': 4,
+                            'Triple Cropping (Final)': 5
+                        };
+                        return priorityMap[a.key] - priorityMap[b.key];
+                    }
+                }
+            }
+        });
+        //? Data Check
+        function hasSectionData(dataObj) {
+            if (!dataObj) return false;
+            
+            // Check for total_area
+            if (dataObj.hasOwnProperty('total_area')) {
+                return dataObj.total_area > 0;
+            }
+            
+            // Check for total_population
+            if (dataObj.hasOwnProperty('total_population')) {
+                return dataObj.total_population > 0;
+            }
+            
+            // Check for total_villages
+            if (dataObj.hasOwnProperty('total_villages')) {
+                return dataObj.total_villages > 0;
+            }
+            
+            return false;
         }
-        
-        // Check for total_population
-        if (dataObj.hasOwnProperty('total_population')) {
-            return dataObj.total_population > 0;
+
+        // Function to hide section by removing it from DOM
+        function hideSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.style.display = 'none';
+            }
         }
-        
-        // Check for total_villages
-        if (dataObj.hasOwnProperty('total_villages')) {
-            return dataObj.total_villages > 0;
+
+        // Check and hide sections without data
+        // Agriculture subsections
+        if (!hasSectionData(groundwaterStress)) {
+            hideSection('groundwater-section');
         }
-        
-        return false;
-    }
-
-    // Function to hide section by removing it from DOM
-    function hideSection(sectionId) {
-        const section = document.getElementById(sectionId);
-        if (section) {
-            section.style.display = 'none';
+        if (!hasSectionData(highDroughtIncidence)) {
+            hideSection('drought-section');
         }
-    }
+        if (!hasSectionData(highIrrigationRisk)) {
+            hideSection('irrigation-section');
+        }
+        if (!hasSectionData(lowYield)) {
+            hideSection('yield-section');
+        }
 
-    // Check and hide sections without data
-    // Agriculture subsections
-    if (!hasSectionData(groundwaterStress)) {
-        hideSection('groundwater-section');
-    }
-    if (!hasSectionData(highDroughtIncidence)) {
-        hideSection('drought-section');
-    }
-    if (!hasSectionData(highIrrigationRisk)) {
-        hideSection('irrigation-section');
-    }
-    if (!hasSectionData(lowYield)) {
-        hideSection('yield-section');
-    }
+        // Check if entire Agriculture section should be hidden
+        if (!hasSectionData(groundwaterStress) && 
+            !hasSectionData(highDroughtIncidence) && 
+            !hasSectionData(highIrrigationRisk) && 
+            !hasSectionData(lowYield)) {
+            hideSection('agriculture-section');
+        }
 
-    // Check if entire Agriculture section should be hidden
-    if (!hasSectionData(groundwaterStress) && 
-        !hasSectionData(highDroughtIncidence) && 
-        !hasSectionData(highIrrigationRisk) && 
-        !hasSectionData(lowYield)) {
-        hideSection('agriculture-section');
-    }
+        // Forest section
+        if (!hasSectionData(forestDegradation)) {
+            hideSection('forest-section');
+        }
 
-    // Forest section
-    if (!hasSectionData(forestDegradation)) {
-        hideSection('forest-section');
-    }
+        // Health/Mining section
+        if (!hasSectionData(miningPresence)) {
+            hideSection('health-section');
+        }
 
-    // Health/Mining section
-    if (!hasSectionData(miningPresence)) {
-        hideSection('health-section');
-    }
+        // Socio-economic subsections
+        if (!hasSectionData(socioCaste)) {
+            hideSection('caste-section');
+        }
+        if (!hasSectionData(socioNrega)) {
+            hideSection('nrega-section');
+        }
 
-    // Socio-economic subsections
-    if (!hasSectionData(socioCaste)) {
-        hideSection('caste-section');
-    }
-    if (!hasSectionData(socioNrega)) {
-        hideSection('nrega-section');
-    }
+        // Check if entire Socio-economic section should be hidden
+        if (!hasSectionData(socioCaste) && !hasSectionData(socioNrega)) {
+            hideSection('socioeconomic-section');
+        }
 
-    // Check if entire Socio-economic section should be hidden
-    if (!hasSectionData(socioCaste) && !hasSectionData(socioNrega)) {
-        hideSection('socioeconomic-section');
-    }
+        // Fishery section
+        if (!hasSectionData(fisheryPotential)) {
+            hideSection('fishery-section');
+        }
 
-    // Fishery section
-    if (!hasSectionData(fisheryPotential)) {
-        hideSection('fishery-section');
-    }
+        // Agroforestry section
+        if (!hasSectionData(agroforestryTransition)) {
+            hideSection('agroforestry-section');
+        }
 
-    // Agroforestry section
-    if (!hasSectionData(agroforestryTransition)) {
-        hideSection('agroforestry-section');
-    }
-
-    </script>
+   </script>
 </body>
 </html>
