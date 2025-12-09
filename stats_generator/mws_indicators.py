@@ -695,6 +695,8 @@ def generate_mws_data_for_kyl_filters(
                     2: "Critical",
                     3: "Over Exploited",
                     4: "Saline",
+                    5: "Hilly Area",
+                    6: "Not Assessed",
                 }
 
                 class_to_id = {v: k for k, v in Soge_class.items()}
