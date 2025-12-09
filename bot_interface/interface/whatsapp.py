@@ -637,13 +637,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         return "failure"
                 elif isinstance(response, dict):
                     # If response is a dict, use it directly
+                    
                     community_data = get_communities(
                         state_name=response.get("State", ""),
                         district_name=response.get("District", ""),
                         block_name=response.get("Block", ""),
                     )
                 else:
-                    return "failure"
+                    return "no_communities"
                 if community_data == "no_communities":
                     return "no_communities"
                 print("Community list:", community_data)
@@ -680,15 +681,15 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     ):
                         return "success"
                     else:
-                        return "failure"
+                        return "no_communities"
                 else:
-                    return "failure"
+                    return "no_communities"
             else:
-                return "failure"
+                return "no_communities"
 
         except Exception as e:
             print(f"Error in sendCommunityByLocation: {e}")
-            return "failure"
+            return "no_communities"
 
     def sendStates(self, bot_instance_id, data_dict):
         """
@@ -838,7 +839,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 response = requests.get(
                     # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_districts_with_community/",
-                    url=f"http://localhost:8000/api/v1/get_districts_with_community/",
+                    url=f"https://geoserver.core-stack.org/api/v1/get_districts_with_community/",
+            
                     params={"state_id": state_id},
                     timeout=30,
                 )
@@ -989,7 +991,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 response = requests.get(
                     # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_communities_by_location/",
-                    url=f"http://localhost:8000/api/v1/get_communities_by_location/",
+                    url=f"https://geoserver.core-stack.org/api/v1/get_communities_by_location/",
                     params={"state_id": state_id, "district_id": district_id},
                     timeout=30,
                 )
@@ -1177,7 +1179,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     try:
                         response = requests.post(
                             # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
-                            url="http://localhost:8000/api/v1/add_user_to_community/",
+                            url="https://geoserver.core-stack.org/api/v1/add_user_to_community/",
                             data={"community_id": community_id, "number": user.phone},
                             timeout=30,
                         )
@@ -1391,7 +1393,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Trying API approach for phone number: {phone_number}")
             # base_url = settings.COMMUNITY_ENGAGEMENT_API_URL.rstrip('/')
             response = requests.get(
-                f"http://localhost:8000/api/v1/get_community_by_user/",
+                    f"https://geoserver.core-stack.org/api/v1/get_community_by_user/",
                 params={"number": phone_number},
                 timeout=10,
             )
@@ -3229,7 +3231,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 try:
                     # Use similar pattern as existing addUserToCommunity function
                     response = requests.post(
-                        url="http://localhost:8000/api/v1/add_user_to_community/",
+                            url="https://geoserver.core-stack.org/api/v1/add_user_to_community/",
                         data={"community_id": community_id, "number": int(user_phone)},
                         timeout=30,
                     )
@@ -3532,7 +3534,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Files to upload: {list(files.keys())}")
 
             # Submit to Community Engagement API
-            api_url = f"http://localhost:8000/api/v1/upsert_item/"
+            api_url = f"https://geoserver.core-stack.org/api/v1/upsert_item/"
 
             try:
                 response = requests.post(
@@ -3784,7 +3786,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Files to upload: {list(files.keys())}")
 
             # Submit to Community Engagement API
-            api_url = f"http://localhost:8000/api/v1/upsert_item/"
+            api_url = f"https://geoserver.core-stack.org/api/v1/upsert_item/"
 
             try:
                 response = requests.post(
@@ -3922,7 +3924,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return "failure"
 
             # Call Community Engagement API
-            api_url = f"http://localhost:8000/api/v1/get_items_status/"
+            api_url = f"https://geoserver.core-stack.org/api/v1/get_items_status/"
             params = {
                 "number": contact_number,
                 "bot_id": bot_instance_id,
