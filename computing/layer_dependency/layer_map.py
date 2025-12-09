@@ -61,6 +61,7 @@ map_2_2 = [
                 "children": [
                     {
                         "name": "vectorise_change_detection",
+                        "use_global_args": True,
                     }
                 ],
             },
