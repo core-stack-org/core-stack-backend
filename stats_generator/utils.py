@@ -133,7 +133,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_crop_inten(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-            elif workspace == "cropping_drought":
+            elif workspace == "drought":
                 create_excel_crop_drou(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
