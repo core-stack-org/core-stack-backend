@@ -254,11 +254,11 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         return {"error": f"Error reading or processing file: {str(e)}"}
 
 
-def get_tehsil_json(state, district, tehsil):
+def get_tehsil_json(state, district, tehsil, regenerate):
     file_path, file_exists = excel_file_exists(state, district, tehsil)
     json_path = file_path.replace(".xlsx", ".json")
 
-    if os.path.exists(json_path):
+    if not regenerate and os.path.exists(json_path):
         with open(json_path, "r") as f:
             return json.load(f)
 

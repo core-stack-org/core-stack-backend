@@ -9,6 +9,7 @@ from .utils import get_url
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
+from .models import LayerInfo
 
 
 def create_geojson_for_all_mws(existing_geojson_path, df, new_geojson_path):
@@ -451,10 +452,19 @@ def generate_mws_data_for_kyl_filters(
 
                 #########  drought_category  ##############
                 try:
+
+                    layers = LayerInfo.objects.get(
+                        layer_type="vector", workspace="drought"
+                    )
+                    years = [
+                        str(year)
+                        for year in range(layers.start_year, layers.end_year + 1)
+                    ]
+
                     df_crpDrought_mws_data = sheets["croppingDrought_kharif"][
                         sheets["croppingDrought_kharif"]["UID"] == specific_mws_id
                     ]
-                    years = ["2017", "2018", "2019", "2020", "2021", "2022"]
+
                     sum_moderate_severe = {
                         year: (
                             1
