@@ -192,6 +192,7 @@ def generate_tehsil_data(request):
         state = valid_gee_text(request.query_params.get("state").lower())
         district = valid_gee_text(request.query_params.get("district").lower())
         tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        regenerate = request.query_params.get("regenerate", "").lower()
 
         if state is None or district is None or tehsil is None:
             return Response(
@@ -219,7 +220,7 @@ def generate_tehsil_data(request):
             )
 
         # Get JSON (from cache or generate)
-        json_data = get_tehsil_json(state, district, tehsil)
+        json_data = get_tehsil_json(state, district, tehsil, regenerate)
         return JsonResponse(json_data, status=200)
 
     except Exception as e:
