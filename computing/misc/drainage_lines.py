@@ -79,6 +79,7 @@ def clip_drainage_lines(
     print("task_id_list", task_id_list)
     make_asset_public(asset_id)
     layer_at_geoserver = False
+    layer_id = None
     if is_gee_asset_exists(asset_id):
         if state and district and block:
             layer_id = save_layer_info_to_db(
