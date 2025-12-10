@@ -63,15 +63,14 @@ class WaterbodiesFileUploadLog(models.Model):
 
         super().save(*args, **kwargs)
         Upload_Desilting_Points.apply_async(
-                kwargs={
-                        "file_obj_id": self.id,
-                        "gee_project_id": self.gee_account_id,
-                        "is_closest_wp": True,
-                    "is_lulc_required": True,
-                    },
-                queue="waterbody1"
-            )
-
+            kwargs={
+                "file_obj_id": self.id,
+                "gee_project_id": self.gee_account_id,
+                "is_closest_wp": True,
+                "is_lulc_required": False,
+            },
+            queue="waterbody1",
+        )
 
     class Meta:
         ordering = ["-created_at"]
