@@ -9,7 +9,7 @@ from computing.misc.catchment_area import (
     generate_catchment_area_singleflow,
 )
 from computing.misc.stream_order import generate_stream_order
-from computing.mws.generate_hydrology import generate_hydrology
+from computing.mws.precipitation import precipitation
 from computing.terrain_descriptor.terrain_raster_fabdem import (
     generate_terrain_raster_clip,
 )
@@ -73,6 +73,7 @@ def Upload_Desilting_Points(
         return val if val not in ("", " ", None) else None
 
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
+
     print(f"file obj id {file_obj_id}")
     ee_initialize(gee_project_id)
     merged_features = []
@@ -81,12 +82,12 @@ def Upload_Desilting_Points(
     wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
-    mws_asset_suffix = f"{proj_obj.name}_{proj_obj.id}"
+    mws_asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
     asset_folder = [proj_obj.name.lower()]
     description = "mws_" + mws_asset_suffix
     mws_asset_id = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + description
     )
@@ -188,7 +189,7 @@ def Upload_Desilting_Points(
                     roi_path=mws_asset_id,
                     asset_folder=asset_folder,
                     asset_suffix=f"{proj_obj.name}_{proj_obj.id}".lower(),
-                    app_type="WATER_REJ",
+                    app_type="WATERBODY",
                 )
                 logger.info("luc Task finished for lulc")
         except Exception as e:
@@ -199,12 +200,15 @@ def Upload_Desilting_Points(
     asset_suffix_swb4 = f"swb4_{proj_obj.name}+{proj_obj.id}"
     asset_id_swb = (
         get_gee_dir_path(
-            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            [proj_obj.name], asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_swb4
     )
     Genereate_zoi_and_zoi_indicator(
         asset_suffix_swb4, proj_obj.id, gee_account_id=gee_project_id
+    )
+    BuildMWSLayer(
+        gee_account_id=gee_project_id, proj_id=proj_obj.id, app_type="WATERBODY"
     )
 
 
@@ -222,7 +226,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
-        app_type="WATER_REJ",
+        app_type="WATERDBOY",
     )
 
     generate_catchment_area_singleflow(
@@ -231,7 +235,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
     )
 
     generate_stream_order(
@@ -240,17 +244,17 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
     )
     asset_id_swb1 = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + f"swb1_{asset_suffix}"
     )
     asset_id_swb2 = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + f"swb2_{asset_suffix}"
     )
@@ -261,7 +265,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         roi_path=mws_asset_id,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
         start_year="2017",
         end_year="2023",
         is_all_classes=True,
@@ -273,20 +277,21 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
     asset_suffix_prec = (
         f"precipitation_forthnight_{proj_obj.name}_{proj_obj.id}".lower()
     )
+
     asset_id_prec = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_prec
     )
     roi = ee.FeatureCollection(mws_asset_id)
-    hydrology = generate_hydrology(
+    precipitation(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
-        app_type="WATER_REJ",
-        start_year=2017,
-        end_year=2023,
+        app_type="WATERBODY",
+        start_date="2017-06-30",
+        end_date="2024-07-1",
         is_annual=False,
         gee_account_id=gee_account_id,
     )
@@ -296,27 +301,31 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         roi_path=mws_asset_id,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
         start_year=2017,
         end_year=2022,
         gee_account_id=gee_account_id,
     )
-    dst_filename = "drought_" + asset_suffix_draught + "_" + str(2017) + "_" + str(2022)
+    dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
     draught_asset_id = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + dst_filename
     )
 
     BuildDesiltingLayer(proj_obj.id, gee_account_id)
     BuildWaterBodyLayer(
-        proj_id=proj_obj.id, app_type="WATER_REJ", gee_account_id=gee_account_id
+        proj_id=proj_obj.id,
+        app_type="WATERBODY",
+        gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        asset_folder=asset_folder,
     )
     generate_terrain_raster_clip(
-        asset_suffix=asset_suffix_catchment,
+        asset_suffix=asset_suffix,
         asset_folder_list=[proj_obj.name],
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
         roi_path=mws_asset_id,
         gee_account_id=gee_account_id,
     )
@@ -349,7 +358,7 @@ def Genereate_zoi_and_zoi_indicator(
 def BuildDesiltingLayer(
     project_id, asset_suffix=None, asset_folder=None, gee_account_id=None
 ):
-    ee_initialize(gee_account_id)
+    # ee_initialize(gee_account_id)
     from .models import WaterbodiesDesiltingLog
 
     instance = Project.objects.get(pk=project_id)
@@ -360,7 +369,7 @@ def BuildDesiltingLayer(
     assst_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + assst_suffix_desilt
     )
@@ -646,7 +655,7 @@ def BuildMWSLayer(
         asset_suffix_wb = f"waterbodies_mws_{asset_suffix}".lower()
         asset_id_wb_mws = (
             get_gee_dir_path(
-                asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+                asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
             )
             + asset_suffix_wb
         )
@@ -721,8 +730,9 @@ def BuildWaterBodyLayer(
     app_type=None,
     proj_id=None,
 ):
-    ee_initialize(gee_account_id)
+    # ee_initialize(gee_account_id)
     proj_obj = Project.objects.get(pk=proj_id)
+
     description = "swb4_" + asset_suffix
     asset_id = (
         get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
@@ -735,7 +745,7 @@ def BuildWaterBodyLayer(
     assst_suffix_desilt = f"desilt_layer_{asset_suffix}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + assst_suffix_desilt
     )
@@ -769,7 +779,7 @@ def BuildWaterBodyLayer(
 
     asset_id_wb = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_wb
     )
