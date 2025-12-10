@@ -1219,12 +1219,13 @@ def convert_image_hdpi(filepath):
     hdpi_fixed_width_in_pixel = 480
     wpercent = hdpi_fixed_width_in_pixel / float(width_0)
     hsize = int(float(height_0) * float(wpercent))
-    img.resize((hdpi_fixed_width_in_pixel, hsize), Image.ANTIALIAS).save(im_hdpi_file)
+    img.resize((800, 800), Image.Resampling.LANCZOS).save(im_hdpi_file)
     return im_hdpi_file
 
 
 def push_to_s3(local_file_path, bucket_name, s3_file_path, cType):
     import boto3
+    from nrm_app.settings import CE_BUCKET_URL
 
     s3_client = boto3.client("s3")
     try:
@@ -1232,7 +1233,7 @@ def push_to_s3(local_file_path, bucket_name, s3_file_path, cType):
             local_file_path, bucket_name, s3_file_path, ExtraArgs={"ContentType": cType}
         )
         exception = ""
-        s3_url = BUCKET_URL + str(s3_file_path)
+        s3_url = CE_BUCKET_URL + str(s3_file_path)
         # if msidn_obj:
         #     data_logger = S3_sync_log(user = msidn_obj, success = True)
         #     data_logger.save()
@@ -1389,7 +1390,7 @@ def check_user_community_status_direct(bot_number: str) -> tuple[bool, Dict[str,
 
 
 def check_user_community_status_http(
-    user_number: str, base_url: str = "http://localhost:8000/api/v1"
+        user_number: str, base_url: str = "https://geoserver.core-stack.org/api/v1"
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Check if a user (by phone number) is part of any community using HTTP API calls.
@@ -1452,7 +1453,7 @@ def check_user_community_status_http(
 
 
 def get_community_by_lat_lon(
-    lat: str, lon: str, base_url: str = "http://localhost:8000/api/v1"
+    lat: str, lon: str, base_url: str = "https://geoserver.core-stack.org/api/v1"
 ) -> Tuple[bool, Dict[str, Any]]:
     """Get community by latitude and longitude"""
     try:
@@ -1735,6 +1736,12 @@ def callFunctionByName(funct_name, app_type, data_dict):
     elif funct_name == "log_work_demand_completion":
         print(f"calling log_work_demand_completion with data_dict: {data_dict}")
         event = whatsappInterface.log_work_demand_completion(
+            bot_instance_id=bot_id, data_dict=data_dict
+        )
+        print(f"log_work_demand_completion returned: {event}")
+    elif funct_name == "log_story_completion":
+        print(f"calling log_story_completion with data_dict: {data_dict}")
+        event = whatsappInterface.log_story_completion(
             bot_instance_id=bot_id, data_dict=data_dict
         )
         print(f"log_work_demand_completion returned: {event}")

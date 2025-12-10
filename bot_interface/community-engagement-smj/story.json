@@ -1,0 +1,165 @@
+[
+  {
+    "name": "StoryWelcome",
+    "preAction": [
+      {
+        "text": [
+         {
+  "en": "🌍 Share Your Climate Story\n\nHave you seen or experienced something related to nature, climate, or the environment? Tell me your story — big or small — so we can learn from it.\n\nReady to begin?",
+  "hi": "🌍 अपनी जलवायु कहानी साझा करें\n\nक्या आपने प्रकृति, जलवायु या पर्यावरण से जुड़ा कोई अनुभव देखा या महसूस किया है? अपनी कहानी बताएँ — छोटी हो या बड़ी, हर कहानी महत्वपूर्ण है।\n\nक्या हम शुरू करें?",
+  "default": "🌍 Share Your Climate Story\n\nHave you experienced something related to nature or the environment? Tell me your story so we can learn and create awareness together.\n\nShall we start?"
+}
+
+        ]
+      },
+      {
+        "function": "move_forward"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "SendLocationRequest": [
+          "success"
+        ]
+      },
+      {
+        "StoryWelcome": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "SendLocationRequest",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "📍 Please send  your location",
+            "hi": "📍 कृपया स्थल की लोकेशन भेजें",
+            "default": "📍 Please send your location"
+          }
+        ]
+      },
+      {
+        "function": "send_location_request"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_location_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestAudio": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RequestAudio",
+    "preAction": [
+      {
+        "text": [
+         {
+  "en": "🎤 Please record an audio to share your climate or environmental story.\n\nInclude the following details in your audio:\n• State, district, tehsil and village name\n• What you observed or experienced related to climate or the environment",
+  "hi": "🎤 कृपया अपनी जलवायु या पर्यावरण से जुड़ी कहानी साझा करने के लिए एक ऑडियो रिकॉर्ड करें।\n\nअपने ऑडियो में निम्नलिखित विवरण शामिल करें:\n• राज्य, जिला, तहसील और गांव का नाम\n• आपने जलवायु या पर्यावरण से संबंधित क्या देखा या अनुभव किया",
+  "default": "🎤 Please record an audio to share your climate or environmental story.\n\nInclude the following details in your audio:\n• State, district, tehsil and village name\n• What you observed or experienced related to climate or the environment"
+}
+
+        ]
+      },
+      {
+        "function": "pick_audio"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_audio_data"
+      }
+    ],
+    "transition": [
+      {
+        "RequestPhotos": [
+          "success"
+        ]
+      },
+      {
+        "RequestAudio": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "RequestPhotos",
+    "preAction": [
+      {
+        "text": [
+          {
+  "en": "📷 Please upload photos related to your climate or environmental story",
+  "hi": "📷 कृपया अपनी जलवायु या पर्यावरण से जुड़ी कहानी से संबंधित फोटो अपलोड करें",
+  "default": "📷 Please upload photos related to your climate or environmental story"
+}
+
+        ]
+      },
+      {
+        "function": "pick_img"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "store_photo_data"
+      }
+    ],
+    "transition": [
+      {
+        "ThankYou": [
+          "success"
+        ]
+      },
+      {
+        "RequestPhotos": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ThankYou",
+    "preAction": [
+      {
+        "function": "log_story_completion"
+      },
+      {
+        "text": [{
+  "en": "✅ Thank you! Your climate story has been successfully submitted.\n\n🙏 Send \"Hi\" to restart the chat.",
+  "hi": "✅ धन्यवाद! आपकी जलवायु से जुड़ी कहानी सफलतापूर्वक सबमिट हो गई है।\n\n🙏 चैट दोबारा शुरू करने के लिए \"Hi\" भेजें।",
+  "default": "✅ Thank you! Your climate story has been successfully submitted.\n\n🙏 Send \"Hi\" to restart the chat."
+}
+
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "ThankYou": [
+          "failure"
+        ]
+      }
+    ]
+  }
+]

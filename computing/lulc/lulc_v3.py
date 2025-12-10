@@ -19,7 +19,6 @@ from utilities.gee_utils import (
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
-from .misc import clip_lulc_from_river_basin
 from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
@@ -103,45 +102,51 @@ def clip_lulc_v3(
         curr_end_date = curr_start_date + relativedelta(years=1) - timedelta(days=1)
 
         loop_start = curr_start_date + relativedelta(years=1)  # .strftime("%Y-%m-%d")
-        curr_start_date = curr_start_date.strftime("%Y-%m-%d")
-        curr_end_date = curr_end_date.strftime("%Y-%m-%d")
-        curr_filename = filename_prefix + "_" + curr_start_date + "_" + curr_end_date
+        curr_start_year = curr_start_date.year
+        curr_end_year = curr_end_date.year
+
+        curr_filename = (
+            filename_prefix
+            + "_"
+            + curr_start_date.strftime("%Y-%m-%d")
+            + "_"
+            + curr_end_date.strftime("%Y-%m-%d")
+        )
 
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
         final_output_assetid = gee_asset_path + final_output_filename
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
-        river_basin = ee.FeatureCollection(
-            "projects/corestack-datasets/assets/datasets/CGWB_basin"
+
+        pan_india = ee.Image(
+            f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{curr_start_year}_{curr_end_year}"
         )
-        l1_asset_new.append(
-            clip_lulc_from_river_basin(
-                river_basin, roi, scale, curr_start_date, curr_end_date
-            )
-        )
+        clipped_lulc = pan_india.clip(roi.geometry())
+        l1_asset_new.append(clipped_lulc)
 
     task_list = []
     geometry = roi.geometry()
-    for i in range(0, len(l1_asset_new)):
-        if is_gee_asset_exists(final_output_assetid_array_new[i]):
-            ee.data.copyAsset(
-                final_output_assetid_array_new[i],
-                f"{final_output_assetid_array_new[i]}_old",
+    if not is_gee_asset_exists(final_output_assetid_array_new[len(l1_asset_new) - 1]):
+        for i in range(0, len(l1_asset_new)):
+            if is_gee_asset_exists(final_output_assetid_array_new[i]):
+                ee.data.copyAsset(
+                    final_output_assetid_array_new[i],
+                    f"{final_output_assetid_array_new[i]}_old",
+                )
+                time.sleep(10)
+                ee.data.deleteAsset(final_output_assetid_array_new[i])
+            task_id = export_raster_asset_to_gee(
+                image=l1_asset_new[i].clip(geometry),
+                description=final_output_filename_array_new[i],
+                asset_id=final_output_assetid_array_new[i],
+                scale=scale,
+                region=geometry,
+                pyramiding_policy={"predicted_label": "mode"},
             )
-            time.sleep(10)
-            ee.data.deleteAsset(final_output_assetid_array_new[i])
-        task_id = export_raster_asset_to_gee(
-            image=l1_asset_new[i].clip(geometry),
-            description=final_output_filename_array_new[i],
-            asset_id=final_output_assetid_array_new[i],
-            scale=scale,
-            region=geometry,
-            pyramiding_policy={"predicted_label": "mode"},
-        )
-        task_list.append(task_id)
+            task_list.append(task_id)
 
-    task_id_list = check_task_status(task_list)
-    print("LULC task_id_list", task_id_list)
+        task_id_list = check_task_status(task_list)
+        print("LULC task_id_list", task_id_list)
 
     layer_ids = []
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
@@ -265,8 +270,8 @@ def sync_lulc_to_geoserver(
                     start_year_STAC = "20" + str(
                         s_year
                     )  # TODO: these are temp fixes, based on current implementations of the pipelines
+
                     if state_name and block_name and district_name:
-                        layer_STAC_generated = False
                         layer_STAC_generated = (
                             generate_STAC_layerwise.generate_raster_stac(
                                 state=state_name,
@@ -276,11 +281,10 @@ def sync_lulc_to_geoserver(
                                 start_year=str(start_year_STAC),
                             )
                         )
-                    update_layer_sync_status(
-                        layer_id=layer_ids[i],
-                        is_stac_specs_generated=layer_STAC_generated,
-                    )
-
+                        update_layer_sync_status(
+                            layer_id=layer_ids[i],
+                            is_stac_specs_generated=layer_STAC_generated,
+                        )
                 print("geoserver flag is updated")
                 layer_at_geoserver = True
     return layer_at_geoserver

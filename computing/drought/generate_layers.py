@@ -105,15 +105,7 @@ def generate_drought_layers(
     for part in range(parts + 1):
         start = part * chunk_size
         end = start + chunk_size
-        block_name_for_parts = (
-            asset_suffix
-            + "_drought_"
-            + str(start)
-            + "-"
-            + str(end)
-            + "_"
-            + str(current_year)
-        )
+        block_name_for_parts = f"{asset_suffix}_drought_{start}-{end}_{current_year}_v2"
         chunk = ee.FeatureCollection(aoi.toList(aoi.size()).slice(start, end))
         if chunk.size().getInfo() > 0:
             drought_chunk(

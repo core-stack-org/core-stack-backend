@@ -9,7 +9,7 @@ from computing.misc.catchment_area import (
     generate_catchment_area_singleflow,
 )
 from computing.misc.stream_order import generate_stream_order
-from computing.mws.generate_hydrology import generate_hydrology
+from computing.mws.precipitation import precipitation
 from computing.terrain_descriptor.terrain_raster_fabdem import (
     generate_terrain_raster_clip,
 )
@@ -66,7 +66,7 @@ def is_nan(value):
 
 @shared_task
 def Upload_Desilting_Points(
-    file_obj_id, is_closest_wp=True, is_lulc_required=True, gee_project_id=None
+    file_obj_id=None, is_closest_wp=True, is_lulc_required=True, gee_project_id=None
 ):
     def get_val(row, key):
         val = row.get(key)
@@ -74,6 +74,7 @@ def Upload_Desilting_Points(
 
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
 
+    print(f"file obj id {file_obj_id}")
     ee_initialize(gee_project_id)
     merged_features = []
 
@@ -81,12 +82,12 @@ def Upload_Desilting_Points(
     wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
-    mws_asset_suffix = f"{proj_obj.name}_{proj_obj.id}"
+    mws_asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
     asset_folder = [proj_obj.name.lower()]
     description = "mws_" + mws_asset_suffix
     mws_asset_id = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + description
     )
@@ -188,7 +189,7 @@ def Upload_Desilting_Points(
                     roi_path=mws_asset_id,
                     asset_folder=asset_folder,
                     asset_suffix=f"{proj_obj.name}_{proj_obj.id}".lower(),
-                    app_type="WATER_REJ",
+                    app_type="WATERBODY",
                 )
                 logger.info("luc Task finished for lulc")
         except Exception as e:
@@ -199,12 +200,15 @@ def Upload_Desilting_Points(
     asset_suffix_swb4 = f"swb4_{proj_obj.name}+{proj_obj.id}"
     asset_id_swb = (
         get_gee_dir_path(
-            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            [proj_obj.name], asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_swb4
     )
     Genereate_zoi_and_zoi_indicator(
         asset_suffix_swb4, proj_obj.id, gee_account_id=gee_project_id
+    )
+    BuildMWSLayer(
+        gee_account_id=gee_project_id, proj_id=proj_obj.id, app_type="WATERBODY"
     )
 
 
@@ -222,7 +226,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
-        app_type="WATER_REJ",
+        app_type="WATERDBOY",
     )
 
     generate_catchment_area_singleflow(
@@ -231,7 +235,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
     )
 
     generate_stream_order(
@@ -240,17 +244,17 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder=asset_folder,
         gee_account_id=gee_account_id,
         proj_id=proj_obj.id,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
     )
     asset_id_swb1 = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + f"swb1_{asset_suffix}"
     )
     asset_id_swb2 = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + f"swb2_{asset_suffix}"
     )
@@ -261,7 +265,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         roi_path=mws_asset_id,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
         start_year="2017",
         end_year="2023",
         is_all_classes=True,
@@ -273,20 +277,21 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
     asset_suffix_prec = (
         f"precipitation_forthnight_{proj_obj.name}_{proj_obj.id}".lower()
     )
+
     asset_id_prec = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_prec
     )
     roi = ee.FeatureCollection(mws_asset_id)
-    hydrology = generate_hydrology(
+    precipitation(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
-        app_type="WATER_REJ",
-        start_year=2017,
-        end_year=2023,
+        app_type="WATERBODY",
+        start_date="2017-06-30",
+        end_date="2024-07-1",
         is_annual=False,
         gee_account_id=gee_account_id,
     )
@@ -296,27 +301,31 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         roi_path=mws_asset_id,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
         start_year=2017,
         end_year=2022,
         gee_account_id=gee_account_id,
     )
-    dst_filename = "drought_" + asset_suffix_draught + "_" + str(2017) + "_" + str(2022)
+    dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
     draught_asset_id = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + dst_filename
     )
 
     BuildDesiltingLayer(proj_obj.id, gee_account_id)
     BuildWaterBodyLayer(
-        proj_id=proj_obj.id, app_type="WATER_REJ", gee_account_id=gee_account_id
+        proj_id=proj_obj.id,
+        app_type="WATERBODY",
+        gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        asset_folder=asset_folder,
     )
     generate_terrain_raster_clip(
-        asset_suffix=asset_suffix_catchment,
+        asset_suffix=asset_suffix,
         asset_folder_list=[proj_obj.name],
-        app_type="WATER_REJ",
+        app_type="WATERBODY",
         roi_path=mws_asset_id,
         gee_account_id=gee_account_id,
     )
@@ -349,7 +358,7 @@ def Genereate_zoi_and_zoi_indicator(
 def BuildDesiltingLayer(
     project_id, asset_suffix=None, asset_folder=None, gee_account_id=None
 ):
-    ee_initialize(gee_account_id)
+    # ee_initialize(gee_account_id)
     from .models import WaterbodiesDesiltingLog
 
     instance = Project.objects.get(pk=project_id)
@@ -360,7 +369,7 @@ def BuildDesiltingLayer(
     assst_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + assst_suffix_desilt
     )
@@ -440,62 +449,277 @@ def BuildMWSLayer(
     app_type="MWS",
     block=None,
     district=None,
+    drought_asset_override=None,  # optional: full path to drought asset if you want to override default
+    export_year_range=(2017, 2022),  # for naming drought asset
 ):
-    ee_initialize(gee_account_id)
-    if proj_id:
-        instance = Project.objects.get(pk=proj_id)
-        asset_folder = [instance.name.lower()]
-        asset_suffix = "f{proj_obj.name}_{proj_obj.id}".lower()
+    """
+    Full BuildMWSLayer: builds final MWS waterbody FC, joins drought properties (flat, prefixed),
+    exports merged FeatureCollection to a GEE asset, and syncs to GeoServer.
 
-        mws_geojson_op = "data/fc_to_shape/" + str(instance.name) + "/" + asset_suffix
+    Returns:
+        dict: {
+            "status": "SUCCESS" | "FAILED",
+            "asset_id": asset_id_wb_mws (str),
+            "export_task_id": <task id or None>,
+            "feature_count": <int or None>,
+            "message": <string>
+        }
+    """
 
-    else:
-        asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+    try:
+        # initialize GEE
+        ee_initialize(gee_account_id)
+
+        # -------------------------
+        # Build asset suffix & paths
+        # -------------------------
+        if proj_id:
+            instance = Project.objects.get(pk=proj_id)
+            asset_folder = [instance.name.lower()]
+            asset_suffix = f"{instance.name}_{instance.id}".lower()
+            mws_geojson_op = f"data/fc_to_shape/{instance.name}/{asset_suffix}"
+        else:
+            if not (state and district and block):
+                raise ValueError(
+                    "state, district and block required when proj_id is not provided"
+                )
+            asset_suffix = (
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            )
+            asset_folder = [state, district, block]
+            mws_geojson_op = f"data/fc_to_shape/{state}/{asset_suffix}"
+
+        # -------------------------
+        # Load precipitation FC
+        # -------------------------
+        asset_suffix_prec = f"Prec_fortnight_{asset_suffix}"
+        asset_id_prec = (
+            get_gee_dir_path(
+                asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix_prec
         )
-        asset_folder = [state, district, block]
-        mws_geojson_op = "data/fc_to_shape/" + str(state) + "/" + asset_suffix
+        precip = ee.FeatureCollection(asset_id_prec)
 
-    asset_suffix_prec = f"Prec_fortnight_{asset_suffix}"
-    asset_id_prec = (
-        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
-        + asset_suffix_prec
-    )
-    precip = ee.FeatureCollection(asset_id_prec)
-    gdf = geemap.ee_to_gdf(precip)
+        # If precip empty -> fail early
+        if precip.size().getInfo() == 0:
+            msg = f"Precipitation feature collection empty: {asset_id_prec}"
+            logger.warning(msg)
+            return {
+                "status": "FAILED",
+                "message": msg,
+                "asset_id": None,
+                "export_task_id": None,
+                "feature_count": 0,
+            }
 
-    dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
-    draught_asset_id = (
-        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
-        + dst_filename
-    )
-    gdf.to_file(mws_geojson_op, driver="GeoJSON")
-    final_fc = calculate_precipitation_season(
-        mws_geojson_op, draught_asset_id=draught_asset_id
-    )
-    asset_suffix_wb = f"waterbodies_mws_{asset_suffix}".lower()
+        # convert to geodataframe for local processing (as in your flow)
+        gdf = geemap.ee_to_gdf(precip)
 
-    asset_id_wb_mws = (
-        get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        # -------------------------
+        # Drought asset id (default naming)
+        # -------------------------
+        if drought_asset_override:
+            draught_asset_id = drought_asset_override
+        else:
+            start_y, end_y = export_year_range
+            dst_filename = f"drought_{asset_suffix}_{start_y}_{end_y}"
+            draught_asset_id = (
+                get_gee_dir_path(
+                    asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + dst_filename
+            )
+
+        # -------------------------
+        # Save GDF to GeoJSON for custom processing
+        # -------------------------
+        # Ensure parent dir exists on disk (optional, your environment may handle)
+        try:
+            gdf.to_file(mws_geojson_op, driver="GeoJSON")
+        except Exception as e:
+            logger.exception("Failed to write GeoJSON to %s: %s", mws_geojson_op, e)
+            return {
+                "status": "FAILED",
+                "message": f"Error writing GeoJSON: {e}",
+                "asset_id": None,
+                "export_task_id": None,
+                "feature_count": None,
+            }
+
+        # -------------------------
+        # Create final_fc using your domain function
+        # -------------------------
+        final_fc = calculate_precipitation_season(
+            mws_geojson_op, draught_asset_id=draught_asset_id
         )
-        + asset_suffix_wb
-    )
-    point_tasks = ee.batch.Export.table.toAsset(
-        collection=final_fc,
-        description=asset_suffix_wb,
-        assetId=asset_id_wb_mws,
-    )
-    point_tasks.start()
-    wait_for_task_completion(point_tasks)
-    if proj_id:
-        proj_obj = Project.objects.get(pk=proj_id)
-        layer_name = f"waterbodies_mws_{asset_suffix}".lower()
+        final_fc = ee.FeatureCollection(final_fc)
 
-        sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, "mws")
-    else:
-        layer_name = f"waterbodies_mws_{asset_suffix}".lower()
-        res = sync_fc_to_geoserver(final_fc, state, layer_name, "mws")
+        # quick check
+        try:
+            final_count = final_fc.size().getInfo()
+        except Exception:
+            final_count = None
+
+        if final_count == 0:
+            msg = "final_fc is empty after calculate_precipitation_season"
+            logger.warning(msg)
+            return {
+                "status": "FAILED",
+                "message": msg,
+                "asset_id": None,
+                "export_task_id": None,
+                "feature_count": 0,
+            }
+
+        # ------------------------------------------------
+        # JOIN AND FLATTEN DROUGHT PROPERTIES (prefixed)
+        # ------------------------------------------------
+        drought_fc = ee.FeatureCollection(draught_asset_id)
+
+        # It's possible drought asset does not exist or is empty - handle gracefully
+        try:
+            drought_count = drought_fc.size().getInfo()
+        except Exception:
+            drought_count = 0
+
+        if drought_count == 0:
+            # No drought data - keep final_fc as-is (but ensure no non-exportable complex properties)
+            logger.info(
+                "Drought FC not found or empty (%s). Skipping join.", draught_asset_id
+            )
+            merged_fc = final_fc.map(
+                lambda f: ee.Feature(f).select(ee.List(ee.Feature(f).propertyNames()))
+            )  # ensure properties are primitives
+        else:
+            # Use saveFirst to avoid List<Feature> problem
+            join = ee.Join.saveFirst("match")
+            ffilter = ee.Filter.equals(leftField="uid", rightField="uid")
+            joined = join.apply(
+                primary=final_fc, secondary=drought_fc, condition=ffilter
+            )
+
+            def dedupe_by_uid(fc, uid_field="uid"):
+                uids = fc.aggregate_array(uid_field).distinct()
+                return ee.FeatureCollection(
+                    uids.map(
+                        lambda u: ee.Feature(
+                            fc.filter(ee.Filter.eq(uid_field, u)).first()
+                        )
+                    )
+                )
+
+            # Map function to flatten the match's properties prefixed with 'drought_'
+            def _flatten_match(feat):
+                feat = ee.Feature(feat)
+
+                # copy_props will only be executed if feat.get('match') is truthy (exists)
+                def copy_props(_):
+                    match = ee.Feature(
+                        feat.get("match")
+                    )  # safe because only called when match exists
+                    match_props = match.propertyNames()
+
+                    def _setter(prop, acc):
+                        acc = ee.Feature(acc)
+                        prop = ee.String(prop)
+                        val = match.get(prop)
+                        new_name = ee.String("drought_").cat(prop)
+                        return acc.set(new_name, val)
+
+                    merged = ee.Feature(match_props.iterate(_setter, feat))
+                    # remove the temporary 'match' property so exports won't fail
+                    merged = ee.Feature(merged).select(
+                        ee.List(merged.propertyNames()).remove("match")
+                    )
+                    return merged
+
+                # If no match, just remove 'match' (if present) and return original feature
+                def remove_match(_):
+                    return ee.Feature(feat).select(
+                        ee.List(feat.propertyNames()).remove("match")
+                    )
+
+                # ee.Algorithms.If will evaluate the server-side truthiness of feat.get('match')
+                result = ee.Algorithms.If(
+                    feat.get("match"), copy_props(None), remove_match(None)
+                )
+                return ee.Feature(result)
+
+            # Use it as before:
+            merged_fc = ee.FeatureCollection(joined.map(_flatten_match))
+
+        # -------------------------
+        # Prepare export asset id (waterbodies)
+        # -------------------------
+        asset_suffix_wb = f"waterbodies_mws_{asset_suffix}".lower()
+        asset_id_wb_mws = (
+            get_gee_dir_path(
+                asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix_wb
+        )
+
+        # -------------------------
+        # Export merged FC to GEE asset
+        # -------------------------
+        task = ee.batch.Export.table.toAsset(
+            collection=merged_fc,
+            description=asset_suffix_wb,
+            assetId=asset_id_wb_mws,
+        )
+
+        task.start()
+        logger.info("Started export task %s -> %s", task.id, asset_id_wb_mws)
+
+        # Wait for completion (uses your helper)
+        wait_for_task_completion(task)
+
+        # After export, optionally refresh or get info
+        try:
+            exported_count = ee.FeatureCollection(asset_id_wb_mws).size().getInfo()
+        except Exception:
+            exported_count = None
+
+        # -------------------------
+        # Push to GeoServer
+        # -------------------------
+        layer_name = (
+            asset_suffix_wb  # same as f"waterbodies_mws_{asset_suffix}".lower()
+        )
+
+        if proj_id:
+            proj_obj = Project.objects.get(pk=proj_id)
+            sync_project_fc_to_geoserver(merged_fc, proj_obj.name, layer_name, "mws")
+        else:
+            sync_fc_to_geoserver(merged_fc, state, layer_name, "mws")
+
+        return {
+            "status": "SUCCESS",
+            "asset_id": asset_id_wb_mws,
+            "export_task_id": task.id if hasattr(task, "id") else None,
+            "feature_count": exported_count,
+            "message": f"Exported and synced layer {layer_name}",
+        }
+
+    except ee.EEException as ee_err:
+        logger.exception("EarthEngine error in BuildMWSLayer: %s", ee_err)
+        return {
+            "status": "FAILED",
+            "message": f"EE error: {ee_err}",
+            "asset_id": None,
+            "export_task_id": None,
+            "feature_count": None,
+        }
+    except Exception as e:
+        logger.exception("Unexpected error in BuildMWSLayer: %s", e)
+        return {
+            "status": "FAILED",
+            "message": str(e),
+            "asset_id": None,
+            "export_task_id": None,
+            "feature_count": None,
+        }
 
 
 @shared_task()
@@ -506,8 +730,9 @@ def BuildWaterBodyLayer(
     app_type=None,
     proj_id=None,
 ):
-    ee_initialize(gee_account_id)
+    # ee_initialize(gee_account_id)
     proj_obj = Project.objects.get(pk=proj_id)
+
     description = "swb4_" + asset_suffix
     asset_id = (
         get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
@@ -520,7 +745,7 @@ def BuildWaterBodyLayer(
     assst_suffix_desilt = f"desilt_layer_{asset_suffix}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + assst_suffix_desilt
     )
@@ -554,7 +779,7 @@ def BuildWaterBodyLayer(
 
     asset_id_wb = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_wb
     )

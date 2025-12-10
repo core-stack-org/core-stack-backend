@@ -649,7 +649,7 @@ def get_tehsil_data(state, district, block):
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
+            parameter_block = f"The Tehsil {block} having total area {total_area:,} hectares" + parameter_block + "."
 
         return parameter_block
 
@@ -658,14 +658,414 @@ def get_tehsil_data(state, district, block):
         return "", ""
 
 
-def get_pattern_intensity(state, district, block, mws_pattern_intensity, pattern_count):
+def get_pattern_intensity(state, district, block):
     try:
         file_path = DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx"
 
         block_patterns = load_block_patterns()
+    
+        df_temp = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
 
+        #? Get all UIDs from the column and initialize them in the map
+        mws_pattern_intensity = {}
+
+        for uid in df_temp["UID"]:
+            mws_pattern_intensity[uid] = 0
         
-        
+        # Iterate through ALL categories (Agriculture, Forest & Livestock, Health, Socio-economic)
+        for category_name, patterns in block_patterns.items():
+
+            # Iterate through each pattern in this category
+            for pattern in patterns:
+                pattern_name = pattern.get('Name')
+                indicators = pattern.get('values', [])
+                
+                # Dictionary to store UIDs that pass each indicator
+                uids_per_indicator = {}
+                
+                # Iterate through each indicator for this pattern
+                for idx, indicator in enumerate(indicators):
+                    sheet_name = indicator.get('sheet_name')
+                    indicator_type = indicator.get('type')
+                    column = indicator.get('column')
+                    comparison = indicator.get('comparison')
+                    comp_type = indicator.get('comp_type')
+                    trend = indicator.get('trend')
+                    percentage = indicator.get('percentage')
+                    
+                    # Initialize set for this indicator
+                    uids_per_indicator[idx] = set()
+                    
+                    # Handle multiple sheets (Type 7)
+                    if isinstance(sheet_name, list):
+                        dataframes = {}
+                        
+                        # Load each sheet
+                        try:
+                            for sheet in sheet_name:
+                                df = pd.read_excel(file_path, sheet_name=sheet)
+                                dataframes[sheet] = df
+                            
+                            # Type 7 logic
+                            if indicator_type == 7:
+                                # Get the two dataframes
+                                df1 = dataframes[sheet_name[0]]
+                                df2 = dataframes[sheet_name[1]]
+                                
+                                # Column names from the indicator
+                                sheet1_columns = column[0]
+                                sheet2_columns = column[1]
+                                
+                                mws_uid_col = sheet1_columns[0]
+                                village_ids_col = sheet1_columns[1]
+                                
+                                village_id_col = sheet2_columns[0]
+                                metric_col = sheet2_columns[1]
+                                
+                                # For each MWS UID in the first sheet
+                                for index, row in df1.iterrows():
+                                    mws_uid = row[mws_uid_col]
+                                    village_ids = row[village_ids_col]
+                                    
+                                    # Parse village IDs
+                                    if isinstance(village_ids, str):
+                                        # Try to parse as list string
+                                        try:
+                                            import ast
+                                            village_ids = ast.literal_eval(village_ids)
+                                        except:
+                                            # If parsing fails, try JSON
+                                            try:
+                                                village_ids = json.loads(village_ids)
+                                            except:
+                                                # Skip if we can't parse
+                                                continue
+                                    
+                                    # Ensure village_ids is a list
+                                    if not isinstance(village_ids, list):
+                                        continue
+                                    
+                                    # Get metric values for each village ID
+                                    metric_values = []
+                                    for village_id in village_ids:
+                                        # Find the row in df2 with this village_id
+                                        matching_rows = df2[df2[village_id_col] == village_id]
+                                        if not matching_rows.empty:
+                                            metric_val = matching_rows.iloc[0][metric_col]
+                                            if pd.notna(metric_val):
+                                                metric_values.append(float(metric_val))
+                                    
+                                    # Calculate average metric across all villages
+                                    if len(metric_values) > 0:
+                                        avg_metric = sum(metric_values) / len(metric_values)
+                                        
+                                        # Compare using comp_type
+                                        passed = False
+                                        
+                                        if comp_type == 1: 
+                                            passed = avg_metric == comparison
+                                        elif comp_type == 2:  
+                                            passed = avg_metric != comparison
+                                        elif comp_type == 3:  
+                                            passed = avg_metric > comparison
+                                        elif comp_type == 4:  
+                                            passed = avg_metric < comparison
+                                        elif comp_type == 5:  
+                                            passed = avg_metric >= comparison
+                                        elif comp_type == 6:  
+                                            passed = avg_metric <= comparison
+                                        
+                                        if passed:
+                                            uids_per_indicator[idx].add(mws_uid)
+                        
+                        except Exception as e:
+                            print(f"    ✗ Error loading sheets: {e}")
+                    
+                    # Handle single sheet
+                    else:
+                        try:
+                            df = pd.read_excel(file_path, sheet_name=sheet_name)
+                            
+                            # Type 2: Class/category comparison
+                            if indicator_type == 2:
+                                for index, row in df.iterrows():
+                                    uid = row['UID']
+                                    value = row[column]
+                                    
+                                    passed = False
+                                    
+                                    if comp_type == 2:  # Equal to
+                                        if isinstance(comparison, str):
+                                            passed = str(value).lower() == comparison.lower()
+                                        else:
+                                            passed = value == comparison
+                                    elif comp_type == 3:  # Greater than
+                                        passed = value > comparison
+                                    elif comp_type == 4:  # Less than
+                                        passed = value < comparison
+                                    
+                                    if passed:
+                                        uids_per_indicator[idx].add(uid)
+                            
+                            # Type 1: Direct column comparison
+                            elif indicator_type == 1:
+                                # Find all columns that start with the base column name
+                                avg_columns = [col for col in df.columns if col.startswith(column)]
+                                avg_columns.sort()
+                                
+                                # For each UID, calculate average
+                                for index, row in df.iterrows():
+                                    uid = row['UID']
+                                    
+                                    # Collect values from all matching columns
+                                    values = []
+                                    for col in avg_columns:
+                                        val = row[col]
+                                        if pd.notna(val):
+                                            values.append(float(val))
+                                    
+                                    # Calculate average if we have values
+                                    if len(values) > 0:
+                                        average = sum(values) / len(values)
+                                        
+                                        # Apply comparison based on comp_type
+                                        passed = False
+                                        
+                                        if comp_type == 1:  # Equals to
+                                            passed = average == comparison
+                                        elif comp_type == 2:  # Not Equals to
+                                            passed = average != comparison
+                                        elif comp_type == 3:  # Greater than
+                                            passed = average > comparison
+                                        elif comp_type == 4:  # Less than
+                                            passed = average < comparison
+                                        elif comp_type == 5:  # Greater than equal to
+                                            passed = average >= comparison
+                                        elif comp_type == 6:  # Less than equal to
+                                            passed = average <= comparison
+                                        
+                                        if passed:
+                                            uids_per_indicator[idx].add(uid)
+
+                            # Type 3: Trend analysis
+                            elif indicator_type == 3:
+                                # Find all columns that start with the base column name
+                                trend_columns = [col for col in df.columns if col.startswith(column)]
+                                
+                                # For each UID, analyze the trend
+                                for index, row in df.iterrows():
+                                    uid = row['UID']
+                                    
+                                    # Extract values from all trend columns
+                                    values = []
+                                    for col in trend_columns:
+                                        val = row[col]
+                                        if pd.notna(val):
+                                            values.append(float(val))
+                                    
+                                    if len(values) >= 3:
+                                        try:
+                                            mk_result = mk.original_test(values)
+                                            
+                                            if trend == 1 and mk_result.trend == 'increasing':
+                                                uids_per_indicator[idx].add(uid)
+                                            elif trend == 0 and mk_result.trend == 'no trend':
+                                                uids_per_indicator[idx].add(uid)
+                                            elif trend == -1 and mk_result.trend == 'decreasing':
+                                                uids_per_indicator[idx].add(uid)
+                                        
+                                        except Exception as e:
+                                            # If Mann-Kendall fails, skip this UID
+                                            pass
+                            
+                            # Type 4: Percentage calculation
+                            elif indicator_type == 4:
+                                total_base_col = column[0]
+                                part_base_col = column[1]
+                                
+                                # Find all years from the total column
+                                total_columns = [col for col in df.columns if col.startswith(total_base_col)]
+                                years = []
+                                for col in total_columns:
+                                    year = col.replace(total_base_col, '')
+                                    if year:
+                                        years.append(year)
+                                
+                                years.sort()
+                                
+                                # Convert percentage string to float for comparison
+                                percentage_threshold = float(percentage)
+                                
+                                # For each UID, calculate average percentage across years
+                                for index, row in df.iterrows():
+                                    uid = row['UID']
+                                    yearly_percentages = []
+                                    
+                                    # Calculate percentage for each year
+                                    for year in years:
+                                        total_col = total_base_col + year
+                                        part_col = part_base_col + year
+                                        
+                                        # Check if both columns exist
+                                        if total_col in df.columns and part_col in df.columns:
+                                            total_val = row[total_col]
+                                            part_val = row[part_col]
+                                            
+                                            # Calculate percentage if values are valid
+                                            if pd.notna(total_val) and pd.notna(part_val) and total_val > 0:
+                                                year_percentage = (float(part_val) / float(total_val)) * 100
+                                                yearly_percentages.append(year_percentage)
+                                    
+                                    # Calculate average percentage
+                                    if len(yearly_percentages) > 0:
+                                        avg_percentage = sum(yearly_percentages) / len(yearly_percentages)
+                                        
+                                        # Apply comparison based on comp_type
+                                        passed = False
+                                        
+                                        if comp_type == 1: 
+                                            passed = avg_percentage == percentage_threshold
+                                        elif comp_type == 2: 
+                                            passed = avg_percentage != percentage_threshold
+                                        elif comp_type == 3:
+                                            passed = avg_percentage > percentage_threshold
+                                        elif comp_type == 4:
+                                            passed = avg_percentage < percentage_threshold
+                                        elif comp_type == 5:
+                                            passed = avg_percentage >= percentage_threshold
+                                        elif comp_type == 6:
+                                            passed = avg_percentage <= percentage_threshold
+                                        
+                                        if passed:
+                                            uids_per_indicator[idx].add(uid)
+                            
+                            # Type 5: Multiple column comparison
+                            elif indicator_type == 5:
+                                # Find all unique years across all base columns
+                                years = set()
+                                for base_col in column:
+                                    year_columns = [col for col in df.columns if col.startswith(base_col)]
+                                    for col in year_columns:
+                                        year = col.replace(base_col, '')
+                                        if year:
+                                            years.add(year)
+                                
+                                years = sorted(list(years))
+                                
+                                # For each UID, check how many drought years exist
+                                for index, row in df.iterrows():
+                                    uid = row['UID']
+                                    drought_year_count = 0
+                                    
+                                    # For each year, sum values from all base columns
+                                    for year in years:
+                                        year_sum = 0
+                                        valid_year = True
+                                        
+                                        for base_col in column:
+                                            col_name = base_col + year
+                                            if col_name in df.columns:
+                                                val = row[col_name]
+                                                if pd.notna(val):
+                                                    year_sum += float(val)
+                                                else:
+                                                    valid_year = False
+                                                    break
+                                            else:
+                                                valid_year = False
+                                                break
+                                        
+                                        # Check if this year qualifies as a drought year (sum > 5)
+                                        if valid_year and year_sum > 5:
+                                            drought_year_count += 1
+                                    
+                                    # Now check if drought_year_count meets the comparison criteria
+                                    passed = False
+                                    
+                                    if comp_type == 1:  # Equals to
+                                        passed = drought_year_count == comparison
+                                    elif comp_type == 2:  # Not Equals to
+                                        passed = drought_year_count != comparison
+                                    elif comp_type == 3:  # Greater than
+                                        passed = drought_year_count > comparison
+                                    elif comp_type == 4:  # Less than
+                                        passed = drought_year_count < comparison
+                                    elif comp_type == 5:  # Greater than equal to
+                                        passed = drought_year_count >= comparison
+                                    elif comp_type == 6:  # Less than equal to
+                                        passed = drought_year_count <= comparison
+                                    
+                                    if passed:
+                                        uids_per_indicator[idx].add(uid)
+                            
+                            # Type 6: Presence check
+                            elif indicator_type == 6:
+                                # Get all UIDs present in this sheet
+                                if 'UID' in df.columns:
+                                    present_uids = df['UID'].unique()
+                                    
+                                    # Add all present UIDs to the passing set
+                                    for uid in present_uids:
+                                        if pd.notna(uid):
+                                            uids_per_indicator[idx].add(uid)
+                            
+                            # Type 8: Count-based logic
+                            elif indicator_type == 8:
+                                uid_col = column[0]
+                                metric_base_cols = column[1:]
+
+                                # For each row/UID
+                                for index, row in df.iterrows():
+                                    mws_uid = row[uid_col]
+                                    total_count = 0
+                                    
+                                    # find all year columns
+                                    for base_col in metric_base_cols:
+                                        metric_columns = [col for col in df.columns if col.startswith(base_col)]
+                                        
+                                        # Sum values across all year columns for this metric
+                                        for col in metric_columns:
+                                            val = row[col]
+                                            if pd.notna(val):
+                                                total_count += float(val)
+                                    
+                                    # Compare total count using comp_type
+                                    passed = False
+                                    
+                                    if comp_type == 1:  # Equals to
+                                        passed = total_count == comparison
+                                    elif comp_type == 2:  # Not Equals to
+                                        passed = total_count != comparison
+                                    elif comp_type == 3:  # Greater than
+                                        passed = total_count > comparison
+                                    elif comp_type == 4:  # Less than
+                                        passed = total_count < comparison
+                                    elif comp_type == 5:  # Greater than equal to
+                                        passed = total_count >= comparison
+                                    elif comp_type == 6:  # Less than equal to
+                                        passed = total_count <= comparison
+                                    
+                                    if passed:
+                                        uids_per_indicator[idx].add(mws_uid)
+                        
+                        except Exception as e:
+                            print(f"Error loading sheet '{sheet_name}': {e}")
+                
+                # Find UIDs that passed ALL indicators (intersection of all sets)
+                if uids_per_indicator:
+                    # Start with UIDs from first indicator
+                    common_uids = uids_per_indicator[0]
+                    
+                    # Intersect with UIDs from remaining indicators
+                    for idx in range(1, len(uids_per_indicator)):
+                        common_uids = common_uids.intersection(uids_per_indicator[idx])
+                    
+                    # Increment intensity for UIDs that satisfied this pattern
+                    for uid in common_uids:
+                        if uid in mws_pattern_intensity:
+                            mws_pattern_intensity[uid] += 1
+
+
         return mws_pattern_intensity
 
     except Exception as e:
@@ -678,58 +1078,1492 @@ def get_pattern_intensity(state, district, block, mws_pattern_intensity, pattern
         return mws_pattern_intensity
 
 
-def get_agriculture_data(state, district, block):
+def get_agri_water_stress_data(state, district, block):
     try:
         file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
 
-        df = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_soge = pd.read_excel(file_path, sheet_name="soge_vector")
+        df_water = pd.read_excel(file_path, sheet_name="hydrological_annual")
 
-        # Find all columns
-        doubly_cropped_columns = [col for col in df.columns if col.startswith("doubly_cropped_area_in_ha_")]
+        mws_pattern = {}
+        mws_intensity = {}
 
-        # Convert to numeric
-        df["sum_area_in_ha"] = pd.to_numeric(df["sum_area_in_ha"], errors="coerce")
-        for col in doubly_cropped_columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-
-        # Calculate average percentage for each UID
-        result = []
-
-        for index, row in df.iterrows():
-            uid = row["UID"]
-            sum_area = row["sum_area_in_ha"]
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        indicator_weights = {
+            'indicator1': 0.5,
+            'indicator2': 0.5
+        }
+        
+        # Indicator 1: class_name != "Safe"
+        indicator1_uids = set()
+        for index, row in df_soge.iterrows():
+            uid = row['UID']
+            class_name = row['class_name']
             
-            # Skip if sum_area is 0 or NaN
-            if sum_area == 0 or pd.isna(sum_area):
-                result.append({
-                    "uid": uid,
-                    "avg_doubly_cropped_percent": 0
-                })
-                continue
+            if str(class_name).lower() != "safe":
+                indicator1_uids.add(uid)
+        
+        # Indicator 2: G_in_mm_ decreasing trend
+        indicator2_uids = set()
+        
+        g_columns = [col for col in df_water.columns if col.startswith("G_in_mm_")]
+        g_columns.sort()
+        
+        for index, row in df_water.iterrows():
+            uid = row['UID']
             
-            # Calculate percentages for all years
-            percentages = []
-            for col in doubly_cropped_columns:
-                doubly_area = row[col]
-                if not pd.isna(doubly_area):
-                    percent = (doubly_area / sum_area) * 100
-                    percentages.append(percent)
+            values = []
+            for col in g_columns:
+                val = row[col]
+                if pd.notna(val):
+                    values.append(float(val))
             
-            # Calculate average
-            avg_percent = sum(percentages) / len(percentages) if percentages else 0
+            if len(values) >= 3:
+                try:
+                    mk_result = mk.original_test(values)
+                    
+                    if mk_result.trend == 'decreasing':
+                        indicator2_uids.add(uid)
+                except Exception as e:
+                    pass
+        
+        # Calculate intensity for each MWS
+        for uid in mws_intensity.keys():
+            intensity = 0.0
             
-            result.append({
-                "uid": uid,
-                "avg_doubly_cropped_percent": round(avg_percent, 2)
-            })
+            if uid in indicator1_uids:
+                intensity += indicator_weights['indicator1']
+            
+            if uid in indicator2_uids:
+                intensity += indicator_weights['indicator2']
+            
+            mws_intensity[uid] = round(intensity, 2)
+            
+            if intensity >= 1.0:  # Only True if ALL indicators passed
+                mws_pattern[uid] = True
+        
+        matched_uids = indicator1_uids.intersection(indicator2_uids)
+        
+        # Calculate total area of matched MWS
+        total_matched_area = 0.0
+        for index, row in df_area.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                area = row['sum_area_in_ha']
+                if pd.notna(area):
+                    total_matched_area += float(area)
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": total_matched_area
+        }
         
         return result
+        
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Cropping Intensity: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }
+
+
+def get_agri_water_drought_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_drought = pd.read_excel(file_path, sheet_name="croppingDrought_kharif")
+
+        mws_pattern = {}
+        mws_intensity = {}
+        
+        # Initialize all UIDs with False and 0 intensity
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        # Define weights for each indicator
+        indicator_weights = {
+            'indicator1': 0.5,  # Kharif drought frequency >= 2
+            'indicator2': 0.5   # Average dry spell length >= 2
+        }
+        
+        # Indicator 1: Kharif drought frequency >= 2
+        indicator1_uids = set()
+
+        moderate_cols = [col for col in df_drought.columns if col.startswith("Moderate_in_weeks_")]
+        severe_cols = [col for col in df_drought.columns if col.startswith("Severe_in_weeks_")]
+        
+        years = set()
+        for col in moderate_cols:
+            year = col.replace("Moderate_in_weeks_", "")
+            if year:
+                years.add(year)
+        
+        years_sorted = sorted(list(years))
+        
+        for index, row in df_drought.iterrows():
+            uid = row['UID']
+            drought_year_count = 0
+            
+            for year in years_sorted:
+                moderate_col = f"Moderate_in_weeks_{year}"
+                severe_col = f"Severe_in_weeks_{year}"
+                
+                if moderate_col in df_drought.columns and severe_col in df_drought.columns:
+                    moderate_val = row[moderate_col]
+                    severe_val = row[severe_col]
+                    
+                    if pd.notna(moderate_val) and pd.notna(severe_val):
+                        year_sum = float(moderate_val) + float(severe_val)
+                        
+                        if year_sum > 5:
+                            drought_year_count += 1
+            
+            if drought_year_count >= 2:
+                indicator1_uids.add(uid)
+        
+        # Indicator 2: Average dry spell length >= 2
+        indicator2_uids = set()
+        
+        drysp_cols = [col for col in df_drought.columns if col.startswith("drysp_unit_4_weeks_")]
+        drysp_cols.sort()
+        
+        for index, row in df_drought.iterrows():
+            uid = row['UID']
+            
+            values = []
+            for col in drysp_cols:
+                val = row[col]
+                if pd.notna(val):
+                    values.append(float(val))
+            
+            if len(values) > 0:
+                average = sum(values) / len(values)
+                
+                if average >= 2:
+                    indicator2_uids.add(uid)
+        
+        # Calculate intensity for each MWS
+        for uid in mws_intensity.keys():
+            intensity = 0.0
+            
+            # Add weight if indicator 1 passed
+            if uid in indicator1_uids:
+                intensity += indicator_weights['indicator1']
+            
+            # Add weight if indicator 2 passed
+            if uid in indicator2_uids:
+                intensity += indicator_weights['indicator2']
+            
+            mws_intensity[uid] = round(intensity, 2)
+            
+            # Mark as True if ALL indicators passed
+            if intensity >= 1.0:
+                mws_pattern[uid] = True
+        
+        # Find UIDs that passed BOTH indicators (for area calculation)
+        matched_uids = indicator1_uids.intersection(indicator2_uids)
+        
+        # Calculate total area of matched MWS
+        total_matched_area = 0.0
+        for index, row in df_area.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                area = row['sum_area_in_ha']
+                if pd.notna(area):
+                    total_matched_area += float(area)
+        
+        # Calculate weighted average drought incidence timeline
+        weighted_drought_timeline = {}
+        
+        for year in years_sorted:
+            numerator = 0.0
+            denominator = 0.0
+            
+            for index, row in df_drought.iterrows():
+                uid = row['UID']
+                
+                # Only include matched UIDs
+                if uid in matched_uids:
+                    # Get cropping area for this MWS from df_area
+                    area_row = df_area[df_area['UID'] == uid]
+                    if not area_row.empty:
+                        cropping_area = area_row.iloc[0]['sum_area_in_ha']
+                        
+                        if pd.notna(cropping_area):
+                            cropping_area = float(cropping_area)
+                            
+                            # Calculate drought binary for this year
+                            moderate_col = f"Moderate_in_weeks_{year}"
+                            severe_col = f"Severe_in_weeks_{year}"
+                            
+                            if moderate_col in df_drought.columns and severe_col in df_drought.columns:
+                                moderate_val = row[moderate_col]
+                                severe_val = row[severe_col]
+                                
+                                if pd.notna(moderate_val) and pd.notna(severe_val):
+                                    year_sum = float(moderate_val) + float(severe_val)
+                                    drought_binary = 1 if year_sum > 5 else 0
+                                    
+                                    numerator += drought_binary * cropping_area
+                                    denominator += cropping_area
+            
+            # Calculate weighted average for this year
+            if denominator > 0:
+                weighted_drought_timeline[year] = round(numerator / denominator, 4)
+            else:
+                weighted_drought_timeline[year] = 0.0
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": total_matched_area
+        }
+        
+        return result, weighted_drought_timeline
+        
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Drought Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }, {}
+
+
+def get_agri_water_irrigation_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_water = pd.read_excel(file_path, sheet_name="surfaceWaterBodies_annual")
+
+        mws_pattern = {}
+        mws_intensity = {}
+        
+        # Initialize all UIDs with False and 0 intensity
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        # Define weights for each indicator
+        indicator_weights = {
+            'indicator1': 0.5,  # Rabi water availability < 30%
+            'indicator2': 0.5   # Total water body area decreasing trend
+        }
+        
+        # Indicator 1: Rabi water availability < 30%
+        indicator1_uids = set()
+        
+        # Find all years from total_area_in_ha_ columns
+        total_cols = [col for col in df_water.columns if col.startswith("total_area_in_ha_")]
+        years = []
+        for col in total_cols:
+            year = col.replace("total_area_in_ha_", "")
+            if year:
+                years.append(year)
+        
+        years_sorted = sorted(years)
+        percentage_threshold = 30.0
+        
+        for index, row in df_water.iterrows():
+            uid = row['UID']
+            yearly_percentages = []
+            
+            # Calculate percentage for each year
+            for year in years_sorted:
+                total_col = f"total_area_in_ha_{year}"
+                rabi_col = f"rabi_area_in_ha_{year}"
+                
+                # Check if both columns exist
+                if total_col in df_water.columns and rabi_col in df_water.columns:
+                    total_val = row[total_col]
+                    rabi_val = row[rabi_col]
+                    
+                    # Calculate percentage if values are valid
+                    if pd.notna(total_val) and pd.notna(rabi_val) and total_val > 0:
+                        year_percentage = (float(rabi_val) / float(total_val)) * 100
+                        yearly_percentages.append(year_percentage)
+            
+            # Calculate average percentage
+            if len(yearly_percentages) > 0:
+                avg_percentage = sum(yearly_percentages) / len(yearly_percentages)
+                
+                if avg_percentage < percentage_threshold:
+                    indicator1_uids.add(uid)
+        
+        # Indicator 2: Total water body area decreasing trend
+        indicator2_uids = set()
+        
+        # Find all total_area_in_ha_ columns
+        total_cols = [col for col in df_water.columns if col.startswith("total_area_in_ha_")]
+        total_cols.sort()
+        
+        for index, row in df_water.iterrows():
+            uid = row['UID']
+            
+            # Extract values from all total_area_in_ha_ columns
+            values = []
+            for col in total_cols:
+                val = row[col]
+                if pd.notna(val):
+                    values.append(float(val))
+            
+            if len(values) >= 3:
+                try:
+                    mk_result = mk.original_test(values)
+                    
+                    # Check for decreasing trend
+                    if mk_result.trend == 'decreasing':
+                        indicator2_uids.add(uid)
+                except Exception as e:
+                    pass
+        
+        # Calculate intensity for each MWS
+        for uid in mws_intensity.keys():
+            intensity = 0.0
+            
+            # Add weight if indicator 1 passed
+            if uid in indicator1_uids:
+                intensity += indicator_weights['indicator1']
+            
+            # Add weight if indicator 2 passed
+            if uid in indicator2_uids:
+                intensity += indicator_weights['indicator2']
+            
+            mws_intensity[uid] = round(intensity, 2)
+            
+            # Mark as True if ALL indicators passed
+            if intensity >= 1.0:
+                mws_pattern[uid] = True
+        
+        # Find UIDs that passed both indicators (for area calculation)
+        matched_uids = indicator1_uids.intersection(indicator2_uids)
+        
+        # Calculate total area of matched MWS
+        total_matched_area = 0.0
+        for index, row in df_area.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                area = row['sum_area_in_ha']
+                if pd.notna(area):
+                    total_matched_area += float(area)
+        
+        # Calculate weighted average seasonal water availability timeline
+        seasonal_timeline = {
+            "kharif": {},
+            "rabi": {},
+            "zaid": {}
+        }
+        
+        for year in years_sorted:
+            # Initialize accumulators for each season
+            kharif_numerator = 0.0
+            rabi_numerator = 0.0
+            zaid_numerator = 0.0
+            denominator = 0.0
+            
+            for index, row in df_water.iterrows():
+                uid = row['UID']
+                
+                # Only include matched UIDs
+                if uid in matched_uids:
+                    total_col = f"total_area_in_ha_{year}"
+                    kharif_col = f"kharif_area_in_ha_{year}"
+                    rabi_col = f"rabi_area_in_ha_{year}"
+                    zaid_col = f"zaid_area_in_ha_{year}"
+                    
+                    # Check if all columns exist
+                    if (total_col in df_water.columns and 
+                        kharif_col in df_water.columns and 
+                        rabi_col in df_water.columns and 
+                        zaid_col in df_water.columns):
+                        
+                        total_val = row[total_col]
+                        kharif_val = row[kharif_col]
+                        rabi_val = row[rabi_col]
+                        zaid_val = row[zaid_col]
+                        
+                        # Calculate if all values are valid
+                        if (pd.notna(total_val) and pd.notna(kharif_val) and 
+                            pd.notna(rabi_val) and pd.notna(zaid_val) and 
+                            total_val > 0):
+                            
+                            total_area = float(total_val)
+                            
+                            # Calculate percentages for each season
+                            kharif_percentage = (float(kharif_val) / total_area) * 100
+                            rabi_percentage = (float(rabi_val) / total_area) * 100
+                            zaid_percentage = (float(zaid_val) / total_area) * 100
+                            
+                            # Weighted sum
+                            kharif_numerator += kharif_percentage * total_area
+                            rabi_numerator += rabi_percentage * total_area
+                            zaid_numerator += zaid_percentage * total_area
+                            denominator += total_area
+            
+            # Calculate weighted averages for this year
+            if denominator > 0:
+                seasonal_timeline["kharif"][year] = round(kharif_numerator / denominator, 2)
+                seasonal_timeline["rabi"][year] = round(rabi_numerator / denominator, 2)
+                seasonal_timeline["zaid"][year] = round(zaid_numerator / denominator, 2)
+            else:
+                seasonal_timeline["kharif"][year] = 0.0
+                seasonal_timeline["rabi"][year] = 0.0
+                seasonal_timeline["zaid"][year] = 0.0
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": total_matched_area
+        }
+        
+        return result, seasonal_timeline
+        
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Irrigation Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }, {
+            "kharif": {},
+            "rabi": {},
+            "zaid": {}
+        }
+
+
+def get_agri_low_yield_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_cropIntensity = pd.read_excel(file_path, sheet_name="change_detection_cropintensity")
+        df_degrade = pd.read_excel(file_path, sheet_name="change_detection_degradation")
+        
+        mws_pattern = {}
+        mws_intensity = {}
+        
+        # Initialize all UIDs with False and 0 intensity
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        # Define weights for each indicator
+        indicator_weights = {
+            'indicator1': 0.5,  # Farm to barren/scrub land > 30 ha
+            'indicator2': 0.5   # Total crop intensity change > 30 ha
+        }
+
+        # Indicator 1: Farm to barren/scrub land > 30 ha
+        indicator1_uids = set()
+        
+        for index, row in df_degrade.iterrows():
+            uid = row['UID']
+            
+            barren_val = row['farm_to_barren_area_in_ha']
+            scrub_val = row['farm_to_scrub_land_area_in_ha']
+            
+            if pd.notna(barren_val) and pd.notna(scrub_val):
+                total_sum = float(barren_val) + float(scrub_val)
+                
+                if total_sum > 30:
+                    indicator1_uids.add(uid)
+        
+        # Indicator 2: Total crop intensity change > 30 ha
+        indicator2_uids = set()
+        
+        for index, row in df_cropIntensity.iterrows():
+            uid = row['UID']
+            value = row['total_change_crop_intensity_area_in_ha']
+ 
+            if pd.notna(value) and float(value) > 30:
+                indicator2_uids.add(uid)
+        
+        # Calculate intensity for each MWS
+        for uid in mws_intensity.keys():
+            intensity = 0.0
+            
+            # Add weight if indicator 1 passed
+            if uid in indicator1_uids:
+                intensity += indicator_weights['indicator1']
+            
+            # Add weight if indicator 2 passed
+            if uid in indicator2_uids:
+                intensity += indicator_weights['indicator2']
+            
+            mws_intensity[uid] = round(intensity, 2)
+            
+            # Mark as True if ALL indicators passed
+            if intensity >= 1.0:
+                mws_pattern[uid] = True
+        
+        # Find UIDs that passed BOTH indicators (for area calculation)
+        matched_uids = indicator1_uids.intersection(indicator2_uids)
+        
+        # Calculate areas for Sankey chart
+        total_farmland_area = 0.0
+        total_to_barren = 0.0
+        total_to_scrub = 0.0
+        
+        for uid in matched_uids:
+
+            area_row = df_area[df_area['UID'] == uid]
+            if not area_row.empty:
+                farmland_area = area_row.iloc[0]['sum_area_in_ha']
+                if pd.notna(farmland_area):
+                    total_farmland_area += float(farmland_area)
+            
+            degrade_row = df_degrade[df_degrade['UID'] == uid]
+            if not degrade_row.empty:
+                barren_val = degrade_row.iloc[0]['farm_to_barren_area_in_ha']
+                scrub_val = degrade_row.iloc[0]['farm_to_scrub_land_area_in_ha']
+                
+                if pd.notna(barren_val):
+                    total_to_barren += float(barren_val)
+                if pd.notna(scrub_val):
+                    total_to_scrub += float(scrub_val)
+        
+        # Calculate remaining farmland
+        remaining_farmland = total_farmland_area - total_to_barren - total_to_scrub
+        
+        sankey_data = {
+            "nodes": [
+                {"name": "Farmlands"},
+                {"name": "Barren Land"},
+                {"name": "Scrub Land"},
+                {"name": "Remaining Farmlands"}
+            ],
+            "links": [
+                {
+                    "source": 0,
+                    "target": 1,
+                    "value": round(total_to_barren, 2)
+                },
+                {
+                    "source": 0,
+                    "target": 2,
+                    "value": round(total_to_scrub, 2)
+                },
+                {
+                    "source": 0,
+                    "target": 3,
+                    "value": round(remaining_farmland, 2) if remaining_farmland > 0 else 0
+                }
+            ]
+        }
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": round(total_to_barren + total_to_scrub, 2)
+        }
+        
+        return result, sankey_data
+    
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Low Yield Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }, {
+            "nodes": [],
+            "links": []
+        }
+
+
+def get_forest_degrad_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_degrade = pd.read_excel(file_path, sheet_name="change_detection_deforestation")
+
+        mws_pattern = {}
+        mws_intensity = {}
+        
+        # Initialize all UIDs with False and 0 intensity
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        # Single indicator (Type 2): Check if total_deforestation_area_in_ha > 50
+        # Since there's only one indicator, weight is 1.0
+        matched_uids = set()
+        
+        for index, row in df_degrade.iterrows():
+            uid = row['UID']
+            value = row['total_deforestation_area_in_ha']
+            
+            # Check if value > 50 (comp_type 3 = Greater than)
+            if pd.notna(value) and float(value) > 50:
+                matched_uids.add(uid)
+        
+        # Calculate intensity for each MWS
+        for uid in mws_intensity.keys():
+            # Since there's only one indicator, intensity is either 0.0 or 1.0
+            if uid in matched_uids:
+                mws_intensity[uid] = 1.0
+                mws_pattern[uid] = True
+        
+        # Calculate total deforestation area and forest transition flows
+        total_matched_area = 0.0
+        total_to_barren = 0.0
+        total_to_builtup = 0.0
+        total_to_farm = 0.0
+        total_to_forest = 0.0
+        total_to_scrub = 0.0
+        
+        for index, row in df_degrade.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                deforest_val = row['total_deforestation_area_in_ha']
+                
+                if pd.notna(deforest_val):
+                    total_matched_area += float(deforest_val)
+                
+                # Get transition values
+                barren_val = row.get('forest_to_barren_area_in_ha')
+                builtup_val = row.get('forest_to_built_up_area_in_ha')
+                farm_val = row.get('forest_to_farm_area_in_ha')
+                forest_val = row.get('forest_to_forest_area_in_ha')
+                scrub_val = row.get('forest_to_scrub_land_area_in_ha')
+                
+                # Sum up transitions
+                if pd.notna(barren_val):
+                    total_to_barren += float(barren_val)
+                if pd.notna(builtup_val):
+                    total_to_builtup += float(builtup_val)
+                if pd.notna(farm_val):
+                    total_to_farm += float(farm_val)
+                if pd.notna(forest_val):
+                    total_to_forest += float(forest_val)
+                if pd.notna(scrub_val):
+                    total_to_scrub += float(scrub_val)
+        
+        # Prepare Sankey data for forest transitions
+        forest_sankey = {
+            "nodes": [
+                {"name": "Forest Cover"},
+                {"name": "Barren Land"},
+                {"name": "Built-up Area"},
+                {"name": "Farmland"},
+                {"name": "Remaining Forest"},
+                {"name": "Scrub Land"}
+            ],
+            "links": [
+                {
+                    "source": 0,  # Forest Cover
+                    "target": 1,  # Barren Land
+                    "value": round(total_to_barren, 2)
+                },
+                {
+                    "source": 0,  # Forest Cover
+                    "target": 2,  # Built-up Area
+                    "value": round(total_to_builtup, 2)
+                },
+                {
+                    "source": 0,  # Forest Cover
+                    "target": 3,  # Farmland
+                    "value": round(total_to_farm, 2)
+                },
+                {
+                    "source": 0,  # Forest Cover
+                    "target": 4,  # Remaining Forest
+                    "value": round(total_to_forest, 2)
+                },
+                {
+                    "source": 0,  # Forest Cover
+                    "target": 5,  # Scrub Land
+                    "value": round(total_to_scrub, 2)
+                }
+            ]
+        }
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": total_matched_area
+        }
+        
+        return result, forest_sankey
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for Cropping Intensity",
+            "Not able to access excel for %s district, %s block for Forest Degradation Data: %s",
             district,
-            block
+            block,
+            e
         )
 
-        return []
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }, {
+            "nodes": [],
+            "links": []
+        }
+
+
+def get_mining_presence_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+        
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_mining = pd.read_excel(file_path, sheet_name="mining")
+
+        mws_pattern = {}
+        
+        # Initialize all UIDs with False
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+        
+        # Type 6 - Presence Check: Check if UID exists in mining sheet
+        matched_uids = set()
+        
+        # Get all unique UIDs from mining sheet
+        mining_uids = df_mining['UID'].unique()
+        
+        for uid in mining_uids:
+            if pd.notna(uid):
+                matched_uids.add(uid)
+        
+        # Update mws_pattern with matched UIDs
+        for uid in matched_uids:
+            if uid in mws_pattern:
+                mws_pattern[uid] = True
+        
+        # Calculate total area of MWS with mining presence
+        total_matched_area = 0.0
+        for index, row in df_area.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                area = row['sum_area_in_ha']
+                if pd.notna(area):
+                    total_matched_area += float(area)
+        
+        # Prepare pie chart data - count different types of mines
+        mining_types = {}
+        
+        # Only include mines from matched UIDs
+        for index, row in df_mining.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                sector = row.get('sector_moefcc')
+                
+                if pd.notna(sector):
+                    sector_str = str(sector).strip()
+                    if sector_str:  # Not empty
+                        if sector_str in mining_types:
+                            mining_types[sector_str] += 1
+                        else:
+                            mining_types[sector_str] = 1
+        
+        # Prepare pie chart data structure
+        mining_pie_chart = {
+            "labels": list(mining_types.keys()),
+            "values": list(mining_types.values())
+        }
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "total_area": total_matched_area
+        }
+        
+        return result, mining_pie_chart
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Mining Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "total_area": 0.0
+        }, {
+            "labels": [],
+            "values": []
+        }
+
+
+def get_socio_economic_caste_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
+
+        village_pattern = {}
+        village_intensity = {}
+        
+        # Initialize all village IDs with False and 0 intensity
+        for village_id in df_social["village_id"]:
+            village_pattern[village_id] = False
+            village_intensity[village_id] = 0.0
+        
+        # Define weights for each indicator
+        indicator_weights = {
+            'indicator1': 0.5,  # SC_percent > 17
+            'indicator2': 0.5   # ST_percent > 33
+        }
+        
+        # Process each village
+        indicator1_villages = set()
+        indicator2_villages = set()
+        
+        for index, row in df_social.iterrows():
+            village_id = row['village_id']
+            sc_percent = row.get('SC_percent', 0)
+            st_percent = row.get('ST_percent', 0)
+            
+            # Indicator 1: SC_percent > 17
+            if pd.notna(sc_percent) and float(sc_percent) > 17:
+                indicator1_villages.add(village_id)
+            
+            # Indicator 2: ST_percent > 33
+            if pd.notna(st_percent) and float(st_percent) > 33:
+                indicator2_villages.add(village_id)
+        
+        # Calculate intensity for each village
+        for village_id in village_intensity.keys():
+            intensity = 0.0
+            
+            # Add weight if indicator 1 passed
+            if village_id in indicator1_villages:
+                intensity += indicator_weights['indicator1']
+            
+            # Add weight if indicator 2 passed
+            if village_id in indicator2_villages:
+                intensity += indicator_weights['indicator2']
+            
+            village_intensity[village_id] = round(intensity, 2)
+            
+            # Mark as True if ALL indicators passed
+            if intensity >= 1.0:
+                village_pattern[village_id] = True
+        
+        # Find villages that passed BOTH indicators (for population calculation)
+        matched_villages = indicator1_villages.intersection(indicator2_villages)
+        
+        # Calculate total population and SC/ST populations for matched villages
+        total_population = 0
+        sc_population = 0
+        st_population = 0
+        
+        for index, row in df_social.iterrows():
+            village_id = row['village_id']
+            
+            if village_id in matched_villages:
+                pop = row.get('total_population', 0)
+                
+                if pd.notna(pop):
+                    pop_value = float(pop)
+                    total_population += pop_value
+                    
+                    # Calculate SC and ST populations
+                    sc_percent = row.get('SC_percent', 0)
+                    st_percent = row.get('ST_percent', 0)
+                    
+                    if pd.notna(sc_percent):
+                        sc_population += (float(sc_percent) / 100) * pop_value
+                    if pd.notna(st_percent):
+                        st_population += (float(st_percent) / 100) * pop_value
+        
+        # Calculate Others population
+        others_population = total_population - sc_population - st_population
+        
+        # Prepare pie chart data
+        caste_pie_chart = {
+            "labels": ["SC (Scheduled Caste)", "ST (Scheduled Tribe)", "Others"],
+            "values": [
+                round(sc_population, 0),
+                round(st_population, 0),
+                round(others_population, 0)
+            ]
+        }
+        
+        result = {
+            "village_pattern": village_pattern,
+            "village_intensity": village_intensity,
+            "total_population": round(total_population, 0),
+            "total_villages": len(matched_villages)
+        }
+        
+        return result, caste_pie_chart
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Socio Caste Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "village_pattern": {},
+            "village_intensity": {},
+            "total_population": 0,
+            "total_villages": 0
+        }, {
+            "labels": [],
+            "values": []
+        }
+
+
+def get_socio_economic_nrega_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_nrega = pd.read_excel(file_path, sheet_name="nrega_annual")
+        df_mws_villages = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
+        df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
+
+        village_pattern = {}
+        village_intensity = {}
+        
+        # Initialize all village IDs with False and 0 intensity
+        for village_id in df_social["village_id"]:
+            village_pattern[village_id] = False
+            village_intensity[village_id] = 0.0
+        
+        base_columns = [
+            "Soil and water conservation_count_",
+            "Land restoration_count_",
+            "Plantations_count_",
+            "Irrigation on farms_count_",
+            "Other farm works_count_",
+            "Off-farm livelihood assets_count_",
+            "Community assets_count_"
+        ]
+        
+        # Single indicator (Type 8): Total NREGA works < 100
+        # Since there's only one indicator, weight is 1.0
+        matched_mws_uids = set()
+        
+        for index, row in df_nrega.iterrows():
+            uid = row['mws_id']
+            
+            grand_total = 0.0
+            
+            # For each base column, find all year columns and sum
+            for base_col in base_columns:
+                # Find all columns that start with this base name
+                matching_cols = [col for col in df_nrega.columns if col.startswith(base_col)]
+                
+                for col in matching_cols:
+                    val = row[col]
+                    if pd.notna(val):
+                        grand_total += float(val)
+            
+            # Check if grand_total < 100 (comp_type 4 = Less than)
+            if grand_total < 100:
+                matched_mws_uids.add(uid)
+        
+        # Map MWS to villages and set village intensity
+        matched_villages = set()
+        
+        for index, row in df_mws_villages.iterrows():
+            mws_uid = row['MWS UID']
+            
+            if mws_uid in matched_mws_uids:
+                village_ids = row['Village IDs']
+                
+                if pd.notna(village_ids):
+                    try:
+                        if isinstance(village_ids, str):
+                            import ast
+                            import json
+                            try:
+                                village_list = ast.literal_eval(village_ids)
+                            except:
+                                try:
+                                    village_list = json.loads(village_ids)
+                                except:
+                                    village_list = [v.strip() for v in village_ids.split(',')]
+                        elif isinstance(village_ids, (list, tuple)):
+                            village_list = list(village_ids)
+                        else:
+                            village_list = [village_ids]
+                        
+                        # Add villages to matched set and update intensity
+                        for village_id in village_list:
+                            matched_villages.add(village_id)
+                            if village_id in village_intensity:
+                                village_intensity[village_id] = 1.0
+                                village_pattern[village_id] = True
+                            
+                    except Exception as e:
+                        continue
+        
+        # Calculate totals for each NREGA work type for pie chart (using matched MWS)
+        nrega_totals = {
+            "Soil and Water Conservation": 0,
+            "Land Restoration": 0,
+            "Plantations": 0,
+            "Irrigation on Farms": 0,
+            "Other Farm Works": 0,
+            "Off-farm Livelihood Assets": 0,
+            "Community Assets": 0
+        }
+        
+        base_to_label = {
+            "Soil and water conservation_count_": "Soil and Water Conservation",
+            "Land restoration_count_": "Land Restoration",
+            "Plantations_count_": "Plantations",
+            "Irrigation on farms_count_": "Irrigation on Farms",
+            "Other farm works_count_": "Other Farm Works",
+            "Off-farm livelihood assets_count_": "Off-farm Livelihood Assets",
+            "Community assets_count_": "Community Assets"
+        }
+        
+        for index, row in df_nrega.iterrows():
+            uid = row['mws_id']
+            
+            if uid in matched_mws_uids:
+                for base_col, label in base_to_label.items():
+                    # Find all columns that start with this base name
+                    matching_cols = [col for col in df_nrega.columns if col.startswith(base_col)]
+                    
+                    for col in matching_cols:
+                        val = row[col]
+                        if pd.notna(val):
+                            nrega_totals[label] += float(val)
+        
+        # Prepare pie chart data
+        nrega_pie_chart = {
+            "labels": list(nrega_totals.keys()),
+            "values": [round(v, 0) for v in nrega_totals.values()]
+        }
+        
+        result = {
+            "village_pattern": village_pattern,
+            "village_intensity": village_intensity,
+            "total_villages": len(matched_villages)
+        }
+        
+        return result, nrega_pie_chart
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for NREGA Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "village_pattern": {},
+            "village_intensity": {},
+            "total_villages": 0
+        }, {
+            "labels": [],
+            "values": []
+        }
+
+
+def get_fishery_water_potential_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_water = pd.read_excel(file_path, sheet_name="surfaceWaterBodies_annual")
+
+        mws_pattern = {}
+        mws_intensity = {}
+        
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        indicator_weights = {
+            'indicator1': 0.34,
+            'indicator2': 0.33,
+            'indicator3': 0.33  
+        }
+        
+        # Find all years from total_area_in_ha_ columns
+        total_cols = [col for col in df_water.columns if col.startswith("total_area_in_ha_")]
+        years = []
+        for col in total_cols:
+            year = col.replace("total_area_in_ha_", "")
+            if year:
+                years.append(year)
+        
+        years_sorted = sorted(years)
+        percentage_threshold = 30.0
+        
+        indicator1_uids = set()
+        
+        for index, row in df_water.iterrows():
+            uid = row['UID']
+            yearly_percentages = []
+            
+            for year in years_sorted:
+                total_col = f"total_area_in_ha_{year}"
+                rabi_col = f"rabi_area_in_ha_{year}"
+                
+                if total_col in df_water.columns and rabi_col in df_water.columns:
+                    total_val = row[total_col]
+                    rabi_val = row[rabi_col]
+                    
+                    if pd.notna(total_val) and pd.notna(rabi_val) and total_val > 0:
+                        year_percentage = (float(rabi_val) / float(total_val)) * 100
+                        yearly_percentages.append(year_percentage)
+            
+            if len(yearly_percentages) > 0:
+                avg_percentage = sum(yearly_percentages) / len(yearly_percentages)
+                
+                if avg_percentage > percentage_threshold:
+                    indicator1_uids.add(uid)
+
+        indicator2_uids = set()
+        
+        for index, row in df_water.iterrows():
+            uid = row['UID']
+            yearly_percentages = []
+            
+            for year in years_sorted:
+                total_col = f"total_area_in_ha_{year}"
+                zaid_col = f"zaid_area_in_ha_{year}"
+                
+                if total_col in df_water.columns and zaid_col in df_water.columns:
+                    total_val = row[total_col]
+                    zaid_val = row[zaid_col]
+                    
+                    if pd.notna(total_val) and pd.notna(zaid_val) and total_val > 0:
+                        year_percentage = (float(zaid_val) / float(total_val)) * 100
+                        yearly_percentages.append(year_percentage)
+            
+            if len(yearly_percentages) > 0:
+                avg_percentage = sum(yearly_percentages) / len(yearly_percentages)
+                
+                if avg_percentage > percentage_threshold:
+                    indicator2_uids.add(uid)
+
+        indicator3_uids = set()
+        
+        total_cols = [col for col in df_water.columns if col.startswith("total_area_in_ha_")]
+        total_cols.sort()
+        
+        for index, row in df_water.iterrows():
+            uid = row['UID']
+            
+            values = []
+            for col in total_cols:
+                val = row[col]
+                if pd.notna(val):
+                    values.append(float(val))
+            
+            if len(values) >= 3:
+                try:
+                    mk_result = mk.original_test(values)
+                    
+                    if mk_result.trend != 'decreasing':
+                        indicator3_uids.add(uid)
+                except Exception as e:
+                    indicator3_uids.add(uid)
+            else:
+                indicator3_uids.add(uid)
+        
+        # Calculate intensity for each MWS
+        for uid in mws_intensity.keys():
+            intensity = 0.0
+
+            if uid in indicator1_uids:
+                intensity += indicator_weights['indicator1']
+
+            if uid in indicator2_uids:
+                intensity += indicator_weights['indicator2']
+
+            if uid in indicator3_uids:
+                intensity += indicator_weights['indicator3']
+            
+            mws_intensity[uid] = round(intensity, 2)
+            
+            if intensity >= 1.0:
+                mws_pattern[uid] = True
+        
+        matched_uids = indicator1_uids.intersection(indicator2_uids).intersection(indicator3_uids)
+        
+        # Calculate total area of matched MWS
+        total_matched_area = 0.0
+        for index, row in df_area.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                area = row['sum_area_in_ha']
+                if pd.notna(area):
+                    total_matched_area += float(area)
+        
+        seasonal_timeline = {
+            "kharif": {},
+            "rabi": {},
+            "zaid": {}
+        }
+        
+        for year in years_sorted:
+            kharif_numerator = 0.0
+            rabi_numerator = 0.0
+            zaid_numerator = 0.0
+            denominator = 0.0
+            
+            for index, row in df_water.iterrows():
+                uid = row['UID']
+                
+                # Only include matched UIDs
+                if uid in matched_uids:
+                    total_col = f"total_area_in_ha_{year}"
+                    kharif_col = f"kharif_area_in_ha_{year}"
+                    rabi_col = f"rabi_area_in_ha_{year}"
+                    zaid_col = f"zaid_area_in_ha_{year}"
+                    
+                    if (total_col in df_water.columns and 
+                        kharif_col in df_water.columns and 
+                        rabi_col in df_water.columns and 
+                        zaid_col in df_water.columns):
+                        
+                        total_val = row[total_col]
+                        kharif_val = row[kharif_col]
+                        rabi_val = row[rabi_col]
+                        zaid_val = row[zaid_col]
+                        
+                        if (pd.notna(total_val) and pd.notna(kharif_val) and 
+                            pd.notna(rabi_val) and pd.notna(zaid_val) and 
+                            total_val > 0):
+                            
+                            total_area = float(total_val)
+                            
+                            # Calculate percentages for each season
+                            kharif_percentage = (float(kharif_val) / total_area) * 100
+                            rabi_percentage = (float(rabi_val) / total_area) * 100
+                            zaid_percentage = (float(zaid_val) / total_area) * 100
+                            
+                            # Weighted sum
+                            kharif_numerator += kharif_percentage * total_area
+                            rabi_numerator += rabi_percentage * total_area
+                            zaid_numerator += zaid_percentage * total_area
+                            denominator += total_area
+            
+            if denominator > 0:
+                seasonal_timeline["kharif"][year] = round(kharif_numerator / denominator, 2)
+                seasonal_timeline["rabi"][year] = round(rabi_numerator / denominator, 2)
+                seasonal_timeline["zaid"][year] = round(zaid_numerator / denominator, 2)
+            else:
+                seasonal_timeline["kharif"][year] = 0.0
+                seasonal_timeline["rabi"][year] = 0.0
+                seasonal_timeline["zaid"][year] = 0.0
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": total_matched_area
+        }
+        
+        return result, seasonal_timeline
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Fishery Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }, {
+            "kharif": {},
+            "rabi": {},
+            "zaid": {}
+        }
+
+
+def get_agroforestry_transition_data(state, district, block):
+    try:
+        file_path = (DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx")
+
+        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_cropIntensity = pd.read_excel(file_path, sheet_name="change_detection_cropintensity")
+        df_degrade = pd.read_excel(file_path, sheet_name="change_detection_degradation")
+
+        mws_pattern = {}
+        mws_intensity = {}
+
+        # Initialize all UIDs with False and 0 intensity
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+        
+        # Define weights for each indicator
+        indicator_weights = {
+            'indicator1': 0.5,
+            'indicator2': 0.5 
+        }
+        
+        indicator1_uids = set()
+        
+        for index, row in df_degrade.iterrows():
+            uid = row['UID']
+            
+            barren_val = row['farm_to_barren_area_in_ha']
+            scrub_val = row['farm_to_scrub_land_area_in_ha']
+            
+            if pd.notna(barren_val) and pd.notna(scrub_val):
+                total_sum = float(barren_val) + float(scrub_val)
+                
+                if total_sum > 30:
+                    indicator1_uids.add(uid)
+        
+        indicator2_uids = set()
+        
+        for index, row in df_cropIntensity.iterrows():
+            uid = row['UID']
+            value = row['total_change_crop_intensity_area_in_ha']
+            
+            if pd.notna(value) and float(value) > 30:
+                indicator2_uids.add(uid)
+        
+        for uid in mws_intensity.keys():
+            intensity = 0.0
+            
+            # Add weight if indicator 1 passed
+            if uid in indicator1_uids:
+                intensity += indicator_weights['indicator1']
+            
+            # Add weight if indicator 2 passed
+            if uid in indicator2_uids:
+                intensity += indicator_weights['indicator2']
+            
+            mws_intensity[uid] = round(intensity, 2)
+            
+            # Mark as True if ALL indicators passed
+            if intensity >= 1.0:
+                mws_pattern[uid] = True
+        
+        matched_uids = indicator1_uids.intersection(indicator2_uids)
+        
+        # Calculate total area of matched MWS
+        total_matched_area = 0.0
+        for index, row in df_area.iterrows():
+            uid = row['UID']
+            if uid in matched_uids:
+                area = row['sum_area_in_ha']
+                if pd.notna(area):
+                    total_matched_area += float(area)
+        
+        total_double_to_single = 0.0
+        total_double_to_triple = 0.0
+        total_single_to_double = 0.0
+        total_single_to_triple = 0.0
+        total_triple_to_double = 0.0
+        total_triple_to_single = 0.0
+        
+        for index, row in df_cropIntensity.iterrows():
+            uid = row['UID']
+            
+            if uid in matched_uids:
+                # Get transition values
+                double_to_single = row.get('double_to_single_area_in_ha')
+                double_to_triple = row.get('double_to_triple_area_in_ha')
+                single_to_double = row.get('single_to_double_area_in_ha')
+                single_to_triple = row.get('single_to_triple_area_in_ha')
+                triple_to_double = row.get('triple_to_double_area_in_ha')
+                triple_to_single = row.get('triple_to_single_area_in_ha')
+                
+                # Sum up transitions
+                if pd.notna(double_to_single):
+                    total_double_to_single += float(double_to_single)
+                if pd.notna(double_to_triple):
+                    total_double_to_triple += float(double_to_triple)
+                if pd.notna(single_to_double):
+                    total_single_to_double += float(single_to_double)
+                if pd.notna(single_to_triple):
+                    total_single_to_triple += float(single_to_triple)
+                if pd.notna(triple_to_double):
+                    total_triple_to_double += float(triple_to_double)
+                if pd.notna(triple_to_single):
+                    total_triple_to_single += float(triple_to_single)
+        
+        agroforestry_sankey = {
+            "nodes": [
+                {"name": "Single Cropping (Initial)", "priority": 0},
+                {"name": "Double Cropping (Initial)", "priority": 1},
+                {"name": "Triple Cropping (Initial)", "priority": 2},
+                {"name": "Single Cropping (Final)", "priority": 0},
+                {"name": "Double Cropping (Final)", "priority": 1},
+                {"name": "Triple Cropping (Final)", "priority": 2}
+            ],
+            "links": [
+                # Single Cropping (Initial) transitions
+                {"source": 0, "target": 4, "value": round(total_single_to_double, 2)},
+                {"source": 0, "target": 5, "value": round(total_single_to_triple, 2)},
+                # Double Cropping (Initial) transitions
+                {"source": 1, "target": 3, "value": round(total_double_to_single, 2)},
+                {"source": 1, "target": 5, "value": round(total_double_to_triple, 2)},
+                # Triple Cropping (Initial) transitions
+                {"source": 2, "target": 3, "value": round(total_triple_to_single, 2)},
+                {"source": 2, "target": 4, "value": round(total_triple_to_double, 2)}
+            ]
+        }
+        
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": total_matched_area
+        }
+        
+        return result, agroforestry_sankey
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Agroforestry Data: %s",
+            district,
+            block,
+            e
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0
+        }, {
+            "nodes": [],
+            "links": []
+        }

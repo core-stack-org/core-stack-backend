@@ -53,15 +53,21 @@ def StartUserSession(
         import time
 
         start_time = time.time()
-        success, response_json = bot_interface.utils.check_user_community_status_http(
-            user_number
-        )
-        print("is_in_community", success, response_json)
-        end_time = time.time()
-        duration = end_time - start_time
-        logger.info("Community check (HTTP) took %.3f seconds", duration)
-
-        if success and response_json.get("success"):
+        try:
+            success, response_json = bot_interface.utils.check_user_community_status_http(
+                user_number
+             )
+            print("is_in_community", success, response_json)
+            end_time = time.time()
+            duration = end_time - start_time
+            logger.info("Community check (HTTP) took %.3f seconds", duration)
+            response_text = response_json.get("success")
+            logger.info(f"community check result {success}, {response_text}")
+        except Exception as e:
+            print (e)
+            success = False
+        a = True
+        if a:
             response_data = response_json.get("data", {})
             is_in_community = response_data.get("is_in_community", False)
 

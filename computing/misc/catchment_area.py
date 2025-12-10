@@ -55,7 +55,7 @@ def generate_catchment_area_singleflow(
 
     else:
         roi_boundary = ee.FeatureCollection(roi_path)
-        description = "catchment_area_" + asset_suffix
+        description = "catchment_area_" + asset_suffix +'_raster'
 
         asset_id = (
             get_gee_dir_path(

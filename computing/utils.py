@@ -76,10 +76,7 @@ def push_shape_to_geoserver(
         workspace=workspace,
         file_extension=file_type,
     )
-    if response["status_code"] in [200, 201, 202]:
-        path = path.split("/")[:-1]
-        path = os.path.join(*path)
-        shutil.rmtree(path)
+    #
     return response
 
 
@@ -343,12 +340,13 @@ def calculate_precipitation_season(
         original_props = feature["properties"]
         new_props = {}
 
-        # Copy UID if available
+        # Copy UID
         if "uid" in original_props:
             new_props["uid"] = original_props["uid"]
 
         agri_year_totals = {}
 
+        # Parse precipitation date keys
         for key, val in original_props.items():
             try:
                 date = datetime.strptime(key, "%Y-%m-%d")
@@ -360,57 +358,33 @@ def calculate_precipitation_season(
                 if not agri_key:
                     continue
 
-                # Filter by agri year range
                 agri_start = int(agri_key.split("-")[0])
                 if not (start_year <= agri_start <= end_year):
                     continue
 
-                season = season_key.split("_")[0]  # e.g., 'kharif'
-                full_key = f"{season}_{agri_key}"  # e.g., '2017-2018_kharif'
+                season = season_key.split("_")[0]  # kharif, rabi etc
+                full_key = f"{season}_{agri_key}"
 
                 agri_year_totals[full_key] = agri_year_totals.get(full_key, 0) + float(
                     val
                 )
 
             except Exception:
-                continue  # Skip bad keys/values
+                continue
 
-        # Add precipitation totals per agri year and season
+        # Add all seasonal totals to new_props
         for agri_key, total in agri_year_totals.items():
             new_props[f"precipitation_{agri_key}"] = total
 
-        # Optional debug
-        print(new_props)
-
-        # Create Earth Engine Feature
+        # Create EE Feature
         geom_ee = ee.Geometry(feature["geometry"])
         feature_ee = ee.Feature(geom_ee, new_props)
         features_ee.append(feature_ee)
+
+    # Left side FC
     mws_fc = ee.FeatureCollection(features_ee)
-    draught_fc = ee.FeatureCollection(draught_asset_id)
 
-    # Define spatial filter (intersects)
-    spatial_filter = ee.Filter.intersects(
-        leftField=".geo",  # geometry field of left collection
-        rightField=".geo",
-        maxError=1,
-    )
-
-    # Define the join
-    join = ee.Join.inner()
-
-    # Apply the join
-    joined = join.apply(mws_fc, draught_fc, spatial_filter)
-
-    # Convert joined result into a proper FeatureCollection
-    # by merging properties from both
-    def merge_features(feature):
-        left = ee.Feature(feature.get("primary"))
-        right = ee.Feature(feature.get("secondary"))
-        return left.copyProperties(right)
-
-    final_fc = ee.FeatureCollection(joined.map(merge_features))
-    return final_fc
+    return mws_fc
 
 
 def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
@@ -838,6 +812,75 @@ def update_dashboard_geojson(
     print(f"✅ Added/Updated {json_key} for {state}, {district}, {block}")
 
 
+def clean_geometry(geom):
+    """
+    Clean geometry:
+    - Dissolve multipolygon → single polygon
+    - Remove holes automatically
+    - Fix invalid topology
+    - Buffer tiny polygons
+    """
+
+    # 1. Dissolve multi-polygons and remove holes
+    geom = geom.dissolve(maxError=1)
+
+    # 2. Fix invalid rings by simplifying slightly (NEVER buffer(0))
+    geom = geom.simplify(1)
+
+    # 3. Buffer polygons smaller than 1 pixel (< 900 m²)
+    area = geom.area()
+    geom = ee.Algorithms.If(
+        area.lt(900), geom.buffer(15), geom  # ensure raster pixel center is captured
+    )
+
+    return ee.Geometry(geom)
+
+
+def safe_reduce_max(image, geom, scale=30):
+    geom = clean_geometry(geom)
+
+    val = (
+        image.unmask(0)
+        .reduceRegion(
+            reducer=ee.Reducer.max(),
+            geometry=geom,
+            scale=scale,
+            maxPixels=1e13,
+            tileScale=4,
+            bestEffort=True,
+        )
+        .get("b1")
+    )
+
+    return ee.Number(ee.Algorithms.If(val, val, 0))
+
+
+# ------------------------------------------------------
+#  SAFE REDUCE MAX FUNCTION
+# ------------------------------------------------------
+def safe_reduce_max(image, geom, scale=30):
+    geom = clean_geometry(geom)
+
+    result = (
+        image.unmask(0)
+        .reduceRegion(
+            reducer=ee.Reducer.max(),
+            geometry=geom,
+            scale=scale,
+            maxPixels=1e13,
+            tileScale=4,
+            bestEffort=True,
+        )
+        .get("b1")
+    )
+
+    # Convert null → 0
+    return ee.Number(ee.Algorithms.If(result, result, 0))
+
+
+# ------------------------------------------------------
+#  MAIN FUNCTION TO PROCESS SWB LAYER
+# ------------------------------------------------------
 def generate_swb_layer_with_max_so_catchment(
     roi=None,
     app_type="MWS",
@@ -846,49 +889,108 @@ def generate_swb_layer_with_max_so_catchment(
     gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
-    asset_suffix_so = "stream_order_" + asset_suffix + "_raster"
+
+    # Build asset paths
+    base_path = get_gee_dir_path(
+        asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+
+    so_asset = f"{base_path}stream_order_{asset_suffix}_raster"
+    ca_asset = f"{base_path}catchment_area_{asset_suffix}_raster"
+
+    # Load rasters
+    stream_order_band = ee.Image(so_asset).select("b1")
+    catchment_band = ee.Image(ca_asset).select("b1")
+
+    # Processing per waterbody
+    def compute_for_feature(feature):
+        geom = feature.geometry()
+
+        max_so = safe_reduce_max(stream_order_band, geom, scale=30)
+        max_ca = safe_reduce_max(catchment_band, geom, scale=30)
+
+        return feature.set(
+            {
+                "max_stream_order": max_so,
+                "max_catchment_area": max_ca,
+            }
+        )
+
+    # Map over the feature collection
+    return roi.map(compute_for_feature)
+
+
+def generate_swb_layer_with_max_so_catchment(
+    roi=None,
+    app_type="MWS",
+    asset_suffix=None,
+    asset_folder=None,
+    gee_account_id=None,
+):
+    ee_initialize(gee_account_id)
+
+    # Build asset IDs
+    asset_suffix_so = f"stream_order_{asset_suffix}_raster"
     asset_suffix_ca = f"catchment_area_{asset_suffix}_raster"
-    asset_id_ca = (
-        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
-        + asset_suffix_ca
-    )
-    asset_id_so = (
-        get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
-        + asset_suffix_so
+
+    base_path = get_gee_dir_path(
+        asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
     )
 
-    # Load the raster image (must contain 'SR_B1' or your band)
-    catchemnt_area_raster = ee.Image(asset_id_ca)  # Replace with your image ID
-    catchment_band = catchemnt_area_raster.select(
-        "b1"
-    )  # Adjust based on the band you need
-    stream_order_raster = ee.Image(asset_id_so)
-    stream_order_band = stream_order_raster.select("b1")
+    asset_id_ca = base_path + asset_suffix_ca
+    asset_id_so = base_path + asset_suffix_so
 
-    # Function to compute max B1 inside each feature
-    def make_compute_max(so_band, cm_band, band_name="b1"):
-        def compute_max(feature):
-            max_val_so = so_band.reduceRegion(
-                reducer=ee.Reducer.max(),
-                geometry=feature.geometry(),
-                scale=30,
-                maxPixels=1e13,
-            ).get(band_name)
+    # Load rasters
+    catchment_band = ee.Image(asset_id_ca).select("b1")
+    stream_order_band = ee.Image(asset_id_so).select("b1")
 
-            max_val_cm = cm_band.reduceRegion(
-                reducer=ee.Reducer.max(),
-                geometry=feature.geometry(),
-                scale=30,
-                maxPixels=1e13,
-            ).get(band_name)
+    # ----------------------------
+    # MAIN FIX: Null-safe reducer
+    # ----------------------------
 
-            return feature.set(
-                {"max_catchment_area": max_val_cm, "max_stream_order": max_val_so}
-            )
+    def safe_geometry(geom, scale):
+        # Compute approx radius of buffer needed (half pixel)
+        buffer_dist = scale / 2
 
-        return compute_max
+        # If the geometry area is too small compared to one pixel, buffer it
+        return ee.Algorithms.If(
+            geom.area().lt(scale * scale),  # geometry area < 1 pixel area?
+            geom.buffer(buffer_dist),  # buffer to make it cover at least one pixel
+            geom  # otherwise return original
+        )
 
-    # Apply the function to each polygon in the collection
-    compute_max = make_compute_max(stream_order_band, catchment_band)
-    swb_with_max = roi.map(compute_max)
-    return swb_with_max
+
+    def safe_reduce_max(image, geom, scale=30):
+        """Returns max value safely, fallback to 0 instead of null."""
+        result = image.reduceRegion(
+            reducer=ee.Reducer.max(),
+            geometry=safe_geometry(geom, scale),
+            scale=scale,
+            maxPixels=1e13,
+            bestEffort=True,
+        ).get("b1")
+
+        # Convert null → 0
+        return ee.Number(ee.Algorithms.If(result, result, 0))
+
+    # ----------------------------
+    # Compute values for each waterbody
+    # ----------------------------
+    def compute_for_feature(feature):
+        geom = feature.geometry()
+
+        # Buffer 1 meter to avoid tiny/degenerate geometry → NULL fix
+        geom = geom.buffer(1)
+
+        # Safe max extraction
+        max_so = safe_reduce_max(stream_order_band, geom)
+        max_cm = safe_reduce_max(catchment_band, geom)
+
+        return feature.set(
+            {
+                "max_stream_order": max_so,
+                "max_catchment_area": max_cm,
+            }
+        )
+
+    return roi.map(compute_for_feature)

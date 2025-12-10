@@ -9,6 +9,7 @@ import bot_interface.auth
 import requests
 import os
 import emoji
+
 # from deep_translator import GoogleTranslator
 from utilities.auth_utils import auth_free
 
@@ -18,6 +19,7 @@ import subprocess
 from requests.exceptions import RequestException
 
 from django.conf import settings
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 
 # from pydub import AudioSegment
 # from pydub.utils import which
@@ -35,7 +37,9 @@ os.makedirs(WHATSAPP_MEDIA_PATH, exist_ok=True)
 def mark_message_as_read(bot_instance_id, message_id):
     """Mark WhatsApp message as read"""
     try:
-        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(bot_instance_id)
+        BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
+            bot_instance_id
+        )
         print("message_id : ", message_id)
         response = requests.post(
             f"{BSP_URL}messages",
@@ -44,8 +48,8 @@ def mark_message_as_read(bot_instance_id, message_id):
             json={
                 "messaging_product": "whatsapp",
                 "status": "read",
-                "message_id": message_id
-            }
+                "message_id": message_id,
+            },
         )
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
@@ -54,12 +58,39 @@ def mark_message_as_read(bot_instance_id, message_id):
         print(f"Error marking message as read: {str(e)}")
 
 
-@api_view(["POST"])
+@api_view(["POST", "GET"])
 @auth_free
 @schema(None)
 def whatsapp_webhook(request):
+
     print("Webhook start")
     print("START TIME = ", datetime.now())
+    if request.method == "GET":
+        # Example incoming:
+        # GET /whatsapp_webhook?hub.mode=subscribe&hub.challenge=964057123&hub.verify_token=hello
+        mode = request.GET.get("hub.mode")
+        challenge = request.GET.get("hub.challenge")
+        verify_token = request.GET.get("hub.verify_token")
+
+        print(
+            "Webhook verification attempt: mode=%s token=%s challenge=%s",
+            mode,
+            verify_token,
+            challenge,
+        )
+
+        if mode == "subscribe" and verify_token == "Hello Coretsack":
+            # Return challenge as plain text with 200 OK
+            return HttpResponse(challenge, content_type="text/plain", status=200)
+        else:
+            print(
+                "Webhook verification failed: mode=%s verify_token=%s expected=%s",
+                mode,
+                verify_token,
+                "Hello Corestack",
+            )
+            return HttpResponseForbidden("Verification token mismatch")
+
     webhook_params = request.GET.dict()
     # Extract JSON data from the POST body
     json_data = request.data
@@ -69,21 +100,33 @@ def whatsapp_webhook(request):
     entry = json_data.get("entry", [])
     if not entry or "changes" not in entry[0]:
         print(
-            f"Invalid webhook structure: missing 'entry' or 'changes'. Received data: {json.dumps(json_data, indent=4)}")
-        return Response({"error": "Invalid webhook structure"}, status=status.HTTP_400_BAD_REQUEST)
+            f"Invalid webhook structure: missing 'entry' or 'changes'. Received data: {json.dumps(json_data, indent=4)}"
+        )
+        return Response(
+            {"error": "Invalid webhook structure"}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     changes = entry[0]["changes"]
     if not changes or "value" not in changes[0]:
-        print(f"Invalid webhook structure: missing 'value' in 'changes'. Changes content: {changes}")
-        return Response({"error": "Invalid webhook structure"}, status=status.HTTP_400_BAD_REQUEST)
+        print(
+            f"Invalid webhook structure: missing 'value' in 'changes'. Changes content: {changes}"
+        )
+        return Response(
+            {"error": "Invalid webhook structure"}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     value = changes[0]["value"]
     metadata = value.get("metadata", {})
     msisdn = metadata.get("display_phone_number")
 
     if not msisdn:
-        print(f"Missing 'display_phone_number' in metadata: {json.dumps(metadata, indent=4)}")
-        return Response({"error": "Missing 'display_phone_number'"}, status=status.HTTP_400_BAD_REQUEST)
+        print(
+            f"Missing 'display_phone_number' in metadata: {json.dumps(metadata, indent=4)}"
+        )
+        return Response(
+            {"error": "Missing 'display_phone_number'"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     print("webhook intiated for phone number :: ", msisdn)
     json_data = json.dumps(request.data)
@@ -94,8 +137,11 @@ def whatsapp_webhook(request):
         bot = bot_interface.models.Bot.objects.get(bot_number=msisdn)
     except bot_interface.models.Bot.DoesNotExist:
         print(
-            f"No App_instance_config found for msisdn: {msisdn}. Request data: {json.dumps(request.data, indent=4)}, Webhook params: {webhook_params}")
-        return Response({"error": "App_instance_config not found"}, status=status.HTTP_404_NOT_FOUND)
+            f"No App_instance_config found for msisdn: {msisdn}. Request data: {json.dumps(request.data, indent=4)}, Webhook params: {webhook_params}"
+        )
+        return Response(
+            {"error": "App_instance_config not found"}, status=status.HTTP_404_NOT_FOUND
+        )
 
     bot_id = bot.id
     print("bot_id :: ", bot_id)
@@ -108,10 +154,12 @@ def whatsapp_webhook(request):
     #         return Response({"status": message_status}, status=status.HTTP_200_OK)
 
     # If no statuses, use messages to get message ID and mark as read
-    if 'messages' in entry[0]['changes'][0]['value']:
-        message_id = entry[0]['changes'][0]['value']['messages'][0]['id']
+    if "messages" in entry[0]["changes"][0]["value"]:
+        message_id = entry[0]["changes"][0]["value"]["messages"][0]["id"]
         if message_id in processed_message_ids:
-            return Response({"error": "Duplicate message ID"}, status=status.HTTP_200_OK)
+            return Response(
+                {"error": "Duplicate message ID"}, status=status.HTTP_200_OK
+            )
         processed_message_ids.add(message_id)
         mark_message_as_read(bot.id, message_id)
         Response({"success": True}, status=status.HTTP_200_OK)
@@ -157,17 +205,14 @@ def send_text_url(app_instance_config_id, contact_number, text):
             "recipient_type": "individual",
             "to": contact_number,
             "type": "text",
-            "text": {
-                "preview_url": True,
-                "body": text
-            }
+            "text": {"preview_url": True, "body": text},
         },
     ).json()
     return response
 
 
 def send_text(bot_instance_id, contact_number, text, bold=False):
-    """ This function sends a text message to a WhatsApp user.
+    """This function sends a text message to a WhatsApp user.
     Args:
         bot_instance_id (int): The ID of the bot instance.
         contact_number (str): The phone number of the recipient.
@@ -183,7 +228,7 @@ def send_text(bot_instance_id, contact_number, text, bold=False):
         return {"error": "Empty contact number"}
 
     # Remove any + or - characters for WhatsApp API
-    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    cleaned_number = contact_number.replace("+", "").replace("-", "").replace(" ", "")
     print(f"Cleaned contact number: {type(cleaned_number)}")
 
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
@@ -198,9 +243,7 @@ def send_text(bot_instance_id, contact_number, text, bold=False):
         "recipient_type": "individual",
         "to": cleaned_number,  # Use cleaned number
         "type": "text",
-        "text": {
-            "body": text
-        }
+        "text": {"body": text},
     }
 
     # text = emoji.emojize(text)
@@ -224,7 +267,9 @@ def send_text(bot_instance_id, contact_number, text, bold=False):
 
     try:
         response_json = response.json()
-        print(f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
+        print(
+            f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}"
+        )
     except json.JSONDecodeError:
         print(f"RESPONSE TEXT: {response.text}")
         response_json = {"error": "Invalid JSON response"}
@@ -235,7 +280,7 @@ def send_text(bot_instance_id, contact_number, text, bold=False):
         print(f"  Status: {response.status_code}")
         print(f"  Reason: {response.reason}")
         print(f"  URL: {response.url}")
-        if hasattr(response, 'request') and response.request:
+        if hasattr(response, "request") and response.request:
             print(f"  Request Headers: {dict(response.request.headers)}")
             print(f"  Request Body: {response.request.body}")
 
@@ -255,10 +300,7 @@ def send_url(app_instance_config_id, contact_number, item_url):
             "recipient_type": "individual",
             "to": contact_number,
             "type": "text",
-            "text": {
-                "preview_url": "true",
-                "body": "            " + item_url
-            }
+            "text": {"preview_url": "true", "body": "            " + item_url},
         },
     ).json()
 
@@ -279,21 +321,27 @@ def send_items(app_instance_config_id, contact_number, caption, items):
             item_response = send_url(app_instance_config_id, contact_number, item)
             print("ITEM CARD SENT RESPONSE:", item_response)
 
-            response = send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url, caption)
+            response = send_audio_with_retries(
+                app_instance_config_id, contact_number, s3_audio_url, caption
+            )
             print("ITEM AUDIO FILE SENT RESPONSE:", response, response.json())
 
         time.sleep(2.0)
     time.sleep(2.0)
 
 
-def send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url, caption, max_retries=3):
+def send_audio_with_retries(
+    app_instance_config_id, contact_number, s3_audio_url, caption, max_retries=3
+):
     """
     Helper function to send audio with retries.
     """
     count = 0
     while count <= max_retries:
         try:
-            response = send_audio_as_reply(app_instance_config_id, contact_number, s3_audio_url, caption)
+            response = send_audio_as_reply(
+                app_instance_config_id, contact_number, s3_audio_url, caption
+            )
             if response.status_code == 201:
                 return response
             print(f"RETRYING SENDING ITEM TIMES: {count}; ITEM_URL: {s3_audio_url}")
@@ -338,6 +386,7 @@ def send_audio_with_retries(app_instance_config_id, contact_number, s3_audio_url
 #             time.sleep(0.5)
 #     time.sleep(1.5)
 
+
 def send_button_msg(bot_instance_id, contact_number, text, menu_list):
     """
     This function sends a button message to a WhatsApp user.
@@ -357,7 +406,7 @@ def send_button_msg(bot_instance_id, contact_number, text, menu_list):
         return {"error": "Empty contact number"}
 
     # Remove any + or - characters for WhatsApp API
-    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    cleaned_number = contact_number.replace("+", "").replace("-", "").replace(" ", "")
     print(f"Cleaned contact number: {cleaned_number}")
 
     try:
@@ -413,10 +462,16 @@ def send_button_msg(bot_instance_id, contact_number, text, menu_list):
 
     try:
         response_json = response.json()
-        print(f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
+        print(
+            f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}"
+        )
 
         # Save context ID if successful
-        if response.status_code == 200 and "messages" in response_json and len(response_json["messages"]) > 0:
+        if (
+            response.status_code == 200
+            and "messages" in response_json
+            and len(response_json["messages"]) > 0
+        ):
             context_id = response_json["messages"][0]["id"]
             print("context id >> ", context_id)
             # TODO: Implement save_context_id_in_user_misc function
@@ -437,7 +492,7 @@ def send_button_msg(bot_instance_id, contact_number, text, menu_list):
         print(f"  Status: {response.status_code}")
         print(f"  Reason: {response.reason}")
         print(f"  URL: {response.url}")
-        if hasattr(response, 'request') and response.request:
+        if hasattr(response, "request") and response.request:
             print(f"  Request Headers: {dict(response.request.headers)}")
             print(f"  Request Body: {response.request.body}")
 
@@ -445,11 +500,11 @@ def send_button_msg(bot_instance_id, contact_number, text, menu_list):
 
 
 def send_list_msg(
-        bot_instance_id,
-        contact_number,
-        text,
-        menu_list,
-        button_label="Menu (मेनू)",
+    bot_instance_id,
+    contact_number,
+    text,
+    menu_list,
+    button_label="Menu (मेनू)",
 ):
     """
     This function sends a list message to a WhatsApp user.
@@ -471,7 +526,7 @@ def send_list_msg(
         return {"error": "Empty contact number"}
 
     # Remove any + or - characters for WhatsApp API
-    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    cleaned_number = contact_number.replace("+", "").replace("-", "").replace(" ", "")
     print(f"Cleaned contact number: {cleaned_number}")
 
     try:
@@ -560,7 +615,9 @@ def send_list_msg(
 
         try:
             response_json = response.json()
-            print(f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}")
+            print(
+                f"RESPONSE JSON: {json.dumps(response_json, indent=2, ensure_ascii=False)}"
+            )
         except json.JSONDecodeError:
             print(f"RESPONSE TEXT: {response.text}")
             response_json = {"error": "Invalid JSON response"}
@@ -572,7 +629,7 @@ def send_list_msg(
             print(f"  Status: {response.status_code}")
             print(f"  Reason: {response.reason}")
             print(f"  URL: {response.url}")
-            if hasattr(response, 'request') and response.request:
+            if hasattr(response, "request") and response.request:
                 print(f"  Request Headers: {dict(response.request.headers)}")
                 print(f"  Request Body: {response.request.body}")
             return response_json
@@ -615,7 +672,7 @@ def send_location_request(bot_instance_id, contact_number, text):
         print("ERROR: Empty contact number")
         return {"error": "Empty contact number"}
     # Remove any + or - characters for WhatsApp API
-    cleaned_number = contact_number.replace('+', '').replace('-', '').replace(' ', '')
+    cleaned_number = contact_number.replace("+", "").replace("-", "").replace(" ", "")
     print(f"Cleaned contact number: {cleaned_number}")
     print("BSP_URL:", BSP_URL)
     print("HEADERS:", HEADERS)
@@ -627,21 +684,13 @@ def send_location_request(bot_instance_id, contact_number, text):
         "type": "interactive",
         "interactive": {
             "type": "location_request_message",
-            "body": {
-                "text": text
-            },
-            "action": {
-                "name": "send_location"
-            }
-        }
+            "body": {"text": text},
+            "action": {"name": "send_location"},
+        },
     }
 
     try:
-        response = requests.post(
-            BSP_URL + "messages",
-            headers=HEADERS,
-            json=payload
-        )
+        response = requests.post(BSP_URL + "messages", headers=HEADERS, json=payload)
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"ERROR sending location request: {str(e)}")
@@ -664,11 +713,13 @@ def download_image(app_instance_config_id, mime_type, media_id):
         bot_instance_id=app_instance_config_id
     )
     filepath = WHATSAPP_MEDIA_PATH + media_id + ".jpg"
-    url = BSP_URL + media_id
+    url = BSP_URL.split("v24.0")[0] + "v24.0"+"/" +media_id
     print("url :: ", url)
     r = requests.get(url, headers=HEADERS)
     print("r :: ", r, r.json())
-    filepath, success = download_media_from_url(app_instance_config_id, media_response=r.json())
+    filepath, success = download_media_from_url(
+        app_instance_config_id, media_response=r.json()
+    )
     print("filepath :: ", filepath)
     if success:
         hdpi_path = bot_interface.utils.convert_image_hdpi(filepath)
@@ -686,17 +737,21 @@ def download_audio(app_instance_config_id, mime_type, media_id):
         )
 
         # Get media info using proper endpoint
-        media_info_url = f"{BSP_URL.rstrip('/')}/{media_id}"
+        media_info_url = BSP_URL.split("v24.0")[0] + "v24.0/"+media_id
         print(f"Getting media info from: {media_info_url}")
         r = requests.get(media_info_url, headers=HEADERS, timeout=30)
-        print(f"Media info response: {r.status_code}, {r.json() if r.status_code == 200 else r.text}")
+        print(
+            f"Media info response: {r.status_code}, {r.json() if r.status_code == 200 else r.text}"
+        )
 
         if r.status_code != 200:
             print(f"Failed to get media info: {r.status_code}")
             return r, None
 
         # Step 2: Use existing download_media_from_url function to download actual file
-        filepath, success = download_media_from_url(app_instance_config_id, media_response=r.json())
+        filepath, success = download_media_from_url(
+            app_instance_config_id, media_response=r.json()
+        )
         print(f"Audio download result - filepath: {filepath}, success: {success}")
 
         if success and filepath:
@@ -714,11 +769,11 @@ def download_audio(app_instance_config_id, mime_type, media_id):
 def is_audio_file(mime_type):
     """Check if mime type is audio"""
     AUDIO_MIME_TYPES = {
-        'audio/aac': '.aac',
-        'audio/amr': '.amr',
-        'audio/mpeg': '.mp3',
-        'audio/mp4': '.m4a',
-        'audio/ogg': '.opus'
+        "audio/aac": ".aac",
+        "audio/amr": ".amr",
+        "audio/mpeg": ".mp3",
+        "audio/mp4": ".m4a",
+        "audio/ogg": ".opus",
     }
     return mime_type in AUDIO_MIME_TYPES
 
@@ -726,20 +781,20 @@ def is_audio_file(mime_type):
 def get_audio_extension(mime_type: str) -> str:
     """Get proper file extension based on audio mime type"""
     AUDIO_EXTENSIONS = {
-        'audio/aac': '.aac',
-        'audio/amr': '.amr',
-        'audio/mpeg': '.mp3',
-        'audio/mp4': '.m4a',
-        'audio/ogg': '.ogg',
-        'audio/opus': '.opus'
+        "audio/aac": ".aac",
+        "audio/amr": ".amr",
+        "audio/mpeg": ".mp3",
+        "audio/mp4": ".m4a",
+        "audio/ogg": ".ogg",
+        "audio/opus": ".opus",
     }
-    return AUDIO_EXTENSIONS.get(mime_type, '.mp3')  # Default to .mp3
+    return AUDIO_EXTENSIONS.get(mime_type, ".mp3")  # Default to .mp3
 
 
 def convert_wav_to_mp3(input_path, bitrate="192k"):
     """
     Convert WAV to MP3 with quality checks and detailed logging.
-    
+
     Args:
         input_path: Path to input WAV file
         bitrate: Target MP3 bitrate (default: 192k for good quality)
@@ -752,25 +807,29 @@ def convert_wav_to_mp3(input_path, bitrate="192k"):
         input_size = os.path.getsize(input_path)
         print(f"Input WAV file size: {input_size / 1024:.2f} KB")
 
-        output_path = input_path.replace('.wav', '.mp3')
+        output_path = input_path.replace(".wav", ".mp3")
 
         # Direct FFmpeg conversion for better control
         command = [
-            'ffmpeg',
-            '-i', input_path,  # Input file
-            '-codec:a', 'libmp3lame',  # Use LAME MP3 encoder
-            '-q:a', '2',  # Quality setting (2 is high quality, range is 0-9)
-            '-b:a', bitrate,  # Target bitrate
-            '-ar', '48000',  # Maintain sampling rate close to original
-            '-map_metadata', '0',  # Copy metadata
-            '-y',  # Overwrite output if exists
-            output_path
+            "ffmpeg",
+            "-i",
+            input_path,  # Input file
+            "-codec:a",
+            "libmp3lame",  # Use LAME MP3 encoder
+            "-q:a",
+            "2",  # Quality setting (2 is high quality, range is 0-9)
+            "-b:a",
+            bitrate,  # Target bitrate
+            "-ar",
+            "48000",  # Maintain sampling rate close to original
+            "-map_metadata",
+            "0",  # Copy metadata
+            "-y",  # Overwrite output if exists
+            output_path,
         ]
 
         # Run conversion
-        result = subprocess.run(command,
-                                capture_output=True,
-                                text=True)
+        result = subprocess.run(command, capture_output=True, text=True)
 
         if result.returncode != 0:
             print("Conversion failed. FFmpeg output:")
@@ -796,14 +855,24 @@ def convert_ogg_to_wav(input_path):
     """Convert .ogg audio file to .mp3 using pydub and ffmpeg"""
     try:
         # output_path = input_path.replace('.ogg', '.mp3')
-        wav_path = input_path.replace('.ogg', '.wav')
+        wav_path = input_path.replace(".ogg", ".wav")
 
         ogg_to_wav_cmd = [
-            "ffmpeg", "-y", "-i", input_path, "-acodec", "pcm_s16le", "-ar", "48100", wav_path
+            "ffmpeg",
+            "-y",
+            "-i",
+            input_path,
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "48100",
+            wav_path,
         ]
 
         # Execute the first command (OGG to WAV)
-        ogg_to_wav_result = subprocess.run(ogg_to_wav_cmd, capture_output=True, text=True)
+        ogg_to_wav_result = subprocess.run(
+            ogg_to_wav_cmd, capture_output=True, text=True
+        )
         ogg_to_wav_output = ogg_to_wav_result.stdout + "\n" + ogg_to_wav_result.stderr
 
         # Execute the second command (WAV to MP3) if the first step succeeds
@@ -813,7 +882,9 @@ def convert_ogg_to_wav(input_path):
             # wav_to_mp3_output = wav_to_mp3_result.stdout + "\n" + wav_to_mp3_result.stderr
         else:
             wav_to_mp3_output = "OGG to WAV conversion failed, skipping MP3 conversion."
-        print(f"Converted audio from ogg format :{input_path} to mp3 format: {wav_to_mp3_result}")
+        print(
+            f"Converted audio from ogg format :{input_path} to mp3 format: {wav_to_mp3_result}"
+        )
         return wav_to_mp3_result
     except subprocess.CalledProcessError as e:
         print(f"Error converting audio: {str(e)}")
@@ -831,8 +902,9 @@ def download_media_from_url(app_instance_config_id, media_response):
     """
     try:
         # Extract media URL path
-        fb_url = media_response['url']
-        media_path = fb_url.replace('https://lookaside.fbsbx.com', '')
+        fb_url = media_response["url"]
+        print("fb url" + str(fb_url))
+        media_path = fb_url
 
         # Get BSP URL and headers
         BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
@@ -840,15 +912,15 @@ def download_media_from_url(app_instance_config_id, media_response):
         )
 
         # Construct download URL
-        download_url = f"{BSP_URL.rstrip('/')}{media_path}"
+        download_url = f"{media_path}"
 
         # Determine file extension from mime_type
-        mime_type = media_response['mime_type']
-        extension = mime_type.split('/')[-1]
+        mime_type = media_response["mime_type"]
+        extension = mime_type.split("/")[-1]
         print("media_response :: ", media_response, mime_type)
 
         # Create filepath
-        media_id = media_response['id']
+        media_id = media_response["id"]
         print("media_id :: ", media_id)
         print("extension :: ", extension)
         print("WHATSAPP_MEDIA_PATH :: ", WHATSAPP_MEDIA_PATH)

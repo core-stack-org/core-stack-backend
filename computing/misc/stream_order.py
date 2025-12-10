@@ -57,7 +57,7 @@ def generate_stream_order(
             + valid_gee_text(proj_obj.name)
             + "_"
             + valid_gee_text(str(proj_id))
-        )
+        ).lower()
 
         roi = ee.FeatureCollection(roi_path)
         asset_id_raster = (
@@ -74,20 +74,21 @@ def generate_stream_order(
     # Generate raster Layer
     stream_order_raster_generation(
         raster,
-        state=None,
-        district=None,
-        block=None,
+        state,
+        district,
+        block,
         description=description,
         roi=roi,
         raster_asset_id=asset_id_raster,
+        proj_id = proj_obj.id
     )
 
 
 def stream_order_raster_generation(
     raster,
-    state=None,
-    district=None,
-    block=None,
+    state,
+    district,
+    block,
     description=None,
     roi=None,
     raster_asset_id=None,
@@ -123,11 +124,11 @@ def stream_order_raster_generation(
                 asset_id=raster_asset_id,
                 dataset_name="Stream Order",
             )
-            workspace_name = ("stream_order",)
+            workspace_name = "stream_order"
 
         else:
             proj_obj = Project.objects.get(pk=proj_id)
-            workspace_name = proj_obj.app_type
+            workspace_name = "stream_order"
         make_asset_public(raster_asset_id)
         res = sync_raster_gcs_to_geoserver(
             workspace_name,

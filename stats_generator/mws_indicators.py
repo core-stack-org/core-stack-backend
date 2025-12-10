@@ -9,6 +9,7 @@ from .utils import get_url
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
+from .models import LayerInfo
 
 
 def create_geojson_for_all_mws(existing_geojson_path, df, new_geojson_path):
@@ -451,10 +452,19 @@ def generate_mws_data_for_kyl_filters(
 
                 #########  drought_category  ##############
                 try:
+
+                    layers = LayerInfo.objects.get(
+                        layer_type="vector", workspace="drought"
+                    )
+                    years = [
+                        str(year)
+                        for year in range(layers.start_year, layers.end_year + 1)
+                    ]
+
                     df_crpDrought_mws_data = sheets["croppingDrought_kharif"][
                         sheets["croppingDrought_kharif"]["UID"] == specific_mws_id
                     ]
-                    years = ["2017", "2018", "2019", "2020", "2021", "2022"]
+
                     sum_moderate_severe = {
                         year: (
                             1
@@ -685,6 +695,8 @@ def generate_mws_data_for_kyl_filters(
                     2: "Critical",
                     3: "Over Exploited",
                     4: "Saline",
+                    5: "Hilly Area",
+                    6: "Not Assessed",
                 }
 
                 class_to_id = {v: k for k, v in Soge_class.items()}
@@ -712,7 +724,7 @@ def generate_mws_data_for_kyl_filters(
                     else:
                         lcw_conflict = 1
                 except Exception as e:
-                    lcw_conflict = -1
+                    lcw_conflict = 0
 
                 ################## mining  ######################
                 ## if count is 0 then Areas with no mining else Areas with mining
@@ -725,7 +737,7 @@ def generate_mws_data_for_kyl_filters(
                     else:
                         mining = 1
                 except Exception as e:
-                    mining = -1
+                    mining = 0
 
                 ################## green credit  ######################
                 ## if count is 0 then Areas with no green credit else Areas with green credit
@@ -738,7 +750,7 @@ def generate_mws_data_for_kyl_filters(
                     else:
                         green_credit = 1
                 except Exception as e:
-                    green_credit = -1
+                    green_credit = 0
 
                 ################## factory csr  ######################
                 ## if count is 0 then Areas with no factory else Areas with factory
@@ -751,7 +763,7 @@ def generate_mws_data_for_kyl_filters(
                     else:
                         factory_csr = 1
                 except Exception as e:
-                    factory_csr = -1
+                    factory_csr = 0
 
                 results.append(
                     {

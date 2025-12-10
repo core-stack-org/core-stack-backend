@@ -133,7 +133,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_crop_inten(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-            elif workspace == "cropping_drought":
+            elif workspace == "drought":
                 create_excel_crop_drou(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
@@ -1809,7 +1809,14 @@ def generate_stats_excel_file(state, district, block):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        get_vector_layer_geoserver(state, district, block)
+            from .mws_indicators import generate_mws_data_for_kyl_filters
+            from .village_indicators import get_generate_filter_data_village
+            from public_api.views import get_tehsil_json
+
+            get_vector_layer_geoserver(state, district, block)
+            get_tehsil_json(state, district, block, 1)
+            generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
+            get_generate_filter_data_village(state, district, block, 1)
 
         if not os.path.exists(file_path):
             return Response(
@@ -1839,7 +1846,19 @@ def generate_stats_excel_file(state, district, block):
 def add_sheets_to_excel(state, district, block, sheets):
     try:
         sheets_to_add = [sheet.strip() for sheet in sheets.split(",") if sheet.strip()]
-        results = get_vector_layer_geoserver(state, district, block, sheets_to_add)
+        results = []
+
+        for sheet in sheets_to_add:
+            r = get_vector_layer_geoserver(state, district, block, sheet)
+            results.append(r)
+
+        from .mws_indicators import generate_mws_data_for_kyl_filters
+        from .village_indicators import get_generate_filter_data_village
+        from public_api.views import get_tehsil_json
+
+        get_tehsil_json(state, district, block, 1)
+        generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
+        get_generate_filter_data_village(state, district, block, 1)
 
         successful = [r for r in results if r["status"] == "success"]
         failed = [r for r in results if r["status"] == "failed"]

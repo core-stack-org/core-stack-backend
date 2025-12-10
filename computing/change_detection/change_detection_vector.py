@@ -14,11 +14,14 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
+
 # from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
-def vectorise_change_detection(self, state, district, block, gee_account_id):
+def vectorise_change_detection(
+    self, state, district, block, start_year, end_year, gee_account_id
+):
     ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -30,11 +33,11 @@ def vectorise_change_detection(self, state, district, block, gee_account_id):
     )
 
     task_list = [
-        afforestation_vector(roi, state, district, block),
-        deforestation_vector(roi, state, district, block),
-        degradation_vector(roi, state, district, block),
-        urbanization_vector(roi, state, district, block),
-        crop_intensity_vector(roi, state, district, block),
+        afforestation_vector(roi, state, district, block, start_year, end_year),
+        deforestation_vector(roi, state, district, block, start_year, end_year),
+        degradation_vector(roi, state, district, block, start_year, end_year),
+        urbanization_vector(roi, state, district, block, start_year, end_year),
+        crop_intensity_vector(roi, state, district, block, start_year, end_year),
     ]
 
     print(task_list)
@@ -50,14 +53,7 @@ def vectorise_change_detection(self, state, district, block, gee_account_id):
     ]
     layer_at_geoserver = False
     for param in param_list:
-        description = (
-                "change_vector_"
-                + valid_gee_text(district)
-                + "_"
-                + valid_gee_text(block)
-                + "_"
-                + param
-        )
+        description = f"change_vector_{valid_gee_text(district)}_{valid_gee_text(block)}_{param}_{start_year}_{end_year}"
         asset_id = get_gee_asset_path(state, district, block) + description
         if is_gee_asset_exists(asset_id):
             layer_id = save_layer_info_to_db(
@@ -76,7 +72,7 @@ def vectorise_change_detection(self, state, district, block, gee_account_id):
     return layer_at_geoserver
 
 
-def afforestation_vector(roi, state, district, block):
+def afforestation_vector(roi, state, district, block, start_year, end_year):
     args = [
         {"value": 1, "label": "fo_fo"},
         {"value": 2, "label": "bu_fo"},
@@ -86,10 +82,12 @@ def afforestation_vector(roi, state, district, block):
         {"value": [2, 3, 4, 5], "label": "total_aff"},
     ]  # Classes in afforestation raster layer
 
-    return generate_vector(roi, args, state, district, block, "Afforestation")
+    return generate_vector(
+        roi, args, state, district, block, "Afforestation", start_year, end_year
+    )
 
 
-def deforestation_vector(roi, state, district, block):
+def deforestation_vector(roi, state, district, block, start_year, end_year):
     args = [
         {"value": 1, "label": "fo_fo"},
         {"value": 2, "label": "fo_bu"},
@@ -99,10 +97,12 @@ def deforestation_vector(roi, state, district, block):
         {"value": [2, 3, 4, 5], "label": "total_def"},
     ]  # Classes in deforestation raster layer
 
-    return generate_vector(roi, args, state, district, block, "Deforestation")
+    return generate_vector(
+        roi, args, state, district, block, "Deforestation", start_year, end_year
+    )
 
 
-def degradation_vector(roi, state, district, block):
+def degradation_vector(roi, state, district, block, start_year, end_year):
 
     args = [
         {"value": 1, "label": "f_f"},
@@ -112,10 +112,12 @@ def degradation_vector(roi, state, district, block):
         {"value": [2, 3, 4], "label": "total_deg"},
     ]  # Classes in degradation raster layer
 
-    return generate_vector(roi, args, state, district, block, "Degradation")
+    return generate_vector(
+        roi, args, state, district, block, "Degradation", start_year, end_year
+    )
 
 
-def urbanization_vector(roi, state, district, block):
+def urbanization_vector(roi, state, district, block, start_year, end_year):
     args = [
         {"value": 1, "label": "bu_bu"},
         {"value": 2, "label": "w_bu"},
@@ -124,10 +126,12 @@ def urbanization_vector(roi, state, district, block):
         {"value": [2, 3, 4], "label": "total_urb"},
     ]  # Classes in urbanization raster layer
 
-    return generate_vector(roi, args, state, district, block, "Urbanization")
+    return generate_vector(
+        roi, args, state, district, block, "Urbanization", start_year, end_year
+    )
 
 
-def crop_intensity_vector(roi, state, district, block):
+def crop_intensity_vector(roi, state, district, block, start_year, end_year):
 
     args = [
         {"value": 1, "label": "do_si"},
@@ -140,18 +144,17 @@ def crop_intensity_vector(roi, state, district, block):
         {"value": [1, 2, 3, 4, 5, 6], "label": "total_change"},
     ]  # Classes in crop_intensity raster layer
 
-    return generate_vector(roi, args, state, district, block, "CropIntensity")
+    return generate_vector(
+        roi, args, state, district, block, "CropIntensity", start_year, end_year
+    )
 
 
-def generate_vector(roi, args, state, district, block, layer_name):
+def generate_vector(
+    roi, args, state, district, block, layer_name, start_year, end_year
+):
     raster = ee.Image(
         get_gee_asset_path(state, district, block)
-        + "change_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_"
-        + layer_name
+        + f"change_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{layer_name}_{start_year}_{end_year}"
     )  # Change detection raster layer
 
     fc = roi
@@ -191,14 +194,7 @@ def generate_vector(roi, args, state, district, block, layer_name):
 
     fc = ee.FeatureCollection(fc)
 
-    description = (
-        "change_vector_"
-        + valid_gee_text(district)
-        + "_"
-        + valid_gee_text(block)
-        + "_"
-        + layer_name
-    )
+    description = f"change_vector_{valid_gee_text(district)}_{valid_gee_text(block)}_{layer_name}_{start_year}_{end_year}"
     task = export_vector_asset_to_gee(
         fc, description, get_gee_asset_path(state, district, block) + description
     )

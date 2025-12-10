@@ -874,7 +874,7 @@ def get_osm_data(state, district, block, uid):
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
+            parameter_block = f"The Tehsil {block} having total area {total_area:,} hectares" + parameter_block + "."
 
         if parameter_mws == "":
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
@@ -1088,7 +1088,7 @@ def get_terrain_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block", district, block, e
+            "Not able to access excel for %s district, %s block", district, block
         )
         return "", [], [], "", "", [], [], [], []
 
@@ -1204,7 +1204,6 @@ def get_change_detection_data(state, district, block, uid):
             "Not able to access excel for %s district, %s block for degradation",
             district,
             block,
-            e,
         )
         return "", "", "", ""
 
@@ -1231,7 +1230,6 @@ def get_land_conflict_industrial_data(state, district, block, uid):
             "Not able to access excel for %s district, %s block for Land Conflict",
             district,
             block,
-            e,
         )
         return []
 
@@ -1267,10 +1265,9 @@ def get_factory_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for Factory Data: %s",
+            "Not able to access excel for %s district, %s block for Factory Data",
             district,
             block,
-            e,
         )
         return []
 
@@ -1302,10 +1299,9 @@ def get_mining_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for Mining Data: %s",
+            "Not able to access excel for %s district, %s block for Mining Data",
             district,
             block,
-            e,
         )
         return []
 
@@ -1342,10 +1338,9 @@ def get_green_credit_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for Green Credit Data: %s",
+            "Not able to access excel for %s district, %s block for Green Credit Data",
             district,
             block,
-            e,
         )
         return []
 
@@ -1668,7 +1663,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric, errors="coerce")
             df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric, errors="coerce")
 
-
             #? Trend Calculation
             filtered_df_kh = df.loc[df["UID"] == uid, selected_columns_kh].values[0]
 
@@ -1697,7 +1691,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     else:
                         non_drought_year.append(match_exp.group(0))
             
-
             if len(drought_years):
                 
                 total_area_d = 0
@@ -1705,22 +1698,28 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                 for year in drought_years:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-                    total_area_d += yearly_area[0]
+                    if selected_column_temp:
+                        yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area) > 0 and len(yearly_area[0]) > 0:
+                            total_area_d += yearly_area[0][0]
 
 
                 for year in non_drought_year:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-                    total_area_nd += yearly_area[0]
+                    if selected_column_temp:
+                        yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area) > 0 and len(yearly_area[0]) > 0:
+                            total_area_nd += yearly_area[0][0]
                 
                 percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
+
 
                 if result.trend == "increasing":
                     parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
                     
                 else:
                     parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
+
 
             #? Non-Drought Years SWB
             if len(non_drought_year):
@@ -1730,13 +1729,17 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                 for year in non_drought_year:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-
                     selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
-                    yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values[0]
-
-                    area_under_rb_nd += yearly_area_rb[0]
-                    area_under_kh_nd += yearly_area_kh[0]
+                    
+                    if selected_column_temp:
+                        yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area_kh) > 0 and len(yearly_area_kh[0]) > 0:
+                            area_under_kh_nd += yearly_area_kh[0][0]
+                    
+                    if selected_column_temp_rb:
+                        yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values
+                        if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
+                            area_under_rb_nd += yearly_area_rb[0][0]
 
                 if area_under_kh_nd:
                     percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd ) * 100
@@ -1755,13 +1758,17 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                 for year in drought_years:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-
                     selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
-                    yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values[0]
-
-                    area_under_rb += yearly_area_rb[0]
-                    area_under_kh += yearly_area_kh[0]
+                    
+                    if selected_column_temp:
+                        yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area_kh) > 0 and len(yearly_area_kh[0]) > 0:
+                            area_under_kh += yearly_area_kh[0][0]
+                    
+                    if selected_column_temp_rb:
+                        yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values
+                        if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
+                            area_under_rb += yearly_area_rb[0][0]
                 
                 if area_under_kh_nd:
                     percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh ) * 100
@@ -1786,9 +1793,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             filtered_df_rabi = (df.loc[df["UID"] == uid, selected_columns_rabi].values[0].tolist())
             filtered_df_zaid = (df.loc[df["UID"] == uid, selected_columns_zaid].values[0].tolist())
 
-            #filtered_df_kharif = [abs(kharif - rabi) for kharif, rabi in zip(filtered_df_kharif, filtered_df_rabi)]
-            #filtered_df_rabi = [abs(rabi - zaid) for rabi, zaid in zip(filtered_df_rabi, filtered_df_zaid)]
-
         else:
             parameter_swb_1 += (
                 f"No surface water bodies were detected through remote sensing in this micro-watershed."
@@ -1805,7 +1809,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         )
 
     except Exception as e:
-        logger.info("Not able to access excel for %s district, %s block for Waterbodies",district,block)
+        print(e)
+        logger.info("Not able to access excel for %s state, %s district, %s block for Waterbodies",state.upper(),district.upper(),block.upper())
         return "", "", "", [], [], [], []
 
 
@@ -2553,6 +2558,5 @@ def get_village_data(state, district, block, uid):
             "Error accessing excel for %s district, %s block: %s",
             district,
             block,
-            str(e)
         )
         return [], [], [], [], [], [], [], [], [], [], []
