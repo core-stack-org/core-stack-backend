@@ -26,7 +26,7 @@ def get_ndvi_for_zoi(
 
     if not proj_id:
         description_zoi = (
-            "cropping_intensity_zoi_" + asset_suffix + "_" + str(start_year)
+            "cropping_intensity_zoi_" + asset_suffix 
         )
         asset_id_zoi = (
             get_gee_dir_path(
@@ -37,7 +37,7 @@ def get_ndvi_for_zoi(
     else:
 
         description_zoi = (
-            "cropping_intensity_zoi_" + asset_suffix + "_" + str(start_year)
+            "cropping_intensity_zoi_" + asset_suffix 
         )
         asset_id_zoi = (
             get_gee_dir_path(
