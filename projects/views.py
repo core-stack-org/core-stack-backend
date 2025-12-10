@@ -22,10 +22,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.is_superadmin or user.is_superuser:
-            return Project.objects.all()
+            return Project.objects.filter(enabled=True)
 
         if user.organization:
-            return Project.objects.filter(organization=user.organization)
+            return Project.objects.filter(organization=user.organization, enabled=True)
 
         return Project.objects.none()
 
