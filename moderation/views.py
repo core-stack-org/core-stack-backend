@@ -1,46 +1,11 @@
 from django.shortcuts import render
-from dpr.models import *
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.forms.models import model_to_dict
 import requests
 from django.http import JsonResponse
-from plans.utils import fetch_bearer_token
-from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 import requests
-from utilities.constants import ODK_BASE_URL
 from moderation.utils.get_submissions import ODKSubmissionsChecker
 from moderation.utils.update_csdb import *
-
-
-def delete_odk_submission(form_id, submission_uuid, project_id):
-    token = fetch_bearer_token(ODK_USERNAME, ODK_PASSWORD)
-    url = f"{ODK_BASE_URL}{project_id}/forms/{form_id}/submissions/{submission_uuid}"
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-    response = requests.delete(url, headers=headers)
-    model_form_id = {"Add_Settlements_form%20_V1.0.1": ODK_settlement}
-    try:
-        data = response.json()
-        if data.get("success") is True:
-            print("Submission deleted successfully")
-            sub_delete = (
-                model_form_id[form_id].objects.filter(uuid=submission_uuid).delete()
-            )
-            if sub_delete:
-                print(f"dleted from models as well {sub_delete}")
-            else:
-                print("object not found")
-            # return True
-        else:
-            print("Failed to delete submission:", data)
-            return False
-    except:
-        print(
-            f"Unexpected response | status={response.status_code} | text={response.text}"
-        )
-        return False
-
-
-# from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 
 
 def paginate_queryset(queryset, page=1, per_page=10):
@@ -62,20 +27,6 @@ def paginate_queryset(queryset, page=1, per_page=10):
         "data": data,
     }
 
-
-FORM_ID_MAP = {
-    "ODK_settlement": "Add_Settlements_form%20_V1.0.1",
-    "ODK_well": "Add_well_form_V1.0.1",
-    "ODK_waterbody": "Add_Waterbodies_Form_V1.0.3",
-    "ODK_groundwater": "Groundwater_Form%20_V1.0.0",
-    "ODK_agri": "NRM_form_Agri_Screen_V1.0.0",
-    "ODK_livelihood": "NRM%20Livelihood%20Form",
-    "ODK_crop": "crop_form_V1.0.0",
-    "Agri_maintenance": "Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1",
-    "GW_maintenance": "GW_Maintenance_Form",
-    "SWB_maintenance": "SWB_Maintenance_Form",
-    "SWB_RS_maintenance": "SWB_RS_Maintenance_Form",
-}
 
 class SubmissionsOfPlan:
 
@@ -163,4 +114,3 @@ def sync_updated_submissions():
             else:
                 print("passed wrong form name")
     return JsonResponse({"status": "Sync complete", "result": res})
-

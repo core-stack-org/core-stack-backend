@@ -1,3 +1,5 @@
+from dpr.models import *
+
 corestack = {
     "Settlement Form": "Add_Settlements_form%20_V1.0.1",
     "Well Form": "Add_well_form_V1.0.1",
@@ -13,4 +15,18 @@ corestack = {
     "new irrigation form": "NRM_form_Agri_Screen_V1.0.0",
     "new recharge structure form": "NRM_form_propose_new_recharge_structure_V1.0.0",
     "water body analysis feedback form": "rm_waterbody_analysis_feedback_form_V1.0.0",
+}
+
+model_map = {
+    "settlement": ODK_settlement,
+    "well": ODK_well,
+    "waterbody": ODK_waterbody,
+    "groundwater": ODK_groundwater,
+    "agri": ODK_agri,
+    "livelihood": ODK_livelihood,
+    "crop": ODK_crop,
+    "agri-maint": Agri_maintenance,
+    "gw-maint": GW_maintenance,
+    "swb-maint": SWB_maintenance,
+    "swb-rs-maint": SWB_RS_maintenance,
 }

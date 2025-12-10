@@ -5,9 +5,10 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 import requests
 from rest_framework import status
+from .utils.form_mapping import model_map
 
 
-@require_GET
+@api_view(["GET"])
 def get_paginated_submissions(request, form, plan_id):
     page = request.GET.get("page", 1)
 
@@ -32,7 +33,7 @@ def get_paginated_submissions(request, form, plan_id):
     return JsonResponse(result, safe=False)
 
 
-
+@api_view(["GET"])
 def get_form_names(request):
     form_names = [
         {"name": "settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
@@ -54,19 +55,6 @@ def get_form_names(request):
         },
     ]
     return JsonResponse({"forms": form_names})
-
-
-MODEL_FORM_MAP = {
-    "Add_Settlements_form%20_V1.0.1": ODK_settlement,
-    "Add_well_form_V1.0.1": ODK_well,
-}
-
-model_map = {
-    "settlement": ODK_settlement,
-    "well": ODK_well,
-    "waterbody": ODK_waterbody,
-    "groundwater": ODK_groundwater,
-}
 
 
 @api_view(["PUT"])
