@@ -1,5 +1,4 @@
 import requests
-from requests.auth import HTTPBasicAuth
 from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from .utils import *
 from .get_submissions import get_edited_updated_all_submissions

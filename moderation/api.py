@@ -1,22 +1,14 @@
 from .views import *
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import *
-from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 import requests
 from rest_framework import status
-from rest_framework.permissions import AllowAny
 
 
 @require_GET
 def get_paginated_submissions(request, form, plan_id):
-    """
-    API: /api/submissions/<form>/<plan_id>/?page=1
-    Returns paginated submissions + edit URLs
-    """
-
     page = request.GET.get("page", 1)
 
     mapping = {
@@ -40,25 +32,8 @@ def get_paginated_submissions(request, form, plan_id):
     return JsonResponse(result, safe=False)
 
 
-# def get_form_names(request):
-#     form_names = [
-#         "settlement",
-#         "well",
-#         "waterbody",
-#         "groundwater",
-#         "agri",
-#         "livelihood",
-#         "crop",
-#         "agri-maint",
-#         "gw-maint",
-#         "swb-maint",
-#         "swb-rs-maint",
-#     ]
-#     return JsonResponse({"forms": form_names})
-
 
 def get_form_names(request):
-    # Map friendly names to actual ODK form IDs
     form_names = [
         {"name": "settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
         {"name": "well", "form_id": "Add_Wells_form%20_V1.0.1"},
@@ -86,50 +61,40 @@ MODEL_FORM_MAP = {
     "Add_well_form_V1.0.1": ODK_well,
 }
 
+model_map = {
+    "settlement": ODK_settlement,
+    "well": ODK_well,
+    "waterbody": ODK_waterbody,
+    "groundwater": ODK_groundwater,
+}
 
-@api_view(["DELETE"])
-@permission_classes([AllowAny])
-def delete_odk_submission(request, project_id, form_id, submission_uuid):
-    """
-    1. Get token
-    2. Delete from ODK
-    3. If success -> delete from DB
-    """
-    token = fetch_bearer_token(ODK_USERNAME, ODK_PASSWORD)
 
-    if not token:
-        return Response({"success": False, "message": "ODK Auth Failed"}, status=401)
-
-    odk_url = (
-        f"{ODK_BASE_URL}{project_id}/forms/{form_id}/submissions/{submission_uuid}"
-    )
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-
-    r = requests.delete(odk_url, headers=headers)
+@api_view(["PUT"])
+def update_submission(request, form_name, uuid):
+    Model = model_map.get(form_name)
+    if not Model:
+        return Response({"success": False, "message": "Invalid form"}, status=400)
 
     try:
-        data = r.json()
+        obj = Model.objects.get(uuid=uuid)
+    except Model.DoesNotExist:
+        return Response({"success": False, "message": "Not found"}, status=404)
 
-        if data.get("success") is True:
+    for field, value in request.data.items():
+        setattr(obj, field, value)
 
-            # qs = MODEL_FORM_MAP[form_id].objects.filter(uuid=submission_uuid)
+    obj.save()
+    return Response({"success": True})
 
-            # if qs.exists():
-            #     deleted_count = qs.delete()
-            #     print(f"Deleted from DB: {deleted_count}")
-            #     return Response({"success": True, "message": "Deleted from ODK + DB"})
-            # else:
-            #     print("UUID not found in DB")
-            return Response(
-                {
-                    "success": True,
-                    "message": "Deleted from ODK but record not found in DB",
-                }
-            )
 
-        return Response({"success": False, "message": data}, status=400)
+@api_view(["DELETE"])
+def delete_submission(request, form_name, uuid):
+    Model = model_map.get(form_name)
+    if not Model:
+        return Response({"success": False, "message": "Invalid form"}, status=400)
 
-    except:
-        return Response(
-            {"success": False, "message": "Unexpected ODK response"}, status=500
-        )
+    try:
+        Model.objects.get(uuid=uuid).delete()
+        return Response({"success": True})
+    except Model.DoesNotExist:
+        return Response({"success": False, "message": "Not found"}, status=404)

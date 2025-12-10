@@ -33,7 +33,6 @@ def form_submissions_edited_updated_url(form_id, filter_query):
 
     """
     project_id = 2
-    base_url = "https://odk.core-stack.org"
     url = f"{ODK_BASE_URL}{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
     return url
 

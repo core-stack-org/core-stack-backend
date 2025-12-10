@@ -1,5 +1,10 @@
 from django.urls import path
-from .api import get_paginated_submissions, get_form_names, delete_odk_submission
+from .api import (
+    get_paginated_submissions,
+    get_form_names,
+    update_submission,
+    delete_submission,
+)
 
 urlpatterns = [
     path(
@@ -8,9 +13,6 @@ urlpatterns = [
         name="get_paginated_submissions",
     ),
     path("forms/", get_form_names),
-    # urls.py
-    path(
-        "delete/<int:project_id>/<str:form_id>/<str:submission_uuid>/",
-        delete_odk_submission,
-    ),
+    path("submissions/<str:form_name>/<path:uuid>/modify/", update_submission),
+    path("submissions/<str:form_name>/<path:uuid>/delete/", delete_submission),
 ]
