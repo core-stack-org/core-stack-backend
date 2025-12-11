@@ -77,6 +77,17 @@ def tree_health_ccd_raster(
                 ccd_raster = ee.ImageCollection(CCD_RASTER + str(year))
             raster = ccd_raster.filterBounds(roi.geometry()).mean().clip(roi.geometry())
 
+            lulc = ee.Image(
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
+                )
+                + f"{asset_suffix}_{year}-07-01_{year + 1}-06-30_LULCmap_10m"
+            )
+
+            # Apply tree mask to the raster; Tree: class 6
+            tree_mask = lulc.eq(6)
+            raster = raster.updateMask(tree_mask)
+
             task_id = export_raster_asset_to_gee(
                 image=raster,
                 description=description,
