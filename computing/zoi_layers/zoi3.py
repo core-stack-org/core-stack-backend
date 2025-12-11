@@ -46,7 +46,7 @@ def get_ndvi_for_zoi(
             + description_zoi
         )
 
-    description_ndvi = "zoi_ndvi_" + asset_suffix
+    description_ndvi = "ndvi_" + asset_suffix
     ndvi_asset_path = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
