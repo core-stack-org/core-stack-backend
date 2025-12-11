@@ -204,11 +204,18 @@ def Upload_Desilting_Points(
         )
         + asset_suffix_swb4
     )
-    Genereate_zoi_and_zoi_indicator(
-        asset_suffix_swb4, proj_obj.id, gee_account_id=gee_project_id
-    )
     BuildMWSLayer(
         gee_account_id=gee_project_id, proj_id=proj_obj.id, app_type="WATERBODY"
+    )
+    asset_suffix_wb = f"waterbodies_{asset_suffix}".lower()
+    asset_id_wb = (
+        get_gee_dir_path(
+            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
+        )
+        + asset_suffix_wb
+    )
+    Genereate_zoi_and_zoi_indicator(
+       roi = asset_id_wb, proj_id = proj_obj.id, gee_account_id=gee_project_id, asset_suffix = asset_suffix, asset_folder = asset_folder
     )
 
 
@@ -292,8 +299,8 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         app_type="WATERBODY",
         start_date="2017-06-30",
         end_date="2024-07-1",
-        is_annual=False,
-        gee_account_id=gee_account_id,
+        is_annual=False
+      
     )
     make_asset_public(asset_id_prec)
 
@@ -305,6 +312,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         start_year=2017,
         end_year=2022,
         gee_account_id=gee_account_id,
+        state = proj_obj.state_soi.state_name
     )
     dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
     draught_asset_id = (
@@ -322,20 +330,22 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_suffix=asset_suffix,
         asset_folder=asset_folder,
     )
+
     generate_terrain_raster_clip(
         asset_suffix=asset_suffix,
-        asset_folder_list=[proj_obj.name],
+        asset_folder=[proj_obj.name],
         app_type="WATERBODY",
-        roi_path=mws_asset_id,
+        roi=mws_asset_id,
         gee_account_id=gee_account_id,
     )
 
 
 @shared_task()
 def Genereate_zoi_and_zoi_indicator(
-    state=None, district=None, block=None, proj_id=None, ee_project=None, app_type=None, asset_suffix = None, asset_folder = None
+    state=None, district=None, block=None, proj_id=None, gee_project_id=None, app_type=None, asset_suffix = None, asset_folder = None, roi = None
 ):
-    ee_initialize(ee_project)
+    print (f"roi: {roi}")
+    ee_initialize(gee_project_id)
     if proj_id:
         proj_obj = Project.objects.get(pk=proj_id)
         asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
@@ -345,11 +355,11 @@ def Genereate_zoi_and_zoi_indicator(
         state=None,
         district=None,
         block=None,
-        roi=None,
+        roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type=app_type,
-        gee_account_id=ee_project,
+        gee_account_id=gee_project_id,
         proj_id=proj_id,
     )
 
@@ -523,7 +533,7 @@ def BuildMWSLayer(
             draught_asset_id = drought_asset_override
         else:
             start_y, end_y = export_year_range
-            dst_filename = f"drought_{asset_suffix}_{start_y}_{end_y}"
+            dst_filename = f"drought_{asset_suffix}"
             draught_asset_id = (
                 get_gee_dir_path(
                     asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
