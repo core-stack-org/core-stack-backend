@@ -129,17 +129,6 @@ def ch_vector(roi, year, asset_folder_list, asset_suffix, app_type):
         + f"ch_raster_{asset_suffix}_{year}"
     )
 
-    lulc = ee.Image(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
-        )
-        + f"{asset_suffix}_{year}-07-01_{year+1}-06-30_LULCmap_10m"
-    )
-
-    # Apply tree mask to the raster; Tree: class 6
-    tree_mask = lulc.eq(6)
-    raster = raster.updateMask(tree_mask)
-
     fc = roi
     for arg in args:
         raster_ch = raster.select(["ch_class"])
