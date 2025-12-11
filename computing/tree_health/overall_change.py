@@ -73,6 +73,8 @@ def tree_health_overall_change_raster(
             .clip(roi.geometry())
         )
 
+        raster = mask_raster(app_type, asset_folder_list, asset_suffix, raster)
+
         task_id = export_raster_asset_to_gee(
             image=raster,
             description=description,
@@ -120,3 +122,52 @@ def tree_health_overall_change_raster(
         #         sync_to_geoserver=layer_at_geoserver,
         #     )
     return layer_at_geoserver
+
+
+def mask_raster(app_type, asset_folder_list, asset_suffix, raster):
+    deforestation = ee.Image(
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + f"change_{asset_suffix}_Deforestation"
+    )
+    afforestation = ee.Image(
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + f"change_{asset_suffix}_Afforestation"
+    )
+
+    # Ignore Deforestation (-2) and Afforestation (2) pixels
+    ignore_mask = raster.neq(-2).And(raster.neq(2))
+    raster = raster.updateMask(ignore_mask)
+
+    # Apply no change mask to the raster
+    no_change_mask = afforestation.eq(1)
+    raster = raster.updateMask(no_change_mask)
+
+    # Join Degradation and Afforestation (to cover for tree cover gain/loss)
+    defr_mask = (
+        deforestation.eq(2)
+        .Or(deforestation.eq(3))
+        .Or(deforestation.eq(4))
+        .Or(deforestation.eq(5))
+    )
+    aff_mask = (
+        afforestation.eq(2)
+        .Or(afforestation.eq(3))
+        .Or(afforestation.eq(4))
+        .Or(afforestation.eq(5))
+    )
+    # Apply the IndiaSAT LULC change pixel values into the raster
+    # Deforestation pixels: write values from degradation
+    BACKGROUND = -9999
+    raster = raster.unmask(BACKGROUND)
+    raster = raster.where(defr_mask, -2)
+
+    # Afforestation pixels: write values from afforestation
+    raster = raster.where(aff_mask, 2)
+
+    raster = raster.updateMask(raster.neq(BACKGROUND))
+
+    return raster

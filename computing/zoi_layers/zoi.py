@@ -39,6 +39,7 @@ def generate_zoi(
         asset_folder_list,
         app_type,
         gee_account_id,
+        proj_obj.id
     )
 
     generate_zoi_ci(
@@ -49,15 +50,18 @@ def generate_zoi(
         asset_folder_list,
         app_type,
         gee_account_id,
+        proj_obj.id
     )
 
-    get_ndvi_for_zoi(
-        state=state,
-        district=district,
-        block=block,
-        asset_suffix=asset_suffix,
-        asset_folder_list=asset_folder_list,
-        app_type=app_type,
-        gee_account_id=gee_account_id,
-        proj_id=proj_id,
-    )
+    if proj_id:
+
+        get_ndvi_for_zoi(
+            state=state,
+            district=district,
+            block=block,
+             asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+             gee_account_id=gee_account_id,
+            proj_id=proj_id,
+        )

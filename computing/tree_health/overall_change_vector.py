@@ -96,8 +96,6 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
         + f"overall_change_raster_{asset_suffix}"
     )
 
-    raster = mask_raster(app_type, asset_folder_list, asset_suffix, raster)
-
     fc = roi
     for arg in args:
         raster = raster.select(["constant"])
@@ -144,44 +142,3 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
     )
     task_id = export_vector_asset_to_gee(fc, description, asset_id)
     return asset_id, task_id
-
-
-def mask_raster(app_type, asset_folder_list, asset_suffix, raster):
-    degradation = ee.Image(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + f"change_{asset_suffix}_Degradation"
-    )
-    afforestation = ee.Image(
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + f"change_{asset_suffix}_Afforestation"
-    )
-
-    # Ignore Deforestation (-2) and Afforestation (2) pixels
-    ignore_mask = raster.neq(-2).And(raster.neq(2))
-    raster = raster.updateMask(ignore_mask)
-
-    # Apply no change mask to the raster
-    no_change_mask = afforestation.eq(1)
-    raster = raster.updateMask(no_change_mask)
-
-    # Join Degradation and Afforestation (to cover for tree cover gain/loss)
-    degr_mask = degradation.eq(2).Or(degradation.eq(3)).Or(degradation.eq(4))
-    aff_mask = (
-        afforestation.eq(2)
-        .Or(afforestation.eq(3))
-        .Or(afforestation.eq(4))
-        .Or(afforestation.eq(5))
-    )
-    # Apply the pixel values INTO the raster
-    # Degradation pixels: write values from degradation
-    raster = raster.unmask()
-    raster = raster.where(degr_mask, -2)
-
-    # Afforestation pixels: write values from afforestation
-    raster = raster.where(aff_mask, 2)
-
-    return raster
