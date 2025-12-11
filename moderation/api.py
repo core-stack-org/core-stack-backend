@@ -1,7 +1,7 @@
 from .views import *
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 import requests
 from rest_framework import status
@@ -9,6 +9,7 @@ from .utils.form_mapping import model_map
 
 
 @api_view(["GET"])
+@schema(None)
 def get_paginated_submissions(request, form, plan_id):
     page = request.GET.get("page", 1)
 
@@ -34,6 +35,7 @@ def get_paginated_submissions(request, form, plan_id):
 
 
 @api_view(["GET"])
+@schema(None)
 def get_form_names(request):
     form_names = [
         {"name": "settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
@@ -58,6 +60,7 @@ def get_form_names(request):
 
 
 @api_view(["PUT"])
+@schema(None)
 def update_submission(request, form_name, uuid):
     Model = model_map.get(form_name)
     if not Model:
@@ -76,6 +79,7 @@ def update_submission(request, form_name, uuid):
 
 
 @api_view(["DELETE"])
+@schema(None)
 def delete_submission(request, form_name, uuid):
     Model = model_map.get(form_name)
     if not Model:

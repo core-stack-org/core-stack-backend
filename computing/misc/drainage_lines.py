@@ -65,7 +65,7 @@ def clip_drainage_lines(
         state = proj_obj.name
         asset_id = (
             get_gee_dir_path(
-                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+                [proj_obj.name], asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
             )
             + description
         )
