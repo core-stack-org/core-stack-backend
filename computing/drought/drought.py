@@ -218,4 +218,4 @@ def get_last_date(asset_id, layer_obj):
         filtered_col.sort()
         existing_end_year = filtered_col[-1]
 
-    return existing_end_year
+    return int(existing_end_year)

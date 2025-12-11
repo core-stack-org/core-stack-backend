@@ -333,7 +333,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
 
 @shared_task()
 def Genereate_zoi_and_zoi_indicator(
-    state=None, district=None, block=None, proj_id=None, ee_project=None, app_type=None
+    state=None, district=None, block=None, proj_id=None, ee_project=None, app_type=None, asset_suffix = None, asset_folder = None
 ):
     ee_initialize(ee_project)
     if proj_id:
@@ -730,7 +730,6 @@ def BuildWaterBodyLayer(
     app_type=None,
     proj_id=None,
 ):
-    # ee_initialize(gee_account_id)
     proj_obj = Project.objects.get(pk=proj_id)
 
     description = "swb4_" + asset_suffix
@@ -738,59 +737,67 @@ def BuildWaterBodyLayer(
         get_gee_dir_path(asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"])
         + description
     )
-    # Load the FeatureCollections and Image
-    waterbodies = ee.FeatureCollection(
-        asset_id
-    )  # Replace with your actual table2 asset
+
+    waterbodies = ee.FeatureCollection(asset_id)
+
+    # Load desilting points
     assst_suffix_desilt = f"desilt_layer_{asset_suffix}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
-        )
-        + assst_suffix_desilt
+            asset_folder,
+            asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
+        ) + assst_suffix_desilt
     )
+    desiltingPoints = ee.FeatureCollection(asset_id_desilt)
 
-    desiltingPoints = ee.FeatureCollection(
-        asset_id_desilt
-    )  # Replace with your actual table asset
-
-    # Map over waterbodies to attach intersecting point geometry and properties
+    # --- Attach intersecting desilting point properties to polygon ---
     def attach_matching_point(feature):
-        # Filter points that intersect (fall inside) the polygon
-        contained_points = desiltingPoints.filterBounds(feature.geometry())
+        contained = desiltingPoints.filterBounds(feature.geometry())
 
-        # Get the first matching point (optional: you can use reduceToCollection or something else if needed)
-        point = contained_points.first()
+        # Get first point (may be null)
+        point = contained.first()
 
-        # Check if any point was found
-        return ee.Algorithms.If(
-            point,
-            ee.Feature(feature).copyProperties(point).set("matched", True),
-            feature.set("matched", False),
+        # If point exists, copy its properties
+        return ee.Feature(
+            ee.Algorithms.If(
+                point,  # If this is null → goes to else branch
+                ee.Feature(feature).copyProperties(
+                    ee.Feature(point),
+                    ee.Feature(point).propertyNames()
+                ).set("matched", True),
+                ee.Feature(feature).set("matched", False)
+            )
         )
-
-    # Apply the function to each waterbody polygon
+    # Map to attach points
     joined = waterbodies.map(attach_matching_point)
+
     matched_polygons = ee.FeatureCollection(joined).filter(
         ee.Filter.eq("matched", True)
     )
 
+    # Export asset
     asset_suffix_wb = f"waterbodies_{asset_suffix}".lower()
-
     asset_id_wb = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
         + asset_suffix_wb
     )
-    point_tasks = ee.batch.Export.table.toAsset(
+
+    export_task = ee.batch.Export.table.toAsset(
         collection=matched_polygons,
         description="water_rej_desilting_point_tasks",
         assetId=asset_id_wb,
     )
-    point_tasks.start()
-    wait_for_task_completion(point_tasks)
+    export_task.start()
+    wait_for_task_completion(export_task)
+
+    # Publish to GeoServer
     layer_name = f"waterbodies_{proj_obj.name}_{proj_obj.id}".lower()
     sync_project_fc_to_geoserver(
-        matched_polygons, proj_obj.name, layer_name, "water_bodies"
+        matched_polygons,
+        proj_obj.name,
+        layer_name,
+        "swb"
     )
+

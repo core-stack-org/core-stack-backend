@@ -64,18 +64,21 @@ def push_shape_to_geoserver(
     path, store_name=None, workspace=None, layer_name=None, file_type="shp"
 ):
     geo = Geoserver()
+    print(f"layer_name: {layer_name}")
     if layer_name:
         geo.delete_vector_store(workspace=workspace, store=layer_name)
     zip_path = convert_to_zip(path, file_type)
     print(path)
     print(store_name)
     print(workspace)
+
     response = geo.create_shp_datastore(
         path=zip_path,
         store_name=store_name,
         workspace=workspace,
         file_extension=file_type,
     )
+    print (response)
     #
     return response
 
@@ -181,6 +184,7 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
 def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
     print("inside")
+    print(layer_name)
     try:
         geojson_fc = fc.getInfo()
     except Exception as e:
@@ -189,7 +193,7 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         check_task_status([task_id])
 
         geojson_fc = get_geojson_from_gcs(layer_name)
-
+    print(len(geojson_fc["features"]))
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", project_name)
         if not os.path.exists(state_dir):
@@ -208,7 +212,7 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         gdf.to_file(path + ".gpkg", driver="GPKG")
         print("pushed to geoserver")
         return push_shape_to_geoserver(
-            path, workspace, workspace=workspace, file_type="gpkg"
+            path, workspace=workspace,layer_name = layer_name, file_type="gpkg"
         )
     else:
         print("no features found")
