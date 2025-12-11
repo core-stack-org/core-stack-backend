@@ -65,7 +65,7 @@ def generate_terrain_raster_clip(
             get_gee_dir_path(
                 asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
-            + f"terrain_raster{asset_suffix}"
+            + f"terrain_raster_{asset_suffix}"
         )
     # Load ROI geometry
     roi = ee.FeatureCollection(roi_asset_id)
