@@ -253,6 +253,8 @@ def sync_lulc_to_geoserver(
                     + "_"
                     + e_year
                     + "_"
+                    + valid_gee_text(district_name.lower())
+                    + "_"
                     + valid_gee_text(block_name.lower())
                     + suff
                 )
