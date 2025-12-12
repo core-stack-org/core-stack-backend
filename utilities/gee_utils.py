@@ -454,7 +454,7 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
 
 def gcs_file_exists(layer_name):
     bucket = gcs_config()
-    blob = bucket.blob("nrm_raster/" + layer_name)
+    blob = bucket.blob(f"nrm_raster/{layer_name}.tif")
     return blob.exists()
 
 
