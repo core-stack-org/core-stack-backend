@@ -1809,7 +1809,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         )
 
     except Exception as e:
-        print(e)
         logger.info("Not able to access excel for %s state, %s district, %s block for Waterbodies",state.upper(),district.upper(),block.upper())
         return "", "", "", [], [], [], []
 
@@ -1911,6 +1910,7 @@ def get_water_balance_data(state, district, block, uid):
                     non_drought_years.append(match_exp.group(0))
 
 
+
         #? Good Rainfall Years
         if len(non_drought_years):
 
@@ -1923,30 +1923,58 @@ def get_water_balance_data(state, district, block, uid):
 
                 #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
-                rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
-                avg_rainfall += rainfall[0]
+                if selected_column_precp:
+                    rainfall_data = df.loc[df["UID"] == uid, selected_column_precp].values
+                    if len(rainfall_data) > 0 and len(rainfall_data[0]) > 0:
+                        rainfall = rainfall_data[0][0]
+                        avg_rainfall += rainfall
+                    else:
+                        continue  # Skip this year if no rainfall data
+                else:
+                    continue
 
                 #? Monsoon Onset
                 selected_column_onset = [col for col in df_drought.columns if col.startswith("monsoon_onset_" + year)]
-                onset = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values[0]
-                monsoon_onset.append(onset[0])
+                if selected_column_onset:
+                    onset_data = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values
+                    if len(onset_data) > 0 and len(onset_data[0]) > 0:
+                        onset = onset_data[0][0]
+                        monsoon_onset.append(onset)
 
                 #? Fortnight Delg Calc
                 selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
                 selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
                 selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
-                delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
-                delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
-                delg_zd = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values[0]
+                delg_kh_val = 0
+                delg_rb_val = 0
+                delg_zd_val = 0
 
-                avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
+                if selected_column_kh:
+                    delg_kh_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values
+                    if len(delg_kh_data) > 0 and len(delg_kh_data[0]) > 0:
+                        delg_kh_val = delg_kh_data[0][0]
+
+                if selected_column_rb:
+                    delg_rb_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values
+                    if len(delg_rb_data) > 0 and len(delg_rb_data[0]) > 0:
+                        delg_rb_val = delg_rb_data[0][0]
+
+                if selected_column_zd:
+                    delg_zd_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values
+                    if len(delg_zd_data) > 0 and len(delg_zd_data[0]) > 0:
+                        delg_zd_val = delg_zd_data[0][0]
+
+                avg_fortnight_delg += (delg_kh_val + delg_rb_val + delg_zd_val)
 
                 #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
-                runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
-
-                runoff_percent += ((runoff[0] / rainfall[0]) * 100)
+                if selected_column_runoff:
+                    runoff_data = df.loc[df["UID"] == uid, selected_column_runoff].values
+                    if len(runoff_data) > 0 and len(runoff_data[0]) > 0:
+                        runoff = runoff_data[0][0]
+                        if rainfall > 0:  # Avoid division by zero
+                            runoff_percent += ((runoff / rainfall) * 100)
             
             avg_rainfall = avg_rainfall / len(non_drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(non_drought_years)
@@ -1982,25 +2010,51 @@ def get_water_balance_data(state, district, block, uid):
 
                 #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
-                rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
-                avg_rainfall += rainfall[0]
+                rainfall = None
+                if selected_column_precp:
+                    rainfall_data = df.loc[df["UID"] == uid, selected_column_precp].values
+                    if len(rainfall_data) > 0 and len(rainfall_data[0]) > 0:
+                        rainfall = rainfall_data[0][0]
+                        avg_rainfall += rainfall
+                    else:
+                        continue  # Skip this year if no rainfall data
+                else:
+                    continue
 
                 #? Fortnight Delg Calc
                 selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
                 selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
                 selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
-                delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
-                delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
-                delg_zd = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values[0]
+                delg_kh_val = 0
+                delg_rb_val = 0
+                delg_zd_val = 0
 
-                avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
+                if selected_column_kh:
+                    delg_kh_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values
+                    if len(delg_kh_data) > 0 and len(delg_kh_data[0]) > 0:
+                        delg_kh_val = delg_kh_data[0][0]
+
+                if selected_column_rb:
+                    delg_rb_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values
+                    if len(delg_rb_data) > 0 and len(delg_rb_data[0]) > 0:
+                        delg_rb_val = delg_rb_data[0][0]
+
+                if selected_column_zd:
+                    delg_zd_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values
+                    if len(delg_zd_data) > 0 and len(delg_zd_data[0]) > 0:
+                        delg_zd_val = delg_zd_data[0][0]
+
+                avg_fortnight_delg += (delg_kh_val + delg_rb_val + delg_zd_val)
 
                 #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
-                runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
-
-                runoff_percent += ((runoff[0] / rainfall[0]) * 100)
+                if selected_column_runoff and rainfall is not None:
+                    runoff_data = df.loc[df["UID"] == uid, selected_column_runoff].values
+                    if len(runoff_data) > 0 and len(runoff_data[0]) > 0:
+                        runoff = runoff_data[0][0]
+                        if rainfall > 0:  # Avoid division by zero
+                            runoff_percent += ((runoff / rainfall) * 100)
 
             avg_rainfall = avg_rainfall / len(drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(drought_years)
