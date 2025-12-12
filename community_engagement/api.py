@@ -735,25 +735,33 @@ def get_community_details(request):
 def get_communities_by_location(request):
     try:
         print("Request query params:", request.query_params, request)
-        state_id = request.query_params.get("state_id")
-        district_id = request.query_params.get("district_id")
-        block_id = request.query_params.get("block_id")
+        state_id = request.query_params.get("state_id", None)
+        district_id = request.query_params.get("district_id", None)
+        block_id = request.query_params.get("block_id", None)
+        district_name = request.query_params.get("district_name", None)
 
-        state_name = district_name = block_name = ""
+        state_name = block_name = ""
 
         if state_id:
             state = State.objects.filter(pk=state_id).first()
             state_name = state.state_name if state else ""
+        else:
+             district = District.objects.filter(district_name=district_name).first()
+             print (district)
+             if district:
+                    state_name = district.state.state_name
 
         if district_id:
             district = District.objects.filter(id=district_id).first()
             district_name = district.district_name if district else ""
 
+
+
         if block_id:
             block = Block.objects.filter(id=block_id).first()
             block_name = block.block_name if block else ""
         print(
-            f"Fetching communities for State: '{state_id}', District: '{district_id}'"
+            f"Fetching communities for State: '{state_name}', District: '{district_name}'"
         )
         data = get_communities(state_name, district_name, block_name)
         print(f"Communities found: {data}")
@@ -763,7 +771,6 @@ def get_communities_by_location(request):
         return Response(
             {"success": False}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 ############  Get Community by Lat Lon  ################
 
