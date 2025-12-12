@@ -452,6 +452,13 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
     return f"gs://{GCS_BUCKET_NAME}/{blob_name}"
 
 
+def gcs_file_exists(layer_name):
+    client = storage.Client()
+    bucket = client.bucket(GCS_BUCKET_NAME)
+    blob = bucket.blob("nrm_raster/" + layer_name)
+    return blob.exists()
+
+
 def upload_tif_from_gcs_to_gee(gcs_path, asset_id, scale):
     # Read the image
     image = ee.Image.loadGeoTIFF(gcs_path)
