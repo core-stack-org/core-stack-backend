@@ -617,7 +617,7 @@ def create_excel_for_drought_causality(data, xlsx_file, writer, start_year, end_
             "area_in_ha": properties["area_in_ha"],
         }
 
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             row["severe_moderate_drought_causality_" + str(year)] = properties.get(
                 "se_mo_" + str(year), None
             )
@@ -1639,7 +1639,7 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
 
     data = {"UID": []}
     for variable in variables:
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             for season in seasons:
                 end_to_year = year + 1
                 column_name = f"{variable}_{season}_in_mm_{year}-{end_to_year}"
@@ -1648,7 +1648,7 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
     for feature_data in processed_data:
         data["UID"].append(feature_data["UID"])
         for variable in variables:
-            for year in range(start_year, end_year):
+            for year in range(start_year, end_year + 1):
                 for season in seasons:
                     end_to_year = year + 1
                     column_name = f"{variable}_{season}_in_mm_{year}-{end_to_year}"

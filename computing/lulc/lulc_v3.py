@@ -91,6 +91,7 @@ def clip_lulc_v3(
     if layer_obj:
         existing_end_year = int(layer_obj.misc["end_year"])
         new_loop_start = str(existing_end_year) + "-07-01"
+        new_loop_start = datetime.strptime(new_loop_start, "%Y-%m-%d")
 
     scale = 10
 
