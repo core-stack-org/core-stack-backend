@@ -2194,7 +2194,6 @@ def get_items_status(request):
 
 
 @api_view(["POST"])
-@schema(None)
 @auth_free
 def create_community(request):
     try:
