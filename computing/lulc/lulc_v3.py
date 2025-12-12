@@ -16,6 +16,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     is_gee_asset_exists,
     get_gee_dir_path,
+    gcs_file_exists,
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
@@ -80,15 +81,16 @@ def clip_lulc_v3(
             state,
             district,
             block,
-            layer_name=f"LULC_17_18_{valid_gee_text(block.lower())}_level_3",
+            layer_name=f"LULC_17_18_{filename_prefix}_level_3",
             dataset_name="LULC_level_3",
         )
     except Exception as e:
         print("DB layer not found for lulc.")
 
+    new_loop_start = None
     if layer_obj:
         existing_end_year = int(layer_obj.misc["end_year"])
-        loop_start = str(existing_end_year) + "-07-01"
+        new_loop_start = str(existing_end_year) + "-07-01"
 
     scale = 10
 
@@ -117,18 +119,21 @@ def clip_lulc_v3(
         final_output_assetid = gee_asset_path + final_output_filename
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
-
-        pan_india = ee.Image(
-            f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{curr_start_year}_{curr_end_year}"
-        )
-        clipped_lulc = pan_india.clip(roi.geometry())
-        l1_asset_new.append(clipped_lulc)
+        if not new_loop_start or loop_start >= new_loop_start:
+            pan_india = ee.Image(
+                f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{curr_start_year}_{curr_end_year}"
+            )
+            clipped_lulc = pan_india.clip(roi.geometry())
+            l1_asset_new.append(clipped_lulc)
 
     task_list = []
     geometry = roi.geometry()
     if not is_gee_asset_exists(final_output_assetid_array_new[len(l1_asset_new) - 1]):
         for i in range(0, len(l1_asset_new)):
-            if is_gee_asset_exists(final_output_assetid_array_new[i]):
+            if (
+                is_gee_asset_exists(final_output_assetid_array_new[i])
+                and len(l1_asset_new) <= 2
+            ):
                 ee.data.copyAsset(
                     final_output_assetid_array_new[i],
                     f"{final_output_assetid_array_new[i]}_old",
@@ -150,7 +155,7 @@ def clip_lulc_v3(
 
     layer_ids = []
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
-    for i in range(0, len(l1_asset_new)):
+    for i in range(0, len(final_output_filename_array_new)):
         name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]
@@ -158,13 +163,7 @@ def clip_lulc_v3(
             if not roi_path:
                 suff = workspace.replace("LULC", "")
                 layer_name = (
-                    "LULC_"
-                    + s_year
-                    + "_"
-                    + e_year
-                    + "_"
-                    + valid_gee_text(block.lower())
-                    + suff
+                    "LULC_" + s_year + "_" + e_year + "_" + filename_prefix + suff
                 )
             else:
                 suff = workspace.replace("LULC", "")
@@ -195,7 +194,6 @@ def clip_lulc_v3(
 
     layer_at_geoserver = sync_lulc_to_geoserver(
         final_output_filename_array_new,
-        l1_asset_new,
         state,
         district,
         block,
@@ -217,7 +215,8 @@ def sync_lulc_to_gcs(
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]
         layer_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
-        task_ids.append(sync_raster_to_gcs(image, scale, layer_name))
+        if not gcs_file_exists(layer_name):
+            task_ids.append(sync_raster_to_gcs(image, scale, layer_name))
 
     task_id_list = check_task_status(task_ids)
     print("task_ids sync to gcs ", task_id_list)
@@ -225,7 +224,6 @@ def sync_lulc_to_gcs(
 
 def sync_lulc_to_geoserver(
     final_output_filename_array_new,
-    l1_asset_new,
     state_name=None,
     district_name=None,
     block_name=None,
@@ -235,7 +233,7 @@ def sync_lulc_to_geoserver(
     print("Syncing lulc to geoserver")
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     layer_at_geoserver = False
-    for i in range(0, len(l1_asset_new)):
+    for i in range(0, len(final_output_filename_array_new)):
         name_arr = final_output_filename_array_new[i].split(
             "_20"
         )  # TODO: better logic than this
