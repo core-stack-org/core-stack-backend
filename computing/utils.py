@@ -78,7 +78,7 @@ def push_shape_to_geoserver(
         workspace=workspace,
         file_extension=file_type,
     )
-    print (response)
+    print(response)
     #
     return response
 
@@ -142,7 +142,7 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
             print(e)
 
     path = generate_shape_files(path)
-    return push_shape_to_geoserver(path, workspace=workspace)
+    return push_shape_to_geoserver(path, workspace=workspace, layer_name=layer_name)
 
 
 def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None):
@@ -212,7 +212,7 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         gdf.to_file(path + ".gpkg", driver="GPKG")
         print("pushed to geoserver")
         return push_shape_to_geoserver(
-            path, workspace=workspace,layer_name = layer_name, file_type="gpkg"
+            path, workspace=workspace, layer_name=layer_name, file_type="gpkg"
         )
     else:
         print("no features found")
@@ -960,9 +960,8 @@ def generate_swb_layer_with_max_so_catchment(
         return ee.Algorithms.If(
             geom.area().lt(scale * scale),  # geometry area < 1 pixel area?
             geom.buffer(buffer_dist),  # buffer to make it cover at least one pixel
-            geom  # otherwise return original
+            geom,  # otherwise return original
         )
-
 
     def safe_reduce_max(image, geom, scale=30):
         """Returns max value safely, fallback to 0 instead of null."""
