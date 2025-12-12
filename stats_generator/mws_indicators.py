@@ -538,7 +538,7 @@ def generate_mws_data_for_kyl_filters(
                     ).iloc[0]
                     mws_intersect_villages = ast.literal_eval(mws_intersect_villages)
                 except:
-                    mws_intersect_villages = ""
+                    mws_intersect_villages = []
 
                 ############  Change Detection Degradation  ###################
                 try:
@@ -573,8 +573,15 @@ def generate_mws_data_for_kyl_filters(
                         .iloc[0]
                     )
                     degradation_land_area = degr_sum + crp_sum
+                    change_in_cropping_intensity_area = (
+                        df_change_crp_detection_mws_data.get(
+                            "total_change_crop_intensity_area_in_ha", None
+                        ).iloc[0]
+                    )
+
                 except:
                     degradation_land_area = 0
+                    change_in_cropping_intensity_area = 0
 
                 ############  Change Detection Afforestation  ###################
                 try:
@@ -602,12 +609,6 @@ def generate_mws_data_for_kyl_filters(
                         sheets["change_detection_deforestation"]["UID"]
                         == specific_mws_id
                     ]
-                    deforestation_column = [
-                        "forest_to_scrub_land_area_in_ha",
-                        "forest_to_barren_area_in_ha",
-                        "forest_to_built_up_area_in_ha",
-                        "forest_to_farm_area_in_ha",
-                    ]
                     deforestation_land_area = df_change_defo_detection_mws_data.get(
                         "total_deforestation_area_in_ha", None
                     ).iloc[0]
@@ -619,12 +620,6 @@ def generate_mws_data_for_kyl_filters(
                     df_change_urba_detection_mws_data = sheets[
                         "change_detection_urbanization"
                     ][sheets["change_detection_urbanization"]["UID"] == specific_mws_id]
-                    urbanization_column = [
-                        "barren_shrub_to_built_up_area_in_ha",
-                        "built_up_to_built_up_area_in_ha",
-                        "tree_farm_to_built_up_area_in_ha",
-                        "water_to_built_up_area_in_ha",
-                    ]
                     urbanization_land_area = df_change_urba_detection_mws_data.get(
                         "total_urbanization_area_in_ha", None
                     ).iloc[0]
@@ -694,9 +689,7 @@ def generate_mws_data_for_kyl_filters(
                     1: "Semi-Critical",
                     2: "Critical",
                     3: "Over Exploited",
-                    4: "Saline",
-                    5: "Hilly Area",
-                    6: "Not Assessed",
+                    4: "Not Assessed",
                 }
 
                 class_to_id = {v: k for k, v in Soge_class.items()}
@@ -790,6 +783,9 @@ def generate_mws_data_for_kyl_filters(
                         "degradation_land_area": round(degradation_land_area, 4),
                         "increase_in_tree_cover": round(afforestation_land_area, 4),
                         "decrease_in_tree_cover": round(deforestation_land_area, 4),
+                        "change_in_cropping_intensity_area": round(
+                            change_in_cropping_intensity_area, 4
+                        ),
                         "built_up_area": round(urbanization_land_area, 4),
                         "lulc_slope_category": lulc_slope_category,
                         "lulc_plain_category": lulc_plain_category,
