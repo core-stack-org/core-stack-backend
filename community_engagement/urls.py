@@ -60,4 +60,5 @@ urlpatterns = [
         api.get_community_details,
         name="get_community_details",
     ),
+    path("create_community/", api.create_community, name="create_community"),
 ]
