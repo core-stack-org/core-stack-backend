@@ -1156,11 +1156,15 @@ def get_agri_water_stress_data(state, district, block):
                 area = row['sum_area_in_ha']
                 if pd.notna(area):
                     total_matched_area += float(area)
+
+        # Calculate total area of ALL MWS (more concise)
+        total_all_area = float(df_area['sum_area_in_ha'].sum())
         
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": total_matched_area
+            "total_area": total_matched_area,
+            "total_all_area": total_all_area
         }
         
         return result
@@ -1176,7 +1180,8 @@ def get_agri_water_stress_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_all_area": 0.0
         }
 
 
@@ -1328,10 +1333,14 @@ def get_agri_water_drought_data(state, district, block):
             else:
                 weighted_drought_timeline[year] = 0.0
         
+        # Calculate total area of ALL MWS (more concise)
+        total_all_area = float(df_area['sum_area_in_ha'].sum())
+
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": total_matched_area
+            "total_area": total_matched_area,
+            "total_all_area" : total_all_area
         }
         
         return result, weighted_drought_timeline
@@ -1347,7 +1356,8 @@ def get_agri_water_drought_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_all_area" : 0.0
         }, {}
 
 
@@ -1532,10 +1542,14 @@ def get_agri_water_irrigation_data(state, district, block):
                 seasonal_timeline["rabi"][year] = 0.0
                 seasonal_timeline["zaid"][year] = 0.0
         
+        # Calculate total area of ALL MWS (more concise)
+        total_all_area = float(df_area['sum_area_in_ha'].sum())
+
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": total_matched_area
+            "total_area": total_matched_area,
+            "total_all_area" : total_all_area
         }
         
         return result, seasonal_timeline
@@ -1551,7 +1565,8 @@ def get_agri_water_irrigation_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_all_area" : 0.0
         }, {
             "kharif": {},
             "rabi": {},
@@ -1678,11 +1693,15 @@ def get_agri_low_yield_data(state, district, block):
                 }
             ]
         }
+
+        # Calculate total area of ALL MWS (more concise)
+        total_all_area = float(df_area['sum_area_in_ha'].sum())
         
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": round(total_to_barren + total_to_scrub, 2)
+            "total_area": round(total_to_barren + total_to_scrub, 2),
+            "total_all_area" : total_all_area
         }
         
         return result, sankey_data
@@ -1698,7 +1717,8 @@ def get_agri_low_yield_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_all_area" : 0.0
         }, {
             "nodes": [],
             "links": []
@@ -1813,10 +1833,14 @@ def get_forest_degrad_data(state, district, block):
             ]
         }
         
+        # Calculate total area of ALL MWS (more concise)
+        total_all_area = float(df_degrade['total_deforestation_area_in_ha'].sum())
+
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": total_matched_area
+            "total_area": total_matched_area,
+            "total_all_area" : total_all_area
         }
         
         return result, forest_sankey
@@ -1832,7 +1856,8 @@ def get_forest_degrad_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_all_area" : 0.0
         }, {
             "nodes": [],
             "links": []
@@ -2170,11 +2195,15 @@ def get_socio_economic_nrega_data(state, district, block):
             "labels": list(nrega_totals.keys()),
             "values": [round(v, 0) for v in nrega_totals.values()]
         }
+
+        # Calculate total number of ALL villages from nrega_assets_village sheet
+        total_all_villages = df_nrega_assets["vill_name"].nunique()
         
         result = {
             "village_pattern": village_pattern,
             "village_intensity": village_intensity,
-            "total_villages": len(matched_villages)
+            "total_villages": len(matched_villages),
+            "total_all_villages" : total_all_villages
         }
         
         return result, nrega_pie_chart
@@ -2190,7 +2219,8 @@ def get_socio_economic_nrega_data(state, district, block):
         return {
             "village_pattern": {},
             "village_intensity": {},
-            "total_villages": 0
+            "total_villages": 0,
+            "total_all_villages": 0
         }, {
             "labels": [],
             "values": []
@@ -2321,6 +2351,9 @@ def get_fishery_water_potential_data(state, district, block):
         
         matched_uids = indicator1_uids.intersection(indicator2_uids).intersection(indicator3_uids)
         
+        # Calculate total area of ALL MWS
+        total_all_area = float(df_area['sum_area_in_ha'].sum())
+        
         # Calculate total area of matched MWS
         total_matched_area = 0.0
         for index, row in df_area.iterrows():
@@ -2329,6 +2362,12 @@ def get_fishery_water_potential_data(state, district, block):
                 area = row['sum_area_in_ha']
                 if pd.notna(area):
                     total_matched_area += float(area)
+        
+        # Calculate percentage
+        if total_all_area > 0:
+            area_percentage = round((total_matched_area / total_all_area) * 100, 2)
+        else:
+            area_percentage = 0.0
         
         seasonal_timeline = {
             "kharif": {},
@@ -2391,7 +2430,7 @@ def get_fishery_water_potential_data(state, district, block):
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": total_matched_area
+            "total_area": area_percentage
         }
         
         return result, seasonal_timeline
@@ -2488,12 +2527,18 @@ def get_agroforestry_transition_data(state, district, block):
                 if pd.notna(area):
                     total_matched_area += float(area)
         
+        # Initialize transition totals
         total_double_to_single = 0.0
         total_double_to_triple = 0.0
         total_single_to_double = 0.0
         total_single_to_triple = 0.0
         total_triple_to_double = 0.0
         total_triple_to_single = 0.0
+        
+        # Also track "staying same" transitions
+        total_single_to_single = 0.0
+        total_double_to_double = 0.0
+        total_triple_to_triple = 0.0
         
         for index, row in df_cropIntensity.iterrows():
             uid = row['UID']
@@ -2506,6 +2551,11 @@ def get_agroforestry_transition_data(state, district, block):
                 single_to_triple = row.get('single_to_triple_area_in_ha')
                 triple_to_double = row.get('triple_to_double_area_in_ha')
                 triple_to_single = row.get('triple_to_single_area_in_ha')
+                
+                # Get "staying same" values (if columns exist)
+                single_to_single = row.get('single_to_single_area_in_ha', 0)
+                double_to_double = row.get('double_to_double_area_in_ha', 0)
+                triple_to_triple = row.get('triple_to_triple_area_in_ha', 0)
                 
                 # Sum up transitions
                 if pd.notna(double_to_single):
@@ -2520,33 +2570,74 @@ def get_agroforestry_transition_data(state, district, block):
                     total_triple_to_double += float(triple_to_double)
                 if pd.notna(triple_to_single):
                     total_triple_to_single += float(triple_to_single)
+                
+                # Sum "staying same"
+                if pd.notna(single_to_single):
+                    total_single_to_single += float(single_to_single)
+                if pd.notna(double_to_double):
+                    total_double_to_double += float(double_to_double)
+                if pd.notna(triple_to_triple):
+                    total_triple_to_triple += float(triple_to_triple)
         
-        agroforestry_sankey = {
+        # Sankey 1: Single Cropping Transitions
+        single_sankey = {
             "nodes": [
-                {"name": "Single Cropping (Initial)", "priority": 0},
-                {"name": "Double Cropping (Initial)", "priority": 1},
-                {"name": "Triple Cropping (Initial)", "priority": 2},
-                {"name": "Single Cropping (Final)", "priority": 0},
-                {"name": "Double Cropping (Final)", "priority": 1},
-                {"name": "Triple Cropping (Final)", "priority": 2}
+                {"name": "Single Cropping (Initial)"},
+                {"name": "Single Cropping (Final)"},
+                {"name": "Double Cropping (Final)"},
+                {"name": "Triple Cropping (Final)"}
             ],
             "links": [
-                # Single Cropping (Initial) transitions
-                {"source": 0, "target": 4, "value": round(total_single_to_double, 2)},
-                {"source": 0, "target": 5, "value": round(total_single_to_triple, 2)},
-                # Double Cropping (Initial) transitions
-                {"source": 1, "target": 3, "value": round(total_double_to_single, 2)},
-                {"source": 1, "target": 5, "value": round(total_double_to_triple, 2)},
-                # Triple Cropping (Initial) transitions
-                {"source": 2, "target": 3, "value": round(total_triple_to_single, 2)},
-                {"source": 2, "target": 4, "value": round(total_triple_to_double, 2)}
+                {"source": 0, "target": 1, "value": round(total_single_to_single, 2)},
+                {"source": 0, "target": 2, "value": round(total_single_to_double, 2)},
+                {"source": 0, "target": 3, "value": round(total_single_to_triple, 2)}
             ]
         }
+        
+        # Sankey 2: Double Cropping Transitions
+        double_sankey = {
+            "nodes": [
+                {"name": "Double Cropping (Initial)"},
+                {"name": "Single Cropping (Final)"},
+                {"name": "Double Cropping (Final)"},
+                {"name": "Triple Cropping (Final)"}
+            ],
+            "links": [
+                {"source": 0, "target": 1, "value": round(total_double_to_single, 2)},
+                {"source": 0, "target": 2, "value": round(total_double_to_double, 2)},
+                {"source": 0, "target": 3, "value": round(total_double_to_triple, 2)}
+            ]
+        }
+        
+        # Sankey 3: Triple Cropping Transitions
+        triple_sankey = {
+            "nodes": [
+                {"name": "Triple Cropping (Initial)"},
+                {"name": "Single Cropping (Final)"},
+                {"name": "Double Cropping (Final)"},
+                {"name": "Triple Cropping (Final)"}
+            ],
+            "links": [
+                {"source": 0, "target": 1, "value": round(total_triple_to_single, 2)},
+                {"source": 0, "target": 2, "value": round(total_triple_to_double, 2)},
+                {"source": 0, "target": 3, "value": round(total_triple_to_triple, 2)}
+            ]
+        }
+        
+        # Calculate total area of ALL MWS
+        total_all_area = float(df_area['sum_area_in_ha'].sum())
         
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": total_matched_area
+            "total_area": total_matched_area,
+            "total_all_area": total_all_area
+        }
+        
+        agroforestry_sankey = {
+            "single": single_sankey,
+            "double": double_sankey,
+            "triple": triple_sankey
         }
         
         return result, agroforestry_sankey
@@ -2562,8 +2653,10 @@ def get_agroforestry_transition_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_all_area": 0.0
         }, {
-            "nodes": [],
-            "links": []
+            "single": {"nodes": [], "links": []},
+            "double": {"nodes": [], "links": []},
+            "triple": {"nodes": [], "links": []}
         }
