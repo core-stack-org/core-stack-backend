@@ -80,37 +80,3 @@ class SubmissionsOfPlan:
     def get_swb_rs_maintenance(plan_id, page=1):
         return SubmissionsOfPlan._fetch(SWB_RS_maintenance, plan_id, page)
 
-
-def sync_updated_submissions():
-    checker = ODKSubmissionsChecker()
-    res = checker.process("updated")
-    for form_name, status in res.items():
-        if status.get("is_edited"):
-            if form_name == "Settlement Form":
-                resync_settlement()
-            elif form_name == "Well Form":
-                resync_well()
-            elif form_name == "water body form":
-                resync_waterbody()
-            elif form_name == "new recharge structure form":
-                resync_gw()
-            elif form_name == "new irrigation form":
-                resync_agri()
-            elif form_name == "livelihood form":
-                resync_livelihood()
-            elif form_name == "cropping pattern form":
-                resync_cropping()
-            elif form_name == "propose maintenance on existing irrigation form":
-                resync_agri_maintenance()
-            elif form_name == "propose maintenance on water structure form":
-                resync_gw_maintenance()
-            elif form_name == "propose maintenance on existing water recharge form":
-                resync_swb_maintenance()
-            elif (
-                form_name
-                == "propose maintenance of remotely sensed water structure form"
-            ):
-                resync_swb_rs_maintenance()
-            else:
-                print("passed wrong form name")
-    return JsonResponse({"status": "Sync complete", "result": res})
