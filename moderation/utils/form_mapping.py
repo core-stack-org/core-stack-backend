@@ -18,15 +18,15 @@ corestack = {
 }
 
 model_map = {
-    "settlement": ODK_settlement,
-    "well": ODK_well,
-    "waterbody": ODK_waterbody,
-    "groundwater": ODK_groundwater,
-    "agri": ODK_agri,
-    "livelihood": ODK_livelihood,
-    "crop": ODK_crop,
-    "agri-maint": Agri_maintenance,
-    "gw-maint": GW_maintenance,
-    "swb-maint": SWB_maintenance,
-    "swb-rs-maint": SWB_RS_maintenance,
+    "Settlement": ODK_settlement,
+    "Well": ODK_well,
+    "Waterbody": ODK_waterbody,
+    "Groundwater": ODK_groundwater,
+    "Agri": ODK_agri,
+    "Livelihood": ODK_livelihood,
+    "Crop": ODK_crop,
+    "Agri Maintenance": Agri_maintenance,
+    "GroundWater Maintenance": GW_maintenance,
+    "Surface Water Body Maintenance": SWB_maintenance,
+    "Surface Water Body Recharge Structure Maintenance": SWB_RS_maintenance,
 }
