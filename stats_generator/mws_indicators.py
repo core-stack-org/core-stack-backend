@@ -424,6 +424,27 @@ def generate_mws_data_for_kyl_filters(
                         avg_perc_rabi_surface_water_mws
                     ) = avg_perc_zaid_surface_water_mws = 0
 
+                ################# SWB Trend ######################
+                try:
+                    df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
+                        sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
+                    ]
+                    swb_T = df_swb_annual_mws_data.filter(
+                        like="total_area_in_ha"
+                    ).dropna()  # Drop rows with NaN for trend calculation
+                    swb_T = swb_T.iloc[0].dropna().tolist()
+                    result = mk.original_test(swb_T)
+
+                    trend_swb = None
+                    if result.trend == "no trend":
+                        trend_swb = "0"
+                    elif result.trend == "increasing":
+                        trend_swb = "1"
+                    else:
+                        trend_swb = "-1"
+                except:
+                    trend_swb = "-1"
+
                 ######### G Trend  #################
                 G_Trend = (
                     hydro_annual_mws_data.filter(like="G")
@@ -774,6 +795,7 @@ def generate_mws_data_for_kyl_filters(
                         "avg_kharif_surface_water_mws": avg_kharif_surface_water_mws,
                         "avg_rabi_surface_water_mws": avg_rabi_surface_water_mws,
                         "avg_zaid_surface_water_mws": avg_zaid_surface_water_mws,
+                        "trend_swb": trend_swb,
                         "trend_g": trend_g,
                         "drought_category": drought_category,
                         "avg_number_dry_spell": avg_dry_spell_in_weeks,
@@ -783,7 +805,7 @@ def generate_mws_data_for_kyl_filters(
                         "degradation_land_area": round(degradation_land_area, 4),
                         "increase_in_tree_cover": round(afforestation_land_area, 4),
                         "decrease_in_tree_cover": round(deforestation_land_area, 4),
-                        "change_in_cropping_intensity_area": round(
+                        "degradation_cropping_intensity": round(
                             change_in_cropping_intensity_area, 4
                         ),
                         "built_up_area": round(urbanization_land_area, 4),
