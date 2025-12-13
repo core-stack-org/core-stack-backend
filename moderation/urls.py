@@ -4,6 +4,7 @@ from .api import (
     get_form_names,
     update_submission,
     delete_submission,
+    sync_updated_submissions,
 )
 
 urlpatterns = [
@@ -15,4 +16,5 @@ urlpatterns = [
     path("forms/", get_form_names),
     path("submissions/<str:form_name>/<path:uuid>/modify/", update_submission),
     path("submissions/<str:form_name>/<path:uuid>/delete/", delete_submission),
+    path("ODKSubmissionEvent", sync_updated_submissions),
 ]

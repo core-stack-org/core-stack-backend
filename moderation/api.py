@@ -14,17 +14,17 @@ def get_paginated_submissions(request, form, plan_id):
     page = request.GET.get("page", 1)
 
     mapping = {
-        "settlement": SubmissionsOfPlan.get_settlement,
-        "well": SubmissionsOfPlan.get_well,
-        "waterbody": SubmissionsOfPlan.get_waterbody,
-        "groundwater": SubmissionsOfPlan.get_groundwater,
-        "agri": SubmissionsOfPlan.get_agri,
-        "livelihood": SubmissionsOfPlan.get_livelihood,
-        "crop": SubmissionsOfPlan.get_crop,
-        "agri-maint": SubmissionsOfPlan.get_agri_maintenance,
-        "gw-maint": SubmissionsOfPlan.get_gw_maintenance,
-        "swb-maint": SubmissionsOfPlan.get_swb_maintenance,
-        "swb-rs-maint": SubmissionsOfPlan.get_swb_rs_maintenance,
+        "Settlement": SubmissionsOfPlan.get_settlement,
+        "Well": SubmissionsOfPlan.get_well,
+        "Waterbody": SubmissionsOfPlan.get_waterbody,
+        "Groundwater": SubmissionsOfPlan.get_groundwater,
+        "Agri": SubmissionsOfPlan.get_agri,
+        "Livelihood": SubmissionsOfPlan.get_livelihood,
+        "Crop": SubmissionsOfPlan.get_crop,
+        "Agri Maintenance": SubmissionsOfPlan.get_agri_maintenance,
+        "GroundWater Maintenance": SubmissionsOfPlan.get_gw_maintenance,
+        "Surface Water Body Maintenance": SubmissionsOfPlan.get_swb_maintenance,
+        "Surface Water Body Recharge Structure Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
     }
 
     if form not in mapping:
@@ -38,21 +38,24 @@ def get_paginated_submissions(request, form, plan_id):
 @schema(None)
 def get_form_names(request):
     form_names = [
-        {"name": "settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
-        {"name": "well", "form_id": "Add_Wells_form%20_V1.0.1"},
-        {"name": "waterbody", "form_id": "Add_Waterbody_form%20_V1.0.1"},
-        {"name": "groundwater", "form_id": "Add_Groundwater_form%20_V1.0.1"},
-        {"name": "agri", "form_id": "Add_Agri_form%20_V1.0.1"},
-        {"name": "livelihood", "form_id": "Add_Livelihood_form%20_V1.0.1"},
-        {"name": "crop", "form_id": "Add_Cropping_form%20_V1.0.1"},
-        {"name": "agri-maint", "form_id": "Agri_Maintenance_form%20_V1.0.1"},
-        {"name": "gw-maint", "form_id": "Groundwater_Maintenance_form%20_V1.0.1"},
+        {"name": "Settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
+        {"name": "Well", "form_id": "Add_Wells_form%20_V1.0.1"},
+        {"name": "Waterbody", "form_id": "Add_Waterbody_form%20_V1.0.1"},
+        {"name": "Groundwater", "form_id": "Add_Groundwater_form%20_V1.0.1"},
+        {"name": "Agri", "form_id": "Add_Agri_form%20_V1.0.1"},
+        {"name": "Livelihood", "form_id": "Add_Livelihood_form%20_V1.0.1"},
+        {"name": "Crop", "form_id": "Add_Cropping_form%20_V1.0.1"},
+        {"name": "Agri Maintenance", "form_id": "Agri_Maintenance_form%20_V1.0.1"},
         {
-            "name": "swb-maint",
+            "name": "GroundWater Maintenance",
+            "form_id": "Groundwater_Maintenance_form%20_V1.0.1",
+        },
+        {
+            "name": "Surface Water Body Maintenance",
             "form_id": "Surface_Waterbody_Maintenance_form%20_V1.0.1",
         },
         {
-            "name": "swb-rs-maint",
+            "name": "Surface Water Body Recharge Structure Maintenance",
             "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
         },
     ]
@@ -90,3 +93,53 @@ def delete_submission(request, form_name, uuid):
         return Response({"success": True})
     except Model.DoesNotExist:
         return Response({"success": False, "message": "Not found"}, status=404)
+
+
+@api_view(["GET"])
+@schema(None)
+def sync_updated_submissions(request):
+    (
+        settlement_submissions,
+        well_submissions,
+        waterbody_submissions,
+        groundwater_submissions,
+        agri_submissions,
+        livelihood_submissions,
+        cropping_submissions,
+        agri_maintenance_submissions,
+        gw_maintenance_submissions,
+        swb_maintenance_submissions,
+        swb_rs_maintenance_submissions,
+    ) = sync_settlement_odk_data(get_edited_updated_all_submissions)
+    checker = ODKSubmissionsChecker()
+    res = checker.process("updated")
+    for form_name, status in res.items():
+        if status.get("is_updated"):
+            if form_name == "Settlement Form":
+                resync_settlement(settlement_submissions)
+            elif form_name == "Well Form":
+                resync_well(well_submissions)
+            elif form_name == "water body form":
+                resync_waterbody(waterbody_submissions)
+            elif form_name == "new recharge structure form":
+                resync_gw(groundwater_submissions)
+            elif form_name == "new irrigation form":
+                resync_agri(agri_submissions)
+            elif form_name == "livelihood form":
+                resync_livelihood(livelihood_submissions)
+            elif form_name == "cropping pattern form":
+                resync_cropping(cropping_submissions)
+            elif form_name == "propose maintenance on existing irrigation form":
+                resync_agri_maintenance(agri_maintenance_submissions)
+            elif form_name == "propose maintenance on water structure form":
+                resync_gw_maintenance(gw_maintenance_submissions)
+            elif form_name == "propose maintenance on existing water recharge form":
+                resync_swb_maintenance(swb_maintenance_submissions)
+            elif (
+                form_name
+                == "propose maintenance of remotely sensed water structure form"
+            ):
+                resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
+            else:
+                print("passed wrong form name")
+    return JsonResponse({"status": "Sync complete", "result": res})
