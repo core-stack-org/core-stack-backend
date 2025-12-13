@@ -324,6 +324,10 @@
         border: none;
     }
 
+    .number-class {
+        font-weight : bold;
+    }
+
     /* Responsive - stack on smaller screens */
     @media screen and (max-width: 768px) {
         .map-chart-container {
@@ -651,7 +655,7 @@
         </section>
 
         <!-- Grid Maps Section -->
-        <section class="section maps-grid-section">
+        {% comment %} <section class="section maps-grid-section">
             <h2>Hydrology Maps</h2>
             <p>Click the "Load Map" button below each map to view it.</p>
             
@@ -689,20 +693,20 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </section> {% endcomment %}
 
         <section class="section" id="agriculture-section">
             <h2>Agriculture</h2>
             
             <div id="groundwater-section">
                 <h3>Groundwater Stress</h3>
-                <p><span id="groundwater-area"></span> area (in hectares) appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater recharge structures, and groundwater collectives should be considered.</p>
+                <p><span id="groundwater-area" class="number-class"></span> hectares out of <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater recharge structures, and groundwater collectives should be considered.</p>
                 <div id="agriMap" class="map map-only"></div>
             </div>
 
             <div id="drought-section">
                 <h3>High Drought Incidence</h3>
-                <p><span id="drought-area"></span> area (in hectares) appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater harvesting structures, and water user associations should be considered.</p>
+                <p><span id="drought-area" class="number-class"></span> hectares out of <span id="drought-area-1" class="number-class"></span> hectares of cropping area appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater harvesting structures, and water user associations should be considered.</p>
                 
                 <div class="map-chart-container">
                     <div id="agriDroughtMap" class="map"></div>
@@ -714,7 +718,7 @@
 
             <div id="irrigation-section">
                 <h3>High Irrigation Risk</h3>
-                <p><span id="irrigation-area"></span> area (in hectares) appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water user associations, and construction of new waterbodies should be considered.</p>
+                <p><span id="irrigation-area" class="number-class"></span> hectares out of <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water user associations, and construction of new waterbodies should be considered.</p>
 
                 <div class="map-chart-container">
                     <div id="agriIrrigationMap" class="map"></div>
@@ -726,8 +730,7 @@
 
             <div id="yield-section">
                 <h3>Low Yield</h3>
-                <p><span id="yield-area"></span> area (in hectares) appears to have had a reduction in cropping area. The reasons should be investigated and changes in cropping patterns and methods to improve soil health should be considered.</p>
-
+                <p><span id="yield-area" class="number-class"></span> hectares out of <span id="yield-area-1" class="number-class"></span> hectares appears to have had a reduction in cropping area. The reasons should be investigated and changes in cropping patterns and methods to improve soil health should be considered.</p>
                 <div class="map-chart-container">
                     <div id="agriYieldMap" class="map"></div>
                     <div class="chart-container">
@@ -740,7 +743,7 @@
         <section class="section" id="forest-section">
             <h2>Forests and livestock</h2>
             <h3>Forest Degradation</h3>
-            <p><span id="forest-area"></span> area (in hectares) appears to have been vulnerable from overgrazing or other forest stress. Forest protection committees and strengthening of collective norms should be considered.</p>
+            <p><span id="forest-area" class="number-class"></span> hectares out of <span id="forest-area-1" class="number-class"></span> hectares appears to have been vulnerable from overgrazing or other forest stress. Forest protection committees and strengthening of collective norms should be considered.</p>
             
             <div class="map-chart-container">
                 <div id="forestDegradMap" class="map"></div>
@@ -752,7 +755,7 @@
 
         <section class="section" id="health-section">
             <h2>Health</h2>
-            <p><span id="mining-area"></span> area (in hectares) could be at risk of air or water or soil pollution from industries. Pollution tests should be considered as a safety measure.</p>
+            <p><span id="mining-area" class="number-class"></span> hectares could be at risk of air or water or soil pollution from industries. Pollution tests should be considered as a safety measure.</p>
             
             <div class="map-chart-container">
                 <div id="miningMap" class="map"></div>
@@ -767,7 +770,7 @@
             
             <div id="caste-section">
                 <h3>Caste</h3>
-                <p><span id="caste-population"></span> population in <span id="caste-villages"></span> villages are from marginalized groups. Positive discrimination in access to social entitlements should be considered.</p>
+                <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages" class="number-class"></span> villages are from marginalized groups. Positive discrimination in access to social entitlements should be considered.</p>
                 
                 <div class="map-chart-container">
                     <div id="casteMap" class="map"></div>
@@ -779,7 +782,7 @@
 
             <div id="nrega-section">
                 <h3>NREGA</h3>
-                <p><span id="nrega-villages"></span> villages have a low (less than 100 NREGA work) number of NREGA works. Positive discrimination in access to NREGA assets should be considered.</p>
+                <p><span id="nrega-villages" class="number-class"></span> villages out of <span id="nrega-villages-1" class="number-class"></span>  have a low (less than 100 NREGA work) number of NREGA works. Positive discrimination in access to NREGA assets should be considered.</p>
                 
                 <div class="map-chart-container">
                     <div id="nregaMap" class="map"></div>
@@ -792,7 +795,7 @@
 
         <section class="section" id="fishery-section">
             <h2>Fishery</h2>
-            <p>Up to <span id="fishery-area"></span> area (in hectares) appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year.</p>
+            <p>Up to <span id="fishery-area" class="number-class"></span>% area appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year.</p>
             
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
@@ -804,12 +807,34 @@
 
         <section class="section" id="agroforestry-section">
             <h2>Agroforestry</h2>
-            <p>Up to <span id="agroforestry-area"></span> area (in hectares) could benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
+            <p>Up to <span id="agroforestry-area" class="number-class"></span> hectares out of <span id="agroforestry-area-1" class="number-class"></span> hectares could benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
             
-            <div class="map-chart-container">
-                <div id="agroforestryMap" class="map"></div>
-                <div class="chart-container">
-                    <canvas id="agroforestrySankeyChart"></canvas>
+            <!-- Map on the left -->
+            <div style="width: 100%; margin: 20px 0;">
+                <div id="agroforestryMap" class="map map-only"></div>
+            </div>
+            
+            <!-- Three stacked Sankey charts below the map -->
+            <div style="width: 100%; margin: 20px 0;">
+                <div style="margin-bottom: 30px;">
+                    <h4 style="text-align: center; margin-bottom: 10px;">Single Cropping Transitions</h4>
+                    <div style="height: 300px; width: 100%;">
+                        <canvas id="singleSankeyChart"></canvas>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 30px;">
+                    <h4 style="text-align: center; margin-bottom: 10px;">Double Cropping Transitions</h4>
+                    <div style="height: 300px; width: 100%;">
+                        <canvas id="doubleSankeyChart"></canvas>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 style="text-align: center; margin-bottom: 10px;">Triple Cropping Transitions</h4>
+                    <div style="height: 300px; width: 100%;">
+                        <canvas id="tripleSankeyChart"></canvas>
+                    </div>
                 </div>
             </div>
         </section>
@@ -868,7 +893,14 @@
         document.getElementById('nrega-villages').textContent = socioNrega.total_villages;
         document.getElementById('fishery-area').textContent = fisheryPotential.total_area.toFixed(2);
         document.getElementById('agroforestry-area').textContent = agroforestryTransition.total_area.toFixed(2);
-        
+
+        document.getElementById('groundwater-area-1').textContent = groundwaterStress.total_all_area.toFixed(2);
+        document.getElementById('drought-area-1').textContent = highDroughtIncidence.total_all_area.toFixed(2);
+        document.getElementById('irrigation-area-1').textContent = highIrrigationRisk.total_all_area.toFixed(2);
+        document.getElementById('yield-area-1').textContent = lowYield.total_all_area.toFixed(2);
+        document.getElementById('forest-area-1').textContent = forestDegradation.total_all_area.toFixed(2);
+        document.getElementById('nrega-villages-1').textContent = socioNrega.total_all_villages;
+        document.getElementById('agroforestry-area-1').textContent = agroforestryTransition.total_all_area.toFixed(2);
 
         function getColorForIntensity(intensity) {
 
@@ -2263,69 +2295,41 @@
             }
         });
 
-        const agroforestrySankeyData = {
+        const singleSankeyData = {
             datasets: [{
-                label: 'Cropping Intensity Transition',
-                data: agroforestrySankey.links.map(link => ({
-                    from: agroforestrySankey.nodes[link.source].name,
-                    to: agroforestrySankey.nodes[link.target].name,
+                label: 'Single Cropping Transition',
+                data: agroforestrySankey.single.links.map(link => ({
+                    from: agroforestrySankey.single.nodes[link.source].name,
+                    to: agroforestrySankey.single.nodes[link.target].name,
                     flow: link.value
                 })),
-                colorFrom: (c) => {
-                    const fromNode = c.dataset.data[c.dataIndex].from;
-                    if (fromNode === 'Single Cropping (Initial)') {
-                        return 'rgba(244, 67, 54, 0.8)';
-                    } else if (fromNode === 'Double Cropping (Initial)') {
-                        return 'rgba(255, 193, 7, 0.8)';
-                    } else if (fromNode === 'Triple Cropping (Initial)') {
-                        return 'rgba(76, 175, 80, 0.8)';
-                    }
-                    return 'rgba(158, 158, 158, 0.5)';
-                },
+                colorFrom: () => 'rgba(244, 67, 54, 0.8)', // Red for single
                 colorTo: (c) => {
                     const toNode = c.dataset.data[c.dataIndex].to;
                     if (toNode === 'Single Cropping (Final)') {
-                        return 'rgba(244, 67, 54, 0.8)';
+                        return 'rgba(244, 67, 54, 0.8)'; // Red
                     } else if (toNode === 'Double Cropping (Final)') {
-                        return 'rgba(255, 193, 7, 0.8)';
+                        return 'rgba(255, 193, 7, 0.8)'; // Amber
                     } else if (toNode === 'Triple Cropping (Final)') {
-                        return 'rgba(76, 175, 80, 0.8)';
+                        return 'rgba(76, 175, 80, 0.8)'; // Green
                     }
                     return 'rgba(158, 158, 158, 0.5)';
                 },
                 colorMode: 'gradient',
                 size: 'max',
                 borderWidth: 1,
-                borderColor: 'white',
-                // Add priority/column information
-                priority: {
-                    'Single Cropping (Initial)': 0,
-                    'Double Cropping (Initial)': 1,
-                    'Triple Cropping (Initial)': 2,
-                    'Single Cropping (Final)': 0,
-                    'Double Cropping (Final)': 1,
-                    'Triple Cropping (Final)': 2
-                }
+                borderColor: 'white'
             }]
         };
 
-        const agroforestrySankeyChart = new Chart(document.getElementById('agroforestrySankeyChart'), {
+        const singleSankeyChart = new Chart(document.getElementById('singleSankeyChart'), {
             type: 'sankey',
-            data: agroforestrySankeyData,
+            data: singleSankeyData,
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    title: {
-                        display: true,
-                        text: 'Cropping Intensity Transitions (Area in Hectares)',
-                        font: {
-                            size: 16
-                        }
-                    },
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
@@ -2334,24 +2338,107 @@
                             }
                         }
                     }
+                }
+            }
+        });
+
+        // Double Cropping Sankey
+        const doubleSankeyData = {
+            datasets: [{
+                label: 'Double Cropping Transition',
+                data: agroforestrySankey.double.links.map(link => ({
+                    from: agroforestrySankey.double.nodes[link.source].name,
+                    to: agroforestrySankey.double.nodes[link.target].name,
+                    flow: link.value
+                })),
+                colorFrom: () => 'rgba(255, 193, 7, 0.8)', // Amber for double
+                colorTo: (c) => {
+                    const toNode = c.dataset.data[c.dataIndex].to;
+                    if (toNode === 'Single Cropping (Final)') {
+                        return 'rgba(244, 67, 54, 0.8)'; // Red
+                    } else if (toNode === 'Double Cropping (Final)') {
+                        return 'rgba(255, 193, 7, 0.8)'; // Amber
+                    } else if (toNode === 'Triple Cropping (Final)') {
+                        return 'rgba(76, 175, 80, 0.8)'; // Green
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
                 },
-                // Add layout options to control node positioning
-                layout: {
-                    nodeSort: (a, b) => {
-                        // Sort by priority
-                        const priorityMap = {
-                            'Single Cropping (Initial)': 0,
-                            'Double Cropping (Initial)': 1,
-                            'Triple Cropping (Initial)': 2,
-                            'Single Cropping (Final)': 3,
-                            'Double Cropping (Final)': 4,
-                            'Triple Cropping (Final)': 5
-                        };
-                        return priorityMap[a.key] - priorityMap[b.key];
+                colorMode: 'gradient',
+                size: 'max',
+                borderWidth: 1,
+                borderColor: 'white'
+            }]
+        };
+
+        const doubleSankeyChart = new Chart(document.getElementById('doubleSankeyChart'), {
+            type: 'sankey',
+            data: doubleSankeyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = context.dataset.data[context.dataIndex];
+                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
+                            }
+                        }
                     }
                 }
             }
         });
+
+        // Triple Cropping Sankey
+        const tripleSankeyData = {
+            datasets: [{
+                label: 'Triple Cropping Transition',
+                data: agroforestrySankey.triple.links.map(link => ({
+                    from: agroforestrySankey.triple.nodes[link.source].name,
+                    to: agroforestrySankey.triple.nodes[link.target].name,
+                    flow: link.value
+                })),
+                colorFrom: () => 'rgba(76, 175, 80, 0.8)', // Green for triple
+                colorTo: (c) => {
+                    const toNode = c.dataset.data[c.dataIndex].to;
+                    if (toNode === 'Single Cropping (Final)') {
+                        return 'rgba(244, 67, 54, 0.8)'; // Red
+                    } else if (toNode === 'Double Cropping (Final)') {
+                        return 'rgba(255, 193, 7, 0.8)'; // Amber
+                    } else if (toNode === 'Triple Cropping (Final)') {
+                        return 'rgba(76, 175, 80, 0.8)'; // Green
+                    }
+                    return 'rgba(158, 158, 158, 0.5)';
+                },
+                colorMode: 'gradient',
+                size: 'max',
+                borderWidth: 1,
+                borderColor: 'white'
+            }]
+        };
+
+        const tripleSankeyChart = new Chart(document.getElementById('tripleSankeyChart'), {
+            type: 'sankey',
+            data: tripleSankeyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const item = context.dataset.data[context.dataIndex];
+                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        
         //? Data Check
         function hasSectionData(dataObj) {
             if (!dataObj) return false;
