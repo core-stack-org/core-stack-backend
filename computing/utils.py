@@ -64,9 +64,12 @@ def push_shape_to_geoserver(
     path, store_name=None, workspace=None, layer_name=None, file_type="shp"
 ):
     geo = Geoserver()
+
     print(f"layer_name: {layer_name}")
     if layer_name:
+        geo.delete_layer(layer_name, workspace)
         geo.delete_vector_store(workspace=workspace, store=layer_name)
+
     zip_path = convert_to_zip(path, file_type)
     print(path)
     print(store_name)
