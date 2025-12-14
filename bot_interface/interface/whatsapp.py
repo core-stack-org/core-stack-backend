@@ -2748,8 +2748,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         )
 
                 # Run in background thread to avoid blocking SMJ flow
-                thread = threading.Thread(target=async_submit, daemon=True)
-                thread.start()
+                #thread = threading.Thread(target=async_submit, daemon=True)
+                #thread.start()
+                async_submit()
                 print(
                     f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}"
                 )
@@ -3390,6 +3391,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 user_log = UserLogs.objects.get(id=user_log_id)
             except UserLogs.DoesNotExist:
+                print ("user log not found") 
                 return {
                     "success": False,
                     "message": f"UserLogs record with id {user_log_id} not found",
@@ -3518,13 +3520,13 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Prepare API payload
             payload = {
-                "item_type": item_type,
+                "item_type": 'Asset_Demand',
                 "coordinates": json.dumps(coordinates) if coordinates else "",
                 "number": contact_number,
                 "community_id": community_id,
                 "source": "BOT",
                 "bot_id": user_log.bot.id,
-                "title": f"{item_type}",  # Auto-generated if not provided
+                "title": f"Asset_Demand",  # Auto-generated if not provided
                 "transcript": work_demand_data.get(
                     "description", ""
                 ),  # If any description exists

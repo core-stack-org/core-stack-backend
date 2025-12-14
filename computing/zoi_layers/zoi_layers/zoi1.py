@@ -46,9 +46,11 @@ def generate_zoi1(
     asset_folder_list=None,
     app_type="MWS",
     gee_account_id=None,
-    proj_id=None,
+    proj_id = None
 ):
     print("insdie zoi")
+    start_date = '2017-07-01'
+    end_date = '2025-06-30'
     ee_initialize(gee_account_id)
     description = "swb4_" + asset_suffix
     asset_id = (
@@ -58,8 +60,8 @@ def generate_zoi1(
         + description
     )
     if roi:
-        print("inside roi")
-        print(roi)
+        print ("inside roi")
+        print (roi)
         roi = ee.FeatureCollection(roi)
     else:
         roi = ee.FeatureCollection(asset_id)
@@ -70,8 +72,7 @@ def generate_zoi1(
         )
         + description_zoi
     )
-    start_date = "2017-07-01"
-    end_date = "2025-06-30"
+
     zoi_fc = roi.map(compute_zoi)
     zoi_fc = ee.FeatureCollection(zoi_fc)
     zoi_rings = zoi_fc.filter(ee.Filter.gt("zoi_wb", 0)).map(create_ring)
@@ -81,7 +82,7 @@ def generate_zoi1(
         make_asset_public(asset_id_zoi)
     if state and district and block:
         layer_name = f"waterbodies_zoi_{asset_suffix}"
-        print(layer_name)
+        print (layer_name)
         layer_at_geoserver = sync_asset_to_db_and_geoserver(
             asset_id_zoi,
             layer_name,
@@ -95,7 +96,7 @@ def generate_zoi1(
     else:
         proj_obj = Project.objects.get(pk=proj_id)
         layer_name = f"waterbodies_zoi_{asset_suffix}"
-        print(layer_name)
+        print (layer_name)
         sync_project_fc_to_geoserver(zoi_rings, proj_obj.name, layer_name, "zoi_layers")
 
 

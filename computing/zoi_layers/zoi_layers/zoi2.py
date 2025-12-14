@@ -1,11 +1,10 @@
-from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import valid_gee_text, get_gee_dir_path, make_asset_public
 from projects.models import Project
 from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 import ee
-
+from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 
 def generate_zoi_ci(
     state=None,
@@ -15,12 +14,14 @@ def generate_zoi_ci(
     asset_folder_list=None,
     app_type="MWS",
     gee_account_id=None,
-    proj_id=None,
-    roi=None,
+    proj_id = None,
+    roi  = None
 ):
     from computing.cropping_intensity.cropping_intensity import (
         generate_cropping_intensity,
     )
+    start_date = '2017-07-01'
+    end_date = '2025-06-30'
 
     if state and district and block:
         asset_suffix = (
@@ -57,16 +58,14 @@ def generate_zoi_ci(
         end_year=2023,
         gee_account_id=gee_account_id,
     )
-    start_date = "2017-07-01"
-    end_date = "2025-06-30"
     description_zoi_ci = f"cropping_intensity_zoi_{asset_suffix}"
 
     asset_id_zoi_ci = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+             get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + description_zoi_ci
         )
-        + description_zoi_ci
-    )
     if state and district and block:
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         layer_at_geoserver = sync_asset_to_db_and_geoserver(
