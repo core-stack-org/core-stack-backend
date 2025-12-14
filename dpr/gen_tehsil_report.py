@@ -1235,7 +1235,7 @@ def get_agri_water_drought_data(state, district, block):
                     if pd.notna(moderate_val) and pd.notna(severe_val):
                         year_sum = float(moderate_val) + float(severe_val)
                         
-                        if year_sum > 5:
+                        if year_sum >= 5:
                             drought_year_count += 1
             
             if drought_year_count >= 2:
@@ -1280,10 +1280,13 @@ def get_agri_water_drought_data(state, district, block):
             if intensity >= 1.0:
                 mws_pattern[uid] = True
         
-        # Find UIDs that passed BOTH indicators (for area calculation)
+        # Find UIDs that passed BOTH indicators (for total_area)
         matched_uids = indicator1_uids.intersection(indicator2_uids)
         
-        # Calculate total area of matched MWS
+        # Find UIDs that passed AT LEAST ONE indicator (for timeline denominator)
+        any_indicator_uids = indicator1_uids.union(indicator2_uids)
+        
+        # Calculate total area of matched MWS (both indicators)
         total_matched_area = 0.0
         for index, row in df_area.iterrows():
             uid = row['UID']
@@ -1302,8 +1305,8 @@ def get_agri_water_drought_data(state, district, block):
             for index, row in df_drought.iterrows():
                 uid = row['UID']
                 
-                # Only include matched UIDs
-                if uid in matched_uids:
+                # Include MWS units where AT LEAST ONE indicator matches
+                if uid in any_indicator_uids:
                     # Get cropping area for this MWS from df_area
                     area_row = df_area[df_area['UID'] == uid]
                     if not area_row.empty:
@@ -1333,14 +1336,14 @@ def get_agri_water_drought_data(state, district, block):
             else:
                 weighted_drought_timeline[year] = 0.0
         
-        # Calculate total area of ALL MWS (more concise)
+        # Calculate total area of ALL MWS
         total_all_area = float(df_area['sum_area_in_ha'].sum())
 
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
             "total_area": total_matched_area,
-            "total_all_area" : total_all_area
+            "total_all_area": total_all_area
         }
         
         return result, weighted_drought_timeline
@@ -1357,7 +1360,7 @@ def get_agri_water_drought_data(state, district, block):
             "mws_pattern": {},
             "mws_intensity": {},
             "total_area": 0.0,
-            "total_all_area" : 0.0
+            "total_all_area": 0.0
         }, {}
 
 

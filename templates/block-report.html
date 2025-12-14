@@ -1694,6 +1694,25 @@
         const droughtYears = Object.keys(droughtTimeline).sort();
         const droughtValues = droughtYears.map(year => (droughtTimeline[year] * 100).toFixed(2)); // Convert to percentage
 
+        // Calculate dynamic Y-axis range
+        const droughtValuesNumeric = droughtValues.map(v => parseFloat(v));
+        const minValue = Math.min(...droughtValuesNumeric);
+        const maxValue = Math.max(...droughtValuesNumeric);
+
+        // Add 10% padding above and below for better visibility
+        const range = maxValue - minValue;
+        const padding = Math.max(range * 0.1, 5); // At least 5% padding
+
+        let yAxisMin = Math.max(0, minValue - padding);
+        let yAxisMax = Math.min(100, maxValue + padding);
+
+        // Ensure minimum range of 20% for visibility
+        if (yAxisMax - yAxisMin < 20) {
+            const center = (yAxisMax + yAxisMin) / 2;
+            yAxisMin = Math.max(0, center - 10);
+            yAxisMax = Math.min(100, center + 10);
+        }
+
         const droughtTimelineChart = new Chart(document.getElementById('weighted_drought_timeline'), {
             type: 'line',
             data: {
@@ -1705,7 +1724,7 @@
                     borderColor: 'rgba(244, 67, 54, 1)',
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.4,  // Smooth curve
+                    tension: 0.4,
                     pointRadius: 5,
                     pointBackgroundColor: 'rgba(244, 67, 54, 1)',
                     pointBorderColor: '#fff',
@@ -1738,15 +1757,15 @@
                 },
                 scales: {
                     y: {
-                        beginAtZero: true,
-                        max: 100,
+                        min: yAxisMin,
+                        max: yAxisMax,
                         title: {
                             display: true,
                             text: 'Percentage of Cropping Area Affected (%)'
                         },
                         ticks: {
                             callback: function(value) {
-                                return value + '%';
+                                return value.toFixed(1) + '%';
                             }
                         }
                     },
