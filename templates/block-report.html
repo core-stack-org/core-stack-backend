@@ -640,7 +640,7 @@
             <div id="mainMap" class="map"></div>
 
             <div class="legend-below-map">
-            <h4>Pattern Intensity</h4>
+            <h4>Stress Pattern Intensity</h4>
             <div class="legend-gradient-container">
                 <div class="legend-gradient-bar"></div>
                 <div class="legend-gradient-labels">
@@ -700,13 +700,13 @@
             
             <div id="groundwater-section">
                 <h3>Groundwater Stress</h3>
-                <p><span id="groundwater-area" class="number-class"></span> hectares out of <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater recharge structures, and groundwater collectives should be considered.</p>
+                <p><span id="groundwater-area" class="number-class"></span> hectares out of <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in tehsil appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater recharge structures, and groundwater collectives should be considered.</p>
                 <div id="agriMap" class="map map-only"></div>
             </div>
 
             <div id="drought-section">
                 <h3>High Drought Incidence</h3>
-                <p><span id="drought-area" class="number-class"></span> hectares out of <span id="drought-area-1" class="number-class"></span> hectares of cropping area appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater harvesting structures, and water user associations should be considered.</p>
+                <p><span id="drought-area" class="number-class"></span> hectares out of <span id="drought-area-1" class="number-class"></span> hectares of cropping area in tehsil appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater harvesting structures, and water user associations should be considered.</p>
                 
                 <div class="map-chart-container">
                     <div id="agriDroughtMap" class="map"></div>
@@ -718,7 +718,7 @@
 
             <div id="irrigation-section">
                 <h3>High Irrigation Risk</h3>
-                <p><span id="irrigation-area" class="number-class"></span> hectares out of <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water user associations, and construction of new waterbodies should be considered.</p>
+                <p><span id="irrigation-area" class="number-class"></span> hectares out of <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in tehsil appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water user associations, and construction of new waterbodies should be considered.</p>
 
                 <div class="map-chart-container">
                     <div id="agriIrrigationMap" class="map"></div>
@@ -730,7 +730,7 @@
 
             <div id="yield-section">
                 <h3>Low Yield</h3>
-                <p><span id="yield-area" class="number-class"></span> hectares out of <span id="yield-area-1" class="number-class"></span> hectares appears to have had a reduction in cropping area. The reasons should be investigated and changes in cropping patterns and methods to improve soil health should be considered.</p>
+                <p><span id="yield-area" class="number-class"></span> hectares out of <span id="yield-area-1" class="number-class"></span> hectares in tehsil appears to have had a reduction in cropping area. The reasons should be investigated and changes in cropping patterns and methods to improve soil health should be considered.</p>
                 <div class="map-chart-container">
                     <div id="agriYieldMap" class="map"></div>
                     <div class="chart-container">
@@ -743,7 +743,7 @@
         <section class="section" id="forest-section">
             <h2>Forests and livestock</h2>
             <h3>Forest Degradation</h3>
-            <p><span id="forest-area" class="number-class"></span> hectares out of <span id="forest-area-1" class="number-class"></span> hectares appears to have been vulnerable from overgrazing or other forest stress. Forest protection committees and strengthening of collective norms should be considered.</p>
+            <p><span id="forest-area" class="number-class"></span> hectares out of <span id="forest-area-1" class="number-class"></span> hectares in tehsil appears to have been vulnerable from overgrazing or other forest stress. Forest protection committees and strengthening of collective norms should be considered.</p>
             
             <div class="map-chart-container">
                 <div id="forestDegradMap" class="map"></div>
@@ -795,7 +795,7 @@
 
         <section class="section" id="fishery-section">
             <h2>Fishery</h2>
-            <p>Up to <span id="fishery-area" class="number-class"></span>% area appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year.</p>
+            <p>Up to <span id="fishery-area" class="number-class"></span>% area in tehsil appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year.</p>
             
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
@@ -807,7 +807,7 @@
 
         <section class="section" id="agroforestry-section">
             <h2>Agroforestry</h2>
-            <p>Up to <span id="agroforestry-area" class="number-class"></span> hectares out of <span id="agroforestry-area-1" class="number-class"></span> hectares could benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
+            <p>Up to <span id="agroforestry-area" class="number-class"></span> hectares out of <span id="agroforestry-area-1" class="number-class"></span> hectares in tehsil could benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
             
             <!-- Map on the left -->
             <div style="width: 100%; margin: 20px 0;">
@@ -2543,6 +2543,85 @@
         if (!hasSectionData(agroforestryTransition)) {
             hideSection('agroforestry-section');
         }
+
+        // Print Report Function
+        function printReport() {
+            console.log('Print button clicked!');
+
+            try {
+                // Trigger print
+                window.print();
+
+            } catch (error) {
+                console.error('Error in printReport:', error);
+                // Fallback - just print
+                window.print();
+            }
+        }
+
+        // Also attach to window object as backup
+        window.printReport = printReport;
+
+        // Update the beforeprint event handler to force map rendering
+        window.addEventListener('beforeprint', function () {
+            console.log('Preparing for print...');
+            const allMaps = [
+                mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap, 
+                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap, 
+                NREGAMap, FisheryMap, AgroforestryMap, AquiferMap, 
+                SogeMap, wellDepthMap
+            ];
+
+            allMaps.forEach(function (map) {
+                if (map) {
+                    try {
+                        // Force the map to recalculate its size
+                        map.updateSize();
+                        // Force synchronous rendering
+                        map.renderSync();
+                    } catch (e) {
+                        console.log('Error updating map:', e);
+                    }
+                }
+            });
+        });
+
+        window.addEventListener('afterprint', function () {
+            console.log('Print complete');
+
+            // Remove the print-visible class after printing (if you add this feature later)
+            const printVisibleItems = document.querySelectorAll('.print-visible');
+            printVisibleItems.forEach(item => {
+                item.classList.remove('print-visible');
+            });
+
+            // Force maps to restore to normal size
+            const allMaps = [
+                mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap, 
+                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap, 
+                NREGAMap, FisheryMap, AgroforestryMap, AquiferMap, 
+                SogeMap, wellDepthMap
+            ];
+
+            setTimeout(function () {
+                allMaps.forEach(function (map) {
+                    if (map) {
+                        try {
+                            map.updateSize();
+                        } catch (e) {
+                            console.log('Error restoring map:', e);
+                        }
+                    }
+                });
+            }, 100);
+        });
+
+        // Set report date
+        document.getElementById('report-date').textContent = new Date().toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
 
    </script>
 </body>
