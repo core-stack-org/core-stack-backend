@@ -14,11 +14,11 @@ def sync_settlement_odk_data(get_edited_updated_all_submissions):
     )
 
     filter_query = (
-        "$filter=(day(__system/submissionDate) ge 28 "
-        "and month(__system/submissionDate) ge 11 "
+        "$filter=(day(__system/submissionDate) ge 14 "
+        "and month(__system/submissionDate) ge 12 "
         "and year(__system/submissionDate) ge 2025) "
-        "or (day(__system/updatedAt) ge 28 "
-        "and month(__system/updatedAt) ge 11 "
+        "or (day(__system/updatedAt) ge 14 "
+        "and month(__system/updatedAt) ge 12 "
         "and year(__system/updatedAt) eq 2025)"
     )
 
