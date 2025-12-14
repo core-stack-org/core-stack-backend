@@ -20,6 +20,45 @@ from .serializers import (
     PlanUpdateSerializer,
 )
 
+STATE_CENTROIDS = {
+    "01": {"lat": 34.0837, "lon": 74.7973},  # Jammu & Kashmir
+    "02": {"lat": 31.1048, "lon": 77.1734},  # Himachal Pradesh
+    "03": {"lat": 31.1471, "lon": 75.3412},  # Punjab
+    "04": {"lat": 30.0668, "lon": 79.0193},  # Uttarakhand
+    "05": {"lat": 29.0588, "lon": 76.0856},  # Haryana
+    "06": {"lat": 28.7041, "lon": 77.1025},  # Delhi
+    "07": {"lat": 26.8467, "lon": 80.9462},  # Uttar Pradesh
+    "08": {"lat": 26.4499, "lon": 74.6399},  # Rajasthan
+    "09": {"lat": 22.9734, "lon": 78.6569},  # Madhya Pradesh
+    "10": {"lat": 22.2587, "lon": 71.1924},  # Gujarat
+    "11": {"lat": 19.7515, "lon": 75.7139},  # Maharashtra
+    "12": {"lat": 15.3173, "lon": 75.7139},  # Karnataka
+    "13": {"lat": 15.2993, "lon": 74.1240},  # Goa
+    "14": {"lat": 34.1526, "lon": 77.5771},  # Ladakh
+    "15": {"lat": 10.8505, "lon": 76.2711},  # Kerala
+    "16": {"lat": 11.1271, "lon": 78.6569},  # Tamil Nadu
+    "17": {"lat": 15.9129, "lon": 79.7400},  # Andhra Pradesh
+    "18": {"lat": 20.9517, "lon": 85.0985},  # Odisha
+    "19": {"lat": 22.9868, "lon": 87.8550},  # West Bengal
+    "20": {"lat": 23.6102, "lon": 85.2799},  # Jharkhand
+    "21": {"lat": 25.0961, "lon": 85.3131},  # Bihar
+    "22": {"lat": 26.2006, "lon": 92.9376},  # Assam
+    "23": {"lat": 27.5330, "lon": 88.5122},  # Sikkim
+    "24": {"lat": 23.1645, "lon": 92.9376},  # Mizoram
+    "25": {"lat": 24.6637, "lon": 93.9063},  # Manipur
+    "26": {"lat": 25.4670, "lon": 91.3662},  # Meghalaya
+    "27": {"lat": 27.1004, "lon": 93.6166},  # Arunachal Pradesh
+    "28": {"lat": 25.6751, "lon": 94.1086},  # Nagaland
+    "29": {"lat": 23.7451, "lon": 91.7468},  # Tripura
+    "30": {"lat": 21.2787, "lon": 81.8661},  # Chhattisgarh
+    "32": {"lat": 10.5667, "lon": 72.6417},  # Lakshadweep
+    "33": {"lat": 11.9416, "lon": 79.8083},  # Puducherry
+    "34": {"lat": 30.7333, "lon": 76.7794},  # Chandigarh
+    "35": {"lat": 11.7401, "lon": 92.6586},  # Andaman & Nicobar
+    "36": {"lat": 17.1232, "lon": 79.2088},  # Telangana
+    "37": {"lat": 20.2376, "lon": 73.0167},  # Dadra & Nagar Haveli and Daman & Diu
+}
+
 
 class PlanPermission(permissions.BasePermission):
     """
@@ -306,14 +345,17 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
             for stat in state_stats:
+                state_id_val = stat["state"]
+                centroid = STATE_CENTROIDS.get(state_id_val, {})
                 state_breakdown.append(
                     {
-                        "state_id": stat["state"],
+                        "state_id": state_id_val,
                         "state_name": stat["state__state_name"],
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
                         "dpr_generated": stat["dpr_generated"],
                         "dpr_approved": stat["dpr_approved"],
+                        "centroid": centroid if centroid else None,
                     }
                 )
 
@@ -771,14 +813,17 @@ class PlanViewSet(viewsets.ModelViewSet):
             )
 
             for stat in state_stats:
+                state_id_val = stat["state"]
+                centroid = STATE_CENTROIDS.get(state_id_val, {})
                 state_breakdown.append(
                     {
-                        "state_id": stat["state"],
+                        "state_id": state_id_val,
                         "state_name": stat["state__state_name"],
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
                         "dpr_generated": stat["dpr_generated"],
                         "dpr_approved": stat["dpr_approved"],
+                        "centroid": centroid if centroid else None,
                     }
                 )
 
