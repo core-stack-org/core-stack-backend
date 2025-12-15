@@ -10,7 +10,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from geoadmin.models import UserAPIKey
 from organization.models import Organization
 from projects.models import AppType, Project
-from users.models import UserProjectGroup
+from users.models import User, UserProjectGroup
 
 from .models import PlanApp
 from .serializers import (
@@ -481,6 +481,101 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         return PlanApp.objects.none()
 
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="steward-details",
+        authentication_classes=[APIKeyOrJWTAuth],
+    )
+    def steward_details(self, request, *args, **kwargs):
+        """
+        Get details of a facilitator (steward) by username at organization level.
+
+        Query Parameters:
+        - username: The facilitator's username (required)
+
+        URL: /api/v1/organization/{organization_id}/watershed/plans/steward-details/?username=xxx
+        """
+        username = request.query_params.get("username")
+        if not username:
+            return Response(
+                {"message": "username query parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.select_related("organization").get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        organization_id = self.kwargs.get("organization_pk")
+        plans_queryset = PlanApp.objects.filter(facilitator_name=username, enabled=True)
+
+        if organization_id:
+            plans_queryset = plans_queryset.filter(organization_id=organization_id)
+
+        total_plans = plans_queryset.count()
+        dpr_completed = plans_queryset.filter(is_dpr_approved=True).count()
+
+        working_locations = plans_queryset.values(
+            "state",
+            "state__state_name",
+            "district",
+            "district__district_name",
+            "tehsil_soi",
+            "tehsil_soi__tehsil_name",
+        ).distinct()
+
+        states = {}
+        districts = {}
+        tehsils = {}
+        for loc in working_locations:
+            if loc["state"]:
+                states[loc["state"]] = loc["state__state_name"]
+            if loc["district"]:
+                districts[loc["district"]] = loc["district__district_name"]
+            if loc["tehsil_soi"]:
+                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
+
+        projects = list(plans_queryset.values("project", "project__name").distinct())
+
+        profile_picture_url = None
+        if user.profile_picture:
+            profile_picture_url = request.build_absolute_uri(user.profile_picture.url)
+
+        response_data = {
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "age": user.age,
+            "gender": user.get_gender_display() if user.gender else None,
+            "education_qualification": user.education_qualification,
+            "organization": {
+                "id": user.organization.id,
+                "name": user.organization.name,
+            }
+            if user.organization
+            else None,
+            "projects": [
+                {"id": p["project"], "name": p["project__name"]} for p in projects
+            ],
+            "profile_picture": profile_picture_url,
+            "statistics": {
+                "total_plans": total_plans,
+                "dpr_completed": dpr_completed,
+            },
+            "working_locations": {
+                "states": [{"id": k, "name": v} for k, v in states.items()],
+                "districts": [{"id": k, "name": v} for k, v in districts.items()],
+                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
+            },
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
 
 class PlanViewSet(viewsets.ModelViewSet):
     """
@@ -910,6 +1005,106 @@ class PlanViewSet(viewsets.ModelViewSet):
             "state_id": state_id,
             "district_id": district_id,
             "block_id": block_id,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="steward-details",
+        authentication_classes=[APIKeyOrJWTAuth],
+    )
+    def steward_details(self, request, *args, **kwargs):
+        """
+        Get details of a facilitator (steward) by username.
+
+        Query Parameters:
+        - username: The facilitator's username (required)
+
+        URL: /api/v1/projects/{project_id}/watershed/plans/steward-details/?username=xxx
+
+        Returns:
+        - User profile details
+        - Plan statistics (count, DPR completed)
+        - Working locations (states, districts, tehsils)
+        """
+        username = request.query_params.get("username")
+        if not username:
+            return Response(
+                {"message": "username query parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.select_related("organization").get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        plans_queryset = PlanApp.objects.filter(facilitator_name=username, enabled=True)
+
+        project_id = self.kwargs.get("project_pk")
+        if project_id:
+            plans_queryset = plans_queryset.filter(project_id=project_id)
+
+        total_plans = plans_queryset.count()
+        dpr_completed = plans_queryset.filter(is_dpr_approved=True).count()
+
+        working_locations = plans_queryset.values(
+            "state",
+            "state__state_name",
+            "district",
+            "district__district_name",
+            "tehsil_soi",
+            "tehsil_soi__tehsil_name",
+        ).distinct()
+
+        states = {}
+        districts = {}
+        tehsils = {}
+        for loc in working_locations:
+            if loc["state"]:
+                states[loc["state"]] = loc["state__state_name"]
+            if loc["district"]:
+                districts[loc["district"]] = loc["district__district_name"]
+            if loc["tehsil_soi"]:
+                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
+
+        projects = list(plans_queryset.values("project", "project__name").distinct())
+
+        profile_picture_url = None
+        if user.profile_picture:
+            profile_picture_url = request.build_absolute_uri(user.profile_picture.url)
+
+        response_data = {
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "age": user.age,
+            "gender": user.get_gender_display() if user.gender else None,
+            "education_qualification": user.education_qualification,
+            "organization": {
+                "id": user.organization.id,
+                "name": user.organization.name,
+            }
+            if user.organization
+            else None,
+            "projects": [
+                {"id": p["project"], "name": p["project__name"]} for p in projects
+            ],
+            "profile_picture": profile_picture_url,
+            "statistics": {
+                "total_plans": total_plans,
+                "dpr_completed": dpr_completed,
+            },
+            "working_locations": {
+                "states": [{"id": k, "name": v} for k, v in states.items()],
+                "districts": [{"id": k, "name": v} for k, v in districts.items()],
+                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
+            },
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
