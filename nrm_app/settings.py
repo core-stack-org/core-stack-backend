@@ -62,7 +62,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "0.0.0.0",
     "api-doc.core-stack.org",
-    "0cb52a0325c7.ngrok-free.app",
+    "2bb02f703cef.ngrok-free.app",
     "odk.core-stack.org",
     "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
