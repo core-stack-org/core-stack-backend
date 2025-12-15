@@ -870,8 +870,8 @@
         const nregaPie = {{nrega_pie_json|safe}};
         const fisheryPotential = {{fishery_potential_json|safe}};
         const fisheryTimeline = {{fishery_timeline_json|safe}};
-        const agroforestryTransition = {{agroforestry_transition_json|safe}};
-        const agroforestrySankey = {{agroforestry_sankey_json|safe}};
+        //const agroforestryTransition = {{agroforestry_transition_json|safe}};
+        //const agroforestrySankey = {{agroforestry_sankey_json|safe}};
 
 
         const intensityValues = Object.values(mwsPatternIntensity);
@@ -892,7 +892,7 @@
         document.getElementById('caste-villages').textContent = socioCaste.total_villages;
         document.getElementById('nrega-villages').textContent = socioNrega.total_villages;
         document.getElementById('fishery-area').textContent = fisheryPotential.total_area.toFixed(2);
-        document.getElementById('agroforestry-area').textContent = agroforestryTransition.total_area.toFixed(2);
+        //document.getElementById('agroforestry-area').textContent = agroforestryTransition.total_area.toFixed(2);
 
         document.getElementById('groundwater-area-1').textContent = groundwaterStress.total_all_area.toFixed(2);
         document.getElementById('drought-area-1').textContent = highDroughtIncidence.total_all_area.toFixed(2);
@@ -900,7 +900,7 @@
         document.getElementById('yield-area-1').textContent = lowYield.total_all_area.toFixed(2);
         document.getElementById('forest-area-1').textContent = forestDegradation.total_all_area.toFixed(2);
         document.getElementById('nrega-villages-1').textContent = socioNrega.total_all_villages;
-        document.getElementById('agroforestry-area-1').textContent = agroforestryTransition.total_all_area.toFixed(2);
+        //document.getElementById('agroforestry-area-1').textContent = agroforestryTransition.total_all_area.toFixed(2);
 
         function getColorForIntensity(intensity) {
 
@@ -1452,10 +1452,10 @@
                 style: createStyleFunction(fisheryPotential),
             }); 
 
-            const vectorLayer10 = new ol.layer.Vector({
-                source: vectorSource,
-                style: createStyleFunction(agroforestryTransition),
-            }); 
+            //const vectorLayer10 = new ol.layer.Vector({
+            //    source: vectorSource,
+            //    style: createStyleFunction(agroforestryTransition),
+            //}); 
 
             const arr = vectorSource.getExtent();
             const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
@@ -1469,7 +1469,7 @@
             //CasteMap.addLayer(vectorLayer7);
             //NREGAMap.addLayer(vectorLayer8)
             FisheryMap.addLayer(vectorLayer9)
-            AgroforestryMap.addLayer(vectorLayer10)
+            //AgroforestryMap.addLayer(vectorLayer10)
 
             AgricultureMap.getView().setCenter(mapcenter);
             AgriDroughtMap.getView().setCenter(mapcenter);
@@ -1480,7 +1480,7 @@
             //CasteMap.getView().setCenter(mapcenter);
             //NREGAMap.getView().setCenter(mapcenter);
             FisheryMap.getView().setCenter(mapcenter);
-            AgroforestryMap.getView().setCenter(mapcenter);
+            //AgroforestryMap.getView().setCenter(mapcenter);
         }).catch(error => console.error('Error fetching GeoJSON for Groundwater:', error));
 
         
@@ -2314,149 +2314,6 @@
             }
         });
 
-        const singleSankeyData = {
-            datasets: [{
-                label: 'Single Cropping Transition',
-                data: agroforestrySankey.single.links.map(link => ({
-                    from: agroforestrySankey.single.nodes[link.source].name,
-                    to: agroforestrySankey.single.nodes[link.target].name,
-                    flow: link.value
-                })),
-                colorFrom: () => 'rgba(244, 67, 54, 0.8)', // Red for single
-                colorTo: (c) => {
-                    const toNode = c.dataset.data[c.dataIndex].to;
-                    if (toNode === 'Single Cropping (Final)') {
-                        return 'rgba(244, 67, 54, 0.8)'; // Red
-                    } else if (toNode === 'Double Cropping (Final)') {
-                        return 'rgba(255, 193, 7, 0.8)'; // Amber
-                    } else if (toNode === 'Triple Cropping (Final)') {
-                        return 'rgba(76, 175, 80, 0.8)'; // Green
-                    }
-                    return 'rgba(158, 158, 158, 0.5)';
-                },
-                colorMode: 'gradient',
-                size: 'max',
-                borderWidth: 1,
-                borderColor: 'white'
-            }]
-        };
-
-        const singleSankeyChart = new Chart(document.getElementById('singleSankeyChart'), {
-            type: 'sankey',
-            data: singleSankeyData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const item = context.dataset.data[context.dataIndex];
-                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Double Cropping Sankey
-        const doubleSankeyData = {
-            datasets: [{
-                label: 'Double Cropping Transition',
-                data: agroforestrySankey.double.links.map(link => ({
-                    from: agroforestrySankey.double.nodes[link.source].name,
-                    to: agroforestrySankey.double.nodes[link.target].name,
-                    flow: link.value
-                })),
-                colorFrom: () => 'rgba(255, 193, 7, 0.8)', // Amber for double
-                colorTo: (c) => {
-                    const toNode = c.dataset.data[c.dataIndex].to;
-                    if (toNode === 'Single Cropping (Final)') {
-                        return 'rgba(244, 67, 54, 0.8)'; // Red
-                    } else if (toNode === 'Double Cropping (Final)') {
-                        return 'rgba(255, 193, 7, 0.8)'; // Amber
-                    } else if (toNode === 'Triple Cropping (Final)') {
-                        return 'rgba(76, 175, 80, 0.8)'; // Green
-                    }
-                    return 'rgba(158, 158, 158, 0.5)';
-                },
-                colorMode: 'gradient',
-                size: 'max',
-                borderWidth: 1,
-                borderColor: 'white'
-            }]
-        };
-
-        const doubleSankeyChart = new Chart(document.getElementById('doubleSankeyChart'), {
-            type: 'sankey',
-            data: doubleSankeyData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const item = context.dataset.data[context.dataIndex];
-                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Triple Cropping Sankey
-        const tripleSankeyData = {
-            datasets: [{
-                label: 'Triple Cropping Transition',
-                data: agroforestrySankey.triple.links.map(link => ({
-                    from: agroforestrySankey.triple.nodes[link.source].name,
-                    to: agroforestrySankey.triple.nodes[link.target].name,
-                    flow: link.value
-                })),
-                colorFrom: () => 'rgba(76, 175, 80, 0.8)', // Green for triple
-                colorTo: (c) => {
-                    const toNode = c.dataset.data[c.dataIndex].to;
-                    if (toNode === 'Single Cropping (Final)') {
-                        return 'rgba(244, 67, 54, 0.8)'; // Red
-                    } else if (toNode === 'Double Cropping (Final)') {
-                        return 'rgba(255, 193, 7, 0.8)'; // Amber
-                    } else if (toNode === 'Triple Cropping (Final)') {
-                        return 'rgba(76, 175, 80, 0.8)'; // Green
-                    }
-                    return 'rgba(158, 158, 158, 0.5)';
-                },
-                colorMode: 'gradient',
-                size: 'max',
-                borderWidth: 1,
-                borderColor: 'white'
-            }]
-        };
-
-        const tripleSankeyChart = new Chart(document.getElementById('tripleSankeyChart'), {
-            type: 'sankey',
-            data: tripleSankeyData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const item = context.dataset.data[context.dataIndex];
-                                return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        
         
         //? Data Check
         function hasSectionData(dataObj) {
@@ -2537,11 +2394,6 @@
         // Fishery section
         if (!hasSectionData(fisheryPotential)) {
             hideSection('fishery-section');
-        }
-
-        // Agroforestry section
-        if (!hasSectionData(agroforestryTransition)) {
-            hideSection('agroforestry-section');
         }
 
         // Print Report Function
