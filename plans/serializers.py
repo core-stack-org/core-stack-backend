@@ -54,6 +54,8 @@ class PlanAppSerializer(serializers.ModelSerializer):
             "is_dpr_generated",
             "is_dpr_reviewed",
             "is_dpr_approved",
+            "latitude",
+            "longitude",
         ]
         read_only_fields = [
             "id",

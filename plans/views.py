@@ -1,13 +1,16 @@
 # plans/views.py
+from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from geoadmin.models import UserAPIKey
 from organization.models import Organization
 from projects.models import AppType, Project
+from users.models import User, UserProjectGroup
 
 from .models import PlanApp
 from .serializers import (
@@ -16,6 +19,45 @@ from .serializers import (
     PlanSerializer,
     PlanUpdateSerializer,
 )
+
+STATE_CENTROIDS = {
+    "01": {"lat": 34.0837, "lon": 74.7973},  # Jammu & Kashmir
+    "02": {"lat": 31.1048, "lon": 77.1734},  # Himachal Pradesh
+    "03": {"lat": 31.1471, "lon": 75.3412},  # Punjab
+    "04": {"lat": 30.0668, "lon": 79.0193},  # Uttarakhand
+    "05": {"lat": 29.0588, "lon": 76.0856},  # Haryana
+    "06": {"lat": 28.7041, "lon": 77.1025},  # Delhi
+    "07": {"lat": 26.8467, "lon": 80.9462},  # Uttar Pradesh
+    "08": {"lat": 26.4499, "lon": 74.6399},  # Rajasthan
+    "09": {"lat": 22.9734, "lon": 78.6569},  # Madhya Pradesh
+    "10": {"lat": 22.2587, "lon": 71.1924},  # Gujarat
+    "11": {"lat": 19.7515, "lon": 75.7139},  # Maharashtra
+    "12": {"lat": 15.3173, "lon": 75.7139},  # Karnataka
+    "13": {"lat": 15.2993, "lon": 74.1240},  # Goa
+    "14": {"lat": 34.1526, "lon": 77.5771},  # Ladakh
+    "15": {"lat": 10.8505, "lon": 76.2711},  # Kerala
+    "16": {"lat": 11.1271, "lon": 78.6569},  # Tamil Nadu
+    "17": {"lat": 15.9129, "lon": 79.7400},  # Andhra Pradesh
+    "18": {"lat": 20.9517, "lon": 85.0985},  # Odisha
+    "19": {"lat": 22.9868, "lon": 87.8550},  # West Bengal
+    "20": {"lat": 23.6102, "lon": 85.2799},  # Jharkhand
+    "21": {"lat": 25.0961, "lon": 85.3131},  # Bihar
+    "22": {"lat": 26.2006, "lon": 92.9376},  # Assam
+    "23": {"lat": 27.5330, "lon": 88.5122},  # Sikkim
+    "24": {"lat": 23.1645, "lon": 92.9376},  # Mizoram
+    "25": {"lat": 24.6637, "lon": 93.9063},  # Manipur
+    "26": {"lat": 25.4670, "lon": 91.3662},  # Meghalaya
+    "27": {"lat": 27.1004, "lon": 93.6166},  # Arunachal Pradesh
+    "28": {"lat": 25.6751, "lon": 94.1086},  # Nagaland
+    "29": {"lat": 23.7451, "lon": 91.7468},  # Tripura
+    "30": {"lat": 21.2787, "lon": 81.8661},  # Chhattisgarh
+    "32": {"lat": 10.5667, "lon": 72.6417},  # Lakshadweep
+    "33": {"lat": 11.9416, "lon": 79.8083},  # Puducherry
+    "34": {"lat": 30.7333, "lon": 76.7794},  # Chandigarh
+    "35": {"lat": 11.7401, "lon": 92.6586},  # Andaman & Nicobar
+    "36": {"lat": 17.1232, "lon": 79.2088},  # Telangana
+    "37": {"lat": 20.2376, "lon": 73.0167},  # Dadra & Nagar Haveli and Daman & Diu
+}
 
 
 class PlanPermission(permissions.BasePermission):
@@ -198,6 +240,215 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(state=state_id)
         return queryset.order_by("-created_at")
 
+    @action(detail=False, methods=["get"], url_path="meta-stats")
+    def meta_stats(self, request, *args, **kwargs):
+        """
+        Get global meta statistics about watershed plans.
+        Excludes Test/Demo plans from counts.
+        Only accessible to superadmins and API key users.
+
+        Query Parameters:
+        - state: Filter by state ID
+        - district: Filter by district ID
+        - block: Filter by block ID
+        - project: Filter by project ID
+        - organization: Filter by organization ID
+
+        URL: /api/v1/watershed/plans/meta-stats/
+
+        Returns comprehensive statistics across all plans.
+        """
+        base_queryset = PlanApp.objects.filter(enabled=True)
+
+        base_queryset = base_queryset.exclude(
+            Q(plan__icontains="test") | Q(plan__icontains="demo")
+        )
+
+        organization_id = request.query_params.get("organization")
+        project_id = request.query_params.get("project")
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        block_id = request.query_params.get("block")
+
+        if organization_id:
+            base_queryset = base_queryset.filter(organization_id=organization_id)
+
+        if project_id:
+            base_queryset = base_queryset.filter(project_id=project_id)
+
+        if block_id:
+            base_queryset = base_queryset.filter(block_id=block_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_id=state_id)
+
+        total_plans = base_queryset.count()
+        completed_plans = base_queryset.filter(is_completed=True).count()
+        dpr_generated = base_queryset.filter(is_dpr_generated=True).count()
+        dpr_reviewed = base_queryset.filter(is_dpr_reviewed=True).count()
+        dpr_approved = base_queryset.filter(is_dpr_approved=True).count()
+
+        in_progress_plans = base_queryset.filter(is_completed=False).count()
+
+        pending_dpr_generation = base_queryset.filter(
+            is_completed=True, is_dpr_generated=False
+        ).count()
+
+        pending_dpr_review = base_queryset.filter(
+            is_dpr_generated=True, is_dpr_reviewed=False
+        ).count()
+
+        pending_dpr_approval = base_queryset.filter(
+            is_dpr_reviewed=True, is_dpr_approved=False
+        ).count()
+
+        organization_breakdown = []
+        state_breakdown = []
+        district_breakdown = []
+        block_breakdown = []
+
+        if not organization_id:
+            org_stats = (
+                base_queryset.values("organization", "organization__name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in org_stats:
+                organization_breakdown.append(
+                    {
+                        "organization_id": stat["organization"],
+                        "organization_name": stat["organization__name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                    }
+                )
+
+        if not block_id and not district_id:
+            state_stats = (
+                base_queryset.values("state", "state__state_name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in state_stats:
+                state_id_val = stat["state"]
+                centroid = STATE_CENTROIDS.get(state_id_val, {})
+                state_breakdown.append(
+                    {
+                        "state_id": state_id_val,
+                        "state_name": stat["state__state_name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                        "centroid": centroid if centroid else None,
+                    }
+                )
+
+        if not block_id and (district_id or state_id):
+            district_stats = (
+                base_queryset.values("district", "district__district_name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in district_stats:
+                district_breakdown.append(
+                    {
+                        "district_id": stat["district"],
+                        "district_name": stat["district__district_name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                    }
+                )
+
+        if district_id or state_id or block_id:
+            block_stats = (
+                base_queryset.values("block", "block__block_name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in block_stats:
+                block_breakdown.append(
+                    {
+                        "block_id": stat["block"],
+                        "block_name": stat["block__block_name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                    }
+                )
+
+        response_data = {
+            "summary": {
+                "total_plans": total_plans,
+                "completed_plans": completed_plans,
+                "in_progress_plans": in_progress_plans,
+                "dpr_generated": dpr_generated,
+                "dpr_reviewed": dpr_reviewed,
+                "dpr_approved": dpr_approved,
+                "pending_dpr_generation": pending_dpr_generation,
+                "pending_dpr_review": pending_dpr_review,
+                "pending_dpr_approval": pending_dpr_approval,
+            },
+            "completion_rate": round((completed_plans / total_plans * 100), 2)
+            if total_plans > 0
+            else 0,
+            "dpr_generation_rate": round((dpr_generated / total_plans * 100), 2)
+            if total_plans > 0
+            else 0,
+            "dpr_approval_rate": round((dpr_approved / total_plans * 100), 2)
+            if total_plans > 0
+            else 0,
+        }
+
+        if organization_breakdown:
+            response_data["organization_breakdown"] = organization_breakdown
+        if state_breakdown:
+            response_data["state_breakdown"] = state_breakdown
+        if district_breakdown:
+            response_data["district_breakdown"] = district_breakdown
+        if block_breakdown:
+            response_data["block_breakdown"] = block_breakdown
+
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "project_id": project_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "block_id": block_id,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
 
 class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -229,6 +480,101 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
                 return PlanApp.objects.none()
 
         return PlanApp.objects.none()
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="steward-details",
+        authentication_classes=[APIKeyOrJWTAuth],
+    )
+    def steward_details(self, request, *args, **kwargs):
+        """
+        Get details of a facilitator (steward) by username at organization level.
+
+        Query Parameters:
+        - username: The facilitator's username (required)
+
+        URL: /api/v1/organization/{organization_id}/watershed/plans/steward-details/?username=xxx
+        """
+        username = request.query_params.get("username")
+        if not username:
+            return Response(
+                {"message": "username query parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.select_related("organization").get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        organization_id = self.kwargs.get("organization_pk")
+        plans_queryset = PlanApp.objects.filter(facilitator_name=username, enabled=True)
+
+        if organization_id:
+            plans_queryset = plans_queryset.filter(organization_id=organization_id)
+
+        total_plans = plans_queryset.count()
+        dpr_completed = plans_queryset.filter(is_dpr_approved=True).count()
+
+        working_locations = plans_queryset.values(
+            "state",
+            "state__state_name",
+            "district",
+            "district__district_name",
+            "tehsil_soi",
+            "tehsil_soi__tehsil_name",
+        ).distinct()
+
+        states = {}
+        districts = {}
+        tehsils = {}
+        for loc in working_locations:
+            if loc["state"]:
+                states[loc["state"]] = loc["state__state_name"]
+            if loc["district"]:
+                districts[loc["district"]] = loc["district__district_name"]
+            if loc["tehsil_soi"]:
+                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
+
+        projects = list(plans_queryset.values("project", "project__name").distinct())
+
+        profile_picture_url = None
+        if user.profile_picture:
+            profile_picture_url = request.build_absolute_uri(user.profile_picture.url)
+
+        response_data = {
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "age": user.age,
+            "gender": user.get_gender_display() if user.gender else None,
+            "education_qualification": user.education_qualification,
+            "organization": {
+                "id": user.organization.id,
+                "name": user.organization.name,
+            }
+            if user.organization
+            else None,
+            "projects": [
+                {"id": p["project"], "name": p["project__name"]} for p in projects
+            ],
+            "profile_picture": profile_picture_url,
+            "statistics": {
+                "total_plans": total_plans,
+                "dpr_completed": dpr_completed,
+            },
+            "working_locations": {
+                "states": [{"id": k, "name": v} for k, v in states.items()],
+                "districts": [{"id": k, "name": v} for k, v in districts.items()],
+                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
+            },
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class PlanViewSet(viewsets.ModelViewSet):
@@ -377,3 +723,388 @@ class PlanViewSet(viewsets.ModelViewSet):
         Delete a watershed plan
         """
         instance.delete()
+
+    @action(detail=False, methods=["get"], url_path="my-plans")
+    def my_plans(self, request, *args, **kwargs):
+        """
+        Get all plans for the authenticated user.
+        Returns plans from projects the user belongs to.
+        URL: /api/v1/projects/{project_id}/watershed/plans/my-plans/
+        """
+        user = request.user
+        project_id = self.kwargs.get("project_pk")
+
+        if project_id:
+            try:
+                project = Project.objects.get(
+                    id=project_id, app_type=AppType.WATERSHED, enabled=True
+                )
+            except Project.DoesNotExist:
+                return Response(
+                    {"message": "Project not found or watershed planning not enabled."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            user_project_exists = UserProjectGroup.objects.filter(
+                user=user, project=project
+            ).exists()
+
+            if not user_project_exists and not (
+                user.is_superadmin or user.is_superuser
+            ):
+                if not (
+                    user.groups.filter(
+                        name__in=["Organization Admin", "Org Admin", "Administrator"]
+                    ).exists()
+                    and project.organization == user.organization
+                ):
+                    return Response(
+                        {"message": "You do not have access to this project."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+
+            plans = PlanApp.objects.filter(project=project, enabled=True)
+        else:
+            user_projects = UserProjectGroup.objects.filter(user=user).values_list(
+                "project_id", flat=True
+            )
+            plans = PlanApp.objects.filter(project_id__in=user_projects, enabled=True)
+
+        block_id = request.query_params.get("block", None)
+        if block_id:
+            plans = plans.filter(block=block_id)
+
+        serializer = PlanAppSerializer(plans, many=True)
+        return Response(
+            {
+                "count": plans.count(),
+                "plans": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"], url_path="meta-stats")
+    def meta_stats(self, request, *args, **kwargs):
+        """
+        Get meta statistics about watershed plans.
+        Excludes Test/Demo plans from counts.
+
+        Query Parameters:
+        - state: Filter by state ID
+        - district: Filter by district ID
+        - block: Filter by block ID
+        - project: Filter by project ID (optional when called from project context)
+
+        URL: /api/v1/projects/{project_id}/watershed/plans/meta-stats/
+        or /api/v1/watershed/plans/meta-stats/
+
+        Returns statistics like:
+        - Total enabled plans (excluding test/demo)
+        - Completed plans count
+        - DPR generated count
+        - DPR reviewed count
+        - DPR approved count
+        - Plans by state/district/block breakdown
+        """
+        user = request.user
+        project_id = self.kwargs.get("project_pk") or request.query_params.get(
+            "project"
+        )
+
+        base_queryset = PlanApp.objects.filter(enabled=True)
+
+        base_queryset = base_queryset.exclude(
+            Q(plan__icontains="test") | Q(plan__icontains="demo")
+        )
+
+        if project_id:
+            try:
+                project = Project.objects.get(
+                    id=project_id, app_type=AppType.WATERSHED, enabled=True
+                )
+
+                if not (user.is_superadmin or user.is_superuser):
+                    if user.groups.filter(
+                        name__in=["Organization Admin", "Org Admin", "Administrator"]
+                    ).exists():
+                        if project.organization != user.organization:
+                            return Response(
+                                {"message": "You do not have access to this project."},
+                                status=status.HTTP_403_FORBIDDEN,
+                            )
+                    else:
+                        user_project_exists = UserProjectGroup.objects.filter(
+                            user=user, project=project
+                        ).exists()
+                        if not user_project_exists:
+                            return Response(
+                                {"message": "You do not have access to this project."},
+                                status=status.HTTP_403_FORBIDDEN,
+                            )
+
+                base_queryset = base_queryset.filter(project=project)
+            except Project.DoesNotExist:
+                return Response(
+                    {"message": "Project not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        else:
+            if not (user.is_superadmin or user.is_superuser):
+                if user.groups.filter(
+                    name__in=["Organization Admin", "Org Admin", "Administrator"]
+                ).exists():
+                    base_queryset = base_queryset.filter(organization=user.organization)
+                else:
+                    user_projects = UserProjectGroup.objects.filter(
+                        user=user
+                    ).values_list("project_id", flat=True)
+                    base_queryset = base_queryset.filter(project_id__in=user_projects)
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        block_id = request.query_params.get("block")
+
+        if block_id:
+            base_queryset = base_queryset.filter(block_id=block_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_id=state_id)
+
+        total_plans = base_queryset.count()
+        completed_plans = base_queryset.filter(is_completed=True).count()
+        dpr_generated = base_queryset.filter(is_dpr_generated=True).count()
+        dpr_reviewed = base_queryset.filter(is_dpr_reviewed=True).count()
+        dpr_approved = base_queryset.filter(is_dpr_approved=True).count()
+
+        in_progress_plans = base_queryset.filter(is_completed=False).count()
+
+        pending_dpr_generation = base_queryset.filter(
+            is_completed=True, is_dpr_generated=False
+        ).count()
+
+        pending_dpr_review = base_queryset.filter(
+            is_dpr_generated=True, is_dpr_reviewed=False
+        ).count()
+
+        pending_dpr_approval = base_queryset.filter(
+            is_dpr_reviewed=True, is_dpr_approved=False
+        ).count()
+
+        state_breakdown = []
+        district_breakdown = []
+        block_breakdown = []
+
+        if not block_id and not district_id:
+            state_stats = (
+                base_queryset.values("state", "state__state_name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in state_stats:
+                state_id_val = stat["state"]
+                centroid = STATE_CENTROIDS.get(state_id_val, {})
+                state_breakdown.append(
+                    {
+                        "state_id": state_id_val,
+                        "state_name": stat["state__state_name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                        "centroid": centroid if centroid else None,
+                    }
+                )
+
+        if not block_id and (district_id or state_id):
+            district_stats = (
+                base_queryset.values("district", "district__district_name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in district_stats:
+                district_breakdown.append(
+                    {
+                        "district_id": stat["district"],
+                        "district_name": stat["district__district_name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                    }
+                )
+
+        if district_id or state_id or block_id:
+            block_stats = (
+                base_queryset.values("block", "block__block_name")
+                .annotate(
+                    total=Count("id"),
+                    completed=Count("id", filter=Q(is_completed=True)),
+                    dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+                    dpr_approved=Count("id", filter=Q(is_dpr_approved=True)),
+                )
+                .order_by("-total")
+            )
+
+            for stat in block_stats:
+                block_breakdown.append(
+                    {
+                        "block_id": stat["block"],
+                        "block_name": stat["block__block_name"],
+                        "total_plans": stat["total"],
+                        "completed_plans": stat["completed"],
+                        "dpr_generated": stat["dpr_generated"],
+                        "dpr_approved": stat["dpr_approved"],
+                    }
+                )
+
+        response_data = {
+            "summary": {
+                "total_plans": total_plans,
+                "completed_plans": completed_plans,
+                "in_progress_plans": in_progress_plans,
+                "dpr_generated": dpr_generated,
+                "dpr_reviewed": dpr_reviewed,
+                "dpr_approved": dpr_approved,
+                "pending_dpr_generation": pending_dpr_generation,
+                "pending_dpr_review": pending_dpr_review,
+                "pending_dpr_approval": pending_dpr_approval,
+            },
+            "completion_rate": round((completed_plans / total_plans * 100), 2)
+            if total_plans > 0
+            else 0,
+            "dpr_generation_rate": round((dpr_generated / total_plans * 100), 2)
+            if total_plans > 0
+            else 0,
+            "dpr_approval_rate": round((dpr_approved / total_plans * 100), 2)
+            if total_plans > 0
+            else 0,
+        }
+
+        if state_breakdown:
+            response_data["state_breakdown"] = state_breakdown
+        if district_breakdown:
+            response_data["district_breakdown"] = district_breakdown
+        if block_breakdown:
+            response_data["block_breakdown"] = block_breakdown
+
+        response_data["filters_applied"] = {
+            "project_id": project_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "block_id": block_id,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="steward-details",
+        authentication_classes=[APIKeyOrJWTAuth],
+    )
+    def steward_details(self, request, *args, **kwargs):
+        """
+        Get details of a facilitator (steward) by username.
+
+        Query Parameters:
+        - username: The facilitator's username (required)
+
+        URL: /api/v1/projects/{project_id}/watershed/plans/steward-details/?username=xxx
+
+        Returns:
+        - User profile details
+        - Plan statistics (count, DPR completed)
+        - Working locations (states, districts, tehsils)
+        """
+        username = request.query_params.get("username")
+        if not username:
+            return Response(
+                {"message": "username query parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.select_related("organization").get(username=username)
+        except User.DoesNotExist:
+            return Response(
+                {"message": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        plans_queryset = PlanApp.objects.filter(facilitator_name=username, enabled=True)
+
+        project_id = self.kwargs.get("project_pk")
+        if project_id:
+            plans_queryset = plans_queryset.filter(project_id=project_id)
+
+        total_plans = plans_queryset.count()
+        dpr_completed = plans_queryset.filter(is_dpr_approved=True).count()
+
+        working_locations = plans_queryset.values(
+            "state",
+            "state__state_name",
+            "district",
+            "district__district_name",
+            "tehsil_soi",
+            "tehsil_soi__tehsil_name",
+        ).distinct()
+
+        states = {}
+        districts = {}
+        tehsils = {}
+        for loc in working_locations:
+            if loc["state"]:
+                states[loc["state"]] = loc["state__state_name"]
+            if loc["district"]:
+                districts[loc["district"]] = loc["district__district_name"]
+            if loc["tehsil_soi"]:
+                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
+
+        projects = list(plans_queryset.values("project", "project__name").distinct())
+
+        profile_picture_url = None
+        if user.profile_picture:
+            profile_picture_url = request.build_absolute_uri(user.profile_picture.url)
+
+        response_data = {
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "age": user.age,
+            "gender": user.get_gender_display() if user.gender else None,
+            "education_qualification": user.education_qualification,
+            "organization": {
+                "id": user.organization.id,
+                "name": user.organization.name,
+            }
+            if user.organization
+            else None,
+            "projects": [
+                {"id": p["project"], "name": p["project__name"]} for p in projects
+            ],
+            "profile_picture": profile_picture_url,
+            "statistics": {
+                "total_plans": total_plans,
+                "dpr_completed": dpr_completed,
+            },
+            "working_locations": {
+                "states": [{"id": k, "name": v} for k, v in states.items()],
+                "districts": [{"id": k, "name": v} for k, v in districts.items()],
+                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
+            },
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)

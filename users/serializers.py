@@ -31,6 +31,10 @@ class UserSerializer(serializers.ModelSerializer):
             "groups",
             "project_details",
             "is_superadmin",
+            "age",
+            "education_qualification",
+            "gender",
+            "profile_picture",
         ]
         read_only_fields = ["id", "is_active"]
 
@@ -90,6 +94,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "last_name",
             "contact_number",
             "organization",
+            "age",
+            "education_qualification",
+            "gender",
+            "profile_picture",
         ]
         read_only_fields = ["id"]
 
@@ -154,6 +162,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             first_name=validated_data.get("first_name", ""),
             last_name=validated_data.get("last_name", ""),
             contact_number=validated_data.get("contact_number", ""),
+            age=validated_data.get("age"),
+            education_qualification=validated_data.get("education_qualification", ""),
+            gender=validated_data.get("gender", ""),
+            profile_picture=validated_data.get("profile_picture"),
         )
 
         if org_obj:
