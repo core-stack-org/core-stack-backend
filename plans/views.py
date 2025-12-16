@@ -527,22 +527,27 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             "state__state_name",
             "district",
             "district__district_name",
-            "tehsil_soi",
-            "tehsil_soi__tehsil_name",
+            "block",
+            "block__block_name",
         ).distinct()
 
         states = {}
         districts = {}
-        tehsils = {}
+        blocks = {}
         for loc in working_locations:
             if loc["state"]:
                 states[loc["state"]] = loc["state__state_name"]
             if loc["district"]:
                 districts[loc["district"]] = loc["district__district_name"]
-            if loc["tehsil_soi"]:
-                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
+            if loc["block"]:
+                blocks[loc["block"]] = loc["block__block_name"]
 
-        projects = list(plans_queryset.values("project", "project__name").distinct())
+        projects = {}
+        for p in plans_queryset.values("project", "project__name"):
+            if p["project"]:
+                projects[p["project"]] = p["project__name"]
+
+        plans = list(plans_queryset.values("id", "plan"))
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -562,9 +567,8 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             }
             if user and user.organization
             else None,
-            "projects": [
-                {"id": p["project"], "name": p["project__name"]} for p in projects
-            ],
+            "projects": [{"id": k, "name": v} for k, v in projects.items()],
+            "plans": [{"id": p["id"], "name": p["plan"]} for p in plans],
             "profile_picture": profile_picture_url,
             "statistics": {
                 "total_plans": total_plans,
@@ -573,7 +577,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             "working_locations": {
                 "states": [{"id": k, "name": v} for k, v in states.items()],
                 "districts": [{"id": k, "name": v} for k, v in districts.items()],
-                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
+                "blocks": [{"id": k, "name": v} for k, v in blocks.items()],
             },
         }
 
@@ -1062,22 +1066,27 @@ class PlanViewSet(viewsets.ModelViewSet):
             "state__state_name",
             "district",
             "district__district_name",
-            "tehsil_soi",
-            "tehsil_soi__tehsil_name",
+            "block",
+            "block__block_name",
         ).distinct()
 
         states = {}
         districts = {}
-        tehsils = {}
+        blocks = {}
         for loc in working_locations:
             if loc["state"]:
                 states[loc["state"]] = loc["state__state_name"]
             if loc["district"]:
                 districts[loc["district"]] = loc["district__district_name"]
-            if loc["tehsil_soi"]:
-                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
+            if loc["block"]:
+                blocks[loc["block"]] = loc["block__block_name"]
 
-        projects = list(plans_queryset.values("project", "project__name").distinct())
+        projects = {}
+        for p in plans_queryset.values("project", "project__name"):
+            if p["project"]:
+                projects[p["project"]] = p["project__name"]
+
+        plans = list(plans_queryset.values("id", "plan"))
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -1097,9 +1106,8 @@ class PlanViewSet(viewsets.ModelViewSet):
             }
             if user and user.organization
             else None,
-            "projects": [
-                {"id": p["project"], "name": p["project__name"]} for p in projects
-            ],
+            "projects": [{"id": k, "name": v} for k, v in projects.items()],
+            "plans": [{"id": p["id"], "name": p["plan"]} for p in plans],
             "profile_picture": profile_picture_url,
             "statistics": {
                 "total_plans": total_plans,
@@ -1108,7 +1116,7 @@ class PlanViewSet(viewsets.ModelViewSet):
             "working_locations": {
                 "states": [{"id": k, "name": v} for k, v in states.items()],
                 "districts": [{"id": k, "name": v} for k, v in districts.items()],
-                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
+                "blocks": [{"id": k, "name": v} for k, v in blocks.items()],
             },
         }
 
