@@ -1,5 +1,6 @@
 # plans/views.py
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Value
+from django.db.models.functions import Concat
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
@@ -489,30 +490,31 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def steward_details(self, request, *args, **kwargs):
         """
-        Get details of a facilitator (steward) by username at organization level.
+        Get details of a facilitator (steward) by facilitator_name at organization level.
 
         Query Parameters:
-        - username: The facilitator's username (required)
+        - facilitator_name: The facilitator's full name (required)
 
-        URL: /api/v1/organization/{organization_id}/watershed/plans/steward-details/?username=xxx
+        URL: /api/v1/organization/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx
         """
-        username = request.query_params.get("username")
-        if not username:
+        facilitator_name = request.query_params.get("facilitator_name")
+        if not facilitator_name:
             return Response(
-                {"message": "username query parameter is required."},
+                {"message": "facilitator_name query parameter is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            user = User.objects.select_related("organization").get(username=username)
-        except User.DoesNotExist:
-            return Response(
-                {"message": "User not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        user = (
+            User.objects.select_related("organization")
+            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .filter(full_name__iexact=facilitator_name)
+            .first()
+        )
 
         organization_id = self.kwargs.get("organization_pk")
-        plans_queryset = PlanApp.objects.filter(facilitator_name=username, enabled=True)
+        plans_queryset = PlanApp.objects.filter(
+            facilitator_name__iexact=facilitator_name, enabled=True
+        )
 
         if organization_id:
             plans_queryset = plans_queryset.filter(organization_id=organization_id)
@@ -543,21 +545,22 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         projects = list(plans_queryset.values("project", "project__name").distinct())
 
         profile_picture_url = None
-        if user.profile_picture:
+        if user and user.profile_picture:
             profile_picture_url = request.build_absolute_uri(user.profile_picture.url)
 
         response_data = {
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "age": user.age,
-            "gender": user.get_gender_display() if user.gender else None,
-            "education_qualification": user.education_qualification,
+            "facilitator_name": facilitator_name,
+            "username": user.username if user else None,
+            "first_name": user.first_name if user else None,
+            "last_name": user.last_name if user else None,
+            "age": user.age if user else None,
+            "gender": user.get_gender_display() if user and user.gender else None,
+            "education_qualification": user.education_qualification if user else None,
             "organization": {
                 "id": user.organization.id,
                 "name": user.organization.name,
             }
-            if user.organization
+            if user and user.organization
             else None,
             "projects": [
                 {"id": p["project"], "name": p["project__name"]} for p in projects
@@ -1017,34 +1020,35 @@ class PlanViewSet(viewsets.ModelViewSet):
     )
     def steward_details(self, request, *args, **kwargs):
         """
-        Get details of a facilitator (steward) by username.
+        Get details of a facilitator (steward) by facilitator_name.
 
         Query Parameters:
-        - username: The facilitator's username (required)
+        - facilitator_name: The facilitator's full name (required)
 
-        URL: /api/v1/projects/{project_id}/watershed/plans/steward-details/?username=xxx
+        URL: /api/v1/projects/{project_id}/watershed/plans/steward-details/?facilitator_name=xxx
 
         Returns:
         - User profile details
         - Plan statistics (count, DPR completed)
         - Working locations (states, districts, tehsils)
         """
-        username = request.query_params.get("username")
-        if not username:
+        facilitator_name = request.query_params.get("facilitator_name")
+        if not facilitator_name:
             return Response(
-                {"message": "username query parameter is required."},
+                {"message": "facilitator_name query parameter is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            user = User.objects.select_related("organization").get(username=username)
-        except User.DoesNotExist:
-            return Response(
-                {"message": "User not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        user = (
+            User.objects.select_related("organization")
+            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .filter(full_name__iexact=facilitator_name)
+            .first()
+        )
 
-        plans_queryset = PlanApp.objects.filter(facilitator_name=username, enabled=True)
+        plans_queryset = PlanApp.objects.filter(
+            facilitator_name__iexact=facilitator_name, enabled=True
+        )
 
         project_id = self.kwargs.get("project_pk")
         if project_id:
@@ -1076,21 +1080,22 @@ class PlanViewSet(viewsets.ModelViewSet):
         projects = list(plans_queryset.values("project", "project__name").distinct())
 
         profile_picture_url = None
-        if user.profile_picture:
+        if user and user.profile_picture:
             profile_picture_url = request.build_absolute_uri(user.profile_picture.url)
 
         response_data = {
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "age": user.age,
-            "gender": user.get_gender_display() if user.gender else None,
-            "education_qualification": user.education_qualification,
+            "facilitator_name": facilitator_name,
+            "username": user.username if user else None,
+            "first_name": user.first_name if user else None,
+            "last_name": user.last_name if user else None,
+            "age": user.age if user else None,
+            "gender": user.get_gender_display() if user and user.gender else None,
+            "education_qualification": user.education_qualification if user else None,
             "organization": {
                 "id": user.organization.id,
                 "name": user.organization.name,
             }
-            if user.organization
+            if user and user.organization
             else None,
             "projects": [
                 {"id": p["project"], "name": p["project__name"]} for p in projects
