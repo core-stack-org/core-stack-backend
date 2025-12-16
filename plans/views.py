@@ -547,7 +547,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             if p["project"]:
                 projects[p["project"]] = p["project__name"]
 
-        plans = list(plans_queryset.values("id", "plan"))
+        plans = list(plans_queryset.values("id", "plan", "is_completed"))
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -568,7 +568,10 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             if user and user.organization
             else None,
             "projects": [{"id": k, "name": v} for k, v in projects.items()],
-            "plans": [{"id": p["id"], "name": p["plan"]} for p in plans],
+            "plans": [
+                {"id": p["id"], "name": p["plan"], "is_completed": p["is_completed"]}
+                for p in plans
+            ],
             "profile_picture": profile_picture_url,
             "statistics": {
                 "total_plans": total_plans,
@@ -1086,7 +1089,7 @@ class PlanViewSet(viewsets.ModelViewSet):
             if p["project"]:
                 projects[p["project"]] = p["project__name"]
 
-        plans = list(plans_queryset.values("id", "plan"))
+        plans = list(plans_queryset.values("id", "plan", "is_completed"))
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -1107,7 +1110,10 @@ class PlanViewSet(viewsets.ModelViewSet):
             if user and user.organization
             else None,
             "projects": [{"id": k, "name": v} for k, v in projects.items()],
-            "plans": [{"id": p["id"], "name": p["plan"]} for p in plans],
+            "plans": [
+                {"id": p["id"], "name": p["plan"], "is_completed": p["is_completed"]}
+                for p in plans
+            ],
             "profile_picture": profile_picture_url,
             "statistics": {
                 "total_plans": total_plans,
