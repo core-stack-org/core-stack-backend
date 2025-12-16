@@ -1,0 +1,18 @@
+{
+  "output_dir": "data",
+  "google_api_key": "YOUR_GOOGLE_API_KEY_HERE",
+  "gee_project_id": "YOUR_GEE_PROJECT_ID",
+  "gee_service_account": "path/to/service_account_key.json",
+  "headless_browser": true,
+  "geocoding_batch_size": 50,
+  "geocoding_delay": 0.1,
+  "validation_enabled": true,
+  "scraper_settings": {
+    "timeout": 30,
+    "retry_attempts": 3,
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  },
+  "export_formats": ["geojson", "shapefile", "csv"],
+  "state_filter": [],
+  "district_filter": []
+}
