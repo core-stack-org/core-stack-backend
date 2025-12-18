@@ -48,7 +48,7 @@ def download_layer(url, output_file):
 def invoke_api(api_endpoint, api_params):
     # Base URL and (add your) API key
     base_url = 'https://geoserver.core-stack.org/api/v1/'
-    Api_key = 'cH9Rk0j5.9B1vX4LLHzK8I4i1ruVufVVo585QCR3G'
+    Api_key = ''
 
     # Define the HTTP request headers with the API key
     headers = {
@@ -349,4 +349,5 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig('data/cropping_vs_krk_scatter.png')
         plt.close()
+
 
