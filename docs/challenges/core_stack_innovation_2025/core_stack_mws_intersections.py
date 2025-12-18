@@ -502,7 +502,7 @@ def plot_mws_network(tehsils_df, all_mws_ids, tehsil_list, mws_data, geometries,
 
 #PRIMARY INVOVATION FUNCTION TO PLOT THE MAP FOR A GIVEN AREA OF INTEREST
 if __name__ == "__main__":
-    geojson_file = "C:\\Users\\Prof. A Set\\Downloads\\Sunderpahari.geojson"  # Replace with your GeoJSON file path
+    geojson_file = ""  # Replace with your GeoJSON file path
 
     # Initialize Earth Engine
     ee.Authenticate()
@@ -538,5 +538,6 @@ if __name__ == "__main__":
             print(f"not found tehsil {tehsil}")
 
     plot_mws_network(tehsils_df, mwses, tehsils, mws_data, geometries, mws_connectivity)
+
 
 
