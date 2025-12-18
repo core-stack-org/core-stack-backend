@@ -30,6 +30,9 @@ Each entity contains **spatial geometry** and **thematic attributes** derived fr
 A detailed narrative of this structure is available here:  
 🔗 [https://core-stack.org/the-core-stack-data-structure/](https://core-stack.org/the-core-stack-data-structure/)
 
+The CoRE stack micro-watersheds registry is described here:
+[https://core-stack.org/a-micro-watershed-registry-for-india/](https://core-stack.org/a-micro-watershed-registry-for-india/)
+
 The **Entity-Relationship (ER) diagram** can help visualize this conceptually:
 
 ![CoRE Stack ER Diagram](https://core-stack.org/wp-content/uploads/2025/11/watershed_erd-1.jpg)
@@ -57,7 +60,7 @@ Defines Python ORM-style classes for tehsil, micro-watersheds, and waterbodies, 
 
 ----------
 
-### `core-stack-layer-load.py`
+### `core_stack_layer_load.py`
 
 End-to-end workflow:
 - Select **State → District → Tehsil**  
@@ -66,7 +69,17 @@ End-to-end workflow:
 - Build the ORM hierarchy  
 - Flatten into a Pandas dataframe  
 - Plot ready-to-use insights: Cropping intensity vs. drought frequency, Surface water vs. groundwater balance, Terrain influence on agriculture
-    
+
+### `core_stack_mws_intersections.py`
+
+End-to-end workflow:
+- Specify an area of interest as a polygon in a GeoJSON  
+- Find intersectining micro-watersheds, and upstream and downstream micro-watersheds  
+- Demonstrates use of Google Earth Engine APIs and CoRE stack GEE assets
+- Use the APIs to get data of the micro-watersheds
+- Flatten into a Pandas dataframe  
+- Plot graphs embedded into a Folium map
+
 Outputs sample CSVs and charts into the `data/` folder.
 
 ----------
@@ -97,10 +110,13 @@ You need Python ≥ 3.9. Install dependencies:
 
 Example command:
 
-`python core-stack-layer-load.py` 
+`python core_stack_layer_load.py` 
 
 The script can be changed to specify a (State, District, Tehsil) for which data is available with the CoRE stack. Then it will fetch all necessary layers and generate outputs  in `./data/`
     
+`python core_stack_mws_intersections.py` 
+
+The script can be changed to specify an area of interest as a GeoJSON. Then it will fetch all necessary data and generate a map in `./data/`
 
 ----------
 
