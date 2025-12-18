@@ -5,7 +5,7 @@ import json
 class tehsil_data:
     """
     Tehsil/Block administrative unit data class containing location information
-    and a collection of microwatersheds within the tehsil.
+    and a collection of microwatersheds and waterbodies within the tehsil.
     """
     
     def __init__(self, state, district, tehsil):
@@ -27,7 +27,7 @@ class tehsil_data:
 class MWS_data:
     """
     Microwatershed data class combining terrain, cropping intensity, 
-    drought frequency, and well depth information.
+    drought frequency, and hydrology variables, and waterbodies in the micro-watershed.
     """
     
     def __init__(self):
@@ -44,7 +44,41 @@ class MWS_data:
         self.valley_are: Optional[float] = None
         self.ridge_area: Optional[float] = None
         self.terrainClu: Optional[int] = None
+
+        # === TREE COVER REDUCTION ===
+        self.forest_to_barren: Optional[float] = None
+        self.forest_to_builtu: Optional[float] = None
+        self.forest_to_farm: Optional[float] = None
+        self.forest_to_forest: Optional[float] = None
+        self.forest_to_scrub: Optional[float] = None
+
+        # === SURFACE WATER AREA ===
+        self.swb_area_in_ha: Optional[float] = None
+
+        # === SURFACE WATER AREA (Dict[year_range, hectares]) ===
+        self.sw_area: Dict[str, Optional[float]] = {
+            '2017': None, '2018': None, '2019': None, '2020': None,
+            '2021': None, '2022': None, '2023': None
+        }
         
+        # === WATER AVAILABILITY - KHARIF SEASON (Dict[year_range, percent]) ===
+        self.sw_k: Dict[str, Optional[float]] = {
+            '2017': None, '2018': None, '2019': None, '2020': None,
+            '2021': None, '2022': None, '2023': None
+        }
+        
+        # === WATER AVAILABILITY - KHARIF & RABI SEASONS (Dict[year_range, percent]) ===
+        self.sw_kr: Dict[str, Optional[float]] = {
+            '2017': None, '2018': None, '2019': None, '2020': None,
+            '2021': None, '2022': None, '2023': None
+        }
+        
+        # === WATER AVAILABILITY - ALL SEASONS (Dict[year_range, percent]) ===
+        self.sw_krz: Dict[str, Optional[float]] = {
+            '2017': None, '2018': None, '2019': None, '2020': None,
+            '2021': None, '2022': None, '2023': None
+        }
+
         # === CROPPING INTENSITY - TOTALS ===
         self.total_cropable_area_ever_hydroyear_2017_2023: Optional[float] = None
         
@@ -172,10 +206,10 @@ class MWS_data:
             '2020': None, '2021': None, '2022': None
         }
         
-        # === WELL DEPTH - AQUIFER ===
+        # === RAINFALL, ET, RUNOFFF - AQUIFER ===
         self.weighted_a: Optional[float] = None
         
-        # === WELL DEPTH - ANNUAL CHANGE (Dict[year_range, value]) ===
+        # === RAINFALL, ET, RUNOFF - ANNUAL CHANGE (Dict[year_range, value]) ===
         self.well_depth: Dict[str, Optional[str]] = {
             '2017': None, '2018': None, '2019': None, '2020': None,
             '2021': None, '2022': None, '2023': None, '2024': None
@@ -234,7 +268,7 @@ class waterbody_data:
             '2021': None, '2022': None, '2023': None
         }
         
-        # === LOCATION INFORMATION ===
+        # === LOCATION INFORMATION: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.State_Name: Optional[str] = None
         self.District_Name: Optional[str] = None
         self.Block_Tehsil_Name: Optional[str] = None
@@ -245,7 +279,7 @@ class waterbody_data:
         self.latitude_dec: Optional[float] = None
         self.longitude_dec: Optional[float] = None
 
-        # === WATER BODY CHARACTERISTICS ===
+        # === WATER BODY CHARACTERISTICS: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.water_body_name: Optional[str] = None
         self.water_body_loc_name: Optional[str] = None
         self.ref_water_body_type_id_name: Optional[str] = None
@@ -254,7 +288,7 @@ class waterbody_data:
         self.water_body_ownership_name: Optional[str] = None
         self.nature_of_storage: Optional[str] = None
         
-        # === PHYSICAL CHARACTERISTICS ===
+        # === PHYSICAL CHARACTERISTICS: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.water_spread_area_of_water_body: Optional[float] = None
         self.area_ored: Optional[float] = None
         self.max_depth_water_body_fully_filled: Optional[float] = None
@@ -262,17 +296,17 @@ class waterbody_data:
         self.storage_capacity_water_body_present: Optional[float] = None
         self.category_sq_m: Optional[str] = None
         
-        # === STORAGE STATUS ===
+        # === STORAGE STATUS:: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.filled_up_storage_name: Optional[str] = None
         self.filled_up_storage_space_name: Optional[str] = None
         
-        # === CONSTRUCTION & ADMINISTRATIVE ===
+        # === CONSTRUCTION & ADMINISTRATIVE: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.construcion_year: Optional[float] = None
         self.construction_cost: Optional[float] = None
         self.khasra_number: Optional[str] = None
         self.si_no_of_water_body_within_village_town: Optional[float] = None
         
-        # === USAGE & BENEFICIARIES ===
+        # === USAGE & BENEFICIARIES: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.ref_water_body_in_use_id_name: Optional[str] = None
         self.ref_reason_water_body_in_use_id1_name: Optional[str] = None
         self.reason_water_body_in_use_name2: Optional[str] = None
@@ -283,14 +317,14 @@ class waterbody_data:
         self.cca_water_body: Optional[float] = None
         self.ipc_water_body: Optional[float] = None
         
-        # === MANAGEMENT & MAINTENANCE ===
+        # === MANAGEMENT & MAINTENANCE: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.ref_water_body_under_repair_renovation_restoration_id_name: Optional[str] = None
         self.scheme_status_reason_name: Optional[str] = None
         self.scheme_under_revival_is_done: Optional[str] = None
         self.ref_selection_id_dip_sip_exists_name: Optional[str] = None
         self.ref_selection_id_wua_exists_name: Optional[str] = None
         
-        # === ENCROACHMENT ===
+        # === ENCROACHMENT: FILLED FROM WATERBODY CENSUS - CAN BE INCOMPLETE ===
         self.ref_selection_id_water_body_encroached_name: Optional[str] = None
         self.ref_selection_id_encroachment_assessed_name: Optional[str] = None
                 
@@ -305,14 +339,12 @@ class loading_util:
             return geojson.get("features", [])
         return [geojson]
 
+    #LOAD FROM TERRAIN TEHSIL LAYER
     @staticmethod
     def load_terrain(obj, geojson):
         for feat in loading_util.ensure_feature_list(geojson):
             props = feat.get("properties", {})
-            if props.get("uid") not in obj.microwatersheds.keys():
-                obj.microwatersheds[props.get("uid")] = MWS_data()
-            mws = obj.microwatersheds[props.get("uid")]
-            loading_util.load_base_fields(mws, props)
+            mws = loading_util.load_base_fields(mws, props)
             mws.plain_area = props.get("plain_area")
             mws.slopy_area = props.get("slopy_area")
             mws.hill_slope = props.get("hill_slope")
@@ -320,14 +352,12 @@ class loading_util:
             mws.ridge_area = props.get("ridge_area")
             mws.terrainClu = props.get("terrainClu")
 
+    #LOAD FROM CROPPING INTENSITY TEHSIL LAYER
     @staticmethod
     def load_cropping_intensity(obj, geojson):
         for feat in loading_util.ensure_feature_list(geojson):
             props = feat.get("properties", {})
-            if props.get("uid") not in obj.microwatersheds.keys():
-                obj.microwatersheds[props.get("uid")] = MWS_data()
-            mws = obj.microwatersheds[props.get("uid")]
-            loading_util.load_base_fields(mws, props)
+            mws = loading_util.load_base_fields(mws, props)
             for y in mws.cropping_intensity.keys():
                 key = f"cropping_intensity_{y}"
                 if key in props:
@@ -349,14 +379,12 @@ class loading_util:
                     mws.triply_cropped_area[y] = props[key]
             mws.total_cropable_area_ever_hydroyear_2017_2023 = props.get("total_cropable_area_ever_hydroyear_2017_2023")
 
+    #LOAD FROM HYDROLOGY TEHSIL LAYER
     @staticmethod
     def load_well_depth(obj, geojson):
         for feat in loading_util.ensure_feature_list(geojson):
             props = feat.get("properties", {})
-            if props.get("uid") not in obj.microwatersheds.keys():
-                obj.microwatersheds[props.get("uid")] = MWS_data()
-            mws = obj.microwatersheds[props.get("uid")]
-            loading_util.load_base_fields(mws, props)
+            mws = loading_util.load_base_fields(mws, props)
             mws.weighted_a = props.get("weighted_a")
             for yr in mws.well_depth.keys():
                 yr_range = "_".join([yr, str(int(yr)+1)])
@@ -367,14 +395,12 @@ class loading_util:
                 if prop_key in props:
                     mws.well_depth_net[k] = props[prop_key]
 
+    #LOAD FROM DROUGHT TEHSIL LAYER
     @staticmethod
     def load_drought_frequency(obj, geojson):
         for feat in loading_util.ensure_feature_list(geojson):
             props = feat.get("properties", {})
-            if props.get("uid") not in obj.microwatersheds.keys():
-                obj.microwatersheds[props.get("uid")] = MWS_data()
-            mws = obj.microwatersheds[props.get("uid")]
-            loading_util.load_base_fields(mws, props)
+            mws = loading_util.load_base_fields(obj, props)
             mws.avg_dryspell = props.get("avg_dryspell")
             for y in mws.drlb.keys():
                 dr = f"drlb_{y}"
@@ -402,6 +428,7 @@ class loading_util:
                 if key in props:
                     mws.m_ons[y] = props[key]
 
+    #HELPER METHOD
     @staticmethod
     def split_every_second_underscore(s):
         parts = s.split('_')
@@ -410,6 +437,7 @@ class loading_util:
         else:
             return [s]
 
+    #HELPER METHOD
     @staticmethod
     def load_waterbody_in_mws(obj, waterbody):
         mws_ids = loading_util.split_every_second_underscore(waterbody.MWS_UID)
@@ -417,6 +445,7 @@ class loading_util:
             mws = obj.microwatersheds[mws_id]
             mws.waterbodies[waterbody.UID] = waterbody
 
+    #LOAD FROM WATERBODY TEHSIL LAYER
     @staticmethod
     def load_waterbodies(obj, geojson):
         for feat in loading_util.ensure_feature_list(geojson):
@@ -439,9 +468,91 @@ class loading_util:
                     if src in props:
                         target[yr] = props[src]
 
+    #HELPER METHOD
     @staticmethod
-    def load_base_fields(mws, props):
+    def load_base_fields(obj, props):
+        if props.get("uid") not in obj.microwatersheds.keys():
+            obj.microwatersheds[props.get("uid")] = MWS_data()
+        mws = obj.microwatersheds[props.get("uid")]
         mws.uid = mws.uid or props.get("uid")
-        mws.area_in_ha = mws.area_in_ha or props.get("area_in_ha")
-        mws.geometry = mws.geometry or props.get("geometry")  # Keep if already loaded
+        if "area_in_ha" in props.keys():
+            mws.area_in_ha = mws.area_in_ha or props.get("area_in_ha")
+        if "geometry" in props.keys():
+            mws.geometry = mws.geometry or props.get("geometry")  # Keep if already loaded
+        return mws
+
+    #LOAD FROM TEHSIL API DATA
+    @staticmethod
+    def load_from_api_payload(obj, api_response, mws_params):
+        for mws_param in mws_params:
+            if mws_param == "terrain":
+                for data in api_response.get(mws_param, []):
+                    data = dict(data)
+                    mws = loading_util.load_base_fields(obj, data)
+                    mws.area_in_ha = data["area_in_ha"]
+                    mws.plain_area = data["plain_area_percent"]
+                    mws.slopy_area = data["slopy_area_percent"]
+                    mws.hill_slope = data["hill_slope_area_percent"]
+                    mws.valley_are = data["valley_area_percent"]
+                    mws.ridge_area = data["ridge_area_percent"]
+                    mws.terrainClu = data["terrain_cluster_id"]
+            elif mws_param == "change_detection_deforestation":
+                for data in api_response.get(mws_param, []):
+                    data = dict(data)
+                    mws = loading_util.load_base_fields(obj, data)
+                    mws.area_in_ha = data["area_in_ha"]
+                    mws.forest_to_barren = data["forest_to_barren_area_in_ha"]
+                    mws.forest_to_builtu = data["forest_to_built_up_area_in_ha"]
+                    mws.forest_to_farm   = data["forest_to_farm_area_in_ha"]
+                    mws.forest_to_forest = data["forest_to_forest_area_in_ha"]
+                    mws.forest_to_scrub = data["forest_to_scrub_land_area_in_ha"]
+            elif mws_param == "surfaceWaterBodies_annual":
+                for data in api_response.get(mws_param, []):
+                    data = dict(data)
+                    mws = loading_util.load_base_fields(obj, data)
+
+                    mws.swb_area_in_ha = data['total_swb_area_in_ha']
+                    # Process year-range keys from API response
+                    year_data = {}
+                    for key, value in data.items():
+                        if key.startswith('total_area_in_ha_') or key.startswith('kharif_area_in_ha_') or \
+                           key.startswith('rabi_area_in_ha_') or key.startswith('zaid_area_in_ha_'):
+                            # Extract year range (e.g., "2017-2018" from "total_area_in_ha_2017-2018")
+                            year_range = key.split('_')[-1]  # Get "2017-2018"
+                            start_year = year_range.split('-')[0]  # Get "2017"
+                            
+                            if start_year not in year_data:
+                                year_data[start_year] = {}
+                            
+                            if key.startswith('total_area_in_ha_'):
+                                year_data[start_year]['total'] = float(value)
+                            elif key.startswith('kharif_area_in_ha_'):
+                                year_data[start_year]['kharif'] = float(value)
+                            elif key.startswith('rabi_area_in_ha_'):
+                                year_data[start_year]['rabi'] = float(value)
+                            elif key.startswith('zaid_area_in_ha_'):
+                                year_data[start_year]['zaid'] = float(value)
+                    
+                    # Fill sw_area, sw_k, sw_kr, sw_krz dictionaries
+                    for year, areas in year_data.items():
+                        if year in mws.sw_area.keys():
+                            # sw_area: total area
+                            if 'total' in areas:
+                                mws.sw_area[year] = areas['total']
+                            
+                            # Calculate percentages
+                            total = areas.get('total', 0)
+                            if total > 0:
+                                # sw_k: kharif only (percentage)
+                                if 'kharif' in areas:
+                                    mws.sw_k[year] = (areas['kharif'] / total) * 100
+                                
+                                # sw_kr: kharif + rabi (percentage)
+                                if 'rabi' in areas:
+                                    mws.sw_kr[year] = (areas['rabi'] / total) * 100
+                                
+                                # sw_krz: all seasons kharif + rabi + zaid (percentage)
+                                if 'zaid' in areas:
+                                    mws.sw_krz[year] = (areas['zaid'] / total) * 100
+                    
 
