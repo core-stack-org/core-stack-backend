@@ -1,5 +1,9 @@
 
-# CoRE Stack Innovation Challenge on Geospatial Programming: Nov-Dec 2025
+# CoRE Stack Innovation Challenge on Geospatial Programming: Nov 2025 - Jan 2026
+
+## Update:## Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
+
+---
 
 Inviting ecologists, water-security researchers, geospatial programmers, and community practitioners to build open-source solutions, analyses, and tools using the CoRE Stack datasets and APIs to improve socio-ecological resilience and support community-led landscape action.
 
@@ -75,6 +79,8 @@ More generally, combine all of the above and describe the most important changes
 ---
 
 ## 6. Resources & starting points
+##Update:## Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
+
 - First start with understanding the data in the CoRE stack. The easiest is to check out the Know Your Landscape dashboard: https://www.explorer.core-stack.org/
 - And the pan-India [Google Earth Engine app](https://ee-corestackdev.projects.earthengine.app/view/core-stack-gee-app)
 - You can also take a look at the CoRE Stack technical manual (datasets & methods) to understand the methodologies that have been used: https://core-stack.org/core-stack-technical-manual-v2/
@@ -119,9 +125,9 @@ Submissions will be scored on:
 ## 10. Timeline & milestones
 - Launch: `Nov 22, 2025`
 - Weekly developer community calls / mentorship: `Fridays, 3-4pm`
-- Submission deadline: `Dec 31, 2025`
-- Shortlist & demos: `Jan 15, 2026`
-- Winners announced & prize distribution: `Jan 31, 2026`
+- Submission deadline: ~~`Dec 31, 2025`~~`Jan 15, 2026`
+- Shortlist & demos: ~~`Jan 15, 2026`~~`Jan 31, 2026`
+- Winners announced & prize distribution: ~~`Jan 31, 2026`~~`Feb 15, 2026`
 
 ---
 
