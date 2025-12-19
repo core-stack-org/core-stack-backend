@@ -1,7 +1,7 @@
 
 # CoRE Stack Innovation Challenge on Geospatial Programming: Nov 2025 - Jan 2026
 
-## Update:## Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
+## Update: Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
 
 ---
 
@@ -79,7 +79,7 @@ More generally, combine all of the above and describe the most important changes
 ---
 
 ## 6. Resources & starting points
-##Update:## Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
+## Update: Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
 
 - First start with understanding the data in the CoRE stack. The easiest is to check out the Know Your Landscape dashboard: https://www.explorer.core-stack.org/
 - And the pan-India [Google Earth Engine app](https://ee-corestackdev.projects.earthengine.app/view/core-stack-gee-app)
