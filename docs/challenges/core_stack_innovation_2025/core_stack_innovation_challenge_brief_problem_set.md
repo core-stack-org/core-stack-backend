@@ -116,7 +116,7 @@ Submissions will be scored on:
 ---
 
 ## 9. Prizes
-- TBD.
+- Cash prizes of Rs 10,000 for exciting solutions and merch from FOSS United for all participants. 
 - Additionally, mentorship sessions with domain experts in the CoRE stack network for top finalists.
 - And opportunities to integrate winning work into the CoRE Stack ecosystem and technical support for adoption.
 
