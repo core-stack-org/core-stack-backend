@@ -11,6 +11,16 @@ class get_edited_updated_all_submissions:
         self.token = fetch_bearer_token(username, password)
 
     def get_edited_updated_submissions(self, project_id, form_id, filter_query):
+        """
+        Args:
+            project_id:
+            form_id:
+            filter_query:
+
+        Returns:
+            list of submissions for all forms after certain date
+
+        """
         url = f"{self.base_url}{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -52,7 +62,12 @@ class ODKSubmissionsChecker:
 
     def process(self, mode="updated"):
         """
-        mode = "updated" or "edited"
+
+        Args:
+            mode: edited/updated
+
+        Returns:
+            flag for each submissions whether edited/updated
         """
         filter_query = (
             filter_query_updated if mode == "updated" else filter_query_edited
