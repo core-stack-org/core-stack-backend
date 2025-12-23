@@ -187,3 +187,17 @@ GEE_PATHS = {
 }
 
 WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
+
+filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
+filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
+
+filter_query = (
+    "$filter=(day(__system/submissionDate) ge 14 "
+    "and month(__system/submissionDate) ge 12 "
+    "and year(__system/submissionDate) ge 2025) "
+    "or (day(__system/updatedAt) ge 14 "
+    "and month(__system/updatedAt) ge 12 "
+    "and year(__system/updatedAt) eq 2025)"
+)
+
+project_id = 2

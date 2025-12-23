@@ -3,7 +3,7 @@ from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from .utils import *
 from .get_submissions import get_edited_updated_all_submissions
 from .form_mapping import corestack
-from utilities.constants import ODK_BASE_URL
+from utilities.constants import ODK_BASE_URL, filter_query, project_id
 
 
 def sync_settlement_odk_data(get_edited_updated_all_submissions):
@@ -12,17 +12,6 @@ def sync_settlement_odk_data(get_edited_updated_all_submissions):
         password=ODK_PASSWORD,
         base_url=ODK_BASE_URL,
     )
-
-    filter_query = (
-        "$filter=(day(__system/submissionDate) ge 14 "
-        "and month(__system/submissionDate) ge 12 "
-        "and year(__system/submissionDate) ge 2025) "
-        "or (day(__system/updatedAt) ge 14 "
-        "and month(__system/updatedAt) ge 12 "
-        "and year(__system/updatedAt) eq 2025)"
-    )
-
-    project_id = 2
 
     settlement_submissions = (
         get_edited_updated_all_submissions.get_edited_updated_submissions(

@@ -2,7 +2,7 @@ import requests
 from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from plans.utils import fetch_bearer_token
 from .form_mapping import corestack
-from utilities.constants import ODK_BASE_URL
+from utilities.constants import ODK_BASE_URL, filter_query_updated, filter_query_edited
 
 
 class get_edited_updated_all_submissions:
@@ -45,10 +45,6 @@ def form_submissions_edited_updated_url(form_id, filter_query):
     project_id = 2
     url = f"{ODK_BASE_URL}{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
     return url
-
-
-filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
-filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
 
 
 class ODKSubmissionsChecker:

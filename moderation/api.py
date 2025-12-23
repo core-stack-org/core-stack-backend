@@ -6,6 +6,7 @@ from rest_framework.response import Response
 import requests
 from rest_framework import status
 from .utils.form_mapping import model_map
+import json
 
 
 @api_view(["GET"])
@@ -37,29 +38,9 @@ def get_paginated_submissions(request, form, plan_id):
 @api_view(["GET"])
 @schema(None)
 def get_form_names(request):
-    form_names = [
-        {"name": "Settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
-        {"name": "Well", "form_id": "Add_Wells_form%20_V1.0.1"},
-        {"name": "Waterbody", "form_id": "Add_Waterbody_form%20_V1.0.1"},
-        {"name": "Groundwater", "form_id": "Add_Groundwater_form%20_V1.0.1"},
-        {"name": "Agri", "form_id": "Add_Agri_form%20_V1.0.1"},
-        {"name": "Livelihood", "form_id": "Add_Livelihood_form%20_V1.0.1"},
-        {"name": "Crop", "form_id": "Add_Cropping_form%20_V1.0.1"},
-        {"name": "Agri Maintenance", "form_id": "Agri_Maintenance_form%20_V1.0.1"},
-        {
-            "name": "GroundWater Maintenance",
-            "form_id": "Groundwater_Maintenance_form%20_V1.0.1",
-        },
-        {
-            "name": "Surface Water Body Maintenance",
-            "form_id": "Surface_Waterbody_Maintenance_form%20_V1.0.1",
-        },
-        {
-            "name": "Surface Water Body Recharge Structure Maintenance",
-            "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
-        },
-    ]
-    return JsonResponse({"forms": form_names})
+    with open("moderation/utils/forms.json", "r") as file:
+        data = json.load(file)
+    return JsonResponse({"forms": data["Forms"]}, safe=False)
 
 
 @api_view(["PUT"])
