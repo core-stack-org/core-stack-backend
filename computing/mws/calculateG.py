@@ -47,17 +47,18 @@ def calculate_g(
         except Exception as e:
             print("layer not found. So, reading the column name from asset_id.")
 
+        db_end_year = None
         if layer_obj:
             db_end_date = layer_obj.misc["end_date"]
+            db_end_year = datetime.datetime.strptime(db_end_date, "%Y-%m-%d").year
         else:
             roi = ee.FeatureCollection(asset_id)
             col_names = roi.first().propertyNames().getInfo()
             filtered_col = [col for col in col_names if col.startswith("20")]
             filtered_col.sort()
-            db_end_date = filtered_col[-1]  # .split("-")[0].split("_")[-1]
+            db_end_year = int(filtered_col[-1].split("_")[-1])
 
-        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
-        if db_end_date.year < end_date.year:
+        if db_end_year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
             return asset_id
