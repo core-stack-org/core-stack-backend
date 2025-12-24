@@ -1498,7 +1498,6 @@ def get_agri_water_irrigation_data(state, district, block):
             
             for index, row in df_water.iterrows():
                 uid = row['UID']
-                
                 # Only include matched UIDs
                 if uid in matched_uids:
                     total_col = f"total_area_in_ha_{year}"
@@ -2372,6 +2371,29 @@ def get_fishery_water_potential_data(state, district, block):
         else:
             area_percentage = 0.0
         
+        # Calculate total zaid area and total SWB area for matched UIDs (using latest year)
+        latest_year = years_sorted[-1] if years_sorted else None
+        total_zaid_area = 0.0
+        total_swb_area = 0.0
+        
+        if latest_year:
+            zaid_col = f"zaid_area_in_ha_{latest_year}"
+            total_col = f"total_area_in_ha_{latest_year}"
+            
+            for index, row in df_water.iterrows():
+                uid = row['UID']
+                
+                if uid in matched_uids:
+                    if zaid_col in df_water.columns:
+                        zaid_val = row[zaid_col]
+                        if pd.notna(zaid_val):
+                            total_zaid_area += float(zaid_val)
+                    
+                    if total_col in df_water.columns:
+                        total_val = row[total_col]
+                        if pd.notna(total_val):
+                            total_swb_area += float(total_val)
+        
         seasonal_timeline = {
             "kharif": {},
             "rabi": {},
@@ -2433,7 +2455,9 @@ def get_fishery_water_potential_data(state, district, block):
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": area_percentage
+            "total_area": area_percentage,
+            "total_zaid_area": round(total_zaid_area, 2),
+            "total_swb_area": round(total_swb_area, 2)
         }
         
         return result, seasonal_timeline
@@ -2449,7 +2473,9 @@ def get_fishery_water_potential_data(state, district, block):
         return {
             "mws_pattern": {},
             "mws_intensity": {},
-            "total_area": 0.0
+            "total_area": 0.0,
+            "total_zaid_area": 0.0,
+            "total_swb_area": 0.0
         }, {
             "kharif": {},
             "rabi": {},
