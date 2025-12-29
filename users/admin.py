@@ -14,11 +14,21 @@ class CustomUserAdmin(UserAdmin):
         "last_name",
         "email",
         "organization",
+        "age",
+        "education_qualification",
+        "gender",
         "get_groups",
         "is_superadmin",
         "is_superuser",
     )
-    list_filter = ("is_superadmin", "is_staff", "is_active", "groups", "organization")
+    list_filter = (
+        "is_superadmin",
+        "is_staff",
+        "is_active",
+        "groups",
+        "organization",
+        "gender",
+    )
     search_fields = ("username", "email", "first_name", "last_name")
     autocomplete_fields = ("organization",)
 
@@ -26,7 +36,18 @@ class CustomUserAdmin(UserAdmin):
         (None, {"fields": ("username", "password")}),
         (
             "Personal info",
-            {"fields": ("first_name", "last_name", "email", "contact_number")},
+            {
+                "fields": (
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "contact_number",
+                    "age",
+                    "education_qualification",
+                    "gender",
+                    "profile_picture",
+                )
+            },
         ),
         (
             "Permissions",

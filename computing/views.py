@@ -1,4 +1,3 @@
-
 import requests
 from dpr.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
@@ -34,10 +33,7 @@ def layer_status(self, state, district, block):
         layer_type = config.get("type", "")
 
         # constructing layer name
-        if workspace_display.startswith("LULC_level_"):
-            layer_name_parts = [prefix, block, suffix]
-        else:
-            layer_name_parts = [prefix, district, block, suffix]
+        layer_name_parts = [prefix, district, block, suffix]
         layer_name = "_".join(part for part in layer_name_parts if part)
 
         total_features = None
