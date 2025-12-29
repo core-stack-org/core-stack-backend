@@ -1,3 +1,5 @@
+import os
+
 import bot_interface.models
 import bot_interface.statemachine
 import bot_interface.utils
@@ -9,10 +11,12 @@ import requests
 import json
 import logging
 
+from nrm_app.settings import CE_API_URL
+
 logger = logging.getLogger(__name__)
 
 
-@app.task(bind=True, name="StartUserSession")
+@app.task(bind=True, name="StartUserSession", queue="whatsapp")
 def StartUserSession(
     self, event_packet: Dict[str, Any], event: str, bot_id: str, app_type: str
 ) -> None:
@@ -54,9 +58,9 @@ def StartUserSession(
 
         start_time = time.time()
         try:
-            success, response_json = bot_interface.utils.check_user_community_status_http(
-                user_number
-             )
+            success, response_json = (
+                bot_interface.utils.check_user_community_status_http(user_number)
+            )
             print("is_in_community", success, response_json)
             end_time = time.time()
             duration = end_time - start_time
@@ -64,7 +68,7 @@ def StartUserSession(
             response_text = response_json.get("success")
             logger.info(f"community check result {success}, {response_text}")
         except Exception as e:
-            print (e)
+            print(e)
             success = False
         a = True
         if a:
@@ -698,3 +702,202 @@ def _load_or_create_user_session(event_packet, bot_instance, response_data):
     smj_controller.runSmj(event_packet)
 
     return user_session
+
+
+@app.task(bind=True, name="ProcessWorkdDemand", queue="whatsapp")
+def process_and_submit_work_demand(self, user_log_id):
+    import json
+    import requests
+    from .models import UserLogs
+
+    print("Invoking process_and_submit_work_demand")
+
+    try:
+        # ----------------------------
+        # Fetch UserLog
+        # ----------------------------
+        try:
+            user_log = UserLogs.objects.get(id=user_log_id)
+        except UserLogs.DoesNotExist:
+            return {
+                "success": False,
+                "message": f"UserLogs record with id {user_log_id} not found",
+            }
+
+        misc = user_log.misc or {}
+
+        # ----------------------------
+        # Extract core data
+        # ----------------------------
+        flow_data = misc.get("flow_data", {})
+        audio_data = misc.get("audio_data")
+        photo_data = misc.get("photo_data", [])
+        community_context = misc.get("community_context", {})
+
+        community_id = community_context.get("community_id")
+        if not community_id:
+            return {
+                "success": False,
+                "message": "Could not find community_id in UserLogs data",
+            }
+
+        print(f"Processing work demand for community_id={community_id}")
+
+        # ----------------------------
+        # Prepare coordinates
+        # ----------------------------
+        coordinates = {}
+        location = flow_data.get("location")
+        if isinstance(location, dict):
+            lat = location.get("latitude")
+            lon = location.get("longitude")
+            if lat and lon:
+                coordinates = {"lat": lat, "lon": lon}
+
+        # ----------------------------
+        # Get user contact number
+        # ----------------------------
+        try:
+            bot_user = user_log.user  # BotUsers
+            actual_user = bot_user.user  # Users
+            contact_number = actual_user.contact_number
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Could not get user contact number: {e}",
+            }
+
+        # ----------------------------
+        # Prepare API payload
+        # ----------------------------
+        payload = {
+            "item_type": "Asset_Demand",
+            "coordinates": json.dumps(coordinates) if coordinates else "",
+            "number": contact_number,
+            "community_id": community_id,
+            "source": "BOT",
+            "bot_id": user_log.bot.id,
+            "title": "Asset_Demand",
+            "transcript": flow_data.get("description", ""),
+        }
+
+        # ----------------------------
+        # Prepare files (download from URLs)
+        # ----------------------------
+        files = {}
+
+        # ---- Audio
+        if audio_data and audio_data.get("url"):
+            try:
+                audio_resp = requests.get(audio_data["url"], timeout=20)
+                audio_resp.raise_for_status()
+
+                media_id = audio_data.get("media_id", "audio")
+                files["audios"] = (
+                    f"{media_id}.ogg",
+                    audio_resp.content,
+                    "audio/ogg",
+                )
+                print("Audio file added from URL")
+
+            except Exception as e:
+                print(f"Failed to download audio: {e}")
+
+        # ---- Photos
+        if isinstance(photo_data, list):
+            for idx, photo in enumerate(photo_data):
+                url = photo.get("url")
+                if not url:
+                    continue
+
+                try:
+                    img_resp = requests.get(url, timeout=20)
+                    img_resp.raise_for_status()
+
+                    media_id = photo.get("media_id", f"photo_{idx}")
+                    files[f"images_{idx}"] = (
+                        f"{media_id}.jpg",
+                        img_resp.content,
+                        "image/jpeg",
+                    )
+                    print(f"Photo {idx} added from URL")
+
+                except Exception as e:
+                    print(f"Failed to download photo {idx}: {e}")
+
+        print(f"Files prepared: {list(files.keys())}")
+        print(f"Payload prepared: {payload}")
+
+        # ----------------------------
+        # Submit to CE API
+        # ----------------------------
+        api_url = f"{CE_API_URL}upsert_item/"
+
+        try:
+            response = requests.post(
+                api_url,
+                data=payload,
+                files=files,
+                timeout=30,
+            )
+
+            print(f"API status: {response.status_code}")
+            print(f"API response: {response.text}")
+
+            if response.status_code in (200, 201):
+                result = response.json()
+
+                if result.get("success"):
+                    user_log.value2 = "success"
+                    user_log.value3 = "0"
+                    user_log.key4 = "response"
+                    user_log.value4 = response.text
+                    user_log.save(update_fields=["value2", "value3", "key4", "value4"])
+
+                    return result
+
+                else:
+                    user_log.value2 = "failure"
+                    user_log.value3 = "0"
+                    user_log.key4 = "response"
+                    user_log.value4 = response.text
+                    user_log.save(update_fields=["value2", "value3", "key4", "value4"])
+
+                    return result
+
+            else:
+                user_log.value2 = "failure"
+                user_log.value3 = "0"
+                user_log.key4 = "error"
+                user_log.value4 = response.text
+                user_log.save(update_fields=["value2", "value3", "key4", "value4"])
+
+                return {
+                    "success": False,
+                    "message": f"API call failed with status {response.status_code}",
+                }
+
+        except requests.exceptions.RequestException as e:
+            user_log.value2 = "failure"
+            user_log.value3 = "0"
+            user_log.key4 = "error"
+            user_log.value4 = str(e)
+            user_log.save(update_fields=["value2", "value3", "key4", "value4"])
+
+            return {"success": False, "message": f"Request error: {e}"}
+
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+
+        try:
+            user_log.value2 = "failure"
+            user_log.value3 = "0"
+            user_log.key4 = "error"
+            user_log.value4 = str(e)
+            user_log.save(update_fields=["value2", "value3", "key4", "value4"])
+        except Exception:
+            pass
+
+        return {"success": False, "message": f"Internal error: {e}"}

@@ -1,19 +1,38 @@
 import json
 from typing import Dict, Any
 from django.utils import timezone
-from django.conf import settings
-
 import bot_interface.interface.generic
 import bot_interface.models
 import bot_interface.utils
 import bot_interface.api
 import bot_interface.auth
-
 import requests
 
+from bot_interface.data_classes import EventPacket
+from bot_interface.helper import (
+    _extract_whatsapp_value,
+    _load_user_session,
+    _normalize_location_response,
+    _extract_lat_lon_from_session,
+    _prepare_and_send_list,
+    _extract_community_id_from_session,
+    _build_community_data,
+    _get_user_session,
+    _extract_location_data,
+    _archive_user_session,
+    _reset_user_session,
+    _get_bot_instance,
+    _get_bot_user,
+    _get_smj,
+    _extract_ids_from_session,
+    _extract_media_data,
+    _detect_flow_type,
+    _build_misc_payload,
+    _resolve_community_id,
+)
 from geoadmin.models import State, District, Block
-
 import logging
+from nrm_app.settings import CE_API_URL, CE_BUCKET_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -21,223 +40,89 @@ logger = logging.getLogger(__name__)
 class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     """WhatsApp interface implementation for handling WhatsApp Business API interactions"""
 
-    BUCKET_NAME = "communityengagementstack"
-
     @staticmethod
     def create_event_packet(
         json_obj: Any, bot_id: int, event: str = "start"
     ) -> Dict[str, Any]:
         """
         Create an event packet from WhatsApp webhook data.
-
-        Args:
-            json_obj: JSON string or dict containing webhook data
-            bot_id: Bot instance ID
-            event: Event type (default: "start")
-
-        Returns:
-            dict: Event packet dictionary
         """
-        print("create_event_packet called with bot_id:", bot_id, type(bot_id))
 
-        try:
-            bot_interface.models.Bot.objects.get(id=bot_id)
-        except bot_interface.models.Bot.DoesNotExist:
+        # Validate bot
+        if not bot_interface.models.Bot.objects.filter(id=bot_id).exists():
             raise ValueError(f"Bot with id {bot_id} not found")
 
-        print("Json Obj in create_event_packet", json_obj, type(json_obj))
-
-        # Parse JSON if it's a string
+        # Parse JSON string
         if isinstance(json_obj, str):
             try:
                 json_obj = json.loads(json_obj)
             except json.JSONDecodeError as exc:
-                raise ValueError(f"Invalid JSON string provided: {json_obj}") from exc
+                raise ValueError("Invalid JSON string provided") from exc
 
-        print("Parsed Json Obj in create_event_packet", json_obj, type(json_obj))
-
-        # Ensure we have a valid data structure
         if not isinstance(json_obj, (dict, list)):
             raise ValueError(f"Expected dict or list, got {type(json_obj)}")
 
-        # If it's a list, it might be the WhatsApp webhook entry format
-        if isinstance(json_obj, list) and len(json_obj) > 0:
-            # WhatsApp webhook format is typically: [{"changes": [{"value": {...}}]}]
-            if isinstance(json_obj[0], dict) and "changes" in json_obj[0]:
-                # Extract the actual message data from WhatsApp webhook format
-                changes = json_obj[0]["changes"]
-                if len(changes) > 0 and "value" in changes[0]:
-                    json_obj = changes[0]["value"]
-                    print("Extracted value from WhatsApp webhook format:", json_obj)
-        # Initialize event packet with defaults
-        event_packet = {
-            "event": event,
-            "bot_id": bot_id,
-            "data": "",
-            "timestamp": "",
-            "message_id": "",
-            "media_id": "",
-            "wa_id": "",
-            "misc": "",
-            "type": "",
-            "user_number": "",
-            "smj_id": "",
-            "state": "",
-        }
+        # Normalize WhatsApp webhook structure
+        json_obj = _extract_whatsapp_value(json_obj)
+        event_packet = EventPacket(event=event, bot_id=bot_id)
 
-        # Process different types of incoming data
-        if "contacts" in json_obj:
-            WhatsAppInterface._process_message_data(json_obj, event_packet, bot_id)
-        elif WhatsAppInterface._is_interactive_message(json_obj):
-            WhatsAppInterface._process_interactive_message(json_obj, event_packet)
+        # Initialize event packet
 
-        # Preserve current user context for button events and other interactions
+        # Process message
+        if isinstance(json_obj, dict):
+            if "contacts" in json_obj:
+                WhatsAppInterface._process_message_data(json_obj, event_packet, bot_id)
+            elif WhatsAppInterface._is_interactive_message(json_obj):
+                WhatsAppInterface._process_interactive_message(json_obj, event_packet)
+
+        # Preserve user context
         WhatsAppInterface._preserve_user_context(event_packet, bot_id)
+        logger.info(f"Event Packet : {event_packet}")
 
         return event_packet
 
     @staticmethod
     def _process_message_data(json_obj: Dict, event_packet: Dict, bot_id: int) -> None:
         """Process regular WhatsApp message data"""
-        contacts = json_obj["contacts"][0]
-        wa_id = contacts.get("wa_id", "")
-        event_packet["user_number"] = wa_id
-        event_packet["wa_id"] = wa_id
 
-        if "messages" not in json_obj:
+        # Extract contact info
+        contact = json_obj.get("contacts", [{}])[0]
+        wa_id = contact.get("wa_id", "")
+        event_packet.user_number = wa_id
+        event_packet.wa_id = wa_id
+
+        # No messages present
+        messages = json_obj.get("messages")
+        if not messages:
+            logger.warning(f"No messages found in event packet")
             return
 
-        message = json_obj["messages"][0]
+        message = messages[0]
         data_type = message.get("type", "")
-        event_packet["timestamp"] = message.get("timestamp", "")
-        event_packet["message_id"] = message.get("id", "")
 
-        if data_type == "text":
-            WhatsAppInterface._process_text_message(message, event_packet)
-        elif data_type == "interactive":
-            WhatsAppInterface._process_interactive_response(message, event_packet)
-        elif data_type == "location":
-            WhatsAppInterface._process_location_message(message, event_packet)
-        elif data_type == "image":
-            WhatsAppInterface._process_image_message(message, event_packet, bot_id)
-        elif data_type in ("audio", "voice"):
-            WhatsAppInterface._process_audio_message(message, event_packet, bot_id)
-        elif data_type == "video":
-            event_packet["type"] = data_type
+        event_packet.timestamp = message.get("timestamp", "")
+        event_packet.message_id = message.get("id", "")
+        event_packet.type = data_type
 
-    @staticmethod
-    def _process_text_message(message: Dict, event_packet: Dict) -> None:
-        """Process text message"""
-        event_packet["type"] = "text"
-        event_packet["data"] = message["text"]["body"]
-
-    @staticmethod
-    def _process_interactive_response(message: Dict, event_packet: Dict) -> None:
-        """Process interactive message response"""
-        event_packet["type"] = "button"
-        interactive = message["interactive"]
-
-        if interactive.get("list_reply"):
-            event_packet["data"] = interactive["list_reply"]["title"]
-            event_packet["misc"] = interactive["list_reply"]["id"]
-        else:
-            event_packet["data"] = interactive["button_reply"]["id"]
-
-        if message.get("context"):
-            event_packet["context_id"] = message["context"]["id"]
-
-    @staticmethod
-    def _process_location_message(message: Dict, event_packet: Dict) -> None:
-        """Process location message"""
-        event_packet["type"] = "location"
-        location = message["location"]
-
-        # Extract latitude and longitude
-        latitude = location.get("latitude", "")
-        longitude = location.get("longitude", "")
-
-        # Store as formatted string or coordinate object
-        event_packet["data"] = f"{latitude},{longitude}"
-        event_packet["misc"] = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "name": location.get("name", ""),
-            "address": location.get("address", ""),
+        # Message type routing
+        handlers = {
+            "text": WhatsAppInterface._process_text_message,
+            "interactive": WhatsAppInterface._process_interactive_response,
+            "location": WhatsAppInterface._process_location_message,
+            "image": lambda m, e: WhatsAppInterface._process_image_message(
+                m, e, bot_id
+            ),
+            "audio": lambda m, e: WhatsAppInterface._process_audio_message(
+                m, e, bot_id
+            ),
+            "voice": lambda m, e: WhatsAppInterface._process_audio_message(
+                m, e, bot_id
+            ),
         }
-        print(f"Processed location message: {latitude}, {longitude}")
 
-    @staticmethod
-    def _preserve_user_context(event_packet: Dict, bot_id: int) -> None:
-        """Preserve current user context for proper state transitions"""
-        try:
-            user_number = event_packet.get("user_number")
-            if not user_number:
-                return
-
-            # Find the current user session to preserve context
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_id)
-
-            # Check if user exists in our system
-            try:
-                bot_user = bot_interface.models.BotUsers.objects.get(
-                    user__contact_number=user_number
-                )
-                user_session = bot_interface.models.UserSessions.objects.get(
-                    user_id=bot_user.id, bot=bot_instance
-                )
-
-                # Preserve current SMJ and state context
-                if user_session.current_smj and user_session.current_state:
-                    event_packet["smj_id"] = user_session.current_smj.id
-                    event_packet["state"] = user_session.current_state
-                    print(
-                        f"Preserved user context - SMJ: {user_session.current_smj.id}, State: {user_session.current_state}"
-                    )
-
-            except (
-                bot_interface.models.BotUsers.DoesNotExist,
-                bot_interface.models.UserSessions.DoesNotExist,
-            ):
-                # User or session doesn't exist yet, will be handled in session creation
-                print("No existing user session found, will use default context")
-
-        except Exception as e:
-            print(f"Error preserving user context: {e}")
-            # Don't fail the whole process if context preservation fails
-
-    @staticmethod
-    def _process_image_message(message: Dict, event_packet: Dict, bot_id: int) -> None:
-        """Process image message"""
-        event_packet["type"] = "image"
-        mime_type = message["image"]["mime_type"]
-        media_id = message["image"]["id"]
-        event_packet["media_id"] = media_id
-
-        # Download and process image
-        filepath = WhatsAppInterface._download_and_upload_media(
-            bot_id, mime_type, media_id, "image"
-        )
-        event_packet["data"] = filepath
-
-    @staticmethod
-    def _process_audio_message(message: Dict, event_packet: Dict, bot_id: int) -> None:
-        """Process audio/voice message"""
-        event_packet["type"] = "audio"
-
-        if message.get("voice"):
-            media_id = message["voice"]["id"]
-            mime_type = message["voice"]["mime_type"]
-        else:
-            media_id = message["audio"]["id"]
-            mime_type = message["audio"]["mime_type"]
-
-        event_packet["media_id"] = media_id
-
-        # Download and process audio
-        filepath = WhatsAppInterface._download_and_upload_media(
-            bot_id, mime_type, media_id, "audio"
-        )
-        event_packet["data"] = filepath
+        handler = handlers.get(data_type)
+        if handler:
+            handler(message, event_packet)
 
     @staticmethod
     def _download_and_upload_media(
@@ -255,1611 +140,148 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         s3_folder = "docs/images/" if media_type == "image" else "docs/audios/"
         file_name = s3_folder + filepath.split("/")[-1]
 
-        bot_interface.utils.push_to_s3(
-            filepath, WhatsAppInterface.BUCKET_NAME, file_name, file_extension
+        status, url, error = bot_interface.utils.push_to_s3(
+            filepath, CE_BUCKET_NAME, file_name, file_extension
         )
-
-        return filepath
-
-    @staticmethod
-    def _download_image(bot_id: int, mime_type: str, media_id: str) -> str:
-        """Download image from WhatsApp API using proper API flow"""
-        try:
-            print(
-                f"Downloading image: bot_id={bot_id}, mime_type={mime_type}, media_id={media_id}"
-            )
-            response, filepath = bot_interface.api.download_image(
-                bot_id, mime_type, media_id
-            )
-
-            if response and response.status_code == 200 and filepath:
-                print(f"Successfully downloaded image to: {filepath}")
-                return filepath
-            else:
-                error_msg = f"Image download failed - response: {response.status_code if response else 'None'}, filepath: {filepath}"
-                print(error_msg)
-                raise Exception(error_msg)
-
-        except Exception as e:
-            error_msg = f"Error downloading image: {e}"
-            print(error_msg)
-            raise Exception(error_msg)
-
-    @staticmethod
-    def _download_audio(bot_id: int, mime_type: str, media_id: str) -> str:
-        """Download audio from WhatsApp API using proper API flow"""
-        try:
-            print(
-                f"Downloading audio: bot_id={bot_id}, mime_type={mime_type}, media_id={media_id}"
-            )
-            response, filepath = bot_interface.api.download_audio(
-                bot_id, mime_type, media_id
-            )
-
-            if response and response.status_code == 200 and filepath:
-                print(f"Successfully downloaded audio to: {filepath}")
-                return filepath
-            else:
-                error_msg = f"Audio download failed - response: {response.status_code if response else 'None'}, filepath: {filepath}"
-                print(error_msg)
-                raise Exception(error_msg)
-
-        except Exception as e:
-            error_msg = f"Error downloading audio: {e}"
-            print(error_msg)
-            raise Exception(error_msg)
-
-    @staticmethod
-    def _is_interactive_message(json_obj: Dict) -> bool:
-        """Check if this is an interactive message"""
-        return bool(json_obj.get("id") and json_obj.get("type") == "interactive")
-
-    @staticmethod
-    def _process_interactive_message(json_obj: Dict, event_packet: Dict) -> None:
-        """Process interactive message"""
-        event_packet["message_id"] = json_obj["id"]
-        event_packet["message_to"] = json_obj.get("to", "")
-        event_packet["type"] = json_obj["type"]
-
-    def sendText(self, bot_id, data_dict):
-        # 1 : user profile lnguage 2: config language(app_config_json) 3: default
-        logger.info("data_dict in sendText: %s", data_dict)
-        data = data_dict.get("text")
-
-        bot_instance = bot_interface.models.Bot.objects.get(id=bot_id)
-        if bot_instance:
-            logger.info("bot_instance language in sendText: %s", bot_instance.language)
-
-        user_id = data_dict.get("user_id")
-        print("user in sendText", user_id)
-
-        text = data[0].get(bot_instance.language)
-        print(text, bot_id)
-
-        try:
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            response = bot_interface.api.send_text(
-                bot_instance_id=bot_id, contact_number=user.phone, text=text
-            )
-            print("Text message response:", response)
-
-            # Update user session state
-            print("user", user.current_session)
-            user.expected_response_type = "text"
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup with error handling
-            smjid = data_dict.get("smj_id")
-            user.current_smj = bot_instance.smj
-            user.save()
-            print("SMJ : ", bot_instance.smj)
-            logger.info("sendText response: %s", response)
-            logger.info("Exiting sendText with response: ")
-
-            # Return success/failure based on API response
-            if response and response.get("messages"):
-                return "success"
-            else:
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in sendText: {e}")
-            logger.error(f"Error in sendText: {e}")
-            return "failure"
-
-    def sendButton(self, bot_instance_id, data_dict):
-        print("in sendButton")
-        logger.info("data_dict in sendButton: %s", data_dict)
-        logger.info("bot instance id: %s", bot_instance_id)
-        bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-        if bot_instance:
-            print("bot_instance", bot_instance.language)
-
-        user_id = data_dict.get("user_id")
-        print("user in sendButton", user_id)
-
-        data = data_dict.get("menu")
-        # Extract caption from first menu item or use data_dict caption or default
-        caption = "Select an option:"  # Default
-        if data_dict.get("caption"):
-            caption = data_dict.get("caption")
-        elif data and len(data) > 0 and "caption" in data[0]:
-            caption = data[0]["caption"]
-
-        print(data)
-        print("caption", caption)
-
-        try:
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            print("user in sendButton", user)
-            user.expected_response_type = "button"
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup with error handling
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-            user.save()
-
-            print("length of data ::", len(data))
-            response = None
-
-            if len(data) > 3:
-                print("in send_list msg ::")
-                label = "Select Here"
-                response = bot_interface.api.send_list_msg(
-                    bot_instance_id=bot_instance_id,
-                    contact_number=user.phone,
-                    text=caption,
-                    menu_list=data,
-                    button_label=label,
-                )
-                print("List message without description response :", response)
-            elif len(data) <= 3 and ("description" in data[0]):
-                print(
-                    "in send_list msg with less than equals to 3 options- labels with description::"
-                )
-                label = "Select Here"
-                response = bot_interface.api.send_list_msg(
-                    bot_instance_id=bot_instance_id,
-                    contact_number=user.phone,
-                    text=caption,
-                    menu_list=data,
-                    button_label=label,
-                )
-                print("List message with description response :", response)
-            else:
-                print("in send_list msg labels with description::")
-                label = "Select Here"
-                response = bot_interface.api.send_button_msg(
-                    bot_instance_id=bot_instance_id,
-                    contact_number=user.phone,
-                    text=caption,
-                    menu_list=data,
-                )
-                print("Button message response:", response)
-
-            # Return success/failure based on API response
-            if response and response.get("messages"):
-                return "success"
-            else:
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in sendButton: {e}")
-            return "failure"
-
-    def sendLocationRequest(self, bot_instance_id, data_dict):
-        """
-        Send a location request to the user.
-        This function prepares the user session and sends a request for location sharing.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            response: Response from the WhatsApp API after sending the location request.
-        """
-        print("in sendLocationRequest")
-        bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-        if bot_instance:
-            print("bot_instance", bot_instance.language)
-
-        user_id = data_dict.get("user_id")
-        print("user in sendLocationRequest", user_id)
-
-        # check if user is created
-        user = bot_interface.models.UserSessions.objects.get(
-            user=user_id, bot=bot_instance
-        )
-        print("user in sendLocationRequest", user)
-        user.expected_response_type = "location"
-        user.current_state = data_dict.get("state")
-
-        # Handle SMJ object lookup with error handling
-        smj_id = data_dict.get("smj_id")
-        user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-        user.save()
-
-        response = bot_interface.api.send_location_request(
-            bot_instance_id=bot_instance_id,
-            contact_number=user.phone,
-            text="कृपया स्थान भेजें",
-        )
-
-        print("Location request response:", response)
-
-        # Return success/failure based on API response
-        if response and response.get("messages"):
-            return "success"
+        if status:
+            print(f"URL:  {url}")
+            return url
         else:
-            return "failure"
+            return "Failed"
 
-    def sendCommunityByLocation(self, bot_instance_id, data_dict):
-        """
-        Send community options based on user's location.
-        This function prepares the user session and sends a request for community selection.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure" based on operation result.
-        """
-        print("in sendCommunityByLocation")
+    @staticmethod
+    def _process_text_message(message: Dict, event_packet: Dict) -> None:
+        """Process text message"""
+        event_packet.type = "text"
+        event_packet.data = message["text"]["body"]
 
+    @staticmethod
+    def _process_interactive_response(message: Dict, event_packet: Dict) -> None:
+        """Process interactive message response"""
+
+        event_packet.type = "button"
+
+        interactive = message.get("interactive", {})
+        list_reply = interactive.get("list_reply")
+        button_reply = interactive.get("button_reply")
+
+        if list_reply:
+            event_packet.data = list_reply.get("title", "")
+            event_packet.misc = list_reply.get("id", "")
+
+        elif button_reply:
+            event_packet.data = button_reply.get("id", "")
+
+        context = message.get("context")
+        if context:
+            event_packet.context_id = context.get("id", "")
+
+    @staticmethod
+    def _process_location_message(message: Dict, event_packet: Dict) -> None:
+        """Process location message"""
+
+        event_packet.type = "location"
+        location = message["location"]
+
+        # Extract latitude and longitude
+        latitude = location.get("latitude", "")
+        longitude = location.get("longitude", "")
+
+        # Store as formatted string or coordinate object
+        event_packet.data = f"{latitude},{longitude}"
+        event_packet.misc = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "name": location.get("name", ""),
+            "address": location.get("address", ""),
+        }
+
+        logger.info(f"Processed Location Message: {latitude} long: {longitude}")
+
+    @staticmethod
+    def _preserve_user_context(event_packet: Dict, bot_id: int) -> None:
+        """Preserve current user context for proper state transitions"""
         try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            if bot_instance:
-                print("bot_instance", bot_instance.language)
+            user_number = event_packet.user_number
+            if not user_number:
+                logger.warning(f"No user number found in event packed")
+                return
 
-            user_id = data_dict.get("user_id")
-            print("user in sendCommunityByLocation", user_id)
-            logger.info(data_dict)
-            # assert False
-            data = data_dict.get("data", {})
-            print("data in sendCommunityByLocation:", data)
+            # Find the current user session to preserve context
+            bot_instance = _load_user_session(bot_id)
 
-            # Initialize variables
-            get_data_from_state = None
-            get_data_from_state_field = None
-
-            # check if data_dict has 'getDataFrom' key
-            if "getDataFrom" in data:
-                # getDataFrom has the statename from which we need to get the data received to use it here
-                get_data_from = data["getDataFrom"]
-                get_data_from_state = get_data_from.get("state", "")
-                get_data_from_state_field = get_data_from.get("field", "data")
-                print("State name from data_dict:", get_data_from_state)
-                print("Field name from data_dict:", get_data_from_state_field)
-
-            # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            print("user in sendCommunityByLocation", user)
-            # user.expected_response_type = "community"
-            user.current_state = data_dict.get("state")
-
-            # load user's current session
-            current_session = user.current_session
-            print("Current session in sendCommunityByLocation:", current_session)
-
-            # Initialize latitude and longitude
-            latitude = ""
-            longitude = ""
-
-            # get the data field from getDataFrom state in current session
-            location_data_found = False
-
-            if get_data_from_state and current_session:
-                # current_session is a list of dictionaries, need to search through them
-                for session_dict in current_session:
-                    if (
-                        isinstance(session_dict, dict)
-                        and get_data_from_state in session_dict
-                    ):
-                        data = session_dict[get_data_from_state].get(
-                            get_data_from_state_field, {}
-                        )
-                        print("Data from current session for state:", data)
-                        location_data_found = True
-
-                        # lat lon is stored as a string in data separated by comma eg (25.2048, 55.2708)
-                        if isinstance(data, str):
-                            lat_lon = data.split(",")
-                            if len(lat_lon) == 2:
-                                latitude = lat_lon[0].strip()
-                                longitude = lat_lon[1].strip()
-                                print(
-                                    "Latitude and Longitude from string:",
-                                    latitude,
-                                    longitude,
-                                )
-                                break  # Found the data, exit the loop
-                            else:
-                                print("Invalid latitude and longitude format in string")
-                        else:
-                            print(
-                                "Latitude and Longitude not found in current session data - data is not string"
-                            )
-
-            if not location_data_found or not latitude or not longitude:
-                print(
-                    f"Required location data not found in session: {get_data_from_state}"
+            # Check if user exists in our system
+            try:
+                bot_user = bot_interface.models.BotUsers.objects.get(
+                    user__contact_number=user_number
                 )
-                return "failure"
+                user_session = bot_interface.models.UserSessions.objects.get(
+                    user_id=bot_user.id, bot=bot_instance
+                )
 
-            # Handle SMJ object lookup with error handling
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-
-            response = None
-            # try:
-            from public_api.views import get_location_info_by_lat_lon
-
-            print("Fetching community by location...", latitude, longitude)
-            response = get_location_info_by_lat_lon(
-                lat=float(latitude), lon=float(longitude)
-            )
-            logger.info("Location info response:", response)
-            # except Exception as e:
-            #     logger.error(f"Error fetching community using get_community_by_lat_lon: {e}")
-            #     # except 500 error
-            #     try:
-            #         print("Fetching community by location...")
-            #         response = requests.get(
-            #             url="https://uat.core-stack.org/api/v1/get_admin_details_by_latlon/?latitude=25.1369&longitude=85.4516",
-            #             # params={"latitude": latitude, "longitude": longitude},
-            #             timeout=30
-            #         ).json()
-            #     except requests.exceptions.RequestException as e:
-            #         print(f"Error fetching community by location: {e}")
-            #         return "failure"
-
-            print("Community by location response:", response)
-
-            if response:
-                from community_engagement.utils import get_communities
-
-                # Handle response based on its type
-                if isinstance(response, tuple):
-                    # If response is a tuple (success, data), extract the data
-                    success, location_data = response
-                    if success and isinstance(location_data, dict):
-                        community_data = get_communities(
-                            state_name=location_data.get("State", ""),
-                            district_name=location_data.get("District", ""),
-                            block_name=location_data.get("Block", ""),
-                        )
-                    else:
-                        return "failure"
-                elif isinstance(response, dict):
-                    # If response is a dict, use it directly
-                    
-                    community_data = get_communities(
-                        state_name=response.get("State", ""),
-                        district_name=response.get("District", ""),
-                        block_name=response.get("Block", ""),
+                # Preserve current SMJ and state context
+                if user_session.current_smj and user_session.current_state:
+                    event_packet.smj_id = user_session.current_smj.id
+                    event_packet.state = user_session.current_state
+                    logger.info(
+                        f"Preserved user context - SMJ: {user_session.current_smj.id}, State: {user_session.current_state}"
                     )
-                else:
-                    return "no_communities"
-                if community_data == "no_communities":
-                    return "no_communities"
-                print("Community list:", community_data)
-                communities_list = []
-                if community_data:
-                    for community in community_data:
-                        communities_list.append(
-                            {
-                                "value": community.get("community_id"),
-                                "label": community.get("name"),
-                                "description": community.get("description", ""),
-                            }
-                        )
 
-                    print("Communities list for WhatsApp:", communities_list)
-
-                    # Send the communities list to user
-                    if communities_list:
-                        send_communities_response = bot_interface.api.send_list_msg(
-                            bot_instance_id=bot_instance_id,
-                            contact_number=user.phone,
-                            text="कृपया अपना समुदाय चुनें",
-                            menu_list=communities_list,
-                        )
-
-                        print(
-                            "Communities list message response:",
-                            send_communities_response,
-                        )
-                    user.expected_response_type = "community"
-                    user.save()
-                    if send_communities_response and send_communities_response.get(
-                        "messages"
-                    ):
-                        return "success"
-                    else:
-                        return "no_communities"
-                else:
-                    return "no_communities"
-            else:
-                return "no_communities"
-
-        except Exception as e:
-            print(f"Error in sendCommunityByLocation: {e}")
-            return "no_communities"
-
-    def sendStates(self, bot_instance_id, data_dict):
-        """
-        Send state options to the user.
-        This function prepares the user session and sends a request for state selection.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            response: Response from the WhatsApp API after sending the state options.
-        """
-        print("in sendStates")
-        bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-        if bot_instance:
-            print("bot_instance", bot_instance.language)
-
-        user_id = data_dict.get("user_id")
-        print("user in sendStates", user_id)
-
-        # check if user is created
-        user = bot_interface.models.UserSessions.objects.get(
-            user=user_id, bot=bot_instance
-        )
-        print("user in sendStates", user)
-        user.expected_response_type = "button"
-        user.current_state = data_dict.get("state")
-
-        # Handle SMJ object lookup with error handling
-        smj_id = data_dict.get("smj_id")
-        user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-        user.save()
-
-        from community_engagement.models import Location
-
-        state_ids_with_community = (
-            Location.objects.filter(communities__isnull=False)
-            .values_list("state_id", flat=True)
-            .distinct()
-        )
-        states = State.objects.filter(pk__in=state_ids_with_community).order_by(
-            "state_name"
-        )
-
-        print("States to be sent:", states)
-        states_list = [
-            {"value": state.pk, "label": state.state_name, "description": ""}
-            for state in states
-        ]
-        # states_list = [{"value": state.pk, "label": state.state_name}]
-        print("States list to be sent:", states_list)
-        response = bot_interface.api.send_list_msg(
-            bot_instance_id=bot_instance_id,
-            contact_number=user.phone,
-            text="कृपया अपना राज्य चुनें",
-            menu_list=states_list,
-        )
-        print("List message response:", response)
-
-        # Return success/failure based on API response
-        if response and response.get("messages"):
-            return "success"
-        else:
-            return "failure"
-
-    def sendDistricts(self, bot_instance_id, data_dict):
-        """
-        Send district options based on selected state.
-        This function prepares the user session and sends a request for district selection.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure" based on operation result.
-        """
-        print("in sendDistricts")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            if bot_instance:
-                print("bot_instance", bot_instance.language)
-
-            user_id = data_dict.get("user_id")
-            print("user in sendDistricts", user_id)
-
-            # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            print("user in sendDistricts", user)
-
-            # get the state name from data_dict
-            user.expected_response_type = "button"
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup with error handling
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-
-            data = data_dict.get("data", {})
-            print("data in sendDistricts:", data)
-
-            # Initialize variables
-            get_data_from_state = None
-            get_data_from_state_field = "data"  # Default value
-
-            # check if data_dict has 'getDataFrom' key
-            if "getDataFrom" in data:
-                # getDataFrom has the statename from which we need to get the data received to use it here
-                get_data_from = data["getDataFrom"]
-                get_data_from_state = get_data_from.get("state", "")
-                get_data_from_state_field = get_data_from.get("field", "data")
-                print("State name from data_dict:", get_data_from_state)
-                print("Field name from data_dict:", get_data_from_state_field)
-
-            # Check if we have the required state data
-            if not get_data_from_state:
-                print("No state data found in configuration")
-                return "failure"
-
-            current_session = user.current_session
-            print(
-                "Current session in sendDistricts:",
-                type(current_session),
-                current_session,
-            )
-
-            # Validate session structure and extract state ID
-            state_id = None
-            if (
-                current_session
-                and isinstance(current_session, list)
-                and len(current_session) > 0
+            except (
+                bot_interface.models.BotUsers.DoesNotExist,
+                bot_interface.models.UserSessions.DoesNotExist,
             ):
-                if get_data_from_state in current_session[0]:
-                    state_data = current_session[0][get_data_from_state]
-                    state_id = state_data.get(get_data_from_state_field, "")
-                    print(f"State ID extracted from session: {state_id}")
-                else:
-                    print(f"State '{get_data_from_state}' not found in session data")
-            else:
-                print("Session data is empty or malformed")
-
-            if not state_id:
-                print("No state ID found in session data")
-                return "failure"
-            # get districts based on the selected state
-            try:
-                response = requests.get(
-                    # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_districts_with_community/",
-                    url=f"https://geoserver.core-stack.org/api/v1/get_districts_with_community/",
-            
-                    params={"state_id": state_id},
-                    timeout=30,
-                )
-                response.raise_for_status()  # Raise an error for bad responses
-                print("Response from get_districts_with_community:", response.json())
-            except requests.exceptions.RequestException as e:
-                print(f"Error fetching districts by state: {e}")
-                return "failure"
-            print("Response from get_districts_with_community:", response.json())
-            # Parse the response to get districts
-            districts_data = response.json().get("data", [])
-            print("Districts data:", districts_data)
-            for district in districts_data:
-                print("District:", district, district.get("id"), district.get("name"))
-            districts_list = [
-                {
-                    "value": district.get("id"),
-                    "label": district.get("name"),
-                    "description": "",
-                }
-                for district in districts_data
-            ]
-
-            send_districts_response = bot_interface.api.send_list_msg(
-                bot_instance_id=bot_instance_id,
-                contact_number=user.phone,
-                text="कृपया अपना जिला चुनें",
-                menu_list=districts_list,
-            )
-
-            print("List message response:", send_districts_response)
-
-            # Save user session
-            user.save()
-
-            # Return success/failure based on API response
-            if send_districts_response and send_districts_response.get("messages"):
-                return "success"
-            else:
-                return "failure"
+                # User or session doesn't exist yet, will be handled in session creation
+                logger.error("No existing user session found, will use default context")
 
         except Exception as e:
-            print(f"Error in sendDistricts: {e}")
-            return "failure"
+            logger.error(f"Error preserving user context: {e}")
+            # Don't fail the whole process if context preservation fails
 
-    def sendCommunityByStateDistrict(self, bot_instance_id, data_dict):
+    @staticmethod
+    def _process_media_message(
+        message: Dict,
+        event_packet: Dict,
+        bot_id: int,
+        media_type: str,
+    ) -> None:
         """
-        Send community options based on selected state and district.
-        This function prepares the user session and sends a request for community selection.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure" based on operation result.
+        Process WhatsApp media messages (image, audio, voice).
         """
-        print("in sendCommunityByStateDistrict")
 
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            if bot_instance:
-                print("bot_instance", bot_instance.language)
-
-            user_id = data_dict.get("user_id")
-            print("user in sendCommunityByStateDistrict", user_id)
-
-            # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            print("user in sendCommunityByStateDistrict", user)
-
-            # Set user session properties
-            user.expected_response_type = "community"
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup with error handling
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-
-            data = data_dict.get("data", {})
-            print("data in sendCommunityByStateDistrict:", data)
-
-            # Initialize variables
-            state_id = None
-            district_id = None
-
-            # Check if data_dict has 'getDataFrom' key
-            if "getDataFrom" in data:
-                get_data_from_list = data["getDataFrom"]
-                print("getDataFrom configuration:", get_data_from_list)
-
-                current_session = user.current_session
-                print(
-                    "Current session in sendCommunityByStateDistrict:",
-                    type(current_session),
-                    current_session,
-                )
-
-                # Extract state and district IDs from session data
-                for get_data_from in get_data_from_list:
-                    state_name = get_data_from.get("state", "")
-                    field_name = get_data_from.get("field", "data")
-
-                    print(f"Looking for state: {state_name}, field: {field_name}")
-
-                    if state_name == "SendState":
-                        # Get state_id from SendState session data
-                        if (
-                            current_session
-                            and len(current_session) > 0
-                            and state_name in current_session[0]
-                        ):
-                            state_id = current_session[0][state_name].get(
-                                field_name, ""
-                            )
-                            print(f"Extracted state_id: {state_id}")
-                    elif state_name == "SendDistrict":
-                        # Get district_id from SendDistrict session data
-                        if (
-                            current_session
-                            and len(current_session) > 0
-                            and state_name in current_session[0]
-                        ):
-                            district_id = current_session[0][state_name].get(
-                                field_name, ""
-                            )
-                            print(f"Extracted district_id: {district_id}")
-
-            # Check if we have the required state and district data
-            if not state_id or not district_id:
-                print(
-                    f"Missing required data - state_id: {state_id}, district_id: {district_id}"
-                )
-                return "failure"
-
-            # # Get state and district names for API call
-            # try:
-            #     state_obj = State.objects.get(pk=state_name)
-            #     district_obj = District.objects.get(pk=district_name)
-            #     state_name = state_obj.state_name
-            #     district_name = district_obj.district_name
-            #     print(f"State name: {state_name}, District name: {district_name}")
-            # except (State.DoesNotExist, District.DoesNotExist) as e:
-            #     print(f"Error getting state/district names: {e}")
-            #     return "failure"
-
-            # Call the API to get communities by location
-            try:
-                response = requests.get(
-                    # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}get_communities_by_location/",
-                    url=f"https://geoserver.core-stack.org/api/v1/get_communities_by_location/",
-                    params={"state_id": state_id, "district_id": district_id},
-                    timeout=30,
-                )
-                response.raise_for_status()
-                api_response = response.json()
-                print("API response from get_communities_by_location:", api_response)
-
-                # Check if the API call was successful
-                if api_response.get("success") and api_response.get("data"):
-                    communities_data = api_response["data"]
-                    print("Communities data:", communities_data)
-
-                    # Format communities for WhatsApp list message
-                    communities_list = []
-                    for community in communities_data:
-                        communities_list.append(
-                            {
-                                "value": community.get("community_id"),
-                                "label": community.get("name"),
-                                "description": community.get("description", ""),
-                            }
-                        )
-
-                    print("Communities list for WhatsApp:", communities_list)
-
-                    # Send the communities list to user
-                    if communities_list:
-                        send_communities_response = bot_interface.api.send_list_msg(
-                            bot_instance_id=bot_instance_id,
-                            contact_number=user.phone,
-                            text="कृपया अपना समुदाय चुनें",
-                            menu_list=communities_list,
-                        )
-
-                        print(
-                            "Communities list message response:",
-                            send_communities_response,
-                        )
-
-                        # Save user session
-                        user.save()
-
-                        # Return success/failure based on API response
-                        if send_communities_response and send_communities_response.get(
-                            "messages"
-                        ):
-                            return "success"
-                        else:
-                            return "failure"
-                    else:
-                        print(
-                            "No communities found for the selected state and district"
-                        )
-                        return "failure"
-                else:
-                    print("API response indicates failure or no data")
-                    return "failure"
-
-            except requests.exceptions.RequestException as e:
-                print(f"Error calling get_communities_by_location API: {e}")
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in sendCommunityByStateDistrict: {e}")
-            return "failure"
-
-    def addUserToCommunity(self, bot_instance_id, data_dict):
-        """
-        Add user to a community.
-        This function prepares the user session and adds the user to the selected community.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure" based on operation result.
-        """
-        print("in addUserToCommunity")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            if bot_instance:
-                print("bot_instance", bot_instance.language)
-
-            user_id = data_dict.get("user_id")
-            print("user in addUserToCommunity", user_id)
-
-            # check if user is created
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            print("user in addUserToCommunity", user)
-
-            # Set user session properties
-            user.expected_response_type = "button"
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup with error handling
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-
-            data = data_dict.get("data", {})
-            print("data in addUserToCommunity:", data)
-
-            # Initialize variable
-            community_id = None
-
-            # Check if data_dict has 'getDataFrom' key
-            if "getDataFrom" in data:
-                get_data_from_config = data["getDataFrom"]
-                print("getDataFrom configuration:", get_data_from_config)
-
-                # Normalize getDataFrom to list format for consistent processing
-                if isinstance(get_data_from_config, dict):
-                    # Single object - convert to list
-                    get_data_from_list = [get_data_from_config]
-                elif isinstance(get_data_from_config, list):
-                    # Already a list
-                    get_data_from_list = get_data_from_config
-                else:
-                    print(f"Invalid getDataFrom format: {type(get_data_from_config)}")
-                    return "failure"
-
-                print("Normalized getDataFrom list:", get_data_from_list)
-
-                current_session = user.current_session
-                print(
-                    "Current session in addUserToCommunity:",
-                    type(current_session),
-                    current_session,
-                )
-
-                # Extract community ID from session data
-                for get_data_from in get_data_from_list:
-                    state_name = get_data_from.get("state", "")
-                    field_name = get_data_from.get("field", "misc")
-
-                    print(f"Looking for state: {state_name}, field: {field_name}")
-
-                    if state_name == "CommunityByStateDistrict":
-                        # Get community_id from CommunityByStateDistrict session data
-                        if current_session and len(current_session) > 0:
-                            print(
-                                f"Session structure check - type: {type(current_session[0])}"
-                            )
-                            if state_name in current_session[0]:
-                                state_data = current_session[0][state_name]
-                                print(
-                                    f"State data type: {type(state_data)}, content: {state_data}"
-                                )
-
-                                if isinstance(state_data, dict):
-                                    community_id = state_data.get(field_name)
-                                    print(f"Extracted community_id: {community_id}")
-                                else:
-                                    print(
-                                        f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}"
-                                    )
-                                    return "failure"
-                            else:
-                                print(f"State {state_name} not found in session")
-                        else:
-                            print("No current session data available")
-                    elif state_name == "CommunityByLocation":
-                        if current_session and len(current_session) > 0:
-                            print(
-                                f"Session structure check - type: {type(current_session[0])}"
-                            )
-                            if state_name in current_session[0]:
-                                state_data = current_session[0][state_name]
-                                print(
-                                    f"State data type: {type(state_data)}, content: {state_data}"
-                                )
-
-                                if isinstance(state_data, dict):
-                                    community_id = state_data.get(field_name)
-                                    print(f"Extracted community_id: {community_id}")
-                                else:
-                                    print(
-                                        f"ERROR: State data is not a dict, it's {type(state_data)}: {state_data}"
-                                    )
-                                    return "failure"
-                # add user to community
-                if community_id:
-                    print(f"Adding user {user.phone} to community {community_id}")
-                    try:
-                        response = requests.post(
-                            # url=f"{settings.COMMUNITY_ENGAGEMENT_API_URL}add_user_to_community/",
-                            url="https://geoserver.core-stack.org/api/v1/add_user_to_community/",
-                            data={"community_id": community_id, "number": user.phone},
-                            timeout=30,
-                        )
-                        response.raise_for_status()
-                        api_response = response.json()
-                        print("Add user to community API response:", api_response)
-
-                        # Return success/failure based on API response
-                        if api_response.get("success"):
-                            # Save community membership data locally
-                            try:
-                                from bot_interface.utils import add_community_membership
-
-                                # Extract community data from API response
-                                community_data = {
-                                    "community_id": community_id,
-                                    "community_name": api_response.get(
-                                        "community_name", ""
-                                    ),
-                                    "community_description": api_response.get(
-                                        "community_description", ""
-                                    ),
-                                    "organization": api_response.get(
-                                        "organization", ""
-                                    ),
-                                }
-
-                                # If API didn't return complete data, try database fallback
-                                if (
-                                    not community_data["community_name"]
-                                    or not community_data["organization"]
-                                ):
-                                    print(
-                                        "API returned incomplete data, trying database fallback..."
-                                    )
-                                    try:
-                                        from community_engagement.models import (
-                                            Community_user_mapping,
-                                        )
-                                        from users.models import User
-
-                                        # Get user's phone number
-                                        bot_user = (
-                                            bot_interface.models.BotUsers.objects.get(
-                                                id=user_id
-                                            )
-                                        )
-                                        phone_number = bot_user.user.contact_number
-
-                                        # Find user and community mapping
-                                        user_obj = User.objects.get(
-                                            contact_number=phone_number
-                                        )
-                                        community_mapping = (
-                                            Community_user_mapping.objects.filter(
-                                                user=user_obj, community_id=community_id
-                                            )
-                                            .select_related(
-                                                "community", "community__project"
-                                            )
-                                            .first()
-                                        )
-
-                                        if community_mapping:
-                                            # Update with database data
-                                            if (
-                                                not community_data["community_name"]
-                                                and community_mapping.community.project
-                                            ):
-                                                community_data["community_name"] = (
-                                                    community_mapping.community.project.name
-                                                )
-                                            if (
-                                                not community_data["organization"]
-                                                and community_mapping.community.project
-                                                and community_mapping.community.project.organization
-                                            ):
-                                                community_data["organization"] = (
-                                                    community_mapping.community.project.organization.name
-                                                )
-                                            if (
-                                                not community_data[
-                                                    "community_description"
-                                                ]
-                                                and community_mapping.community.project
-                                            ):
-                                                community_data[
-                                                    "community_description"
-                                                ] = getattr(
-                                                    community_mapping.community.project,
-                                                    "description",
-                                                    "",
-                                                )
-
-                                            print(
-                                                f"Enhanced community data from database: {community_data}"
-                                            )
-
-                                    except Exception as db_e:
-                                        print(f"Database fallback failed: {db_e}")
-                                        # Use defaults if database lookup fails
-                                        if not community_data["community_name"]:
-                                            community_data["community_name"] = (
-                                                f"Community {community_id}"
-                                            )
-                                        if not community_data["organization"]:
-                                            community_data["organization"] = (
-                                                "Unknown Organization"
-                                            )
-
-                                # Get the BotUsers object from user_id
-                                bot_user = bot_interface.models.BotUsers.objects.get(
-                                    id=user_id
-                                )
-
-                                # Add community membership to user's local data
-                                add_community_membership(bot_user, community_data)
-                                print(
-                                    f"Successfully added community membership data for user {user.phone}: {community_data}"
-                                )
-
-                            except Exception as e:
-                                print(f"Error saving community membership data: {e}")
-                                # Continue with success even if local tracking fails
-
-                            # Save user session only on success
-                            user.save()
-                            return "success"
-                        else:
-                            print("API response indicates failure")
-                            return "failure"
-
-                    except requests.exceptions.RequestException as e:
-                        print(f"Error calling add_user_to_community API: {e}")
-                        return "failure"
-                    except json.JSONDecodeError as e:
-                        print(f"Error parsing API response: {e}")
-                        return "failure"
-                else:
-                    print("No community ID found in session data")
-                    return "failure"
-
-        except Exception as e:
-            print(f"Error in addUserToCommunity: {e}")
-            return "failure"
-
-    def get_user_communities(self, bot_instance_id, data_dict):
-        """
-        Get user communities using hybrid API + database fallback approach.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "single_community", "multiple_communities", or "failure"
-        """
-        print("in get_user_communities")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            user_id = data_dict.get("user_id")
-
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-            user.save()
-
-            # Get phone number from BotUser
-            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            phone_number = bot_user.user.contact_number
-
-            print(f"Getting communities for phone number: {phone_number}")
-
-            # Sync community data from database for existing users (if needed)
-            try:
-                from bot_interface.utils import sync_community_data_from_database
-
-                sync_community_data_from_database(bot_user)
-            except Exception as sync_e:
-                print(f"Community data sync failed (non-critical): {sync_e}")
-
-            # First try API approach
-            communities = self._get_communities_via_api(phone_number)
-
-            # If API fails, fallback to database approach
-            if not communities:
-                print("API approach failed, trying database fallback...")
-                communities = self._get_communities_via_database(phone_number)
-
-            # Determine community flow based on count
-            return self._determine_community_flow(communities, user_id)
-
-        except Exception as e:
-            print(f"Error in get_user_communities: {e}")
-            return "failure"
-
-    def _get_communities_via_api(self, phone_number):
-        """
-        Get communities using API approach.
-        Args:
-            phone_number (str): User's phone number
-        Returns:
-            list: List of communities or empty list if failed
-        """
-        try:
-            print(f"Trying API approach for phone number: {phone_number}")
-            # base_url = settings.COMMUNITY_ENGAGEMENT_API_URL.rstrip('/')
-            response = requests.get(
-                    f"https://geoserver.core-stack.org/api/v1/get_community_by_user/",
-                params={"number": phone_number},
-                timeout=10,
-            )
-
-            print(f"API response status: {response.status_code}")
-
-            if response.status_code == 200:
-                response_data = response.json()
-                print(f"API response data: {response_data}")
-
-                if response_data.get("success"):
-                    communities = response_data.get("data", [])
-                    print(f"API returned {len(communities)} communities: {communities}")
-                    return communities
-                else:
-                    print(f"API returned success=False: {response_data}")
-            else:
-                print(f"API returned non-200 status: {response.status_code}")
-
-        except requests.exceptions.RequestException as e:
-            print(f"API request failed: {e}")
-        except Exception as e:
-            print(f"Error in API approach: {e}")
-
-        return []
-
-    def _get_communities_via_database(self, phone_number):
-        """
-        Get communities using direct database queries as fallback.
-        Args:
-            phone_number (str): User's phone number
-        Returns:
-            list: List of communities or empty list if failed
-        """
-        try:
-            print(f"Trying database approach for phone number: {phone_number}")
-
-            # Import required models
-            from community_engagement.models import Community_user_mapping
-            from users.models import User
-
-            # Find user by contact number
-            try:
-                user_obj = User.objects.get(contact_number=phone_number)
-                print(f"Found user in database: {user_obj.id}")
-            except User.DoesNotExist:
-                print(f"User not found in database for phone number: {phone_number}")
-                return []
-
-            # Get community mappings for this user
-            community_mappings = Community_user_mapping.objects.filter(
-                user=user_obj
-            ).select_related("community", "community__project")
-
-            communities = []
-            for mapping in community_mappings:
-                # Get community name from the related project
-                community_name = (
-                    mapping.community.project.name
-                    if mapping.community.project
-                    else f"Community {mapping.community.id}"
-                )
-
-                community_data = {
-                    "community_id": mapping.community.id,
-                    "community_name": community_name,
-                    "community_description": (
-                        getattr(mapping.community.project, "description", "")
-                        if mapping.community.project
-                        else ""
-                    ),
-                    "organization": (
-                        mapping.community.project.organization.name
-                        if (
-                            mapping.community.project
-                            and mapping.community.project.organization
-                        )
-                        else ""
-                    ),
-                    "created_at": (
-                        mapping.created_at.isoformat()
-                        if hasattr(mapping, "created_at")
-                        else None
-                    ),
-                }
-                communities.append(community_data)
-
-            print(f"Database returned {len(communities)} communities: {communities}")
-            return communities
-
-        except Exception as e:
-            print(f"Error in database approach: {e}")
-            return []
-
-    def _determine_community_flow(self, communities, user_id):
-        """
-        Determine community flow based on community count.
-        Args:
-            communities (list): List of user communities
-            user_id (int): User ID for logging
-        Returns:
-            str: "single_community", "multiple_communities", or "failure"
-        """
-        community_count = len(communities)
-        print(f"Determining flow for {community_count} communities for user {user_id}")
-
-        if community_count == 1:
-            print("User has single community")
-            return "single_community"
-        elif community_count > 1:
-            print("User has multiple communities")
-            return "multiple_communities"
-        else:
-            print(
-                "User has no communities - this shouldn't happen in community features flow"
-            )
-            return "failure"
-
-    def display_single_community_message(self, bot_instance_id, data_dict):
-        """
-        Display welcome message for users with single community.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in display_single_community_message")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            user_id = data_dict.get("user_id")
-
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-
-            # Get BotUsers object to access user_misc
-            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get(
-                "community_membership", {}
-            ).get("current_communities", [])
-
-            if len(current_communities) > 0:
-                community_name = current_communities[0].get(
-                    "community_name", "Unknown Community"
-                )
-
-                # Create welcome message
-                welcome_text = (
-                    f"🏠 आप {community_name} समुदाय का हिस्सा हैं।\n\nआप कैसे आगे बढ़ना चाहेंगे?"
-                )
-
-                # Send text message
-                response = bot_interface.api.send_text(
-                    bot_instance_id=bot_instance_id,
-                    contact_number=user.phone,
-                    text=welcome_text,
-                )
-
-                print(f"Single community welcome message sent: {response}")
-
-                if response and response.get("messages"):
-                    return "success"
-                else:
-                    return "failure"
-            else:
-                print("No communities found for user")
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in display_single_community_message: {e}")
-            return "failure"
-
-    def display_multiple_community_message(self, bot_instance_id, data_dict):
-        """
-        Display welcome message for users with multiple communities.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in display_multiple_community_message")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            user_id = data_dict.get("user_id")
-
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-
-            # Get BotUsers object to access user_misc
-            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get(
-                "community_membership", {}
-            ).get("current_communities", [])
-
-            if len(current_communities) > 0:
-                # Get fresh community data with last accessed info
-                success, api_response = (
-                    bot_interface.utils.check_user_community_status_http(user.phone)
-                )
-                if success and api_response.get("success"):
-                    community_data = api_response.get("data", {})
-                    last_accessed_id = community_data.get("misc", {}).get(
-                        "last_accessed_community_id"
-                    )
-
-                    # Find the last accessed community name
-                    communities_list = community_data.get("data", [])
-                    last_community_name = "Unknown Community"
-                    for community in communities_list:
-                        if community.get("community_id") == last_accessed_id:
-                            last_community_name = community.get(
-                                "name", "Unknown Community"
-                            )
-                            break
-                else:
-                    # Fallback to first community
-                    last_community_name = current_communities[0].get(
-                        "community_name", "Unknown Community"
-                    )
-
-                # Create welcome message
-                welcome_text = (
-                    f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।"
-                )
-
-                # Send text message
-                response = bot_interface.api.send_text(
-                    bot_instance_id=bot_instance_id,
-                    contact_number=user.phone,
-                    text=welcome_text,
-                )
-
-                print(f"Multiple community welcome message sent: {response}")
-
-                if response and response.get("messages"):
-                    return "success"
-                else:
-                    return "failure"
-            else:
-                print("No communities found for user")
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in display_multiple_community_message: {e}")
-            return "failure"
-
-    def generate_community_menu(self, bot_instance_id, data_dict):
-        """
-        Generate dynamic menu from user's communities.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in generate_community_menu")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            user_id = data_dict.get("user_id")
-
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-            user.expected_response_type = "button"
-            user.current_state = data_dict.get("state")
-
-            # Handle SMJ object lookup
-            smj_id = data_dict.get("smj_id")
-            user.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-            user.save()
-
-            # Get BotUsers object to access user_misc
-            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get(
-                "community_membership", {}
-            ).get("current_communities", [])
-
-            if len(current_communities) > 0:
-                # Get fresh community data with last accessed info
-                success, api_response = (
-                    bot_interface.utils.check_user_community_status_http(user.phone)
-                )
-                if success and api_response.get("success"):
-                    community_data = api_response.get("data", {})
-                    last_accessed_id = community_data.get("misc", {}).get(
-                        "last_accessed_community_id"
-                    )
-                    communities_list = community_data.get("data", [])
-
-                    # Create menu excluding the last accessed community
-                    communities_menu_list = []
-                    for community in communities_list:
-                        community_id = community.get("community_id")
-                        if community_id != last_accessed_id:  # Exclude last accessed
-                            communities_menu_list.append(
-                                {
-                                    "value": f"community_{community_id}",
-                                    "label": community.get("name", "Unknown Community"),
-                                    "description": f"Select {community.get('name', 'Unknown Community')}",
-                                }
-                            )
-                else:
-                    # Fallback to existing logic (show all communities)
-                    communities_menu_list = []
-                    for community in current_communities:
-                        community_id = community.get("community_id")
-                        community_name = community.get(
-                            "community_name", "Unknown Community"
-                        )
-
-                        communities_menu_list.append(
-                            {
-                                "value": f"community_{community_id}",
-                                "label": community_name,
-                                "description": f"Select {community_name}",
-                            }
-                        )
-
-                # Add option to continue with last accessed community
-                communities_menu_list.append(
-                    {
-                        "value": "continue_last_accessed",
-                        "label": "पिछला समुदाय चुनें",
-                        "description": "अपने पिछले समुदाय के साथ वापस जाएं",
-                    }
-                )
-
-                print(f"Generated community menu: {communities_menu_list}")
-
-                # Send community selection menu
-                response = bot_interface.api.send_list_msg(
-                    bot_instance_id=bot_instance_id,
-                    contact_number=user.phone,
-                    text="कृपया अपना समुदाय चुनें:",
-                    menu_list=communities_menu_list,
-                    button_label="समुदाय चुनें",
-                )
-
-                print(f"Community menu sent: {response}")
-
-                if response and response.get("messages"):
-                    return "success"
-                else:
-                    return "failure"
-            else:
-                print("No communities found for user")
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in generate_community_menu: {e}")
-            return "failure"
-
-    def store_active_community_and_context(self, bot_instance_id, data_dict):
-        """
-        Store active community ID and navigation context.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in store_active_community_and_context")
-
-        try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            user_id = data_dict.get("user_id")
-
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-
-            # Get BotUsers object
-            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            current_communities = bot_user.user_misc.get(
-                "community_membership", {}
-            ).get("current_communities", [])
-
-            # Get the event to determine which community to store
-            # First try direct event, then extract from event_data for button events
-            event = data_dict.get("event", "")
-            if not event:
-                # For button events, extract from event_data.misc
-                event_data = data_dict.get("event_data", {})
-                event = event_data.get("misc", "")
-                print(f"Extracted event from button data: {event}")
-
-            print(f"Storing community for event: '{event}'")
-
-            if event == "continue_single":
-                # Single community - store the only community
-                if len(current_communities) > 0:
-                    community_id = current_communities[0].get("community_id")
-                    context = "single_community"
-                else:
-                    print("No communities found for single community user")
-                    return "failure"
-
-            elif event == "continue_last":
-                # Multiple communities - store the actual last accessed community
-                success, api_response = (
-                    bot_interface.utils.check_user_community_status_http(user.phone)
-                )
-                if success and api_response.get("success"):
-                    community_data = api_response.get("data", {})
-                    last_accessed_id = community_data.get("misc", {}).get(
-                        "last_accessed_community_id"
-                    )
-                    if last_accessed_id:
-                        community_id = str(last_accessed_id)
-                        context = "multiple_community"
-                    else:
-                        print("No last accessed community ID found in API response")
-                        return "failure"
-                else:
-                    # Fallback to first community if API fails
-                    if len(current_communities) > 0:
-                        community_id = current_communities[0].get("community_id")
-                        context = "multiple_community"
-                    else:
-                        print("No communities found for multiple community user")
-                        return "failure"
-
-            elif event == "join_new":
-                # User wants to join a new community - return original event for proper transition
-                print(
-                    "User selecting to join new community - no community storage required"
-                )
-                return "join_new"
-
-            elif event == "choose_other":
-                # User wants to choose from multiple communities - return original event for proper transition
-                print(
-                    "User selecting to choose from other communities - no community storage required"
-                )
-                return "choose_other"
-
-            else:
-                print(f"Unknown event for community storage: '{event}'")
-                return "failure"
-
-            # Store in UserSessions.misc_data
-            if not user.misc_data:
-                user.misc_data = {}
-
-            user.misc_data["active_community_id"] = community_id
-            user.misc_data["navigation_context"] = context
-            user.misc_data["last_service_event"] = event
-            user.save()
-
-            print(f"Stored active community {community_id} with context {context}")
-            # Return the original event for proper state transitions
-            return event
-
-        except Exception as e:
-            print(f"Error in store_active_community_and_context: {e}")
-            return "failure"
+        event_packet.type = media_type
+
+        # Extract media block safely
+        media_block = message.get(media_type) or message.get("voice")
+        if not media_block:
+            return
+
+        media_id = media_block.get("id", "")
+        mime_type = media_block.get("mime_type", "")
+
+        event_packet.media_id = media_id
+
+        # Download and upload media
+        filepath = WhatsAppInterface._download_and_upload_media(
+            bot_id=bot_id,
+            mime_type=mime_type,
+            media_id=media_id,
+            media_type=media_type,
+        )
+
+        event_packet.data = filepath
+
+    @staticmethod
+    def _process_image_message(message: Dict, event_packet: Dict, bot_id: int) -> None:
+        WhatsAppInterface._process_media_message(
+            message, event_packet, bot_id, media_type="image"
+        )
+
+    @staticmethod
+    def _process_audio_message(message: Dict, event_packet: Dict, bot_id: int) -> None:
+        WhatsAppInterface._process_media_message(
+            message, event_packet, bot_id, media_type="audio"
+        )
 
     def store_selected_community_and_context(self, bot_instance_id, data_dict):
         """
@@ -1993,6 +415,920 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             traceback.print_exc()
             return "failure"
 
+    def _store_media_data(
+        self, bot_instance_id, data_dict, media_type, flow_type="work_demand"
+    ):
+        """
+        Generic handler for audio/photo storage.
+        """
+        try:
+            print(f"data dict : {data_dict}")
+            user = _get_user_session(bot_instance_id, data_dict.get("user_id"))
+            print(f"user: {user}")
+            if not user:
+                return "failure"
+
+            media_data = _extract_media_data(user, data_dict, media_type)
+            if not media_data:
+                print(f"No {media_type} data found")
+                return "failure"
+
+            user.misc_data = user.misc_data or {}
+            user.misc_data.setdefault(flow_type, {})
+
+            if media_type == "audio":
+                user.misc_data[flow_type]["audio"] = media_data
+            else:
+                user.misc_data[flow_type].setdefault("photos", [])
+                if isinstance(media_data, list):
+                    user.misc_data[flow_type]["photos"].extend(media_data)
+                else:
+                    user.misc_data[flow_type]["photos"].append(media_data)
+
+            user.save()
+            print(f"Stored {media_type} data for {flow_type}: {media_data}")
+            return "success"
+
+        except Exception:
+            logger.exception(f"_store_media_data failed for {media_type}")
+            return "failure"
+
+    @staticmethod
+    def _download_media(
+        bot_id: int,
+        mime_type: str,
+        media_id: str,
+        media_type: str,
+    ) -> str:
+        """
+        Download media (image, audio, voice, video) from WhatsApp API.
+        """
+
+        try:
+            logger.info(
+                "Downloading %s | bot_id=%s | mime_type=%s | media_id=%s",
+                media_type,
+                bot_id,
+                mime_type,
+                media_id,
+            )
+
+            # Select correct API method
+            download_fn_map = {
+                "image": bot_interface.api.download_image,
+                "audio": bot_interface.api.download_audio,
+                "voice": bot_interface.api.download_audio,
+            }
+
+            download_fn = download_fn_map.get(media_type)
+            if not download_fn:
+                raise ValueError(f"Unsupported media type: {media_type}")
+
+            response, filepath = download_fn(bot_id, mime_type, media_id)
+
+            if response and response.status_code == 200 and filepath:
+                logger.info(
+                    "%s downloaded successfully: %s",
+                    media_type.capitalize(),
+                    filepath,
+                )
+                return filepath
+
+            raise RuntimeError(
+                f"{media_type.capitalize()} download failed | "
+                f"status={response.status_code if response else 'None'} | "
+                f"filepath={filepath}"
+            )
+
+        except Exception as exc:
+            logger.exception("Error downloading %s media", media_type)
+            raise
+
+    @staticmethod
+    def _download_image(bot_id: int, mime_type: str, media_id: str) -> str:
+        return WhatsAppInterface._download_media(
+            bot_id, mime_type, media_id, media_type="image"
+        )
+
+    @staticmethod
+    def _download_audio(bot_id: int, mime_type: str, media_id: str) -> str:
+        return WhatsAppInterface._download_media(
+            bot_id, mime_type, media_id, media_type="audio"
+        )
+
+    @staticmethod
+    def _is_interactive_message(json_obj: Dict) -> bool:
+        """Check if this is an interactive message"""
+        return bool(json_obj.get("id") and json_obj.get("type") == "interactive")
+
+    @staticmethod
+    def _process_interactive_message(json_obj: Dict, event_packet: Dict) -> None:
+        """Process interactive message"""
+        event_packet["message_id"] = json_obj["id"]
+        event_packet["message_to"] = json_obj.get("to", "")
+        event_packet["type"] = json_obj["type"]
+
+    def sendText(self, bot_id, data_dict):
+        logger.info("data_dict in sendText: %s", data_dict)
+        data = data_dict.get("text")
+        user_id = data_dict.get("user_id")
+        bot_instance, user_session = _load_user_session(bot_id=bot_id, user_id=user_id)
+        text = data[0].get(bot_instance.language)
+        try:
+            response = bot_interface.api.send_text(
+                bot_instance_id=bot_id, contact_number=user_session.phone, text=text
+            )
+            user_session.expected_response_type = "text"
+            user_session.current_state = data_dict.get("state")
+            user_session.current_smj = bot_instance.smj
+            user_session.save()
+            if response and response.get("messages"):
+                logger.info(
+                    f"Whatsapp Text Message {text} send to {user_session.phone} under {user_session.id} session"
+                )
+                return "success"
+            else:
+                logger.info(
+                    f"Whatsapp Text Message {text} send to {user_session.phone} under {user_session.id} session Failed {response.text}"
+                )
+                return "failure"
+
+        except Exception as e:
+            logger.error(
+                f"Whatsapp Text Message {text} send to {user_session.phone} under {user_session.id} session Failed {error}"
+            )
+            return "failure"
+
+    def sendButton(self, bot_instance_id, data_dict):
+        logger.info("data_dict in sendButton: %s", data_dict)
+        logger.info("bot instance id: %s", bot_instance_id)
+        user_id = data_dict.get("user_id")
+        bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+        data = data_dict.get("menu")
+        caption = "Select an option:"  # Default
+        if data_dict.get("caption"):
+            caption = data_dict.get("caption")
+        elif data and len(data) > 0 and "caption" in data[0]:
+            caption = data[0]["caption"]
+        try:
+            user_session.expected_response_type = "button"
+            user_session.current_state = data_dict.get("state")
+
+            # Handle SMJ object lookup with error handling
+            smj_id = data_dict.get("smj_id")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+            user_session.save()
+            if len(data) > 3:
+                print("in send_list msg ::")
+                label = "Select Here"
+                response = bot_interface.api.send_list_msg(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=user_session.phone,
+                    text=caption,
+                    menu_list=data,
+                    button_label=label,
+                )
+
+            elif len(data) <= 3 and ("description" in data[0]):
+                label = "Select Here"
+                response = bot_interface.api.send_list_msg(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=user_session.phone,
+                    text=caption,
+                    menu_list=data,
+                    button_label=label,
+                )
+
+            else:
+
+                label = "Select Here"
+                response = bot_interface.api.send_button_msg(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=user_session.phone,
+                    text=caption,
+                    menu_list=data,
+                )
+
+            # Return success/failure based on API response
+            if response and response.get("messages"):
+                logger.info(
+                    f"Menu Send to user {user_session.phone} under {user_session.id} session"
+                )
+                return "success"
+            else:
+                logger.error(
+                    f"Failed to Send Menu to user {user_session.phone} under {user_session.id} session"
+                )
+                return "failure"
+
+        except Exception as e:
+            logger.error(f"Failed to Send Menu to user: {e}")
+            return "failure"
+
+    def sendLocationRequest(self, bot_instance_id, data_dict, text=None):
+        user_id = data_dict.get("user_id")
+        smj_id = data_dict.get("smj_id")
+        bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+        user_session.expected_response_type = "location"
+        user_session.current_state = data_dict.get("state")
+        user_session.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+        user_session.save()
+        if not text:
+            text = "कृपया स्थान भेजें"
+
+        # Handle SMJ object lookup with error handling
+
+        response = bot_interface.api.send_location_request(
+            bot_instance_id=bot_instance_id,
+            contact_number=user_session.phone,
+            text=text,
+        )
+
+        # Return success/failure based on API response
+        if response and response.get("messages"):
+            logger.info(f"Location message sent for session {user_session.id}")
+            return "success"
+        else:
+            logger.error(f"Failed: Location message failed {response.text}")
+            return "failure"
+
+    def sendCommunityByLocation(self, bot_instance_id, data_dict):
+        """
+        Send community options based on user's location.
+        """
+        logger.debug("sendCommunityByLocation called")
+
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+
+            data = data_dict.get("data", {})
+            get_data_from = data.get("getDataFrom", {})
+
+            state_name = get_data_from.get("state")
+            field_name = get_data_from.get("field", "data")
+
+            user_session.current_state = data_dict.get("state")
+
+            latitude, longitude = _extract_lat_lon_from_session(
+                user_session.current_session, state_name, field_name
+            )
+
+            if not latitude or not longitude:
+                logger.error("Location data not found in user session")
+                return "failure"
+
+            # Set SMJ
+            smj_id = data_dict.get("smj_id")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(id=smj_id)
+
+            from public_api.views import get_location_info_by_lat_lon
+            from community_engagement.utils import get_communities
+
+            logger.debug("Fetching location info lat=%s lon=%s", latitude, longitude)
+            raw_response = get_location_info_by_lat_lon(
+                lat=float(latitude), lon=float(longitude)
+            )
+
+            location_data = _normalize_location_response(raw_response)
+            if not location_data:
+                return "no_communities"
+
+            communities = get_communities(
+                state_name=location_data.get("State", ""),
+                district_name=location_data.get("District", ""),
+                block_name=location_data.get("Block", ""),
+            )
+
+            if not communities or communities == "no_communities":
+                return "no_communities"
+
+            menu_list = [
+                {
+                    "value": c.get("community_id"),
+                    "label": c.get("name"),
+                    "description": c.get("description", ""),
+                }
+                for c in communities
+            ]
+
+            response = bot_interface.api.send_list_msg(
+                bot_instance_id=bot_instance_id,
+                contact_number=user_session.phone,
+                text="कृपया अपना समुदाय चुनें",
+                menu_list=menu_list,
+            )
+
+            user_session.expected_response_type = "community"
+            user_session.save()
+
+            return (
+                "success" if response and response.get("messages") else "no_communities"
+            )
+
+        except Exception:
+            logger.exception("Error in sendCommunityByLocation")
+            return "no_communities"
+
+    def sendStates(self, bot_instance_id, data_dict):
+        logger.debug("sendStates called")
+
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+
+            user_session.current_state = data_dict.get("state")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(
+                id=data_dict.get("smj_id")
+            )
+
+            from community_engagement.models import Location
+            from geoadmin.models import State
+
+            state_ids = (
+                Location.objects.filter(communities__isnull=False)
+                .values_list("state_id", flat=True)
+                .distinct()
+            )
+
+            states = State.objects.filter(pk__in=state_ids).order_by("state_name")
+
+            menu_list = [
+                {"value": s.pk, "label": s.state_name, "description": ""}
+                for s in states
+            ]
+
+            return _prepare_and_send_list(
+                bot_instance_id,
+                user_session,
+                menu_list,
+                text="कृपया अपना राज्य चुनें",
+            )
+
+        except Exception:
+            logger.exception("Error in sendStates")
+            return "failure"
+
+    def sendDistricts(self, bot_instance_id, data_dict):
+        logger.debug("sendDistricts called")
+
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+
+            user_session.current_state = data_dict.get("state")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(
+                id=data_dict.get("smj_id")
+            )
+
+            data = data_dict.get("data", {})
+            get_data_from = data.get("getDataFrom", {})
+            state_name = get_data_from.get("state")
+            field = get_data_from.get("field", "data")
+
+            if not state_name:
+                logger.error("Missing getDataFrom state config")
+                return "failure"
+
+            # Extract state_id from session
+            state_id = None
+            for entry in user_session.current_session or []:
+                if state_name in entry:
+                    state_id = entry[state_name].get(field)
+                    break
+
+            if not state_id:
+                logger.error("State ID not found in session")
+                return "failure"
+
+            response = requests.get(
+                f"{CE_API_URL}get_districts_with_community/",
+                params={"state_id": state_id},
+                timeout=30,
+            )
+            response.raise_for_status()
+
+            districts = response.json().get("data", [])
+            if not districts:
+                return "failure"
+
+            menu_list = [
+                {"value": d.get("id"), "label": d.get("name"), "description": ""}
+                for d in districts
+            ]
+
+            return _prepare_and_send_list(
+                bot_instance_id,
+                user_session,
+                menu_list,
+                text="कृपया अपना जिला चुनें",
+            )
+
+        except Exception:
+            logger.exception("Error in sendDistricts")
+            return "failure"
+
+    def sendCommunityByStateDistrict(self, bot_instance_id, data_dict):
+        """
+        Send community options based on selected state and district.
+        """
+        logger.debug("sendCommunityByStateDistrict called")
+
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+
+            # Update session context
+            user_session.expected_response_type = "community"
+            user_session.current_state = data_dict.get("state")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(
+                id=data_dict.get("smj_id")
+            )
+
+            data = data_dict.get("data", {})
+            mappings = data.get("getDataFrom", [])
+
+            if not mappings:
+                logger.error("Missing getDataFrom configuration")
+                return "failure"
+
+            # Extract state & district IDs
+            extracted = _extract_ids_from_session(
+                user_session.current_session, mappings
+            )
+
+            state_id = extracted.get("SendState")
+            district_id = extracted.get("SendDistrict")
+
+            if not state_id or not district_id:
+                logger.error(
+                    "Missing required IDs | state_id=%s district_id=%s",
+                    state_id,
+                    district_id,
+                )
+                return "failure"
+
+            # Call community API
+            response = requests.get(
+                f"{CE_API_URL}get_communities_by_location/",
+                params={"state_id": state_id, "district_id": district_id},
+                timeout=30,
+            )
+            response.raise_for_status()
+
+            api_response = response.json()
+            communities = (
+                api_response.get("data") if api_response.get("success") else None
+            )
+
+            if not communities:
+                logger.info(
+                    "No communities found for state=%s district=%s",
+                    state_id,
+                    district_id,
+                )
+                return "failure"
+
+            menu_list = [
+                {
+                    "value": c.get("community_id"),
+                    "label": c.get("name"),
+                    "description": c.get("description", ""),
+                }
+                for c in communities
+            ]
+
+            send_response = bot_interface.api.send_list_msg(
+                bot_instance_id=bot_instance_id,
+                contact_number=user_session.phone,
+                text="कृपया अपना समुदाय चुनें",
+                menu_list=menu_list,
+            )
+
+            user_session.save()
+
+            return (
+                "success"
+                if send_response and send_response.get("messages")
+                else "failure"
+            )
+
+        except Exception:
+            logger.exception("Error in sendCommunityByStateDistrict")
+            return "failure"
+
+    def addUserToCommunity(self, bot_instance_id, data_dict):
+        """
+        Add user to a community.
+        """
+        logger.debug("addUserToCommunity called")
+
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+
+            # Update session
+            user_session.expected_response_type = "button"
+            user_session.current_state = data_dict.get("state")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(
+                id=data_dict.get("smj_id")
+            )
+
+            data = data_dict.get("data", {})
+            mappings = data.get("getDataFrom")
+
+            if not mappings:
+                logger.error("Missing getDataFrom configuration")
+                return "failure"
+
+            if isinstance(mappings, dict):
+                mappings = [mappings]
+
+            community_id = _extract_community_id_from_session(
+                user_session.current_session, mappings
+            )
+
+            if not community_id:
+                logger.error("Community ID not found in session")
+                return "failure"
+
+            logger.info(
+                "Adding user %s to community %s",
+                user_session.phone,
+                community_id,
+            )
+
+            response = requests.post(
+                f"{CE_API_URL}add_user_to_community/",
+                data={"community_id": community_id, "number": user_session.phone},
+                timeout=30,
+            )
+            response.raise_for_status()
+            api_response = response.json()
+
+            if not api_response.get("success"):
+                logger.error("Community API returned failure")
+                return "failure"
+
+            # Build & store community membership
+            community_data = _build_community_data(user_id, community_id, api_response)
+
+            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            from bot_interface.utils import add_community_membership
+
+            add_community_membership(bot_user, community_data)
+
+            user_session.save()
+            return "success"
+
+        except Exception:
+            logger.exception("Error in addUserToCommunity")
+            return "failure"
+
+    def get_user_communities(self, bot_instance_id, data_dict):
+        """
+        Determine whether user has single or multiple communities
+        using API with DB fallback.
+        """
+        logger.debug("get_user_communities called")
+
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
+
+            # Update session context
+            user_session.current_state = data_dict.get("state")
+            user_session.current_smj = bot_interface.models.SMJ.objects.get(
+                id=data_dict.get("smj_id")
+            )
+            user_session.save()
+
+            # Get phone number
+            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            phone_number = bot_user.user.contact_number
+
+            logger.info("Fetching communities for phone=%s", phone_number)
+
+            # Sync local cache (non-blocking)
+            try:
+                from bot_interface.utils import sync_community_data_from_database
+
+                sync_community_data_from_database(bot_user)
+            except Exception:
+                logger.warning("Community sync failed (non-critical)", exc_info=True)
+
+            communities = self._fetch_user_communities(phone_number)
+            return self._determine_community_flow(communities, user_id)
+
+        except Exception:
+            logger.exception("Error in get_user_communities")
+            return "failure"
+
+    def _fetch_user_communities(self, phone_number: str) -> list:
+        """
+        Fetch user communities using API first, then DB fallback.
+        """
+        communities = self._get_communities_via_api(phone_number)
+
+        if communities:
+            return communities
+
+        logger.info("API returned no communities, using DB fallback")
+        return self._get_communities_via_database(phone_number)
+
+    def _get_communities_via_api(self, phone_number: str) -> list:
+        try:
+            response = requests.get(
+                f"{CE_API_URL}get_community_by_user/",
+                params={"number": phone_number},
+                timeout=10,
+            )
+
+            if response.status_code != 200:
+                logger.warning("Community API returned status=%s", response.status_code)
+                return []
+
+            payload = response.json()
+            return payload.get("data", []) if payload.get("success") else []
+
+        except requests.exceptions.RequestException:
+            logger.warning("Community API request failed", exc_info=True)
+            return []
+
+    def _get_communities_via_database(self, phone_number: str) -> list:
+        try:
+            from community_engagement.models import Community_user_mapping
+            from users.models import User
+
+            user = User.objects.filter(contact_number=phone_number).first()
+            if not user:
+                return []
+
+            mappings = Community_user_mapping.objects.filter(user=user).select_related(
+                "community", "community__project"
+            )
+
+            return [
+                {
+                    "community_id": m.community.id,
+                    "community_name": (
+                        m.community.project.name
+                        if m.community.project
+                        else f"Community {m.community.id}"
+                    ),
+                    "community_description": (
+                        getattr(m.community.project, "description", "")
+                        if m.community.project
+                        else ""
+                    ),
+                    "organization": (
+                        m.community.project.organization.name
+                        if m.community.project and m.community.project.organization
+                        else ""
+                    ),
+                    "created_at": (
+                        m.created_at.isoformat() if hasattr(m, "created_at") else None
+                    ),
+                }
+                for m in mappings
+            ]
+
+        except Exception:
+            logger.exception("Database fallback failed")
+            return []
+
+    def _determine_community_flow(self, communities, user_id):
+        """
+        Determine community flow based on community count.
+        Args:
+            communities (list): List of user communities
+            user_id (int): User ID for logging
+        Returns:
+            str: "single_community", "multiple_communities", or "failure"
+        """
+        community_count = len(communities)
+        print(f"Determining flow for {community_count} communities for user {user_id}")
+
+        if community_count == 1:
+            print("User has single community")
+            return "single_community"
+        elif community_count > 1:
+            print("User has multiple communities")
+            return "multiple_communities"
+        else:
+            print(
+                "User has no communities - this shouldn't happen in community features flow"
+            )
+            return "failure"
+
+    def display_community_message(self, bot_instance_id, data_dict, mode="single"):
+        """
+        Display welcome message for users with single or multiple communities.
+
+        Args:
+            bot_instance_id (int): Bot instance ID
+            data_dict (dict): User/session data
+            mode (str): "single" or "multiple"
+
+        Returns:
+            str: "success" or "failure"
+        """
+        try:
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            user_id = data_dict.get("user_id")
+
+            # Get user session
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
+
+            # Get user communities
+            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            communities = bot_user.user_misc.get("community_membership", {}).get(
+                "current_communities", []
+            )
+
+            if not communities:
+                return "failure"
+
+            # Resolve community name
+            community_name = communities[0].get("community_name", "Unknown Community")
+
+            if mode == "multiple":
+                success, api_response = (
+                    bot_interface.utils.check_user_community_status_http(user.phone)
+                )
+                if success and api_response.get("success"):
+                    data = api_response.get("data", {})
+                    last_id = data.get("misc", {}).get("last_accessed_community_id")
+
+                    for c in data.get("data", []):
+                        if c.get("community_id") == last_id:
+                            community_name = c.get("name", community_name)
+                            break
+
+                welcome_text = (
+                    f"🏠 आपने पिछली बार {community_name} समुदाय का उपयोग किया था।"
+                )
+            else:
+                welcome_text = (
+                    f"🏠 आप {community_name} समुदाय का हिस्सा हैं।\n\n"
+                    "आप कैसे आगे बढ़ना चाहेंगे?"
+                )
+
+            response = bot_interface.api.send_text(
+                bot_instance_id=bot_instance_id,
+                contact_number=user.phone,
+                text=welcome_text,
+            )
+
+            return "success" if response and response.get("messages") else "failure"
+
+        except Exception:
+            logger.exception("display_community_message failed")
+            return "failure"
+
+    def generate_community_menu(self, bot_instance_id, data_dict):
+        """
+        Generate dynamic menu from user's communities.
+        """
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance, user = _load_user_session(bot_instance_id, user_id)
+
+            # Update session state
+            user.expected_response_type = "button"
+            user.current_state = data_dict.get("state")
+            user.current_smj = bot_interface.models.SMJ.objects.get(
+                id=data_dict.get("smj_id")
+            )
+            user.save()
+
+            # Get user communities from misc
+            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
+
+            if not current_communities:
+                return "failure"
+
+            # Try API for last accessed community
+            menu_items = []
+            success, api_response = (
+                bot_interface.utils.check_user_community_status_http(user.phone)
+            )
+
+            if success and api_response.get("success"):
+                data = api_response.get("data", {})
+                last_accessed_id = data.get("misc", {}).get(
+                    "last_accessed_community_id"
+                )
+                api_communities = data.get("data", [])
+
+                menu_items = [
+                    {
+                        "value": f"community_{c.get('community_id')}",
+                        "label": c.get("name", "Unknown Community"),
+                        "description": f"Select {c.get('name', 'Unknown Community')}",
+                    }
+                    for c in api_communities
+                    if c.get("community_id") != last_accessed_id
+                ]
+            else:
+                # Fallback: use stored communities
+                menu_items = [
+                    {
+                        "value": f"community_{c.get('community_id')}",
+                        "label": c.get("community_name", "Unknown Community"),
+                        "description": f"Select {c.get('community_name', 'Unknown Community')}",
+                    }
+                    for c in current_communities
+                ]
+
+            # Add continue option
+            menu_items.append(
+                {
+                    "value": "continue_last_accessed",
+                    "label": "पिछला समुदाय चुनें",
+                    "description": "अपने पिछले समुदाय के साथ वापस जाएं",
+                }
+            )
+
+            # Send WhatsApp list
+            response = bot_interface.api.send_list_msg(
+                bot_instance_id=bot_instance_id,
+                contact_number=user.phone,
+                text="कृपया अपना समुदाय चुनें:",
+                menu_list=menu_items,
+                button_label="समुदाय चुनें",
+            )
+
+            return "success" if response and response.get("messages") else "failure"
+
+        except Exception:
+            logger.exception("generate_community_menu failed")
+            return "failure"
+
+    def store_active_community_and_context(self, bot_instance_id, data_dict):
+        """
+        Store active / selected community and navigation context.
+        Handles:
+        - single community auto-continue
+        - last accessed community
+        - menu-based community selection
+        """
+        try:
+            user_id = data_dict.get("user_id")
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
+
+            event = data_dict.get("event") or data_dict.get("event_data", {}).get(
+                "misc", ""
+            )
+
+            event_data = data_dict.get("event_data", {})
+
+            # Explicit navigation events
+            if event == "join_new":
+                return "join_new"
+
+            if event == "choose_other":
+                return "choose_other"
+
+            # Resolve community
+            community_id = _resolve_community_id(user, user_id, event, event_data)
+
+            if not community_id:
+                return "failure"
+
+            # Store context
+            user.misc_data = user.misc_data or {}
+            user.misc_data.update(
+                {
+                    "active_community_id": str(community_id),
+                    "navigation_context": (
+                        "community_selection"
+                        if event_data.get("type") == "button"
+                        else "auto_continue"
+                    ),
+                    "last_service_event": event,
+                }
+            )
+
+            user.save()
+
+            return "community_selected" if event_data.get("type") == "button" else event
+
+        except Exception as e:
+            logger.exception("store_active_community_and_context failed")
+            logger.debug(str(e))
+
+            return "failure"
+
     def display_service_menu_message(self, bot_instance_id, data_dict):
         """
         Display contextual service menu message.
@@ -2005,15 +1341,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         print("in display_service_menu_message")
 
         try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+
             user_id = data_dict.get("user_id")
-
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-
-            # Get active community name for context
+            bot_instance, user = _load_user_session(bot_instance_id, user_id)
             active_community_id = (
                 user.misc_data.get("active_community_id") if user.misc_data else None
             )
@@ -2089,1188 +1419,394 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
     def store_location_data(self, bot_instance_id, data_dict):
         """
-        Store location data from SendLocationRequest in work demand flow.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
+        Store location data from WhatsApp location event into work_demand context.
         """
-        print("in store_location_data")
-
         try:
-            # Get bot instance with better error handling
-            try:
-                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            except bot_interface.models.Bot.DoesNotExist:
-                print(
-                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
-                )
-                bot_instance = bot_interface.models.Bot.objects.first()
-                if not bot_instance:
-                    print("No bot instances found in database")
-                    return "failure"
+            user = _get_user_session(bot_instance_id, data_dict.get("user_id"))
+            if not user:
+                return "failure"
 
-            user_id = data_dict.get("user_id")
-            if isinstance(user_id, str):
-                user_id = int(user_id)
+            location_data = _extract_location_data(user, data_dict)
 
-            # Get user session with better error handling
-            try:
-                user = bot_interface.models.UserSessions.objects.get(
-                    user=user_id, bot=bot_instance
-                )
-            except bot_interface.models.UserSessions.DoesNotExist:
-                print(
-                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
-                )
-                # Try to get user session without bot constraint
-                try:
-                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(
-                        f"Found user session for user_id: {user_id} without bot constraint"
-                    )
-                except bot_interface.models.UserSessions.DoesNotExist:
-                    print(f"No user session found for user_id: {user_id}")
-                    return "failure"
-
-            # Get location data from current event packet instead of searching old session states
-            location_data = None
-
-            # Try to get location data from data_dict first (current event packet)
-            if "location_data" in data_dict:
-                location_raw_dict = data_dict.get("location_data")
-                if location_raw_dict:
-                    # Use the structured location data from event packet
-                    location_data = {
-                        "latitude": str(location_raw_dict.get("latitude", "")),
-                        "longitude": str(location_raw_dict.get("longitude", "")),
-                        "address": location_raw_dict.get("address", ""),
-                        "name": location_raw_dict.get("name", ""),
-                    }
-                    print(
-                        f"Found structured location data in data_dict: {location_data}"
-                    )
-            elif "event_data" in data_dict:
-                # Extract from event_data if available
-                event_data = data_dict.get("event_data")
-                if event_data and event_data.get("type") == "location":
-                    location_raw = event_data.get("data", "")
-                    misc_data = event_data.get("misc", {})
-
-                    if (
-                        isinstance(misc_data, dict)
-                        and misc_data.get("latitude")
-                        and misc_data.get("longitude")
-                    ):
-                        # Use misc data (preferred for WhatsApp location data)
-                        location_data = {
-                            "latitude": str(misc_data.get("latitude", "")),
-                            "longitude": str(misc_data.get("longitude", "")),
-                            "address": misc_data.get("address", ""),
-                            "name": misc_data.get("name", ""),
-                        }
-                        print(
-                            f"Found location data in event_data misc: {location_data}"
-                        )
-                    elif (
-                        location_raw
-                        and isinstance(location_raw, str)
-                        and "," in location_raw
-                    ):
-                        # Fallback to raw coordinate string
-                        lat, lon = location_raw.split(",", 1)
-                        location_data = {
-                            "latitude": lat.strip(),
-                            "longitude": lon.strip(),
-                            "address": "",
-                            "name": "",
-                        }
-                        print(f"Found location data in event_data raw: {location_data}")
-
-            # Fallback: Look for location data in current session if not found in event packet
             if not location_data:
-                current_session = user.current_session
-                print(
-                    f"Location not found in event packet, checking current session: {current_session}"
-                )
-
-                if current_session and len(current_session) > 0:
-                    # Find the SendLocationRequest state in session
-                    for session_item in current_session:
-                        if "SendLocationRequest" in session_item:
-                            location_raw = session_item["SendLocationRequest"].get(
-                                "data", ""
-                            )
-                            misc_data = session_item["SendLocationRequest"].get(
-                                "misc", {}
-                            )
-
-                            # Parse location data
-                            if (
-                                location_raw
-                                and isinstance(location_raw, str)
-                                and "," in location_raw
-                            ):
-                                # Format: "latitude,longitude"
-                                lat, lon = location_raw.split(",", 1)
-                                location_data = {
-                                    "latitude": lat.strip(),
-                                    "longitude": lon.strip(),
-                                    "address": misc_data.get("address", ""),
-                                    "name": misc_data.get("name", ""),
-                                }
-                            elif isinstance(misc_data, dict):
-                                # Use misc data if available
-                                location_data = {
-                                    "latitude": misc_data.get("latitude", ""),
-                                    "longitude": misc_data.get("longitude", ""),
-                                    "address": misc_data.get("address", ""),
-                                    "name": misc_data.get("name", ""),
-                                }
-                            break
-
-            if location_data:
-                # Initialize misc_data if needed
-                if not user.misc_data:
-                    user.misc_data = {}
-
-                # Initialize work_demand structure
-                if "work_demand" not in user.misc_data:
-                    user.misc_data["work_demand"] = {}
-
-                # Store location data
-                user.misc_data["work_demand"]["location"] = location_data
-                user.save()
-
-                print(f"Successfully stored location data: {location_data}")
-                return "success"
-            else:
-                print("No location data found in session")
+                print("No location data found")
                 return "failure"
 
-        except Exception as e:
-            print(f"Error in store_location_data: {e}")
+            user.misc_data = user.misc_data or {}
+            user.misc_data.setdefault("work_demand", {})
+            user.misc_data["work_demand"]["location"] = location_data
+            user.save()
+
+            print(f"Stored location data: {location_data}")
+            return "success"
+
+        except Exception:
+            logger.exception("store_location_data failed")
             return "failure"
 
-    def store_audio_data(self, bot_instance_id, data_dict):
-        """
-        Store audio data from RequestAudio in work demand flow.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in store_audio_data")
+    def store_audio_data(self, bot_instance_id, data_dict, flow_type="work_demand"):
+        return self._store_media_data(
+            bot_instance_id=bot_instance_id,
+            data_dict=data_dict,
+            media_type="audio",
+            flow_type=flow_type,
+        )
 
-        try:
-            # Get bot instance with better error handling
-            try:
-                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            except bot_interface.models.Bot.DoesNotExist:
-                print(
-                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
-                )
-                bot_instance = bot_interface.models.Bot.objects.first()
-                if not bot_instance:
-                    print("No bot instances found in database")
-                    return "failure"
-
-            user_id = data_dict.get("user_id")
-            if isinstance(user_id, str):
-                user_id = int(user_id)
-
-            # Get user session with better error handling
-            try:
-                user = bot_interface.models.UserSessions.objects.get(
-                    user=user_id, bot=bot_instance
-                )
-            except bot_interface.models.UserSessions.DoesNotExist:
-                print(
-                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
-                )
-                # Try to get user session without bot constraint
-                try:
-                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(
-                        f"Found user session for user_id: {user_id} without bot constraint"
-                    )
-                except bot_interface.models.UserSessions.DoesNotExist:
-                    print(f"No user session found for user_id: {user_id}")
-                    return "failure"
-
-            # Get audio data from current event packet instead of searching old session states
-            audio_data = None
-
-            # Try to get audio data from data_dict first (current event packet)
-            if "audio_data" in data_dict:
-                audio_raw_dict = data_dict.get("audio_data")
-                if audio_raw_dict:
-                    # Use the structured audio data from event packet
-                    audio_data = audio_raw_dict.get("file_path") or audio_raw_dict.get(
-                        "data"
-                    )
-                    print(f"Found structured audio data in data_dict: {audio_data}")
-            elif "event_data" in data_dict:
-                # Extract from event_data if available
-                event_data = data_dict.get("event_data")
-                if event_data and event_data.get("type") in ["audio", "voice"]:
-                    audio_data = event_data.get("data", "")
-                    print(f"Found audio data in event_data: {audio_data}")
-
-            # Fallback: Look for audio data in current session if not found in event packet
-            if not audio_data:
-                current_session = user.current_session
-                print(
-                    f"Audio not found in event packet, checking current session: {current_session}"
-                )
-
-                if current_session and len(current_session) > 0:
-                    # Find the RequestAudio state in session
-                    for session_item in current_session:
-                        if "RequestAudio" in session_item:
-                            audio_data = session_item["RequestAudio"].get("data", "")
-                            break
-
-            if audio_data:
-                # Initialize misc_data if needed
-                if not user.misc_data:
-                    user.misc_data = {}
-
-                # Determine which flow we're in based on current SMJ
-                flow_type = "work_demand"  # Default
-                try:
-                    smj_id = data_dict.get("smj_id")
-                    if smj_id:
-                        smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-                        if smj.name == "grievance":
-                            flow_type = "grievance"
-                        elif smj.name == "work_demand":
-                            flow_type = "work_demand"
-                        print(f"Detected flow type: {flow_type} (SMJ: {smj.name})")
-                except Exception as e:
-                    print(f"Could not determine flow type, using default: {e}")
-
-                # Initialize structure based on flow type
-                if flow_type not in user.misc_data:
-                    user.misc_data[flow_type] = {}
-
-                # Store audio data
-                user.misc_data[flow_type]["audio"] = audio_data
-                user.save()
-
-                print(f"Successfully stored audio data for {flow_type}: {audio_data}")
-                return "success"
-            else:
-                print("No audio data found in session")
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in store_audio_data: {e}")
-            return "failure"
-
-    def store_photo_data(self, bot_instance_id, data_dict):
-        """
-        Store photo data from RequestPhotos in work demand flow.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in store_photo_data")
-
-        try:
-            # Get bot instance with better error handling
-            try:
-                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            except bot_interface.models.Bot.DoesNotExist:
-                print(
-                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
-                )
-                bot_instance = bot_interface.models.Bot.objects.first()
-                if not bot_instance:
-                    print("No bot instances found in database")
-                    return "failure"
-
-            user_id = data_dict.get("user_id")
-            if isinstance(user_id, str):
-                user_id = int(user_id)
-
-            # Get user session with better error handling
-            try:
-                user = bot_interface.models.UserSessions.objects.get(
-                    user=user_id, bot=bot_instance
-                )
-            except bot_interface.models.UserSessions.DoesNotExist:
-                print(
-                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
-                )
-                # Try to get user session without bot constraint
-                try:
-                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(
-                        f"Found user session for user_id: {user_id} without bot constraint"
-                    )
-                except bot_interface.models.UserSessions.DoesNotExist:
-                    print(f"No user session found for user_id: {user_id}")
-                    return "failure"
-
-            # Get photo data from current event packet instead of searching old session states
-            photo_data = None
-
-            # Try to get photo data from data_dict first (current event packet)
-            if "photo_data" in data_dict:
-                photo_raw_dict = data_dict.get("photo_data")
-                if photo_raw_dict:
-                    # Use the structured photo data from event packet
-                    photo_data = photo_raw_dict.get("file_path") or photo_raw_dict.get(
-                        "data"
-                    )
-                    print(f"Found structured photo data in data_dict: {photo_data}")
-            elif "event_data" in data_dict:
-                # Extract from event_data if available
-                event_data = data_dict.get("event_data")
-                if event_data and event_data.get("type") == "image":
-                    photo_data = event_data.get("data", "")
-                    print(f"Found photo data in event_data: {photo_data}")
-
-            # Fallback: Look for RequestPhotos state data in session (old method)
-            if not photo_data:
-                current_session = user.current_session
-                print(f"Current session for photo storage: {current_session}")
-
-                if current_session and len(current_session) > 0:
-                    # Find the RequestPhotos state in session
-                    for session_item in current_session:
-                        if "RequestPhotos" in session_item:
-                            photo_data = session_item["RequestPhotos"].get("data", "")
-                            break
-
-            if photo_data:
-                # Initialize misc_data if needed
-                if not user.misc_data:
-                    user.misc_data = {}
-
-                # Determine which flow we're in based on current SMJ
-                flow_type = "work_demand"  # Default
-                try:
-                    smj_id = data_dict.get("smj_id")
-                    if smj_id:
-                        smj = bot_interface.models.SMJ.objects.get(id=smj_id)
-                        if smj.name == "grievance":
-                            flow_type = "grievance"
-                        elif smj.name == "work_demand":
-                            flow_type = "work_demand"
-                        print(
-                            f"Detected flow type for photos: {flow_type} (SMJ: {smj.name})"
-                        )
-                except Exception as e:
-                    print(
-                        f"Could not determine flow type for photos, using default: {e}"
-                    )
-
-                # Initialize structure based on flow type
-                if flow_type not in user.misc_data:
-                    user.misc_data[flow_type] = {}
-
-                # Initialize photos array if needed
-                if "photos" not in user.misc_data[flow_type]:
-                    user.misc_data[flow_type]["photos"] = []
-
-                # Store photo data (append to list if multiple photos)
-                if isinstance(photo_data, list):
-                    user.misc_data[flow_type]["photos"].extend(photo_data)
-                else:
-                    user.misc_data[flow_type]["photos"].append(photo_data)
-
-                user.save()
-
-                print(f"Successfully stored photo data for {flow_type}: {photo_data}")
-                return "success"
-            else:
-                print("No photo data found in session")
-                return "failure"
-
-        except Exception as e:
-            print(f"Error in store_photo_data: {e}")
-            return "failure"
+    def store_photo_data(self, bot_instance_id, data_dict, flow_type="work_demand"):
+        return self._store_media_data(
+            bot_instance_id=bot_instance_id,
+            data_dict=data_dict,
+            media_type="photo",
+            flow_type=flow_type,
+        )
 
     def archive_and_end_session(self, bot_instance_id, data_dict):
         """
         Archive current session and end it completely.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
         """
-        print("in archive_and_end_session")
-
         try:
-            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            user_id = data_dict.get("user_id")
+            user = _get_user_session(bot_instance_id, data_dict.get("user_id"))
+            if not user:
+                return "failure"
 
-            # Get user session
-            user = bot_interface.models.UserSessions.objects.get(
-                user=user_id, bot=bot_instance
-            )
-
-            # Get BotUsers object for archiving
-            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-
-            # Create archive entry
-            archive_data = {
-                "session_data": user.current_session,
-                "misc_data": user.misc_data,
-                "final_state": user.current_state,
-                "session_duration": (
-                    user.last_updated_at - user.started_at
-                ).total_seconds(),
-                "archived_reason": "work_demand_completion",
-            }
-
-            # Create UserArchive entry
-            bot_interface.models.UserArchive.objects.create(
-                app_type=user.app_type,
-                bot=bot_instance,
-                user=bot_user,
-                session_data=archive_data,
-            )
-
-            print(f"Successfully archived session for user {user_id}")
-
-            # Clear session data
-            user.current_session = {}
-            user.current_smj = None
-            user.current_state = ""
-            user.expected_response_type = "text"
-            user.misc_data = {}
-            user.save()
-
-            print(f"Successfully cleared session data for user {user_id}")
+            _archive_user_session(user, reason="work_demand_completion")
+            _reset_user_session(user)
 
             return "success"
 
+        except Exception:
+            logger.exception("archive_and_end_session failed")
+            return "failure"
+
+    def _extract_flow_data(self, user, flow_type):
+        data = user.misc_data.get(flow_type, {}) if user.misc_data else {}
+
+        if "photos" in data:
+            data["photos_note"] = (
+                "Photo paths are HDPI processed images from WhatsApp media"
+            )
+
+        return data
+
+    def _build_community_context(self, user):
+        active_community_id = (
+            user.misc_data.get("active_community_id") if user.misc_data else None
+        )
+        if not active_community_id:
+            return {}
+
+        try:
+            from community_engagement.models import Community
+
+            community = Community.objects.get(id=active_community_id)
+            context = {
+                "community_id": active_community_id,
+                "community_name": (
+                    community.project.name if community.project else "Unknown"
+                ),
+                "organization": (
+                    community.project.organization.name
+                    if community.project and community.project.organization
+                    else "Unknown"
+                ),
+                "location_hierarchy": {},
+            }
+
+            for loc in community.locations.all():
+                if loc.state:
+                    context["location_hierarchy"]["state"] = loc.state.state_name
+                if loc.district:
+                    context["location_hierarchy"][
+                        "district"
+                    ] = loc.district.district_name
+                if loc.block:
+                    context["location_hierarchy"]["block"] = loc.block.block_name
+
+            return context
+
         except Exception as e:
-            print(f"Error in archive_and_end_session: {e}")
+            logger.warning(f"Community context load failed: {e}")
+            return {"community_id": active_community_id, "error": "load_failed"}
+
+    def _build_community_context(self, user):
+        active_community_id = (
+            user.misc_data.get("active_community_id") if user.misc_data else None
+        )
+        if not active_community_id:
+            return {}
+
+        try:
+            from community_engagement.models import Community
+
+            community = Community.objects.get(id=active_community_id)
+            context = {
+                "community_id": active_community_id,
+                "community_name": (
+                    community.project.name if community.project else "Unknown"
+                ),
+                "organization": (
+                    community.project.organization.name
+                    if community.project and community.project.organization
+                    else "Unknown"
+                ),
+                "location_hierarchy": {},
+            }
+
+            for loc in community.locations.all():
+                if loc.state:
+                    context["location_hierarchy"]["state"] = loc.state.state_name
+                if loc.district:
+                    context["location_hierarchy"][
+                        "district"
+                    ] = loc.district.district_name
+                if loc.block:
+                    context["location_hierarchy"]["block"] = loc.block.block_name
+
+            return context
+
+        except Exception as e:
+            logger.warning(f"Community context load failed: {e}")
+            return {"community_id": active_community_id, "error": "load_failed"}
+
+    def _log_flow_completion(
+        self,
+        bot_instance_id,
+        data_dict,
+        flow_type: str,
+        submit_func,
+    ):
+        """
+        Generic logger for work_demand / story / grievance flows.
+        Creates UserLogs ONLY at the end, reading accumulated data
+        from user.misc_data.
+        """
+        try:
+            # ----------------------------
+            # Load core objects
+            # ----------------------------
+            bot_instance = _get_bot_instance(bot_instance_id)
+            if not bot_instance:
+                return "failure"
+
+            user = _get_user_session(bot_instance, data_dict.get("user_id"))
+            print(f"User Session Data: {user.__dict__}")
+            if not user:
+                return "failure"
+
+            bot_user = _get_bot_user(user.user_id)
+            smj = _get_smj(data_dict.get("smj_id"))
+
+            # ----------------------------
+            # CRITICAL: Refresh user cache
+            # ----------------------------
+            user.refresh_from_db(fields=["misc_data"])
+
+            # ----------------------------
+            # Find correct flow cache
+            # (defensive against key mismatch)
+            # ----------------------------
+            flow_cache = {}
+            misc_data = user.misc_data or {}
+
+            if flow_type in misc_data:
+                flow_cache = misc_data.get(flow_type, {})
+            else:
+                # fallback: partial match (debug safety)
+                for key, value in misc_data.items():
+                    if flow_type in key:
+                        flow_cache = value
+                        break
+
+            # ----------------------------
+            # Extract accumulated media
+            # ----------------------------
+            audio_data = flow_cache.get("audio")
+            photo_data = flow_cache.get("photos")
+            community_id = flow_cache.get("community_id")
+
+            # ----------------------------
+            # Extract structured flow data
+            # ----------------------------
+            flow_data = self._extract_flow_data(user, flow_type)
+
+            # ----------------------------
+            # Build community context
+            # ----------------------------
+            community_context = self._build_community_context(user)
+            if community_id and isinstance(community_context, dict):
+                community_context.setdefault("community_id", community_id)
+
+            # ----------------------------
+            # Build misc payload
+            # ----------------------------
+            misc_payload = _build_misc_payload(
+                self,
+                flow_type=flow_type,
+                flow_data=flow_data,
+                community_context=community_context,
+                bot_instance=bot_instance,
+                user=user,
+                bot_user=bot_user,
+            )
+
+            misc_payload["audio_data"] = audio_data
+            misc_payload["photo_data"] = photo_data
+
+            # ----------------------------
+            # Create final UserLog
+            # ----------------------------
+            bot_interface.models.UserLogs.objects.create(
+                app_type=user.app_type,
+                bot=bot_instance,
+                user=bot_user,
+                key1="useraction",
+                value1=flow_type,
+                misc=misc_payload,
+                smj=smj,
+            )
+
+            # ----------------------------
+            # Cleanup cached flow data
+            # ----------------------------
+            if flow_type in misc_data:
+                misc_data.pop(flow_type, None)
+                user.misc_data = misc_data
+                user.save(update_fields=["misc_data"])
+
+            return "success"
+
+        except Exception:
+            logger.exception(f"log_{flow_type}_completion failed")
             return "failure"
 
     def log_work_demand_completion(self, bot_instance_id, data_dict):
-        """
-        Log complete work demand data to UserLogs when RequestPhotos transitions to ThankYou.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in log_work_demand_completion")
-
-        try:
-            # Get bot instance with better error handling
-            try:
-                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            except bot_interface.models.Bot.DoesNotExist:
-                print(
-                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
-                )
-                bot_instance = bot_interface.models.Bot.objects.first()
-                if not bot_instance:
-                    print("No bot instances found in database")
-                    return "failure"
-
-            user_id = data_dict.get("user_id")
-            if isinstance(user_id, str):
-                user_id = int(user_id)
-
-            # Get user session with better error handling
-            try:
-                user = bot_interface.models.UserSessions.objects.get(
-                    user=user_id, bot=bot_instance
-                )
-            except bot_interface.models.UserSessions.DoesNotExist:
-                print(
-                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
-                )
-                try:
-                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(
-                        f"Found user session for user_id: {user_id} without bot constraint"
-                    )
-                except bot_interface.models.UserSessions.DoesNotExist:
-                    print(f"No user session found for user_id: {user_id}")
-                    return "failure"
-
-            # Get BotUsers object for UserLogs
-            try:
-                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            except bot_interface.models.BotUsers.DoesNotExist:
-                print(f"BotUser not found for user_id: {user_id}")
-                return "failure"
-
-            # Get work_demand SMJ for reference
-            try:
-                smj = bot_interface.models.SMJ.objects.get(id=data_dict.get("smj_id"))
-            except bot_interface.models.SMJ.DoesNotExist:
-                print(f"SMJ not found for smj_id: {data_dict.get('smj_id')}")
-                smj = None
-
-            # Collect work demand data from misc_data
-            work_demand_data = {}
-            if user.misc_data and "work_demand" in user.misc_data:
-                work_demand_data = user.misc_data["work_demand"]
-
-                # Log photo paths to confirm HDPI paths are captured
-                if "photos" in work_demand_data:
-                    print(f"Photo paths being logged: {work_demand_data['photos']}")
-                    # Add explicit note about HDPI paths in the data
-                    work_demand_data["photos_note"] = (
-                        "Photo paths are HDPI processed images from WhatsApp media"
-                    )
-
-            # Collect community context
-            community_context = {}
-            active_community_id = (
-                user.misc_data.get("active_community_id") if user.misc_data else None
-            )
-
-            if active_community_id:
-                try:
-                    from community_engagement.models import Community
-
-                    community = Community.objects.get(id=active_community_id)
-
-                    # Get community details
-                    community_context = {
-                        "community_id": active_community_id,
-                        "community_name": (
-                            community.project.name if community.project else "Unknown"
-                        ),
-                        "organization": (
-                            community.project.organization.name
-                            if community.project and community.project.organization
-                            else "Unknown"
-                        ),
-                    }
-
-                    # Get location hierarchy from community locations
-                    location_hierarchy = {}
-                    for location in community.locations.all():
-                        if location.state:
-                            location_hierarchy["state"] = location.state.state_name
-                        if location.district:
-                            location_hierarchy["district"] = (
-                                location.district.district_name
-                            )
-                        if location.block:
-                            location_hierarchy["block"] = location.block.block_name
-
-                    community_context["location_hierarchy"] = location_hierarchy
-
-                except Exception as e:
-                    print(f"Error getting community context: {e}")
-                    community_context = {
-                        "community_id": active_community_id,
-                        "error": "Failed to load community details",
-                    }
-
-            # Prepare comprehensive misc data
-            from datetime import datetime
-
-            comprehensive_misc_data = {
-                "work_demand_data": work_demand_data,
-                "community_context": community_context,
-                "flow_metadata": {
-                    "smj_name": "work_demand",
-                    "completion_timestamp": datetime.now().isoformat(),
-                    "user_number": (
-                        bot_user.user.username if bot_user.user else "unknown"
-                    ),
-                    "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
-                    "app_type": user.app_type,
-                },
-            }
-
-            # Create UserLogs entry with specified structure
-            user_log = bot_interface.models.UserLogs.objects.create(
-                app_type=user.app_type,
-                bot=bot_instance,
-                user=bot_user,
-                key1="useraction",
-                value1="work_demand",
-                key2="upload",
-                value2="",
-                key3="retries",
-                value3="",
-                key4="",  # Leave empty as not specified
-                misc=comprehensive_misc_data,
-                smj=smj,
-            )
-
-            print(
-                f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}"
-            )
-            print(
-                f"Work demand data logged for user {user_id} in community {active_community_id}"
-            )
-
-            # Additional logging for HDPI path verification
-            if "photos" in work_demand_data:
-                print(
-                    f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}"
-                )
-
-            # Process and submit work demand to Community Engagement API
-            try:
-                import threading
-
-                def async_submit():
-                    try:
-                        # Check if already processed (avoid duplicate processing from signal)
-                        user_log.refresh_from_db()
-                        if (
-                            user_log.value2
-                        ):  # If value2 is not empty, it's already been processed
-                            print(
-                                f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission"
-                            )
-                            return
-
-                        self.process_and_submit_work_demand(user_log.id)
-                        print(
-                            f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}"
-                        )
-                    except Exception as e:
-                        print(
-                            f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}"
-                        )
-
-                # Run in background thread to avoid blocking SMJ flow
-                thread = threading.Thread(target=async_submit, daemon=True)
-                thread.start()
-                print(
-                    f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}"
-                )
-
-            except Exception as e:
-                print(f"❌ Failed to start work demand processing: {e}")
-
-            return "success"
-
-        except Exception as e:
-            print(f"Error in log_work_demand_completion: {e}")
-            return "failure"
+        print(f"Data Dict for work demand {data_dict}")
+        return self._log_flow_completion(
+            bot_instance_id=bot_instance_id,
+            data_dict=data_dict,
+            flow_type="work_demand",
+            submit_func=self.process_and_submit_work_demand,
+        )
 
     def log_story_completion(self, bot_instance_id, data_dict):
+        print(f"Data Dict for work demand {data_dict}")
+        return self._log_flow_completion(
+            bot_instance_id=bot_instance_id,
+            data_dict=data_dict,
+            flow_type="story",
+            submit_func=self.process_and_submit_work_demand,
+        )
+
+    def log_story_completion(self, bot_instance_id, data_dict):
+        return self._log_flow_completion(
+            bot_instance_id=bot_instance_id,
+            data_dict=data_dict,
+            flow_type="story",
+            submit_func=self.process_and_submit_story,
+        )
+
+    def _extract_community_id_for_join(self, user_session, event_data):
         """
-        Log complete work demand data to UserLogs when RequestPhotos transitions to ThankYou.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
+        Extract community_id from session or button event.
         """
-        print("in log story completion")
+        import json
+
+        current_session = user_session.current_session
 
         try:
-            # Get bot instance with better error handling
-            try:
-                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            except bot_interface.models.Bot.DoesNotExist:
-                print(
-                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
-                )
-                bot_instance = bot_interface.models.Bot.objects.first()
-                if not bot_instance:
-                    print("No bot instances found in database")
-                    return "failure"
+            if isinstance(current_session, str):
+                current_session = json.loads(current_session or "[]")
+        except Exception:
+            current_session = []
 
-            user_id = data_dict.get("user_id")
-            if isinstance(user_id, str):
-                user_id = int(user_id)
+        # 1️⃣ Prefer session-based selection
+        for entry in current_session or []:
+            if not isinstance(entry, dict):
+                continue
 
-            # Get user session with better error handling
-            try:
-                user = bot_interface.models.UserSessions.objects.get(
-                    user=user_id, bot=bot_instance
-                )
-            except bot_interface.models.UserSessions.DoesNotExist:
-                print(
-                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
-                )
-                try:
-                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(
-                        f"Found user session for user_id: {user_id} without bot constraint"
-                    )
-                except bot_interface.models.UserSessions.DoesNotExist:
-                    print(f"No user session found for user_id: {user_id}")
-                    return "failure"
+            if "CommunityByStateDistrict" in entry:
+                return entry["CommunityByStateDistrict"].get("misc")
 
-            # Get BotUsers object for UserLogs
-            try:
-                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            except bot_interface.models.BotUsers.DoesNotExist:
-                print(f"BotUser not found for user_id: {user_id}")
+            if "CommunityByLocation" in entry:
+                return entry["CommunityByLocation"].get("misc")
+
+        # 2️⃣ Fallback: button click
+        if event_data.get("type") == "button":
+            return event_data.get("misc") or event_data.get("data")
+
+        return None
+
+    def _join_user_to_community(self, user_session, community_id, phone_number):
+        """
+        Calls CE API to join user to community and stores context locally.
+        """
+        try:
+            response = requests.post(
+                url=f"{CE_API_URL}add_user_to_community/",
+                data={
+                    "community_id": community_id,
+                    "number": int(phone_number),
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            api_response = response.json()
+
+            if not api_response.get("success"):
+                logger.warning(f"Community join failed: {api_response}")
                 return "failure"
 
-            # Get work_demand SMJ for reference
-            try:
-                smj = bot_interface.models.SMJ.objects.get(id=data_dict.get("smj_id"))
-            except bot_interface.models.SMJ.DoesNotExist:
-                print(f"SMJ not found for smj_id: {data_dict.get('smj_id')}")
-                smj = None
+            if not user_session.misc_data:
+                user_session.misc_data = {}
 
-            # Collect work demand data from misc_data
-            work_demand_data = {}
-            if user.misc_data and "work_demand" in user.misc_data:
-                work_demand_data = user.misc_data["work_demand"]
-
-                # Log photo paths to confirm HDPI paths are captured
-                if "photos" in work_demand_data:
-                    print(f"Photo paths being logged: {work_demand_data['photos']}")
-                    # Add explicit note about HDPI paths in the data
-                    work_demand_data["photos_note"] = (
-                        "Photo paths are HDPI processed images from WhatsApp media"
-                    )
-
-            # Collect community context
-            community_context = {}
-            active_community_id = (
-                user.misc_data.get("active_community_id") if user.misc_data else None
+            user_session.misc_data.update(
+                {
+                    "active_community_id": community_id,
+                    "navigation_context": "join_community",
+                    "join_timestamp": timezone.now().isoformat(),
+                }
             )
-
-            if active_community_id:
-                try:
-                    from community_engagement.models import Community
-
-                    community = Community.objects.get(id=active_community_id)
-
-                    # Get community details
-                    community_context = {
-                        "community_id": active_community_id,
-                        "community_name": (
-                            community.project.name if community.project else "Unknown"
-                        ),
-                        "organization": (
-                            community.project.organization.name
-                            if community.project and community.project.organization
-                            else "Unknown"
-                        ),
-                    }
-
-                    # Get location hierarchy from community locations
-                    location_hierarchy = {}
-                    for location in community.locations.all():
-                        if location.state:
-                            location_hierarchy["state"] = location.state.state_name
-                        if location.district:
-                            location_hierarchy["district"] = (
-                                location.district.district_name
-                            )
-                        if location.block:
-                            location_hierarchy["block"] = location.block.block_name
-
-                    community_context["location_hierarchy"] = location_hierarchy
-
-                except Exception as e:
-                    print(f"Error getting community context: {e}")
-                    community_context = {
-                        "community_id": active_community_id,
-                        "error": "Failed to load community details",
-                    }
-
-            # Prepare comprehensive misc data
-            from datetime import datetime
-
-            comprehensive_misc_data = {
-                "work_demand_data": work_demand_data,
-                "community_context": community_context,
-                "flow_metadata": {
-                    "smj_name": "work_demand",
-                    "completion_timestamp": datetime.now().isoformat(),
-                    "user_number": (
-                        bot_user.user.username if bot_user.user else "unknown"
-                    ),
-                    "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
-                    "app_type": user.app_type,
-                },
-            }
-
-            # Create UserLogs entry with specified structure
-            user_log = bot_interface.models.UserLogs.objects.create(
-                app_type=user.app_type,
-                bot=bot_instance,
-                user=bot_user,
-                key1="useraction",
-                value1="story",
-                key2="upload",
-                value2="",
-                key3="retries",
-                value3="",
-                key4="",  # Leave empty as not specified
-                misc=comprehensive_misc_data,
-                smj=smj,
-            )
-
-            print(
-                f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}"
-            )
-            print(
-                f"Work demand data logged for user {user_id} in community {active_community_id}"
-            )
-
-            # Additional logging for HDPI path verification
-            if "photos" in work_demand_data:
-                print(
-                    f"HDPI photo paths captured in UserLogs: {work_demand_data['photos']}"
-                )
-
-            # Process and submit work demand to Community Engagement API
-            try:
-                import threading
-
-                def async_submit():
-                    try:
-                        # Check if already processed (avoid duplicate processing from signal)
-                        user_log.refresh_from_db()
-                        if (
-                            user_log.value2
-                        ):  # If value2 is not empty, it's already been processed
-                            print(
-                                f"🔄 UserLogs ID {user_log.id} already processed, skipping duplicate submission"
-                            )
-                            return
-
-                        self.process_and_submit_story(user_log.id)
-                        print(
-                            f"✅ Work demand processing initiated for UserLogs ID: {user_log.id}"
-                        )
-                    except Exception as e:
-                        print(
-                            f"❌ Error processing work demand for UserLogs ID {user_log.id}: {e}"
-                        )
-
-                # Run in background thread to avoid blocking SMJ flow
-                thread = threading.Thread(target=async_submit, daemon=True)
-                thread.start()
-                print(
-                    f"🚀 Started background work demand processing for UserLogs ID: {user_log.id}"
-                )
-
-            except Exception as e:
-                print(f"❌ Failed to start work demand processing: {e}")
+            user_session.save()
 
             return "success"
 
-        except Exception as e:
-            print(f"Error in log_work_demand_completion: {e}")
-            return "failure"
-
-    def log_grievance_completion(self, bot_instance_id, data_dict):
-        """
-        Log complete grievance data to UserLogs when RequestPhotos transitions to ThankYou.
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
-        """
-        print("in log_grievance_completion")
-
-        try:
-            # Get bot instance with better error handling
-            try:
-                bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
-            except bot_interface.models.Bot.DoesNotExist:
-                print(
-                    f"Bot instance with ID {bot_instance_id} not found, trying to get any bot instance"
-                )
-                bot_instance = bot_interface.models.Bot.objects.first()
-                if not bot_instance:
-                    print("No bot instances found in database")
-                    return "failure"
-
-            user_id = data_dict.get("user_id")
-            if isinstance(user_id, str):
-                user_id = int(user_id)
-
-            # Get user session with better error handling
-            try:
-                user = bot_interface.models.UserSessions.objects.get(
-                    user=user_id, bot=bot_instance
-                )
-            except bot_interface.models.UserSessions.DoesNotExist:
-                print(
-                    f"UserSession not found for user_id: {user_id}, bot: {bot_instance}"
-                )
-                try:
-                    user = bot_interface.models.UserSessions.objects.get(user=user_id)
-                    print(
-                        f"Found user session for user_id: {user_id} without bot constraint"
-                    )
-                except bot_interface.models.UserSessions.DoesNotExist:
-                    print(f"No user session found for user_id: {user_id}")
-                    return "failure"
-
-            # Get BotUsers object for UserLogs
-            try:
-                bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
-            except bot_interface.models.BotUsers.DoesNotExist:
-                print(f"BotUser not found for user_id: {user_id}")
-                return "failure"
-
-            # Get grievance SMJ for reference
-            try:
-                smj = bot_interface.models.SMJ.objects.get(id=data_dict.get("smj_id"))
-            except bot_interface.models.SMJ.DoesNotExist:
-                print(f"SMJ not found for smj_id: {data_dict.get('smj_id')}")
-                smj = None
-
-            # Collect grievance data from misc_data
-            grievance_data = {}
-            if user.misc_data and "grievance" in user.misc_data:
-                grievance_data = user.misc_data["grievance"]
-
-                # Log photo paths to confirm HDPI paths are captured
-                if "photos" in grievance_data:
-                    print(f"Photo paths being logged: {grievance_data['photos']}")
-                    # Add explicit note about HDPI paths in the data
-                    grievance_data["photos_note"] = (
-                        "Photo paths are HDPI processed images from WhatsApp media"
-                    )
-
-            # Collect community context
-            community_context = {}
-            active_community_id = (
-                user.misc_data.get("active_community_id") if user.misc_data else None
-            )
-
-            if active_community_id:
-                try:
-                    from community_engagement.models import Community
-
-                    community = Community.objects.get(id=active_community_id)
-
-                    # Get community details
-                    community_context = {
-                        "community_id": active_community_id,
-                        "community_name": (
-                            community.project.name if community.project else "Unknown"
-                        ),
-                        "organization": (
-                            community.project.organization.name
-                            if community.project and community.project.organization
-                            else "Unknown"
-                        ),
-                    }
-
-                    # Get location hierarchy from community locations
-                    location_hierarchy = {}
-                    for location in community.locations.all():
-                        if location.state:
-                            location_hierarchy["state"] = location.state.state_name
-                        if location.district:
-                            location_hierarchy["district"] = (
-                                location.district.district_name
-                            )
-                        if location.block:
-                            location_hierarchy["block"] = location.block.block_name
-
-                    community_context["location_hierarchy"] = location_hierarchy
-
-                except Exception as e:
-                    print(f"Error getting community context: {e}")
-                    community_context = {
-                        "community_id": active_community_id,
-                        "error": "Failed to load community details",
-                    }
-
-            # Prepare comprehensive misc data
-            from datetime import datetime
-
-            comprehensive_misc_data = {
-                "grievance_data": grievance_data,
-                "community_context": community_context,
-                "flow_metadata": {
-                    "smj_name": "story",
-                    "completion_timestamp": datetime.now().isoformat(),
-                    "user_number": (
-                        bot_user.user.username if bot_user.user else "unknown"
-                    ),
-                    "session_id": f"session_{user_id}_{getattr(bot_instance, 'id', 'unknown')}",
-                    "app_type": user.app_type,
-                },
-            }
-
-            # Create UserLogs entry with specified structure
-            user_log = bot_interface.models.UserLogs.objects.create(
-                app_type=user.app_type,
-                bot=bot_instance,
-                user=bot_user,
-                key1="useraction",
-                value1="grievance",
-                key2="upload",
-                value2="",
-                key3="retries",
-                value3="",
-                key4="",  # Leave empty as not specified
-                misc=comprehensive_misc_data,
-                smj=smj,
-            )
-
-            print(
-                f"Successfully created UserLogs entry with ID: {getattr(user_log, 'id', 'unknown')}"
-            )
-            print(
-                f"Grievance data logged for user {user_id} in community {active_community_id}"
-            )
-
-            # Additional logging for HDPI path verification
-            if "photos" in grievance_data:
-                print(
-                    f"HDPI photo paths captured in UserLogs: {grievance_data['photos']}"
-                )
-
-            return "success"
-
-        except Exception as e:
-            print(f"Error in log_grievance_completion: {e}")
+        except Exception:
+            logger.exception("Community join API failed")
             return "failure"
 
     def add_user_to_selected_community_join_flow(self, bot_instance_id, data_dict):
         """
         Add user to selected community in join community flow.
-        Extracts community ID from session data (CommunityByLocation or CommunityByStateDistrict).
-        Args:
-            bot_instance_id (int): The ID of the bot instance.
-            data_dict (dict): Dictionary containing user and session data.
-        Returns:
-            str: "success" or "failure"
+        Extracts community ID from:
+          1. Session data (CommunityByStateDistrict / CommunityByLocation)
+          2. Button event fallback
         """
-        import json
-
-        print(
-            f"DEBUG: add_user_to_selected_community_join_flow called with bot_instance_id={bot_instance_id}"
-        )
-        print(f"DEBUG: data_dict keys: {list(data_dict.keys())}")
-
         try:
             bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
             user_id = data_dict.get("user_id")
 
-            # Get user session
             user_session = bot_interface.models.UserSessions.objects.get(
                 user=user_id, bot=bot_instance
             )
             bot_user = user_session.user
 
-            # Extract community ID from session data (from either CommunityByLocation or CommunityByStateDistrict)
-            community_id = None
+            community_id = self._extract_community_id_for_join(
+                user_session=user_session,
+                event_data=data_dict.get("event_data", {}),
+            )
 
-            # Parse current session data - handle both string and object formats
-            try:
-                if isinstance(user_session.current_session, str):
-                    current_session = json.loads(user_session.current_session or "[]")
-                elif isinstance(user_session.current_session, (list, dict)):
-                    current_session = user_session.current_session
-                else:
-                    current_session = []
-                print(f"DEBUG: current_session data: {current_session}")
-
-                # Look for community selection in either state
-                for session_entry in current_session:
-                    if isinstance(session_entry, dict):
-                        # Check CommunityByStateDistrict first
-                        if "CommunityByStateDistrict" in session_entry:
-                            community_id = session_entry[
-                                "CommunityByStateDistrict"
-                            ].get("misc")
-                            print(
-                                f"DEBUG: Found community ID from CommunityByStateDistrict: {community_id}"
-                            )
-                            break
-                        # Check CommunityByLocation second
-                        elif "CommunityByLocation" in session_entry:
-                            community_id = session_entry["CommunityByLocation"].get(
-                                "misc"
-                            )
-                            print(
-                                f"DEBUG: Found community ID from CommunityByLocation: {community_id}"
-                            )
-                            break
-
-            except (json.JSONDecodeError, TypeError) as e:
-                print(f"DEBUG: Error handling session data: {e}")
-                current_session = []
-
-            # Fallback: try to get from event_data if not found in session
             if not community_id:
-                event_data = data_dict.get("event_data", {})
-                print(f"DEBUG: Fallback - checking event_data: {event_data}")
-
-                if event_data.get("type") == "button":
-                    # For button events, extract community ID from button value (misc field)
-                    button_value = event_data.get("misc") or event_data.get("data")
-                    print(
-                        f"DEBUG: Button event detected - button_value: {button_value}"
-                    )
-                    if button_value:
-                        community_id = button_value
-                        print(
-                            f"DEBUG: Extracted community ID from button: {community_id}"
-                        )
-
-            if community_id:
-                # Add user to selected community using existing API pattern
-                user_phone = bot_user.user.contact_number
-                print(f"DEBUG: Adding user {user_phone} to community {community_id}")
-
-                try:
-                    # Use similar pattern as existing addUserToCommunity function
-                    response = requests.post(
-                            url="https://geoserver.core-stack.org/api/v1/add_user_to_community/",
-                        data={"community_id": community_id, "number": int(user_phone)},
-                        timeout=30,
-                    )
-                    response.raise_for_status()
-                    api_response = response.json()
-                    print("Add user to community API response:", api_response)
-
-                    if api_response.get("success", False):
-                        # Store community context in user session
-                        if not user_session.misc_data:
-                            user_session.misc_data = {}
-
-                        user_session.misc_data["active_community_id"] = community_id
-                        user_session.misc_data["navigation_context"] = "join_community"
-                        user_session.misc_data["join_timestamp"] = str(timezone.now())
-                        user_session.save()
-
-                        print(
-                            f"DEBUG: Successfully added user to community {community_id}"
-                        )
-                        return "success"
-                    else:
-                        print(f"DEBUG: Failed to add user to community: {api_response}")
-                        return "failure"
-
-                except Exception as api_error:
-                    print(f"DEBUG: API call failed: {api_error}")
-                    return "failure"
-            else:
-                print(
-                    f"DEBUG: Could not extract community ID from session or event data"
-                )
+                logger.warning("Community ID not found for join flow")
                 return "failure"
 
-        except Exception as e:
-            print(f"DEBUG: Exception in add_user_to_selected_community_join_flow: {e}")
-            import traceback
+            return self._join_user_to_community(
+                user_session=user_session,
+                community_id=community_id,
+                phone_number=bot_user.user.contact_number,
+            )
 
-            traceback.print_exc()
+        except Exception:
+            logger.exception("add_user_to_selected_community_join_flow failed")
             return "failure"
 
     def send_join_success_message(self, bot_instance_id, data_dict):
@@ -3355,7 +1891,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 }
             }
 
-            # Add jump data to data_dict for postAction processing
+            # Add jump data to data_dict for store_active_community_and_context processing
             data_dict.update(jump_data)
 
             print(f"DEBUG: Prepared return to community services: {jump_data}")
@@ -3534,7 +2070,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Files to upload: {list(files.keys())}")
 
             # Submit to Community Engagement API
-            api_url = f"https://geoserver.core-stack.org/api/v1/upsert_item/"
+            api_url = f"{CE_API_URL}upsert_item/"
 
             try:
                 response = requests.post(
@@ -3786,7 +2322,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             print(f"Files to upload: {list(files.keys())}")
 
             # Submit to Community Engagement API
-            api_url = f"https://geoserver.core-stack.org/api/v1/upsert_item/"
+            api_url = f"{CE_API_URL}upsert_item/"
 
             try:
                 response = requests.post(
@@ -3924,7 +2460,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 return "failure"
 
             # Call Community Engagement API
-            api_url = f"https://geoserver.core-stack.org/api/v1/get_items_status/"
+            api_url = f"{CE_API_URL}get_items_status/"
             params = {
                 "number": contact_number,
                 "bot_id": bot_instance_id,
@@ -3980,6 +2516,152 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
         except Exception as e:
             print(f"Error in fetch_work_demand_status: {e}")
+            return "failure"
+
+    def display_multiple_community_message(self, bot_instance_id, data_dict):
+        """
+        Display welcome message for users with multiple communities.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        print("in display_multiple_community_message")
+
+        try:
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            user_id = data_dict.get("user_id")
+
+            # Get user session
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
+
+            # Get BotUsers object to access user_misc
+            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
+
+            if len(current_communities) > 0:
+                # Get fresh community data with last accessed info
+                success, api_response = (
+                    bot_interface.utils.check_user_community_status_http(user.phone)
+                )
+                if success and api_response.get("success"):
+                    community_data = api_response.get("data", {})
+                    last_accessed_id = community_data.get("misc", {}).get(
+                        "last_accessed_community_id"
+                    )
+
+                    # Find the last accessed community name
+                    communities_list = community_data.get("data", [])
+                    last_community_name = "Unknown Community"
+                    for community in communities_list:
+                        if community.get("community_id") == last_accessed_id:
+                            last_community_name = community.get(
+                                "name", "Unknown Community"
+                            )
+                            break
+                else:
+                    # Fallback to first community
+                    last_community_name = current_communities[0].get(
+                        "community_name", "Unknown Community"
+                    )
+
+                # Create welcome message
+                welcome_text = (
+                    f"🏠 आपने पिछली बार {last_community_name} समुदाय का उपयोग किया था।"
+                )
+
+                # Send text message
+                response = bot_interface.api.send_text(
+                    bot_instance_id=bot_instance_id,
+                    contact_number=user.phone,
+                    text=welcome_text,
+                )
+
+                print(f"Multiple community welcome message sent: {response}")
+
+                if response and response.get("messages"):
+                    return "success"
+                else:
+                    return "failure"
+            else:
+                print("No communities found for user")
+                return "failure"
+
+        except Exception as e:
+            print(f"Error in display_multiple_community_message: {e}")
+            return "failure"
+
+    def display_single_community_message(self, bot_instance_id, data_dict):
+        """
+        Display welcome message for users with a single community.
+        Args:
+            bot_instance_id (int): The ID of the bot instance.
+            data_dict (dict): Dictionary containing user and session data.
+        Returns:
+            str: "success" or "failure"
+        """
+        print("in display_single_community_message")
+
+        try:
+            bot_instance = bot_interface.models.Bot.objects.get(id=bot_instance_id)
+            user_id = data_dict.get("user_id")
+
+            # Get user session
+            user = bot_interface.models.UserSessions.objects.get(
+                user=user_id, bot=bot_instance
+            )
+
+            # Get BotUsers object to access user_misc
+            bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
+
+            current_communities = bot_user.user_misc.get(
+                "community_membership", {}
+            ).get("current_communities", [])
+
+            # Single community expected
+            if len(current_communities) != 1:
+                print("User does not have exactly one community")
+                return "failure"
+
+            community_name = current_communities[0].get("community_name", "आपका समुदाय")
+
+            # Try to refresh from API (optional but consistent)
+            success, api_response = (
+                bot_interface.utils.check_user_community_status_http(user.phone)
+            )
+
+            if success and api_response.get("success"):
+                community_data = api_response.get("data", {})
+                communities_list = community_data.get("data", [])
+
+                # Prefer authoritative API name
+                if communities_list:
+                    community_name = communities_list[0].get("name", community_name)
+
+            # Create welcome message
+            welcome_text = f"🏠 आप {community_name} समुदाय से जुड़े हुए हैं।"
+
+            # Send text message
+            response = bot_interface.api.send_text(
+                bot_instance_id=bot_instance_id,
+                contact_number=user.phone,
+                text=welcome_text,
+            )
+
+            print(f"Single community welcome message sent: {response}")
+
+            if response and response.get("messages"):
+                return "success"
+
+            return "failure"
+
+        except Exception as e:
+            print(f"Error in display_single_community_message: {e}")
             return "failure"
 
     def display_work_demands_text(self, bot_instance_id, data_dict):
