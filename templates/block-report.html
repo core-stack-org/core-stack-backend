@@ -166,15 +166,90 @@
         background-color: #f2f2f2;
         font-size: 0.9em;
     }
-    .village-section {
-        overflow-x: auto;
-    }
+
     .legend-note {
         color: #6c757d;
         text-align: center;
         font-size: 0.9rem;
         font-style: italic;
         margin: 6px 0 0;
+    }
+
+    /* Pattern Summary */
+    .pattern-summary {
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-bottom: 15px;
+        color: #333;
+    }
+
+    /* Container for side-by-side cards */
+    .pattern-info-container {
+        display: flex;
+        gap: 15px;
+        margin: 15px 0 20px 0;
+    }
+
+    /* Pattern Conditions Box */
+    .pattern-conditions {
+        flex: 1;
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 15px 20px;
+        border-radius: 4px;
+    }
+
+    .pattern-conditions h4 {
+        margin: 0 0 10px 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #856404;
+    }
+
+    .pattern-conditions ul {
+        margin: 0;
+        padding-left: 20px;
+        list-style-type: disc;
+    }
+
+    .pattern-conditions li {
+        margin: 8px 0;
+        font-size: 0.9rem;
+        color: #856404;
+        line-height: 1.5;
+    }
+
+    .pattern-conditions li strong {
+        font-weight: 700;
+    }
+
+    /* Pattern Recommendations Box */
+    .pattern-recommendations {
+        flex: 1;
+        background-color: #d1ecf1;
+        border-left: 4px solid #17a2b8;
+        padding: 15px 20px;
+        border-radius: 4px;
+    }
+
+    .pattern-recommendations h4 {
+        margin: 0 0 10px 0;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0c5460;
+    }
+
+    .pattern-recommendations ul {
+        margin: 0;
+        padding-left: 20px;
+        list-style-type: circle;
+    }
+
+    .pattern-recommendations li {
+        margin: 8px 0;
+        font-size: 0.9rem;
+        color: #0c5460;
+        line-height: 1.5;
     }
 
     /* Print Button Styles */
@@ -337,6 +412,10 @@
         .map-chart-container .map,
         .map-chart-container .chart-container {
             width: 100%;
+        }
+
+        .pattern-info-container {
+            flex-direction: column;
         }
     }
             
@@ -605,6 +684,19 @@
             min-height: 350px !important;
         }
 
+        .pattern-info-container {
+            display: flex !important;
+            gap: 10px !important;
+            page-break-inside: avoid;
+        }
+        
+        .pattern-conditions,
+        .pattern-recommendations {
+            flex: 1 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
         /* Page setup for better printing */
         @page {
             size: A4 portrait;
@@ -649,7 +741,7 @@
                 </div>
             </div>
             <p class="legend-note">
-                This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate compounding stresses.
+                This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate compounding stresses. In this report we highlight areas in tehsil that seems to have various stresses.
             </p>
         </div>
         </section>
@@ -700,13 +792,53 @@
             
             <div id="groundwater-section">
                 <h3>Groundwater Stress</h3>
-                <p><span id="groundwater-area" class="number-class"></span> hectares out of <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in the tehsil appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater recharge structures, and groundwater collectives should be considered.</p>
+                <p class="pattern-summary">
+                    <span id="groundwater-area" class="number-class"></span> hectares out of 
+                    <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in the tehsil appears to be groundwater stressed.
+                </p>
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Pattern identified where:</h4>
+                        <ul>
+                            <li>Stage of groundwater extraction is <strong>unsafe</strong></li>
+                            <li>Water balance is <strong>negative</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pattern-recommendations">
+                        <h4>Suggested Actions:</h4>
+                        <ul>
+                            <li>Changes in cropping patterns</li>
+                            <li>Creation of groundwater recharge structures</li>
+                            <li>Formation of groundwater collectives</li>
+                        </ul>
+                    </div>
+                </div>
                 <div id="agriMap" class="map map-only"></div>
             </div>
 
             <div id="drought-section">
                 <h3>High Drought Incidence</h3>
-                <p><span id="drought-area" class="number-class"></span> hectares out of <span id="drought-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater harvesting structures, and water user associations should be considered.</p>
+                <p class="pattern-summary">
+                    <span id="drought-area" class="number-class"></span> hectares out of 
+                    <span id="drought-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have a high drought incidence.
+                </p>
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Pattern identified where:</h4>
+                        <ul>
+                            <li>Drought frequency is <strong>high</strong></li>
+                            <li>Dry spells length is <strong>long</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pattern-recommendations">
+                        <h4>Suggested Actions:</h4>
+                        <ul>
+                            <li>Changes in cropping patterns</li>
+                            <li>Creation of rainwater harvesting structures</li>
+                            <li>Formation of water user associations</li>
+                        </ul>
+                    </div>
+                </div>
                 
                 <div class="map-chart-container">
                     <div id="agriDroughtMap" class="map"></div>
@@ -718,8 +850,28 @@
 
             <div id="irrigation-section">
                 <h3>High Irrigation Risk</h3>
-                <p><span id="irrigation-area" class="number-class"></span> hectares out of <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water user associations, and construction of new waterbodies should be considered.</p>
-
+                <p class="pattern-summary">
+                    <span id="irrigation-area" class="number-class"></span> hectares out of 
+                    <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have a high irrigation risk.
+                </p>
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Pattern identified where:</h4>
+                        <ul>
+                            <li>Surface water during Rabi is  <strong>low</strong></li>
+                            <li>Surface water trends over the years are <strong>negative</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pattern-recommendations">
+                        <h4>Suggested Actions:</h4>
+                        <ul>
+                            <li>De-silting of waterbodies</li>
+                            <li>Regular maintenance tasks</li>
+                            <li>Formation of water user associations</li>
+                            <li>Construction of new waterbodies</li>
+                        </ul>
+                    </div>
+                </div>
                 <div class="map-chart-container">
                     <div id="agriIrrigationMap" class="map"></div>
                     <div class="chart-container">
@@ -730,7 +882,27 @@
 
             <div id="yield-section">
                 <h3>Low Yield</h3>
-                <p><span id="yield-area" class="number-class"></span> hectares out of <span id="yield-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have had a reduction in cropping area. The reasons should be investigated and changes in cropping patterns and methods to improve soil health should be considered.</p>
+                <p class="pattern-summary">
+                    <span id="yield-area" class="number-class"></span> hectares out of 
+                    <span id="yield-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have had a reduction in cropping area.
+                </p>
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Pattern identified where:</h4>
+                        <ul>
+                            <li>Reduction in cropping area over the years is <strong>&gt; 30 ha</strong></li>
+                            <li>Reduction in cropping intensity over the years is <strong>&gt; 30 ha</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pattern-recommendations">
+                        <h4>Suggested Actions:</h4>
+                        <ul>
+                            <li>Investigate the reasons for reduction</li>
+                            <li>Changes in cropping patterns</li>
+                            <li>Methods to improve soil health</li>
+                        </ul>
+                    </div>
+                </div>
                 <div class="map-chart-container">
                     <div id="agriYieldMap" class="map"></div>
                     <div class="chart-container">
@@ -743,8 +915,25 @@
         <section class="section" id="forest-section">
             <h2>Forests and livestock</h2>
             <h3>Forest Degradation</h3>
-            <p><span id="forest-area" class="number-class"></span> hectares out of <span id="forest-area-1" class="number-class"></span> hectares of area under tree cover in the tehsil appears to have been vulnerable from overgrazing or other forest stress. Forest protection committees and strengthening of collective norms should be considered.</p>
-            
+            <p class="pattern-summary">
+                <span id="forest-area" class="number-class"></span> hectares out of 
+                <span id="forest-area-1" class="number-class"></span> hectares of area under tree cover in the tehsil appears to have reduced.
+            </p>
+            <div class="pattern-info-container">
+                <div class="pattern-conditions">
+                    <h4>Pattern identified where:</h4>
+                    <ul>
+                        <li>Reduction in tree cover over the years is <strong>&gt; 50 ha</strong></li>
+                    </ul>
+                </div>
+                <div class="pattern-recommendations">
+                    <h4>Suggested Actions:</h4>
+                    <ul>
+                        <li>Formation of forest protection committees</li>
+                        <li>Strengthening of collective norms</li>
+                    </ul>
+                </div>
+            </div>
             <div class="map-chart-container">
                 <div id="forestDegradMap" class="map"></div>
                 <div class="chart-container">
@@ -755,8 +944,24 @@
 
         <section class="section" id="health-section">
             <h2>Health</h2>
-            <p><span id="mining-area" class="number-class"></span> hectares could be at risk of air or water or soil pollution from industries. Pollution tests should be considered as a safety measure.</p>
-            
+            <p class="pattern-summary">
+                <span id="mining-area" class="number-class"></span> hectares could be at risk of air, water, or soil pollution from industries.
+            </p>
+            <div class="pattern-info-container">
+                <div class="pattern-conditions">
+                    <h4>Pattern identified where:</h4>
+                    <ul>
+                        <li>Mining or industrial activities are <strong>present</strong></li>
+                    </ul>
+                </div>
+                <div class="pattern-recommendations">
+                    <h4>Suggested Actions:</h4>
+                    <ul>
+                        <li>Regular pollution tests as a safety measure</li>
+                        <li>Monitor air, water, and soil quality</li>
+                    </ul>
+                </div>
+            </div>
             <div class="map-chart-container">
                 <div id="miningMap" class="map"></div>
                 <div class="chart-container">
@@ -770,7 +975,8 @@
             
             <div id="caste-section">
                 <h3>Caste</h3>
-                <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages" class="number-class"></span> villages are from marginalized groups. Positive discrimination in access to social entitlements should be considered.</p>
+                <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages" class="number-class"></span> villages are from marginalized groups defined as SC or ST population is high
+                Positive discrimination in access to social entitlements should be considered.</p>
                 
                 <div class="map-chart-container">
                     <div id="casteMap" class="map"></div>
@@ -795,7 +1001,7 @@
 
         <section class="section" id="fishery-section">
             <h2>Fishery</h2>
-            <p>Up to <span id="fishery-area" class="number-class"></span>% area in the tehsil appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year.</p>
+            <p>Up to <span id="fishery-area" class="number-class"></span>% area in the tehsil appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year. Currently <span id="fishery-area-1" class="number-class"></span> hectares of land is under Perennial surface water in these areas, out of <span id="fishery-area-2" class="number-class"></span> hectare Perennial surface water area in hectares in the tehsil.</p>
             
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
@@ -900,6 +1106,8 @@
         document.getElementById('yield-area-1').textContent = lowYield.total_all_area.toFixed(2);
         document.getElementById('forest-area-1').textContent = forestDegradation.total_all_area.toFixed(2);
         document.getElementById('nrega-villages-1').textContent = socioNrega.total_all_villages;
+        document.getElementById('fishery-area-1').textContent = fisheryPotential.total_zaid_area.toFixed(2);
+        document.getElementById('fishery-area-2').textContent = fisheryPotential.total_swb_area.toFixed(2);
         //document.getElementById('agroforestry-area-1').textContent = agroforestryTransition.total_all_area.toFixed(2);
 
         function getColorForIntensity(intensity) {
@@ -1345,28 +1553,54 @@
         const villageJsonUrl = "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=	panchayat_boundaries:{{district}}_{{block}}&outputFormat=application/json"
         
         // Function to create style based on pattern data
-        function createStyleFunction(patternData) {
+        function createStyleFunction(patternData, colorScheme = "default") {
             return function(feature) {
-                const uid = feature.get('uid') || feature.get('UID');
+                const uid = feature.get('uid');
                 
                 // Check for both mws_intensity and village_intensity
                 const intensity = (patternData.mws_intensity && patternData.mws_intensity[uid]) || 
                                 (patternData.village_intensity && patternData.village_intensity[uid]) || 
                                 0.0;
+                const pattern = (patternData.mws_pattern[uid]) || false;
                 
                 let strokeColor = 'black';
                 let fillColor;
-
-                if (intensity === 0) {
-                    fillColor = 'rgba(135, 206, 235, 0.3)';
-                } else if (intensity <= 0.25) {
-                    fillColor = 'rgba(100, 200, 100, 0.5)';
-                } else if (intensity <= 0.5) {
-                    fillColor = 'rgba(255, 235, 59, 0.6)';
-                } else if (intensity <= 0.75) {
-                    fillColor = 'rgba(255, 152, 0, 0.7)';
-                } else {
-                    fillColor = 'rgba(244, 67, 54, 0.8)';
+                
+                if (colorScheme === "fishery") {
+                    if (intensity === 0) {
+                        fillColor = 'rgba(240, 240, 240, 0.3)';  // Light gray - no potential
+                    } else if (intensity <= 0.25) {
+                        fillColor = 'rgba(173, 216, 230, 0.6)';  // Light blue
+                    } else if (intensity <= 0.5) {
+                        fillColor = 'rgba(100, 149, 237, 0.7)';  // Cornflower blue
+                    } else if (intensity <= 0.75) {
+                        fillColor = 'rgba(30, 144, 255, 0.8)';   // Dodger blue
+                    } else {
+                        fillColor = 'rgba(0, 0, 139, 0.85)';     // Dark blue - high potential
+                    }
+                }
+                else {
+                    const hasIntensity = patternData.mws_intensity || patternData.village_intensity;
+                    
+                    if (!hasIntensity && intensity === 0.0) {
+                        if (pattern) {
+                            fillColor = 'rgba(244, 67, 54, 0.8)';     // Red - pattern detected (mining present)
+                        } else {
+                            fillColor = 'rgba(135, 206, 235, 0.3)';   // Light blue - no pattern (no mining)
+                        }
+                    } else {
+                        if (intensity === 0.0) {
+                            fillColor = 'rgba(135, 206, 235, 0.3)';   // Light blue - no stress
+                        } else if (intensity <= 0.25) {
+                            fillColor = 'rgba(100, 200, 100, 0.5)';   // Light green
+                        } else if (intensity <= 0.5) {
+                            fillColor = 'rgba(255, 235, 59, 0.6)';    // Yellow
+                        } else if (intensity <= 0.75) {
+                            fillColor = 'rgba(255, 152, 0, 0.7)';     // Orange
+                        } else {
+                            fillColor = 'rgba(244, 67, 54, 0.8)';     // Red - high stress
+                        }
+                    }
                 }
                 
                 return new ol.style.Style({
@@ -1386,7 +1620,7 @@
                 features: new ol.format.GeoJSON().readFeatures(data),
             });
 
-            const styleFunction = feature => {
+            const styleFunction = (feature, name="") => {
                 const uid = feature.get('UID');
                 const intensity = groundwaterIntensity[uid] || 0.0;
                 
@@ -1442,14 +1676,9 @@
                 style: createStyleFunction(miningPresence),
             }); 
 
-            //const vectorLayer8 = new ol.layer.Vector({
-            //    source: vectorSource,
-            //    style: createStyleFunction(socioNrega),
-            //}); 
-
             const vectorLayer9 = new ol.layer.Vector({
                 source: vectorSource,
-                style: createStyleFunction(fisheryPotential),
+                style: createStyleFunction(fisheryPotential, "fishery"),
             }); 
 
             //const vectorLayer10 = new ol.layer.Vector({
@@ -1466,8 +1695,6 @@
             AgriYieldMap.addLayer(vectorLayer4);
             ForestDegradMap.addLayer(vectorLayer5);
             MiningMap.addLayer(vectorLayer6);
-            //CasteMap.addLayer(vectorLayer7);
-            //NREGAMap.addLayer(vectorLayer8)
             FisheryMap.addLayer(vectorLayer9)
             //AgroforestryMap.addLayer(vectorLayer10)
 
@@ -1477,8 +1704,6 @@
             AgriYieldMap.getView().setCenter(mapcenter);
             ForestDegradMap.getView().setCenter(mapcenter);
             MiningMap.getView().setCenter(mapcenter);
-            //CasteMap.getView().setCenter(mapcenter);
-            //NREGAMap.getView().setCenter(mapcenter);
             FisheryMap.getView().setCenter(mapcenter);
             //AgroforestryMap.getView().setCenter(mapcenter);
         }).catch(error => console.error('Error fetching GeoJSON for Groundwater:', error));
