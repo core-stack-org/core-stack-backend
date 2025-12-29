@@ -770,8 +770,13 @@ def process_and_submit_work_demand(self, user_log_id):
         # ----------------------------
         # Prepare API payload
         # ----------------------------
+
+        if user_log.value1 == "work_demand":
+            item_type = "Asset_Demand"
+        if user_log.value1 == "story":
+            item_type = "Story"
         payload = {
-            "item_type": "Asset_Demand",
+            "item_type": item_type,
             "coordinates": json.dumps(coordinates) if coordinates else "",
             "number": contact_number,
             "community_id": community_id,

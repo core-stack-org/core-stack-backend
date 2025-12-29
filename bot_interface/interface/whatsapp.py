@@ -422,6 +422,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         Generic handler for audio/photo storage.
         """
         try:
+            smj = _get_smj(data_dict.get("smj_id"))
+            flow_type = getattr(smj, "name", None)
+            print(f"Flow Type: {flow_type}")
+
             print(f"data dict : {data_dict}")
             user = _get_user_session(bot_instance_id, data_dict.get("user_id"))
             print(f"user: {user}")
@@ -1431,10 +1435,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             if not location_data:
                 print("No location data found")
                 return "failure"
+            smj = _get_smj(data_dict.get("smj_id"))
 
+            flow_type = getattr(smj, "name", None)
             user.misc_data = user.misc_data or {}
-            user.misc_data.setdefault("work_demand", {})
-            user.misc_data["work_demand"]["location"] = location_data
+            user.misc_data.setdefault(flow_type, {})
+            user.misc_data[flow_type]["location"] = location_data
             user.save()
 
             print(f"Stored location data: {location_data}")
@@ -1444,20 +1450,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             logger.exception("store_location_data failed")
             return "failure"
 
-    def store_audio_data(self, bot_instance_id, data_dict, flow_type="work_demand"):
+    def store_audio_data(self, bot_instance_id, data_dict):
         return self._store_media_data(
-            bot_instance_id=bot_instance_id,
-            data_dict=data_dict,
-            media_type="audio",
-            flow_type=flow_type,
+            bot_instance_id=bot_instance_id, data_dict=data_dict, media_type="audio"
         )
 
     def store_photo_data(self, bot_instance_id, data_dict, flow_type="work_demand"):
         return self._store_media_data(
-            bot_instance_id=bot_instance_id,
-            data_dict=data_dict,
-            media_type="photo",
-            flow_type=flow_type,
+            bot_instance_id=bot_instance_id, data_dict=data_dict, media_type="photo"
         )
 
     def archive_and_end_session(self, bot_instance_id, data_dict):
@@ -1568,13 +1568,10 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             logger.warning(f"Community context load failed: {e}")
             return {"community_id": active_community_id, "error": "load_failed"}
 
-    def _log_flow_completion(
-        self,
-        bot_instance_id,
-        data_dict,
-        flow_type: str,
-        submit_func,
-    ):
+    def _log_flow_completion(self, bot_instance_id, data_dict):
+        smj = _get_smj(data_dict.get("smj_id"))
+        flow_type = getattr(smj, "name", None)
+        logger.info(f"Runnuing for flow type: {flow_type}")
         """
         Generic logger for work_demand / story / grievance flows.
         Creates UserLogs ONLY at the end, reading accumulated data
@@ -1600,7 +1597,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             # CRITICAL: Refresh user cache
             # ----------------------------
             user.refresh_from_db(fields=["misc_data"])
-
+            print(user.__dict__)
             # ----------------------------
             # Find correct flow cache
             # (defensive against key mismatch)
@@ -1682,27 +1679,12 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def log_work_demand_completion(self, bot_instance_id, data_dict):
         print(f"Data Dict for work demand {data_dict}")
         return self._log_flow_completion(
-            bot_instance_id=bot_instance_id,
-            data_dict=data_dict,
-            flow_type="work_demand",
-            submit_func=self.process_and_submit_work_demand,
-        )
-
-    def log_story_completion(self, bot_instance_id, data_dict):
-        print(f"Data Dict for work demand {data_dict}")
-        return self._log_flow_completion(
-            bot_instance_id=bot_instance_id,
-            data_dict=data_dict,
-            flow_type="story",
-            submit_func=self.process_and_submit_work_demand,
+            bot_instance_id=bot_instance_id, data_dict=data_dict
         )
 
     def log_story_completion(self, bot_instance_id, data_dict):
         return self._log_flow_completion(
-            bot_instance_id=bot_instance_id,
-            data_dict=data_dict,
-            flow_type="story",
-            submit_func=self.process_and_submit_story,
+            bot_instance_id=bot_instance_id, data_dict=data_dict
         )
 
     def _extract_community_id_for_join(self, user_session, event_data):
@@ -2172,7 +2154,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         from django.conf import settings
         from bot_interface.models import UserLogs
 
-        print(f"invoking proces and submit work demand")
+        print(f"invoking proces and submit story")
         try:
             # Get the UserLogs record
             try:
@@ -2184,18 +2166,18 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 }
 
             # Extract work demand data from misc field
-            work_demand_data = user_log.misc.get("work_demand_data", {})
-            if not work_demand_data:
+            story_data = user_log.misc.get("story_data", {})
+            if not story_data:
                 # Try alternative key structure
-                work_demand_data = user_log.misc.get("work_demand", {})
-            print(f"workd demand data {work_demand_data}")
-            if not work_demand_data:
+                work_demand_data = user_log.misc.get("story", {})
+            print(f"story data {story_data}")
+            if not story_data:
                 return {
                     "success": False,
                     "message": "No work demand data found in UserLogs.misc",
                 }
 
-            print(f"Processing work demand data: {work_demand_data}")
+            print(f"Processing work demand data: {story_data}")
 
             # Get user's community context from UserLogs misc data
             community_id = None
@@ -2223,8 +2205,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             files = {}
 
             # Handle audio file - use "audios" key for API
-            if "audio" in work_demand_data:
-                audio_path = work_demand_data["audio"]
+            if "audio" in story_data:
+                audio_path = story_data["audio"]
                 if audio_path and os.path.exists(audio_path):
                     try:
                         with open(audio_path, "rb") as audio_file:
@@ -2246,10 +2228,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                     print(f"Audio file not found or invalid path: {audio_path}")
 
             # Handle photo files - use indexed keys for multiple images
-            if "photos" in work_demand_data and isinstance(
-                work_demand_data["photos"], list
-            ):
-                for i, photo_path in enumerate(work_demand_data["photos"]):
+            if "photos" in story_data and isinstance(story_data["photos"], list):
+                for i, photo_path in enumerate(story_data["photos"]):
                     if photo_path and os.path.exists(photo_path):
                         try:
                             with open(photo_path, "rb") as photo_file:
@@ -2274,8 +2254,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Prepare coordinates from location data - use lat/lon format
             coordinates = {}
-            if "location" in work_demand_data:
-                location = work_demand_data["location"]
+            if "location" in story_data:
+                location = story_data["location"]
                 if isinstance(location, dict):
                     coordinates = {
                         "lat": location.get("latitude"),
@@ -2313,7 +2293,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 "source": "BOT",
                 "bot_id": user_log.bot.id,
                 "title": "Story",  # Auto-generated if not provided
-                "transcript": work_demand_data.get(
+                "transcript": story_data.get(
                     "description", ""
                 ),  # If any description exists
             }

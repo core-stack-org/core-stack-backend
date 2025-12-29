@@ -176,6 +176,7 @@ class StateMapData(object):
                 )
                 if pre_action.get("data"):
                     data_dict.update({"data": pre_action.get("data")})
+
                 # call generic interface fucntion:factory
                 # Import locally to avoid circular import
                 from bot_interface.utils import callFunctionByName
