@@ -48,38 +48,80 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         Create an event packet from WhatsApp webhook data.
         """
 
-        # Validate bot
-        if not bot_interface.models.Bot.objects.filter(id=bot_id).exists():
+        print("create_event_packet called with bot_id:", bot_id, type(bot_id))
+
+        try:
+            bot_interface.models.Bot.objects.get(id=bot_id)
+        except bot_interface.models.Bot.DoesNotExist:
             raise ValueError(f"Bot with id {bot_id} not found")
 
-        # Parse JSON string
+        # Parse JSON if string
         if isinstance(json_obj, str):
-            try:
-                json_obj = json.loads(json_obj)
-            except json.JSONDecodeError as exc:
-                raise ValueError("Invalid JSON string provided") from exc
+            json_obj = json.loads(json_obj)
 
-        if not isinstance(json_obj, (dict, list)):
-            raise ValueError(f"Expected dict or list, got {type(json_obj)}")
+        # Handle WhatsApp webhook list format
+        if isinstance(json_obj, list) and len(json_obj) > 0:
+            if "changes" in json_obj[0]:
+                json_obj = json_obj[0]["changes"][0]["value"]
 
-        # Normalize WhatsApp webhook structure
-        json_obj = _extract_whatsapp_value(json_obj)
-        event_packet = EventPacket(event=event, bot_id=bot_id)
+        # Base packet
+        event_packet = {
+            "event": event,
+            "bot_id": bot_id,
+            "data": "",
+            "timestamp": "",
+            "message_id": "",
+            "media_id": "",
+            "wa_id": "",
+            "misc": "",
+            "type": "",
+            "user_number": "",
+            "smj_id": "",
+            "state": "",
+            "context_id": "",
+        }
 
-        # Initialize event packet
+        # Process incoming message
+        if "contacts" in json_obj:
+            WhatsAppInterface._process_message_data(json_obj, event_packet, bot_id)
 
-        # Process message
-        if isinstance(json_obj, dict):
-            if "contacts" in json_obj:
-                WhatsAppInterface._process_message_data(json_obj, event_packet, bot_id)
-            elif WhatsAppInterface._is_interactive_message(json_obj):
-                WhatsAppInterface._process_interactive_message(json_obj, event_packet)
-
-        # Preserve user context
+        # Preserve session context (smj_id, state, user_id)
         WhatsAppInterface._preserve_user_context(event_packet, bot_id)
-        logger.info(f"Event Packet : {event_packet}")
+
+        # 🔥 CRITICAL FIX: normalize interactive events
+        WhatsAppInterface._normalize_interactive_event(event_packet, bot_id)
 
         return event_packet
+
+    @staticmethod
+    def _normalize_interactive_event(event_packet: Dict, bot_id: int) -> None:
+        """
+        Convert WhatsApp interactive/button replies into semantic SMJ events.
+        """
+
+        if event_packet.get("type") != "button":
+            return
+
+        user_number = event_packet.get("user_number")
+        if not user_number:
+            return
+
+        try:
+            bot = bot_interface.models.Bot.objects.get(id=bot_id)
+            user_session = bot_interface.models.UserSessions.objects.get(
+                user__phone=user_number, bot=bot
+            )
+        except Exception:
+            return
+
+        # 🔑 COMMUNITY SELECTION CONTRACT
+        if user_session.expected_response_type == "community":
+            event_packet["event"] = "success"
+            # misc already has community_id
+            return
+
+        # Default fallback
+        event_packet["event"] = "success"
 
     @staticmethod
     def _process_message_data(json_obj: Dict, event_packet: Dict, bot_id: int) -> None:
@@ -88,8 +130,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         # Extract contact info
         contact = json_obj.get("contacts", [{}])[0]
         wa_id = contact.get("wa_id", "")
-        event_packet.user_number = wa_id
-        event_packet.wa_id = wa_id
+        event_packet["user_number"] = wa_id
+        event_packet["wa_id"] = wa_id
 
         # No messages present
         messages = json_obj.get("messages")
@@ -100,9 +142,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         message = messages[0]
         data_type = message.get("type", "")
 
-        event_packet.timestamp = message.get("timestamp", "")
-        event_packet.message_id = message.get("id", "")
-        event_packet.type = data_type
+        event_packet["timestamp"] = message.get("timestamp", "")
+        event_packet["message_id"] = message.get("id", "")
+        event_packet["type"] = data_type
 
         # Message type routing
         handlers = {
@@ -123,6 +165,30 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         handler = handlers.get(data_type)
         if handler:
             handler(message, event_packet)
+
+    @staticmethod
+    def _process_interactive_response(message: Dict, event_packet: Dict) -> None:
+        event_packet["type"] = "button"
+        interactive = message["interactive"]
+
+        if interactive.get("list_reply"):
+            title = interactive["list_reply"]["title"]
+            reply_id = interactive["list_reply"]["id"]
+        else:
+            title = interactive["button_reply"]["title"]
+            reply_id = interactive["button_reply"]["id"]
+
+        # Always keep UI text separate
+        event_packet["data"] = title
+
+        # Always keep raw id available
+        event_packet["misc"] = reply_id
+
+        # 🔑 IMPORTANT: set semantic event
+        event_packet["event"] = reply_id
+
+        if message.get("context"):
+            event_packet["context_id"] = message["context"]["id"]
 
     @staticmethod
     def _download_and_upload_media(
@@ -152,35 +218,14 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     @staticmethod
     def _process_text_message(message: Dict, event_packet: Dict) -> None:
         """Process text message"""
-        event_packet.type = "text"
-        event_packet.data = message["text"]["body"]
-
-    @staticmethod
-    def _process_interactive_response(message: Dict, event_packet: Dict) -> None:
-        """Process interactive message response"""
-
-        event_packet.type = "button"
-
-        interactive = message.get("interactive", {})
-        list_reply = interactive.get("list_reply")
-        button_reply = interactive.get("button_reply")
-
-        if list_reply:
-            event_packet.data = list_reply.get("title", "")
-            event_packet.misc = list_reply.get("id", "")
-
-        elif button_reply:
-            event_packet.data = button_reply.get("id", "")
-
-        context = message.get("context")
-        if context:
-            event_packet.context_id = context.get("id", "")
+        event_packet["type"] = "text"
+        event_packet["data"] = message["text"]["body"]
 
     @staticmethod
     def _process_location_message(message: Dict, event_packet: Dict) -> None:
         """Process location message"""
 
-        event_packet.type = "location"
+        event_packet["type"] = "location"
         location = message["location"]
 
         # Extract latitude and longitude
@@ -188,8 +233,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         longitude = location.get("longitude", "")
 
         # Store as formatted string or coordinate object
-        event_packet.data = f"{latitude},{longitude}"
-        event_packet.misc = {
+        event_packet["data"] = f"{latitude},{longitude}"
+        event_packet["misc"] = {
             "latitude": latitude,
             "longitude": longitude,
             "name": location.get("name", ""),
@@ -202,7 +247,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
     def _preserve_user_context(event_packet: Dict, bot_id: int) -> None:
         """Preserve current user context for proper state transitions"""
         try:
-            user_number = event_packet.user_number
+            user_number = event_packet["user_number"]
             if not user_number:
                 logger.warning(f"No user number found in event packed")
                 return
@@ -221,8 +266,8 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
                 # Preserve current SMJ and state context
                 if user_session.current_smj and user_session.current_state:
-                    event_packet.smj_id = user_session.current_smj.id
-                    event_packet.state = user_session.current_state
+                    event_packet["smj_id"] = user_session.current_smj.id
+                    event_packet["state"] = user_session.current_state
                     logger.info(
                         f"Preserved user context - SMJ: {user_session.current_smj.id}, State: {user_session.current_state}"
                     )
@@ -249,7 +294,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         Process WhatsApp media messages (image, audio, voice).
         """
 
-        event_packet.type = media_type
+        event_packet["type"] = media_type
 
         # Extract media block safely
         media_block = message.get(media_type) or message.get("voice")
@@ -259,7 +304,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         media_id = media_block.get("id", "")
         mime_type = media_block.get("mime_type", "")
 
-        event_packet.media_id = media_id
+        event_packet["media_id"] = media_id
 
         # Download and upload media
         filepath = WhatsAppInterface._download_and_upload_media(
@@ -269,7 +314,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             media_type=media_type,
         )
 
-        event_packet.data = filepath
+        event_packet["data"] = filepath
 
     @staticmethod
     def _process_image_message(message: Dict, event_packet: Dict, bot_id: int) -> None:
@@ -314,43 +359,48 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             event_data = data_dict.get("event_data", {})
             print(f"DEBUG: event_data: {event_data}")
             print(f"DEBUG: event_data type: {event_data.get('type')}")
-
             if event_data.get("type") == "button":
-                # For button events, extract community ID from button value (misc field)
                 button_value = event_data.get("misc") or event_data.get("data")
                 print(f"DEBUG: Button event detected - button_value: {button_value}")
 
+                # ✅ Always preserve semantic event
+                event_to_process = event_data.get("event") or "success"
+
+                # -------- Payload handling ONLY --------
+
                 if button_value == "continue_last_accessed":
-                    # User wants to continue with last accessed community
-                    print(f"DEBUG: User chose to continue with last accessed community")
-                    # Get last accessed community from API or user data
+                    print("DEBUG: User chose to continue with last accessed community")
+
                     bot_user = bot_interface.models.BotUsers.objects.get(id=user_id)
                     success, api_response = (
                         bot_interface.utils.check_user_community_status_http(user.phone)
                     )
+
                     if success and api_response.get("success"):
-                        community_data = api_response.get("data", {})
-                        community_id = community_data.get("misc", {}).get(
-                            "last_accessed_community_id"
+                        community_id = (
+                            api_response.get("data", {})
+                            .get("misc", {})
+                            .get("last_accessed_community_id")
                         )
                         print(
                             f"DEBUG: Got last accessed community ID from API: {community_id}"
                         )
                     else:
-                        # Fallback to stored data
                         community_id = bot_user.user_misc.get(
                             "community_membership", {}
                         ).get("last_accessed_community_id")
                         print(
                             f"DEBUG: Got last accessed community ID from stored data: {community_id}"
                         )
-                elif button_value and button_value.startswith("community_"):
-                    community_id = button_value.split("_")[1]
+
+                elif button_value and str(button_value).startswith("community_"):
+                    community_id = button_value.split("_", 1)[1]
                     print(f"DEBUG: Extracted community ID from button: {community_id}")
-                else:
-                    print(
-                        f"DEBUG: Button value doesn't start with 'community_': {button_value}"
-                    )
+
+                elif button_value and button_value.isdigit():
+                    # Your current case: misc = "8"
+                    community_id = button_value
+                    print(f"DEBUG: Numeric community ID detected: {community_id}")
             else:
                 # For non-button events, extract from event field
                 event = data_dict.get("event", "")

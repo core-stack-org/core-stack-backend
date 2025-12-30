@@ -29,7 +29,7 @@
     "transition": [
       { "SendState": ["state_district"] },
       { "SendLocationRequest": ["location_pin"] },
-      { "Welcome": ["failure"] }
+      { "Welcome": ["failed"] }
     ]
   },
 
@@ -45,7 +45,7 @@
           }
         ]
       },
-       {
+      {
         "menu": [
           {
             "label": "सूची से चुनें",
@@ -55,9 +55,7 @@
         ]
       }
     ],
-
     "postAction": [],
-
     "transition": [
       { "SendState": ["state_district"] },
       { "SendLocationRequest": ["location_pin"] },
@@ -68,17 +66,15 @@
   {
     "name": "SendState",
     "preAction": [
-
       {
-  "text": [
-    {
-      "en": ":folded_hands: We are providing you with a list of states. Please select a state from the list.",
-      "hi": "🙏 नमस्कार। हम आपको राज्यों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक राज्य चुनें।",
-      "default": "Please select a state from the list."
-    }
-  ]
-}
-,
+        "text": [
+          {
+            "en": ":folded_hands: We are providing you with a list of states. Please select a state from the list.",
+            "hi": "🙏 नमस्कार। हम आपको राज्यों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक राज्य चुनें।",
+            "default": "Please select a state from the list."
+          }
+        ]
+      },
       { "function": "send_states" }
     ],
     "postAction": [
@@ -90,37 +86,31 @@
     ]
   },
 
-
-
   {
-  "name": "SendDistrict",
-  "preAction": [
-    {
-      "data": {
-        "getDataFrom": {
-          "field": "misc",
-          "state": "SendState"
-        }
-      },
-      "text": [
-        {
-          "en": "We are providing you with a list of districts. Please select a district from the list.",
-          "hi": "हम आपको जिलों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक जिला चुनें।",
-          "default": "Please select a district from the list."
-        }
-      ],
-      "function": "send_districts"
-    }
-  ],
-  "postAction": [
-    { "function": "move_forward" }
-  ],
-  "transition": [
-    { "CommunityByStateDistrict": ["success"] },
-    { "SendDistrict": ["failure"] }
-  ]
-},
-
+    "name": "SendDistrict",
+    "preAction": [
+      {
+        "data": {
+          "getDataFrom": { "field": "misc", "state": "SendState" }
+        },
+        "text": [
+          {
+            "en": "We are providing you with a list of districts. Please select a district from the list.",
+            "hi": "हम आपको जिलों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक जिला चुनें।",
+            "default": "Please select a district from the list."
+          }
+        ],
+        "function": "send_districts"
+      }
+    ],
+    "postAction": [
+      { "function": "move_forward" }
+    ],
+    "transition": [
+      { "CommunityByStateDistrict": ["success"] },
+      { "SendDistrict": ["failure"] }
+    ]
+  },
 
   {
     "name": "SendLocationRequest",
@@ -139,18 +129,16 @@
     "preAction": [
       {
         "data": {
-          "getDataFrom": {
-            "field": "data",
-            "state": "SendLocationRequest"
-          }
+          "getDataFrom": { "field": "data", "state": "SendLocationRequest" }
         },
         "function": "send_community_by_location"
       }
     ],
     "postAction": [],
     "transition": [
-      { "CommunityByLocation": ["failure"] },
-      { "NoCommunities": ["no_communities"] }
+      { "AddUserToCommunityByLocation": ["success"] },
+      { "NoCommunities": ["no_communities"] },
+      { "CommunityByLocation": ["failure"] }
     ]
   },
 
@@ -175,16 +163,30 @@
       { "CommunityByStateDistrict": ["failure"] }
     ]
   },
+  {
+    "name": "AddUserToCommunityByLocation",
+    "preAction": [
+      {
+        "data": {
+          "getDataFrom": { "field": "misc", "state": "CommunityByLocation" }
+        },
+        "function": "add_user_to_community"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      { "PostOnboardingMenu": ["success"] },
+      { "AddUserToCommunity": ["failure"] }
+    ]
+  },
+
 
   {
     "name": "AddUserToCommunity",
     "preAction": [
       {
         "data": {
-          "getDataFrom": {
-            "field": "misc",
-            "state": "CommunityByStateDistrict"
-          }
+          "getDataFrom": { "field": "misc", "state": "CommunityByStateDistrict" }
         },
         "function": "add_user_to_community"
       }
