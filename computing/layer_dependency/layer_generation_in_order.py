@@ -46,7 +46,7 @@ from computing.misc.green_credit import generate_green_credit_data
 from computing.misc.mining_data import generate_mining_data
 from computing.plantation.site_suitability import site_suitability
 from utilities.gee_utils import valid_gee_text
-from .layer_map import *
+from data.layer_dependency.layer_map import *
 from nrm_app.celery import app
 from computing.models import Layer
 
@@ -160,12 +160,46 @@ def run_layer_with_dependency(
     for dep in deps:
         if dep == "clip_lulc_v3":
             l = Layer.objects.filter(
-                layer_name__icontains=f"_{valid_gee_text(block.lower())}_level_"
+                layer_name__icontains=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_level_"
             )
-            if len(l) == 21:
-                status[dep] = True
-            else:
-                status[dep] = False
+            status[dep] = True if len(l) == 24 else False
+        elif dep == "terrain_raster":
+            l = (
+                Layer.objects.filter(
+                    layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_terrain_raster"
+                )
+                .order_by("-layer_version")
+                .first()
+            )
+            status[dep] = True if l else False
+        elif dep == "generate_catchment_area_singleflow":
+            l = (
+                Layer.objects.filter(
+                    layer_name=f"catchment_area_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
+                )
+                .order_by("-layer_version")
+                .first()
+            )
+            status[dep] = True if l else False
+        elif dep == "generate_stream_order":
+            l = (
+                Layer.objects.filter(
+                    layer_name=f"stream_order_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector"
+                )
+                .order_by("-layer_version")
+                .first()
+            )
+            status[dep] = True if l else False
+        elif dep == "clip_drainage_lines":
+            l = (
+                Layer.objects.filter(
+                    layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+                    dataset__name="Drainage",
+                )
+                .order_by("-layer_version")
+                .first()
+            )
+            status[dep] = True if l else False
         if not status.get(dep, False):
             print(
                 f"Skipping {node_func_name} because dependency {dep} failed or not executed."
@@ -176,11 +210,13 @@ def run_layer_with_dependency(
         try:
             if node_func_name in end_year_rules:
                 args["end_year"] = end_year_rules[node_func_name]
+            if node_func_name == "site_suitability":
+                args["project_id"] = None
             print(
                 f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
             )
             result = (
-                node_func_obj(state, district, block, **args)
+                node_func_obj(state=state, district=district, block=block, **args)
                 if args
                 else node_func_obj(state, district, block)
             )

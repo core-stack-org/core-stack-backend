@@ -414,7 +414,7 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
 
         # Define export task details
         ndvi_description = f"ndvi_{start_year}_{description}"
-        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"[:100]
+        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"
 
         # Remove previous asset if it exists to avoid overwrite issues
         if is_gee_asset_exists(ndvi_asset_id):
