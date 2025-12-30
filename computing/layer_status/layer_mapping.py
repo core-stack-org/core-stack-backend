@@ -402,7 +402,7 @@ workspace_config = {
         "type": "raster",
     },
     "generate_slope_percentage": {
-        "name": "catchment_area_singleflow",
+        "name": "slope_percentage",
         "suffix": "slope_percentage_raster",
         "type": "raster",
     },
@@ -427,8 +427,8 @@ workspace_config = {
         "type": "vector",
     },
     "generate_mining": {
-        "name": "green_credit",
-        "suffix": "green_credit",
+        "name": "mining",
+        "suffix": "mining",
         "type": "vector",
     },
 }

@@ -119,19 +119,18 @@ def tree_health_ccd_raster(
                 "ccd", description, description, "ccd_style"
             )
 
-            # if res and layer_id:
-            #     layer_at_geoserver = True
-            #     layer_STAC_generated = False
-            #     layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-            #         state=state,
-            #         district=district,
-            #         block=block,
-            #         layer_name="ccd_raster",
-            #         start_year=year,
-            #     )
-            #     update_layer_sync_status(
-            #         layer_id=layer_id,
-            #         is_stac_specs_generated=layer_STAC_generated,
-            #         sync_to_geoserver=layer_at_geoserver,
-            #     )
+            if res and layer_id:
+                layer_at_geoserver = True
+                # layer_STAC_generated = False
+                # layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                #     state=state,
+                #     district=district,
+                #     block=block,
+                #     layer_name="ccd_raster",
+                #     start_year=year,
+                # )
+                update_layer_sync_status(
+                    layer_id=layer_id,
+                    sync_to_geoserver=layer_at_geoserver,
+                )
     return layer_at_geoserver
