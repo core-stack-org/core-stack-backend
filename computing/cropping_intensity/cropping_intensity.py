@@ -166,7 +166,8 @@ def generate_gee_asset(
     lulc_scale = 10
     lulc_band_name = ["predicted_label"]
     lulc_js_list = []
-    s_year = start_year  # START_YEAR
+    initial_year = 2017
+    s_year = initial_year  # start_year  # START_YEAR
     while s_year <= end_year:
         lulc_js_list.append(
             ee.Image(
@@ -216,7 +217,7 @@ def generate_gee_asset(
         s_year = start_year
         while s_year <= end_year:
             sy = s_year
-            image = ee.Image(lulc.get(sy - start_year)).select(lulc_band_name)
+            image = ee.Image(lulc.get(sy - initial_year)).select(lulc_band_name)
             mask = image.eq(ee.Number(arg["label"]))
             pixel_area = ee.Image.pixelArea()
             forestArea = pixel_area.updateMask(mask)
@@ -248,12 +249,13 @@ def generate_gee_asset(
     single_non_kharif_all_years = ee.Image.constant(0)
     triple_all_years = ee.Image.constant(0)
     double_all_years = ee.Image.constant(0)
-    s_year = start_year
+
+    s_year = initial_year  # start_year
 
     while s_year <= end_year:
         sy = s_year
         s_year += 1
-        image = ee.Image(lulc.get(sy - start_year)).select(lulc_band_name)
+        image = ee.Image(lulc.get(sy - initial_year)).select(lulc_band_name)
         single_kharif_all_years = single_kharif_all_years.Or(image.eq(SINGLE_KHARIF))
         single_non_kharif_all_years = single_non_kharif_all_years.Or(
             image.eq(SINGLE_NON_KHARIF)
@@ -276,7 +278,7 @@ def generate_gee_asset(
         value = ee.Number(value).multiply(0.0001)
         return feature.set(
             "total_cropable_area_ever_hydroyear_"
-            + str(start_year)
+            + str(initial_year)
             + "_"
             + str(end_year),
             value,
@@ -291,7 +293,7 @@ def generate_gee_asset(
             st_year += 1
             total_croppable_area = feature.get(
                 "total_cropable_area_ever_hydroyear_"
-                + str(start_year)
+                + str(initial_year)
                 + "_"
                 + str(end_year)
             )
