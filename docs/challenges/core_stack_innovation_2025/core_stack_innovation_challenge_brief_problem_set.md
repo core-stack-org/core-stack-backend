@@ -125,9 +125,9 @@ Submissions will be scored on:
 ## 10. Timeline & milestones
 - Launch: `Nov 22, 2025`
 - Weekly developer community calls / mentorship: `Fridays, 3-4pm`
-- Submission deadline: ~~`Dec 31, 2025`~~`Jan 15, 2026`
-- Shortlist & demos: ~~`Jan 15, 2026`~~`Jan 31, 2026`
-- Winners announced & prize distribution: ~~`Jan 31, 2026`~~`Feb 15, 2026`
+- Submission deadline: ~~`Dec 31, 2025`~~`Jan 15, 2026`; and quarterly thereon
+- Shortlist & demos: ~~`Jan 15, 2026`~~`Jan 31, 2026`; and quarterly thereon
+- Winners announced & prize distribution: ~~`Jan 31, 2026`~~`Feb 15, 2026`; and quarterly thereon
 
 ---
 
