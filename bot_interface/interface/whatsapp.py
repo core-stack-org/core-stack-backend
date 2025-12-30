@@ -619,7 +619,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         user_id = data_dict.get("user_id")
         bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
         data = data_dict.get("menu")
-        caption = "Select an option:"  # Default
+        # caption = "Select an option:"  # Default
         if data_dict.get("caption"):
             caption = data_dict.get("caption")
         elif data and len(data) > 0 and "caption" in data[0]:
