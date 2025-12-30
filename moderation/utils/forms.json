@@ -1,0 +1,48 @@
+{
+  "Forms": [
+    {
+      "name": "Settlement",
+      "form_id": "Add_Settlements_form%20_V1.0.1"
+    },
+    {
+      "name": "Well",
+      "form_id": "Add_Wells_form%20_V1.0.1"
+    },
+    {
+      "name": "Waterbody",
+      "form_id": "Add_Waterbody_form%20_V1.0.1"
+    },
+    {
+      "name": "Groundwater",
+      "form_id": "Add_Groundwater_form%20_V1.0.1"
+    },
+    {
+      "name": "Agri",
+      "form_id": "Add_Agri_form%20_V1.0.1"
+    },
+    {
+      "name": "Livelihood",
+      "form_id": "Add_Livelihood_form%20_V1.0.1"
+    },
+    {
+      "name": "Crop",
+      "form_id": "Add_Cropping_form%20_V1.0.1"
+    },
+    {
+      "name": "Agri Maintenance",
+      "form_id": "Agri_Maintenance_form%20_V1.0.1"
+    },
+    {
+      "name": "GroundWater Maintenance",
+      "form_id": "Groundwater_Maintenance_form%20_V1.0.1"
+    },
+    {
+      "name": "Surface Water Body Maintenance",
+      "form_id": "Surface_Waterbody_Maintenance_form%20_V1.0.1"
+    },
+    {
+      "name": "Surface Water Body Recharge Structure Maintenance",
+      "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1"
+    }
+  ]
+}
