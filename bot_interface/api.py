@@ -185,7 +185,7 @@ def whatsapp_webhook(request):
 
     bot_interface.tasks.StartUserSession.apply_async(
         kwargs={
-            "event_packet": event_packet.to_dict(),  # ✅ converted
+            "event_packet": event_packet,  # ✅ converted
             "event": event,
             "bot_id": bot.id,
             "app_type": app_type,

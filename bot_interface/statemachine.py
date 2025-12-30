@@ -791,19 +791,48 @@ class SmjController(StateMapData):
                 )
 
                 if event_data.get("type") == "button":
-                    if current_state == "CommunitySelectionMenu":
-                        # For CommunitySelectionMenu, pass original event to let postAction handle button processing
+                    current_state = event_data.get("state")
+                    button_id = event_data.get("misc")  # semantic
+                    button_text = event_data.get("data")  # UI text
+
+                    ACTION_EVENT_STATES = {
+                        "Welcome",
+                        "ServiceMenuNew",
+                        "CommunitySelectionMenu",
+                        "PostOnboardingMenu",
+                    }
+
+                    DATA_SELECTION_STATES = {
+                        "SendState",
+                        "SendDistrict",
+                        "CommunityByLocation",
+                        "CommunityByStateDistrict",
+                    }
+
+                    if current_state in ACTION_EVENT_STATES:
+                        # 🔥 button ID is the event
+                        event_to_process = button_id
                         print(
-                            f"CommunitySelectionMenu button event - passing original event '{event_to_process}' to postAction"
+                            f"Button ACTION in '{current_state}' → event='{event_to_process}'"
                         )
+
+                    elif current_state in DATA_SELECTION_STATES:
+                        # 🔥 selection completed
+                        event_to_process = "success"
+                        print(
+                            f"Button SELECTION in '{current_state}' → event='success'"
+                        )
+
                     else:
-                        # For all other states, use existing button mapping logic
-                        button_value = event_data.get("misc") or event_data.get("data")
-                        if button_value:
-                            print(
-                                f"Button event detected - mapping button value '{button_value}' as transition event"
-                            )
-                            event_to_process = button_value
+                        # 🔥 safest fallback: try semantic first
+                        event_to_process = button_id or "success"
+                        print(
+                            f"Button FALLBACK in '{current_state}' → event='{event_to_process}'"
+                        )
+
+                    print(
+                        f"DEBUG: Button payload (NOT event): data='{button_text}', misc='{button_id}'"
+                    )
 
                 updatedEvent = self.postAction(event_to_process, event_data)
 

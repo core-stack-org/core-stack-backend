@@ -6,18 +6,13 @@
         "text": [
           {
             "en": ":folded_hands: Hello. Welcome to Community engagement Platform bot.",
-            "hi": "नमस्कार। सामुदायिक सहभागिता प्लेटफ़ॉर्म बॉट में आपका स्वागत है।",
-            "default": "Hello. Welcome to Community engagement Platform bot."
+            "hi": " नमस्ते! प्राकृतिक संसाधन (NRM) से जुड़ी मदद के लिए आपका स्वागत है। यहाँ आप अपने गाँव के लिए माँग उठा सकते हैं और अपनी कहानियाँ भी शेयर कर सकते हैं। शुरू करने के लिए अपनी लोकेशन शेयर करें और अपने इलाके की कम्युनिटी से जुड़ें।",
+            "default": "Namaskar. Welcome to natural resource management bot. You can use the bot to raise NRM related demands for your village and share stories with your community!\n"
           }
         ]
       },
       {
         "menu": [
-          {
-            "label": "सूची से चुनें",
-            "value": "state_district",
-            "caption": "आपकी बेहतर सेवा के लिए, हमें आपकी लोकेशन की आवश्यकता है। आप अपनी लोकेशन कैसे भेजना चाहते हैं?\n1. आप राज्य और ज़िले की सूची में से अपनी लोकेशन चुन सकते हैं।\n2. बस अपनी लोकेशन भेजें।"
-          },
           {
             "label": "स्थान भेज देंगे",
             "value": "location_pin"
@@ -27,113 +22,141 @@
     ],
     "postAction": [],
     "transition": [
-      { "SendState": ["state_district"] },
-      { "SendLocationRequest": ["location_pin"] },
-      { "Welcome": ["failure"] }
+      {
+        "SendState": [
+          "state_district"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "location_pin"
+        ]
+      },
+      {
+        "Welcome": [
+          "failed"
+        ]
+      }
     ]
   },
-
   {
-    "name": "NoCommunities",
+    "name": "ExitSession",
     "preAction": [
       {
         "text": [
           {
-            "en": "We did not find any community attached to this location. Please select from the list.",
-            "hi": "हमें इस स्थान से जुड़ा कोई समुदाय नहीं मिला। कृपया सूची से चयन करें।",
-            "default": "We did not find any community attached to this location. Please select from the list."
+            "en": "\"We could not find any community linked to this location. Please type 'Hi' to start again.\"\n",
+            "hi": "\"हमें इस स्थान से जुड़ा कोई समुदाय नहीं मिला। कृपया दोबारा शुरू करने के लिए 'Hi' लिखें।\"\n",
+            "default":"We could not find any community linked to this location. Please type 'Hi' to start again."
           }
         ]
       },
-       {
-        "menu": [
-          {
-            "label": "सूची से चुनें",
-            "value": "state_district",
-            "caption": "आपकी बेहतर सेवा के लिए, हमें आपकी लोकेशन की आवश्यकता है। आप अपनी लोकेशन कैसे भेजना चाहते हैं?\n1. आप राज्य और ज़िले की सूची में से अपनी लोकेशन चुन सकते हैं।\n2. बस अपनी लोकेशन भेजें।"
-          }
-        ]
+      {
+        "function": "archive_and_end_session"
       }
     ],
-
     "postAction": [],
-
     "transition": [
-      { "SendState": ["state_district"] },
-      { "SendLocationRequest": ["location_pin"] },
-      { "Welcome": ["failure"] }
+      {
+        "ExitSession": [
+          "failure"
+        ]
+      }
     ]
   },
-
   {
     "name": "SendState",
     "preAction": [
-
       {
-  "text": [
-    {
-      "en": ":folded_hands: We are providing you with a list of states. Please select a state from the list.",
-      "hi": "🙏 नमस्कार। हम आपको राज्यों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक राज्य चुनें।",
-      "default": "Please select a state from the list."
-    }
-  ]
-}
-,
-      { "function": "send_states" }
+        "text": [
+          {
+            "en": ":folded_hands: We are providing you with a list of states. Please select a state from the list.",
+            "hi": "🙏 नमस्कार। हम आपको राज्यों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक राज्य चुनें।",
+            "default": "Please select a state from the list."
+          }
+        ]
+      },
+      {
+        "function": "send_states"
+      }
     ],
     "postAction": [
-      { "function": "move_forward" }
+      {
+        "function": "move_forward"
+      }
     ],
     "transition": [
-      { "SendDistrict": ["success"] },
-      { "SendState": ["failure"] }
+      {
+        "SendDistrict": [
+          "success"
+        ]
+      },
+      {
+        "SendState": [
+          "failure"
+        ]
+      }
     ]
   },
-
-
-
   {
-  "name": "SendDistrict",
-  "preAction": [
-    {
-      "data": {
-        "getDataFrom": {
-          "field": "misc",
-          "state": "SendState"
-        }
+    "name": "SendDistrict",
+    "preAction": [
+      {
+        "data": {
+          "getDataFrom": {
+            "field": "misc",
+            "state": "SendState"
+          }
+        },
+        "text": [
+          {
+            "en": "We are providing you with a list of districts. Please select a district from the list.",
+            "hi": "हम आपको जिलों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक जिला चुनें।",
+            "default": "Please select a district from the list."
+          }
+        ],
+        "function": "send_districts"
+      }
+    ],
+    "postAction": [
+      {
+        "function": "move_forward"
+      }
+    ],
+    "transition": [
+      {
+        "CommunityByStateDistrict": [
+          "success"
+        ]
       },
-      "text": [
-        {
-          "en": "We are providing you with a list of districts. Please select a district from the list.",
-          "hi": "हम आपको जिलों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक जिला चुनें।",
-          "default": "Please select a district from the list."
-        }
-      ],
-      "function": "send_districts"
-    }
-  ],
-  "postAction": [
-    { "function": "move_forward" }
-  ],
-  "transition": [
-    { "CommunityByStateDistrict": ["success"] },
-    { "SendDistrict": ["failure"] }
-  ]
-},
-
-
+      {
+        "SendDistrict": [
+          "failure"
+        ]
+      }
+    ]
+  },
   {
     "name": "SendLocationRequest",
     "preAction": [
-      { "function": "send_location_request" }
+      {
+        "function": "send_location_request"
+      }
     ],
     "postAction": [],
     "transition": [
-      { "CommunityByLocation": ["success"] },
-      { "SendLocationRequest": ["failure"] }
+      {
+        "CommunityByLocation": [
+          "success"
+        ]
+      },
+      {
+        "SendLocationRequest": [
+          "failure"
+        ]
+      }
     ]
   },
-
   {
     "name": "CommunityByLocation",
     "preAction": [
@@ -149,33 +172,87 @@
     ],
     "postAction": [],
     "transition": [
-      { "CommunityByLocation": ["failure"] },
-      { "NoCommunities": ["no_communities"] }
+      {
+        "AddUserToCommunityByLocation": [
+          "success"
+        ]
+      },
+      {
+        "ExitSession": [
+          "no_communities"
+        ]
+      },
+      {
+        "CommunityByLocation": [
+          "failure"
+        ]
+      }
     ]
   },
-
   {
     "name": "CommunityByStateDistrict",
     "preAction": [
       {
         "data": {
           "getDataFrom": [
-            { "field": "misc", "state": "SendState" },
-            { "field": "misc", "state": "SendDistrict" }
+            {
+              "field": "misc",
+              "state": "SendState"
+            },
+            {
+              "field": "misc",
+              "state": "SendDistrict"
+            }
           ]
         },
         "function": "send_community_by_state_district"
       }
     ],
     "postAction": [
-      { "function": "move_forward" }
+      {
+        "function": "move_forward"
+      }
     ],
     "transition": [
-      { "AddUserToCommunity": ["success"] },
-      { "CommunityByStateDistrict": ["failure"] }
+      {
+        "AddUserToCommunity": [
+          "success"
+        ]
+      },
+      {
+        "CommunityByStateDistrict": [
+          "failure"
+        ]
+      }
     ]
   },
-
+  {
+    "name": "AddUserToCommunityByLocation",
+    "preAction": [
+      {
+        "data": {
+          "getDataFrom": {
+            "field": "misc",
+            "state": "CommunityByLocation"
+          }
+        },
+        "function": "add_user_to_community"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "PostOnboardingMenu": [
+          "success"
+        ]
+      },
+      {
+        "AddUserToCommunity": [
+          "failure"
+        ]
+      }
+    ]
+  },
   {
     "name": "AddUserToCommunity",
     "preAction": [
@@ -191,11 +268,18 @@
     ],
     "postAction": [],
     "transition": [
-      { "PostOnboardingMenu": ["success"] },
-      { "AddUserToCommunity": ["failure"] }
+      {
+        "PostOnboardingMenu": [
+          "success"
+        ]
+      },
+      {
+        "AddUserToCommunity": [
+          "failure"
+        ]
+      }
     ]
   },
-
   {
     "name": "PostOnboardingMenu",
     "preAction": [
@@ -230,7 +314,6 @@
     "postAction": [],
     "transition": []
   },
-
   {
     "name": "ExploreServices",
     "preAction": [
