@@ -38,7 +38,7 @@ def mws_layer(self, state, district, block, gee_account_id):
 
     if not is_gee_asset_exists(asset_id):
         mwses_uid_fc = ee.FeatureCollection(
-            GEE_DATASET_PATH + "/India_mws_uid_area_gt_500"
+            GEE_DATASET_PATH + "/hydrological_boundaries/microwatershed"
         )
 
         admin_boundary = ee.FeatureCollection(
@@ -65,10 +65,11 @@ def mws_layer(self, state, district, block, gee_account_id):
             layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
             asset_id=asset_id,
             dataset_name="MWS",
-            algorithm_version="1.1",
+            algorithm_version="1.2",
         )
         layer_generated = True
     return layer_generated
+
 
 # @app.task(bind=True)
 # def mws_layer(self, state, district, block):
