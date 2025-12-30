@@ -38,25 +38,63 @@ def get_paginated_submissions(request, form, plan_id):
 @schema(None)
 def get_form_names(request):
     form_names = [
-        {"name": "Settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
-        {"name": "Well", "form_id": "Add_Wells_form%20_V1.0.1"},
-        {"name": "Waterbody", "form_id": "Add_Waterbody_form%20_V1.0.1"},
-        {"name": "Groundwater", "form_id": "Add_Groundwater_form%20_V1.0.1"},
-        {"name": "Agri", "form_id": "Add_Agri_form%20_V1.0.1"},
-        {"name": "Livelihood", "form_id": "Add_Livelihood_form%20_V1.0.1"},
-        {"name": "Crop", "form_id": "Add_Cropping_form%20_V1.0.1"},
-        {"name": "Agri Maintenance", "form_id": "Agri_Maintenance_form%20_V1.0.1"},
+        # resource mapping
         {
-            "name": "GroundWater Maintenance",
-            "form_id": "Groundwater_Maintenance_form%20_V1.0.1",
+            "name": "Settlement",
+            "form_id": "Add_Settlements_form%20_V1.0.1",
+            "display": "Resource Mapping => Settlement Form ",
         },
         {
+            "name": "Well",
+            "form_id": "Add_well_form_V1.0.1",
+            "display": "Resource Mapping => Add Well Form",
+        },
+        {
+            "name": "Waterbody",
+            "form_id": "Add_Waterbodies_Form_V1.0.3",
+            "display": "Resource Mapping => Add Water Structures Form ",
+        },
+        {
+            "name": "Crop",
+            "form_id": "crop_form_V1.0.0",
+            "display": "Resource Mapping => Cropping Pattern Form",
+        },
+        # planning
+        {
+            "name": "Groundwater",
+            "form_id": "NRM_form_propose_new_recharge_structure_V1.0.0",
+            "display": "Planning New => Propose New Recharge Structure",
+        },
+        {
+            "name": "Agri",
+            "form_id": "NRM_form_Agri_Screen_V1.0.0",
+            "display": "Planning New => Propose New Irrigation Work",
+        },
+        {
+            "name": "Livelihood",
+            "form_id": "NRM%20Livelihood%20Form",
+            "display": "Planning New => Livelihood Details",
+        },
+        # Miantenance
+        {
             "name": "Surface Water Body Maintenance",
-            "form_id": "Surface_Waterbody_Maintenance_form%20_V1.0.1",
+            "form_id": "NRM_form_NRM_form_Waterbody_Screen_V1.0.0",
+            "display": "Planning Maintenance => Propose Maintenance on Surface Water structures",
         },
         {
             "name": "Surface Water Body Recharge Structure Maintenance",
             "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
+            "display": "Planning Maintenance => Propose Maintenance of Remotely Sensed Water Structure",
+        },
+        {
+            "name": "Agri Maintenance",
+            "form_id": "Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1",
+            "display": "Planning Maintenance => Propose Maintenance On Existing Irrigation Structures",
+        },
+        {
+            "name": "GroundWater Maintenance",
+            "form_id": "Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1",
+            "display": "Planning Maintenance => Propose Maintenance On Existing Water Recharge Structures",
         },
     ]
     return JsonResponse({"forms": form_names})
@@ -143,3 +181,22 @@ def sync_updated_submissions(request):
             else:
                 print("passed wrong form name")
     return JsonResponse({"status": "Sync complete", "result": res})
+
+
+@api_view(["GET"])
+@schema(None)
+def fetch_and_parse_odk_form(request):
+    print("inside fetch_and_parse_odk_form API")
+    odk_url = ODK_BASE_URL
+    project_id = 2
+    xml_form_id = "Add_Settlements_form%20_V1.0.1"
+    token = "0IFK1dfXjQNzPEPghQQ8MM$vragz6xdfrgvkAgxFcuTgQe1gwpKewTwlpY82QJ0y"
+    try:
+        result = parse_odk_form_service(
+            odk_url=odk_url, project_id=project_id, xml_form_id=xml_form_id, token=token
+        )
+        cleaned = normalize_odk_labels(result)
+        return Response({"result": cleaned}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in fetch_and_parse_odk_form api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
