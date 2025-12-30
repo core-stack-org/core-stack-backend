@@ -6,7 +6,6 @@
         "function": "get_user_communities"
       }
     ],
-    "postAction": [],
     "transition": [
       {
         "SingleCommunityWelcome": [
@@ -35,7 +34,7 @@
         "menu": [
           {
             "label": "समुदाय के साथ जारी रखें",
-            "value": "continue_single",
+            "value": "community_selected",
             "caption": "कोई एक विकल्प चुनें:",
             "description": "अपने वर्तमान समुदाय के साथ आगे बढ़ें"
           },
@@ -54,8 +53,8 @@
     ],
     "transition": [
       {
-        "ServiceMenu": [
-          "continue_single"
+        "ServiceMenuNew": [
+          "community_selected"
         ]
       },
       {
@@ -104,7 +103,7 @@
     ],
     "transition": [
       {
-        "ServiceMenu": [
+        "ServiceMenuNew": [
           "continue_last"
         ]
       },
@@ -139,8 +138,8 @@
     ],
     "transition": [
       {
-        "ServiceMenu": [
-          "community_selected",
+        "ServiceMenuNew": [
+          "continue_single",
           "continue_last_accessed"
         ]
       },
@@ -155,11 +154,14 @@
     "name": "ServiceMenuNew",
     "preAction": [
       {
+        "function": "store_active_community_and_context"
+      },
+      {
         "text": [
           {
             "en": "🎉 Welcome to your community!\n\nYou can access the following services:",
             "hi": "🎉 आपके समुदाय में आपका स्वागत है!\n\nआप निम्नलिखित सेवाओं का लाभ उठा सकते हैं:",
-            "default": "🎉 Welcome to your community!\n\nYou can access the following services:"
+            "default": "🎉 Welcome to your community!"
           }
         ]
       },
@@ -167,27 +169,22 @@
         "menu": [
           {
             "label": "संसाधन मांग दर्ज करें",
-            "value": "work_demand",
-            "caption": "आप क्या करना चाहते हैं:",
-            "description": "नई संसाधन मांग जमा करें"
-          },
-          {
-            "label": "संसाधन मांग स्थिति",
-            "value": "work_demand_status",
-            "description": "अपनी पिछली संसाधन मांगों की स्थिति देखें"
-          },
-          {
-            "label": "शिकायत दर्ज करें",
-            "value": "grievance",
-            "description": "शिकायत या प्रभाव जमा करें"
+            "value": "work_demand"
           },
 
-        {
-          "label": "कहानी साझा करें",
-          "value": "story",
-          "description": "अपनी जलवायु या पर्यावरण से जुड़ी कहानी जमा करें"
-      }
 
+          {
+            "label": "कहानी साझा करें",
+            "value": "story"
+          },
+          {
+            "label": "नया समुदाय जॉइन करें",
+            "value": "join_new_community"
+          },
+          {
+            "label": "चैट समाप्त करें",
+            "value": "exit_session"
+          }
         ]
       }
     ],
@@ -209,81 +206,6 @@
         ]
       },
       {
-        "JumpToStorySMJ": [
-          "story"
-        ]
-      },
-      {
-        "ServiceMenuNew": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "ServiceMenu",
-    "preAction": [
-      {
-        "function": "display_service_menu_message"
-      },
-      {
-        "menu": [
-          {
-            "label": "संसाधन मांग दर्ज करें",
-            "value": "work_demand",
-            "caption": "आप क्या करना चाहते हैं:",
-            "description": "नई संसाधन मांग जमा करें"
-          },
-          {
-            "label": "संसाधन मांग स्थिति",
-            "value": "work_demand_status",
-            "description": "अपनी पिछली संसाधन मांगों की स्थिति देखें"
-          },
-          {
-            "label": "शिकायत दर्ज करें",
-            "value": "grievance",
-            "description": "शिकायत या प्रभाव जमा करें"
-          },
-          {
-            "label": "नया समुदाय जॉइन करें",
-            "value": "join_new_community",
-            "description": "एक अतिरिक्त समुदाय में शामिल हों"
-          },
-          {
-          "label": "कहानी साझा करें",
-          "value": "story",
-          "description": "अपनी जलवायु या पर्यावरण से जुड़ी कहानी जमा करें"
-      },
-          {
-            "label": "चैट समाप्त करें",
-            "value": "exit_session",
-            "description": "चैट सेशन बंद करें"
-          }
-        ]
-      }
-    ],
-    "postAction": [
-      {
-        "function": "handle_service_selection"
-      }
-    ],
-    "transition": [
-      {
-        "JumpToWorkDemandSMJ": [
-          "work_demand"
-        ]
-      },
-      {
-        "JumpToWorkDemandStatusSMJ": [
-          "work_demand_status"
-        ]
-      },
-      {
-        "JumpToGrievanceSMJ": [
-          "grievance"
-        ]
-      },
-            {
         "JumpToStorySMJ": [
           "story"
         ]
@@ -299,32 +221,7 @@
         ]
       },
       {
-        "ServiceMenu": [
-          "failure"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "ExitSession",
-    "preAction": [
-      {
-        "text": [
-          {
-            "en": "🙏 Thank you! Your session has ended.\n\nSend \"Hi\" to restart the service.",
-            "hi": "🙏 धन्यवाद! आपका सत्र समाप्त हो गया है।\n\nदोबारा सेवा का लाभ उठाने के लिए \"Hi\" भेजें।",
-            "default": "🙏 Thank you! Your session has ended.\n\nSend \"Hi\" to restart the service."
-          }
-        ]
-      },
-      {
-        "function": "archive_and_end_session"
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "ExitSession": [
+        "ServiceMenuNew": [
           "failure"
         ]
       }
@@ -337,8 +234,7 @@
         "text": [
           {
             "en": "🔄 Let's help you join a new community...",
-            "hi": "🔄 आइए आपको एक नया समुदाय ज्वाइन करने में मदद करते हैं...",
-            "default": "Let's help you join a new community..."
+            "hi": "🔄 आइए आपको एक नया समुदाय जॉइन करने में मदद करते हैं..."
           }
         ]
       },
@@ -352,7 +248,6 @@
         "function": "jumpToSmj"
       }
     ],
-    "postAction": [],
     "transition": [
       {
         "JumpToOnboarding": [
@@ -368,8 +263,7 @@
         "text": [
           {
             "en": "📋 Opening asset demand registration...",
-            "hi": "📋 संसाधन मांग पंजीकरण खोल रहे हैं...",
-            "default": "Opening asset demand registration..."
+            "hi": "📋 संसाधन मांग पंजीकरण खोल रहे हैं..."
           }
         ]
       },
@@ -383,7 +277,6 @@
         "function": "jumpToSmj"
       }
     ],
-    "postAction": [],
     "transition": [
       {
         "JumpToWorkDemandSMJ": [
@@ -399,8 +292,7 @@
         "text": [
           {
             "en": "📊 Opening asset demand status...",
-            "hi": "📊 संसाधन मांग स्थिति खोली जा रही है...",
-            "default": "Opening asset demand status..."
+            "hi": "📊 संसाधन मांग स्थिति खोली जा रही है..."
           }
         ]
       },
@@ -414,7 +306,6 @@
         "function": "jumpToSmj"
       }
     ],
-    "postAction": [],
     "transition": [
       {
         "JumpToWorkDemandStatusSMJ": [
@@ -429,11 +320,9 @@
       {
         "text": [
           {
-  "en": "📋 Opening story submission...",
-  "hi": "📋 कहानी जमा करने की प्रक्रिया खोल रहे हैं...",
-  "default": "📋 Opening story submission..."
-}
-
+            "en": "📋 Opening story submission...",
+            "hi": "📋 कहानी जमा करने की प्रक्रिया खोल रहे हैं..."
+          }
         ]
       },
       {
@@ -446,41 +335,9 @@
         "function": "jumpToSmj"
       }
     ],
-    "postAction": [],
     "transition": [
       {
         "JumpToStorySMJ": [
-          "failure"
-        ]
-      }`1
-    ]
-  },
-  {
-    "name": "JumpToWorkDemandStatusSMJ",
-    "preAction": [
-      {
-        "text": [
-          {
-            "en": "📊 Opening asset demand status...",
-            "hi": "📊 संसाधन मांग स्थिति खोली जा रही है...",
-            "default": "Opening asset demand status..."
-          }
-        ]
-      },
-      {
-        "data": [
-          {
-            "smjName": "work_demand_status",
-            "initState": "WorkDemandStatusWelcome"
-          }
-        ],
-        "function": "jumpToSmj"
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "JumpToWorkDemandStatusSMJ": [
           "failure"
         ]
       }
@@ -493,8 +350,7 @@
         "text": [
           {
             "en": "📝 Opening grievance registration...",
-            "hi": "📝 शिकायत पंजीकरण खोल रहे हैं...",
-            "default": "Opening grievance registration..."
+            "hi": "📝 शिकायत पंजीकरण खोल रहे हैं..."
           }
         ]
       },
@@ -508,10 +364,32 @@
         "function": "jumpToSmj"
       }
     ],
-    "postAction": [],
     "transition": [
       {
         "JumpToGrievanceSMJ": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ExitSession",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "🙏 Thank you! Your session has ended.\n\nSend \"Hi\" to restart.",
+            "hi": "🙏 धन्यवाद! आपका सत्र समाप्त हो गया है।\n\nदोबारा शुरू करने के लिए \"Hi\" भेजें।"
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "transition": [
+      {
+        "ExitSession": [
           "failure"
         ]
       }

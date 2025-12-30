@@ -619,7 +619,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         user_id = data_dict.get("user_id")
         bot_instance, user_session = _load_user_session(bot_instance_id, user_id)
         data = data_dict.get("menu")
-        # caption = "Select an option:"  # Default
+        caption = "Select an option:"  # Default
         if data_dict.get("caption"):
             caption = data_dict.get("caption")
         elif data and len(data) > 0 and "caption" in data[0]:
@@ -1958,7 +1958,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 user_log = UserLogs.objects.get(id=user_log_id)
             except UserLogs.DoesNotExist:
-                print ("user log not found") 
+                print("user log not found")
                 return {
                     "success": False,
                     "message": f"UserLogs record with id {user_log_id} not found",
@@ -2087,7 +2087,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Prepare API payload
             payload = {
-                "item_type": 'Asset_Demand',
+                "item_type": "Asset_Demand",
                 "coordinates": json.dumps(coordinates) if coordinates else "",
                 "number": contact_number,
                 "community_id": community_id,

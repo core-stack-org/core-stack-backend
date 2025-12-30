@@ -6,7 +6,7 @@ from nrm_app.settings import (
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
-    GEE_DEFAULT_ACCOUNT_ID,
+    GEE_DEFAULT_ACCOUNT,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -27,7 +27,7 @@ import numpy as np
 import tempfile
 
 
-def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
+def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT):
     account = GEEAccount.objects.get(pk=account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
     credentials = service_account.Credentials.from_service_account_info(
@@ -67,7 +67,7 @@ def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
 #         print("Exception in gee connection", e)
 
 
-def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
+def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT):
     from google.oauth2 import service_account
 
     # # Authenticate Earth Engine
@@ -647,7 +647,7 @@ def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
 
 
 def upload_shp_to_gee(
-    shapefile_path, file_name, asset_id, gee_account_id=GEE_DEFAULT_ACCOUNT_ID
+    shapefile_path, file_name, asset_id, gee_account_id=GEE_DEFAULT_ACCOUNT
 ):
     """
     Upload a shapefile to GEE asset from GCS using CLI commands
