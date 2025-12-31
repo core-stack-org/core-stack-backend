@@ -33,6 +33,7 @@ from utilities.gee_utils import (
 )
 import ee
 import numpy as np
+import shutil
 
 from computing.STAC_specs import generate_STAC_layerwise
 
@@ -154,6 +155,12 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         formatted_state_name,
         f"""{"_".join(valid_gee_text(district).split())}_{"_".join(valid_gee_text(block).split())}""",
     )
+
+    if os.path.exists(path):
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)
+
     output_directory = os.path.dirname(path)
     os.makedirs(output_directory, exist_ok=True)
 
