@@ -140,7 +140,9 @@ def crop_intensity_vector(roi, state, district, block, start_year, end_year):
         {"value": 4, "label": "si_do"},
         {"value": 5, "label": "si_tr"},
         {"value": 6, "label": "do_tr"},
-        {"value": 7, "label": "same"},
+        {"value": 7, "label": "si_si"},
+        {"value": 8, "label": "do_do"},
+        {"value": 9, "label": "tr_tr"},
         {"value": [1, 2, 3, 4, 5, 6], "label": "total_change"},
     ]  # Classes in crop_intensity raster layer
 
