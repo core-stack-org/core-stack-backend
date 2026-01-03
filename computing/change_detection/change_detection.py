@@ -499,7 +499,7 @@ def sync_to_gcs_geoserver(
                 state=state, district=district, block=block, layer_name=layer_name
             )
             update_layer_sync_status(
-                layer_id=layer_ids[change], is_stac_specs_generated=True
+                layer_id=layer_ids[change], is_stac_specs_generated=layer_STAC_generated
             )
 
             if sync_status:
