@@ -1,6 +1,8 @@
+from types import NoneType
 from typing import Optional, Dict
 from datetime import datetime
 import json
+import numpy as np
 
 class tehsil_data:
     """
@@ -51,6 +53,13 @@ class MWS_data:
         self.forest_to_farm: Optional[float] = None
         self.forest_to_forest: Optional[float] = None
         self.forest_to_scrub: Optional[float] = None
+
+        # === HYDROLOGICAL DATA: PRECIPITATION, RUNOFF, ET ===
+        self.hydro_dates_data: Optional[datetime] = None
+        self.hydro_rainfall_data: Optional[np.array] = None
+        self.hydro_et_data: Optional[np.array] = None
+        self.hydro_runoff_data: Optional[np.array] = None
+        self.hydro_waterbalance_data: Optional[np.array] = None
 
         # === SURFACE WATER AREA ===
         self.swb_area_in_ha: Optional[float] = None
@@ -554,5 +563,15 @@ class loading_util:
                                 # sw_krz: all seasons kharif + rabi + zaid (percentage)
                                 if 'zaid' in areas:
                                     mws.sw_krz[year] = (areas['zaid'] / total) * 100
-                    
 
+    #LOAD FROM MWS API DATA
+    @staticmethod
+    def load_hydro_data_from_api_payload(obj, hydrological_data):
+        obj.hydro_dates_data = [datetime.strptime(item['date'], '%Y-%m-%d') for item in hydrological_data]
+        obj.hydro_rainfall_data = np.array([item['precipitation'] for item in hydrological_data])
+        obj.hydro_et_data = np.array([item['et'] for item in hydrological_data])
+        obj.hydro_runoff_data = np.array([item['runoff'] for item in hydrological_data])
+    
+        # Calculate water balance
+        obj.hydro_waterbalance_data = obj.hydro_rainfall_data - obj.hydro_et_data - obj.hydro_runoff_data
+        
