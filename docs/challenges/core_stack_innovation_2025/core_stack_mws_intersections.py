@@ -11,6 +11,7 @@ import json
 from core_stack_orm import *
 from core_stack_layer_load import *
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from base64 import b64encode
 
 #HELPER METHOD TO READ GEOJSON OF AN AREA OF INTEREST AROUND WHICH MICRO-WATERSHEDS CAN BE STUDIED
@@ -41,10 +42,12 @@ def shapely_to_ee_geometry(geom):
     if geom.geom_type == 'Point':
         return ee.Geometry.Point([geom.x, geom.y])
     elif geom.geom_type == 'LineString':
-        coords = list(geom.coords)
+#        coords = list(geom.coords)
+        coords = [[c[0], c[1]] for c in geom.coords]
         return ee.Geometry.LineString(coords)
     elif geom.geom_type == 'Polygon':
-        coords = list(geom.exterior.coords)
+#        coords = list(geom.exterior.coords)
+        coords = [[c[0], c[1]] for c in geom.exterior.coords]
         return ee.Geometry.Polygon([coords])
     else:
         raise ValueError(f"Unsupported geometry type: {geom.geom_type}")
@@ -352,6 +355,7 @@ def plot_mws_network(tehsils_df, all_mws_ids, tehsil_list, mws_data, geometries,
             plt.ylabel('Area in ha', fontsize=8)
             plt.xticks(rotation=45, ha='right', fontsize=8)
             plt.yticks(fontsize=8)
+            plt.title('Tree cover loss', fontsize=8)
             plt.tight_layout()
             tree_path = f"data/tree_{uid}.png"
             plt.savefig(tree_path, dpi=100, bbox_inches='tight')
@@ -408,23 +412,89 @@ def plot_mws_network(tehsils_df, all_mws_ids, tehsil_list, mws_data, geometries,
                     sw_ts_img_b64 = b64encode(imgf.read()).decode('utf-8')
                     sw_ts_html = f'<img src="data:image/png;base64,{sw_ts_img_b64}" style="width:175px; height:auto;"/>'
 
+        # Generate time-series plot for hydrological data
+        # Create figure with two y-axes
+        fig, ax1 = plt.subplots(figsize=(7, 3.5))
+        
+        # Create second y-axis that shares the same x-axis
+        ax2 = ax1.twinx()
+        
+        hydro_dates = list(row.get('hydro_dates')) if row.get('hydro_dates') is not None else []
+        hydro_rainfall = row.get('hydro_rainfall') if row.get('hydro_rainfall') is not None else np.array([])
+        hydro_et = row.get('hydro_et') if row.get('hydro_et') is not None else np.array([])
+        hydro_runoff = row.get('hydro_runoff') if row.get('hydro_runoff') is not None else np.array([])
+        hydro_waterbalance = row.get('hydro_waterbalance') if row.get('hydro_waterbalance') is not None else np.array([])
+
+        # Plot precipitation as bars coming from top (on ax2, inverted)
+        ax2.bar(hydro_dates, hydro_rainfall, width=5, color='steelblue', alpha=0.6, label='Rainfall')
+        ax2.set_ylabel('Rainfall (mm)', fontsize=8, color='steelblue')
+        ax2.tick_params(axis='y', labelcolor='steelblue')
+        ax2.invert_yaxis()  # Invert so rain comes from top
+        ax2.set_ylim(max(hydro_rainfall) * 1.25, 0)  # Set limits with padding
+        
+        # Plot stacked ET and runoff (on ax1)
+#        ax1.bar(hydro_dates, hydro_et, width=5, color='orange', alpha=0.7, label='ET')
+#        ax1.bar(hydro_dates, hydro_runoff, width=5, bottom=hydro_et, color='brown', alpha=0.7, label='Runoff')
+        ax1.bar(hydro_dates, hydro_runoff, width=5, color='brown', alpha=0.7, label='Runoff')
+        
+        # Plot water balance as a line (on ax1)
+#        ax1.plot(hydro_dates, hydro_waterbalance, color='green', linewidth=1, marker='o', 
+#                markersize=1, label='Water Balance', zorder=5)
+
+        # Add horizontal line at y=0 for reference
+        ax1.axhline(y=0, color='black', linestyle='--', linewidth=1, alpha=0.5)
+        
+        # Format x-axis
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        
+        # Labels and title
+        ax1.set_xlabel('Date', fontsize=8)
+        ax1.set_ylabel('ET, Runoff, Water Balance (mm)', fontsize=8)
+        ax1.set_title('Water Balance Analysis', fontsize=8)
+        
+        # Legends
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=8)
+        
+        # Grid
+        ax1.grid(True, alpha=0.3, axis='y')
+        
+        # Tight layout
+        plt.tight_layout()
+
+        hydro_ts_path = f"data/hydro_ts_{uid}.png"
+        plt.savefig(hydro_ts_path, dpi=100, bbox_inches='tight')
+        plt.close()
+                
+        # Prepare HTML for time-series chart image
+        with open(hydro_ts_path, 'rb') as imgf:
+            hydro_ts_img_b64 = b64encode(imgf.read()).decode('utf-8')
+            hydro_ts_html = f'<img src="data:image/png;base64,{hydro_ts_img_b64}" style="width:400px; height:auto;"/>'
+
         # Prepare the popup HTML with side-by-side layout
         charts_html = ''
         if pie_html or tree_html or sw_ts_html:
-            charts_html = '<div style="display:flex; flex-direction:row; width:100%; min-width:500px;">'
+            charts_html = '<div style="display:flex; flex-direction:row; width:100%; min-width:500px;"><table border=0><tr>'
 #            if pie_html:
 #                charts_html += f'<div style="flex:1; text-align:center;"><b style="font-size:11px;">Terrain Distribution</b>{pie_html}</div>'
             if sw_ts_html:
-                charts_html += f'<div style="flex:1; text-align:left;">{sw_ts_html}</div>'
+                charts_html += f'<td><div style="flex:1; text-align:left;">{sw_ts_html}</div></td>'
             if tree_html:
-                charts_html += f'<div style="flex:1; text-align:left;">{tree_html}</div>'
-            charts_html += '</div>'
+                charts_html += f'<td><div style="flex:1; text-align:left;">{tree_html}</div></td>'
+            if hydro_ts_html:
+                charts_html += f'</tr><tr><td colspan=2><div style="flex:1; text-align:left;">{hydro_ts_html}</div></td></tr><tr>'
+
+            charts_html += '</tr></table></div>'
         
         popup_html = (
             f"MWS UID: {uid}<br>"
             f"Level: {level}<br>"
             f"Area (ha): {row.get('area_in_ha', '?')}"
             f"{charts_html}"
+            f"<a href=\"{row.get('url')}\">MWS report</a>"
         )
 
         folium.Polygon(
@@ -435,7 +505,6 @@ def plot_mws_network(tehsils_df, all_mws_ids, tehsil_list, mws_data, geometries,
             fill_opacity=0.3,
             weight=2,
             popup = folium.Popup(popup_html, max_width=400)
-#            popup=f"MWS UID: {uid}<br>Level: {level}"
         ).add_to(m)
     
     # Plot connections with arrows
@@ -502,9 +571,9 @@ def plot_mws_network(tehsils_df, all_mws_ids, tehsil_list, mws_data, geometries,
 
 #PRIMARY INVOVATION FUNCTION TO PLOT THE MAP FOR A GIVEN AREA OF INTEREST
 if __name__ == "__main__":
-    geojson_file = ""  # Replace with your GeoJSON file path
+    geojson_file = "C:\\Users\\Prof. A Set\\Downloads\\Sunderpahari.geojson"  # Replace with your GeoJSON file path
 
-    # Initialize Earth Engine
+    # Initialize Earth Engine, replace with your project
     ee.Authenticate()
     ee.Initialize(project="ee-aaditeshwar")
 
@@ -529,6 +598,7 @@ if __name__ == "__main__":
             print(f"found tehsil {tehsil}")
 #            tehsil_obj = get_tehsil_data_from_layers(tehsil["STATE"], tehsil["District"], tehsil["TEHSIL"])
             tehsil_obj = get_tehsil_data_from_api(tehsil["STATE"], tehsil["District"], tehsil["TEHSIL"], mws_params)
+            get_hydrological_data_from_api(tehsil_obj, mwses)
             df = build_df(tehsil_obj, mwses)
             if tehsils_df is None:
                 tehsils_df = df
@@ -538,6 +608,5 @@ if __name__ == "__main__":
             print(f"not found tehsil {tehsil}")
 
     plot_mws_network(tehsils_df, mwses, tehsils, mws_data, geometries, mws_connectivity)
-
 
 
