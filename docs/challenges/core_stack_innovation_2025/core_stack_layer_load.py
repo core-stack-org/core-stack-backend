@@ -179,11 +179,31 @@ def get_tehsil_data_from_api(state, district, tehsil, mws_params):
 
     return tehsil_obj
 
+def get_hydrological_data_from_api(tehsil_obj, mws_list):
+    # API endpoint to get tehsil data and populate into objects
+    mws_data_api_endpoint = 'get_mws_data/'
+
+    for mws in tehsil_obj.microwatersheds.values():
+        if mws_list and mws.uid not in mws_list:
+            continue
+        
+        # Define the query parameters to be sent in the API request
+        params = {
+            "state": tehsil_obj.state_name,
+            "district": tehsil_obj.district_name,
+            "tehsil": tehsil_obj.tehsil_name,
+            "mws_id": mws.uid
+        }
+
+        mws_data_response = invoke_api(mws_data_api_endpoint, params)
+        hydrological_data = mws_data_response.get('time_series', [])
+        loading_util.load_hydro_data_from_api_payload(mws, hydrological_data)
+
 def build_df(tehsil_obj, mws_list):
     # --- Build DataFrame summarizing each MWS ---
     mws_rows = []
     for mws in tehsil_obj.microwatersheds.values():
-        if mws_list and mws in mws_list:
+        if mws_list and mws.uid not in mws_list:
             continue
         row = {}
         row['uid'] = mws.uid
@@ -247,6 +267,14 @@ def build_df(tehsil_obj, mws_list):
                 if k_mean != 0:
                     krk_ratios.append(kr_mean/k_mean)
         row['mean_krk_ratio'] = np.mean(krk_ratios) if krk_ratios else np.nan
+
+        row['hydro_dates'] = mws.hydro_dates_data
+        row['hydro_rainfall'] = mws.hydro_rainfall_data
+        row['hydro_et'] = mws.hydro_et_data
+        row['hydro_runoff'] = mws.hydro_runoff_data
+        row['hydro_waterbalance'] = mws.hydro_waterbalance_data
+
+        row['url'] = f"https://geoserver.core-stack.org/api/v1/generate_mws_report/?state={tehsil_obj.state_name}&district={tehsil_obj.district_name}&block={tehsil_obj.tehsil_name}&uid={mws.uid}"
         mws_rows.append(row)
     df = pd.DataFrame(mws_rows)
     print(df)
@@ -349,5 +377,4 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig('data/cropping_vs_krk_scatter.png')
         plt.close()
-
 
