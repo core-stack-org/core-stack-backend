@@ -30,39 +30,29 @@ _token_cache = {
 # MARK: Fetch ODK Data
 def fetch_odk_data(csv_path, resource_type, block, plan_id):
     print("CSV path: ", csv_path)
-    if resource_type == "settlement":
-        print("inside settlement")
-        odk_data(
-            ODK_URL_settlement, csv_path, block, plan_id, resource_type="settlement"
-        )
 
-    elif resource_type == "well":
-        print("inside well")
-        odk_data(ODK_URL_well, csv_path, block, plan_id, resource_type="well")
+    odk_url_map = {
+        "settlement": ODK_URL_settlement,
+        "well": ODK_URL_well,
+        "waterbody": ODK_URL_waterbody,
+        "plan_gw": ODK_URL_gw,
+        "main_swb": ODK_URL_swb,
+        "plan_agri": ODK_URL_agri,
+        "livelihood": ODK_URL_livelihood,
+    }
 
-    elif resource_type == "waterbody":
-        print("inside waterbody")
-        odk_data(ODK_URL_waterbody, csv_path, block, plan_id, resource_type="waterbody")
+    if resource_type not in odk_url_map:
+        logger.warning(f"Unknown resource type: {resource_type}")
+        return False
 
-    elif resource_type == "plan_gw":
-        print("inside ground water plan")
-        odk_data(ODK_URL_gw, csv_path, block, plan_id, resource_type="plan_gw")
-
-    elif resource_type == "main_swb":
-        print("inside surface water bodies plan")
-        odk_data(ODK_URL_swb, csv_path, block, plan_id, resource_type="main_swb")
-
-    elif resource_type == "plan_agri":
-        print("inside agri plan")
-        odk_data(ODK_URL_agri, csv_path, block, plan_id, resource_type="plan_agri")
-
-    elif resource_type == "livelihood":
-        print("inside livelihood")
-        odk_data(
-            ODK_URL_livelihood, csv_path, block, plan_id, resource_type="livelihood"
-        )
-
-    return True
+    print(f"inside {resource_type}")
+    return odk_data(
+        odk_url_map[resource_type],
+        csv_path,
+        block,
+        plan_id,
+        resource_type=resource_type,
+    )
 
 
 def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
@@ -118,7 +108,7 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
         fieldnames = list(all_keys)
 
     if not modified_response_list:
-        print(f"No ODK data found for the given Plan ID: {plan_id}")
+        logger.warning(f"No ODK data found for the given Plan ID: {plan_id}")
         return False
 
     if resource_type in ["settlement", "well", "waterbody"]:
@@ -139,6 +129,8 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
                 flattened_item = flatten_dict(item)
                 dict_writer.writerow(flattened_item)
             logger.info(f"CSV generated for the work : {resource_type}")
+
+    return True
 
 
 # MARK: Modify ODK Settlement Data
