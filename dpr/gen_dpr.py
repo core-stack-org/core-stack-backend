@@ -22,7 +22,7 @@ from dpr.mapping import (
     WATER_STRUCTURE_REVERSE_MAPPING,
     populate_maintenance_from_waterbody,
 )
-from dpr.utils import get_waterbody_repair_activities
+from dpr.utils import get_waterbody_repair_activities, transform_name
 from nrm_app.settings import (
     DEBUG,
     EMAIL_HOST,
@@ -59,17 +59,6 @@ from .utils import (
 )
 
 logger = setup_logger(__name__)
-
-
-def transform_name(name):
-    if not name:
-        return name
-
-    name = re.sub(r"[()]", "", name)
-    name = re.sub(r"[-\s]+", "_", name)
-    name = re.sub(r"_+", "_", name)
-    name = re.sub(r"^_|_$", "", name)
-    return name.lower()
 
 
 def get_plan_details(plan_id):
