@@ -108,7 +108,7 @@ def build_layer(layer_type, item_type, plan_id, district, block, csv_path):
         gdf = gpd.GeoDataFrame(df_geom, geometry=geometry)
         gdf.crs = "EPSG:4326"
 
-        formatted_block = transform_name(block_name=block)
+        formatted_block = transform_name(name=block)
         store_layer_name = f"{item_type}_{plan_id}_{district}_{formatted_block}"
         logger.debug(f"Store layer name: {store_layer_name}")
 
