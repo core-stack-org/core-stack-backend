@@ -6,6 +6,9 @@ from rest_framework.response import Response
 import requests
 from rest_framework import status
 from .utils.form_mapping import model_map
+from .api import FETCH_FIELD_MAP
+from .utils.get_submissions import ODKSubmissionsChecker
+import json
 
 
 @api_view(["GET"])
@@ -37,67 +40,9 @@ def get_paginated_submissions(request, form, plan_id):
 @api_view(["GET"])
 @schema(None)
 def get_form_names(request):
-    form_names = [
-        # resource mapping
-        {
-            "name": "Settlement",
-            "form_id": "Add_Settlements_form%20_V1.0.1",
-            "display": "Resource Mapping => Settlement Form ",
-        },
-        {
-            "name": "Well",
-            "form_id": "Add_well_form_V1.0.1",
-            "display": "Resource Mapping => Add Well Form",
-        },
-        {
-            "name": "Waterbody",
-            "form_id": "Add_Waterbodies_Form_V1.0.3",
-            "display": "Resource Mapping => Add Water Structures Form ",
-        },
-        {
-            "name": "Crop",
-            "form_id": "crop_form_V1.0.0",
-            "display": "Resource Mapping => Cropping Pattern Form",
-        },
-        # planning
-        {
-            "name": "Groundwater",
-            "form_id": "NRM_form_propose_new_recharge_structure_V1.0.0",
-            "display": "Planning New => Propose New Recharge Structure",
-        },
-        {
-            "name": "Agri",
-            "form_id": "NRM_form_Agri_Screen_V1.0.0",
-            "display": "Planning New => Propose New Irrigation Work",
-        },
-        {
-            "name": "Livelihood",
-            "form_id": "NRM%20Livelihood%20Form",
-            "display": "Planning New => Livelihood Details",
-        },
-        # Miantenance
-        {
-            "name": "Surface Water Body Maintenance",
-            "form_id": "NRM_form_NRM_form_Waterbody_Screen_V1.0.0",
-            "display": "Planning Maintenance => Propose Maintenance on Surface Water structures",
-        },
-        {
-            "name": "Surface Water Body Recharge Structure Maintenance",
-            "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
-            "display": "Planning Maintenance => Propose Maintenance of Remotely Sensed Water Structure",
-        },
-        {
-            "name": "Agri Maintenance",
-            "form_id": "Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1",
-            "display": "Planning Maintenance => Propose Maintenance On Existing Irrigation Structures",
-        },
-        {
-            "name": "GroundWater Maintenance",
-            "form_id": "Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1",
-            "display": "Planning Maintenance => Propose Maintenance On Existing Water Recharge Structures",
-        },
-    ]
-    return JsonResponse({"forms": form_names})
+    with open("moderation/utils/forms.json", "r") as file:
+        data = json.load(file)
+    return JsonResponse({"forms": data["Forms"]}, safe=False)
 
 
 @api_view(["PUT"])
@@ -106,16 +51,20 @@ def update_submission(request, form_name, uuid):
     Model = model_map.get(form_name)
     if not Model:
         return Response({"success": False, "message": "Invalid form"}, status=400)
-
+    field_name = FETCH_FIELD_MAP.get(Model)
+    if not field_name:
+        return Response(
+            {"success": False, "message": "No JSON field configured"},
+            status=400,
+        )
     try:
         obj = Model.objects.get(uuid=uuid)
     except Model.DoesNotExist:
         return Response({"success": False, "message": "Not found"}, status=404)
-
-    for field, value in request.data.items():
-        setattr(obj, field, value)
-
-    obj.save()
+    existing_data = getattr(obj, field_name) or {}
+    existing_data.update(request.data)
+    setattr(obj, field_name, existing_data)
+    obj.save(update_fields=[field_name])
     return Response({"success": True})
 
 
@@ -181,22 +130,3 @@ def sync_updated_submissions(request):
             else:
                 print("passed wrong form name")
     return JsonResponse({"status": "Sync complete", "result": res})
-
-
-@api_view(["GET"])
-@schema(None)
-def fetch_and_parse_odk_form(request):
-    print("inside fetch_and_parse_odk_form API")
-    odk_url = ODK_BASE_URL
-    project_id = 2
-    xml_form_id = "Add_Settlements_form%20_V1.0.1"
-    token = "0IFK1dfXjQNzPEPghQQ8MM$vragz6xdfrgvkAgxFcuTgQe1gwpKewTwlpY82QJ0y"
-    try:
-        result = parse_odk_form_service(
-            odk_url=odk_url, project_id=project_id, xml_form_id=xml_form_id, token=token
-        )
-        cleaned = normalize_odk_labels(result)
-        return Response({"result": cleaned}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in fetch_and_parse_odk_form api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
