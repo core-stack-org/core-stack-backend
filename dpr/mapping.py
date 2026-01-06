@@ -255,9 +255,10 @@ def get_activity_type_from_well(well):
     return "Maintenance"
 
 
+# MARK: Water Structures Data and Well Data
 def populate_maintenance_from_waterbody(plan):
     """
-    Filter ODK_waterbody records by water structure type and populate the appropriate maintenance tables
+    Filter ODK_waterbody and ODK_well records by water structure type and populate the appropriate maintenance tables
     (GW_maintenance, Agri_maintenance, SWB_maintenance) based on the structure type.
 
     Does the same for wells maintenance -- populating the irrigation table
@@ -271,6 +272,7 @@ def populate_maintenance_from_waterbody(plan):
     )
     wells = ODK_well.objects.filter(plan_id=plan.id).exclude(status_re="rejected")
     print(f"Found {waterbodies.count()} waterbody records for plan {plan.id}")
+    print(f"Found {wells.count()} well records for plan {plan.id}")
 
     for waterbody in waterbodies:
         structure_type = waterbody.water_structure_type
@@ -283,8 +285,10 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_waterbody(waterbody)
 
         common_data = {
+            "demand_type": waterbody.data_waterbody.get("select_one_owns"),
             "beneficiary_settlement": waterbody.beneficiary_settlement,
             "Beneficiary_Name": waterbody.data_waterbody.get("Beneficiary_name"),
+            "ben_father": waterbody.data_waterbody.get("ben_father"),
             "select_one_activities": format_text(activity_type),
         }
 
@@ -400,8 +404,10 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_well(well)
 
         common_data = {
+            "demand_type": well.data_well.get("select_one_owns"),
             "beneficiary_settlement": well.beneficiary_settlement,
             "Beneficiary_Name": well.data_well.get("Beneficiary_name"),
+            "ben_father": well.data_well.get("ben_father"),
             "select_one_activities": format_text(activity_type),
         }
 
