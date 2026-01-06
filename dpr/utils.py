@@ -71,6 +71,7 @@ def get_vector_layer_geoserver(geoserver_url, workspace, layer_name):
         return None
 
 
+# TODO: Align with the sync in moderation/utils/update_csdb.py
 def sync_db_odk():
     sync_settlement()
     sync_well()
