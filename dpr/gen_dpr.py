@@ -22,7 +22,7 @@ from dpr.mapping import (
     WATER_STRUCTURE_REVERSE_MAPPING,
     populate_maintenance_from_waterbody,
 )
-from dpr.utils import get_waterbody_repair_activities
+from dpr.utils import get_waterbody_repair_activities, transform_name
 from nrm_app.settings import (
     DEBUG,
     EMAIL_HOST,
@@ -56,20 +56,10 @@ from .utils import (
     get_vector_layer_geoserver,
     sort_key,
     sync_db_odk,
+    transform_name,
 )
 
 logger = setup_logger(__name__)
-
-
-def transform_name(name):
-    if not name:
-        return name
-
-    name = re.sub(r"[()]", "", name)
-    name = re.sub(r"[-\s]+", "_", name)
-    name = re.sub(r"_+", "_", name)
-    name = re.sub(r"^_|_$", "", name)
-    return name.lower()
 
 
 def get_plan_details(plan_id):
@@ -1087,7 +1077,9 @@ def maintenance_gw_table(doc, plan):
 
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_gw_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = (
+            format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
+        )
         row_cells[1].text = (
             maintenance.data_gw_maintenance.get("beneficiary_settlement") or "NA"
         )
@@ -1151,7 +1143,9 @@ def maintenance_agri_table(doc, plan):
 
     for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_agri_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = (
+            format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
+        )
         row_cells[1].text = (
             maintenance.data_agri_maintenance.get("beneficiary_settlement") or "NA"
         )
@@ -1216,7 +1210,9 @@ def maintenance_waterstructures_table(doc, plan):
 
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = (
+            format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
+        )
         row_cells[1].text = (
             maintenance.data_swb_maintenance.get("beneficiary_settlement") or "NA"
         )
@@ -1250,8 +1246,8 @@ def maintenance_waterstructures_table(doc, plan):
                 "select_one_activities"
             )
         row_cells[6].text = repair_activities or "NA"
-        row_cells[6].text = str(maintenance.latitude)
-        row_cells[7].text = str(maintenance.longitude)
+        row_cells[7].text = str(maintenance.latitude)
+        row_cells[8].text = str(maintenance.longitude)
 
 
 def maintenance_rs_waterstructures_table(doc, plan):
@@ -1276,7 +1272,7 @@ def maintenance_rs_waterstructures_table(doc, plan):
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
         row_cells[0].text = (
-            maintenance.data_swb_rs_maintenance.get("demand_type") or "NA"
+            format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = (
             maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"
