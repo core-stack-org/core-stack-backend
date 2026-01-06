@@ -469,6 +469,7 @@ def create_table_socio_eco(doc, plan, settlement_data):
         "Total Number of Households",
         "Settlement Type",
         "Caste Group",
+        "Total Households",
         "Total marginal farmers (<2 acres)",
     ]
 
@@ -492,7 +493,41 @@ def create_table_socio_eco(doc, plan, settlement_data):
         else:
             row_cells[3].text = "NA"
 
-        row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
+        sub_table = row_cells[4].add_table(rows=4, cols=2)
+        sub_table.style = "Table Grid"
+        sub_table.autofit = False
+        sub_table.allow_autofit = False
+
+        count_sc = str(item.data_settlement.get("count_sc", "")) or "NA"
+        count_st = str(item.data_settlement.get("count_st", "")) or "NA"
+        count_obc = str(item.data_settlement.get("count_obc", "")) or "NA"
+        count_general = str(item.data_settlement.get("count_general", "")) or "NA"
+
+        caste_data = [
+            ("SC", count_sc),
+            ("ST", count_st),
+            ("OBC", count_obc),
+            ("General", count_general),
+        ]
+
+        for i, (label, value) in enumerate(caste_data):
+            label_cell = sub_table.rows[i].cells[0]
+            value_cell = sub_table.rows[i].cells[1]
+
+            label_cell.text = label
+            label_cell.width = Pt(50)
+            label_para = label_cell.paragraphs[0]
+            label_para.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            label_para.runs[0].bold = True
+            label_para.runs[0].font.size = Pt(9)
+
+            value_cell.text = value
+            value_cell.width = Pt(40)
+            value_para = value_cell.paragraphs[0]
+            value_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            value_para.runs[0].font.size = Pt(9)
+
+        row_cells[5].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
 
 def create_table_mgnrega_info(doc, plan, settlement_data):
