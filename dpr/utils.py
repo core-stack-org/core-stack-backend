@@ -989,3 +989,14 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
 
 def sort_key(settlement):
     return (settlement == "NA", settlement.lower() if settlement != "NA" else "")
+
+
+def transform_name(name):
+    if not name:
+        return name
+
+    name = re.sub(r"[()]", "", name)
+    name = re.sub(r"[-\s]+", "_", name)
+    name = re.sub(r"_+", "_", name)
+    name = re.sub(r"^_|_$", "", name)
+    return name.lower()
