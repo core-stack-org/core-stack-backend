@@ -56,20 +56,10 @@ from .utils import (
     get_vector_layer_geoserver,
     sort_key,
     sync_db_odk,
+    transform_name,
 )
 
 logger = setup_logger(__name__)
-
-
-def transform_name(name):
-    if not name:
-        return name
-
-    name = re.sub(r"[()]", "", name)
-    name = re.sub(r"[-\s]+", "_", name)
-    name = re.sub(r"_+", "_", name)
-    name = re.sub(r"^_|_$", "", name)
-    return name.lower()
 
 
 def get_plan_details(plan_id):

@@ -45,7 +45,6 @@ def fetch_odk_data(csv_path, resource_type, block, plan_id):
         logger.warning(f"Unknown resource type: {resource_type}")
         return False
 
-    print(f"inside {resource_type}")
     return odk_data(
         odk_url_map[resource_type],
         csv_path,
@@ -275,6 +274,7 @@ def modify_response_list_well(res, block, plan_id):
 
 # MARK: Modify ODK Waterbody Data
 def modify_response_list_waterbody(res, block, plan_id):
+    print("Result:", res)
     res_list = []
     for result in res:
         if result is None:
