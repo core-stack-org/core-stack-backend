@@ -296,8 +296,8 @@ def get_generated_layer_urls(request):
     try:
         print("Inside Get Generated Layer Urls API.")
         state = request.query_params.get("state").lower()
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        district = request.query_params.get("district").lower()
+        tehsil = request.query_params.get("tehsil").lower()
 
         if state is None or district is None or tehsil is None:
             return Response(
