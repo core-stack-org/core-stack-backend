@@ -295,7 +295,7 @@ def get_mws_json_by_kyl_indicator(request):
 def get_generated_layer_urls(request):
     try:
         print("Inside Get Generated Layer Urls API.")
-        state = valid_gee_text(request.query_params.get("state").lower())
+        state = request.query_params.get("state").lower()
         district = valid_gee_text(request.query_params.get("district").lower())
         tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
 
