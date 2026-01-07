@@ -41,7 +41,7 @@
       "display": "Planning Maintenance => Propose Maintenance on Surface Water structures"
     },
     {
-      "name": "Surface Water Body Recharge Structure Maintenance",
+      "name": "Surface Water Body Remotely Sensed Maintenance",
       "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
       "display": "Planning Maintenance => Propose Maintenance of Remotely Sensed Water Structure"
     },

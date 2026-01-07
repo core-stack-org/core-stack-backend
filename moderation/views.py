@@ -50,8 +50,6 @@ class SubmissionsOfPlan:
         if not field_name:
             raise ValueError(f"No fetch field configured for {model.__name__}")
         qs = model.objects.filter(plan_id=plan_id).values_list(field_name, flat=True)
-        print(f"{qs=}")
-        # quit()
         return paginate_queryset(qs, page)
 
     @staticmethod

@@ -12,7 +12,7 @@ from .models import (
     ODK_well,
     SWB_maintenance,
     SWB_RS_maintenance,
-    Overpass_Block_Details
+    Overpass_Block_Details,
 )
 
 
@@ -33,6 +33,7 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "largest_caste",
         "plan_id",
         "plan_name",
+        "is_moderated",
     ]
     search_fields = ["settlement_name", "settlement_id", "block_name", "submitted_by"]
     readonly_fields = [
@@ -135,6 +136,7 @@ class ODKWellAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
     ]
     search_fields = ["well_id", "beneficiary_settlement", "owner", "block_name"]
     readonly_fields = ["uuid", "system", "gps_point"]
@@ -194,6 +196,7 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
     ]
     search_fields = [
         "waterbody_id",
@@ -275,7 +278,14 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         "work_type",
         "submission_time",
     ]
-    list_filter = ["block_name", "work_type", "status_re", "plan_id", "plan_name"]
+    list_filter = [
+        "block_name",
+        "work_type",
+        "status_re",
+        "plan_id",
+        "plan_name",
+        "is_moderated",
+    ]
     search_fields = ["recharge_structure_id", "beneficiary_settlement", "block_name"]
     readonly_fields = ["uuid", "system", "gps_point", "work_dimensions"]
     ordering = ["-submission_time"]
@@ -321,7 +331,14 @@ class ODKAgriAdmin(admin.ModelAdmin):
         "work_type",
         "submission_time",
     ]
-    list_filter = ["block_name", "work_type", "status_re", "plan_id", "plan_name"]
+    list_filter = [
+        "block_name",
+        "work_type",
+        "status_re",
+        "plan_id",
+        "plan_name",
+        "is_moderated",
+    ]
     search_fields = ["irrigation_work_id", "beneficiary_settlement", "block_name"]
     readonly_fields = ["uuid", "system", "gps_point", "work_dimensions"]
     ordering = ["-submission_time"]
@@ -373,6 +390,7 @@ class ODKCropAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
     ]
     search_fields = ["crop_grid_id", "beneficiary_settlement"]
     readonly_fields = ["uuid", "system"]
@@ -439,6 +457,7 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
     ]
     search_fields = ["beneficiary_settlement", "block_name", "beneficiary_contact"]
     readonly_fields = ["uuid", "system", "gps_point"]
@@ -489,7 +508,7 @@ class GWMaintenanceAdmin(admin.ModelAdmin):
         "plan_name",
         "status_re",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
     readonly_fields = ["uuid"]
 
@@ -524,7 +543,7 @@ class SWBRSMaintenanceAdmin(admin.ModelAdmin):
         "plan_name",
         "status_re",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
     readonly_fields = ["uuid"]
 
@@ -559,7 +578,7 @@ class SWBMaintenanceAdmin(admin.ModelAdmin):
         "plan_name",
         "status_re",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
     readonly_fields = ["uuid"]
 
@@ -594,7 +613,7 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
         "plan_name",
         "status_re",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
     readonly_fields = ["uuid"]
 
@@ -632,17 +651,14 @@ class OverpassBlockDetailsAdmin(admin.ModelAdmin):
 
     def has_overpass_response(self, obj):
         return obj.overpass_response is not None
+
     has_overpass_response.boolean = True
     has_overpass_response.short_description = "Has Response"
 
     fieldsets = (
         (
             "Basic Information",
-            {
-                "fields": (
-                    "location",
-                )
-            },
+            {"fields": ("location",)},
         ),
         (
             "Overpass Response Data",

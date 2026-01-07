@@ -27,7 +27,7 @@ def get_paginated_submissions(request, form, plan_id):
         "Agri Maintenance": SubmissionsOfPlan.get_agri_maintenance,
         "GroundWater Maintenance": SubmissionsOfPlan.get_gw_maintenance,
         "Surface Water Body Maintenance": SubmissionsOfPlan.get_swb_maintenance,
-        "Surface Water Body Recharge Structure Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
+        "Surface Water Body Remotely Sensed Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
     }
 
     if form not in mapping:
@@ -97,7 +97,7 @@ def sync_updated_submissions(request):
         gw_maintenance_submissions,
         swb_maintenance_submissions,
         swb_rs_maintenance_submissions,
-    ) = sync_settlement_odk_data(get_edited_updated_all_submissions)
+    ) = sync_odk_data(get_edited_updated_all_submissions)
     checker = ODKSubmissionsChecker()
     res = checker.process("updated")
     for form_name, status in res.items():
