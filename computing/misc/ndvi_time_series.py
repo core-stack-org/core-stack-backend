@@ -1,6 +1,7 @@
 import ee
 import datetime
 import json
+import re
 
 from gee_computing.models import GEEAccount
 from nrm_app.celery import app
@@ -158,7 +159,181 @@ def ndvi_timeseries(
     return layer_at_geoserver
 
 
+def _generate_data_2(
+    app_type,
+    asset_folder_list,
+    asset_id,
+    asset_suffix,
+    description,
+    start_date,
+    end_date,
+    roi,
+):
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+
+    lulc = ee.Image(
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + asset_suffix
+        + "_"
+        + str(start_date.year)
+        + "-07-01_"
+        + str(start_date.year + 1)
+        + "-06-30_LULCmap_10m"
+    )
+
+    crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
+    tree_mask = lulc.eq(6)
+    shrub_mask = lulc.eq(12)
+
+    # NDVI ImageCollection (14-day)
+    ndvi = get_padded_ndvi_ts_image(start_date_str, end_date_str, roi, 14)
+
+    def add_masked_bands(img):
+        nd = img.select("gapfilled_NDVI_lsc")
+        date = img.date().format("YYYY-MM-dd")
+
+        return ee.Image.cat(
+            [
+                nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
+                nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
+                nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
+            ]
+        )
+
+    ndvi_masked = ndvi.map(add_masked_bands)
+
+    # Convert time → bands (FAST)
+    ndvi_band_stack = ndvi_masked.toBands()
+
+    reduced = ndvi_band_stack.reduceRegions(
+        collection=roi.select(["uid"]),
+        reducer=ee.Reducer.mean(),
+        scale=30,
+        tileScale=4,  # helps large polygons
+    )
+
+    task = export_vector_asset_to_gee(
+        reduced,
+        description,
+        asset_id,
+    )
+
+    return task, asset_id, end_date_str
+
+
 def _generate_data(
+    app_type,
+    asset_folder_list,
+    asset_id,
+    asset_suffix,
+    description,
+    start_date,
+    end_date,
+    roi,
+    gee_account_id,
+):
+    print("f_start_date>>>", start_date)
+    print("end_date>>>", end_date)
+    task_ids = []
+    asset_ids = []
+    f_start_date = start_date
+    year_count = end_date.year - start_date.year
+    last_date = None
+
+    if year_count > 1:
+        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+        ee_initialize(gee_obj.helper_account.id)
+
+    while f_start_date <= end_date:
+        f_end_date = f_start_date + datetime.timedelta(days=364)
+        print("f_end_date>>>", f_end_date)
+        if f_end_date > end_date:
+            break
+
+        f_end_date_str = str(f_end_date.date())
+        f_start_date_str = str(f_start_date.date())
+
+        # Define export task details
+        ndvi_description = f"{description}_{f_start_date_str}_{f_end_date_str}"
+        ndvi_asset_id = (
+            f"{asset_id}_{f_start_date_str}_{f_end_date_str}"
+            if year_count > 1
+            else asset_id
+        )
+
+        lulc = ee.Image(
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix
+            + "_"
+            + str(f_start_date.year)
+            + "-07-01_"
+            + str(f_start_date.year + 1)
+            + "-06-30_LULCmap_10m"
+        )
+        crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
+        tree_mask = lulc.eq(6)
+        shrub_mask = lulc.eq(12)
+
+        # NDVI ImageCollection (14-day)
+        ndvi = get_padded_ndvi_ts_image(f_start_date_str, f_end_date_str, roi, 14)
+
+        def add_masked_bands(img):
+            nd = img.select("gapfilled_NDVI_lsc")
+            date = img.date().format("YYYY-MM-dd")
+
+            return ee.Image.cat(
+                [
+                    nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
+                    nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
+                    nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
+                ]
+            )
+
+        ndvi_masked = ndvi.map(add_masked_bands)
+
+        # Convert time → bands (FAST)
+        ndvi_band_stack = ndvi_masked.toBands()
+
+        reduced = ndvi_band_stack.reduceRegions(
+            collection=roi.select(["uid"]),
+            reducer=ee.Reducer.mean(),
+            scale=30,
+            tileScale=4,  # helps large polygons
+        )
+        # Export as single-row-per-feature collection
+        try:
+            task = export_vector_asset_to_gee(reduced, ndvi_description, ndvi_asset_id)
+            print(f"Started export for {f_start_date.year}")
+            asset_ids.append(ndvi_asset_id)
+            task_ids.append(task)
+        except Exception as e:
+            print("Export error:", e)
+
+        f_start_date = f_end_date
+        last_date = str(f_start_date.date())
+
+    check_task_status(task_ids)
+
+    ee_initialize(gee_account_id)
+    print(asset_ids)
+    if len(asset_ids) > 1:
+        # Merge year-wise outputs into a single collection
+        task_id = export_vector_asset_to_gee(
+            merge_assets_chunked_on_year(asset_ids),
+            description,
+            asset_id,
+        )
+        return task_id, asset_id, last_date
+    return None, asset_id, last_date
+
+
+def _generate_data1(
     app_type,
     asset_folder_list,
     asset_id,
@@ -374,3 +549,23 @@ def get_last_date(asset_id, layer_obj):
         existing_end_date = existing_end_date + datetime.timedelta(days=14)
 
     return existing_end_date
+
+
+def clean_assets(asset_id):
+    fc = ee.FeatureCollection(asset_id)
+    features = fc.getInfo()["features"]
+
+    cleaned_features = []
+
+    for f in features:
+        props = f["properties"]
+        cleaned_props = clean_columns(props)
+        cleaned_features.append(cleaned_props)
+
+
+def clean_columns(feature):
+    cleaned = {}
+    for k, v in feature.items():
+        new_key = re.sub(r"^\d+_", "", k)
+        cleaned[new_key] = v
+    return cleaned
