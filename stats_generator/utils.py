@@ -226,12 +226,48 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_mining(geojson_data, writer)
             elif workspace == "stream_order":
                 create_excel_for_stream_order(geojson_data, writer)
+            elif workspace == "mws_connectivity":
+                create_excel_for_mws_connectivity(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_mws_connectivity(data, writer):
+    """
+    direction_map = {
+                      '0': 'No Direction',
+                      '1': 'North-East',
+                      '2': 'East',
+                      '3': 'South-East',
+                      '4': 'South',
+                      '5': 'South-West',
+                      '6': 'West',
+                      '7': 'North-West',
+                      '8': 'North'
+                    }
+    """
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "direction": properties["direction"],
+            "downstream_mws": properties["downstream"],
+            "upstream_mws": properties["upstream"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df.replace("", "unknown", inplace=True)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="mws_connectivity", index=False)
+    print("Excel file created for mws_connectivity")
 
 
 def create_excel_for_stream_order(data, writer):
