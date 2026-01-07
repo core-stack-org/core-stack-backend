@@ -46,7 +46,7 @@ from computing.misc.green_credit import generate_green_credit_data
 from computing.misc.mining_data import generate_mining_data
 from computing.plantation.site_suitability import site_suitability
 from utilities.gee_utils import valid_gee_text
-from computing.data.layer_dependency.layer_map import *
+from data.layer_dependency.layer_map import *
 from nrm_app.celery import app
 from computing.models import Layer
 

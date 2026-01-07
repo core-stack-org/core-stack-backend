@@ -224,12 +224,43 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_green_credit(geojson_data, writer)
             elif workspace == "mining":
                 create_excel_for_mining(geojson_data, writer)
+            elif workspace == "stream_order":
+                create_excel_for_stream_order(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_stream_order(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "order_1_area_percent": properties["1"],
+            "order_2_area_percent": properties["2"],
+            "order_3_area_percent": properties["3"],
+            "order_4_area_percent": properties["4"],
+            "order_5_area_percent": properties["5"],
+            "order_6_area_percent": properties["6"],
+            "order_7_area_percent": properties["7"],
+            "order_8_area_percent": properties["8"],
+            "order_9_area_percent": properties["9"],
+            "order_10_area_percent": properties["10"],
+            "order_11_area_percent": properties["11"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df.replace("", "unknown", inplace=True)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="stream_order", index=False)
+    print("Excel file created for stream order")
 
 
 def create_excel_for_mining(data, writer):
@@ -263,7 +294,7 @@ def create_excel_for_green_credit(data, writer):
         row = {
             "UID": properties["uid"],
             "division": properties["division"],
-            "parcel_id": properties["parcel_id"],
+            # "parcel_id": properties["parcel_id"],
             "land_info": properties["land_info"],
             "kml_url": properties["kml_url"],
         }

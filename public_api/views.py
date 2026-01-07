@@ -194,7 +194,7 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
 
         # Build time series
         time_series = []
-        for date, data in sorted(properties.items()):
+        for date, data in sorted(properties.items(), key=lambda x: x[0]):
 
             try:
                 values = json.loads(data)

@@ -53,6 +53,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
+
 STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = 2
 GEE_DEFAULT_ACCOUNT_ID = 1
@@ -66,7 +67,8 @@ ALLOWED_HOSTS = [
     "odk.core-stack.org",
     "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
-
+CE_API_URL = env("CE_API_URL")
+CE_BUCKET_NAME = env("CE_BUCKET_NAME")
 # MARK: Django Apps
 
 INSTALLED_APPS = [
