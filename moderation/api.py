@@ -64,7 +64,8 @@ def update_submission(request, form_name, uuid):
     existing_data = getattr(obj, field_name) or {}
     existing_data.update(request.data)
     setattr(obj, field_name, existing_data)
-    obj.save(update_fields=[field_name])
+    obj.is_moderated = True
+    obj.save(update_fields=[field_name, "is_moderated"])
     return Response({"success": True})
 
 
