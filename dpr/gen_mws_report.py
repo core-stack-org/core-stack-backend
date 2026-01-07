@@ -1741,15 +1741,16 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                         if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
                             area_under_rb_nd += yearly_area_rb[0][0]
 
-                if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd ) * 100
+                # Handle division by zero for non-drought years
+                if area_under_kh_nd > 0:
+                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd) * 100
 
                     if result.trend == "increasing":
-                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh,2)}% from the Kharif to the Rabi season."
+                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh, 2)}% from the Kharif to the Rabi season."
                     elif result.trend == "decreasing":
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
                     else:
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
 
             if len(drought_years):
                 area_under_rb = 0
@@ -1770,16 +1771,17 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                         if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
                             area_under_rb += yearly_area_rb[0][0]
                 
-                if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh ) * 100
+                # Handle division by zero for drought years
+                if area_under_kh > 0:
+                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh) * 100
 
-                if result.trend == "increasing":
-                    parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh,2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                elif result.trend == "decreasing":
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                else:
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-
+                    if result.trend == "increasing":
+                        parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh, 2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    elif result.trend == "decreasing":
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    else:
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+ 
             # ? Data yearwise for waterbody
             selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
             selected_columns_rabi = [col for col in df.columns if col.startswith("rabi_area_in_ha_")]
@@ -1809,6 +1811,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         )
 
     except Exception as e:
+        print(e)
         logger.info("Not able to access excel for %s state, %s district, %s block for Waterbodies",state.upper(),district.upper(),block.upper())
         return "", "", "", [], [], [], []
 
