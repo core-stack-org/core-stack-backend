@@ -49,7 +49,9 @@ class SubmissionsOfPlan:
         field_name = FETCH_FIELD_MAP.get(model)
         if not field_name:
             raise ValueError(f"No fetch field configured for {model.__name__}")
-        qs = model.objects.filter(plan_id=plan_id).values_list(field_name, flat=True)
+        qs = model.objects.filter(plan_id=plan_id).values_list(
+            field_name, "is_moderated"
+        )
         return paginate_queryset(qs, page)
 
     @staticmethod
