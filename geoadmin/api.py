@@ -11,9 +11,9 @@ from rest_framework.response import Response
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 
-from .models import Block, District, DistrictSOI, State, StateSOI, TehsilSOI, UserAPIKey
+from .models import StateSOI, DistrictSOI, TehsilSOI, UserAPIKey
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
-from .utils import activated_blocks, normalize_name, transform_data
+from .utils import activated_tehsils, normalize_name, transform_data
 
 
 # state id is the census code while the district id is the id of the district from the DB
@@ -74,7 +74,7 @@ def get_blocks(request, district_id):
 @schema(None)
 def proposed_blocks(request):
     try:
-        response_data = activated_blocks()
+        response_data = activated_tehsils()
         transformed_data = transform_data(data=response_data)
         return Response(transformed_data, status=status.HTTP_200_OK)
     except Exception as e:
