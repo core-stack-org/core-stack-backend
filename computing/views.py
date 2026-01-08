@@ -2,7 +2,7 @@ import requests
 from dpr.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 from utilities.gee_utils import valid_gee_text
-from .layer_status.layer_mapping import workspace_config
+from data.layer_status.layer_mapping import workspace_config
 import xml.etree.ElementTree as ET
 from nrm_app.celery import app
 from computing.models import *
