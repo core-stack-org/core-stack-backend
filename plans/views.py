@@ -17,7 +17,6 @@ from .models import PlanApp
 from .serializers import (
     PlanAppSerializer,
     PlanCreateSerializer,
-    PlanSerializer,
     PlanUpdateSerializer,
 )
 
@@ -229,16 +228,16 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         queryset = PlanApp.objects.filter(enabled=True)
 
-        block_id = self.request.query_params.get("block", None)
+        tehsil_id = self.request.query_params.get("tehsil", None)
         district_id = self.request.query_params.get("district", None)
         state_id = self.request.query_params.get("state", None)
 
-        if block_id:
-            queryset = queryset.filter(block=block_id)
+        if tehsil_id:
+            queryset = queryset.filter(tehsil_soi_id=tehsil_id)
         elif district_id:
-            queryset = queryset.filter(district=district_id)
+            queryset = queryset.filter(district_soi_id=district_id)
         elif state_id:
-            queryset = queryset.filter(state=state_id)
+            queryset = queryset.filter(state_soi_id=state_id)
         return queryset.order_by("-created_at")
 
     @action(detail=False, methods=["get"], url_path="meta-stats")
@@ -251,7 +250,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         Query Parameters:
         - state: Filter by state ID
         - district: Filter by district ID
-        - block: Filter by block ID
+        - tehsil: Filter by tehsil ID
         - project: Filter by project ID
         - organization: Filter by organization ID
 
@@ -269,7 +268,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         project_id = request.query_params.get("project")
         state_id = request.query_params.get("state")
         district_id = request.query_params.get("district")
-        block_id = request.query_params.get("block")
+        tehsil_id = request.query_params.get("tehsil")
 
         if organization_id:
             base_queryset = base_queryset.filter(organization_id=organization_id)
@@ -277,12 +276,12 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         if project_id:
             base_queryset = base_queryset.filter(project_id=project_id)
 
-        if block_id:
-            base_queryset = base_queryset.filter(block_id=block_id)
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
         elif district_id:
-            base_queryset = base_queryset.filter(district_id=district_id)
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
         elif state_id:
-            base_queryset = base_queryset.filter(state_id=state_id)
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
 
         total_plans = base_queryset.count()
         completed_plans = base_queryset.filter(is_completed=True).count()
@@ -299,12 +298,16 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             is_dpr_generated=True, is_dpr_reviewed=False
         ).count()
 
-        cc_operational_queryset = base_queryset.filter(block__active_status=True)
-        cc_active_blocks = cc_operational_queryset.values("block").distinct().count()
-        cc_active_districts = (
-            cc_operational_queryset.values("district").distinct().count()
+        cc_operational_queryset = base_queryset.filter(tehsil_soi__active_status=True)
+        cc_active_tehsils = (
+            cc_operational_queryset.values("tehsil_soi").distinct().count()
         )
-        cc_active_states = cc_operational_queryset.values("state").distinct().count()
+        cc_active_districts = (
+            cc_operational_queryset.values("district_soi").distinct().count()
+        )
+        cc_active_states = (
+            cc_operational_queryset.values("state_soi").distinct().count()
+        )
 
         steward_queryset = base_queryset.exclude(
             Q(facilitator_name__isnull=True)
@@ -333,7 +336,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         organization_breakdown = []
         state_breakdown = []
         district_breakdown = []
-        block_breakdown = []
+        tehsil_breakdown = []
 
         if not organization_id:
             org_stats = (
@@ -359,9 +362,9 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
                     }
                 )
 
-        if not block_id and not district_id:
+        if not tehsil_id and not district_id:
             state_stats = (
-                base_queryset.values("state", "state__state_name")
+                base_queryset.values("state_soi", "state_soi__state_name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -371,11 +374,11 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
             for stat in state_stats:
-                state_name = stat["state__state_name"]
+                state_name = stat["state_soi__state_name"]
                 centroid = STATE_CENTROIDS.get(state_name, {})
                 state_breakdown.append(
                     {
-                        "state_id": stat["state"],
+                        "state_id": stat["state_soi"],
                         "state_name": state_name,
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
@@ -384,9 +387,9 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
                     }
                 )
 
-        if not block_id and (district_id or state_id):
+        if not tehsil_id and (district_id or state_id):
             district_stats = (
-                base_queryset.values("district", "district__district_name")
+                base_queryset.values("district_soi", "district_soi__district_name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -398,17 +401,18 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             for stat in district_stats:
                 district_breakdown.append(
                     {
-                        "district_id": stat["district"],
-                        "district_name": stat["district__district_name"],
+                        "district_id": stat["district_soi"],
+                        "district_name": stat["district_soi__district_name"],
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
                         "dpr_generated": stat["dpr_generated"],
                     }
                 )
 
-        if district_id or state_id or block_id:
-            block_stats = (
-                base_queryset.values("block", "block__block_name")
+        if district_id or state_id or tehsil_id:
+            tehsil_stats = (
+                base_queryset.filter(tehsil_soi__isnull=False)
+                .values("tehsil_soi", "tehsil_soi__tehsil_name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -417,11 +421,11 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
                 .order_by("-total")
             )
 
-            for stat in block_stats:
-                block_breakdown.append(
+            for stat in tehsil_stats:
+                tehsil_breakdown.append(
                     {
-                        "block_id": stat["block"],
-                        "block_name": stat["block__block_name"],
+                        "tehsil_id": stat["tehsil_soi"],
+                        "tehsil_name": stat["tehsil_soi__tehsil_name"],
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
                         "dpr_generated": stat["dpr_generated"],
@@ -439,7 +443,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
                 "pending_dpr_review": pending_dpr_review,
             },
             "commons_connect_operational": {
-                "active_blocks": cc_active_blocks,
+                "active_tehsils": cc_active_tehsils,
                 "active_districts": cc_active_districts,
                 "active_states": cc_active_states,
             },
@@ -461,15 +465,15 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             response_data["state_breakdown"] = state_breakdown
         if district_breakdown:
             response_data["district_breakdown"] = district_breakdown
-        if block_breakdown:
-            response_data["block_breakdown"] = block_breakdown
+        if tehsil_breakdown:
+            response_data["tehsil_breakdown"] = tehsil_breakdown
 
         response_data["filters_applied"] = {
             "organization_id": organization_id,
             "project_id": project_id,
             "state_id": state_id,
             "district_id": district_id,
-            "block_id": block_id,
+            "tehsil_id": tehsil_id,
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
@@ -547,24 +551,24 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         dpr_completed = plans_queryset.filter(is_dpr_approved=True).count()
 
         working_locations = plans_queryset.values(
-            "state",
-            "state__state_name",
-            "district",
-            "district__district_name",
-            "block",
-            "block__block_name",
+            "state_soi",
+            "state_soi__state_name",
+            "district_soi",
+            "district_soi__district_name",
+            "tehsil_soi",
+            "tehsil_soi__tehsil_name",
         ).distinct()
 
         states = {}
         districts = {}
-        blocks = {}
+        tehsils = {}
         for loc in working_locations:
-            if loc["state"]:
-                states[loc["state"]] = loc["state__state_name"]
-            if loc["district"]:
-                districts[loc["district"]] = loc["district__district_name"]
-            if loc["block"]:
-                blocks[loc["block"]] = loc["block__block_name"]
+            if loc["state_soi"]:
+                states[loc["state_soi"]] = loc["state_soi__state_name"]
+            if loc["district_soi"]:
+                districts[loc["district_soi"]] = loc["district_soi__district_name"]
+            if loc["tehsil_soi"]:
+                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
 
         projects = {}
         for p in plans_queryset.values("project", "project__name"):
@@ -604,7 +608,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             "working_locations": {
                 "states": [{"id": k, "name": v} for k, v in states.items()],
                 "districts": [{"id": k, "name": v} for k, v in districts.items()],
-                "blocks": [{"id": k, "name": v} for k, v in blocks.items()],
+                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
             },
         }
 
@@ -616,7 +620,7 @@ class PlanViewSet(viewsets.ModelViewSet):
     ViewSet for watershed planning operations
     """
 
-    serializer_class = PlanSerializer
+    serializer_class = PlanAppSerializer
     permission_classes = [permissions.IsAuthenticated, PlanPermission]
     schema = None
     app_type = AppType.WATERSHED
@@ -678,9 +682,10 @@ class PlanViewSet(viewsets.ModelViewSet):
             else:
                 return PlanApp.objects.none()
 
-        block_id = self.request.query_params.get("block", None)
-        if block_id:
-            base_queryset = base_queryset.filter(block=block_id)
+        tehsil_id = self.request.query_params.get("tehsil", None)
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
 
         return base_queryset
 
@@ -694,7 +699,7 @@ class PlanViewSet(viewsets.ModelViewSet):
             return PlanUpdateSerializer
         elif self.action in ["list", "retrieve"]:
             return PlanAppSerializer
-        return PlanSerializer
+        return PlanAppSerializer
 
     def create(self, request, *args, **kwargs):
         """
@@ -804,9 +809,10 @@ class PlanViewSet(viewsets.ModelViewSet):
             )
             plans = PlanApp.objects.filter(project_id__in=user_projects, enabled=True)
 
-        block_id = request.query_params.get("block", None)
-        if block_id:
-            plans = plans.filter(block=block_id)
+        tehsil_id = request.query_params.get("tehsil", None)
+
+        if tehsil_id:
+            plans = plans.filter(tehsil_soi_id=tehsil_id)
 
         serializer = PlanAppSerializer(plans, many=True)
         return Response(
@@ -896,14 +902,14 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         state_id = request.query_params.get("state")
         district_id = request.query_params.get("district")
-        block_id = request.query_params.get("block")
+        tehsil_id = request.query_params.get("tehsil")
 
-        if block_id:
-            base_queryset = base_queryset.filter(block_id=block_id)
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
         elif district_id:
-            base_queryset = base_queryset.filter(district_id=district_id)
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
         elif state_id:
-            base_queryset = base_queryset.filter(state_id=state_id)
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
 
         total_plans = base_queryset.count()
         completed_plans = base_queryset.filter(is_completed=True).count()
@@ -920,12 +926,16 @@ class PlanViewSet(viewsets.ModelViewSet):
             is_dpr_generated=True, is_dpr_reviewed=False
         ).count()
 
-        cc_operational_queryset = base_queryset.filter(block__active_status=True)
-        cc_active_blocks = cc_operational_queryset.values("block").distinct().count()
-        cc_active_districts = (
-            cc_operational_queryset.values("district").distinct().count()
+        cc_operational_queryset = base_queryset.filter(tehsil_soi__active_status=True)
+        cc_active_tehsils = (
+            cc_operational_queryset.values("tehsil_soi").distinct().count()
         )
-        cc_active_states = cc_operational_queryset.values("state").distinct().count()
+        cc_active_districts = (
+            cc_operational_queryset.values("district_soi").distinct().count()
+        )
+        cc_active_states = (
+            cc_operational_queryset.values("state_soi").distinct().count()
+        )
 
         steward_queryset = base_queryset.exclude(
             Q(facilitator_name__isnull=True)
@@ -951,11 +961,11 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         state_breakdown = []
         district_breakdown = []
-        block_breakdown = []
+        tehsil_breakdown = []
 
-        if not block_id and not district_id:
+        if not tehsil_id and not district_id:
             state_stats = (
-                base_queryset.values("state", "state__state_name")
+                base_queryset.values("state_soi", "state_soi__state_name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -965,11 +975,11 @@ class PlanViewSet(viewsets.ModelViewSet):
             )
 
             for stat in state_stats:
-                state_name = stat["state__state_name"]
+                state_name = stat["state_soi__state_name"]
                 centroid = STATE_CENTROIDS.get(state_name, {})
                 state_breakdown.append(
                     {
-                        "state_id": stat["state"],
+                        "state_id": stat["state_soi"],
                         "state_name": state_name,
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
@@ -978,9 +988,9 @@ class PlanViewSet(viewsets.ModelViewSet):
                     }
                 )
 
-        if not block_id and (district_id or state_id):
+        if not tehsil_id and (district_id or state_id):
             district_stats = (
-                base_queryset.values("district", "district__district_name")
+                base_queryset.values("district_soi", "district_soi__district_name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -992,17 +1002,18 @@ class PlanViewSet(viewsets.ModelViewSet):
             for stat in district_stats:
                 district_breakdown.append(
                     {
-                        "district_id": stat["district"],
-                        "district_name": stat["district__district_name"],
+                        "district_id": stat["district_soi"],
+                        "district_name": stat["district_soi__district_name"],
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
                         "dpr_generated": stat["dpr_generated"],
                     }
                 )
 
-        if district_id or state_id or block_id:
-            block_stats = (
-                base_queryset.values("block", "block__block_name")
+        if district_id or state_id or tehsil_id:
+            tehsil_stats = (
+                base_queryset.filter(tehsil_soi__isnull=False)
+                .values("tehsil_soi", "tehsil_soi__tehsil_name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -1011,11 +1022,11 @@ class PlanViewSet(viewsets.ModelViewSet):
                 .order_by("-total")
             )
 
-            for stat in block_stats:
-                block_breakdown.append(
+            for stat in tehsil_stats:
+                tehsil_breakdown.append(
                     {
-                        "block_id": stat["block"],
-                        "block_name": stat["block__block_name"],
+                        "tehsil_id": stat["tehsil_soi"],
+                        "tehsil_name": stat["tehsil_soi__tehsil_name"],
                         "total_plans": stat["total"],
                         "completed_plans": stat["completed"],
                         "dpr_generated": stat["dpr_generated"],
@@ -1033,7 +1044,7 @@ class PlanViewSet(viewsets.ModelViewSet):
                 "pending_dpr_review": pending_dpr_review,
             },
             "commons_connect_operational": {
-                "active_blocks": cc_active_blocks,
+                "active_tehsils": cc_active_tehsils,
                 "active_districts": cc_active_districts,
                 "active_states": cc_active_states,
             },
@@ -1053,14 +1064,14 @@ class PlanViewSet(viewsets.ModelViewSet):
             response_data["state_breakdown"] = state_breakdown
         if district_breakdown:
             response_data["district_breakdown"] = district_breakdown
-        if block_breakdown:
-            response_data["block_breakdown"] = block_breakdown
+        if tehsil_breakdown:
+            response_data["tehsil_breakdown"] = tehsil_breakdown
 
         response_data["filters_applied"] = {
             "project_id": project_id,
             "state_id": state_id,
             "district_id": district_id,
-            "block_id": block_id,
+            "tehsil_id": tehsil_id,
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
@@ -1111,24 +1122,24 @@ class PlanViewSet(viewsets.ModelViewSet):
         dpr_completed = plans_queryset.filter(is_dpr_approved=True).count()
 
         working_locations = plans_queryset.values(
-            "state",
-            "state__state_name",
-            "district",
-            "district__district_name",
-            "block",
-            "block__block_name",
+            "state_soi",
+            "state_soi__state_name",
+            "district_soi",
+            "district_soi__district_name",
+            "tehsil_soi",
+            "tehsil_soi__tehsil_name",
         ).distinct()
 
         states = {}
         districts = {}
-        blocks = {}
+        tehsils = {}
         for loc in working_locations:
-            if loc["state"]:
-                states[loc["state"]] = loc["state__state_name"]
-            if loc["district"]:
-                districts[loc["district"]] = loc["district__district_name"]
-            if loc["block"]:
-                blocks[loc["block"]] = loc["block__block_name"]
+            if loc["state_soi"]:
+                states[loc["state_soi"]] = loc["state_soi__state_name"]
+            if loc["district_soi"]:
+                districts[loc["district_soi"]] = loc["district_soi__district_name"]
+            if loc["tehsil_soi"]:
+                tehsils[loc["tehsil_soi"]] = loc["tehsil_soi__tehsil_name"]
 
         projects = {}
         for p in plans_queryset.values("project", "project__name"):
@@ -1168,7 +1179,7 @@ class PlanViewSet(viewsets.ModelViewSet):
             "working_locations": {
                 "states": [{"id": k, "name": v} for k, v in states.items()],
                 "districts": [{"id": k, "name": v} for k, v in districts.items()],
-                "blocks": [{"id": k, "name": v} for k, v in blocks.items()],
+                "tehsils": [{"id": k, "name": v} for k, v in tehsils.items()],
             },
         }
 
