@@ -29,7 +29,7 @@ from utilities.constants import (
 
 from .build_layer import build_layer
 from .models import Plan
-from .serializers import PlanSerializer
+from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
 
 
@@ -52,7 +52,7 @@ def get_plans(request):
             plans = Plan.objects.filter(block=block_id)
         else:
             plans = Plan.objects.all()
-        serializer = PlanSerializer(plans, many=True)
+        serializer = PlanAppSerializer(plans, many=True)
         response = {"plans": serializer.data}
 
         return Response(response, status=status.HTTP_200_OK)
@@ -66,7 +66,7 @@ def get_plans(request):
 @schema(None)
 def add_plan(request):
     if request.method == "POST":
-        serializer = PlanSerializer(data=request.data)
+        serializer = PlanAppSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()  # Save the new Plan instance if validation passes
             return Response(serializer.data, status=status.HTTP_201_CREATED)

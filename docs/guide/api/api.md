@@ -502,9 +502,9 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Authentication**: Required
 - **Permissions**: Superadmins only
 - **Query Parameters**:
-    - `block`: Filter plans by block ID (e.g., `?block=311011`)
-    - `district`: Filter plans by district ID (e.g., `?district=3110101`)
-    - `state`: Filter plans by state ID (e.g., `?state=69`)
+    - `tehsil`: Filter plans by tehsil ID (e.g., `?tehsil=123`)
+    - `district`: Filter plans by district ID (e.g., `?district=456`)
+    - `state`: Filter plans by state ID (e.g., `?state=789`)
 
 ### Create Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/`
@@ -519,20 +519,22 @@ Superadmins must specify the organization ID since they can create projects for 
 #### Required Fields:
 
 - `plan` (string): Name of the watershed plan
-- `state` (integer): State ID from geoadmin
-- `district` (integer): District ID from geoadmin
-- `block` (integer): Block ID from geoadmin
+- `state_soi` (integer): State SOI ID from geoadmin
+- `district_soi` (integer): District SOI ID from geoadmin
+- `tehsil_soi` (integer): Tehsil SOI ID from geoadmin
 - `village_name` (string): Name of the village
 - `gram_panchayat` (string): Name of the gram panchayat
+- `facilitator_name` (string): Name of the plan facilitator
 
 #### Optional Fields:
 
-- `facilitator_name` (string): Name of the plan facilitator
 - `enabled` (boolean): Whether the plan is enabled (default: true)
 - `is_completed` (boolean): Whether the plan is completed (default: false)
 - `is_dpr_generated` (boolean): Whether DPR is generated (default: false)
 - `is_dpr_reviewed` (boolean): Whether DPR is reviewed (default: false)
 - `is_dpr_approved` (boolean): Whether DPR is approved (default: false)
+- `latitude` (decimal): Latitude coordinate (optional)
+- `longitude` (decimal): Longitude coordinate (optional)
 
 #### Auto-set Fields:
 
@@ -548,11 +550,12 @@ Superadmins must specify the organization ID since they can create projects for 
 ```json
 {
   "plan": "Basic Watershed Plan 2025",
-  "state": 69,
-  "district": 3110101,
-  "block": 311011,
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "village_name": "Example Village",
-  "gram_panchayat": "Example GP"
+  "gram_panchayat": "Example GP",
+  "facilitator_name": "John Doe"
 }
 ```
 
@@ -561,9 +564,9 @@ Superadmins must specify the organization ID since they can create projects for 
 ```json
 {
   "plan": "Comprehensive Watershed Management Plan 2025",
-  "state": 69,
-  "district": 3110101,
-  "block": 311011,
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "village_name": "Hauz Khas Village",
   "gram_panchayat": "Hauz Khas Gram Panchayat",
   "facilitator_name": "Dr. Rajesh Kumar",
@@ -571,7 +574,9 @@ Superadmins must specify the organization ID since they can create projects for 
   "is_completed": false,
   "is_dpr_generated": false,
   "is_dpr_reviewed": false,
-  "is_dpr_approved": false
+  "is_dpr_approved": false,
+  "latitude": 28.5494,
+  "longitude": 77.1960
 }
 ```
 
@@ -592,13 +597,15 @@ Superadmins must specify the organization ID since they can create projects for 
     "is_dpr_generated": false,
     "is_dpr_reviewed": false,
     "is_dpr_approved": false,
+    "latitude": 28.5494,
+    "longitude": 77.1960,
     "project": 10,
     "project_name": "Delhi Watershed Project",
     "organization": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6",
     "organization_name": "Delhi Development Authority",
-    "state": 69,
-    "district": 3110101,
-    "block": 311011,
+    "state_soi": 1,
+    "district_soi": 10,
+    "tehsil_soi": 100,
     "created_by": 1,
     "created_by_name": "John Doe",
     "updated_by": null
@@ -628,9 +635,9 @@ Superadmins must specify the organization ID since they can create projects for 
 #### Updatable Fields:
 
 - `plan` (string): Name of the watershed plan
-- `state` (integer): State ID from geoadmin
-- `district` (integer): District ID from geoadmin
-- `block` (integer): Block ID from geoadmin
+- `state_soi` (integer): State SOI ID from geoadmin
+- `district_soi` (integer): District SOI ID from geoadmin
+- `tehsil_soi` (integer): Tehsil SOI ID from geoadmin
 - `village_name` (string): Name of the village
 - `gram_panchayat` (string): Name of the gram panchayat
 - `facilitator_name` (string): Name of the plan facilitator
@@ -639,6 +646,8 @@ Superadmins must specify the organization ID since they can create projects for 
 - `is_dpr_generated` (boolean): Whether DPR is generated
 - `is_dpr_reviewed` (boolean): Whether DPR is reviewed
 - `is_dpr_approved` (boolean): Whether DPR is approved
+- `latitude` (decimal): Latitude coordinate
+- `longitude` (decimal): Longitude coordinate
 
 #### Non-updatable Fields:
 
@@ -664,9 +673,9 @@ Superadmins must specify the organization ID since they can create projects for 
 ```json
 {
   "plan": "Updated Watershed Management Plan 2025",
-  "state": 69,
-  "district": 3110101,
-  "block": 311011,
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "village_name": "Updated Village Name",
   "gram_panchayat": "Updated GP Name",
   "facilitator_name": "Dr. Updated Facilitator",
@@ -695,13 +704,15 @@ Superadmins must specify the organization ID since they can create projects for 
     "is_dpr_generated": true,
     "is_dpr_reviewed": false,
     "is_dpr_approved": false,
+    "latitude": null,
+    "longitude": null,
     "project": 10,
     "project_name": "Delhi Watershed Project",
     "organization": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6",
     "organization_name": "Delhi Development Authority",
-    "state": 69,
-    "district": 3110101,
-    "block": 311011,
+    "state_soi": 1,
+    "district_soi": 10,
+    "tehsil_soi": 100,
     "created_by": 1,
     "created_by_name": "John Doe",
     "updated_by": 2
@@ -882,11 +893,12 @@ These endpoints are maintained for backward compatibility:
          -H "Content-Type: application/json" \
          -d '{
            "plan": "Basic Watershed Plan 2025",
-           "state": 69,
-           "district": 3110101,
-           "block": 311011,
+           "state_soi": 1,
+           "district_soi": 10,
+           "tehsil_soi": 100,
            "village_name": "Example Village",
-           "gram_panchayat": "Example GP"
+           "gram_panchayat": "Example GP",
+           "facilitator_name": "John Doe"
          }'
     
        # Complete plan with all optional fields
@@ -895,9 +907,9 @@ These endpoints are maintained for backward compatibility:
          -H "Content-Type: application/json" \
          -d '{
            "plan": "Comprehensive Watershed Management Plan 2025",
-           "state": 69,
-           "district": 3110101,
-           "block": 311011,
+           "state_soi": 1,
+           "district_soi": 10,
+           "tehsil_soi": 100,
            "village_name": "Hauz Khas Village",
            "gram_panchayat": "Hauz Khas Gram Panchayat",
            "facilitator_name": "Dr. Rajesh Kumar",
@@ -905,7 +917,9 @@ These endpoints are maintained for backward compatibility:
            "is_completed": false,
            "is_dpr_generated": false,
            "is_dpr_reviewed": false,
-           "is_dpr_approved": false
+           "is_dpr_approved": false,
+           "latitude": 28.5494,
+           "longitude": 77.1960
          }'
        ```
 
@@ -923,8 +937,8 @@ These endpoints are maintained for backward compatibility:
    curl -X GET http://api.example.com/api/v1/watershed/plans/ \
      -H "Authorization: Bearer {access_token}"
    
-   # View plans filtered by block (superadmin only)
-   curl -X GET http://api.example.com/api/v1/watershed/plans/?block=311011 \
+   # View plans filtered by tehsil (superadmin only)
+   curl -X GET http://api.example.com/api/v1/watershed/plans/?tehsil=100 \
      -H "Authorization: Bearer {access_token}"
    ```
 
@@ -946,9 +960,9 @@ These endpoints are maintained for backward compatibility:
      -H "Content-Type: application/json" \
      -d '{
        "plan": "Updated Watershed Plan 2025",
-       "state": 69,
-       "district": 3110101,
-       "block": 311011,
+       "state_soi": 1,
+       "district_soi": 10,
+       "tehsil_soi": 100,
        "village_name": "Updated Village",
        "gram_panchayat": "Updated GP",
        "facilitator_name": "New Facilitator",
@@ -983,9 +997,9 @@ Superadmins have multiple ways to access watershed plans depending on their cont
 
 4. **Geographical Filtering**: Filter plans by location (useful when working from partner locations)
    ```
-   GET /api/v1/watershed/plans/?block=311011
-   GET /api/v1/watershed/plans/?district=3110101
-   GET /api/v1/watershed/plans/?state=69
+   GET /api/v1/watershed/plans/?tehsil=100
+   GET /api/v1/watershed/plans/?district=10
+   GET /api/v1/watershed/plans/?state=1
    ```
 
 ### Superadmin vs Organization Admin Access
