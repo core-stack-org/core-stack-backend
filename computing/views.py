@@ -6,6 +6,11 @@ import xml.etree.ElementTree as ET
 from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
+from data.workspace_layers.layers_in_workspace import (
+    raster_workspace,
+    raster_and_vector_workspace,
+    vector_workspace,
+)
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -104,46 +109,6 @@ def get_layers_of_workspace(self, workspace):
     """
     It will take workspace as argument and returns all the layers which is present on geoserver.
     """
-    raster_workspace = [
-        "LULC_level_1",
-        "LULC_level_2",
-        "LULC_level_3",
-        "clart",
-        "catchment_area_singleflow",
-        "natural_depression",
-        "slope_percentage",
-    ]
-    vector_workspace = [
-        "cropping_drought",
-        "drought_causality",
-        "swb",
-        "mws_layers",
-        "crop_intensity",
-        "terrain_lulc",
-        "aquifer",
-        "soge",
-        "lulc_vector",
-        "crop_grid_layers",
-        "panchayat_boundaries",
-        "nrega_assets",
-        "drainage",
-        "mws_connectivity",
-        "mining",
-        "green_credit",
-        "factory_csr",
-        "agroecological",
-        "lcw",
-        "stream_order",
-    ]
-    raster_and_vector_workspace = [
-        "restoration",
-        "change_detection",
-        "terrain",
-        "tree_overall_ch",
-        "canopy_height",
-        "ccd",
-        "plantation",
-    ]
     geo = Geoserver()
     layers = geo.get_layers(workspace)
     layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
