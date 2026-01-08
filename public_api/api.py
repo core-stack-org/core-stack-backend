@@ -31,7 +31,7 @@ from .swagger_schemas import (
 )
 from geoadmin.utils import (
     transform_data,
-    activated_entities,
+    activated_tehsils,
     get_activated_location_json,
 )
 
@@ -408,7 +408,7 @@ def generate_active_locations(request):
         if activated_locations_data is not None:
             return Response(activated_locations_data, status=status.HTTP_200_OK)
 
-        response_data = activated_entities()
+        response_data = activated_tehsils()
         transformed_data = transform_data(data=response_data)
         return Response(transformed_data, status=status.HTTP_200_OK)
 

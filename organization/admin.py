@@ -11,6 +11,7 @@ User = get_user_model()
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "name",
         "description",
         "created_by",
