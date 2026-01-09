@@ -1,12 +1,12 @@
 import requests
 from nrm_app.settings import GEOSERVER_URL
 from utilities.gee_utils import valid_gee_text
-from data.layer_status.layer_mapping import workspace_config
+from data.layers.layer_status.layer_mapping import workspace_config
 import xml.etree.ElementTree as ET
 from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
-from data.workspace_layers.layers_in_workspace import (
+from data.layers.workspace_layers.layers_in_workspace import (
     raster_workspace,
     raster_and_vector_workspace,
     vector_workspace,

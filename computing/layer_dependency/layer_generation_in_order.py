@@ -1,5 +1,5 @@
 from utilities.gee_utils import valid_gee_text
-from data.layer_dependency.layer_map import *
+from data.layers.layer_dependency.layer_map import *
 from nrm_app.celery import app
 from computing.models import Layer
 
