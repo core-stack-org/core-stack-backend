@@ -85,6 +85,7 @@ def transform_data(data):
                         {
                             "label": block["block_name"],
                             "block_id": str(block["block_id"]),
+                            "tehsil_id": str(block["block_id"]),
                         }
                         for block in sorted(
                             district["blocks"], key=itemgetter("block_name")

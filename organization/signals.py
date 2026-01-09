@@ -17,7 +17,7 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
         org_approval_url = f"{BASE_URL}admin/organization/organization/{instance.id}"
         superuser_emails = list(
-            User.objects.filter(is_superuser=True).values_list('email', flat=True)
+            User.objects.filter(is_superuser=True).values_list("email", flat=True)
         )
 
         print("super user emai")
@@ -78,9 +78,13 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
 
         """
 
-        send_email_notification.delay(
-            subject,
-            '',
-            message,
-            ['kapil.dadheech@gramvaani.org']
+        recipients = (
+            superuser_emails
+            if superuser_emails
+            else [
+                "ankit.kumar@oniondev.com",
+                "aman.verma@oniondev.com",
+                "kapil.dadheech@gramvaani.org",
+            ]
         )
+        send_email_notification.delay(subject, "", message, recipients)

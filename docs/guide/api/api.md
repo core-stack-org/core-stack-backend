@@ -313,9 +313,9 @@ Regular users create projects under their own organization automatically.
 {
   "name": "Project Name",
   "description": "Project Description",
-  "state": "state-id",
-  "district": "district-id",
-  "block": "block-id",
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "app_type": "plantation",
   "enabled": true,
   "created_by": "user-id",
@@ -334,9 +334,9 @@ Superadmins must specify the organization ID since they can create projects for 
   "name": "Project Name",
   "description": "Project Description",
   "organization": "org-id",
-  "state": "state-id",
-  "district": "district-id",
-  "block": "block-id",
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "app_type": "plantation",
   "enabled": true,
   "created_by": "user-id",
@@ -348,7 +348,9 @@ Superadmins must specify the organization ID since they can create projects for 
 
 - For regular users, the organization is automatically set to the user's organization
 - For superadmins, the organization field is required and must be provided
-- `district` and `block` fields are optional for both user types
+- `state_soi` is the State SOI ID from geoadmin
+- `district_soi` is the District SOI ID from geoadmin (optional)
+- `tehsil_soi` is the Tehsil SOI ID from geoadmin (optional)
 - Valid app_type values include 'plantation', 'watershed', etc. (as defined in AppType choices)
 - The enabled field defaults to true if not specified
 
@@ -800,9 +802,9 @@ These endpoints are maintained for backward compatibility:
      -d '{
        "name": "Plantation Project", 
        "description": "A new plantation project", 
-       "state": "state-id",
-       "district": "district-id",
-       "block": "block-id",
+       "state_soi": 1,
+       "district_soi": 10,
+       "tehsil_soi": 100,
        "app_type": "plantation"
      }'
    ```
@@ -816,9 +818,9 @@ These endpoints are maintained for backward compatibility:
        "name": "Plantation Project", 
        "description": "A new plantation project", 
        "organization": "organization-id",
-       "state": "state-id",
-       "district": "district-id", 
-       "block": "block-id",
+       "state_soi": 1,
+       "district_soi": 10,
+       "tehsil_soi": 100,
        "app_type": "plantation"
      }'
    ```
@@ -857,7 +859,7 @@ These endpoints are maintained for backward compatibility:
      -d '{
        "name": "Watershed Project", 
        "description": "A new watershed project", 
-       "state": "state-id",
+       "state_soi": 1,
        "app_type": "watershed"
      }'
    ```
@@ -871,7 +873,7 @@ These endpoints are maintained for backward compatibility:
        "name": "Watershed Project", 
        "description": "A new watershed project", 
        "organization": "organization-id",
-       "state": "state-id",
+       "state_soi": 1,
        "app_type": "watershed"
      }'
    ```
