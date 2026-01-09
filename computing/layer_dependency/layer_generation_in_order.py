@@ -1,52 +1,5 @@
-from nrm_app.celery import app
-import json
-from computing.misc.admin_boundary import generate_tehsil_shape_file_data
-from computing.misc.nrega import clip_nrega_district_block
-from computing.mws.mws import mws_layer
-from computing.mws.generate_hydrology import generate_hydrology
-from computing.lulc.lulc_v3 import clip_lulc_v3
-from computing.lulc.lulc_vector import vectorise_lulc
-from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
-from computing.surface_water_bodies.swb import generate_swb_layer
-from computing.drought.drought import calculate_drought
-from computing.drought.drought_causality import drought_causality
-from computing.crop_grid.crop_grid import create_crop_grids
-from computing.change_detection.change_detection import get_change_detection
-from computing.change_detection.change_detection_vector import (
-    vectorise_change_detection,
-)
-from computing.misc.restoration_opportunity import generate_restoration_opportunity
-from computing.misc.aquifer_vector import generate_aquifer_vector
-from computing.terrain_descriptor.terrain_raster import terrain_raster
-from computing.terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from computing.lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
-from computing.lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
-from computing.misc.soge_vector import generate_soge_vector
-from computing.misc.stream_order import generate_stream_order
-from computing.misc.drainage_lines import clip_drainage_lines
-from computing.clart.clart import generate_clart_layer
-from computing.tree_health.canopy_height import tree_health_ch_raster
-from computing.tree_health.canopy_height_vector import tree_health_ch_vector
-from computing.tree_health.ccd import tree_health_ccd_raster
-from computing.tree_health.ccd_vector import tree_health_ccd_vector
-from computing.tree_health.overall_change import tree_health_overall_change_raster
-from computing.tree_health.overall_change_vector import (
-    tree_health_overall_change_vector,
-)
-from computing.misc.naturaldepression import generate_natural_depression_data
-from computing.misc.distancetonearestdrainage import (
-    generate_distance_to_nearest_drainage_line,
-)
-from computing.misc.catchment_area import generate_catchment_area_singleflow
-from computing.misc.slope_percentage import generate_slope_percentage_data
-from computing.misc.lcw_conflict import generate_lcw_conflict_data
-from computing.misc.agroecological_space import generate_agroecological_data
-from computing.misc.factory_csr import generate_factory_csr_data
-from computing.misc.green_credit import generate_green_credit_data
-from computing.misc.mining_data import generate_mining_data
-from computing.plantation.site_suitability import site_suitability
 from utilities.gee_utils import valid_gee_text
-from data.layer_dependency.layer_map import *
+from data.layers.layer_dependency.layer_map import *
 from nrm_app.celery import app
 from computing.models import Layer
 
