@@ -21,7 +21,7 @@ class Project(models.Model):
     )
     description = models.TextField(blank=True, null=True)
     geojson_path = models.JSONField(null=True, blank=True)
-    state = models.ForeignKey(State, on_delete=models.CASCADE, null=True)
+    state = models.ForeignKey(State, on_delete=models.CASCADE, null=True, blank=True)
     district = models.ForeignKey(
         District, on_delete=models.CASCADE, null=True, blank=True
     )
