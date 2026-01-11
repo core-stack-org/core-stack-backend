@@ -2,6 +2,7 @@ import ee
 import datetime
 import json
 import re
+import time
 
 from gee_computing.models import GEEAccount
 from nrm_app.celery import app
@@ -99,24 +100,29 @@ def ndvi_timeseries(
         new_start_date = existing_end_date
         last_date = str(existing_end_date.date())
 
-        new_asset_id = f"{asset_id}_{last_date}_{str(end_date.date())}"
-        new_description = f"{description}_{last_date}_{str(end_date.date())}"
-        task_id, new_asset_id, last_date = _generate_data(
-            app_type,
-            asset_folder_list,
-            new_asset_id,
-            asset_suffix,
-            new_description,
-            new_start_date,
-            end_date,
-            roi,
-            gee_account_id,
-        )
-        check_task_status([task_id])
+        if existing_end_date.year < end_date.year:
+            new_asset_id = f"{asset_id}_{last_date}_{str(end_date.date())}"
+            new_description = f"{description}_{last_date}_{str(end_date.date())}"
+            task_id, new_asset_id, last_date = _generate_data(
+                app_type,
+                asset_folder_list,
+                new_asset_id,
+                asset_suffix,
+                new_description,
+                new_start_date,
+                end_date,
+                roi,
+                gee_account_id,
+            )
+            check_task_status([task_id])
 
-        # Check if data for new year is generated, if yes then merge it in existing asset
-        if is_gee_asset_exists(new_asset_id):
-            merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+            clean_asset_columns(description, new_asset_id)
+
+            # Check if data for new year is generated, if yes then merge it in existing asset
+            if is_gee_asset_exists(new_asset_id):
+                merge_fc_into_existing_fc(
+                    asset_id, description, new_asset_id, join_on="uid"
+                )
     else:
         task_id, new_asset_id, last_date = _generate_data(
             app_type,
@@ -130,6 +136,8 @@ def ndvi_timeseries(
             gee_account_id,
         )
 
+        clean_asset_columns(description, asset_id)
+
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
@@ -140,7 +148,7 @@ def ndvi_timeseries(
             asset_id=asset_id,
             dataset_name="NDVI Timeseries",
             misc={
-                "start_date": start_date,
+                "start_date": str(start_date.date()),
                 "end_date": last_date,
             },
         )
@@ -157,72 +165,6 @@ def ndvi_timeseries(
 
             layer_at_geoserver = True
     return layer_at_geoserver
-
-
-def _generate_data_2(
-    app_type,
-    asset_folder_list,
-    asset_id,
-    asset_suffix,
-    description,
-    start_date,
-    end_date,
-    roi,
-):
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
-
-    lulc = ee.Image(
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + asset_suffix
-        + "_"
-        + str(start_date.year)
-        + "-07-01_"
-        + str(start_date.year + 1)
-        + "-06-30_LULCmap_10m"
-    )
-
-    crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
-    tree_mask = lulc.eq(6)
-    shrub_mask = lulc.eq(12)
-
-    # NDVI ImageCollection (14-day)
-    ndvi = get_padded_ndvi_ts_image(start_date_str, end_date_str, roi, 14)
-
-    def add_masked_bands(img):
-        nd = img.select("gapfilled_NDVI_lsc")
-        date = img.date().format("YYYY-MM-dd")
-
-        return ee.Image.cat(
-            [
-                nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
-                nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
-                nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
-            ]
-        )
-
-    ndvi_masked = ndvi.map(add_masked_bands)
-
-    # Convert time → bands (FAST)
-    ndvi_band_stack = ndvi_masked.toBands()
-
-    reduced = ndvi_band_stack.reduceRegions(
-        collection=roi.select(["uid"]),
-        reducer=ee.Reducer.mean(),
-        scale=30,
-        tileScale=4,  # helps large polygons
-    )
-
-    task = export_vector_asset_to_gee(
-        reduced,
-        description,
-        asset_id,
-    )
-
-    return task, asset_id, end_date_str
 
 
 def _generate_data(
@@ -265,223 +207,59 @@ def _generate_data(
             else asset_id
         )
 
-        lulc = ee.Image(
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        if not is_gee_asset_exists(ndvi_asset_id):
+
+            lulc = ee.Image(
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + asset_suffix
+                + "_"
+                + str(f_start_date.year)
+                + "-07-01_"
+                + str(f_start_date.year + 1)
+                + "-06-30_LULCmap_10m"
             )
-            + asset_suffix
-            + "_"
-            + str(f_start_date.year)
-            + "-07-01_"
-            + str(f_start_date.year + 1)
-            + "-06-30_LULCmap_10m"
-        )
-        crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
-        tree_mask = lulc.eq(6)
-        shrub_mask = lulc.eq(12)
+            crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
+            tree_mask = lulc.eq(6)
+            shrub_mask = lulc.eq(12)
 
-        # NDVI ImageCollection (14-day)
-        ndvi = get_padded_ndvi_ts_image(f_start_date_str, f_end_date_str, roi, 14)
+            # NDVI ImageCollection (14-day)
+            ndvi = get_padded_ndvi_ts_image(f_start_date_str, f_end_date_str, roi, 14)
 
-        def add_masked_bands(img):
-            nd = img.select("gapfilled_NDVI_lsc")
-            date = img.date().format("YYYY-MM-dd")
+            def add_masked_bands(img):
+                nd = img.select("gapfilled_NDVI_lsc")
+                date = img.date().format("YYYY-MM-dd")
 
-            return ee.Image.cat(
-                [
-                    nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
-                    nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
-                    nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
-                ]
-            )
+                return ee.Image.cat(
+                    [
+                        nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
+                        nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
+                        nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
+                    ]
+                )
 
-        ndvi_masked = ndvi.map(add_masked_bands)
+            ndvi_masked = ndvi.map(add_masked_bands)
 
-        # Convert time → bands (FAST)
-        ndvi_band_stack = ndvi_masked.toBands()
+            # Convert time → bands (FAST)
+            ndvi_band_stack = ndvi_masked.toBands()
 
-        reduced = ndvi_band_stack.reduceRegions(
-            collection=roi.select(["uid"]),
-            reducer=ee.Reducer.mean(),
-            scale=30,
-            tileScale=4,  # helps large polygons
-        )
-        # Export as single-row-per-feature collection
-        try:
-            task = export_vector_asset_to_gee(reduced, ndvi_description, ndvi_asset_id)
-            print(f"Started export for {f_start_date.year}")
-            asset_ids.append(ndvi_asset_id)
-            task_ids.append(task)
-        except Exception as e:
-            print("Export error:", e)
-
-        f_start_date = f_end_date
-        last_date = str(f_start_date.date())
-
-    check_task_status(task_ids)
-
-    ee_initialize(gee_account_id)
-    print(asset_ids)
-    if len(asset_ids) > 1:
-        # Merge year-wise outputs into a single collection
-        task_id = export_vector_asset_to_gee(
-            merge_assets_chunked_on_year(asset_ids),
-            description,
-            asset_id,
-        )
-        return task_id, asset_id, last_date
-    return None, asset_id, last_date
-
-
-def _generate_data1(
-    app_type,
-    asset_folder_list,
-    asset_id,
-    asset_suffix,
-    description,
-    start_date,
-    end_date,
-    roi,
-    gee_account_id,
-):
-    print("f_start_date>>>", start_date)
-    print("end_date>>>", end_date)
-    task_ids = []
-    asset_ids = []
-    f_start_date = start_date
-    year_count = end_date.year - start_date.year
-    last_date = None
-
-    if year_count > 1:
-        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
-        ee_initialize(gee_obj.helper_account.id)
-
-    while f_start_date <= end_date:
-        f_end_date = f_start_date + datetime.timedelta(days=364)
-        print("f_end_date>>>", f_end_date)
-        if f_end_date > end_date:
-            break
-
-        f_end_date_str = str(f_end_date.date())
-        f_start_date_str = str(f_start_date.date())
-
-        # Define export task details
-        ndvi_description = f"{description}_{f_start_date_str}_{f_end_date_str}"
-        ndvi_asset_id = (
-            f"{asset_id}_{f_start_date_str}_{f_end_date_str}"
-            if year_count > 1
-            else asset_id
-        )
-
-        lulc = ee.Image(
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + asset_suffix
-            + "_"
-            + str(f_start_date.year)
-            + "-07-01_"
-            + str(f_start_date.year + 1)
-            + "-06-30_LULCmap_10m"
-        )
-
-        # NDVI image collection, already padded etc.
-        ndvi = get_padded_ndvi_ts_image(f_start_date_str, f_end_date_str, roi, 14)
-
-        # Clip NDVI images once to ROI geometry (big speed-up on large geoms)
-        ndvi = ndvi.map(lambda img: img.clip(roi.geometry()))
-
-        # Cropped: classes 8, 9, 10, 11
-        crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
-
-        # Tree: class 6
-        tree_mask = lulc.eq(6)
-
-        # Shrub: class 12
-        shrub_mask = lulc.eq(12)
-
-        def add_lulc_ndvi_bands(image):
-            base_ndvi = image.select("gapfilled_NDVI_lsc")
-
-            crop_band = base_ndvi.updateMask(crop_mask).rename("ndvi_crop")
-            tree_band = base_ndvi.updateMask(tree_mask).rename("ndvi_tree")
-            shrub_band = base_ndvi.updateMask(shrub_mask).rename("ndvi_shrub")
-
-            # Keep original band + add 3 class-specific NDVI bands
-            return image.addBands([crop_band, tree_band, shrub_band]).copyProperties(
-                image, image.propertyNames()
-            )
-
-        ndvi_lulc = ndvi.map(add_lulc_ndvi_bands)
-
-        # Per-image reduction: single reduceRegions for 3 bands
-        def extract_per_image(image):
-            date_str = image.date().format("YYYY-MM-dd")
-
-            # Reduce only the 3 masked NDVI bands
-            reduced = image.select(
-                ["ndvi_crop", "ndvi_tree", "ndvi_shrub"]
-            ).reduceRegions(
-                collection=roi.select(["uid"]),  # only geometry + uid to reduce payload
+            reduced = ndvi_band_stack.reduceRegions(
+                collection=roi.select(["uid"]),
                 reducer=ee.Reducer.mean(),
                 scale=30,
+                tileScale=4,  # helps large polygons
             )
-
-            # Attach date string to each feature
-            def annotate(f):
-                return f.set("ndvi_date", date_str)
-
-            return reduced.map(annotate)
-
-        # One flattened FeatureCollection for all images in this year
-        all_ndvi = ndvi_lulc.map(extract_per_image).flatten()
-
-        # Extract all unique UIDs from the input feature collection
-        uids = roi.aggregate_array("uid")
-
-        # For each UID, filter NDVI features and aggregate to dict
-        def build_feature(uid):
-            uid = ee.Number(uid)
-
-            # Feature geometry + original properties from ROI
-            base_feature = ee.Feature(roi.filter(ee.Filter.eq("uid", uid)).first())
-
-            # Filter time-series records for this UID
-            filtered = all_ndvi.filter(ee.Filter.eq("uid", uid))
-
-            dates = filtered.aggregate_array("ndvi_date")
-            crop_vals = filtered.aggregate_array("ndvi_crop")
-            tree_vals = filtered.aggregate_array("ndvi_tree")
-            shrub_vals = filtered.aggregate_array("ndvi_shrub")
-
-            # Convert to dictionary and encode as JSON string
-            crop_dict = ee.Dictionary(dates.zip(crop_vals).flatten())
-            tree_dict = ee.Dictionary(dates.zip(tree_vals).flatten())
-            shrub_dict = ee.Dictionary(dates.zip(shrub_vals).flatten())
-
-            crop_json = ee.String.encodeJSON(crop_dict)
-            tree_json = ee.String.encodeJSON(tree_dict)
-            shrub_json = ee.String.encodeJSON(shrub_dict)
-
-            return (
-                base_feature.set(f"NDVI_crop_{f_start_date.year}", crop_json)
-                .set(f"NDVI_tree_{f_start_date.year}", tree_json)
-                .set(f"NDVI_shrub_{f_start_date.year}", shrub_json)
-            )
-
-        # Apply feature-wise aggregation
-        merged_fc = ee.FeatureCollection(uids.map(build_feature))
-
-        # Export as single-row-per-feature collection
-        try:
-            task = export_vector_asset_to_gee(
-                merged_fc, ndvi_description, ndvi_asset_id
-            )
-            print(f"Started export for {f_start_date.year}")
-            asset_ids.append(ndvi_asset_id)
-            task_ids.append(task)
-        except Exception as e:
-            print("Export error:", e)
+            # Export as single-row-per-feature collection
+            try:
+                task = export_vector_asset_to_gee(
+                    reduced, ndvi_description, ndvi_asset_id
+                )
+                print(f"Started export for {f_start_date.year}")
+                asset_ids.append(ndvi_asset_id)
+                task_ids.append(task)
+            except Exception as e:
+                print("Export error:", e)
 
         f_start_date = f_end_date
         last_date = str(f_start_date.date())
@@ -537,30 +315,46 @@ def get_last_date(asset_id, layer_obj):
     else:
         fc = ee.FeatureCollection(asset_id)
         col_names = fc.first().propertyNames().getInfo()
-        filtered_col = [col for col in col_names if col.startswith("NDVI_")]
+        filtered_col = [
+            col.split("_")[1] for col in col_names if col.startswith("crop_")
+        ]
         filtered_col.sort()
 
-        last_year_col = filtered_col[-1]
-        col_data = fc.first().get(last_year_col)
-        col_data = json.loads(col_data.getInfo())
-        col_data = list(col_data.keys())
-
-        existing_end_date = datetime.datetime.strptime(col_data[-1], "%Y-%m-%d")
-        existing_end_date = existing_end_date + datetime.timedelta(days=14)
+        existing_end_date = datetime.datetime.strptime(filtered_col[-1], "%Y-%m-%d")
 
     return existing_end_date
 
 
-def clean_assets(asset_id):
+def clean_asset_columns(description, asset_id):
     fc = ee.FeatureCollection(asset_id)
     features = fc.getInfo()["features"]
-
-    cleaned_features = []
 
     for f in features:
         props = f["properties"]
         cleaned_props = clean_columns(props)
-        cleaned_features.append(cleaned_props)
+        # cleaned_features.append(cleaned_props)
+
+        f["properties"] = cleaned_props
+
+    ee_features = [
+        ee.Feature(ee.Geometry(f["geometry"]), f["properties"]) for f in features
+    ]
+
+    task_id = export_vector_asset_to_gee(
+        ee.FeatureCollection(ee_features),
+        f"{description}_cleaned",
+        f"{asset_id}_cleaned",
+    )
+    check_task_status([task_id])
+
+    if is_gee_asset_exists(f"{asset_id}_cleaned"):
+        # Delete existing asset
+        ee.data.deleteAsset(asset_id)
+        # Rename new asset with existing asset's name
+        ee.data.copyAsset(f"{asset_id}_cleaned", asset_id)
+        time.sleep(10)
+        # Delete new asset
+        ee.data.deleteAsset(f"{asset_id}_cleaned")
 
 
 def clean_columns(feature):
