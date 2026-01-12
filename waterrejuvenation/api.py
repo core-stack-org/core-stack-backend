@@ -1,3 +1,4 @@
+import io
 import json
 import os
 
@@ -9,12 +10,18 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from nrm_app.settings import MEDIA_ROOT
+from .models import WaterbodiesDesiltingLog
 from .swagger_schemas import waterbodies_by_admin_schema, waterbodies_by_uuid
 from .utils import get_merged_waterbodies_with_zoi
 
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import api_view
+import io
+import pandas as pd
+from django.http import HttpResponse
+from rest_framework import status
+from rest_framework.response import Response
 
 
 @swagger_auto_schema(**waterbodies_by_admin_schema)
@@ -227,3 +234,77 @@ def get_waterbodies_by_uid(request):
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_result_excel(request):
+    print("Inside generate_result_excel API.")
+
+    try:
+        project_id = request.data.get("project_id")
+
+        if not project_id:
+            return Response(
+                {"error": "project_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        queryset = WaterbodiesDesiltingLog.objects.filter(
+            project_id=project_id
+        ).order_by("id")
+
+        if not queryset.exists():
+            return Response(
+                {"error": "No records found for this project"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ✅ Build rows for pandas
+        rows = []
+        for idx, obj in enumerate(queryset, start=1):
+            rows.append(
+                {
+                    "sr no.": idx,
+                    "name of ngo": obj.name_of_ngo,
+                    "state": obj.State,
+                    "district": obj.District,
+                    "taluka": obj.Taluka,
+                    "village": obj.Village,
+                    "name of the waterbody": obj.waterbody_name,
+                    "latitude": obj.lat,
+                    "longitude": obj.lon,
+                    "silt excavated as per app": obj.slit_excavated,
+                    "intervention_year": obj.intervention_year,
+                }
+            )
+
+        # ✅ Create DataFrame with EXACT headers
+        df = pd.DataFrame(rows)
+
+        # ⭐ Append derived column (NO utils change)
+        failure_map = dict(queryset.values_list("id", "failure_reason"))
+        df["closest waterbody found"] = df.index.map(
+            lambda i: "true" if queryset[i].process else "false"
+        )
+        df["Reason for not mapped"] = df.index.map(lambda i: queryset[i].failure_reason)
+
+        # ✅ Write Excel to memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="results")
+
+        output.seek(0)
+
+        response = HttpResponse(
+            output,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = (
+            f'attachment; filename="waterbody_results_project_{project_id}.xlsx"'
+        )
+
+        return response
+
+    except Exception as e:
+        print("Exception in generate_result_excel API ::", e)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

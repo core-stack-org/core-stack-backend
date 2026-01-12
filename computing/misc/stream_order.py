@@ -39,7 +39,6 @@ def generate_stream_order(
 ):
 
     ee_initialize(gee_account_id)
-    proj_obj = None
     if state and district and block:
         description = (
             "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
@@ -58,6 +57,8 @@ def generate_stream_order(
         )
     else:
         proj_obj = Project.objects.get(pk=proj_id)
+        asset_folder = [proj_obj.name.lower()]
+        asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
         description = (
             "stream_order_"
             + valid_gee_text(proj_obj.name)
@@ -104,9 +105,19 @@ def generate_stream_order(
 
     fc = calculate_pixel_area_percentage(args, roi, raster)
     # Generate vector Layer
-    layer_at_geoserver = stream_order_vector_generation(
-        state, district, block, description, fc
-    )
+    if state and district and block:
+        layer_at_geoserver = stream_order_vector_generation(
+            state, district, block, description, fc
+        )
+    else:
+        layer_at_geoserver = stream_order_vector_generation(
+            asset_folder=asset_folder,
+            description=description,
+            fc=fc,
+            proj_id=proj_id,
+            asset_suffix=asset_suffix,
+        )
+
     return layer_at_geoserver
 
 
@@ -155,6 +166,7 @@ def stream_order_raster_generation(
         else:
             proj_obj = Project.objects.get(pk=proj_id)
             workspace_name = "stream_order"
+
         make_asset_public(raster_asset_id)
         res = sync_raster_gcs_to_geoserver(
             workspace_name,
@@ -162,45 +174,110 @@ def stream_order_raster_generation(
             description + "_raster",
             "stream_order",
         )
-        if res and layer_id:
+
+        if res and layer_id and state and district and block:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True
     return layer_at_geoserver
 
 
-def stream_order_vector_generation(state, district, block, description, fc):
-    vector_asset_id = (
-        get_gee_asset_path(state, district, block) + description + "_vector"
-    )
+def stream_order_vector_generation(
+    state=None,
+    district=None,
+    block=None,
+    description=None,
+    fc=None,
+    proj_id=None,
+    asset_suffix=None,
+    asset_folder=None,
+):
+    layer_id = None  # ✅ ensure defined
+
+    # -------------------------------
+    # Build asset path
+    # -------------------------------
+    if state and district and block:
+        vector_asset_id = (
+            get_gee_asset_path(state, district, block) + description + "_vector"
+        )
+    else:
+        vector_asset_id = (
+            get_gee_dir_path(
+                asset_folder,
+                asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"],
+            )
+            + asset_suffix
+            + "_vector"
+        )
+
+        if not proj_id:
+            raise ValueError(
+                "proj_id is required when state/district/block not provided"
+            )
+
+        try:
+            proj_obj = Project.objects.get(pk=proj_id)
+            state = proj_obj.state.state_name
+        except Project.DoesNotExist:
+            raise ValueError(f"Project with id {proj_id} does not exist")
+
+    # -------------------------------
+    # Export if asset does not exist
+    # -------------------------------
     if not is_gee_asset_exists(vector_asset_id):
-        task = export_vector_asset_to_gee(fc, description + "_vector", vector_asset_id)
+        task = export_vector_asset_to_gee(
+            fc,
+            description + "_vector",
+            vector_asset_id,
+        )
         check_task_status([task])
-    if is_gee_asset_exists(vector_asset_id):
+
+    # -------------------------------
+    # Post-export operations
+    # -------------------------------
+    if not is_gee_asset_exists(vector_asset_id):
+        return False
+
+    # Save layer metadata
+    if state and district and block:
         layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
+            state=state,
+            district=district,
+            block=block,
             layer_name=description + "_vector",
             asset_id=vector_asset_id,
             dataset_name="Stream Order",
         )
-        make_asset_public(vector_asset_id)
 
-        # Sync to geoserver
-        fc = ee.FeatureCollection(vector_asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = res = sync_layer_to_geoserver(
-            state, fc, description + "_vector", "stream_order"
+    # Make public
+    make_asset_public(vector_asset_id)
+
+    # -------------------------------
+    # Sync to GeoServer
+    # -------------------------------
+    ee_fc = ee.FeatureCollection(vector_asset_id).getInfo()
+    geojson_fc = {
+        "type": ee_fc["type"],
+        "features": ee_fc["features"],
+    }
+
+    res = sync_layer_to_geoserver(
+        state,
+        geojson_fc,
+        description + "_vector",
+        "stream_order",
+    )
+
+    layer_at_geoserver = False
+    if res.get("status_code") == 201 and layer_id:
+        update_layer_sync_status(
+            layer_id=layer_id,
+            sync_to_geoserver=True,
         )
-        print(res)
-        layer_at_geoserver = False
-        if res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag is updated")
-            layer_at_geoserver = True
-        return layer_at_geoserver
-    return False
+        layer_at_geoserver = True
+
+    return layer_at_geoserver
 
 
 def calculate_pixel_area_percentage(class_labels, fc, raster):

@@ -47,6 +47,9 @@ class WaterbodiesFileUploadLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     process = models.BooleanField(default=False)
     gee_account_id = models.IntegerField(null=True, blank=True)
+    is_processing_required = models.BooleanField(default=True)
+    is_lulc_required = models.BooleanField(default=True)
+    is_closest_wp = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -62,12 +65,15 @@ class WaterbodiesFileUploadLog(models.Model):
             self.excel_hash = file_hash.hexdigest()
 
         super().save(*args, **kwargs)
+        print(f"is processing required: {self.is_processing_required}")
+        print(f"is lullc required: {self.is_lulc_required}")
         Upload_Desilting_Points.apply_async(
             kwargs={
                 "file_obj_id": self.id,
-                "gee_project_id": self.gee_account_id,
-                "is_closest_wp": True,
-                "is_lulc_required": False,
+                "gee_account_id": self.gee_account_id,
+                "is_lulc_required": self.is_lulc_required,
+                "is_processing_required": self.is_processing_required,
+                "is_closest_wp": self.is_closest_wp,
             },
             queue="waterbody1",
         )
@@ -93,8 +99,8 @@ class WaterbodiesDesiltingLog(models.Model):
     Taluka = models.CharField(max_length=255, null=True)
     Village = models.CharField(max_length=255, null=True)
     waterbody_name = models.CharField(max_length=255, null=True)
-    lat = models.FloatField()
-    lon = models.FloatField()
+    lat = models.FloatField(null=True)
+    lon = models.FloatField(null=True)
     slit_excavated = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     process = models.BooleanField(default=False)
@@ -105,6 +111,9 @@ class WaterbodiesDesiltingLog(models.Model):
     distance_closest_wb_pixel = models.IntegerField(null=True)
     excel_hash = models.CharField(max_length=64, null=True)
     intervention_year = models.CharField(max_length=255, null=True)
+    failure_reason = models.TextField(
+        null=True, blank=True, help_text="Reason why processing failed"
+    )
 
     def __str__(self):
         return self.waterbody_name
