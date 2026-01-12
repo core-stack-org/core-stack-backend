@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-
+import os
 import dateutil.parser
 import requests
 
@@ -26,6 +26,17 @@ _token_cache = {
     "expires_at": None,
 }
 
+# MARK: Helper
+def normalize_name(name):
+    """
+    Normalize names for comparison by:
+    - Converting to lowercase
+    - Replacing spaces with underscores
+    - Removing extra whitespace
+    """
+    if not name:
+        return ""
+    return name.lower().replace(" ", "_").strip()
 
 # MARK: Fetch ODK Data
 def fetch_odk_data(csv_path, resource_type, block, plan_id):
@@ -139,12 +150,12 @@ def modify_response_list_settlement(res, block, plan_id):
     for result in res:
         if result is None:
             continue
-
+        
         if result.get("__system", {}).get("reviewState") == "rejected":
             continue
-
+        
         try:
-            if result.get("block_name").lower() != block.lower():
+            if normalize_name(result.get("block_name").lower()) != normalize_name(block):
                 continue
         except AttributeError:
             continue
@@ -209,7 +220,7 @@ def modify_response_list_well(res, block, plan_id):
             continue
 
         try:
-            if result.get("block_name").lower() != block.lower():
+            if normalize_name(result.get("block_name").lower()) != normalize_name(block):
                 continue
         except AttributeError:
             continue
@@ -282,7 +293,7 @@ def modify_response_list_waterbody(res, block, plan_id):
         if result.get("__system", {}).get("reviewState") == "rejected":
             continue
         try:
-            if result.get("block_name").lower() != block.lower():
+            if normalize_name(result.get("block_name").lower()) != normalize_name(block):
                 continue
         except AttributeError:
             continue
@@ -382,7 +393,7 @@ def modify_response_list_plan(res, block, plan_id):
             continue
 
         try:
-            if result.get("block_name").lower() != block.lower():
+            if normalize_name(result.get("block_name").lower()) != normalize_name(block):
                 continue
         except AttributeError:
             continue
@@ -462,7 +473,7 @@ def modify_response_list_livelihood(res, block, plan_id):
             continue
 
         try:
-            if result.get("block_name").lower() != block.lower():
+            if normalize_name(result.get("block_name").lower()) != normalize_name(block):
                 continue
         except AttributeError:
             continue
