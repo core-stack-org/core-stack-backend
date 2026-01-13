@@ -86,7 +86,11 @@ def push_shape_to_geoserver(
         file_extension=file_type,
     )
     print(response)
-    #
+    if response["status_code"] in [200, 201, 202]:
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        if os.path.isdir(path) and path.startswith("data/nrega_assets"):
+            shutil.rmtree(path)
     return response
 
 
