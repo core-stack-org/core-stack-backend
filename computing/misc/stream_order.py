@@ -218,7 +218,7 @@ def stream_order_vector_generation(
 
         try:
             proj_obj = Project.objects.get(pk=proj_id)
-            state = proj_obj.state.state_name
+            state = proj_obj.state_soi.state_name
         except Project.DoesNotExist:
             raise ValueError(f"Project with id {proj_id} does not exist")
 
