@@ -7,12 +7,21 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 from nrm_app.settings import BASE_URL
 from geoadmin.tasks import send_email, send_email_notification
+from nrm_app.settings import ADMIN_GROUP_ID
+from django.contrib.auth.models import Group
 
 
 @receiver(post_save, sender=Organization)
 def send_email_on_org_creation(sender, instance, created, **kwargs):
-    print("singla trigger")
+    print("single trigger")
     if created:  # True only when a new org is created
+        if instance.org_type == "indi":
+            try:
+                group = Group.objects.get(id=ADMIN_GROUP_ID)
+                instance.created_by.groups.add(group)
+            except Exception as r:
+                print("Admin Group not found please set")
+
         subject = f"New Organization Created: {instance.name}"
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
         org_approval_url = f"{BASE_URL}admin/organization/organization/{instance.id}"
