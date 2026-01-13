@@ -734,11 +734,11 @@ def get_merged_waterbodies_with_zoi(
             f"&maxFeatures={maxf}&outputFormat=application/json"
         )
 
-    standard_layer = f"surface_waterbodies_{district_l}_{block_l}"
+    standard_layer = f"swb4_{district_l}_{block_l}"
     zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
 
-    standard_wfs = build_wfs("water_bodies", standard_layer, max_features)
-    zoi_wfs = build_wfs("water_bodies", zoi_layer, max_features)
+    standard_wfs = build_wfs("swb", standard_layer, max_features)
+    zoi_wfs = build_wfs("swb", zoi_layer, max_features)
 
     # fetch and return uid->props dict
     def fetch_uid_props(wfs_url, generate_from_props=False):
