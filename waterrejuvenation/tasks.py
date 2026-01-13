@@ -371,7 +371,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         start_year=2017,
         end_year=2022,
         gee_account_id=gee_account_id,
-        state=proj_obj.state.state_name,
+        state=proj_obj.state_soi.state_name,
     )
     dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
     draught_asset_id = (
