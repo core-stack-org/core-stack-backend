@@ -1,5 +1,6 @@
 import csv
 import os
+import sys
 import time
 from celery import shared_task
 
@@ -273,6 +274,7 @@ def Generate_lulc_mws(
         gee_project_id=gee_account_id,
         asset_suffix=asset_suffix,
         asset_folder=asset_folder,
+        app_type="WATERBODY",
     )
 
 
@@ -349,6 +351,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         + asset_suffix_prec
     )
     roi = ee.FeatureCollection(mws_asset_id)
+    sys.setrecursionlimit(6000)
     precipitation(
         roi=roi,
         asset_suffix=asset_suffix,
@@ -950,15 +953,18 @@ def BuildWaterBodyLayer(
     # ------------------------------------------------------------------
     from .models import WaterbodiesDesiltingLog
 
-    unmatched_info = ee.FeatureCollection(unmatched_asset_id).getInfo()
+    try:
+        unmatched_info = ee.FeatureCollection(unmatched_asset_id).getInfo()
+        unmatched_ids = []
+        for feature in unmatched_info["features"]:
+            desilting_id = feature["properties"]["desilt_id"]
+            if desilting_id:
+                unmatched_ids.append(desilting_id)
 
-    unmatched_ids = []
-    for feature in unmatched_info["features"]:
-        desilting_id = feature["properties"]["desilt_id"]
-        if desilting_id:
-            unmatched_ids.append(desilting_id)
+        if unmatched_ids:
+            WaterbodiesDesiltingLog.objects.filter(id__in=unmatched_ids).update(
+                process=False, failure_reason="No waterbody found within 100m"
+            )
 
-    if unmatched_ids:
-        WaterbodiesDesiltingLog.objects.filter(id__in=unmatched_ids).update(
-            process=False, failure_reason="No waterbody found within 100m"
-        )
+    except Exception as e:
+        print("No Umnatch point found")
