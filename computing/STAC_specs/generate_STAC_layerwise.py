@@ -500,6 +500,7 @@ def read_layer_mapping(
             start_year=start_year, district=district, block=block
         )
     else:  # only LULC has some specific things such as 2 digit year representation and no district information
+        #this has changed now. LULC also has district info. 
         geoserver_layer_name = geoserver_layer_name.format(
             district=district, block=block
         )
