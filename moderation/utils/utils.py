@@ -292,7 +292,7 @@ def sync_edited_updated_agri_maintenance(am_submission):
             lon, lat = coords[0], coords[1]
     except Exception:
         pass
-
+    work_id = am_submission.get("work_id")
     mapped = {
         "uuid": am_submission.get("__id"),
         "plan_id": am_submission.get("plan_id"),
@@ -300,13 +300,12 @@ def sync_edited_updated_agri_maintenance(am_submission):
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState"),
-        "work_id": am_submission.get("work_id"),
+        "work_id": work_id,
         "corresponding_work_id": am_submission.get("corresponding_work_id"),
         "data_agri_maintenance": am_submission,
     }
-    # need to ask how to get id
     Agri_maintenance.objects.update_or_create(
-        agri_maintenance_id=am_submission.get("crop_Grid_id"), defaults=mapped
+        agri_maintenance_id=int(work_id), defaults=mapped
     )
 
 
@@ -321,7 +320,7 @@ def sync_edited_updated_gw_maintenance(gwm_submission):
             lon, lat = coords[0], coords[1]
     except Exception:
         pass
-
+    work_id = gwm_submission.get("work_id")
     mapped = {
         "uuid": gwm_submission.get("__id"),
         "plan_id": gwm_submission.get("plan_id"),
@@ -329,13 +328,13 @@ def sync_edited_updated_gw_maintenance(gwm_submission):
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState"),
-        "work_id": gwm_submission.get("work_id"),
+        "work_id": work_id,
         "corresponding_work_id": gwm_submission.get("corresponding_work_id"),
         "data_gw_maintenance": gwm_submission,
     }
     # need to ask id
     GW_maintenance.objects.update_or_create(
-        gw_maintenance_id=gwm_submission.get("crop_Grid_id"), defaults=mapped
+        gw_maintenance_id=int(work_id), defaults=mapped
     )
 
 
@@ -350,7 +349,7 @@ def sync_edited_updated_swb_maintenance(swbm_submission):
             lon, lat = coords[0], coords[1]
     except Exception:
         pass
-
+    work_id = swbm_submission.get("work_id")
     mapped = {
         "uuid": swbm_submission.get("__id"),
         "plan_id": swbm_submission.get("plan_id"),
@@ -358,13 +357,12 @@ def sync_edited_updated_swb_maintenance(swbm_submission):
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState"),
-        "work_id": swbm_submission.get("work_id"),
+        "work_id": work_id,
         "corresponding_work_id": swbm_submission.get("corresponding_work_id"),
         "data_swb_maintenance": swbm_submission,
     }
-    # need to ask id
     SWB_maintenance.objects.update_or_create(
-        swb_maintenance_id=swbm_submission.get("crop_Grid_id"), defaults=mapped
+        swb_maintenance_id=int(work_id), defaults=mapped
     )
 
 
@@ -379,7 +377,7 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
             lon, lat = coords[0], coords[1]
     except Exception:
         pass
-
+    work_id = swb_rs_submission.get("work_id")
     mapped = {
         "uuid": swb_rs_submission.get("__id"),
         "plan_id": swb_rs_submission.get("plan_id"),
@@ -387,11 +385,10 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState"),
-        "work_id": swb_rs_submission.get("work_id"),
+        "work_id": work_id,
         "corresponding_work_id": swb_rs_submission.get("corresponding_work_id"),
         "data_swb_maintenance": swb_rs_submission,
     }
-    # need to ask id
     SWB_RS_maintenance.objects.update_or_create(
-        swb_rs_maintenance_id=swb_rs_submission.get("crop_Grid_id"), defaults=mapped
+        swb_rs_maintenance_id=int(work_id), defaults=mapped
     )

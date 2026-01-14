@@ -28,5 +28,5 @@ model_map = {
     "Agri Maintenance": Agri_maintenance,
     "GroundWater Maintenance": GW_maintenance,
     "Surface Water Body Maintenance": SWB_maintenance,
-    "Surface Water Body Recharge Structure Maintenance": SWB_RS_maintenance,
+    "Surface Water Body Remotely Sensed Maintenance": SWB_RS_maintenance,
 }
