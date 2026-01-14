@@ -680,12 +680,14 @@ def upload_shp_to_gee(
         check_task_status([task_id], 100)
 
 
-def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
+def merge_fc_into_existing_fc(asset_id, description, new_asset_id, join_on="id"):
+    print("Asset ID:", asset_id)
+    print("New Asset ID:", new_asset_id)
     # Join on 'id'
     joined = ee.Join.inner().apply(
         primary=ee.FeatureCollection(asset_id),
         secondary=ee.FeatureCollection(new_asset_id),
-        condition=ee.Filter.equals(leftField="id", rightField="id"),
+        condition=ee.Filter.equals(leftField=join_on, rightField=join_on),
     )
 
     # Merge properties from both collections
