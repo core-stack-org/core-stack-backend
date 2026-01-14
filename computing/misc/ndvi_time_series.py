@@ -64,6 +64,13 @@ def ndvi_timeseries(
             + "_uid"
         )
 
+    start_date = f"{start_year}-07-01"
+    end_date = f"{end_year+1}-06-30"
+
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+    layer_at_geoserver = False
+    # for cls in ["crop", "tree", "shrub"]:
     description = f"ndvi_timeseries_{asset_suffix}"
     asset_id = (
         get_gee_dir_path(
@@ -72,28 +79,21 @@ def ndvi_timeseries(
         + description
     )
 
-    start_date = f"{start_year}-07-01"
-    end_date = f"{end_year+1}-06-30"
-
-    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    layer_at_geoserver = False
-
-    if is_gee_asset_exists(asset_id):
+    if is_gee_asset_exists(f"{asset_id}_shrub"):  # TODO check for all 3
         layer_obj = None
         try:
             layer_obj = get_layer_object(
                 asset_folder_list[0],
                 asset_folder_list[1],
                 asset_folder_list[2],
-                layer_name=f"{asset_suffix}_ndvi_timeseries",
+                layer_name=f"{description}_shrub",
                 dataset_name="NDVI Timeseries",
             )
         except Exception as e:
             print(
                 f"ndvi_timeseries layer not found in DB. So, reading the column name from asset_id."
             )
-        existing_end_date = get_last_date(asset_id, layer_obj)
+        existing_end_date = get_last_date(f"{asset_id}_shrub", layer_obj)
 
         print("existing_end_date", existing_end_date)
         print("end_date", end_date)
@@ -101,30 +101,25 @@ def ndvi_timeseries(
         last_date = str(existing_end_date.date())
 
         if existing_end_date.year < end_date.year:
-            new_asset_id = f"{asset_id}_{last_date}_{str(end_date.date())}"
-            new_description = f"{description}_{last_date}_{str(end_date.date())}"
-            task_id, new_asset_id, last_date = _generate_data(
+            new_asset_ids, last_date = _generate_data(
                 app_type,
                 asset_folder_list,
-                new_asset_id,
+                asset_id,
                 asset_suffix,
-                new_description,
+                description,
                 new_start_date,
                 end_date,
                 roi,
                 gee_account_id,
             )
-            check_task_status([task_id])
+            print(new_asset_ids)
 
-            clean_asset_columns(description, new_asset_id)
+            if len(new_asset_ids) > 1:
+                ee_initialize(gee_account_id)
 
-            # Check if data for new year is generated, if yes then merge it in existing asset
-            if is_gee_asset_exists(new_asset_id):
-                merge_fc_into_existing_fc(
-                    asset_id, description, new_asset_id, join_on="uid"
-                )
+            build_final_class_asset(new_asset_ids, asset_id, description)
     else:
-        task_id, new_asset_id, last_date = _generate_data(
+        new_asset_ids, last_date = _generate_data(
             app_type,
             asset_folder_list,
             asset_id,
@@ -136,37 +131,113 @@ def ndvi_timeseries(
             gee_account_id,
         )
 
-        check_task_status([task_id])
+        print(new_asset_ids)
+        if len(new_asset_ids) > 1:
+            ee_initialize(gee_account_id)
 
-        clean_asset_columns(description, asset_id)
+        build_final_class_asset(new_asset_ids, asset_id, description)
 
-    if is_gee_asset_exists(asset_id):
-        make_asset_public(asset_id)
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=description,
-            asset_id=asset_id,
-            dataset_name="NDVI Timeseries",
-            misc={
-                "start_date": str(start_date.date()),
-                "end_date": last_date,
-            },
+    for cls in ["crop", "tree", "shrub"]:
+        cls_asset_id = f"{asset_id}_{cls}"
+        cls_description = f"{description}_{cls}"
+        if is_gee_asset_exists(cls_asset_id):
+            make_asset_public(cls_asset_id)
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=cls_description,
+                asset_id=cls_asset_id,
+                dataset_name="NDVI Timeseries",
+                misc={
+                    "start_date": str(start_date.date()),
+                    "end_date": last_date,
+                },
+            )
+
+            fc = ee.FeatureCollection(cls_asset_id)
+            res = sync_fc_to_geoserver(
+                fc, asset_suffix, cls_description, workspace="ndvi_timeseries"
+            )
+            print(res)
+
+            if res["status_code"] == 201 and layer_id:
+                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+                print("sync to geoserver flag is updated")
+
+                layer_at_geoserver = True
+        return layer_at_geoserver
+
+
+def extract_class_fc(asset_id, cls_prefix):
+    """
+    asset_id: yearly NDVI asset
+    cls_prefix: 'crop' | 'tree' | 'shrub'
+    """
+
+    fc = ee.FeatureCollection(asset_id)
+
+    def filter_props(f):
+        props = f.toDictionary()
+        keys = props.keys().filter(ee.Filter.stringStartsWith("item", cls_prefix))
+
+        def build_dict(k, acc):
+            k = ee.String(k)
+            # remove "<number>_<cls_prefix>_"
+            new_key = k.split("_").slice(1).join("_")
+            return ee.Dictionary(acc).set(new_key, props.get(k))
+
+        new_props = ee.Dictionary(keys.iterate(build_dict, ee.Dictionary({})))
+        return ee.Feature(f.geometry(), new_props.set("uid", f.get("uid")))
+
+    return fc.map(filter_props)
+
+
+def build_final_class_asset(yearly_assets, asset_id, description):
+    task_ids = []
+    existing_asset_ids = []
+    for cls_prefix in ["crop", "tree", "shrub"]:
+
+        cls_asset_id = f"{asset_id}_{cls_prefix}"
+        fc_list = [extract_class_fc(asset, cls_prefix) for asset in yearly_assets]
+
+        asset_exists = False
+        if is_gee_asset_exists(cls_asset_id):
+            asset_exists = True
+            merged = ee.FeatureCollection(cls_asset_id)
+            ind = 0
+        else:
+            merged = fc_list[0]
+            ind = 1
+
+        for fc in fc_list[ind:]:
+            merged = merged.map(
+                lambda f: ee.Feature(
+                    f.geometry(),
+                    f.toDictionary().combine(
+                        ee.Feature(
+                            fc.filter(ee.Filter.eq("uid", f.get("uid"))).first()
+                        ).toDictionary(),
+                        overwrite=False,
+                    ),
+                )
+            )
+        if asset_exists:
+            existing_asset_ids.append(cls_asset_id)
+            cls_asset_id = f"{cls_asset_id}_tmp"
+
+        task_id = export_vector_asset_to_gee(
+            merged, f"{description}_{cls_prefix}", cls_asset_id
         )
+        task_ids.append(task_id)
 
-        fc = ee.FeatureCollection(asset_id)
-        res = sync_fc_to_geoserver(
-            fc, asset_suffix, description, workspace="ndvi_timeseries"
-        )
-        print(res)
+    check_task_status(task_ids)
 
-        if res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag is updated")
-
-            layer_at_geoserver = True
-    return layer_at_geoserver
+    if len(existing_asset_ids) > 0:
+        for asset_id in existing_asset_ids:
+            ee.data.deleteAsset(asset_id)
+            ee.data.copyAsset(f"{asset_id}_tmp", asset_id)
+            ee.data.deleteAsset(f"{asset_id}_tmp")
 
 
 def _generate_data(
@@ -203,11 +274,10 @@ def _generate_data(
 
         # Define export task details
         ndvi_description = f"{description}_{f_start_date_str}_{f_end_date_str}"
-        ndvi_asset_id = (
-            f"{asset_id}_{f_start_date_str}_{f_end_date_str}"
-            if year_count > 1
-            else asset_id
-        )
+        ndvi_asset_id = f"{asset_id}_{f_start_date_str}_{f_end_date_str}"
+
+        print(ndvi_asset_id)
+        asset_ids.append(ndvi_asset_id)
 
         if not is_gee_asset_exists(ndvi_asset_id):
 
@@ -235,15 +305,9 @@ def _generate_data(
 
                 return ee.Image.cat(
                     [
-                        nd.updateMask(crop_mask)
-                        # .unmask(0)
-                        .rename(ee.String("crop_").cat(date)),
-                        nd.updateMask(tree_mask)
-                        # .unmask(0)
-                        .rename(ee.String("tree_").cat(date)),
-                        nd.updateMask(shrub_mask)
-                        # .unmask(0)
-                        .rename(ee.String("shrub_").cat(date)),
+                        nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
+                        nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
+                        nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
                     ]
                 )
 
@@ -258,11 +322,32 @@ def _generate_data(
                 scale=30,
                 tileScale=4,  # helps large polygons
             )
+
+            def filter_props(f):
+                props = f.toDictionary()
+
+                keys = props.keys().filter(
+                    ee.Filter.Or(
+                        ee.Filter.stringContains("item", "_crop_"),
+                        ee.Filter.stringContains("item", "_tree_"),
+                        ee.Filter.stringContains("item", "_shrub_"),
+                    )
+                )
+
+                def build_dict(k, acc):
+                    k = ee.String(k)
+                    # remove "<number>_"
+                    new_key = k.split("_").slice(1).join("_")
+                    return ee.Dictionary(acc).set(new_key, props.get(k))
+
+                new_props = ee.Dictionary(keys.iterate(build_dict, ee.Dictionary({})))
+                return ee.Feature(f.geometry(), new_props.set("uid", f.get("uid")))
+
+            fc = reduced.map(filter_props)
+
             # Export as single-row-per-feature collection
             try:
-                task = export_vector_asset_to_gee(
-                    reduced, ndvi_description, ndvi_asset_id
-                )
+                task = export_vector_asset_to_gee(fc, ndvi_description, ndvi_asset_id)
                 print(f"Started export for {f_start_date.year}")
                 asset_ids.append(ndvi_asset_id)
                 task_ids.append(task)
@@ -274,46 +359,7 @@ def _generate_data(
 
     check_task_status(task_ids)
 
-    ee_initialize(gee_account_id)
-    print(asset_ids)
-    if len(asset_ids) > 1:
-        # Merge year-wise outputs into a single collection
-        task_id = export_vector_asset_to_gee(
-            merge_assets_chunked_on_year(asset_ids),
-            description,
-            asset_id,
-        )
-        return task_id, asset_id, last_date
-    return None, asset_id, last_date
-
-
-def merge_assets_chunked_on_year(chunk_assets):
-    def merge_features(feature):
-        # Get the unique ID of the current feature
-        uid = feature.get("uid")
-        matched_features = []
-        for i in range(1, len(chunk_assets)):
-            # Find the matching feature in the second collection
-            matched_feature = ee.Feature(
-                ee.FeatureCollection(chunk_assets[i])
-                .filter(ee.Filter.eq("uid", uid))
-                .first()
-            )
-            matched_features.append(matched_feature)
-
-        merged_properties = feature.toDictionary()
-        for f in matched_features:
-            # Combine properties from both features
-            merged_properties = merged_properties.combine(
-                f.toDictionary(), overwrite=False
-            )
-
-        # Return a new feature with merged properties
-        return ee.Feature(feature.geometry(), merged_properties)
-
-    # Map the merge function over the first feature collection
-    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
-    return merged_fc
+    return asset_ids, last_date
 
 
 def get_last_date(asset_id, layer_obj):
@@ -323,51 +369,9 @@ def get_last_date(asset_id, layer_obj):
     else:
         fc = ee.FeatureCollection(asset_id)
         col_names = fc.first().propertyNames().getInfo()
-        filtered_col = [
-            col.split("_")[1] for col in col_names if col.startswith("crop_")
-        ]
+        filtered_col = [col for col in col_names if col.startswith("20")]
         filtered_col.sort()
         last_date = filtered_col[-1]
         existing_end_date = datetime.datetime.strptime(last_date, "%Y-%m-%d")
 
     return existing_end_date
-
-
-def clean_asset_columns(description, asset_id):
-    fc = ee.FeatureCollection(asset_id)
-    features = fc.getInfo()["features"]
-
-    for f in features:
-        props = f["properties"]
-        cleaned_props = clean_columns(props)
-        # cleaned_features.append(cleaned_props)
-
-        f["properties"] = cleaned_props
-
-    ee_features = [
-        ee.Feature(ee.Geometry(f["geometry"]), f["properties"]) for f in features
-    ]
-
-    task_id = export_vector_asset_to_gee(
-        ee.FeatureCollection(ee_features),
-        f"{description}_cleaned",
-        f"{asset_id}_cleaned",
-    )
-    check_task_status([task_id])
-
-    if is_gee_asset_exists(f"{asset_id}_cleaned"):
-        # Delete existing asset
-        ee.data.deleteAsset(asset_id)
-        # Rename new asset with existing asset's name
-        ee.data.copyAsset(f"{asset_id}_cleaned", asset_id)
-        time.sleep(10)
-        # Delete new asset
-        ee.data.deleteAsset(f"{asset_id}_cleaned")
-
-
-def clean_columns(feature):
-    cleaned = {}
-    for k, v in feature.items():
-        new_key = re.sub(r"^\d+_", "", k)
-        cleaned[new_key] = v
-    return cleaned
