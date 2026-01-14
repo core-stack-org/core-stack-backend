@@ -136,6 +136,8 @@ def ndvi_timeseries(
             gee_account_id,
         )
 
+        check_task_status([task_id])
+
         clean_asset_columns(description, asset_id)
 
     if is_gee_asset_exists(asset_id):
@@ -233,9 +235,15 @@ def _generate_data(
 
                 return ee.Image.cat(
                     [
-                        nd.updateMask(crop_mask).rename(ee.String("crop_").cat(date)),
-                        nd.updateMask(tree_mask).rename(ee.String("tree_").cat(date)),
-                        nd.updateMask(shrub_mask).rename(ee.String("shrub_").cat(date)),
+                        nd.updateMask(crop_mask)
+                        # .unmask(0)
+                        .rename(ee.String("crop_").cat(date)),
+                        nd.updateMask(tree_mask)
+                        # .unmask(0)
+                        .rename(ee.String("tree_").cat(date)),
+                        nd.updateMask(shrub_mask)
+                        # .unmask(0)
+                        .rename(ee.String("shrub_").cat(date)),
                     ]
                 )
 
@@ -319,8 +327,8 @@ def get_last_date(asset_id, layer_obj):
             col.split("_")[1] for col in col_names if col.startswith("crop_")
         ]
         filtered_col.sort()
-
-        existing_end_date = datetime.datetime.strptime(filtered_col[-1], "%Y-%m-%d")
+        last_date = filtered_col[-1]
+        existing_end_date = datetime.datetime.strptime(last_date, "%Y-%m-%d")
 
     return existing_end_date
 

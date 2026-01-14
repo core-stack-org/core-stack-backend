@@ -789,6 +789,8 @@ def tree_health_raster(request):
                 "state": state,
                 "district": district,
                 "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
                 "gee_account_id": gee_account_id,
             },
             queue="nrm",
