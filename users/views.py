@@ -39,7 +39,9 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
             organizations = Organization.objects.all().order_by("name")
         else:
             organizations = (
-                Organization.objects.filter(projects__app_type=app_type)
+                Organization.objects.filter(
+                    projects__app_type=app_type, projects__enabled=True
+                )
                 .distinct()
                 .order_by("name")
             )
@@ -396,12 +398,16 @@ class UserViewSet(viewsets.ModelViewSet):
                         "description": upg.project.description,
                         "app_type": upg.project.app_type,
                         "enabled": upg.project.enabled,
-                        "organization": str(upg.project.organization.id)
-                        if upg.project.organization
-                        else None,
-                        "organization_name": upg.project.organization.name
-                        if upg.project.organization
-                        else None,
+                        "organization": (
+                            str(upg.project.organization.id)
+                            if upg.project.organization
+                            else None
+                        ),
+                        "organization_name": (
+                            upg.project.organization.name
+                            if upg.project.organization
+                            else None
+                        ),
                     },
                     "role": {"id": upg.group.id, "name": upg.group.name},
                 }
