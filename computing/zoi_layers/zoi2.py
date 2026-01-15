@@ -54,7 +54,7 @@ def generate_zoi_ci(
         asset_suffix=asset_suffix,
         app_type=app_type,
         start_year=2017,
-        end_year=2023,
+        end_year=2024,
         gee_account_id=gee_account_id,
     )
     start_date = "2017-07-01"
