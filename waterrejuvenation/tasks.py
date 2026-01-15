@@ -369,7 +369,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
         start_year=2017,
-        end_year=2022,
+        end_year=2024,
         gee_account_id=gee_account_id,
         state=proj_obj.state_soi.state_name,
     )
