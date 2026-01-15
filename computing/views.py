@@ -1,16 +1,11 @@
 import requests
 from nrm_app.settings import GEOSERVER_URL
 from utilities.gee_utils import valid_gee_text
-from data.layers.layer_status.layer_mapping import workspace_config
 import xml.etree.ElementTree as ET
 from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
-from data.layers.workspace_layers.layers_in_workspace import (
-    raster_workspace,
-    raster_and_vector_workspace,
-    vector_workspace,
-)
+import json
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -24,23 +19,37 @@ def get_url(geoserver_url, workspace, layer_name):
     )
 
 
+def load_workspace_config():
+    """
+    Load workspace configuration from JSON file.
+    """
+    config_path = "data/layers/layer_status/layer_mapping.json"
+    with open(config_path, "r") as f:
+        return json.load(f)
+
+
 @app.task(bind=True)
 def layer_status(self, state, district, block):
     """
+    Check the status of all layers for a particular location.
 
     Args:
-        self:
-        state:
-        district:
-        block:
+        self: Instance reference
+        state: State name
+        district: District name
+        block: Block name
 
-    Returns: All the layers for particular location exist or not
-
+    Returns:
+        Dictionary with status of all workspace layers
     """
     print(f"{state=}")
     all_workspace_statuses = {}
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
+
+    # Load workspace configuration from JSON
+    workspace_config = load_workspace_config()
+
     for workspace_display, config in workspace_config.items():
         workspace = config.get("name")
         suffix = config.get("suffix", "")
@@ -104,11 +113,26 @@ def layer_status(self, state, district, block):
     return all_workspace_statuses
 
 
+def load_workspace_types():
+    """
+    Load workspace types configuration from JSON file.
+    """
+    config_path = "data/layers/workspace_layers/layers_in_workspace.json"
+    with open(config_path, "r") as f:
+        return json.load(f)
+
+
 @app.task(bind=True)
 def get_layers_of_workspace(self, workspace):
     """
     It will take workspace as argument and returns all the layers which is present on geoserver.
     """
+    # Load workspace types from JSON
+    workspace_types = load_workspace_types()
+    raster_workspace = workspace_types["raster_workspace"]
+    vector_workspace = workspace_types["vector_workspace"]
+    raster_and_vector_workspace = workspace_types["raster_and_vector_workspace"]
+
     geo = Geoserver()
     layers = geo.get_layers(workspace)
     layer_names = [layer["name"] for layer in layers["layers"]["layer"]]
@@ -147,7 +171,7 @@ def get_layers_of_workspace(self, workspace):
         return {"valid_layer": valid_layers, "invalid_layers": invalid_layers}
     else:
         print("you passed wrong workspace")
-    return []
+        return []
 
 
 def valid_raster_layers_for_workspace(workspace):
