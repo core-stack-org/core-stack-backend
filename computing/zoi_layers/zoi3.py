@@ -55,16 +55,13 @@ def get_ndvi_for_zoi(
         + description_ndvi
     )
 
-    if not is_gee_asset_exists(ndvi_asset_path):
-        zoi_collections = ee.FeatureCollection(asset_id_zoi)
-        fc = get_ndvi_data(
-            zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path
-        )
-        task = ee.batch.Export.table.toAsset(
-            collection=fc, description=description_ndvi, assetId=ndvi_asset_path
-        )
-        task.start()
-        wait_for_task_completion(task)
+    zoi_collections = ee.FeatureCollection(asset_id_zoi)
+    fc = get_ndvi_data(zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path)
+    task = ee.batch.Export.table.toAsset(
+        collection=fc, description=description_ndvi, assetId=ndvi_asset_path
+    )
+    task.start()
+    wait_for_task_completion(task)
     start_date = "30-06-2017"
     end_date = "01-07-2024"
     if state and district and block:
