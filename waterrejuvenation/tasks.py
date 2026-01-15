@@ -742,6 +742,7 @@ def BuildMWSLayer(
         # -------------------------
         # Export merged FC to GEE asset
         # -------------------------
+        delete_asset_on_GEE(asset_id_wb_mws)
         task = ee.batch.Export.table.toAsset(
             collection=merged_fc,
             description=asset_suffix_wb,
