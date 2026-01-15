@@ -33,7 +33,11 @@ from utilities.gee_utils import (
 )
 from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 
-from waterrejuvenation.utils import calculate_zoi_area, wait_for_task_completion
+from waterrejuvenation.utils import (
+    calculate_zoi_area,
+    wait_for_task_completion,
+    delete_asset_on_GEE,
+)
 from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 
 
@@ -70,6 +74,7 @@ def generate_zoi1(
         )
         + description_zoi
     )
+    delete_asset_on_GEE(asset_id_zoi)
     start_date = "2017-07-01"
     end_date = "2025-06-30"
     zoi_fc = roi.map(compute_zoi)
