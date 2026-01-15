@@ -3,7 +3,12 @@ from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 from nrm_app.celery import app
 from projects.models import Project
 from utilities.constants import GEE_PATHS
-from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_dir_path
+from utilities.gee_utils import (
+    ee_initialize,
+    valid_gee_text,
+    get_gee_dir_path,
+    is_gee_asset_exists,
+)
 from waterrejuvenation.utils import wait_for_task_completion
 import ee
 
@@ -25,9 +30,7 @@ def get_ndvi_for_zoi(
     from waterrejuvenation.utils import get_ndvi_data
 
     if not proj_id:
-        description_zoi = (
-            "cropping_intensity_zoi_" + asset_suffix 
-        )
+        description_zoi = "cropping_intensity_zoi_" + asset_suffix
         asset_id_zoi = (
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -36,9 +39,7 @@ def get_ndvi_for_zoi(
         )
     else:
 
-        description_zoi = (
-            "cropping_intensity_zoi_" + asset_suffix 
-        )
+        description_zoi = "cropping_intensity_zoi_" + asset_suffix
         asset_id_zoi = (
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -54,14 +55,16 @@ def get_ndvi_for_zoi(
         + description_ndvi
     )
 
-
-    zoi_collections = ee.FeatureCollection(asset_id_zoi)
-    fc = get_ndvi_data(zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path)
-    task = ee.batch.Export.table.toAsset(
-        collection=fc, description=description_ndvi, assetId=ndvi_asset_path
-    )
-    task.start()
-    wait_for_task_completion(task)
+    if not is_gee_asset_exists(ndvi_asset_path):
+        zoi_collections = ee.FeatureCollection(asset_id_zoi)
+        fc = get_ndvi_data(
+            zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path
+        )
+        task = ee.batch.Export.table.toAsset(
+            collection=fc, description=description_ndvi, assetId=ndvi_asset_path
+        )
+        task.start()
+        wait_for_task_completion(task)
     start_date = "30-06-2017"
     end_date = "01-07-2024"
     if state and district and block:
