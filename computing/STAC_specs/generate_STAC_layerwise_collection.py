@@ -44,11 +44,16 @@ import re
 
 import sys
 sys.path.append('..')
-import constants
+from computing.STAC_specs import constants
 
-# %%
-# # !pip install fsspec s3fs
-# !pip install numpy pandas geopandas matplotlib rasterio shapely pystac boto3 requests tqdm
+from nrm_app.settings import S3_ACCESS_KEY, S3_SECRET_KEY
+from utilities.gee_utils import valid_gee_text
+
+aws_creds = {}
+aws_creds["aws_access_key_id"] = S3_ACCESS_KEY
+aws_creds["aws_secret_access_key"] = S3_SECRET_KEY
+
+
 
 
 # %%
@@ -56,15 +61,16 @@ GEOSERVER_BASE_URL = constants.GEOSERVER_BASE_URL
 # GEOSERVER_BASE_URL
 
 # %%
-THUMBNAIL_DATA_URL = constants.GITHUB_DATA_URL
-#THUMBNAIL_DATA_URL = constants.S3_STAC_BUCKET_URL
+#THUMBNAIL_DATA_URL = constants.GITHUB_DATA_URL
+THUMBNAIL_DATA_URL = constants.S3_STAC_BUCKET_URL
 
 # %%
 # STAC_S3_BUCKET_URL=constants.S3_STAC_BUCKET_URL
 # STAC_S3_BUCKET_URL
 
 # %%
-LOCAL_DATA_DIR = '../data/'
+#LOCAL_DATA_DIR = '../data/'
+LOCAL_DATA_DIR = "data/STAC_specs/"
 
 # %%
 STYLE_FILE_DIR = os.path.join(LOCAL_DATA_DIR,'input/style_files/')
