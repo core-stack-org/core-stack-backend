@@ -14,7 +14,7 @@ import json
 @api_view(["GET"])
 @schema(None)
 def get_paginated_submissions(request, form, plan_id):
-    page = request.GET.get("page", 1)
+    page = request.GET.get("page")
 
     mapping = {
         "Settlement": SubmissionsOfPlan.get_settlement,

@@ -52,6 +52,14 @@ class SubmissionsOfPlan:
         qs = model.objects.filter(plan_id=plan_id).values_list(
             field_name, "is_moderated"
         )
+        if page is None:
+            data = list(qs)
+            return {
+                "page": 1,
+                "total_pages": 1,
+                "total_objects": len(data),
+                "data": data,
+            }
         return paginate_queryset(qs, page)
 
     @staticmethod
