@@ -45,6 +45,7 @@ from computing.misc.green_credit import generate_green_credit_data
 from computing.misc.mining_data import generate_mining_data
 from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
+from computing.misc.ndvi_time_series import ndvi_timeseries
 from utilities.gee_utils import valid_gee_text
 from nrm_app.celery import app
 from computing.models import Layer
