@@ -75,3 +75,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
         user_roles = UserProjectGroup.objects.filter(project=project)
         serializer = UserProjectGroupSerializer(user_roles, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def enable(self, request, pk=None):
+        project = self.get_object()
+        project.enabled = True
+        project.updated_by = request.user
+        project.save(update_fields=["enabled", "updated_by", "updated_at"])
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def disable(self, request, pk=None):
+        project = self.get_object()
+        project.enabled = False
+        project.updated_by = request.user
+        project.save(update_fields=["enabled", "updated_by", "updated_at"])
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
