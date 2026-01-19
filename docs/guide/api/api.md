@@ -375,6 +375,29 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Authentication**: Required
 - **Permissions**: Super admin or organization admin
 
+### Enable Project
+- **URL**: `/api/v1/projects/{project_id}/enable/`
+- **Method**: POST
+- **Description**: Enable a project (sets enabled=True)
+- **Authentication**: Required
+- **Permissions**: Super admin, organization admin, or user with project access
+- **Response**: Returns the updated project object
+- **Notes**: 
+  - Updates the `updated_by` field to the current user
+  - Updates the `updated_at` timestamp
+
+### Disable Project
+- **URL**: `/api/v1/projects/{project_id}/disable/`
+- **Method**: POST
+- **Description**: Disable a project (sets enabled=False)
+- **Authentication**: Required
+- **Permissions**: Super admin, organization admin, or user with project access
+- **Response**: Returns the updated project object
+- **Notes**: 
+  - Updates the `updated_by` field to the current user
+  - Updates the `updated_at` timestamp
+  - Disabled projects are not included in project listings by default
+
 ## Project App Type Management
 
 ### Update Project App Type
@@ -844,6 +867,20 @@ These endpoints are maintained for backward compatibility:
 4. View the uploaded KML files:
    ```bash
    curl -X GET http://api.example.com/api/v1/projects/{project_id}/plantation/kml/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+### Managing Project Status
+
+1. Enable a project:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/{project_id}/enable/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+2. Disable a project:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/{project_id}/disable/ \
      -H "Authorization: Bearer {access_token}"
    ```
 
