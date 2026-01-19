@@ -6,6 +6,8 @@ from projects.models import Project
 from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 import ee
 
+from waterrejuvenation.utils import delete_asset_on_GEE
+
 
 def generate_zoi_ci(
     state=None,
@@ -43,6 +45,7 @@ def generate_zoi_ci(
         )
         + description_ci
     )
+    delete_asset_on_GEE(asset_id_ci)
     if roi:
         roi = ee.FeatureCollection(roi)
     else:
@@ -54,7 +57,7 @@ def generate_zoi_ci(
         asset_suffix=asset_suffix,
         app_type=app_type,
         start_year=2017,
-        end_year=2023,
+        end_year=2024,
         gee_account_id=gee_account_id,
     )
     start_date = "2017-07-01"

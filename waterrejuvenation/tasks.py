@@ -333,7 +333,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
         start_year="2017",
-        end_year="2023",
+        end_year="2024",
         is_all_classes=True,
         gee_account_id=gee_account_id,
     )
@@ -358,7 +358,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
         start_date="2017-06-30",
-        end_date="2024-07-1",
+        end_date="2025-07-1",
         is_annual=False,
     )
     make_asset_public(asset_id_prec)
@@ -369,7 +369,7 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
         start_year=2017,
-        end_year=2022,
+        end_year=2024,
         gee_account_id=gee_account_id,
         state=proj_obj.state_soi.state_name,
     )
@@ -742,6 +742,7 @@ def BuildMWSLayer(
         # -------------------------
         # Export merged FC to GEE asset
         # -------------------------
+        delete_asset_on_GEE(asset_id_wb_mws)
         task = ee.batch.Export.table.toAsset(
             collection=merged_fc,
             description=asset_suffix_wb,
