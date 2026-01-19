@@ -2,8 +2,7 @@
 
 ### Installation
 
-We provide a single installation script that handles everything:
-
+We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
 - Installs **Miniconda** and sets up the Python environment
 - Installs & configures **PostgreSQL**
 - Installs & configures **Apache with mod_wsgi**
