@@ -102,4 +102,4 @@ how to integrate custom pipelines on the CoREStack backend.
 
 ### Further references
 - [DB Design](https://github.com/core-stack-org/core-stack-backend/wiki/DB-Design) 
-- [API Doc](https://github.com/core-stack-org/core-stack-backend/wiki/Project-API-Doc)
+- [API Doc](https://api-doc.core-stack.org/)
