@@ -725,7 +725,7 @@ def generate_mws_data_for_kyl_filters(
                         class_to_id.get(soge_class_name, "")
                     )  # Returns None if not found
                 except Exception:
-                    soge_class = -1
+                    soge_class = 4
 
                 ################## LCW Conflict  ######################
                 ## if count is 0 then Areas with no conflicts else Areas with conflicts
