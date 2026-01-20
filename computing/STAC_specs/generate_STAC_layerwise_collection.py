@@ -1227,7 +1227,7 @@ def create_vector_item(
             "description": layer_description,
             "start_datetime": start_iso,
             "end_datetime": end_iso,
-            "keywords": [display_name.lower()],
+            "keywords": [theme],
         },
     )
 
