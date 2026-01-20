@@ -197,6 +197,7 @@ def create_raster_item(raster_url,
                        id,
                        layer_title,
                        layer_description,
+                       display_name,
                        start_date='',
                        end_date='',
                        gsd=pd.NA
@@ -206,7 +207,7 @@ def create_raster_item(raster_url,
     # raster_data,bbox,footprint,crs,id,gsd,shape,data_type = read_raster_data(raster_filepath)
     raster_data,bbox,footprint,crs,shape,data_type = read_raster_data(raster_url)
 
-    
+    keyword = display_name.lower()
 
     if ((start_date != '') & (end_date != '') & (not pd.isna(gsd))):
         raster_item = pystac.Item(id=id,
@@ -218,7 +219,8 @@ def create_raster_item(raster_url,
                                         "description" : layer_description,
                                         "start_datetime": start_date.isoformat() + 'Z',
                                         "end_datetime": end_date.isoformat() + 'Z',
-                                        "gsd": gsd
+                                        "gsd": gsd,
+                                        "keywords": [keyword]
                                   })
     elif (not pd.isna(gsd)): 
          raster_item = pystac.Item(id=id,
@@ -229,6 +231,9 @@ def create_raster_item(raster_url,
                                         "title" : layer_title,
                                         "description" : layer_description,
                                       "gsd": gsd, #adding this in raster extension
+                                      "start_datetime": constants.DEFAULT_START_DATE.strftime('%Y-%m-%dT%H:%M:%SZ'), 
+                                      "end_datetime": constants.DEFAULT_END_DATE.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                                      "keywords": [keyword]                                                 
                                   })       
     else:
          raster_item = pystac.Item(id=id,
@@ -238,6 +243,7 @@ def create_raster_item(raster_url,
                                   properties={
                                         "title" : layer_title,
                                         "description" : layer_description,
+                                        "keywords": [keyword]
                                   })            
     
     #add certain metadata under projection extension
@@ -525,6 +531,7 @@ def generate_raster_item(state,
                                                  id=layer_id,
                                                  layer_title=layer_title,
                                                  layer_description = layer_description,
+                                                 display_name=layer_display_name,
                                                  start_date=start_date,
                                                  end_date=end_date,
                                                  gsd = gsd
@@ -1064,7 +1071,8 @@ def create_vector_item(vector_url,
                        id,
                        layer_title,
                        layer_description,
-                       column_desc_csv_path
+                       column_desc_csv_path,
+                       display_name
                        ):
     try:
         vector_gdf, bounds, bbox, footprint , geom = read_vector_data(vector_url=vector_url)
@@ -1073,6 +1081,9 @@ def create_vector_item(vector_url,
         print("exiting STAC pipeline")
         return layer_STAC_generated
     
+   
+    start_iso = constants.DEFAULT_START_DATE.strftime('%Y-%m-%dT%H:%M:%SZ')
+    end_iso = constants.DEFAULT_END_DATE.strftime('%Y-%m-%dT%H:%M:%SZ')
 
     vector_item = pystac.Item(
         id=id,
@@ -1082,10 +1093,12 @@ def create_vector_item(vector_url,
         properties={
             "title": layer_title,
             "description": layer_description,
-            #"start_datetime": start_date.isoformat() + 'Z',
-            #"end_datetime": end_date.isoformat() + 'Z',
+            "start_datetime": start_iso,
+            "end_datetime": end_iso,
+            "keywords": [display_name.lower()]
         }
     )
+
 
     return vector_item,vector_gdf
 
@@ -1485,7 +1498,8 @@ def generate_vector_item(state,
                                                     id=layer_id,
                                                     layer_title=layer_title,
                                                     layer_description = layer_description,
-                                                    column_desc_csv_path = column_desc_csv_path
+                                                    column_desc_csv_path = column_desc_csv_path,
+                                                    display_name=layer_display_name
                                                     )
     
     #5. add vector data asset
@@ -1550,7 +1564,7 @@ def create_aws_client(
     )
 
 # %%
-AWS_CREDS_FILEPATH = constants.AWS_CREDS_FILEPATH
+#AWS_CREDS_FILEPATH = constants.AWS_CREDS_FILEPATH
 
 # %%
 # with open(AWS_CREDS_FILEPATH) as src:
@@ -1624,9 +1638,12 @@ def generate_vector_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-                         layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
-                         column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv',
+                         #layer_map_csv_path='data/input/metadata/layer_mapping.csv',
+                         #layer_desc_csv_path='data/input/metadata/layer_descriptions.csv',
+                         #column_desc_csv_path='data/input/metadata/vector_column_descriptions.csv',
+                         layer_map_csv_path="data/STAC_specs/input/metadata/layer_mapping.csv",
+                         layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
+                         column_desc_csv_path="data/STAC_specs/input/metadata/vector_column_descriptions.csv",
                          upload_to_s3=False,
                          overwrite_existing=False
                          ):
@@ -1672,8 +1689,10 @@ def generate_raster_stac(state,
                          district,
                          block,
                          layer_name,
-                         layer_map_csv_path='../data/input/metadata/layer_mapping.csv',
-                         layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
+                         #layer_map_csv_path='data/input/metadata/layer_mapping.csv',
+                         #layer_desc_csv_path='data/input/metadata/layer_descriptions.csv',
+                         layer_map_csv_path="data/STAC_specs/input/metadata/layer_mapping.csv",
+                         layer_desc_csv_path="data/STAC_specs/input/metadata/layer_descriptions.csv",
                          start_year='',
                         #  end_year='',
                          upload_to_s3=False,
