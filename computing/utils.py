@@ -41,8 +41,12 @@ from datetime import datetime, timedelta
 
 
 def generate_shape_files(path):
+
     gdf = gpd.read_file(path + ".json")
-    os.remove(path + ".json")
+    if os.path.exists(path):
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)
 
     gdf.to_file(
         path,
@@ -67,7 +71,7 @@ def push_shape_to_geoserver(
 
     print(f"layer_name: {layer_name}")
     if layer_name:
-        #geo.delete_layer(layer_name, workspace)
+        # geo.delete_layer(layer_name, workspace)
         geo.delete_vector_store(workspace=workspace, store=layer_name)
 
     zip_path = convert_to_zip(path, file_type)
@@ -707,6 +711,7 @@ def update_layer_sync_status(
                 print(
                     f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
                 )
+                return layer_id
 
         if is_stac_specs_generated is not None:
             updated_count = layer_obj.update(
@@ -717,6 +722,7 @@ def update_layer_sync_status(
                 print(
                     f"Updated sync status to {is_stac_specs_generated} for layer ID: {layer_id}"
                 )
+                return layer_id
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")

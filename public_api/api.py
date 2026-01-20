@@ -31,7 +31,7 @@ from .swagger_schemas import (
 )
 from geoadmin.utils import (
     transform_data,
-    activated_entities,
+    activated_tehsils,
     get_activated_location_json,
 )
 
@@ -295,9 +295,9 @@ def get_mws_json_by_kyl_indicator(request):
 def get_generated_layer_urls(request):
     try:
         print("Inside Get Generated Layer Urls API.")
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        state = request.query_params.get("state").lower()
+        district = request.query_params.get("district").lower()
+        tehsil = request.query_params.get("tehsil").lower()
 
         if state is None or district is None or tehsil is None:
             return Response(
@@ -408,7 +408,7 @@ def generate_active_locations(request):
         if activated_locations_data is not None:
             return Response(activated_locations_data, status=status.HTTP_200_OK)
 
-        response_data = activated_entities()
+        response_data = activated_tehsils()
         transformed_data = transform_data(data=response_data)
         return Response(transformed_data, status=status.HTTP_200_OK)
 

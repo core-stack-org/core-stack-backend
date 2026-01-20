@@ -32,9 +32,11 @@ class PlanApp(models.Model):
     )
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
     facilitator_name = models.CharField(max_length=512, null=True, blank=True)
-    state = models.ForeignKey(State, on_delete=models.CASCADE)
-    district = models.ForeignKey(District, on_delete=models.CASCADE)
-    block = models.ForeignKey(Block, on_delete=models.CASCADE)
+    state = models.ForeignKey(State, on_delete=models.CASCADE, null=True, blank=True)
+    district = models.ForeignKey(
+        District, on_delete=models.CASCADE, null=True, blank=True
+    )
+    block = models.ForeignKey(Block, on_delete=models.CASCADE, null=True, blank=True)
     state_soi = models.ForeignKey(
         StateSOI, on_delete=models.CASCADE, null=True, blank=True
     )

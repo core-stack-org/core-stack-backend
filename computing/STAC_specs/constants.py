@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 
 DEFAULT_START_DATE = datetime(2017, 7, 1)
-DEFAULT_END_DATE = datetime(2024, 6, 30)
+DEFAULT_END_DATE = datetime(2025, 6, 30)
 
 SRTM_DEM_START_DATE = datetime(2020, 2, 11)  # used for terrain raster as it
 # uses SRTMGL1_003 product
@@ -16,11 +16,17 @@ GITHUB_DATA_URL = "https://raw.githubusercontent.com/core-stack-org/core-stack-b
 
 
 STAC_VERSION = "1.0.0"
-ROOT_CATALOG_TITLE = "Tehsil level Spatio Temporal Asset Catalog"
-ROOT_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoRE Stack (https://core-stack.org/) generated at an administrative tehsil level."
+#ROOT_CATALOG_TITLE = "Tehsil level Spatio Temporal Asset Catalog"
+#ROOT_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoRE Stack (https://core-stack.org/) generated at an administrative tehsil level."
 
-PAN_INDIA_CATALOG_TITLE = "Pan India Spatio Temporal Asset Catalog"
-PAN_INDIA_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoRE Stack (https://core-stack.org/) generated at Pan India level."
+#PAN_INDIA_CATALOG_TITLE = "Pan India Spatio Temporal Asset Catalog"
+#PAN_INDIA_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoRE Stack (https://core-stack.org/) generated at Pan India level."
+
+ROOT_CATALOG_TITLE="CoRE Stack Spatio Temporal Asset Catalog"
+ROOT_CATALOG_DESCRIPTION="This spatio temporal asset catalog contains all data layers of CoREStack (https://core-stack.org/). The data layers are generated at an administrative block level, and some layers are available for Pan India."
+
+TEHSIL_CATALOG_TITLE="Tehsil level Spatio Temporal Asset Catalog"
+TEHSIL_CATALOG_DESCRIPTION="This spatio temporal asset catalog contains all data layers of CoREStack (https://core-stack.org/). The data layers are generated at an administrative tehsil level."
 
 # ROOT_CATALOG_TITLE = "CoRE Stack Spatio Temporal Asset Catalog"
 # ROOT_CATALOG_DESCRIPTION = "This spatio temporal asset catalog contains all data layers of CoRE Stack (https://core-stack.org/). The data layers are generated at an administrative tehsil level, and some layers are available for Pan India."

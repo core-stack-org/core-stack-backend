@@ -3,7 +3,7 @@ from computing.zoi_layers.zoi2 import generate_zoi_ci
 from computing.zoi_layers.zoi3 import get_ndvi_for_zoi
 from projects.models import Project
 from utilities.gee_utils import ee_initialize, valid_gee_text, check_task_status
-from waterrejuvenation.utils import wait_for_task_completion
+from waterrejuvenation.utils import wait_for_task_completion, delete_asset_on_GEE
 from nrm_app.celery import app
 
 

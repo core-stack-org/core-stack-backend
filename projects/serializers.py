@@ -10,53 +10,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     app_type_display = serializers.CharField(
         source="get_app_type_display", read_only=True
     )
-    state_name = serializers.CharField(source="state.state_name", read_only=True)
-    district_name = serializers.CharField(
-        source="district.district_name", read_only=True
-    )
-    block_name = serializers.CharField(source="block.block_name", read_only=True)
-
-    class Meta:
-        model = Project
-        fields = [
-            "id",
-            "name",
-            "organization",
-            "organization_name",
-            "description",
-            "geojson_path",
-            "state",
-            "state_name",
-            "district",
-            "district_name",
-            "block",
-            "block_name",
-            "state_soi",
-            "district_soi",
-            "tehsil_soi",
-            "app_type",
-            "app_type_display",
-            "enabled",
-            "created_at",
-            "created_by",
-            "updated_at",
-            "updated_by",
-        ]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-
-class ProjectDetailSerializer(serializers.ModelSerializer):
-    organization_name = serializers.CharField(
-        source="organization.name", read_only=True
-    )
-    app_type_display = serializers.CharField(
-        source="get_app_type_display", read_only=True
-    )
-    state_name = serializers.CharField(source="state.state_name", read_only=True)
-    district_name = serializers.CharField(
-        source="district.district_name", read_only=True
-    )
-    block_name = serializers.CharField(source="block.block_name", read_only=True)
     state_soi_name = serializers.CharField(
         source="state_soi.state_name", read_only=True
     )
@@ -76,12 +29,49 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             "organization_name",
             "description",
             "geojson_path",
-            "state",
-            "state_name",
-            "district",
-            "district_name",
-            "block",
-            "block_name",
+            "state_soi",
+            "state_soi_name",
+            "district_soi",
+            "district_soi_name",
+            "tehsil_soi",
+            "tehsil_soi_name",
+            "app_type",
+            "app_type_display",
+            "enabled",
+            "created_at",
+            "created_by",
+            "updated_at",
+            "updated_by",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class ProjectDetailSerializer(serializers.ModelSerializer):
+    organization_name = serializers.CharField(
+        source="organization.name", read_only=True
+    )
+    app_type_display = serializers.CharField(
+        source="get_app_type_display", read_only=True
+    )
+    state_soi_name = serializers.CharField(
+        source="state_soi.state_name", read_only=True
+    )
+    district_soi_name = serializers.CharField(
+        source="district_soi.district_name", read_only=True
+    )
+    tehsil_soi_name = serializers.CharField(
+        source="tehsil_soi.tehsil_name", read_only=True
+    )
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "name",
+            "organization",
+            "organization_name",
+            "description",
+            "geojson_path",
             "state_soi",
             "state_soi_name",
             "district_soi",

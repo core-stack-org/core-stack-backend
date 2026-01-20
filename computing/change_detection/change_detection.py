@@ -424,12 +424,15 @@ def change_cropping_intensity(roi_boundary, l1_asset):
     trans_si_do = then.eq(5).And(now.eq(6)).multiply(4)
     trans_si_tr = then.eq(5).And(now.eq(7)).multiply(5)
     trans_do_tr = then.eq(6).And(now.eq(7)).multiply(6)
-    trans_same = (
-        (then.eq(5).And(now.eq(5)))
-        .Or(then.eq(6).And(now.eq(6)))
-        .Or(then.eq(7).And(now.eq(7)))
-        .multiply(7)
-    )
+    si_si = then.eq(5).And(now.eq(5)).multiply(7)
+    do_do = then.eq(6).And(now.eq(6)).multiply(8)
+    tr_tr = then.eq(7).And(now.eq(7)).multiply(9)
+    # trans_same = (
+    #     (then.eq(5).And(now.eq(5)))
+    #     .Or(then.eq(6).And(now.eq(6)))
+    #     .Or(then.eq(7).And(now.eq(7)))
+    #     .multiply(7)
+    # )
 
     # Create a zero image and add transitions
     change_far = (
@@ -444,7 +447,9 @@ def change_cropping_intensity(roi_boundary, l1_asset):
         .add(trans_si_do)
         .add(trans_si_tr)
         .add(trans_do_tr)
-        .add(trans_same)
+        .add(si_si)
+        .add(do_do)
+        .add(tr_tr)
     )
     return change_far
 

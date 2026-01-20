@@ -21,6 +21,7 @@ BSP_Headers = {
 BSP_URLS = {
     "URL_360": "https://waba-v2.360dialog.io/",
     "FB_META": "https://graph.facebook.com/v24.0/919379201250837/",
+    "FB_META_TEST": "https://graph.facebook.com/v24.0/905190956007447/",
 }
 
 ES_HEADERS = {

@@ -24,6 +24,8 @@ def tree_health_overall_change_raster(
     state=None,
     district=None,
     block=None,
+    start_year=None,
+    end_year=None,
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
@@ -73,7 +75,9 @@ def tree_health_overall_change_raster(
             .clip(roi.geometry())
         )
 
-        raster = mask_raster(app_type, asset_folder_list, asset_suffix, raster)
+        raster = mask_raster(
+            app_type, asset_folder_list, asset_suffix, raster, start_year, end_year
+        )
 
         task_id = export_raster_asset_to_gee(
             image=raster,
@@ -107,35 +111,36 @@ def tree_health_overall_change_raster(
         )
         layer_at_geoserver = True
 
-        # if res and layer_id:
-        #     layer_at_geoserver = True
-        #     layer_STAC_generated = False
-        #     layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-        #         state=state,
-        #         district=district,
-        #         block=block,
-        #         layer_name="tree_cover_change_raster",
-        #     )
-        #     update_layer_sync_status(
-        #         layer_id=layer_id,
-        #         is_stac_specs_generated=layer_STAC_generated,
-        #         sync_to_geoserver=layer_at_geoserver,
-        #     )
+        if res and layer_id:
+            layer_at_geoserver = True
+            # layer_STAC_generated = False
+            # layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+            #     state=state,
+            #     district=district,
+            #     block=block,
+            #     layer_name="tree_cover_change_raster",
+            # )
+            update_layer_sync_status(
+                layer_id=layer_id,
+                sync_to_geoserver=layer_at_geoserver,
+            )
     return layer_at_geoserver
 
 
-def mask_raster(app_type, asset_folder_list, asset_suffix, raster):
+def mask_raster(
+    app_type, asset_folder_list, asset_suffix, raster, start_year, end_year
+):
     deforestation = ee.Image(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
-        + f"change_{asset_suffix}_Deforestation"
+        + f"change_{asset_suffix}_Deforestation_{start_year}_{int(end_year)+1}"  # TODO Fix later with some better logic
     )
     afforestation = ee.Image(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
-        + f"change_{asset_suffix}_Afforestation"
+        + f"change_{asset_suffix}_Afforestation_{start_year}_{int(end_year)+1}"
     )
 
     # Ignore Deforestation (-2) and Afforestation (2) pixels

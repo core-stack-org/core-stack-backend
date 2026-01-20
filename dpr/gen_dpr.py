@@ -22,7 +22,7 @@ from dpr.mapping import (
     WATER_STRUCTURE_REVERSE_MAPPING,
     populate_maintenance_from_waterbody,
 )
-from dpr.utils import get_waterbody_repair_activities
+from dpr.utils import get_waterbody_repair_activities, transform_name
 from nrm_app.settings import (
     DEBUG,
     EMAIL_HOST,
@@ -56,20 +56,10 @@ from .utils import (
     get_vector_layer_geoserver,
     sort_key,
     sync_db_odk,
+    transform_name,
 )
 
 logger = setup_logger(__name__)
-
-
-def transform_name(name):
-    if not name:
-        return name
-
-    name = re.sub(r"[()]", "", name)
-    name = re.sub(r"[-\s]+", "_", name)
-    name = re.sub(r"_+", "_", name)
-    name = re.sub(r"^_|_$", "", name)
-    return name.lower()
 
 
 def get_plan_details(plan_id):
@@ -479,6 +469,7 @@ def create_table_socio_eco(doc, plan, settlement_data):
         "Total Number of Households",
         "Settlement Type",
         "Caste Group",
+        "Total Households",
         "Total marginal farmers (<2 acres)",
     ]
 
@@ -502,7 +493,41 @@ def create_table_socio_eco(doc, plan, settlement_data):
         else:
             row_cells[3].text = "NA"
 
-        row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
+        sub_table = row_cells[4].add_table(rows=4, cols=2)
+        sub_table.style = "Table Grid"
+        sub_table.autofit = False
+        sub_table.allow_autofit = False
+
+        count_sc = str(item.data_settlement.get("count_sc", "")) or "NA"
+        count_st = str(item.data_settlement.get("count_st", "")) or "NA"
+        count_obc = str(item.data_settlement.get("count_obc", "")) or "NA"
+        count_general = str(item.data_settlement.get("count_general", "")) or "NA"
+
+        caste_data = [
+            ("SC", count_sc),
+            ("ST", count_st),
+            ("OBC", count_obc),
+            ("General", count_general),
+        ]
+
+        for i, (label, value) in enumerate(caste_data):
+            label_cell = sub_table.rows[i].cells[0]
+            value_cell = sub_table.rows[i].cells[1]
+
+            label_cell.text = label
+            label_cell.width = Pt(50)
+            label_para = label_cell.paragraphs[0]
+            label_para.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            label_para.runs[0].bold = True
+            label_para.runs[0].font.size = Pt(9)
+
+            value_cell.text = value
+            value_cell.width = Pt(40)
+            value_para = value_cell.paragraphs[0]
+            value_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            value_para.runs[0].font.size = Pt(9)
+
+        row_cells[5].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
 
 def create_table_mgnrega_info(doc, plan, settlement_data):
@@ -1087,7 +1112,9 @@ def maintenance_gw_table(doc, plan):
 
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_gw_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = (
+            format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
+        )
         row_cells[1].text = (
             maintenance.data_gw_maintenance.get("beneficiary_settlement") or "NA"
         )
@@ -1151,7 +1178,9 @@ def maintenance_agri_table(doc, plan):
 
     for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_agri_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = (
+            format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
+        )
         row_cells[1].text = (
             maintenance.data_agri_maintenance.get("beneficiary_settlement") or "NA"
         )
@@ -1216,7 +1245,9 @@ def maintenance_waterstructures_table(doc, plan):
 
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = (
+            format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
+        )
         row_cells[1].text = (
             maintenance.data_swb_maintenance.get("beneficiary_settlement") or "NA"
         )
@@ -1250,8 +1281,8 @@ def maintenance_waterstructures_table(doc, plan):
                 "select_one_activities"
             )
         row_cells[6].text = repair_activities or "NA"
-        row_cells[6].text = str(maintenance.latitude)
-        row_cells[7].text = str(maintenance.longitude)
+        row_cells[7].text = str(maintenance.latitude)
+        row_cells[8].text = str(maintenance.longitude)
 
 
 def maintenance_rs_waterstructures_table(doc, plan):
@@ -1276,7 +1307,7 @@ def maintenance_rs_waterstructures_table(doc, plan):
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id):
         row_cells = table.add_row().cells
         row_cells[0].text = (
-            maintenance.data_swb_rs_maintenance.get("demand_type") or "NA"
+            format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = (
             maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"

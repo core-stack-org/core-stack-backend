@@ -17,7 +17,7 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
         org_approval_url = f"{BASE_URL}admin/organization/organization/{instance.id}"
         superuser_emails = list(
-            User.objects.filter(is_superuser=True).values_list('email', flat=True)
+            User.objects.filter(is_superuser=True).values_list("email", flat=True)
         )
 
         print("super user emai")
@@ -37,7 +37,7 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
       <tr>
         <td style="padding: 30px;">
           <h2 style="color: #2c3e50; margin-top: 0; font-size: 22px; text-align: center;">
-            🚀 New Organization Created
+            New Organization Created
           </h2>
 
           <p style="font-size: 16px; margin-bottom: 20px;">
@@ -50,13 +50,13 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
             <li style="margin-bottom: 10px;">
               <a href="{org_approval_url}" 
                  style="color: #1a73e8; text-decoration: none; font-weight: bold;">
-                 ✅ Approve the organization
+                 Approve the organization
               </a>
             </li>
             <li>
               <a href="{user_approval_url}" 
                  style="color: #1a73e8; text-decoration: none; font-weight: bold;">
-                 👤 Grant organization admin rights to the user
+                 Grant organization admin rights to the user
               </a>
             </li>
           </ol>
@@ -78,9 +78,13 @@ def send_email_on_org_creation(sender, instance, created, **kwargs):
 
         """
 
-        send_email_notification.delay(
-            subject,
-            '',
-            message,
-            ['kapil.dadheech@gramvaani.org']
+        recipients = (
+            superuser_emails
+            if superuser_emails
+            else [
+                "ankit.kumar@oniondev.com",
+                "aman.verma@oniondev.com",
+                "kapil.dadheech@gramvaani.org",
+            ]
         )
+        send_email_notification.delay(subject, "", message, recipients)

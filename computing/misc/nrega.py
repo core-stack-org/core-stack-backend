@@ -33,25 +33,24 @@ from utilities.gee_utils import (
 )
 import ee
 import numpy as np
+import shutil
 
 from computing.STAC_specs import generate_STAC_layerwise
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
     layer_name = (
-            "nrega_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+        "nrega_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
     layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
     upload_shp_to_gee(layer_path, layer_name, asset_id, gee_account_id)
 
 
 @app.task(bind=True)
-def clip_nrega_district_block(
-    self, state_name, district_name, block_name, gee_account_id
-):
+def clip_nrega_district_block(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
     print("inside clip")
     s3 = boto3.resource(
@@ -61,9 +60,11 @@ def clip_nrega_district_block(
         aws_secret_access_key=S3_SECRET_KEY,
     )
 
-    formatted_state_name = valid_gee_text(state_name)
+    formatted_state_name = valid_gee_text(state)
 
-    nrega_dist_file = f"{formatted_state_name.upper()}/{valid_gee_text(district_name).upper()}.geojson"
+    nrega_dist_file = (
+        f"{formatted_state_name.upper()}/{valid_gee_text(district).upper()}.geojson"
+    )
 
     try:
         file_obj = s3.Object(NREGA_BUCKET, nrega_dist_file).get()
@@ -78,9 +79,9 @@ def clip_nrega_district_block(
 
     # If geometry is missing but lat/lon present, build Point geometry
     if (
-            "geometry" not in district_gdf.columns
-            and "lon" in district_gdf.columns
-            and "lat" in district_gdf.columns
+        "geometry" not in district_gdf.columns
+        and "lon" in district_gdf.columns
+        and "lat" in district_gdf.columns
     ):
         print("Creating geometry from lat/lon...")
         district_gdf["geometry"] = [
@@ -92,9 +93,9 @@ def clip_nrega_district_block(
 
     # If GeoJSON was loaded but has no geometry, create Point geometries from lat/lon
     if (
-            "geometry" not in district_gdf.columns
-            and "lon" in district_gdf.columns
-            and "lat" in district_gdf.columns
+        "geometry" not in district_gdf.columns
+        and "lon" in district_gdf.columns
+        and "lat" in district_gdf.columns
     ):
         district_gdf["geometry"] = [
             Point(xy) for xy in zip(district_gdf["lon"], district_gdf["lat"])
@@ -107,9 +108,9 @@ def clip_nrega_district_block(
     soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
 
     # Filter by state, district, block
-    soi = soi[(soi["STATE"].str.lower() == state_name.lower())]
-    soi = soi[(soi["District"].str.lower() == district_name.lower())]
-    soi = soi[(soi["TEHSIL"].str.lower() == block_name.lower())]
+    soi = soi[(soi["STATE"].str.lower() == state.lower())]
+    soi = soi[(soi["District"].str.lower() == district.lower())]
+    soi = soi[(soi["TEHSIL"].str.lower() == block.lower())]
     soi = soi.dissolve()
 
     block_bounds = soi.geometry.iloc[0] if not soi.empty else None
@@ -117,24 +118,24 @@ def clip_nrega_district_block(
     # Create empty dataframe if no matching boundary was found
     if block_bounds is None:
         print(
-            f"No matching boundary found for state={state_name}, district={district_name}, block={block_name}"
+            f"No matching boundary found for state={state}, district={district}, block={block}"
         )
         block_metadata_df = district_gdf.iloc[
-                            0:0
-                            ].copy()  # Empty dataframe with same schema
+            0:0
+        ].copy()  # Empty dataframe with same schema
 
     elif not district_gdf.empty and "geometry" in district_gdf.columns:
         block_metadata_df = district_gdf[district_gdf.geometry.within(block_bounds)]
         if block_metadata_df.empty:
             print("No NREGA assets found within the block boundary")
             block_metadata_df = district_gdf.iloc[
-                                0:0
-                                ].copy()  # Empty dataframe with same schema
+                0:0
+            ].copy()  # Empty dataframe with same schema
     else:
         print("Using empty dataframe due to missing data or geometry")
         block_metadata_df = district_gdf.iloc[
-                            0:0
-                            ].copy()  # Empty dataframe with same schema
+            0:0
+        ].copy()  # Empty dataframe with same schema
 
     # Apply unidecode to string columns
     string_columns = block_metadata_df.select_dtypes(
@@ -152,16 +153,22 @@ def clip_nrega_district_block(
     path = os.path.join(
         NREGA_ASSETS_OUTPUT_DIR,
         formatted_state_name,
-        f"""{"_".join(valid_gee_text(district_name).split())}_{"_".join(valid_gee_text(block_name).split())}""",
+        f"""{"_".join(valid_gee_text(district).split())}_{"_".join(valid_gee_text(block).split())}""",
     )
+
+    if os.path.exists(path):
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        shutil.rmtree(path)
+
     output_directory = os.path.dirname(path)
     os.makedirs(output_directory, exist_ok=True)
 
     block_metadata_df.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
 
     block_metadata_df = block_metadata_df.loc[
-                        :, ~block_metadata_df.columns.str.contains("^Unnamed")
-                        ]
+        :, ~block_metadata_df.columns.str.contains("^Unnamed")
+    ]
     block_metadata_df.columns = [
         col.strip().replace(" ", "_").replace(".", "_")
         for col in block_metadata_df.columns
@@ -169,19 +176,19 @@ def clip_nrega_district_block(
     block_metadata_df = block_metadata_df.replace({np.nan: None})
 
     description = (
-            "nrega_"
-            + valid_gee_text(district_name.lower())
-            + "_"
-            + valid_gee_text(block_name.lower())
+        "nrega_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
     )
-    asset_id = get_gee_asset_path(state_name, district_name, block_name) + description
+    asset_id = get_gee_asset_path(state, district, block) + description
 
     file_size_bytes = get_directory_size(path)
     file_size_mb = file_size_bytes / (1024 * 1024)
 
     if not is_gee_asset_exists(asset_id):
         if file_size_mb > 10:
-            export_shp_to_gee(district_name, block_name, path, asset_id, gee_account_id)
+            export_shp_to_gee(district, block, path, asset_id, gee_account_id)
         else:
             fc = gdf_to_ee_fc(block_metadata_df)
             task_id = export_vector_asset_to_gee(fc, description, asset_id)
@@ -192,10 +199,10 @@ def clip_nrega_district_block(
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
-            state_name,
-            district_name,
-            block_name,
-            layer_name=f"{valid_gee_text(district_name.lower())}_{valid_gee_text(block_name.lower())}",
+            state,
+            district,
+            block,
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
             asset_id=asset_id,
             dataset_name="NREGA Assets",
         )
@@ -207,9 +214,9 @@ def clip_nrega_district_block(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_STAC_generated = False
             layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state_name,
-                district=district_name,
-                block=block_name,
+                state=state,
+                district=district,
+                block=block,
                 layer_name="nrega_vector",
             )
 

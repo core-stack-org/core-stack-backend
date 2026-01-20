@@ -45,6 +45,22 @@ years = [
     "2023_2024",
 ]
 
+# utils.py
+
+EXPECTED_EXCEL_HEADERS = {
+    "sr no.",
+    "name of ngo",
+    "state",
+    "district",
+    "taluka",
+    "village",
+    "name of the waterbody",
+    "latitude",
+    "longitude",
+    "silt excavated as per app",
+    "intervention_year",
+}
+
 
 def get_filtered_mws_layer_name(project_name, layer_name, project_id="ee-corestackdev"):
     WATER_REJ_GEE_ASSET = f"projects/{project_id}/assets/apps/waterbody/"
@@ -163,7 +179,7 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
     """
 
     print("Given lat long")
-    print(lat, lon)
+    print(f"-----{lat}----{lon}---")
     point = ee.Geometry.Point([lon, lat])
 
     # Create water masks from each LULC year
@@ -718,11 +734,11 @@ def get_merged_waterbodies_with_zoi(
             f"&maxFeatures={maxf}&outputFormat=application/json"
         )
 
-    standard_layer = f"surface_waterbodies_{district_l}_{block_l}"
+    standard_layer = f"swb4_{district_l}_{block_l}"
     zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
 
-    standard_wfs = build_wfs("water_bodies", standard_layer, max_features)
-    zoi_wfs = build_wfs("water_bodies", zoi_layer, max_features)
+    standard_wfs = build_wfs("swb", standard_layer, max_features)
+    zoi_wfs = build_wfs("swb", zoi_layer, max_features)
 
     # fetch and return uid->props dict
     def fetch_uid_props(wfs_url, generate_from_props=False):
@@ -818,3 +834,21 @@ def get_merged_waterbodies_with_zoi(
 
     print(f"Saved merged → {merged_path} ({len(merged)} UIDs)")
     return merged
+
+
+def validate_excel_headers(file_obj, expected_headers):
+    try:
+        df = pd.read_excel(file_obj, nrows=0)
+
+        uploaded_headers = {str(col).strip().lower() for col in df.columns}
+
+        missing = expected_headers - uploaded_headers
+        extra = uploaded_headers - expected_headers
+
+        if missing:
+            return (False, f"Missing required columns: {', '.join(sorted(missing))}")
+
+        return True, None
+
+    except Exception as e:
+        return False, f"Invalid Excel file format: {str(e)}"

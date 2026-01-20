@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Optional
 
 import requests
@@ -28,7 +29,7 @@ from utilities.constants import (
 
 from .build_layer import build_layer
 from .models import Plan
-from .serializers import PlanSerializer
+from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
 
 
@@ -51,7 +52,7 @@ def get_plans(request):
             plans = Plan.objects.filter(block=block_id)
         else:
             plans = Plan.objects.all()
-        serializer = PlanSerializer(plans, many=True)
+        serializer = PlanAppSerializer(plans, many=True)
         response = {"plans": serializer.data}
 
         return Response(response, status=status.HTTP_200_OK)
@@ -65,7 +66,7 @@ def get_plans(request):
 @schema(None)
 def add_plan(request):
     if request.method == "POST":
-        serializer = PlanSerializer(data=request.data)
+        serializer = PlanAppSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()  # Save the new Plan instance if validation passes
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -88,7 +89,9 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = (
+        TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    )
 
     odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
 
@@ -117,6 +120,9 @@ def add_resources(request):
             {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+    finally:
+        if os.path.exists(CSV_PATH):
+            os.remove(CSV_PATH)
 
     return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
 
@@ -165,6 +171,9 @@ def add_works(request):
             {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+    finally:
+        if os.path.exists(CSV_PATH):
+            os.remove(CSV_PATH)
 
     return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
 
@@ -245,7 +254,7 @@ def _get_feedback_config() -> Dict[str, Dict[str, Any]]:
 
 
 def _validate_sync_request(
-        request, resource_type: str = None, work_type: str = None, feedback_type: str = None
+    request, resource_type: str = None, work_type: str = None, feedback_type: str = None
 ) -> Optional[Response]:
     """Validate the sync request parameters and content type."""
 
@@ -301,7 +310,7 @@ def _validate_sync_request(
 
 
 def _sync_to_odk(
-        xml_string: str, config: Dict[str, Any], bearer_token: str
+    xml_string: str, config: Dict[str, Any], bearer_token: str
 ) -> Response:
     """Handle the actual sync to ODK for a specific resource or work type."""
     try:

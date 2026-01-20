@@ -680,12 +680,14 @@ def upload_shp_to_gee(
         check_task_status([task_id], 100)
 
 
-def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
+def merge_fc_into_existing_fc(asset_id, description, new_asset_id, join_on="id"):
+    print("Asset ID:", asset_id)
+    print("New Asset ID:", new_asset_id)
     # Join on 'id'
     joined = ee.Join.inner().apply(
         primary=ee.FeatureCollection(asset_id),
         secondary=ee.FeatureCollection(new_asset_id),
-        condition=ee.Filter.equals(leftField="id", rightField="id"),
+        condition=ee.Filter.equals(leftField=join_on, rightField=join_on),
     )
 
     # Merge properties from both collections
@@ -715,16 +717,6 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id):
 def build_gee_helper_paths(app_type, helper_project):
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
     return f"{gee_helper_base_path}/{app_type.lower()}/"
-
-
-def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):
-    lon1, lat1, lon2, lat2 = map(np.radians, [lon1, lat1, lon2, lat2])
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-    c = 2 * np.arcsin(np.sqrt(a))
-    r = 6371
-    return c * r * 1000
 
 
 def get_distance_between_two_lan_long(lon1, lat1, lon2, lat2):

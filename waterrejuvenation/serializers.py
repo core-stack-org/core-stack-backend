@@ -5,11 +5,15 @@ from projects.models import Project, AppType
 
 
 class ExcelFileSerializer(serializers.ModelSerializer):
-    """Serializer for KML files with basic information"""
+    """Serializer for Waterbody Excel files"""
 
     uploaded_by_username = serializers.CharField(
         source="uploaded_by.username", read_only=True
     )
+
+    is_lulc_required = serializers.BooleanField(required=False, default=True)
+    is_processing_required = serializers.BooleanField(required=False, default=True)
+    is_closest_wp = serializers.BooleanField(required=False, default=True)
 
     class Meta:
         model = WaterbodiesFileUploadLog
@@ -21,5 +25,8 @@ class ExcelFileSerializer(serializers.ModelSerializer):
             "uploaded_by_username",
             "created_at",
             "gee_account_id",
+            "is_processing_required",
+            "is_lulc_required",
+            "is_closest_wp",
         ]
         read_only_fields = ["id", "uploaded_by", "created_at"]
