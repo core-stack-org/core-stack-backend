@@ -41,7 +41,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     os.makedirs(district_path, exist_ok=True)
     xlsx_file = os.path.join(district_path, f"{district}_{block}.xlsx")
 
-    workspaces_to_process = set(specific_sheets) if specific_sheets else None
+    workspaces_to_process = specific_sheets
 
     # Handle existing sheets when adding specific workspaces
     results = []
@@ -747,13 +747,15 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
             {
                 "UID": uid,
                 "area_in_ha": properties.get("area_in_ha", None),
-                "double_to_single_area_in_ha": properties.get("do_si", None),
-                "double_to_triple_area_in_ha": properties.get("do_tr", None),
+                "single_to_single_area_in_ha": properties.get("si_si", None),
                 "single_to_double_area_in_ha": properties.get("si_do", None),
                 "single_to_triple_area_in_ha": properties.get("si_tr", None),
-                "triple_to_double_area_in_ha": properties.get("tr_do", None),
+                "double_to_single_area_in_ha": properties.get("do_si", None),
+                "double_to_double_area_in_ha": properties.get("do_do", None),
+                "double_to_triple_area_in_ha": properties.get("do_tr", None),
                 "triple_to_single_area_in_ha": properties.get("tr_si", None),
-                "no_change_area_in_ha": properties.get("same", None),
+                "triple_to_double_area_in_ha": properties.get("tr_do", None),
+                "triple_to_triple_area_in_ha": properties.get("tr_tr", None),
                 "total_change_crop_intensity_area_in_ha": properties.get(
                     "total_chan", None
                 ),
