@@ -35,6 +35,7 @@ class UserSerializer(serializers.ModelSerializer):
             "education_qualification",
             "gender",
             "profile_picture",
+            "account_type",
         ]
         read_only_fields = ["id", "is_active"]
 
@@ -98,6 +99,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "education_qualification",
             "gender",
             "profile_picture",
+            "account_type",
         ]
         read_only_fields = ["id"]
 
@@ -166,6 +168,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             education_qualification=validated_data.get("education_qualification", ""),
             gender=validated_data.get("gender", ""),
             profile_picture=validated_data.get("profile_picture"),
+            account_type=validated_data.get("account_type"),
         )
 
         if org_obj:
@@ -176,7 +179,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 created_by=user,  # <-- here we set created_by to the same new user
             )
             user.organization = org_obj
-
         user.save()
         return user
 

@@ -56,7 +56,8 @@ PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 
 STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = 2
-GEE_DEFAULT_ACCOUNT_ID = 1
+GEE_DEFAULT_ACCOUNT_ID = 22
+ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
@@ -91,7 +92,6 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework_api_key",
     # project applications
-    "users",
     "organization.apps.OrganizationConfig",
     "projects",
     "plantations",
@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     "waterrejuvenation",
     "apiadmin",
     "moderation",
+    "users.apps.UsersConfig",
 ]
 
 # MARK: CORS Settings
