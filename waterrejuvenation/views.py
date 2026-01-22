@@ -58,9 +58,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
 
         # Get project and check if it's a plantation project and enabled
         try:
-            project = Project.objects.get(
-                id=project_id, app_type=AppType.WATERBODY_REJ, enabled=True
-            )
+            project = Project.objects.get(id=project_id, app_type=AppType.WATERBODY_REJ)
         except Project.DoesNotExist:
             return Response(
                 {"detail": "Plantation project not found or not enabled."},
@@ -125,6 +123,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                     "is_processing_required", True
                 ),
                 "is_closest_wp": request.data.get("is_closest_wp", True),
+                "is_compute": request.data.get("is_compute", False),
             }
             print(data)
             serializer = self.get_serializer(data=data)
