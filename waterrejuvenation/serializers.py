@@ -14,6 +14,7 @@ class ExcelFileSerializer(serializers.ModelSerializer):
     is_lulc_required = serializers.BooleanField(required=False, default=True)
     is_processing_required = serializers.BooleanField(required=False, default=True)
     is_closest_wp = serializers.BooleanField(required=False, default=True)
+    is_compute = serializers.BooleanField(required=False, default=False)
 
     class Meta:
         model = WaterbodiesFileUploadLog
@@ -28,5 +29,6 @@ class ExcelFileSerializer(serializers.ModelSerializer):
             "is_processing_required",
             "is_lulc_required",
             "is_closest_wp",
+            "is_compute",
         ]
         read_only_fields = ["id", "uploaded_by", "created_at"]
