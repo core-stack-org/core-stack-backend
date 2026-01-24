@@ -1378,8 +1378,7 @@
             {% if mining_desc %}
             <div class="mining-section">
                 <h3>Mining Sites in this Microwatershed</h3>
-                <p>The following {{ mining_desc|length }} mining site{{ mining_desc|length|pluralize }} {{
-                    mining_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
+                <p>The following {{ mining_desc|length }} mining site{{ mining_desc|length|pluralize }} {{mining_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
 
                 <div class="mining-list collapsible-list" id="miningList">
                     {% for mining in mining_desc %}
