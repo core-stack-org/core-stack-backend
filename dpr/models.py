@@ -32,6 +32,7 @@ class ODK_settlement(models.Model):
     nrega_issues = models.TextField()
     nrega_community = models.TextField()
     data_settlement = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Settlement"
@@ -61,6 +62,7 @@ class ODK_well(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_well = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Well"
@@ -96,6 +98,7 @@ class ODK_waterbody(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_waterbody = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Waterbody Structure"
@@ -122,6 +125,7 @@ class ODK_groundwater(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_groundwater = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Groundwater Structure"
@@ -154,6 +158,7 @@ class ODK_agri(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_agri = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Irrigation Structure"
@@ -186,6 +191,7 @@ class ODK_crop(models.Model):
     status_re = models.TextField()
     system = models.JSONField()
     data_crop = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Cropping Pattern"
@@ -214,6 +220,7 @@ class ODK_livelihood(models.Model):
     system = models.JSONField()
     gps_point = models.JSONField()
     data_livelihood = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Livelihood"
@@ -235,6 +242,7 @@ class GW_maintenance(models.Model):
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
     data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Groundwater Maintenance"
@@ -253,6 +261,7 @@ class SWB_RS_maintenance(models.Model):
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
     data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "SWB-RS Maintenance"
@@ -271,6 +280,7 @@ class SWB_maintenance(models.Model):
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
     data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "SWB Maintenance"
@@ -289,6 +299,7 @@ class Agri_maintenance(models.Model):
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
     data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
 
     class Meta:
         verbose_name = "Agri Maintenance"

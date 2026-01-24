@@ -6,12 +6,15 @@ from rest_framework.response import Response
 import requests
 from rest_framework import status
 from .utils.form_mapping import model_map
+from .api import FETCH_FIELD_MAP
+from .utils.get_submissions import ODKSubmissionsChecker
+import json
 
 
 @api_view(["GET"])
 @schema(None)
 def get_paginated_submissions(request, form, plan_id):
-    page = request.GET.get("page", 1)
+    page = request.GET.get("page")
 
     mapping = {
         "Settlement": SubmissionsOfPlan.get_settlement,
@@ -24,7 +27,7 @@ def get_paginated_submissions(request, form, plan_id):
         "Agri Maintenance": SubmissionsOfPlan.get_agri_maintenance,
         "GroundWater Maintenance": SubmissionsOfPlan.get_gw_maintenance,
         "Surface Water Body Maintenance": SubmissionsOfPlan.get_swb_maintenance,
-        "Surface Water Body Recharge Structure Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
+        "Surface Water Body Remotely Sensed Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
     }
 
     if form not in mapping:
@@ -37,29 +40,9 @@ def get_paginated_submissions(request, form, plan_id):
 @api_view(["GET"])
 @schema(None)
 def get_form_names(request):
-    form_names = [
-        {"name": "Settlement", "form_id": "Add_Settlements_form%20_V1.0.1"},
-        {"name": "Well", "form_id": "Add_Wells_form%20_V1.0.1"},
-        {"name": "Waterbody", "form_id": "Add_Waterbody_form%20_V1.0.1"},
-        {"name": "Groundwater", "form_id": "Add_Groundwater_form%20_V1.0.1"},
-        {"name": "Agri", "form_id": "Add_Agri_form%20_V1.0.1"},
-        {"name": "Livelihood", "form_id": "Add_Livelihood_form%20_V1.0.1"},
-        {"name": "Crop", "form_id": "Add_Cropping_form%20_V1.0.1"},
-        {"name": "Agri Maintenance", "form_id": "Agri_Maintenance_form%20_V1.0.1"},
-        {
-            "name": "GroundWater Maintenance",
-            "form_id": "Groundwater_Maintenance_form%20_V1.0.1",
-        },
-        {
-            "name": "Surface Water Body Maintenance",
-            "form_id": "Surface_Waterbody_Maintenance_form%20_V1.0.1",
-        },
-        {
-            "name": "Surface Water Body Recharge Structure Maintenance",
-            "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
-        },
-    ]
-    return JsonResponse({"forms": form_names})
+    with open("moderation/utils/forms.json", "r") as file:
+        data = json.load(file)
+    return JsonResponse({"forms": data["Forms"]}, safe=False)
 
 
 @api_view(["PUT"])
@@ -68,16 +51,21 @@ def update_submission(request, form_name, uuid):
     Model = model_map.get(form_name)
     if not Model:
         return Response({"success": False, "message": "Invalid form"}, status=400)
-
+    field_name = FETCH_FIELD_MAP.get(Model)
+    if not field_name:
+        return Response(
+            {"success": False, "message": "No JSON field configured"},
+            status=400,
+        )
     try:
         obj = Model.objects.get(uuid=uuid)
     except Model.DoesNotExist:
         return Response({"success": False, "message": "Not found"}, status=404)
-
-    for field, value in request.data.items():
-        setattr(obj, field, value)
-
-    obj.save()
+    existing_data = getattr(obj, field_name) or {}
+    existing_data.update(request.data)
+    setattr(obj, field_name, existing_data)
+    obj.is_moderated = True
+    obj.save(update_fields=[field_name, "is_moderated"])
     return Response({"success": True})
 
 
@@ -110,7 +98,7 @@ def sync_updated_submissions(request):
         gw_maintenance_submissions,
         swb_maintenance_submissions,
         swb_rs_maintenance_submissions,
-    ) = sync_settlement_odk_data(get_edited_updated_all_submissions)
+    ) = sync_odk_data(get_edited_updated_all_submissions)
     checker = ODKSubmissionsChecker()
     res = checker.process("updated")
     for form_name, status in res.items():
