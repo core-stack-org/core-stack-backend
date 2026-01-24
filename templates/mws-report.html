@@ -1334,8 +1334,7 @@
             {% if factory_desc %}
             <div class="factory-section">
                 <h3>Industries in this Microwatershed</h3>
-                <p>The following {{ factory_desc|length }} Industr{{ factory_desc|length|pluralize:"y,ies" }} {{
-                    factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
+                <p>The following {{ factory_desc|length }} Industr{{ factory_desc|length|pluralize:"y,ies" }} {{factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
 
                 <div class="factory-list collapsible-list" id="factoryList">
                     {% for factory in factory_desc %}
@@ -1425,8 +1424,7 @@
         {% if green_credit_desc %}
         <div class="green-credit-section">
             <h3>Green Credit Sites in this Microwatershed</h3>
-            <p>The following {{ green_credit_desc|length }} green credit site{{ green_credit_desc|length|pluralize }} {{
-                green_credit_desc|length|pluralize:"is,are" }} registered in this micro watershed:</p>
+            <p>The following {{ green_credit_desc|length }} green credit site{{ green_credit_desc|length|pluralize }} {{green_credit_desc|length|pluralize:"is,are" }} registered in this micro watershed:</p>
 
             <div class="green-credit-list collapsible-list" id="greenCreditList">
                 {% for credit in green_credit_desc %}
@@ -1736,6 +1734,8 @@
         </div>
     </footer>
     <script>
+
+        console.log("This is Desc : ",  )
 
         const baseLayer = new ol.layer.Tile({
             source: new ol.source.XYZ({
