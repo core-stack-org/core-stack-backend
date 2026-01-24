@@ -10,9 +10,9 @@ class ProjectAdmin(admin.ModelAdmin):
         "id",
         "name",
         "get_organization_name",
-        "state",
-        "district",
-        "block",
+        "state_soi",
+        "district_soi",
+        "tehsil_soi",
         "app_type",
         "enabled",
     )
