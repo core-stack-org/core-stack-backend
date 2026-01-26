@@ -4,7 +4,7 @@ The Django project configuration for core-stack-backend demonstrates a sophistic
 
 ## Settings Architecture Overview
 
-![Django Settings Architecture](https://github.com/core-stack-org/core-stack-backend/blob/main/nrm_app/settings.py?raw=true)
+![Django Settings Architecture](../nrm_app/settings.py)
 
 The settings module follows Django's standard configuration pattern with enhancements for geospatial computing and multi-service integration. The architecture employs a centralized configuration approach where `django-environ` handles environment variable loading, ensuring sensitive credentials never appear in the codebase [settings.py](nrm_app/settings.py#L20-L22). This design enables seamless transitions between development, staging, and production environments while maintaining security best practices.
 
@@ -170,7 +170,7 @@ CORS_ALLOW_METHODS = [
 CORS_ALLOW_CREDENTIALS = True
 ```
 
-The regex patterns accommodate development scenarios using ngrok tunnels and local network IP addresses, while the additional headers support API key authentication through the `X-API-Key` header and file uploads via multipart form data [settings.py](nrm_app/settings.py#L137-L153).
+The regex patterns accommodate development scenarios using ngrok tunnels and local network IP addresses, while the additional headers support API key authentication through the `X-API-Key` header and file uploads via multipart form data [settings.py](../nrm_app/settings.py#L137-L153).
 
 ## External Service Integrations
 
@@ -178,7 +178,7 @@ The settings module orchestrates connections to numerous external services essen
 
 ### Google Earth Engine Integration
 
-Multiple GEE service accounts are configured to support different access levels and computational workloads [settings.py](nrm_app/settings.py#L354-L356):
+Multiple GEE service accounts are configured to support different access levels and computational workloads [settings.py](../nrm_app/settings.py#L354-L356):
 
 ```python
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
@@ -188,15 +188,15 @@ GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PA
 
 The three-tier service account architecture supports:
 
-* **Default Account**: Standard computational tasks (ID: 22) [settings.py](nrm_app/settings.py#L59)
-* **Helper Account**: Support operations and helper functions (ID: 2) [settings.py](nrm_app/settings.py#L58)
+* **Default Account**: Standard computational tasks (ID: 22) [settings.py](../nrm_app/settings.py#L59)
+* **Helper Account**: Support operations and helper functions (ID: 2) [settings.py](../nrm_app/settings.py#L58)
 * **Datasets Account**: Large dataset operations with elevated quotas
 
 For detailed GEE authentication procedures and usage patterns, see [Google Earth Engine Integration and Authentication](/9-google-earth-engine-integration-and-authentication) .
 
 ### GeoServer Configuration
 
-GeoServer provides WMS/WFS services for generated geospatial assets [settings.py](nrm_app/settings.py#L345-L347):
+GeoServer provides WMS/WFS services for generated geospatial assets [settings.py](../nrm_app/settings.py#L345-L347):
 
 ```python
 GEOSERVER_URL = env("GEOSERVER_URL")
@@ -213,7 +213,7 @@ The GeoServer integration enables:
 
 ### Cloud Storage Configuration
 
-AWS S3 integration handles asset storage and distribution across multiple buckets [settings.py](nrm_app/settings.py#L360-L369):
+AWS S3 integration handles asset storage and distribution across multiple buckets [settings.py](../nrm_app/settings.py#L360-L369):
 
 ```python
 NREGA_BUCKET = env("NREGA_BUCKET")
@@ -233,7 +233,7 @@ The multi-bucket architecture separates:
 
 ### Email Configuration
 
-SMTP settings enable transactional email delivery for reports and notifications [settings.py](nrm_app/settings.py#L336-L343):
+SMTP settings enable transactional email delivery for reports and notifications [settings.py](../nrm_app/settings.py#L336-L343):
 
 ```python
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -255,7 +255,7 @@ The email system supports:
 
 ## Logging Configuration
 
-The logging system provides comprehensive monitoring and debugging capabilities with multiple handlers and formatters [settings.py](nrm_app/settings.py#L288-L330). The configuration follows Django's logging best practices while adding application-specific loggers.
+The logging system provides comprehensive monitoring and debugging capabilities with multiple handlers and formatters [settings.py](../nrm_app/settings.py#L288-L330). The configuration follows Django's logging best practices while adding application-specific loggers.
 
 ```mermaid
 graph LR
@@ -417,11 +417,11 @@ The `INSTALLED_APPS` setting reveals the modular architecture with 19 applicatio
 * `gee_computing`: Google Earth Engine integration
 * `waterrejuvenation`: Water body management
 
-The application architecture is designed for modularity, allowing independent development and testing of each component while maintaining clear separation of concerns. For deeper insights into the project architecture, see [Project Architecture and Module Organization](/3-project-architecture-and-module-organization) .
+The application architecture is designed for modularity, allowing independent development and testing of each component while maintaining clear separation of concerns. For deeper insights into the project architecture, see [Project Architecture and Module Organization](./3-project-architecture-and-module-organization) .
 
 ## Celery Integration
 
-Celery is configured through a separate settings file (`nrm_app/celery.py`) that imports the Django settings module and configures the Celery application [celery.py](nrm_app/celery.py#L5-L19):
+Celery is configured through a separate settings file (`nrm_app/celery.py`) that imports the Django settings module and configures the Celery application [celery.py](../nrm_app/celery.py#L5-L19):
 
 ```python
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
@@ -438,7 +438,7 @@ The Celery configuration pattern enables:
 * **Auto-discovery**: Tasks are automatically discovered from all installed applications
 * **Shared Configuration**: Database connections, cache settings, and other resources are shared between Django and Celery workers
 
-This design ensures that background tasks have access to the same environment variables and configuration as the main Django application, maintaining consistency across synchronous and asynchronous code paths. For comprehensive Celery task processing documentation, refer to [Celery Asynchronous Task Processing](/8-celery-asynchronous-task-processing) .
+This design ensures that background tasks have access to the same environment variables and configuration as the main Django application, maintaining consistency across synchronous and asynchronous code paths. For comprehensive Celery task processing documentation, refer to [Celery Asynchronous Task Processing](./8-celery-asynchronous-task-processing) .
 
 ## Security Considerations and Best Practices
 
@@ -446,7 +446,7 @@ The settings implementation follows Django security best practices with several 
 
 ### Credential Management
 
-All sensitive credentials are loaded exclusively from environment variables using `django-environ`, preventing hardcoded secrets in version control [settings.py](nrm_app/settings.py#L31-L47). This includes:
+All sensitive credentials are loaded exclusively from environment variables using `django-environ`, preventing hardcoded secrets in version control [settings.py](../nrm_app/settings.py#L31-L47). This includes:
 
 * Database credentials
 * API keys for third-party services
@@ -455,7 +455,7 @@ All sensitive credentials are loaded exclusively from environment variables usin
 
 ### Allowed Hosts Configuration
 
-The `ALLOWED_HOSTS` list restricts which domains can serve the application, preventing host header attacks [settings.py](nrm_app/settings.py#L60-L70):
+The `ALLOWED_HOSTS` list restricts which domains can serve the application, preventing host header attacks [settings.py](../nrm_app/settings.py#L60-L70):
 
 ```python
 ALLOWED_HOSTS = [
@@ -472,7 +472,7 @@ This configuration explicitly whitelists valid domain names and IP addresses.
 
 ### CSRF Protection
 
-CSRF protection is enabled with trusted origins configured for local development [settings.py](nrm_app/settings.py#L154):
+CSRF protection is enabled with trusted origins configured for local development [settings.py](../nrm_app/settings.py#L154):
 
 ```python
 CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
@@ -538,28 +538,7 @@ The loading sequence ensures:
 
 ## Next Steps
 
-Understanding the Django settings and environment variable 
-
-```mermaid
-graph TB
-    A[Environment Files<br/>.env] --> B[django-environ<br/>Environment Loader]
-    B --> C[settings.py<br/>Configuration Hub]
-    C --> D[Core Django Settings]
-    C --> E[Database Configuration]
-    C --> F[REST Framework & JWT]
-    C --> G[CORS Configuration]
-    C --> H[External Services]
-    C --> I[Logging System]
-    C --> J[File Storage]
-    C --> K[Internationalization]
-    C --> L[Celery Integration]
-    
-    style A fill:#e1f5ff
-    style C fill:#fff4e1
-    style H fill:#ffe1e1
-```
-
-configuration provides the foundation for working with the core-stack-backend application. To continue your exploration of the system:
+Understanding the Django settings and environment variable configuration provides the foundation for working with the core-stack-backend application. To continue your exploration of the system:
 
 1. **Multi-Tenant Architecture**: Learn how the settings support multi-tenant organizations in [Multi-Tenant Organization and User Management](/6-multi-tenant-organization-and-user-management)
 2. **Authentication Details**: Dive deeper into JWT authentication flows in [Authentication and Authorization System](/7-authentication-and-authorization-system)

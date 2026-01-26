@@ -2,7 +2,7 @@
 
 This page provides a comprehensive guide to setting up the CoRE Stack Backend development environment. The backend is a Django-based geospatial computing platform that integrates Google Earth Engine, PostgreSQL, Apache, and Celery for processing remote sensing data and managing natural resource monitoring systems.
 
-![Project Structure](https://github.com/core-stack-org/core-stack-backend/blob/main/docs/guide/design/frontend.md)
+![Project Structure](../docs/guide/design/frontend.md)
 
 ## System Requirements
 
@@ -39,7 +39,7 @@ flowchart TD
     style G fill:#fff3e0
 ```
 
-Sources: [README.md](README.md#L11-L20), [installation/install.sh](installation/install.sh#L1-L10)
+Sources: [README.md](README.md#L11-L20), [installation/install.sh](../installation/install.sh#L1-L10)
 
 ## Installation Architecture
 
@@ -47,7 +47,7 @@ The installation process follows a systematic approach to set up all required co
 
 This architecture ensures that each component is properly configured before dependent components are installed, minimizing configuration errors and ensuring system stability.
 
-Sources: [installation/install.sh](installation/install.sh#L14-L178)
+Sources: [installation/install.sh](../installation/install.sh#L14-L178)
 
 ## Automated Installation Script
 
@@ -69,7 +69,7 @@ The installation script includes configurable parameters at the top:
 
 For production environments, modify these variables in the script before execution to match your security requirements and organizational standards. Avoid using default credentials in production deployments.
 
-Sources: [installation/install.sh](installation/install.sh#L6-L13)
+Sources: [installation/install.sh](../installation/install.sh#L6-L13)
 
 ### Installation Steps
 
@@ -96,7 +96,7 @@ The script will perform the following operations automatically:
 7. **Django Initialization**: Runs migrations and collects static files
 8. **Apache Configuration**: Sets up the virtual host configuration for serving the application
 
-Sources: [README.md](README.md#L21-L31), [installation/install.sh](installation/install.sh#L22-L177)
+Sources: [README.md](README.md#L21-L31), [installation/install.sh](../installation/install.sh#L22-L177)
 
 ## Conda Environment Configuration
 
@@ -119,7 +119,7 @@ The environment includes several categories of dependencies critical for the app
 
 Additional pip packages include essential libraries like `django-environ`, `psycopg` for PostgreSQL, `selenium` for browser automation, and `pystac` for STAC metadata handling.
 
-Sources: [installation/environment.yml](installation/environment.yml#L1-L390)
+Sources: [installation/environment.yml](../installation/environment.yml#L1-L390)
 
 ### Environment Activation
 
@@ -137,7 +137,7 @@ python -c "import django; print(django.VERSION)"  # Should show Django 5.2
 python -c "import ee; print('GEE configured')"  # Should confirm GEE API availability
 ```
 
-Sources: [README.md](README.md#L37-L40), [installation/environment.yml](installation/environment.yml#L200-L390)
+Sources: [README.md](README.md#L37-L40), [installation/environment.yml](../installation/environment.yml#L200-L390)
 
 ## Django Configuration Management
 
@@ -159,19 +159,6 @@ The `nrm_app/settings.py` file reads configuration from environment variables us
 | `GEOSERVER_URL`, `GEOSERVER_USERNAME`, `GEOSERVER_PASSWORD` | Geospatial | GeoServer connection settings |
 
 Create a `.env` file in the project root directory to store these environment variables. The installation script sets up default PostgreSQL credentials, but all other variables should be configured according to your deployment environment.
-
-Sources: [nrm\_app/settings.py](nrm_app/settings.py#L20-L60)
-
-### Key Configuration Sections
-
-The Django settings file is organized into logical sections with `MARK:` comments for easy navigation:
-
-1. **Database Settings**: PostgreSQL configuration with environment-based credentials <nrm_app/settings.py#L49-L53>
-2. **Installed Apps**: Core Django apps, REST framework, and project-specific applications <nrm_app/settings.py#L71-L130>
-3. **CORS Configuration**: Cross-origin resource sharing settings for API access <nrm_app/settings.py#L131-L152>
-4. **JWT Settings**: Simple JWT configuration for token-based authentication <nrm_app/settings.py#L168-L189>
-5. **Static and Media Files**: Configuration for static assets and user-uploaded content <nrm_app/settings.py#L269-L280>
-6. **Logging**: Comprehensive logging setup with console, file, and email handlers <nrm_app/settings.py#L288-L330>
 
 ```mermaid
 graph LR
@@ -201,7 +188,20 @@ graph LR
     class C wsgiStyle;
 ```
 
-Sources: [nrm\_app/settings.py](nrm_app/settings.py#L1-L395)
+Sources: [nrm\_app/settings.py](../nrm_app/settings.py#L20-L60)
+
+### Key Configuration Sections
+
+The Django settings file is organized into logical sections with `MARK:` comments for easy navigation:
+
+1. **Database Settings**: PostgreSQL configuration with environment-based credentials <nrm_app/settings.py#L49-L53>
+2. **Installed Apps**: Core Django apps, REST framework, and project-specific applications <nrm_app/settings.py#L71-L130>
+3. **CORS Configuration**: Cross-origin resource sharing settings for API access <nrm_app/settings.py#L131-L152>
+4. **JWT Settings**: Simple JWT configuration for token-based authentication <nrm_app/settings.py#L168-L189>
+5. **Static and Media Files**: Configuration for static assets and user-uploaded content <nrm_app/settings.py#L269-L280>
+6. **Logging**: Comprehensive logging setup with console, file, and email handlers <nrm_app/settings.py#L288-L330>
+
+Sources: [nrm\_app/settings.py](../nrm_app/settings.py#L1-L395)
 
 ## Web Server Configuration
 
@@ -216,7 +216,7 @@ Key Apache configuration directives:
 * **Alias Directories**: Serves static files (`/static`) and media uploads (`/media`) directly
 * **Error and Access Logs**: Configured to `/var/log/apache2/` for monitoring
 
-Sources: [installation/install.sh](installation/install.sh#L119-L146), [nrm\_app/wsgi.py](nrm_app/wsgi.py#L1-L32)
+Sources: [installation/install.sh](../installation/install.sh#L119-L146), [nrm\_app/wsgi.py](../nrm_app/wsgi.py#L1-L32)
 
 ### WSGI Application
 
@@ -238,7 +238,7 @@ else:
 
 This configuration ensures GDAL can locate its data files and libraries for geospatial processing operations.
 
-Sources: [nrm\_app/wsgi.py](nrm_app/wsgi.py#L14-L32)
+Sources: [nrm\_app/wsgi.py](../nrm_app/wsgi.py#L14-L32)
 
 ## Celery Configuration
 
@@ -259,7 +259,7 @@ app.autodiscover_tasks(INSTALLED_APPS)
 
 Celery reads configuration from Django settings and automatically discovers tasks from all installed Django applications.
 
-Sources: [nrm\_app/celery.py](nrm_app/celery.py#L1-L19)
+Sources: [nrm\_app/celery.py](../nrm_app/celery.py#L1-L19)
 
 ### Running Celery Workers
 
@@ -278,7 +278,7 @@ Parameters explained:
 
 For development, you may run Celery with the `--autoscale` option to automatically adjust worker count based on workload. In production, consider using supervisor or systemd to manage Celery worker processes as services.
 
-Sources: [README.md](README.md#L44-L46), [nrm\_app/celery.py](nrm_app/celery.py#L1-L19)
+Sources: [README.md](../README.md#L44-L46), [nrm\_app/celery.py](../nrm_app/celery.py#L1-L19)
 
 ## Development Server Startup
 
@@ -303,7 +303,7 @@ python manage.py runserver 0.0.0.0:8000
 
 For a complete development environment, you'll need to run both the Django development server and the Celery worker in separate terminal windows.
 
-Sources: [README.md](README.md#L37-L46)
+Sources: [README.md](../README.md#L37-L46)
 
 ## Access Points
 
@@ -318,34 +318,6 @@ After successful installation and server startup, the application provides sever
 
 The application uses `django-rest-framework-simplejwt` for API authentication, so API endpoints will require valid JWT tokens for access.
 
-```mermaid
-graph LR
-    A["HTTP Request"]
-    B["Apache Server"]
-    C["mod_wsgi Module"]
-    D["Django WSGI Application"]
-    E["Django Settings"]
-    F["Application Logic"]
-    G["Response"]
-    H["HTTP Response"]
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
-    G --> C
-    C --> B
-    B --> H
-    
-    classDef djangoStyle fill:#e8f5e9,stroke:#333,stroke-width:1px;
-    classDef wsgiStyle fill:#fff3e0,stroke:#333,stroke-width:1px;
-    
-    class D djangoStyle;
-    class C wsgiStyle;
-```
-
 ## Logging Configuration
 
 The application implements a comprehensive logging system for monitoring and debugging:
@@ -358,7 +330,7 @@ Log configuration includes:
 
 The logs directory is created automatically by the installation script with appropriate permissions for the web server user (`www-data`).
 
-Sources: [nrm\_app/settings.py](nrm_app/settings.py#L288-L330), [installation/install.sh](installation/install.sh#L85-L91)
+Sources: [nrm\_app/settings.py](../nrm_app/settings.py#L288-L330), [installation/install.sh](../installation/install.sh#L85-L91)
 
 ## Troubleshooting Common Issues
 
@@ -373,7 +345,7 @@ echo $LD_LIBRARY_PATH
 
 The paths should point to your conda environment's GDAL installation.
 
-Sources: [nrm\_app/wsgi.py](nrm_app/wsgi.py#L14-L32)
+Sources: [nrm\_app/wsgi.py](../nrm_app/wsgi.py#L14-L32)
 
 ### Database Connection Issues
 
@@ -383,7 +355,7 @@ If PostgreSQL connection fails, verify:
 * Database credentials match those in your `.env` file
 * Database user has appropriate permissions
 
-Sources: [installation/install.sh](installation/install.sh#L52-L62)
+Sources: [installation/install.sh](../installation/install.sh#L52-L62)
 
 ### Static Files Not Loading
 
@@ -393,7 +365,7 @@ If static files return 404 errors:
 * Run `python manage.py collectstatic --noinput` again
 * Check Apache permissions on the static directory
 
-Sources: [installation/install.sh](installation/install.sh#L94-L98)
+Sources: [installation/install.sh](../installation/install.sh#L94-L98)
 
 ### Celery Worker Issues
 
@@ -403,13 +375,13 @@ If Celery tasks aren't processing:
 * Check that the queue name matches: `-Q nrm`
 * Review Celery logs for connection errors
 
-Sources: [README.md](README.md#L44-L46)
+Sources: [README.md](../README.md#L44-L46)
 
 ## Next Steps
 
 After successfully setting up your environment, proceed with these documentation pages to deepen your understanding:
 
-* **[Django Project Settings and Environment Variables](/5-django-project-settings-and-environment-variables)** : Comprehensive guide to all Django configuration options and their purposes
-* **[Celery Asynchronous Task Processing](/8-celery-asynchronous-task-processing)** : Detailed explanation of task queues and background job processing
-* **[Google Earth Engine Integration and Authentication](/9-google-earth-engine-integration-and-authentication)** : Setup guide for GEE service accounts and authentication
+* **[Django Project Settings and Environment Variables](./5-django-project-settings-and-environment-variables)** : Comprehensive guide to all Django configuration options and their purposes
+* **[Celery Asynchronous Task Processing](./8-celery-asynchronous-task-processing)** : Detailed explanation of task queues and background job processing
+* **[Google Earth Engine Integration and Authentication](./9-google-earth-engine-integration-and-authentication)** : Setup guide for GEE service accounts and authentication
 

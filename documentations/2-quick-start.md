@@ -29,7 +29,7 @@ The installation script (`installation/install.sh`) will automatically install a
 | Google Earth Engine API | Geospatial computing | 1.5.9 |
 | GeoPandas | Geospatial data processing | 1.0.1 |
 
-Sources: [installation/install.sh](installation/install.sh#L1-L30), [installation/environment.yml](installation/environment.yml#L1-L50)
+Sources: [installation/install.sh](../installation/install.sh#L1-L30), [installation/environment.yml](../installation/environment.yml#L1-L50)
 
 ## Automated Installation (Recommended)
 
@@ -61,22 +61,22 @@ The installation script typically takes 10-15 minutes to complete, depending on 
 
 ```mermaid
 flowchart TD
-    A[\"Install Miniconda\"] --> B[\"Setup Conda Environment\"]
-    B --> C[\"Install PostgreSQL\"]
-    C --> D[\"Configure PostgreSQL User/DB\"]
-    D --> E[\"Install Apache + mod_wsgi\"]
-    E --> F[\"Clone Backend Repository\"]
-    F --> G[\"Setup Logs Directory\"]
-    G --> H[\"Run Django Migrations\"]
-    H --> I[\"Collect Static Files\"]
-    I --> J[\"Configure Apache VirtualHost\"]
-    J --> K[\"Deployment Complete\"]
+    A["Install Miniconda"] --> B["Setup Conda Environment"]
+    B --> C["Install PostgreSQL"]
+    C --> D["Configure PostgreSQL User/DB"]
+    D --> E["Install Apache + mod_wsgi"]
+    E --> F["Clone Backend Repository"]
+    F --> G["Setup Logs Directory"]
+    G --> H["Run Django Migrations"]
+    H --> I["Collect Static Files"]
+    I --> J["Configure Apache VirtualHost"]
+    J --> K["Deployment Complete"]
     
     style A fill:#e1f5ff
     style K fill:#c8e6c9
 ```
 
-Sources: [installation/install.sh](installation/install.sh#L125-L186)
+Sources: [installation/install.sh](../installation/install.sh#L125-L186)
 
 ### What the Script Does
 
@@ -84,7 +84,7 @@ The installation script executes a comprehensive setup process in the following 
 
 The script creates a PostgreSQL database named `nrm` with user credentials (`nrm`/`nrm@123`), sets up Apache to serve the Django application, and configures all necessary paths and permissions. By the end of this process, your system will be fully configured and ready to run the CoRE Stack Backend.
 
-Sources: [installation/install.sh](installation/install.sh#L32-L100), [README.md](README.md#L1-L50)
+Sources: [installation/install.sh](../installation/install.sh#L32-L100), [README.md](../README.md#L1-L50)
 
 ## Manual Installation Steps
 
@@ -101,7 +101,7 @@ conda activate corestack-backend
 
 This creates a Python 3.10 environment with all required packages including Django, DRF, Celery, Google Earth Engine, and geospatial libraries like GDAL, GeoPandas, and Rasterio.
 
-Sources: [installation/environment.yml](installation/environment.yml#L1-L390)
+Sources: [installation/environment.yml](../installation/environment.yml#L1-L390)
 
 ### Step 2: Database Setup
 
@@ -115,7 +115,7 @@ sudo -u postgres psql -c "CREATE DATABASE nrm OWNER nrm;"
 
 This creates the necessary database user and database that Django will use for data persistence.
 
-Sources: [installation/install.sh](installation/install.sh#L40-L47)
+Sources: [installation/install.sh](../installation/install.sh#L40-L47)
 
 ### Step 3: Django Configuration
 
@@ -128,7 +128,7 @@ python manage.py collectstatic --noinput
 
 These commands apply all database migrations (creating tables for users, organizations, projects, etc.) and collect static files (CSS, JavaScript) into a single directory for serving.
 
-Sources: [manage.py](manage.py#L1-L24), [installation/install.sh](installation/install.sh#L108-L116)
+Sources: [manage.py](../manage.py#L1-L24), [installation/install.sh](../installation/install.sh#L108-L116)
 
 ## Running the Application
 
@@ -156,74 +156,9 @@ celery -A nrm_app worker -l info -Q nrm
 
 Here, `nrm_app` is the Django application name and `nrm` is the RabbitMQ queue name used for task distribution.
 
-Sources: [nrm\_app/celery.py](nrm_app/celery.py#L1-L19), [README.md](README.md#L35-L40)
+Sources: [nrm\_app/celery.py](../nrm_app/celery.py#L1-L19), [README.md](../README.md#L35-L40)
 
 Always keep the Celery worker running when developing features that involve background tasks, such as report generation, Google Earth Engine computations, or file processing operations.
-
-```mermaid
-graph TB
-    subgraph \"Client Layer\"
-        A[Web/Frontend Apps]
-        B[Mobile Apps]
-        C[External APIs]
-    end
-    
-    subgraph \"API Layer\"
-        D[Apache/mod_wsgi]
-        E[Django REST Framework]
-        F[Swagger/ReDoc Documentation]
-    end
-    
-    subgraph \"Application Layer\"
-        G[nrm_app - Core Project]
-        H[Users & Organization]
-        I[Geoadmin - Boundaries]
-        J[Computing - GEE Processing]
-        K[Plantations - KML Files]
-        L[Projects - Management]
-        M[Plans - Watershed Planning]
-        N[Bot Interface - WhatsApp/FB]
-        O[DPR - Report Generation]
-    end
-    
-    subgraph \"Background Processing\"
-        P[Celery Worker]
-        Q[RabbitMQ Queue]
-    end
-    
-    subgraph \"External Services\"
-        R[PostgreSQL + PostGIS]
-        S[Google Earth Engine]
-        T[GeoServer]
-        U[Cloud Storage S3]
-    end
-    
-    A --> D
-    B --> D
-    C --> D
-    D --> E
-    E --> F
-    E --> G
-    G --> H
-    G --> I
-    G --> J
-    G --> K
-    G --> L
-    G --> M
-    G --> N
-    G --> O
-    P --> G
-    P --> Q
-    G --> R
-    J --> S
-    G --> T
-    G --> U
-    
-    style D fill:#e1f5ff
-    style G fill:#fff3e0
-    style P fill:#f3e5f5
-    style R fill:#c8e6c9
-```
 
 ## Architecture Overview
 
@@ -241,7 +176,7 @@ The CoRE Stack Backend follows a modular, multi-tenant architecture designed for
 * **Bot Interface**: WhatsApp and Facebook bot integration using state machine architecture
 * **DPR**: Detailed Project Report generation with multi-level reporting (MWS, Tehsil, Village)
 
-Sources: [nrm\_app/settings.py](nrm_app/settings.py#L75-L130), [nrm\_app/urls.py](nrm_app/urls.py#L1-L68)
+Sources: [nrm\_app/settings.py](../nrm_app/settings.py#L75-L130), [nrm\_app/urls.py](../nrm_app/urls.py#L1-L68)
 
 ## Access Points and Verification
 
@@ -269,7 +204,7 @@ After successfully starting the application, verify your setup by accessing thes
    tail -f /var/www/data/corestack/logs/nrm_app.log
    ```
 
-Sources: [nrm\_app/urls.py](nrm_app/urls.py#L48-L68), [installation/install.sh](installation/install.sh#L99-L107)
+Sources: [nrm\_app/urls.py](../nrm_app/urls.py#L48-L68), [installation/install.sh](../installation/install.sh#L99-L107)
 
 ## Project Structure Overview
 
@@ -370,7 +305,7 @@ graph TB
 
 Each module contains its own models, views, URLs, serializers, and business logic, following Django's app-based architecture.
 
-Sources: [README.md](README.md#L52-L85)
+Sources: [README.md](../README.md#L52-L85)
 
 ## Common Issues and Troubleshooting
 
@@ -410,14 +345,14 @@ If background tasks are not executing:
 3. Ensure the queue name matches (`-Q nrm`)
 4. Verify tasks are defined with the `@shared_task` decorator
 
-Sources: [README.md](README.md#L35-L40), [nrm\_app/celery.py](nrm_app/celery.py#L1-L19)
+Sources: [README.md](../README.md#L35-L40), [nrm\_app/celery.py](../nrm_app/celery.py#L1-L19)
 
 ## Next Steps
 
 Now that you have CoRE Stack Backend running, explore these key areas:
 
-* **[Project Architecture and Module Organization](/3-project-architecture-and-module-organization)** : Understand the complete system architecture, module interactions, and design patterns
-* **[Environment Configuration and Setup](/4-environment-configuration-and-setup)** : Learn about environment variables, configuration management, and customization options
-* **[Django Project Settings and Environment Variables](/5-django-project-settings-and-environment-variables)** : Deep dive into settings configuration for production deployment
+* **[Project Architecture and Module Organization](./3-project-architecture-and-module-organization)** : Understand the complete system architecture, module interactions, and design patterns
+* **[Environment Configuration and Setup](./4-environment-configuration-and-setup)** : Learn about environment variables, configuration management, and customization options
+* **[Django Project Settings and Environment Variables](./5-django-project-settings-and-environment-variables)** : Deep dive into settings configuration for production deployment
 
-For developers starting with feature development, begin by reviewing the [Python Practices](guide/development/practices.md) guide to understand coding standards and best specific to this project.
+For developers starting with feature development, begin by reviewing the [Python Practices](../guide/development/practices.md) guide to understand coding standards and best specific to this project.

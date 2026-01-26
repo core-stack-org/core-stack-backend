@@ -6,7 +6,7 @@ The authentication and authorization system in Core Stack Backend implements a *
 
 The authentication system employs a **dual-strategy approach** supporting both JWT-based authentication for standard web/mobile clients and API key authentication for programmatic integration. The architecture is built on Django REST Framework (DRF) with SimpleJWT for token management, extended with custom authentication classes to support the system's multi-tenant requirements.
 
-At the foundation lies the custom `User` model extending Django's `AbstractUser`, which adds organization-specific fields and multi-tenant support. The model distinguishes between individual accounts and organization accounts through an `account_type` field, and includes an `is_superadmin` flag for platform-wide administrative privileges <users/models.py#L13-L39>.
+At the foundation lies the custom `User` model extending Django's `AbstractUser`, which adds organization-specific fields and multi-tenant support. The model distinguishes between individual accounts and organization accounts through an `account_type` field, and includes an `is_superadmin` flag for platform-wide administrative privileges [users/models.py#L13-L39](../users/models.py#L13-L39).
 
 The authentication configuration in `settings.py` establishes JWT as the default authentication mechanism, configured with a 90-day access token lifetime and 120-day refresh token lifetime. Token security is enhanced through refresh token rotation and automatic blacklisting after rotation, preventing token replay attacks.
 
