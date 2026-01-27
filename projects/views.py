@@ -91,3 +91,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project.updated_by = request.user
         project.save(update_fields=["enabled", "updated_by", "updated_at"])
         return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def disabled(self, request):
+        user = request.user
+
+        if user.is_superadmin or user.is_superuser:
+            queryset = Project.objects.filter(enabled=False)
+        elif user.organization:
+            queryset = Project.objects.filter(organization=user.organization, enabled=False)
+        else:
+            queryset = Project.objects.none()
+
+        serializer = ProjectSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

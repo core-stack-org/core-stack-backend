@@ -9,6 +9,7 @@ from .utils.form_mapping import model_map
 from .api import FETCH_FIELD_MAP
 from .utils.get_submissions import ODKSubmissionsChecker
 import json
+import os
 
 
 @api_view(["GET"])
@@ -40,7 +41,8 @@ def get_paginated_submissions(request, form, plan_id):
 @api_view(["GET"])
 @schema(None)
 def get_form_names(request):
-    with open("moderation/utils/forms.json", "r") as file:
+    forms_path = os.path.join(os.path.dirname(__file__), "utils", "forms.json")
+    with open(forms_path, "r") as file:
         data = json.load(file)
     return JsonResponse({"forms": data["Forms"]}, safe=False)
 
