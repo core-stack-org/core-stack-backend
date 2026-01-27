@@ -116,8 +116,7 @@ def create_dpr_document(plan):
     add_section_g(doc, plan, mws_fortnight)
     add_section_separator(doc)
 
-    # MARK: local save /tmp/dpr/
-    # operations on the document
+    # MARK: local save /var/www/tmp/dpr/
     if DEBUG:
         file_path = TMP_LOCATION + "dpr/"
 
@@ -575,7 +574,7 @@ def create_table_mgnrega_info(doc, plan, settlement_data):
 
 
 def create_table_crop_info(doc, plan):
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.id).exclude(
+    crops_in_plan = ODK_crop.objects.filter(plan_id=str(plan.id)).exclude(
         status_re="rejected"
     )
 
