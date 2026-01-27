@@ -47,7 +47,7 @@ from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
 from computing.misc.ndvi_time_series import ndvi_timeseries
 from utilities.gee_utils import valid_gee_text
-
+import os
 from nrm_app.celery import app
 from computing.models import Layer
 import json
@@ -163,7 +163,7 @@ def load_map_config(map_order):
     """
     Load map configuration from JSON file based on map_order.
     """
-    config_path = "data/layers/layer_dependency/layer_map.json"
+    config_path = os.path.join("data", "layers", "layer_dependency", "layer_map.json")
     with open(config_path, "r") as f:
         all_configs = json.load(f)
     return all_configs.get(map_order, [])
@@ -173,7 +173,9 @@ def load_end_year_rules():
     """
     Load end year rules from JSON.
     """
-    config_path = "data/layers/layer_dependency/end_year_rules.json"
+    config_path = os.path.join(
+        "data", "layers", "layer_dependency", "end_year_rules.json"
+    )
     with open(config_path, "r") as f:
         return json.load(f)
 
