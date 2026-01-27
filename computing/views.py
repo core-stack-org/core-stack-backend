@@ -6,7 +6,7 @@ from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
 import json
-
+import os
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -24,7 +24,7 @@ def load_workspace_config():
     """
     Load workspace configuration from JSON file.
     """
-    config_path = "data/layers/layer_status/layer_mapping.json"
+    config_path = os.path.join("data", "layers", "layer_status", "layer_mapping.json")
     with open(config_path, "r") as f:
         return json.load(f)
 
@@ -118,7 +118,9 @@ def load_workspace_types():
     """
     Load workspace types configuration from JSON file.
     """
-    config_path = "data/layers/workspace_layers/layers_in_workspace.json"
+    config_path = os.path.join(
+        "data", "layers", "workspace_layers", "layers_in_workspace.json"
+    )
     with open(config_path, "r") as f:
         return json.load(f)
 
