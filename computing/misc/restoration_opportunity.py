@@ -54,22 +54,21 @@ def generate_restoration_opportunity(self, state, district, block, gee_account_i
 
 def clip_raster(roi, state, district, block, description):
     asset_id = get_gee_asset_path(state, district, block) + description + "_raster"
-    if is_gee_asset_exists(asset_id):
-        return asset_id
 
     restoration_raster = ee.Image(
         GEE_DATASET_PATH + "/WRI/LandscapeRestorationOpportunities"
     )
 
-    clipped_raster = restoration_raster.clip(roi.geometry())
-    task_id = export_raster_asset_to_gee(
-        image=clipped_raster,
-        description=description + "_raster",
-        asset_id=asset_id,
-        scale=60,
-        region=roi.geometry(),
-    )
-    check_task_status([task_id])
+    if not is_gee_asset_exists(asset_id):
+        clipped_raster = restoration_raster.clip(roi.geometry())
+        task_id = export_raster_asset_to_gee(
+            image=clipped_raster,
+            description=description + "_raster",
+            asset_id=asset_id,
+            scale=60,
+            region=roi.geometry(),
+        )
+        check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
