@@ -808,7 +808,7 @@ def generate_mws_data_for_kyl_filters(
                         "degradation_cropping_intensity": round(
                             change_in_cropping_intensity_area, 4
                         ),
-                        "built_up_area": round(urbanization_land_area, 4),
+                        "urbanization_area": round(urbanization_land_area, 4),
                         "lulc_slope_category": lulc_slope_category,
                         "lulc_plain_category": lulc_plain_category,
                         "area_wide_scale_restoration": round(wide_scale_restoration, 4),

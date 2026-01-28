@@ -1878,14 +1878,14 @@ def generate_stats_excel_file(state, district, block):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-            from .mws_indicators import generate_mws_data_for_kyl_filters
-            from .village_indicators import get_generate_filter_data_village
-            from public_api.views import get_tehsil_json
+        from .mws_indicators import generate_mws_data_for_kyl_filters
+        from .village_indicators import get_generate_filter_data_village
+        from public_api.views import get_tehsil_json
 
-            get_vector_layer_geoserver(state, district, block)
-            get_tehsil_json(state, district, block, 1)
-            generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
-            get_generate_filter_data_village(state, district, block, 1)
+        get_vector_layer_geoserver(state, district, block)
+        get_tehsil_json(state, district, block, 1)
+        generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
+        get_generate_filter_data_village(state, district, block, 1)
 
         if not os.path.exists(file_path):
             return Response(
