@@ -3,7 +3,6 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.forms.models import model_to_dict
 import requests
 from django.http import JsonResponse
-import requests
 from moderation.utils.update_csdb import *
 
 
@@ -19,6 +18,7 @@ FETCH_FIELD_MAP = {
     GW_maintenance: "data_gw_maintenance",
     SWB_maintenance: "data_swb_maintenance",
     SWB_RS_maintenance: "data_swb_rs_maintenance",
+    Agrohorticulture: "data_agrohorticulture",
 }
 
 
@@ -105,3 +105,7 @@ class SubmissionsOfPlan:
     @staticmethod
     def get_swb_rs_maintenance(plan_id, page=1):
         return SubmissionsOfPlan._fetch(SWB_RS_maintenance, plan_id, page)
+
+    @staticmethod
+    def get_agrohorticulture(plan_id, page=1):
+        return SubmissionsOfPlan._fetch(Agrohorticulture, plan_id, page)

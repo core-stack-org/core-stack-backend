@@ -29,6 +29,7 @@ def get_paginated_submissions(request, form, plan_id):
         "GroundWater Maintenance": SubmissionsOfPlan.get_gw_maintenance,
         "Surface Water Body Maintenance": SubmissionsOfPlan.get_swb_maintenance,
         "Surface Water Body Remotely Sensed Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
+        "Agrohorticulture": SubmissionsOfPlan.get_agrohorticulture,
     }
 
     if form not in mapping:
@@ -85,6 +86,13 @@ def delete_submission(request, form_name, uuid):
         return Response({"success": False, "message": "Not found"}, status=404)
 
 
+feedback_form = [
+    "agri analysis feedback form",
+    "groundwater analysis feedback form",
+    "water body analysis feedback form",
+]
+
+
 @api_view(["GET"])
 @schema(None)
 def sync_updated_submissions(request):
@@ -100,10 +108,14 @@ def sync_updated_submissions(request):
         gw_maintenance_submissions,
         swb_maintenance_submissions,
         swb_rs_maintenance_submissions,
+        agrohorticulture_submissions,
     ) = sync_odk_data(get_edited_updated_all_submissions)
     checker = ODKSubmissionsChecker()
     res = checker.process("updated")
     for form_name, status in res.items():
+        if form_name in feedback_form:
+            print("passed feedback form")
+            continue
         if status.get("is_updated"):
             if form_name == "Settlement Form":
                 resync_settlement(settlement_submissions)
@@ -130,6 +142,8 @@ def sync_updated_submissions(request):
                 == "propose maintenance of remotely sensed water structure form"
             ):
                 resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
+            elif form_name == "Agrohorticulture":
+                resync_agrohorticulture(agrohorticulture_submissions)
             else:
                 print("passed wrong form name")
     return JsonResponse({"status": "Sync complete", "result": res})

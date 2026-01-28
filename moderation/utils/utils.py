@@ -10,6 +10,7 @@ from dpr.models import (
     GW_maintenance,
     SWB_maintenance,
     SWB_RS_maintenance,
+    Agrohorticulture,
 )
 from dpr.utils import determine_caste_fields
 
@@ -250,7 +251,6 @@ def sync_edited_updated_livelihhod(livelihood_submission):
         "gps_point": gps,
         "data_livelihood": livelihood_submission,
     }
-    # need to ask
     ODK_livelihood.objects.update_or_create(
         livelihood_id=livelihood_submission.get("work_id"), defaults=mapped
     )
@@ -258,8 +258,12 @@ def sync_edited_updated_livelihhod(livelihood_submission):
 
 def sync_edited_updated_cropping_pattern(cp_submission):
     system = cp_submission.get("__system", {})
+    uuid = cp_submission.get("__id")
+    crop_grid_id = cp_submission.get("crop_Grid_id")
+    if not crop_grid_id:
+        crop_grid_id = uuid
     mapped = {
-        "uuid": cp_submission.get("__id"),
+        "uuid": uuid,
         "beneficiary_settlement": cp_submission.get("beneficiary_settlement"),
         "irrigation_source": cp_submission.get("select_multiple_widgets"),
         "submission_time": system.get("submissionDate"),
@@ -276,9 +280,7 @@ def sync_edited_updated_cropping_pattern(cp_submission):
         "system": system,
         "data_crop": cp_submission,
     }
-    ODK_crop.objects.update_or_create(
-        crop_grid_id=cp_submission.get("crop_Grid_id"), defaults=mapped
-    )
+    ODK_crop.objects.update_or_create(crop_grid_id=crop_grid_id, defaults=mapped)
 
 
 def sync_edited_updated_agri_maintenance(am_submission):
@@ -304,9 +306,7 @@ def sync_edited_updated_agri_maintenance(am_submission):
         "corresponding_work_id": am_submission.get("corresponding_work_id"),
         "data_agri_maintenance": am_submission,
     }
-    Agri_maintenance.objects.update_or_create(
-        agri_maintenance_id=int(work_id), defaults=mapped
-    )
+    Agri_maintenance.objects.update_or_create(work_id=work_id, defaults=mapped)
 
 
 def sync_edited_updated_gw_maintenance(gwm_submission):
@@ -333,9 +333,7 @@ def sync_edited_updated_gw_maintenance(gwm_submission):
         "data_gw_maintenance": gwm_submission,
     }
     # need to ask id
-    GW_maintenance.objects.update_or_create(
-        gw_maintenance_id=int(work_id), defaults=mapped
-    )
+    GW_maintenance.objects.update_or_create(work_id=work_id, defaults=mapped)
 
 
 def sync_edited_updated_swb_maintenance(swbm_submission):
@@ -361,9 +359,7 @@ def sync_edited_updated_swb_maintenance(swbm_submission):
         "corresponding_work_id": swbm_submission.get("corresponding_work_id"),
         "data_swb_maintenance": swbm_submission,
     }
-    SWB_maintenance.objects.update_or_create(
-        swb_maintenance_id=int(work_id), defaults=mapped
-    )
+    SWB_maintenance.objects.update_or_create(work_id=work_id, defaults=mapped)
 
 
 def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
@@ -387,8 +383,10 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
         "status_re": system.get("reviewState"),
         "work_id": work_id,
         "corresponding_work_id": swb_rs_submission.get("corresponding_work_id"),
-        "data_swb_maintenance": swb_rs_submission,
+        "data_swb_rs_maintenance": swb_rs_submission,
     }
-    SWB_RS_maintenance.objects.update_or_create(
-        swb_rs_maintenance_id=int(work_id), defaults=mapped
-    )
+    SWB_RS_maintenance.objects.update_or_create(work_id=work_id, defaults=mapped)
+
+
+def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
+    pass

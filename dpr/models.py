@@ -307,6 +307,13 @@ class Agri_maintenance(models.Model):
         db_table = "odk_agri_maintenance"
 
 
+class Agrohorticulture(models.Model):
+    pass
+
+
+#     change with original one
+
+
 class Overpass_Block_Details(models.Model):
     block_details_id = models.AutoField(primary_key=True)
     location = models.TextField(max_length=511, null=False)
