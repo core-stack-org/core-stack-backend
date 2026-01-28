@@ -28,7 +28,7 @@ from utilities.constants import (
 )
 
 from .build_layer import build_layer
-from .models import Plan
+from .models import ODKSyncLog, Plan
 from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
 
@@ -310,9 +310,21 @@ def _validate_sync_request(
 
 
 def _sync_to_odk(
-    xml_string: str, config: Dict[str, Any], bearer_token: str
+    xml_string: str,
+    config: Dict[str, Any],
+    bearer_token: str,
+    category: str,
+    sync_type: str,
 ) -> Response:
     """Handle the actual sync to ODK for a specific resource or work type."""
+    sync_log = ODKSyncLog.objects.create(
+        category=category,
+        sync_type=sync_type,
+        xml_content=xml_string,
+        odk_url=config["url"],
+        status=ODKSyncLog.SyncStatus.PENDING,
+    )
+
     try:
         response = requests.post(
             config["url"],
@@ -324,11 +336,16 @@ def _sync_to_odk(
         )
         response.raise_for_status()
 
+        odk_response = response.json() if response.content else None
+        sync_log.status = ODKSyncLog.SyncStatus.SUCCESS
+        sync_log.odk_response = odk_response
+        sync_log.save(update_fields=["status", "odk_response"])
+
         return Response(
             {
                 "sync_status": True,
                 "message": config["success_message"],
-                "odk_response": response.json() if response.content else None,
+                "odk_response": odk_response,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -336,6 +353,11 @@ def _sync_to_odk(
     except requests.exceptions.RequestException as e:
         item_name = config["success_message"].split()[0].lower()
         print(f"Error syncing {item_name} data to ODK: {str(e)}")
+
+        sync_log.status = ODKSyncLog.SyncStatus.FAILED
+        sync_log.error_details = str(e)
+        sync_log.save(update_fields=["status", "error_details"])
+
         return Response(
             {
                 "sync_status": False,
@@ -376,28 +398,31 @@ def sync_offline_data(request, resource_type=None, work_type=None, feedback_type
     if resource_type:
         configs = _get_resource_config()
         config = configs[resource_type]
-        sync_type = f"resource type: {resource_type}"
+        category = ODKSyncLog.SyncCategory.RESOURCE
+        item_type = resource_type
     elif work_type:
         configs = _get_work_config()
         config = configs[work_type]
-        sync_type = f"work type: {work_type}"
+        category = ODKSyncLog.SyncCategory.WORK
+        item_type = work_type
     elif feedback_type:
         configs = _get_feedback_config()
         config = configs[feedback_type]
-        sync_type = f"feedback type: {feedback_type}"
+        category = ODKSyncLog.SyncCategory.FEEDBACK
+        item_type = feedback_type
     else:
         return Response(
             {"error": "Invalid request"}, status=status.HTTP_400_BAD_REQUEST
         )
 
     xml_string = request.body.decode("utf-8")
-    print("Sync Type: ", sync_type)
+    print(f"Sync Category: {category}, Type: {item_type}")
 
     try:
         bearer_token = fetch_bearer_token(ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC)
         print("Bearer Token: ", bearer_token)
 
-        return _sync_to_odk(xml_string, config, bearer_token)
+        return _sync_to_odk(xml_string, config, bearer_token, category, item_type)
 
     except Exception as e:
         print("Exception in sync_offline_data api :: ", e)
