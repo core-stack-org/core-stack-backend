@@ -307,6 +307,26 @@ class Agri_maintenance(models.Model):
         db_table = "odk_agri_maintenance"
 
 
+class ODK_agohorticulture(models.Model):
+    agohorticulture_id = models.AutoField(primary_key=True)
+    uuid = models.CharField(max_length=255)
+    plan_id = models.TextField()
+    plan_name = models.TextField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    status_re = models.TextField()
+    data_agohorticulture = models.JSONField(default=dict, null=True, blank=True)
+    is_moderated = models.BooleanField(default=False, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Agohorticulture"
+        verbose_name_plural = "Agohorticulture"
+        db_table = "odk_agohorticulture"
+
+    def __str__(self) -> str:
+        return self.agohorticulture_id
+
+
 class Overpass_Block_Details(models.Model):
     block_details_id = models.AutoField(primary_key=True)
     location = models.TextField(max_length=511, null=False)
