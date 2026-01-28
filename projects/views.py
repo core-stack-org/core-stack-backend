@@ -20,12 +20,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        include_disabled = self.action == "enable"
 
         if user.is_superadmin or user.is_superuser:
-            return Project.objects.filter(enabled=True)
+            qs = Project.objects.all() if include_disabled else Project.objects.filter(enabled=True)
+            return qs
 
         if user.organization:
-            return Project.objects.filter(organization=user.organization, enabled=True)
+            qs = Project.objects.filter(organization=user.organization)
+            if not include_disabled:
+                qs = qs.filter(enabled=True)
+            return qs
 
         return Project.objects.none()
 
