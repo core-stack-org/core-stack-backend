@@ -389,4 +389,25 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
 
 
 def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
-    pass
+    gps = agrohorticulture_submission.get("GPS_point", {})
+    system = agrohorticulture_submission.get("__system", {})
+    lat = None
+    lon = None
+    try:
+        coords = gps.get("point_mapsappearance", {}).get("coordinates", [])
+        if len(coords) >= 2:
+            lon, lat = coords[0], coords[1]
+    except Exception:
+        pass
+    mapped = {
+        "uuid": agrohorticulture_submission.get("__id"),
+        "plan_id": agrohorticulture_submission.get("plan_id"),
+        "plan_name": agrohorticulture_submission.get("plan_name"),
+        "latitude": lat,
+        "longitude": lon,
+        "status_re": system.get("reviewState") or "no",
+        "data_agohorticulture": agrohorticulture_submission,
+    }
+    ODK_agohorticulture.objects.update_or_create(
+        uuid=agrohorticulture_submission.get("__id"), defaults=mapped
+    )

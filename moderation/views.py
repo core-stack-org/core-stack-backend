@@ -4,7 +4,8 @@ from django.forms.models import model_to_dict
 import requests
 from django.http import JsonResponse
 from moderation.utils.update_csdb import *
-
+from .utils.get_submissions import ODKSubmissionsChecker
+from moderation.utils.form_mapping import feedback_form
 
 FETCH_FIELD_MAP = {
     ODK_settlement: "data_settlement",
@@ -18,7 +19,7 @@ FETCH_FIELD_MAP = {
     GW_maintenance: "data_gw_maintenance",
     SWB_maintenance: "data_swb_maintenance",
     SWB_RS_maintenance: "data_swb_rs_maintenance",
-    # Agrohorticulture: "data_agrohorticulture",
+    ODK_agohorticulture: "data_agohorticulture",
 }
 
 
@@ -108,4 +109,58 @@ class SubmissionsOfPlan:
 
     @staticmethod
     def get_agrohorticulture(plan_id, page=1):
-        return SubmissionsOfPlan._fetch(Agrohorticulture, plan_id, page)
+        return SubmissionsOfPlan._fetch(ODK_agohorticulture, plan_id, page)
+
+
+def sync_odk_to_csdb():
+    (
+        settlement_submissions,
+        well_submissions,
+        waterbody_submissions,
+        groundwater_submissions,
+        agri_submissions,
+        livelihood_submissions,
+        cropping_submissions,
+        agri_maintenance_submissions,
+        gw_maintenance_submissions,
+        swb_maintenance_submissions,
+        swb_rs_maintenance_submissions,
+        agrohorticulture_submissions,
+    ) = sync_odk_data(get_edited_updated_all_submissions)
+    checker = ODKSubmissionsChecker()
+    res = checker.process("updated")
+    for form_name, status in res.items():
+        if form_name in feedback_form:
+            print("passed feedback form")
+            continue
+        if status.get("is_updated"):
+            if form_name == "Settlement Form":
+                resync_settlement(settlement_submissions)
+            elif form_name == "Well Form":
+                resync_well(well_submissions)
+            elif form_name == "water body form":
+                resync_waterbody(waterbody_submissions)
+            elif form_name == "new recharge structure form":
+                resync_gw(groundwater_submissions)
+            elif form_name == "new irrigation form":
+                resync_agri(agri_submissions)
+            elif form_name == "livelihood form":
+                resync_livelihood(livelihood_submissions)
+            elif form_name == "cropping pattern form":
+                resync_cropping(cropping_submissions)
+            elif form_name == "propose maintenance on existing irrigation form":
+                resync_agri_maintenance(agri_maintenance_submissions)
+            elif form_name == "propose maintenance on water structure form":
+                resync_gw_maintenance(gw_maintenance_submissions)
+            elif form_name == "propose maintenance on existing water recharge form":
+                resync_swb_maintenance(swb_maintenance_submissions)
+            elif (
+                form_name
+                == "propose maintenance of remotely sensed water structure form"
+            ):
+                resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
+            elif form_name == "Agrohorticulture":
+                resync_agrohorticulture(agrohorticulture_submissions)
+            else:
+                print("passed wrong form name")
+    return JsonResponse({"status": "Sync complete", "result": res})

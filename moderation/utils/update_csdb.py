@@ -4,6 +4,7 @@ from .utils import *
 from .get_submissions import get_edited_updated_all_submissions
 from .form_mapping import corestack
 from utilities.constants import ODK_BASE_URL, filter_query, project_id
+from datetime import datetime, timedelta
 
 
 def sync_odk_data(get_edited_updated_all_submissions):
@@ -17,7 +18,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["Settlement Form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -25,7 +26,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["Well Form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -33,7 +34,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["water body form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -41,7 +42,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["new recharge structure form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -49,7 +50,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["new irrigation form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -57,7 +58,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["livelihood form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -65,7 +66,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["cropping pattern form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -73,7 +74,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["propose maintenance on existing irrigation form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -81,7 +82,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["propose maintenance on water structure form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -89,7 +90,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["propose maintenance on existing water recharge form"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -99,7 +100,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
             form_id=corestack[
                 "propose maintenance of remotely sensed water structure form"
             ],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -107,7 +108,7 @@ def sync_odk_data(get_edited_updated_all_submissions):
         get_edited_updated_all_submissions.get_edited_updated_submissions(
             project_id=project_id,
             form_id=corestack["Agrohorticulture"],
-            filter_query=filter_query,
+            filter_query=get_filter_query(),
         )
     )
 
@@ -252,3 +253,24 @@ def resync_db_odk():
     resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
     resync_agrohorticulture(agrohorticulture_submissions)
     print("ODK data resynced successfully")
+
+
+def get_filter_query():
+    today = datetime.now().date()
+    date_24hrs_ago = today - timedelta(days=1)
+
+    day = date_24hrs_ago.day
+    month = date_24hrs_ago.month
+    year = date_24hrs_ago.year
+
+    return (
+        "$filter=("
+        f"(day(__system/submissionDate) ge {day} "
+        f"and month(__system/submissionDate) ge {month} "
+        f"and year(__system/submissionDate) ge {year}) "
+        "or "
+        f"(day(__system/updatedAt) ge {day} "
+        f"and month(__system/updatedAt) ge {month} "
+        f"and year(__system/updatedAt) eq {year})"
+        ")"
+    )
