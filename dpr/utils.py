@@ -1002,3 +1002,23 @@ def transform_name(name):
     name = re.sub(r"_+", "_", name)
     name = re.sub(r"^_|_$", "", name)
     return name.lower()
+
+def to_utf8(value):
+    """Ensure value is a properly encoded UTF-8 string for Word document.
+    
+    Handles cases where UTF-8 text was incorrectly decoded as Latin-1,
+    resulting in garbled characters like 'à²ªà²¾à²...' for Kannada/Hindi text.
+    """
+    if value is None:
+        return "NA"
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8')
+        except UnicodeDecodeError:
+            return value.decode('latin-1')
+    if not isinstance(value, str):
+        value = str(value)
+    try:
+        return value.encode('latin-1').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return value

@@ -60,6 +60,9 @@ def generate_dpr_task(self, plan_id: int, email_id: str):
         mws_Ids=successful_mws_ids,
         resource_report=resource_report,
         resource_report_url=resource_html_url,
+        state_name=plan.state.state_name,
+        district_name=plan.district.district_name,
+        tehsil_name=plan.block.block_name,
     )
 
     return {"status": "success", "email_id": email_id, "plan_id": plan_id}
