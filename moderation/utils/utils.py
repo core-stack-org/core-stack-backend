@@ -10,7 +10,7 @@ from dpr.models import (
     GW_maintenance,
     SWB_maintenance,
     SWB_RS_maintenance,
-    Agrohorticulture,
+    # Agrohorticulture,
 )
 from dpr.utils import determine_caste_fields
 

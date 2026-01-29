@@ -18,7 +18,7 @@ FETCH_FIELD_MAP = {
     GW_maintenance: "data_gw_maintenance",
     SWB_maintenance: "data_swb_maintenance",
     SWB_RS_maintenance: "data_swb_rs_maintenance",
-    Agrohorticulture: "data_agrohorticulture",
+    # Agrohorticulture: "data_agrohorticulture",
 }
 
 
