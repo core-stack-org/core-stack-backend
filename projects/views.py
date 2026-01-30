@@ -24,6 +24,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         if user.is_superadmin or user.is_superuser:
             qs = Project.objects.all() if include_disabled else Project.objects.filter(enabled=True)
+
+            # Allow superadmins to filter by organization
+            organization_id = self.request.query_params.get("organization")
+            if organization_id:
+                qs = qs.filter(organization_id=organization_id)
+
             return qs
 
         if user.organization:
