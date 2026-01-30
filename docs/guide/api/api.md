@@ -291,10 +291,17 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Method**: GET
 - **Description**: List projects based on permissions
 - **Authentication**: Required
+- **Query Parameters**:
+  - `organization` (optional, superadmin only): Filter projects by organization ID
 - **Notes**:
-  - Super admins see all projects
+  - Super admins see all projects (can filter by organization using `?organization=<org_id>`)
   - Organization admins see all projects in their organization
   - Other users see projects they have access to
+
+**Example (Superadmin filtering by organization)**:
+```
+GET /api/v1/projects/?organization=5
+```
 
 ### Create Project
 - **URL**: `/api/v1/projects/`
