@@ -405,7 +405,7 @@ def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
         "plan_name": agrohorticulture_submission.get("plan_name"),
         "latitude": lat,
         "longitude": lon,
-        "status_re": system.get("reviewState") or "no",
+        "status_re": system.get("reviewState") or "",
         "data_agohorticulture": agrohorticulture_submission,
     }
     ODK_agohorticulture.objects.update_or_create(
