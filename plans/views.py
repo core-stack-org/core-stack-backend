@@ -238,6 +238,13 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(district_soi_id=district_id)
         elif state_id:
             queryset = queryset.filter(state_soi_id=state_id)
+
+        filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        if filter_test_demo:
+            queryset = queryset.exclude(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+
         return queryset.order_by("-created_at")
 
     @action(detail=False, methods=["get"], url_path="meta-stats")
@@ -502,13 +509,21 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         if organization_id:
             try:
                 organization = Organization.objects.get(pk=organization_id)
-                return PlanApp.objects.filter(
+                queryset = PlanApp.objects.filter(
                     organization=organization, enabled=True
-                ).order_by("-created_at")
+                )
             except Organization.DoesNotExist:
                 return PlanApp.objects.none()
+        else:
+            return PlanApp.objects.none()
 
-        return PlanApp.objects.none()
+        filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        if filter_test_demo:
+            queryset = queryset.exclude(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+
+        return queryset.order_by("-created_at")
 
     @action(
         detail=False,
@@ -686,6 +701,12 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         if tehsil_id:
             base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+
+        filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        if filter_test_demo:
+            base_queryset = base_queryset.exclude(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
 
         return base_queryset
 
