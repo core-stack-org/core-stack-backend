@@ -1,9 +1,10 @@
-import requests
 from decimal import Decimal
+
+import requests
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from nrm_app.settings import GEOSERVER_URL, GEOSERVER_USERNAME, GEOSERVER_PASSWORD
+from nrm_app.settings import GEOSERVER_PASSWORD, GEOSERVER_URL, GEOSERVER_USERNAME
 from plans.models import PlanApp
 
 
@@ -30,8 +31,8 @@ class Command(BaseCommand):
         )
 
     def get_settlement_layer_name(self, plan):
-        district_name = plan.district.district_name.lower().replace(" ", "_")
-        tehsil_name = plan.block.block_name.lower().replace(" ", "_")
+        district_name = plan.district_soi.district_name.lower().replace(" ", "_")
+        tehsil_name = plan.tehsil_soi.tehsil_name.lower().replace(" ", "_")
         return f"settlement_{plan.id}_{district_name}_{tehsil_name}"
 
     def fetch_settlement_coordinates(self, layer_name, workspace="resources"):

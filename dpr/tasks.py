@@ -26,9 +26,9 @@ def generate_dpr_task(self, plan_id: int, email_id: str):
     mws_reports = []
     successful_mws_ids = []
 
-    state = transform_name(str(plan.state.state_name))
-    district = transform_name(str(plan.district.district_name))
-    block = transform_name(str(plan.block.block_name))
+    state = transform_name(str(plan.state_soi.state_name))
+    district = transform_name(str(plan.district_soi.district_name))
+    block = transform_name(str(plan.tehsil_soi.tehsil_name))
 
     for ids in mws_Ids:
         try:
@@ -60,6 +60,9 @@ def generate_dpr_task(self, plan_id: int, email_id: str):
         mws_Ids=successful_mws_ids,
         resource_report=resource_report,
         resource_report_url=resource_html_url,
+        state_name=plan.state_soi.state_name,
+        district_name=plan.district_soi.district_name,
+        tehsil_name=plan.tehsil_soi.tehsil_name,
     )
 
     return {"status": "success", "email_id": email_id, "plan_id": plan_id}

@@ -580,8 +580,6 @@ def sync_livelihood():
 
 def sync_cropping_pattern():
     odk_resp_list = fetch_odk_data_sync(ODK_URL_crop)
-    print("ODK data cropping pattern", odk_resp_list[:1])
-    cropping_pattern = ODK_crop()
 
     for record in odk_resp_list:
         submission_date = timezone.datetime.strptime(
@@ -593,6 +591,7 @@ def sync_cropping_pattern():
             "submission_time__max"
         ]
 
+        cropping_pattern = ODK_crop()
         cropping_pattern.status_re = (
             record.get("__system", {}).get("reviewState", "") or "in progress"
         )
@@ -600,12 +599,14 @@ def sync_cropping_pattern():
         # if latest_submission_time and submission_date <= latest_submission_time:
         #     print("The DB is already synced with the latest submissions")
         #     return
-        cropping_pattern.crop_grid_id = record.get("crop_Grid_id", "")
+        uuid_val = record.get("__id", "") or "NA"
+        crop_grid_id = record.get("crop_Grid_id", "")
+        cropping_pattern.crop_grid_id = crop_grid_id if crop_grid_id and crop_grid_id != "undefined" else uuid_val
         cropping_pattern.submission_time = timezone.datetime.strptime(
             record.get("__system", {}).get("submissionDate", ""),
             "%Y-%m-%dT%H:%M:%S.%fZ",
         )
-        cropping_pattern.uuid = record.get("__id", "") or "NA"
+        cropping_pattern.uuid = uuid_val
         cropping_pattern.beneficiary_settlement = (
             record.get("beneficiary_settlement", "") or "NA"
         )
@@ -1001,3 +1002,23 @@ def transform_name(name):
     name = re.sub(r"_+", "_", name)
     name = re.sub(r"^_|_$", "", name)
     return name.lower()
+
+def to_utf8(value):
+    """Ensure value is a properly encoded UTF-8 string for Word document.
+    
+    Handles cases where UTF-8 text was incorrectly decoded as Latin-1,
+    resulting in garbled characters like 'à²ªà²¾à²...' for Kannada/Hindi text.
+    """
+    if value is None:
+        return "NA"
+    if isinstance(value, bytes):
+        try:
+            return value.decode('utf-8')
+        except UnicodeDecodeError:
+            return value.decode('latin-1')
+    if not isinstance(value, str):
+        value = str(value)
+    try:
+        return value.encode('latin-1').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return value

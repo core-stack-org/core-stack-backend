@@ -32,7 +32,7 @@ SECRET_KEY = env("SECRET_KEY")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
 TMP_LOCATION = env("TMP_LOCATION")
@@ -55,8 +55,8 @@ USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 
 STATIC_ROOT = "static/"
-GEE_HELPER_ACCOUNT_ID = 2
-GEE_DEFAULT_ACCOUNT_ID = 22
+GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
+GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
 ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
@@ -64,7 +64,7 @@ ALLOWED_HOSTS = [
     "localhost",
     "0.0.0.0",
     "api-doc.core-stack.org",
-    "2bb02f703cef.ngrok-free.app",
+    "2f2de623c34b.ngrok-free.app",
     "odk.core-stack.org",
     "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
