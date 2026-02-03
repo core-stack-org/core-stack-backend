@@ -49,16 +49,36 @@ function ensure_conda() {
 
 function setup_conda_env() {
     ensure_conda
-    echo "Setting up conda environment '$CONDA_ENV_NAME'..."
-    conda env remove -n "$CONDA_ENV_NAME" -y || true
-    conda env create -f "$CONDA_ENV_YAML" -n "$CONDA_ENV_NAME"
+    echo "Checking conda environment '$CONDA_ENV_NAME'..."
+    
+    if conda env list | grep -q "^${CONDA_ENV_NAME} "; then
+        echo "Conda environment '$CONDA_ENV_NAME' already exists."
+        read -p "Do you want to recreate it? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Removing existing environment..."
+            conda env remove -n "$CONDA_ENV_NAME" -y
+            echo "Creating new environment..."
+            conda env create -f "$CONDA_ENV_YAML" -n "$CONDA_ENV_NAME"
+        else
+            echo "Keeping existing environment."
+        fi
+    else
+        echo "Creating new environment..."
+        conda env create -f "$CONDA_ENV_YAML" -n "$CONDA_ENV_NAME"
+    fi
     echo "Conda environment ready."
 }
 
 function install_postgres() {
-    echo "Installing PostgreSQL..."
-    sudo apt-get update
-    sudo apt-get install -y postgresql postgresql-contrib libpq-dev
+    if command -v psql &> /dev/null && systemctl is-active --quiet postgresql 2>/dev/null; then
+        echo "PostgreSQL already installed and running."
+    else
+        echo "Installing PostgreSQL..."
+        sudo apt-get update
+        sudo apt-get install -y postgresql postgresql-contrib libpq-dev
+        echo "PostgreSQL installed."
+    fi
     echo "Setting up PostgreSQL user/database..."
     sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$POSTGRES_USER'" | grep -q 1 || \
         sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH PASSWORD '$POSTGRES_PASSWORD';"
@@ -68,17 +88,23 @@ function install_postgres() {
 }
 
 function install_apache() {
-    echo "Installing Apache and mod_wsgi..."
-    sudo apt-get update
-    sudo apt-get install -y apache2 libapache2-mod-wsgi-py3
-    sudo a2enmod wsgi
-    sudo systemctl restart apache2
-    echo "Apache installed."
+    if command -v apache2 &> /dev/null && systemctl is-active --quiet apache2 2>/dev/null; then
+        echo "Apache already installed and running."
+    else
+        echo "Installing Apache and mod_wsgi..."
+        sudo apt-get update
+        sudo apt-get install -y apache2 libapache2-mod-wsgi-py3
+        sudo a2enmod wsgi
+        sudo systemctl restart apache2
+        echo "Apache installed."
+    fi
 }
 
 function clone_backend() {
     if [ -d "$BACKEND_DIR/.git" ]; then
         echo "Backend exists as git repo. Pulling latest changes..."
+        # Handle git ownership issue for newer git versions
+        sudo git config --global --add safe.directory "$BACKEND_DIR" 2>/dev/null || true
         sudo git -C "$BACKEND_DIR" pull
     else
         if [ -d "$BACKEND_DIR" ]; then
@@ -123,6 +149,12 @@ function run_migrations() {
     echo "Running Django migrations..."
     run_manage_command "migrate --noinput"
     echo "Migrations applied."
+}
+
+function setup_migrations() {
+    echo "Setting up Django migrations..."
+    run_manage_command "bash installation/setup_migrations.sh"
+    echo "Migrations setup complete."
 }
 
 function configure_apache() {
@@ -174,6 +206,7 @@ install_apache
 setup_conda_env
 clone_backend
 setup_logs_dir
+setup_migrations
 collect_static_files
 run_migrations
 configure_apache
