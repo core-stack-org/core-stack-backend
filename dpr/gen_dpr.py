@@ -1,10 +1,10 @@
 import os
+import re
 import socket
 import ssl
 from collections import defaultdict
 from datetime import date
 from io import BytesIO
-import re
 
 import geopandas as gpd
 from django.core.mail import EmailMessage
@@ -56,8 +56,8 @@ from .utils import (
     get_vector_layer_geoserver,
     sort_key,
     sync_db_odk,
-    transform_name,
     to_utf8,
+    transform_name,
 )
 
 logger = setup_logger(__name__)
@@ -80,8 +80,8 @@ def create_dpr_document(plan):
 
     logger.info("Details of the plan")
     logger.info(plan)
-    logger.info(transform_name(str(plan.district.district_name)))
-    logger.info(transform_name(str(plan.block.block_name)))
+    logger.info(transform_name(str(plan.district_soi.district_name)))
+    logger.info(transform_name(str(plan.tehsil_soi.tehsil_name)))
 
     total_settlements = get_settlement_count_for_plan(plan.id)
 
@@ -89,9 +89,9 @@ def create_dpr_document(plan):
         geoserver_url=GEOSERVER_URL,
         workspace="mws_layers",
         layer_name="deltaG_fortnight_"
-        + transform_name(str(plan.district.district_name))
+        + transform_name(str(plan.district_soi.district_name))
         + "_"
-        + transform_name(str(plan.block.block_name)),
+        + transform_name(str(plan.tehsil_soi.tehsil_name)),
     )
 
     add_section_a(doc, plan)
@@ -128,8 +128,16 @@ def create_dpr_document(plan):
 
 
 def send_dpr_email(
-    doc, email_id, plan_name, mws_reports, mws_Ids, resource_report, resource_report_url,
-    state_name="", district_name="", tehsil_name=""
+    doc,
+    email_id,
+    plan_name,
+    mws_reports,
+    mws_Ids,
+    resource_report,
+    resource_report_url,
+    state_name="",
+    district_name="",
+    tehsil_name="",
 ):
     try:
         buffer = BytesIO()
@@ -311,9 +319,9 @@ def get_mws_ids_for_report(plan):
         geoserver_url=GEOSERVER_URL,
         workspace="mws_layers",
         layer_name="deltaG_fortnight_"
-        + transform_name(str(plan.district.district_name))
+        + transform_name(str(plan.district_soi.district_name))
         + "_"
-        + transform_name(str(plan.block.block_name)),
+        + transform_name(str(plan.tehsil_soi.tehsil_name)),
     )
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
 
@@ -417,9 +425,9 @@ def create_table_village_brief(
     headers_data = [
         ("Name of the Village", to_utf8(plan.village_name)),
         ("Name of the Gram Panchayat", to_utf8(plan.gram_panchayat)),
-        ("Tehsil", to_utf8(plan.block.block_name)),
-        ("District", to_utf8(plan.district.district_name)),
-        ("State", to_utf8(plan.state.state_name)),
+        ("Tehsil", to_utf8(plan.tehsil_soi.tehsil_name)),
+        ("District", to_utf8(plan.district_soi.district_name)),
+        ("State", to_utf8(plan.state_soi.state_name)),
         ("Number of Settlements in the Village", str(total_settlements)),
         ("Intersecting Micro Watershed IDs", None),  # Will be handled separately
         (
@@ -603,7 +611,9 @@ def create_table_mgnrega_info(doc, plan, settlement_data):
             if settlement_nrega.nrega_work_days == 0
             else str(settlement_nrega.nrega_work_days)
         )
-        row_cells[3].text = to_utf8(format_text_demands(settlement_nrega.nrega_past_work))
+        row_cells[3].text = to_utf8(
+            format_text_demands(settlement_nrega.nrega_past_work)
+        )
         row_cells[4].text = to_utf8(format_text(settlement_nrega.nrega_demand))
         row_cells[5].text = to_utf8(format_text(settlement_nrega.nrega_issues))
 
@@ -1155,8 +1165,12 @@ def maintenance_gw_table(doc, plan):
         row_cells[2].text = to_utf8(
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = to_utf8(maintenance.data_gw_maintenance.get("select_gender") or "NA")
-        row_cells[4].text = to_utf8(maintenance.data_gw_maintenance.get("ben_father") or "NA")
+        row_cells[3].text = to_utf8(
+            maintenance.data_gw_maintenance.get("select_gender") or "NA"
+        )
+        row_cells[4].text = to_utf8(
+            maintenance.data_gw_maintenance.get("ben_father") or "NA"
+        )
         row_cells[5].text = to_utf8(
             maintenance.data_gw_maintenance.get("select_one_recharge_structure")
             or maintenance.data_gw_maintenance.get("select_one_water_structure")
@@ -1221,8 +1235,12 @@ def maintenance_agri_table(doc, plan):
         row_cells[2].text = to_utf8(
             maintenance.data_agri_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = to_utf8(maintenance.data_agri_maintenance.get("gender") or "NA")
-        row_cells[4].text = to_utf8(maintenance.data_agri_maintenance.get("ben_father") or "NA")
+        row_cells[3].text = to_utf8(
+            maintenance.data_agri_maintenance.get("gender") or "NA"
+        )
+        row_cells[4].text = to_utf8(
+            maintenance.data_agri_maintenance.get("ben_father") or "NA"
+        )
         row_cells[5].text = to_utf8(
             maintenance.data_agri_maintenance.get("select_one_water_structure")
             or maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
@@ -1291,7 +1309,9 @@ def maintenance_waterstructures_table(doc, plan):
         row_cells[3].text = to_utf8(
             maintenance.data_swb_maintenance.get("select_gender") or "NA"
         )
-        row_cells[4].text = to_utf8(maintenance.data_swb_maintenance.get("ben_father") or "NA")
+        row_cells[4].text = to_utf8(
+            maintenance.data_swb_maintenance.get("ben_father") or "NA"
+        )
         row_cells[5].text = to_utf8(
             maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
             or maintenance.data_swb_maintenance.get("select_one_water_structure")
@@ -1349,7 +1369,9 @@ def maintenance_rs_waterstructures_table(doc, plan):
         row_cells[2].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = to_utf8(maintenance.data_swb_rs_maintenance.get("gender") or "NA")
+        row_cells[3].text = to_utf8(
+            maintenance.data_swb_rs_maintenance.get("gender") or "NA"
+        )
         row_cells[4].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("ben_father") or "NA"
         )
@@ -1420,12 +1442,20 @@ def create_nrm_works_table(doc, plan, mws):
         row_cells = table.rows[i].cells
         row_cells[0].text = str(i)  # S.No
         row_cells[1].text = "Recharge Structure"  # Work Category
-        row_cells[2].text = to_utf8(structure.data_groundwater.get("demand_type") or "NA")
+        row_cells[2].text = to_utf8(
+            structure.data_groundwater.get("demand_type") or "NA"
+        )
         row_cells[3].text = to_utf8(structure.work_type)
         row_cells[4].text = to_utf8(structure.beneficiary_settlement)
-        row_cells[5].text = to_utf8(structure.data_groundwater.get("Beneficiary_Name") or "NA")
-        row_cells[6].text = to_utf8(structure.data_groundwater.get("select_gender") or "NA")
-        row_cells[7].text = to_utf8(structure.data_groundwater.get("ben_father") or "NA")
+        row_cells[5].text = to_utf8(
+            structure.data_groundwater.get("Beneficiary_Name") or "NA"
+        )
+        row_cells[6].text = to_utf8(
+            structure.data_groundwater.get("select_gender") or "NA"
+        )
+        row_cells[7].text = to_utf8(
+            structure.data_groundwater.get("ben_father") or "NA"
+        )
         row_cells[8].text = str(structure.latitude)
         row_cells[9].text = str(structure.longitude)
 
@@ -1524,7 +1554,9 @@ def add_section_g(doc, plan, mws):
                         "select_one_promoting_livestock_other", "NA"
                     )
 
-            row_cells[2].text = to_utf8(format_text(demands_promoting_livestock) or "NA")
+            row_cells[2].text = to_utf8(
+                format_text(demands_promoting_livestock) or "NA"
+            )
             row_cells[3].text = to_utf8(record.beneficiary_settlement or "NA")
             row_cells[4].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
@@ -1532,7 +1564,9 @@ def add_section_g(doc, plan, mws):
                 or "NA"
             )
             row_cells[5].text = to_utf8(livestock_group.get("gender_livestock") or "NA")
-            row_cells[6].text = to_utf8(livestock_group.get("ben_father_livestock") or "NA")
+            row_cells[6].text = to_utf8(
+                livestock_group.get("ben_father_livestock") or "NA"
+            )
             row_cells[7].text = (
                 "{:.6f}".format(record.latitude) if record.latitude else "NA"
             )
@@ -1553,7 +1587,9 @@ def add_section_g(doc, plan, mws):
         ):
             row_cells = table.add_row().cells
             row_cells[0].text = "Fisheries"
-            row_cells[1].text = to_utf8(fisheries_group.get("demand_type_fisheries") or "NA")
+            row_cells[1].text = to_utf8(
+                fisheries_group.get("demand_type_fisheries") or "NA"
+            )
             demands_promoting_fisheries = fisheries_group.get(
                 "select_one_promoting_fisheries"
             )
@@ -1575,7 +1611,9 @@ def add_section_g(doc, plan, mws):
                         "select_one_promoting_fisheries_other", "NA"
                     )
 
-            row_cells[2].text = to_utf8(format_text(demands_promoting_fisheries) or "NA")
+            row_cells[2].text = to_utf8(
+                format_text(demands_promoting_fisheries) or "NA"
+            )
             row_cells[3].text = to_utf8(record.beneficiary_settlement or "NA")
             row_cells[4].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
@@ -1583,7 +1621,9 @@ def add_section_g(doc, plan, mws):
                 or "NA"
             )
             row_cells[5].text = to_utf8(fisheries_group.get("gender_fisheries") or "NA")
-            row_cells[6].text = to_utf8(fisheries_group.get("ben_father_fisheries") or "NA")
+            row_cells[6].text = to_utf8(
+                fisheries_group.get("ben_father_fisheries") or "NA"
+            )
             row_cells[7].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
@@ -1623,7 +1663,9 @@ def add_section_g(doc, plan, mws):
         ):
             row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Plantations"
-            row_cells[1].text = to_utf8(plantation_group.get("demand_type_plantations") or "NA")
+            row_cells[1].text = to_utf8(
+                plantation_group.get("demand_type_plantations") or "NA"
+            )
             row_cells[2].text = to_utf8(record.beneficiary_settlement or "NA")
             row_cells[3].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
