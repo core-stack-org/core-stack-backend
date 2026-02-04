@@ -436,10 +436,17 @@ def generate_tehsil_report(request):
         )
 
         # ? Pattern intensity
-        mws_pattern_intensity = get_pattern_intensity(
+        mws_pattern_intensity_with_active_pattern = get_pattern_intensity(
             result["state"], result["district"], result["block"]
         )
 
+        mws_pattern_intensity = mws_pattern_intensity_with_active_pattern.get(
+            "intensity", None
+        )
+
+        mws_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "active_patterns", []
+        )
         # ? Agriculture data
         groundwater_stress = get_agri_water_stress_data(
             result["state"], result["district"], result["block"]
@@ -477,6 +484,7 @@ def generate_tehsil_report(request):
             "block": result["block"],
             "block_osm": parameter_block,
             "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
+            "mws_active_pattern": mws_active_pattern,
             "groundwater_stress_json": json.dumps(groundwater_stress),
             "high_drought_incidence_json": json.dumps(high_drought_incidence),
             "drought_timeline_json": json.dumps(weighted_drought_timeline),
