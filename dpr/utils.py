@@ -11,6 +11,7 @@ from django.db.models import Max
 from django.utils import timezone
 from django.core.mail import EmailMessage
 from django.core.mail.backends.smtp import EmailBackend
+from docx import Document
 
 from nrm_app.settings import EMAIL_HOST, EMAIL_HOST_PASSWORD, EMAIL_HOST_USER, EMAIL_PORT, EMAIL_TIMEOUT, EMAIL_USE_SSL, ODK_PASSWORD, ODK_USERNAME
 from utilities.constants import (
@@ -41,6 +42,10 @@ from .models import (
     SWB_maintenance,
     SWB_RS_maintenance,
 )
+
+import boto3
+from nrm_app.settings import DPR_S3_ACCESS_KEY, DPR_S3_SECRET_KEY, DPR_S3_REGION, DPR_S3_BUCKET, DPR_S3_FOLDER
+from botocore.exceptions import ClientError
 
 warnings.filterwarnings("ignore")
 
@@ -74,22 +79,6 @@ def get_vector_layer_geoserver(geoserver_url, workspace, layer_name):
             print(f"Response status code: {response.status_code}")
             # print(f"Response content: {response.text}")
         return None
-
-
-# TODO: Align with the sync in moderation/utils/update_csdb.py
-def sync_db_odk():
-    sync_settlement()
-    sync_well()
-    sync_waterbody()
-    sync_groundwater()
-    sync_agri()
-    sync_livelihood()
-    sync_cropping_pattern()
-    sync_agri_maintenance()
-    sync_gw_maintenance()
-    sync_swb_maintenance()
-    sync_swb_rs_maintenance()
-    logger.info("ODK data synced successfully")
 
 
 def determine_caste_fields(record):
@@ -1030,24 +1019,18 @@ def to_utf8(value):
 
 
 def send_dpr_email(
-    doc,
     email_id,
     plan_name,
     mws_reports,
     mws_Ids,
     resource_report,
     resource_report_url,
+    dpr_s3_url,
     state_name="",
     district_name="",
     tehsil_name="",
 ):
     try:
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        doc_bytes = buffer.getvalue()
-        buffer.close()
-
         mws_table_html = ""
         if mws_reports and mws_Ids:
             mws_rows = "".join(
@@ -1086,8 +1069,12 @@ def send_dpr_email(
                     <div style="padding: 32px;">
                         <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
                             Hi,<br><br>
-                            Please find attached the Detailed Project Report for <strong>{to_utf8(plan_name)}</strong>.
+                            Your Detailed Project Report for <strong>{to_utf8(plan_name)}</strong> is ready.
                         </p>
+                        <div style="margin: 24px 0; padding: 16px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6; text-align: center;">
+                            <p style="margin: 0 0 12px 0; color: #1e40af; font-weight: 600;">Download DPR Report</p>
+                            <a href="{dpr_s3_url}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">Download DPR →</a>
+                        </div>
                         {mws_table_html}
                         <div style="margin: 24px 0; padding: 16px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #22c55e;">
                             <p style="margin: 0; color: #166534; font-weight: 600;">Resource Report</p>
@@ -1127,14 +1114,7 @@ def send_dpr_email(
             connection=backend,
         )
 
-        # Set content type to HTML
         email.content_subtype = "html"
-
-        email.attach(
-            f"DPR_{plan_name}.docx",
-            doc_bytes,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
 
         if resource_report is not None:
             email.attach(
@@ -1152,3 +1132,73 @@ def send_dpr_email(
         logger.error(f"SSL error: {e}")
     except Exception as e:
         logger.error(f"Failed to send email: {e}")
+
+
+def upload_dpr_to_s3(doc, plan_id, plan_name): 
+    doc_bytes = BytesIO()
+    doc.save(doc_bytes)
+    doc_bytes.seek(0)
+    
+    safe_plan_name = transform_name(plan_name)
+    s3_key = f"{DPR_S3_FOLDER}/{plan_id}_{safe_plan_name}.docx"
+    
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=DPR_S3_ACCESS_KEY,
+        aws_secret_access_key=DPR_S3_SECRET_KEY,
+        region_name=DPR_S3_REGION,
+    )
+    
+    s3_client.upload_fileobj(
+        doc_bytes,
+        DPR_S3_BUCKET,
+        s3_key,
+        ExtraArgs={"ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+    )
+    
+    s3_url = f"https://{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}"
+    logger.info(f"DPR uploaded to S3: {s3_url}")
+    return s3_url
+
+
+def check_dpr_exists_on_s3(s3_url):
+    if not s3_url:
+        return False
+    
+    try:
+        s3_key = s3_url.split(f"{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/")[1]
+    except (IndexError, AttributeError):
+        return False
+    
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=DPR_S3_ACCESS_KEY,
+        aws_secret_access_key=DPR_S3_SECRET_KEY,
+        region_name=DPR_S3_REGION,
+    )
+    
+    try:
+        s3_client.head_object(Bucket=DPR_S3_BUCKET, Key=s3_key)
+        return True
+    except ClientError:
+        logger.warning(f"DPR not found on S3: {s3_url}")
+        return False
+
+
+def download_dpr_from_s3(s3_url):
+    s3_key = s3_url.split(f"{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/")[1]
+    
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=DPR_S3_ACCESS_KEY,
+        aws_secret_access_key=DPR_S3_SECRET_KEY,
+        region_name=DPR_S3_REGION,
+    )
+    
+    doc_bytes = BytesIO()
+    s3_client.download_fileobj(DPR_S3_BUCKET, s3_key, doc_bytes)
+    doc_bytes.seek(0)
+    
+    doc = Document(doc_bytes)
+    logger.info(f"DPR downloaded from S3: {s3_url}")
+    return doc

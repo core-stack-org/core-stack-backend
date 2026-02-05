@@ -410,7 +410,7 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
         "status_re": system.get("reviewState") or "in progress",
         "work_id": swb_rs_submission.get("work_id") or "0",
         "corresponding_work_id": swb_rs_submission.get("corresponding_work_id") or "0",
-        "data_swb_maintenance": swb_rs_submission,
+        "data_swb_rs_maintenance": swb_rs_submission,
     }
 
     SWB_RS_maintenance.objects.update_or_create(uuid=uuid_val, defaults=mapped)

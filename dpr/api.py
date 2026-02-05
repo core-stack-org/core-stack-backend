@@ -129,7 +129,6 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Task queue to generate DPR document
         generate_dpr_task.apply_async(args=[plan_id, email_id], queue="dpr")
 
         return Response(

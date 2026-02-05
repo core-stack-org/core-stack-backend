@@ -1,6 +1,9 @@
 from django.db import models
 from users.models import User
-from plans.models import Plan
+from plans.models import PlanApp
+
+from django.db.models import Max
+from django.db.models.functions import Greatest
 
 
 DPR_STATUS_CHOICES = [
@@ -68,7 +71,7 @@ class ODK_settlement(models.Model):
         db_table = "odk_settlement"
 
     def __str__(self) -> str:
-        return self.settlement_name
+        return self.settlement_name or self.settlement_id or "Unknown"
 
 
 class ODK_well(models.Model):
@@ -340,6 +343,9 @@ class GW_maintenance(models.Model):
         verbose_name_plural = "Groundwater Maintenance"
         db_table = "odk_gw_maintenance"
 
+    def __str__(self) -> str:
+        return self.uuid or str(self.gw_maintenance_id)
+
 
 class SWB_RS_maintenance(models.Model):
     swb_rs_maintenance_id = models.AutoField(primary_key=True)
@@ -367,6 +373,9 @@ class SWB_RS_maintenance(models.Model):
         verbose_name = "SWB-RS Maintenance"
         verbose_name_plural = "SWB-RS Maintenance"
         db_table = "odk_swb_rs_maintenance"
+
+    def __str__(self) -> str:
+        return self.uuid or str(self.swb_rs_maintenance_id)
 
 
 class SWB_maintenance(models.Model):
@@ -396,6 +405,9 @@ class SWB_maintenance(models.Model):
         verbose_name_plural = "SWB Maintenance"
         db_table = "odk_swb_maintenance"
 
+    def __str__(self) -> str:
+        return self.uuid or str(self.swb_maintenance_id)
+
 
 class Agri_maintenance(models.Model):
     agri_maintenance_id = models.AutoField(primary_key=True)
@@ -423,6 +435,9 @@ class Agri_maintenance(models.Model):
         verbose_name = "Agri Maintenance"
         verbose_name_plural = "Agri Maintenance"
         db_table = "odk_agri_maintenance"
+
+    def __str__(self) -> str:
+        return self.uuid or str(self.agri_maintenance_id)
 
 
 class ODK_agrohorticulture(models.Model):
@@ -467,9 +482,10 @@ class Overpass_Block_Details(models.Model):
 
 class DPR_Report(models.Model):
     dpr_report_id = models.AutoField(primary_key=True)
-    plan_id = models.ForeignKey(Plan, on_delete=models.CASCADE)
+    plan_id = models.ForeignKey(PlanApp, on_delete=models.CASCADE)
     plan_name = models.TextField()
-    dpr_report_s3_url = models.TextField()
+    dpr_report_s3_url = models.TextField(null=True, blank=True)
+    dpr_generated_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="dpr_report_created_by")
     status = models.CharField(max_length=255, choices=DPR_STATUS_CHOICES, default="PENDING")
@@ -482,4 +498,26 @@ class DPR_Report(models.Model):
         db_table = "dpr_report"
 
     def __str__(self) -> str:
-        return self.dpr_report_id
+        return f"{self.plan_name} - {self.dpr_report_id}"
+
+    @classmethod
+    def get_latest_submission_time(cls, plan_id):
+        
+        settlement_max = ODK_settlement.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        well_max = ODK_well.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        waterbody_max = ODK_waterbody.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        groundwater_max = ODK_groundwater.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        irrigation_max = ODK_agri.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        crop_max = ODK_crop.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        livelihood_max = ODK_livelihood.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
+        
+        times = [t for t in [settlement_max, well_max, waterbody_max, groundwater_max, irrigation_max, crop_max, livelihood_max] if t]
+        return max(times) if times else None
+
+    def needs_regeneration(self):
+        if not self.dpr_generated_at or not self.dpr_report_s3_url:
+            return True
+        latest_submission = self.get_latest_submission_time(self.plan_id_id)
+        if not latest_submission:
+            return False
+        return latest_submission > self.dpr_generated_at
