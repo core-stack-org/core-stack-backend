@@ -119,7 +119,6 @@ else:
         "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
         "https://uat.dashboard.core-stack.org",
         "https://www.explorer.core-stack.org",
-        "https://www.explorer.core-stack.org/landscape_explorer",
         "https://development.d2s4eeyazvtd2g.amplifyapp.com",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
