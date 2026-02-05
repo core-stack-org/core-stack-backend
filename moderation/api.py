@@ -1,15 +1,32 @@
-from .views import *
-from django.http import JsonResponse
-from django.views.decorators.http import require_GET
-from rest_framework.decorators import api_view, schema
-from rest_framework.response import Response
-import requests
-from rest_framework import status
-from .utils.form_mapping import model_map
-from .api import FETCH_FIELD_MAP
-from .utils.get_submissions import ODKSubmissionsChecker
 import json
 import os
+
+from django.http import JsonResponse
+from django.utils import timezone
+from rest_framework.decorators import api_view, schema
+from rest_framework.response import Response
+
+from moderation.tasks import sync_odk_data_task
+from moderation.views import sync_odk_to_csdb
+from .views import (
+    FETCH_FIELD_MAP,
+    SubmissionsOfPlan,
+    sync_odk_data,
+    resync_settlement,
+    resync_well,
+    resync_waterbody,
+    resync_gw,
+    resync_agri,
+    resync_livelihood,
+    resync_cropping,
+    resync_agri_maintenance,
+    resync_gw_maintenance,
+    resync_swb_maintenance,
+    resync_swb_rs_maintenance,
+    get_edited_updated_all_submissions,
+)
+from .utils.form_mapping import model_map
+from .utils.get_submissions import ODKSubmissionsChecker
 
 
 @api_view(["GET"])
@@ -63,11 +80,29 @@ def update_submission(request, form_name, uuid):
         obj = Model.objects.get(uuid=uuid)
     except Model.DoesNotExist:
         return Response({"success": False, "message": "Not found"}, status=404)
+
     existing_data = getattr(obj, field_name) or {}
-    existing_data.update(request.data)
+    if not obj.is_moderated:
+        obj.data_before_moderation = existing_data.copy()
+
+    update_payload = request.data.get("data", request.data)
+    existing_data.update(update_payload)
     setattr(obj, field_name, existing_data)
+
     obj.is_moderated = True
-    obj.save(update_fields=[field_name, "is_moderated"])
+    obj.moderated_at = timezone.now()
+    obj.moderated_by = request.user if request.user.is_authenticated else None
+    obj.moderation_reason = request.data.get("moderation_reason") or obj.moderation_reason
+
+    update_fields = [
+        field_name,
+        "is_moderated",
+        "moderated_at",
+        "moderated_by",
+        "moderation_reason",
+        "data_before_moderation",
+    ]
+    obj.save(update_fields=update_fields)
     return Response({"success": True})
 
 
@@ -79,10 +114,35 @@ def delete_submission(request, form_name, uuid):
         return Response({"success": False, "message": "Invalid form"}, status=400)
 
     try:
-        Model.objects.get(uuid=uuid).delete()
+        obj = Model.objects.get(uuid=uuid)
+        obj.is_deleted = True
+        obj.deleted_at = timezone.now()
+        obj.deleted_by = request.user if request.user.is_authenticated else None
+        obj.save(update_fields=["is_deleted", "deleted_at", "deleted_by"])
         return Response({"success": True})
     except Model.DoesNotExist:
         return Response({"success": False, "message": "Not found"}, status=404)
+
+
+@api_view(["POST"])
+@schema(None)
+def trigger_odk_sync(request):
+    
+    async_mode = request.query_params.get("async", "true").lower() == "true"
+    
+    if async_mode:
+        task = sync_odk_data_task.delay()
+        return Response({
+            "status": "queued",
+            "task_id": task.id,
+            "message": "ODK sync task queued"
+        })
+    else:
+        result = sync_odk_to_csdb()
+        return Response({
+            "status": "completed",
+            "result": str(result)
+        })
 
 
 @api_view(["GET"])

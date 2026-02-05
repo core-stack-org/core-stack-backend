@@ -1,4 +1,23 @@
 from django.db import models
+from users.models import User
+from plans.models import Plan
+
+
+DPR_STATUS_CHOICES = [
+    ("PENDING", "PENDING"),
+    ("SUBMITTED", "SUBMITTED"),
+    ("APPROVED", "APPROVED"),
+    ("REVERTED", "REVERTED"),
+    ("REJECTED", "REJECTED"),
+]
+
+DEMAND_STATUS_CHOICES = [
+    ("PENDING", "PENDING"),
+    ("SUBMITTED", "SUBMITTED"),
+    ("APPROVED", "APPROVED"),
+    ("REVERTED", "REVERTED"),
+    ("REJECTED", "REJECTED"),
+]
 
 
 class ODK_settlement(models.Model):
@@ -33,6 +52,15 @@ class ODK_settlement(models.Model):
     nrega_community = models.TextField()
     data_settlement = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    settlement_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_settlements")
 
     class Meta:
         verbose_name = "Settlement"
@@ -63,6 +91,15 @@ class ODK_well(models.Model):
     gps_point = models.JSONField(default=dict)
     data_well = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    well_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_wells")
 
     class Meta:
         verbose_name = "Well"
@@ -99,6 +136,15 @@ class ODK_waterbody(models.Model):
     gps_point = models.JSONField(default=dict)
     data_waterbody = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    waterbody_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_waterbodies")
 
     class Meta:
         verbose_name = "Waterbody Structure"
@@ -126,6 +172,15 @@ class ODK_groundwater(models.Model):
     work_dimensions = models.JSONField(default=dict)
     data_groundwater = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    recharge_structure_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_groundwater")
 
     class Meta:
         verbose_name = "Groundwater Structure"
@@ -159,6 +214,15 @@ class ODK_agri(models.Model):
     work_dimensions = models.JSONField(default=dict)
     data_agri = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    irrigation_work_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_agri")
 
     class Meta:
         verbose_name = "Irrigation Structure"
@@ -192,6 +256,15 @@ class ODK_crop(models.Model):
     system = models.JSONField()
     data_crop = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    crop_pattern_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_crops")
 
     class Meta:
         verbose_name = "Cropping Pattern"
@@ -221,6 +294,15 @@ class ODK_livelihood(models.Model):
     gps_point = models.JSONField()
     data_livelihood = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    livelihood_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_livelihoods")
 
     class Meta:
         verbose_name = "Livelihood"
@@ -243,6 +325,15 @@ class GW_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    recharge_structure_maintenance_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_gw_maintenance")
 
     class Meta:
         verbose_name = "Groundwater Maintenance"
@@ -262,6 +353,15 @@ class SWB_RS_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    swb_rs_maintenance_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_swb_rs_maintenance")
 
     class Meta:
         verbose_name = "SWB-RS Maintenance"
@@ -281,6 +381,15 @@ class SWB_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    swb_maintenance_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_swb_maintenance")
 
     class Meta:
         verbose_name = "SWB Maintenance"
@@ -300,6 +409,15 @@ class Agri_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    irrigation_structure_maintenance_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_agri_maintenance")
 
     class Meta:
         verbose_name = "Agri Maintenance"
@@ -307,8 +425,8 @@ class Agri_maintenance(models.Model):
         db_table = "odk_agri_maintenance"
 
 
-class ODK_agohorticulture(models.Model):
-    agohorticulture_id = models.AutoField(primary_key=True)
+class ODK_agrohorticulture(models.Model):
+    agrohorticulture_id = models.AutoField(primary_key=True)
     uuid = models.CharField(max_length=255)
     plan_id = models.TextField()
     plan_name = models.TextField()
@@ -317,14 +435,23 @@ class ODK_agohorticulture(models.Model):
     status_re = models.TextField()
     data_agohorticulture = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
+    moderated_at = models.DateTimeField(null=True, blank=True)
+    moderated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    moderation_reason = models.TextField(null=True, blank=True)
+    moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
+    agrohorticulture_demand_status = models.CharField(max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING")
+    data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_agrohorticulture")
 
     class Meta:
-        verbose_name = "Agohorticulture"
-        verbose_name_plural = "Agohorticulture"
-        db_table = "odk_agohorticulture"
+        verbose_name = "Agrohorticulture"
+        verbose_name_plural = "Agrohorticulture"
+        db_table = "odk_agrohorticulture"
 
     def __str__(self) -> str:
-        return self.agohorticulture_id
+        return self.agrohorticulture_id
 
 
 class Overpass_Block_Details(models.Model):
@@ -336,3 +463,23 @@ class Overpass_Block_Details(models.Model):
         verbose_name = "Overpass Block Details"
         verbose_name_plural = "Overpass Block Details"
         db_table = "overpass_block_details"
+
+
+class DPR_Report(models.Model):
+    dpr_report_id = models.AutoField(primary_key=True)
+    plan_id = models.ForeignKey(Plan, on_delete=models.CASCADE)
+    plan_name = models.TextField()
+    dpr_report_s3_url = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="dpr_report_created_by")
+    status = models.CharField(max_length=255, choices=DPR_STATUS_CHOICES, default="PENDING")
+    last_updated_at = models.DateTimeField(null=True, blank=True)
+    last_updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="dpr_report_last_updated_by")
+
+    class Meta:
+        verbose_name = "DPR Report"
+        verbose_name_plural = "DPR Reports"
+        db_table = "dpr_report"
+
+    def __str__(self) -> str:
+        return self.dpr_report_id

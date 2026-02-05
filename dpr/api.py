@@ -15,10 +15,7 @@ from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
 
 from .gen_dpr import (
-    create_dpr_document,
-    get_mws_ids_for_report,
     get_plan_details,
-    send_dpr_email,
 )
 from .gen_multi_mws_report import (
     get_cropping_mws_data,

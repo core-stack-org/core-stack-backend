@@ -55,10 +55,10 @@ from .utils import (
     format_text_demands,
     get_vector_layer_geoserver,
     sort_key,
-    sync_db_odk,
     to_utf8,
     transform_name,
 )
+from moderation.views import sync_odk_to_csdb
 
 logger = setup_logger(__name__)
 
@@ -75,15 +75,17 @@ def create_dpr_document(plan):
 
     doc = initialize_document()  # doc init
 
-    sync_db_odk()
+    logger.info("Database sync started") # db sync
+    sync_odk_to_csdb()
     logger.info("Database sync complete")
 
-    logger.info("Details of the plan")
+    logger.info("Plan Details")
     logger.info(plan)
     logger.info(transform_name(str(plan.district_soi.district_name)))
     logger.info(transform_name(str(plan.tehsil_soi.tehsil_name)))
 
     total_settlements = get_settlement_count_for_plan(plan.id)
+    logger.info(f"Total settlements found in the plan: {total_settlements}")
 
     mws_fortnight = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
@@ -93,29 +95,38 @@ def create_dpr_document(plan):
         + "_"
         + transform_name(str(plan.tehsil_soi.tehsil_name)),
     )
+    logger.info(f"MWS Fortnight layer fetched successfully")
 
+    # MARK: - Sections
     add_section_a(doc, plan)
     add_section_separator(doc)
+    logger.info("Section A completed")
 
-    settlement_mws_ids, mws_gdf = add_section_b(
-        doc, plan, total_settlements, mws_fortnight
-    )
-    add_section_separator(doc)
-
-    add_section_c(doc, plan)
-    add_section_separator(doc)
-
-    add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
-    add_section_separator(doc)
-
-    add_section_e(doc, plan)
-    add_section_separator(doc)
-
-    add_section_f(doc, plan, mws_fortnight)
-    add_section_separator(doc)
-
-    add_section_g(doc, plan, mws_fortnight)
-    add_section_separator(doc)
+    # settlement_mws_ids, mws_gdf = add_section_b(
+    #     doc, plan, total_settlements, mws_fortnight
+    # )
+    # add_section_separator(doc)
+    # logger.info("Section B completed")
+    
+    # add_section_c(doc, plan)
+    # add_section_separator(doc)
+    # logger.info("Section C completed")
+    
+    # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    # add_section_separator(doc)
+    # logger.info("Section D completed")
+    
+    # add_section_e(doc, plan)
+    # add_section_separator(doc)
+    # logger.info("Section E completed")
+    
+    # add_section_f(doc, plan, mws_fortnight)
+    # add_section_separator(doc)
+    # logger.info("Section F completed")
+    
+    # add_section_g(doc, plan, mws_fortnight)
+    # add_section_separator(doc)
+    # logger.info("Section G completed")
 
     # MARK: local save /var/www/tmp/dpr/
     # if DEBUG:
@@ -125,131 +136,6 @@ def create_dpr_document(plan):
     #         os.makedirs(file_path)
     #     doc.save(file_path + plan.plan + ".docx")
     return doc
-
-
-def send_dpr_email(
-    doc,
-    email_id,
-    plan_name,
-    mws_reports,
-    mws_Ids,
-    resource_report,
-    resource_report_url,
-    state_name="",
-    district_name="",
-    tehsil_name="",
-):
-    try:
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        doc_bytes = buffer.getvalue()
-        buffer.close()
-
-        mws_table_html = ""
-        if mws_reports and mws_Ids:
-            mws_rows = "".join(
-                f'<tr><td style="padding: 10px 16px; border-bottom: 1px solid #eee;">{mws_id}</td>'
-                f'<td style="padding: 10px 16px; border-bottom: 1px solid #eee; text-align: center;">'
-                f'<a href="{report_url}" style="color: #2563eb; text-decoration: none;">View Report</a></td></tr>'
-                for mws_id, report_url in zip(mws_Ids, mws_reports)
-            )
-            mws_table_html = f"""
-            <div style="margin: 24px 0;">
-                <p style="font-weight: 600; color: #374151; margin-bottom: 12px;">MWS Reports</p>
-                <table style="width: 100%; border-collapse: collapse; background: #f9fafb; border-radius: 8px; overflow: hidden;">
-                    <thead>
-                        <tr style="background: #f3f4f6;">
-                            <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151;">MWS ID</th>
-                            <th style="padding: 12px 16px; text-align: center; font-weight: 600; color: #374151;">Report</th>
-                        </tr>
-                    </thead>
-                    <tbody>{mws_rows}</tbody>
-                </table>
-            </div>
-            """
-
-        email_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"></head>
-        <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-                <div style="background: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
-                    <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 32px; text-align: center;">
-                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Detailed Project Report</h1>
-                        <p style="color: #bfdbfe; margin: 12px 0 0 0; font-size: 16px; font-weight: 500;">{to_utf8(plan_name)}</p>
-                        <p style="color: #93c5fd; margin: 8px 0 0 0; font-size: 13px;">{to_utf8(tehsil_name)} · {to_utf8(district_name)} · {to_utf8(state_name)}</p>
-                    </div>
-                    <div style="padding: 32px;">
-                        <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-                            Hi,<br><br>
-                            Please find attached the Detailed Project Report for <strong>{to_utf8(plan_name)}</strong>.
-                        </p>
-                        {mws_table_html}
-                        <div style="margin: 24px 0; padding: 16px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #22c55e;">
-                            <p style="margin: 0; color: #166534; font-weight: 600;">Resource Report</p>
-                            <a href="{resource_report_url}" style="color: #15803d; text-decoration: none; font-size: 14px;">View Report →</a>
-                        </div>
-                    </div>
-                    <div style="background: #f9fafb; padding: 24px 32px; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                            Thanks and Regards,<br>
-                            <strong style="color: #374151;">CoRE Stack Team</strong>
-                        </p>
-                    </div>
-                </div>
-                <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">
-                    This is an automated email from CoRE Stack.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        backend = EmailBackend(
-            host=EMAIL_HOST,
-            port=EMAIL_PORT,
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_ssl=EMAIL_USE_SSL,
-            timeout=EMAIL_TIMEOUT,
-            ssl_context=ssl.create_default_context(),
-        )
-
-        email = EmailMessage(
-            subject=f"DPR of plan: {plan_name}",
-            body=email_body,
-            from_email=EMAIL_HOST_USER,
-            to=[email_id],
-            connection=backend,
-        )
-
-        # Set content type to HTML
-        email.content_subtype = "html"
-
-        email.attach(
-            f"DPR_{plan_name}.docx",
-            doc_bytes,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-
-        if resource_report is not None:
-            email.attach(
-                f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
-            )
-
-        logger.info("Sending DPR email to %s", email_id)
-        email.send(fail_silently=False)
-        logger.info("DPR email sent.")
-        backend.close()
-
-    except socket.error as e:
-        logger.error(f"Socket error: {e}")
-    except ssl.SSLError as e:
-        logger.error(f"SSL error: {e}")
-    except Exception as e:
-        logger.error(f"Failed to send email: {e}")
 
 
 def get_data_for_settlement(planid):

@@ -5,10 +5,8 @@ from .gen_dpr import (
     create_dpr_document,
     get_mws_ids_for_report,
     get_plan_details,
-    send_dpr_email,
 )
-from .gen_report_download import render_pdf_with_firefox
-from .utils import transform_name
+from .utils import transform_name, send_dpr_email
 
 logger = setup_logger(__name__)
 
@@ -46,11 +44,6 @@ def generate_dpr_task(self, plan_id: int, email_id: str):
         f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
         f"?district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
     )
-
-    try:
-        resource_report = render_pdf_with_firefox(resource_html_url)
-    except Exception as e:
-        logger.error(f"Failed to generate resource report: {e}")
 
     send_dpr_email(
         doc=doc,
