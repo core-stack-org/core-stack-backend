@@ -18,17 +18,17 @@ from .utils import (
 logger = setup_logger(__name__)
 
 
-def get_or_generate_dpr(plan):
+def get_or_generate_dpr(plan, regenerate=False):
     dpr_report, created = DPR_Report.objects.get_or_create(
         plan_id=plan,
         defaults={"plan_name": plan.plan, "status": "PENDING"}
     )
     
-    s3_exists = check_dpr_exists_on_s3(dpr_report.dpr_report_s3_url)
-    
-    if not created and not dpr_report.needs_regeneration() and s3_exists:
-        logger.info(f"Using cached DPR for plan {plan.id} from S3: {dpr_report.dpr_report_s3_url}")
-        return dpr_report, False
+    if not regenerate:
+        s3_exists = check_dpr_exists_on_s3(dpr_report.dpr_report_s3_url)
+        if not created and not dpr_report.needs_regeneration() and s3_exists:
+            logger.info(f"Using cached DPR for plan {plan.id} from S3: {dpr_report.dpr_report_s3_url}")
+            return dpr_report, False
     
     logger.info(f"Generating new DPR for plan {plan.id}")
     dpr_report.status = "GENERATING"
@@ -50,13 +50,13 @@ def get_or_generate_dpr(plan):
 
 
 @app.task(bind=True, name="dpr.generate_dpr_task")
-def generate_dpr_task(self, plan_id: int, email_id: str):
+def generate_dpr_task(self, plan_id: int, email_id: str, regenerate: bool = False):
     plan = get_plan_details(plan_id)
     if plan is None:
         logger.error(f"Plan not found for ID: {plan_id}")
         return {"error": "Plan not found"}
 
-    dpr_report, was_regenerated = get_or_generate_dpr(plan)
+    dpr_report, was_regenerated = get_or_generate_dpr(plan, regenerate=regenerate)
     mws_Ids = get_mws_ids_for_report(plan)
 
     mws_reports = []

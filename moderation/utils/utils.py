@@ -335,6 +335,7 @@ def sync_edited_updated_agri_maintenance(am_submission):
         "status_re": system.get("reviewState") or "in progress",
         "work_id": am_submission.get("work_id") or "0",
         "corresponding_work_id": am_submission.get("corresponding_work_id") or "0",
+        "submission_time": system.get("submissionDate"),
         "data_agri_maintenance": am_submission,
     }
 
@@ -360,6 +361,7 @@ def sync_edited_updated_gw_maintenance(gwm_submission):
         "status_re": system.get("reviewState") or "in progress",
         "work_id": gwm_submission.get("work_id") or "0",
         "corresponding_work_id": gwm_submission.get("corresponding_work_id") or "0",
+        "submission_time": system.get("submissionDate"),
         "data_gw_maintenance": gwm_submission,
     }
 
@@ -385,6 +387,7 @@ def sync_edited_updated_swb_maintenance(swbm_submission):
         "status_re": system.get("reviewState") or "in progress",
         "work_id": swbm_submission.get("work_id") or "0",
         "corresponding_work_id": swbm_submission.get("corresponding_work_id") or "0",
+        "submission_time": system.get("submissionDate"),
         "data_swb_maintenance": swbm_submission,
     }
 
@@ -410,6 +413,7 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
         "status_re": system.get("reviewState") or "in progress",
         "work_id": swb_rs_submission.get("work_id") or "0",
         "corresponding_work_id": swb_rs_submission.get("corresponding_work_id") or "0",
+        "submission_time": system.get("submissionDate"),
         "data_swb_rs_maintenance": swb_rs_submission,
     }
 

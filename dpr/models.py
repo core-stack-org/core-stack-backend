@@ -326,6 +326,7 @@ class GW_maintenance(models.Model):
     status_re = models.TextField()
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
+    submission_time = models.DateTimeField(null=True, blank=True)
     data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
@@ -357,6 +358,7 @@ class SWB_RS_maintenance(models.Model):
     status_re = models.TextField()
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
+    submission_time = models.DateTimeField(null=True, blank=True)
     data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
@@ -388,6 +390,7 @@ class SWB_maintenance(models.Model):
     status_re = models.TextField()
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
+    submission_time = models.DateTimeField(null=True, blank=True)
     data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
@@ -419,6 +422,7 @@ class Agri_maintenance(models.Model):
     status_re = models.TextField()
     work_id = models.CharField(max_length=255)
     corresponding_work_id = models.CharField(max_length=255)
+    submission_time = models.DateTimeField(null=True, blank=True)
     data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
@@ -500,18 +504,19 @@ class DPR_Report(models.Model):
     def __str__(self) -> str:
         return f"{self.plan_name} - {self.dpr_report_id}"
 
-    @classmethod
-    def get_latest_submission_time(cls, plan_id):
-        
-        settlement_max = ODK_settlement.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        well_max = ODK_well.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        waterbody_max = ODK_waterbody.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        groundwater_max = ODK_groundwater.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        irrigation_max = ODK_agri.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        crop_max = ODK_crop.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        livelihood_max = ODK_livelihood.objects.filter(plan_id=plan_id).aggregate(max_time=Max('submission_time'))['max_time']
-        
-        times = [t for t in [settlement_max, well_max, waterbody_max, groundwater_max, irrigation_max, crop_max, livelihood_max] if t]
+    @staticmethod
+    def get_latest_submission_time(plan_id):
+        pid = str(plan_id)
+        all_models = [
+            ODK_settlement, ODK_well, ODK_waterbody,
+            ODK_groundwater, ODK_agri, ODK_crop, ODK_livelihood,
+            GW_maintenance, SWB_RS_maintenance, SWB_maintenance, Agri_maintenance,
+        ]
+        times = [
+            m.objects.filter(plan_id=pid).aggregate(t=Max('submission_time'))['t']
+            for m in all_models
+        ]
+        times = [t for t in times if t]
         return max(times) if times else None
 
     def needs_regeneration(self):

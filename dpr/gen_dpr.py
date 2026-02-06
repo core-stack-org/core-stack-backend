@@ -102,11 +102,11 @@ def create_dpr_document(plan):
     add_section_separator(doc)
     logger.info("Section A completed")
 
-    # settlement_mws_ids, mws_gdf = add_section_b(
-    #     doc, plan, total_settlements, mws_fortnight
-    # )
-    # add_section_separator(doc)
-    # logger.info("Section B completed")
+    settlement_mws_ids, mws_gdf = add_section_b(
+        doc, plan, total_settlements, mws_fortnight
+    )
+    add_section_separator(doc)
+    logger.info("Section B completed")
     
     # add_section_c(doc, plan)
     # add_section_separator(doc)

@@ -4,7 +4,8 @@ import ssl
 import socket
 from io import BytesIO
 import warnings
-
+import time
+from urllib.parse import urlparse
 import pytz
 import requests
 from django.db.models import Max
@@ -1153,12 +1154,23 @@ def upload_dpr_to_s3(doc, plan_id, plan_name):
         doc_bytes,
         DPR_S3_BUCKET,
         s3_key,
-        ExtraArgs={"ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+        ExtraArgs={
+            "ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "ContentDisposition": f'attachment; filename="DPR_{safe_plan_name}.docx"',
+            "CacheControl": "no-cache, no-store, must-revalidate",
+        }
     )
     
-    s3_url = f"https://{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}"
+    ts = int(time.time())
+    s3_url = f"https://{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}?v={ts}"
     logger.info(f"DPR uploaded to S3: {s3_url}")
     return s3_url
+
+
+def _extract_s3_key(s3_url):
+    
+    parsed = urlparse(s3_url)
+    return parsed.path.lstrip("/")
 
 
 def check_dpr_exists_on_s3(s3_url):
@@ -1166,7 +1178,7 @@ def check_dpr_exists_on_s3(s3_url):
         return False
     
     try:
-        s3_key = s3_url.split(f"{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/")[1]
+        s3_key = _extract_s3_key(s3_url)
     except (IndexError, AttributeError):
         return False
     
@@ -1186,7 +1198,7 @@ def check_dpr_exists_on_s3(s3_url):
 
 
 def download_dpr_from_s3(s3_url):
-    s3_key = s3_url.split(f"{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/")[1]
+    s3_key = _extract_s3_key(s3_url)
     
     s3_client = boto3.client(
         "s3",
