@@ -649,6 +649,17 @@ class PlanViewSet(viewsets.ModelViewSet):
         """
         project_id = self.kwargs.get("project_pk")
 
+        if self.request.user.groups.filter(name="Test Plan Reviewer").exists():
+            base_queryset = PlanApp.objects.filter(enabled=True).filter(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+            if project_id:
+                base_queryset = base_queryset.filter(project_id=project_id)
+            tehsil_id = self.request.query_params.get("tehsil")
+            if tehsil_id:
+                base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+            return base_queryset
+
         if self.request.user.is_superuser or self.request.user.is_superadmin:
             if project_id:
                 try:
@@ -794,6 +805,21 @@ class PlanViewSet(viewsets.ModelViewSet):
         user = request.user
         project_id = self.kwargs.get("project_pk")
 
+        if user.groups.filter(name="Test Plan Reviewer").exists():
+            plans = PlanApp.objects.filter(enabled=True).filter(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+            if project_id:
+                plans = plans.filter(project_id=project_id)
+            tehsil_id = request.query_params.get("tehsil")
+            if tehsil_id:
+                plans = plans.filter(tehsil_soi_id=tehsil_id)
+            serializer = PlanAppSerializer(plans, many=True)
+            return Response(
+                {"count": plans.count(), "plans": serializer.data},
+                status=status.HTTP_200_OK,
+            )
+
         if project_id:
             try:
                 project = Project.objects.get(
@@ -872,54 +898,63 @@ class PlanViewSet(viewsets.ModelViewSet):
             "project"
         )
 
+        is_test_plan_reviewer = user.groups.filter(name="Test Plan Reviewer").exists()
+
         base_queryset = PlanApp.objects.filter(enabled=True)
 
-        base_queryset = base_queryset.exclude(
-            Q(plan__icontains="test") | Q(plan__icontains="demo")
-        )
+        if is_test_plan_reviewer:
+            base_queryset = base_queryset.filter(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+            if project_id:
+                base_queryset = base_queryset.filter(project_id=project_id)
+        else:
+            base_queryset = base_queryset.exclude(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
 
-        if project_id:
-            try:
-                project = Project.objects.get(
-                    id=project_id, app_type=AppType.WATERSHED, enabled=True
-                )
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
 
+                    if not (user.is_superadmin or user.is_superuser):
+                        if user.groups.filter(
+                            name__in=["Organization Admin", "Org Admin", "Administrator"]
+                        ).exists():
+                            if project.organization != user.organization:
+                                return Response(
+                                    {"message": "You do not have access to this project."},
+                                    status=status.HTTP_403_FORBIDDEN,
+                                )
+                        else:
+                            user_project_exists = UserProjectGroup.objects.filter(
+                                user=user, project=project
+                            ).exists()
+                            if not user_project_exists:
+                                return Response(
+                                    {"message": "You do not have access to this project."},
+                                    status=status.HTTP_403_FORBIDDEN,
+                                )
+
+                    base_queryset = base_queryset.filter(project=project)
+                except Project.DoesNotExist:
+                    return Response(
+                        {"message": "Project not found."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            else:
                 if not (user.is_superadmin or user.is_superuser):
                     if user.groups.filter(
                         name__in=["Organization Admin", "Org Admin", "Administrator"]
                     ).exists():
-                        if project.organization != user.organization:
-                            return Response(
-                                {"message": "You do not have access to this project."},
-                                status=status.HTTP_403_FORBIDDEN,
-                            )
+                        base_queryset = base_queryset.filter(organization=user.organization)
                     else:
-                        user_project_exists = UserProjectGroup.objects.filter(
-                            user=user, project=project
-                        ).exists()
-                        if not user_project_exists:
-                            return Response(
-                                {"message": "You do not have access to this project."},
-                                status=status.HTTP_403_FORBIDDEN,
-                            )
-
-                base_queryset = base_queryset.filter(project=project)
-            except Project.DoesNotExist:
-                return Response(
-                    {"message": "Project not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        else:
-            if not (user.is_superadmin or user.is_superuser):
-                if user.groups.filter(
-                    name__in=["Organization Admin", "Org Admin", "Administrator"]
-                ).exists():
-                    base_queryset = base_queryset.filter(organization=user.organization)
-                else:
-                    user_projects = UserProjectGroup.objects.filter(
-                        user=user
-                    ).values_list("project_id", flat=True)
-                    base_queryset = base_queryset.filter(project_id__in=user_projects)
+                        user_projects = UserProjectGroup.objects.filter(
+                            user=user
+                        ).values_list("project_id", flat=True)
+                        base_queryset = base_queryset.filter(project_id__in=user_projects)
 
         state_id = request.query_params.get("state")
         district_id = request.query_params.get("district")
