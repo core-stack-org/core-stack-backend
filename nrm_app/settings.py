@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     "apiadmin",
     "moderation",
     "users.apps.UsersConfig",
+    "django_crontab",
 ]
 
 # MARK: CORS Settings
@@ -392,3 +393,5 @@ lulc_years = [
     "2023_2024",
 ]
 water_classes = [2, 3, 4]
+
+CRONJOBS = [("0 0  * * *", "moderation.cron.run_daily_odk_job")]

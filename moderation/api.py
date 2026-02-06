@@ -7,7 +7,6 @@ import requests
 from rest_framework import status
 from .utils.form_mapping import model_map
 from .api import FETCH_FIELD_MAP
-from .utils.get_submissions import ODKSubmissionsChecker
 import json
 import os
 
@@ -29,6 +28,7 @@ def get_paginated_submissions(request, form, plan_id):
         "GroundWater Maintenance": SubmissionsOfPlan.get_gw_maintenance,
         "Surface Water Body Maintenance": SubmissionsOfPlan.get_swb_maintenance,
         "Surface Water Body Remotely Sensed Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
+        "Agrohorticulture": SubmissionsOfPlan.get_agrohorticulture,
     }
 
     if form not in mapping:
@@ -88,48 +88,6 @@ def delete_submission(request, form_name, uuid):
 @api_view(["GET"])
 @schema(None)
 def sync_updated_submissions(request):
-    (
-        settlement_submissions,
-        well_submissions,
-        waterbody_submissions,
-        groundwater_submissions,
-        agri_submissions,
-        livelihood_submissions,
-        cropping_submissions,
-        agri_maintenance_submissions,
-        gw_maintenance_submissions,
-        swb_maintenance_submissions,
-        swb_rs_maintenance_submissions,
-    ) = sync_odk_data(get_edited_updated_all_submissions)
-    checker = ODKSubmissionsChecker()
-    res = checker.process("updated")
-    for form_name, status in res.items():
-        if status.get("is_updated"):
-            if form_name == "Settlement Form":
-                resync_settlement(settlement_submissions)
-            elif form_name == "Well Form":
-                resync_well(well_submissions)
-            elif form_name == "water body form":
-                resync_waterbody(waterbody_submissions)
-            elif form_name == "new recharge structure form":
-                resync_gw(groundwater_submissions)
-            elif form_name == "new irrigation form":
-                resync_agri(agri_submissions)
-            elif form_name == "livelihood form":
-                resync_livelihood(livelihood_submissions)
-            elif form_name == "cropping pattern form":
-                resync_cropping(cropping_submissions)
-            elif form_name == "propose maintenance on existing irrigation form":
-                resync_agri_maintenance(agri_maintenance_submissions)
-            elif form_name == "propose maintenance on water structure form":
-                resync_gw_maintenance(gw_maintenance_submissions)
-            elif form_name == "propose maintenance on existing water recharge form":
-                resync_swb_maintenance(swb_maintenance_submissions)
-            elif (
-                form_name
-                == "propose maintenance of remotely sensed water structure form"
-            ):
-                resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
-            else:
-                print("passed wrong form name")
-    return JsonResponse({"status": "Sync complete", "result": res})
+    print("syncing ODK to CSDB")
+    res = sync_odk_to_csdb()
+    return res

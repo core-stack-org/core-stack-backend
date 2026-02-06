@@ -36,6 +36,11 @@
       "display": "Planning New => Livelihood Details"
     },
     {
+      "name": "Agrohorticulture",
+      "form_id": "Agrohorticulture",
+      "display": "Planning New => Agrohorticulture"
+    },
+    {
       "name": "Surface Water Body Maintenance",
       "form_id": "NRM_form_NRM_form_Waterbody_Screen_V1.0.0",
       "display": "Planning Maintenance => Propose Maintenance on Surface Water structures"
