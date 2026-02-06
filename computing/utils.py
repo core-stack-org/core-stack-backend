@@ -86,7 +86,30 @@ def push_shape_to_geoserver(
         file_extension=file_type,
     )
     print(response)
-    #
+    delete_extension = [".cpg", ".dbf", ".prj", ".shp", ".shx", ".zip"]
+    if response["status_code"] in [200, 201, 202]:
+        path = path.split("/")[:-1]
+        path = os.path.join(*path)
+        if (os.path.isdir(path)) and (
+            path.startswith("data/admin-boundary/output")
+            or path.startswith("data/nrega_assets/output")
+        ):
+            for root, dirs, files in os.walk(path, topdown=False):
+                for file in files:
+                    ext = os.path.splitext(file)[1].lower()
+                    if ext in delete_extension:
+                        file_path = os.path.join(root, file)
+                        os.remove(file_path)
+                for dir in dirs:
+                    dir_path = os.path.join(root, dir)
+                    if not os.listdir(dir_path):
+                        os.rmdir(dir_path)
+
+            if not os.listdir(path):
+                os.rmdir(path)
+        else:
+            print(f"Root folder i.e. data is passed >> {path=}")
+
     return response
 
 
