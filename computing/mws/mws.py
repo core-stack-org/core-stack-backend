@@ -81,7 +81,7 @@ def mws_layer(self, state, district, block, gee_account_id):
             fc,
             state,
             layer_name,
-            "filtered_mws",
+            "mws",
         )
 
         if res and layer_id:
