@@ -387,3 +387,4 @@ dependencies:
           - emoji
           - webdriver-manager
           - pystac==1.13.0
+          - django-celery-beat

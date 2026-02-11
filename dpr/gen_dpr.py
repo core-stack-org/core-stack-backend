@@ -108,25 +108,25 @@ def create_dpr_document(plan):
     add_section_separator(doc)
     logger.info("Section B completed")
     
-    # add_section_c(doc, plan)
-    # add_section_separator(doc)
-    # logger.info("Section C completed")
+    add_section_c(doc, plan)
+    add_section_separator(doc)
+    logger.info("Section C completed")
     
-    # add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
-    # add_section_separator(doc)
-    # logger.info("Section D completed")
+    add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
+    add_section_separator(doc)
+    logger.info("Section D completed")
     
-    # add_section_e(doc, plan)
-    # add_section_separator(doc)
-    # logger.info("Section E completed")
+    add_section_e(doc, plan)
+    add_section_separator(doc)
+    logger.info("Section E completed")
     
-    # add_section_f(doc, plan, mws_fortnight)
-    # add_section_separator(doc)
-    # logger.info("Section F completed")
+    add_section_f(doc, plan, mws_fortnight)
+    add_section_separator(doc)
+    logger.info("Section F completed")
     
-    # add_section_g(doc, plan, mws_fortnight)
-    # add_section_separator(doc)
-    # logger.info("Section G completed")
+    add_section_g(doc, plan, mws_fortnight)
+    add_section_separator(doc)
+    logger.info("Section G completed")
 
     # MARK: local save /var/www/tmp/dpr/
     # if DEBUG:
@@ -139,13 +139,14 @@ def create_dpr_document(plan):
 
 
 def get_data_for_settlement(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected")
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").exclude(is_deleted=True)
 
 
 def get_settlement_count_for_plan(planid):
     return (
         ODK_settlement.objects.filter(plan_id=planid)
         .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
         .count()
     )
 
@@ -154,6 +155,7 @@ def get_settlement_coordinates_for_plan(planid):
     settlements = (
         ODK_settlement.objects.filter(plan_id=planid)
         .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
         .values("settlement_name", "latitude", "longitude")
     )
     return [
@@ -507,7 +509,7 @@ def create_table_mgnrega_info(doc, plan, settlement_data):
 def create_table_crop_info(doc, plan):
     crops_in_plan = ODK_crop.objects.filter(plan_id=str(plan.id)).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     headers_cropping_pattern = [
         "Name of the Settlement",
@@ -579,7 +581,9 @@ def create_table_crop_info(doc, plan):
 
 
 def create_table_livestock(doc, plan):
-    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id)
+    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id).exclude(
+        status_re="rejected"
+    ).exclude(is_deleted=True)
     headers_livelihood = [
         "Name of the Settlement",
         "Goats",
@@ -663,7 +667,7 @@ def get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all wells across all MWS IDs with their corresponding MWS assignment"""
     wells_in_plan = ODK_well.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     all_wells_with_mws = []
 
     for well in wells_in_plan:
@@ -690,7 +694,7 @@ def get_all_waterbodies_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all waterbodies across all MWS IDs with their corresponding MWS assignment"""
     waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     all_waterbodies_with_mws = []
 
     for waterbody in waterbodies_in_plan:
@@ -1040,7 +1044,7 @@ def maintenance_gw_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in GW_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in GW_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
@@ -1110,7 +1114,7 @@ def maintenance_agri_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
@@ -1181,7 +1185,7 @@ def maintenance_waterstructures_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
@@ -1244,7 +1248,7 @@ def maintenance_rs_waterstructures_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
@@ -1294,10 +1298,10 @@ def add_section_f(doc, plan, mws):
 def create_nrm_works_table(doc, plan, mws):
     recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     recharge_works = [structure for structure in recharge_st_in_plan]
     irrigation_works = [irr_work for irr_work in irrigation_works_in_plan]
@@ -1379,7 +1383,7 @@ def add_section_g(doc, plan, mws):
 
     livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     # Table for Livestock and Fisheries
     doc.add_heading("G.1 Livestock and Fisheries", level=2)

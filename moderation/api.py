@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from moderation.tasks import sync_odk_data_task
 from moderation.views import sync_odk_to_csdb
+from .utils.utils import MODEL_FIELD_EXTRACTORS
 from .views import (
     FETCH_FIELD_MAP,
     SubmissionsOfPlan,
@@ -102,6 +103,14 @@ def update_submission(request, form_name, uuid):
         "moderation_reason",
         "data_before_moderation",
     ]
+
+    extractor = MODEL_FIELD_EXTRACTORS.get(Model)
+    if extractor:
+        model_fields = extractor(existing_data)
+        for attr, value in model_fields.items():
+            setattr(obj, attr, value)
+        update_fields.extend(model_fields.keys())
+
     obj.save(update_fields=update_fields)
     return Response({"success": True})
 
