@@ -5,6 +5,14 @@ from organization.models import Organization
 from projects.models import Project
 from users.models import User
 
+PLAN_STATUS_CHOICES = [
+    ("IN_PROGRESS", "IN_PROGRESS"),
+    ("DPR_REVIEW_PHASE", "DPR_REVIEW_PHASE"),
+    ("DPR_SUBMISSION_PHASE", "DPR_SUBMISSION_PHASE"),
+    ("ARCHIVED", "ARCHIVED"),
+    ("COMPLETED", "COMPLETED"),
+]
+
 
 class ODKSyncLog(models.Model):
     class SyncCategory(models.TextChoices):
@@ -103,6 +111,7 @@ class PlanApp(models.Model):
     longitude = models.DecimalField(
         max_digits=20, decimal_places=8, null=True, blank=True
     )
+    plan_status = models.CharField(max_length=255, choices=PLAN_STATUS_CHOICES, default="IN_PROGRESS", null=True, blank=True)
 
     def __str__(self):
         return str(self.plan)

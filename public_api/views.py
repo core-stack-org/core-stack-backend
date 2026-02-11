@@ -20,6 +20,7 @@ from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
+import re
 
 # Create your views here.
 
@@ -62,6 +63,8 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
 
+    from django.db.models import Q
+
     EXCLUDE_LAYER_KEYWORDS = [
         "run off",
         "run_off",
@@ -70,7 +73,9 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         "MWS",
     ]
     for word in EXCLUDE_LAYER_KEYWORDS:
-        layers = layers.exclude(layer_name__icontains=word)
+        layers = layers.exclude(
+            Q(layer_name__icontains=word) & ~Q(layer_name__icontains="mws_connectivity")
+        )
 
     layer_data = []
 
@@ -80,7 +85,11 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         layer_type = dataset.layer_type
         layer_name = layer.layer_name
         gee_asset_path = layer.gee_asset_path
-        style_url = dataset.style_name
+        style_url = (
+            dataset.misc["style_url"]
+            if dataset.misc and "style_url" in dataset.misc
+            else ""
+        )
 
         if layer_type in [LayerType.VECTOR, LayerType.POINT]:
             layer_url = get_url(workspace, layer_name)
@@ -91,11 +100,12 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
         layer_data.append(
             {
-                "layer_name": dataset.name,
+                "layer_name": layer_name,
+                "dataset_name": dataset.name,
                 "layer_type": layer_type,
                 "layer_url": layer_url,
                 "layer_version": layer.layer_version,
-                "style_url": "",
+                "style_url": style_url,
                 "gee_asset_path": gee_asset_path,
             }
         )
@@ -154,7 +164,7 @@ def get_mws_id_by_lat_lon(lon, lat):
             point = ee.Geometry.Point([lon, lat])
             matching_feature = mws_fc.filterBounds(point).first()
             uid = ee.String(matching_feature.get("uid")).getInfo()
-            data_dict["uid"] = uid
+            data_dict["mws_id"] = uid
             return data_dict
         else:
             return Response(
@@ -183,36 +193,35 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
         response.raise_for_status()
         geojson = response.json()
 
-        if not geojson["features"]:
+        if not geojson.get("features"):
             return {"error": f"MWS ID {mws_id} not found"}
 
         properties = geojson["features"][0]["properties"]
 
-        # Helper function to round values
+        date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
         def roundoff_value(value):
             return round(value, 2) if value is not None else None
 
-        # Build time series
         time_series = []
-        for date, data in sorted(properties.items(), key=lambda x: x[0]):
-
-            try:
-                values = json.loads(data)
-                time_series.append(
-                    {
-                        "date": date,
-                        "et": roundoff_value(values.get("ET")),
-                        "runoff": roundoff_value(values.get("RunOff")),
-                        "precipitation": roundoff_value(values.get("Precipitation")),
-                    }
-                )
-            except (json.JSONDecodeError, TypeError):
+        for key, value in properties.items():
+            if not date_pattern.match(key):
                 continue
+            values = json.loads(value)
+            time_series.append(
+                {
+                    "date": key,
+                    "et": roundoff_value(values.get("ET")),
+                    "runoff": roundoff_value(values.get("RunOff")),
+                    "precipitation": roundoff_value(values.get("Precipitation")),
+                }
+            )
 
+        time_series.sort(key=lambda x: x["date"])
         return {"mws_id": mws_id, "time_series": time_series}
 
     except Exception as e:
-        return {"Error in get mws data": str(e)}
+        return {"error": "Error in get mws data", "message": str(e)}
 
 
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):

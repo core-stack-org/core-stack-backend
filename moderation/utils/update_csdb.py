@@ -3,10 +3,25 @@ from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from .utils import *
 from .get_submissions import get_edited_updated_all_submissions
 from .form_mapping import corestack
-from utilities.constants import ODK_BASE_URL, filter_query, project_id
+from utilities.constants import ODK_BASE_URL, project_id
+from moderation.models import SyncMetadata
+
+
+def get_dynamic_filter_query():
+    from datetime import timezone as dt_tz
+    metadata = SyncMetadata.get_odk_sync_metadata()
+    filter_date = metadata.get_filter_date()
+    filter_date_utc = filter_date.astimezone(dt_tz.utc)
+    date_str = filter_date_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    return (
+        f"$filter=__system/submissionDate ge {date_str} "
+        f"or __system/updatedAt ge {date_str}"
+    )
 
 
 def sync_odk_data(get_edited_updated_all_submissions):
+    filter_query = get_dynamic_filter_query()
+
     get_edited_updated_all_submissions = get_edited_updated_all_submissions(
         username=ODK_USERNAME,
         password=ODK_PASSWORD,
@@ -161,7 +176,7 @@ def resync_agri(agri_submissions):
 def resync_livelihood(livelihood_submissions):
     count = 0
     for livelihood_submission in livelihood_submissions:
-        sync_edited_updated_livelihhod(livelihood_submission)
+        sync_edited_updated_livelihood(livelihood_submission)
         count += 1
     print(f"{count} livelihood submissions synced")
 

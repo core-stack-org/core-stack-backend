@@ -71,13 +71,17 @@ def push_shape_to_geoserver(
 
     print(f"layer_name: {layer_name}")
     if layer_name:
-        # geo.delete_layer(layer_name, workspace)
-        geo.delete_vector_store(workspace=workspace, store=layer_name)
+        try:
+            print(f"Attempting to delete store: {layer_name}")
+            geo.delete_vector_store(workspace=workspace, store=layer_name)
+            print(f"Successfully deleted store: {layer_name}")
+        except Exception as e:
+            print(f"Store does not exist or error deleting: {str(e)}")
 
     zip_path = convert_to_zip(path, file_type)
-    print(path)
-    print(store_name)
-    print(workspace)
+    print(f"Zip path: {zip_path}")
+    print(f"Store name: {store_name}")
+    print(f"Workspace: {workspace}")
 
     response = geo.create_shp_datastore(
         path=zip_path,
@@ -85,8 +89,7 @@ def push_shape_to_geoserver(
         workspace=workspace,
         file_extension=file_type,
     )
-    print(response)
-    #
+    print(f"Response: {response}")
     return response
 
 

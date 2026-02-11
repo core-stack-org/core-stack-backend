@@ -15,10 +15,7 @@ from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
 
 from .gen_dpr import (
-    create_dpr_document,
-    get_mws_ids_for_report,
     get_plan_details,
-    send_dpr_email,
 )
 from .gen_multi_mws_report import (
     get_cropping_mws_data,
@@ -113,9 +110,11 @@ def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
+        regenerate = request.data.get("regenerate", False)
 
         logger.info(
-            "Generating DPR for plan ID: %s and email ID: %s", plan_id, email_id
+            "Generating DPR for plan ID: %s and email ID: %s (regenerate=%s)",
+            plan_id, email_id, regenerate
         )
 
         valid_email = validate_email(email_id)
@@ -132,8 +131,7 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        # Task queue to generate DPR document
-        generate_dpr_task.apply_async(args=[plan_id, email_id], queue="dpr")
+        generate_dpr_task.apply_async(args=[plan_id, email_id, regenerate], queue="dpr")
 
         return Response(
             {
