@@ -30,3 +30,9 @@ model_map = {
     "Surface Water Body Maintenance": SWB_maintenance,
     "Surface Water Body Remotely Sensed Maintenance": SWB_RS_maintenance,
 }
+
+feedback_form = [
+    "agri analysis feedback form",
+    "groundwater analysis feedback form",
+    "water body analysis feedback form",
+]

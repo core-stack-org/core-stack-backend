@@ -21,6 +21,7 @@ from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
+import re
 
 # Create your views here.
 
@@ -63,6 +64,8 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
 
+    from django.db.models import Q
+
     EXCLUDE_LAYER_KEYWORDS = [
         "run off",
         "run_off",
@@ -71,7 +74,9 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         "MWS",
     ]
     for word in EXCLUDE_LAYER_KEYWORDS:
-        layers = layers.exclude(layer_name__icontains=word)
+        layers = layers.exclude(
+            Q(layer_name__icontains=word) & ~Q(layer_name__icontains="mws_connectivity")
+        )
 
     layer_data = []
 
@@ -81,7 +86,11 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         layer_type = dataset.layer_type
         layer_name = layer.layer_name
         gee_asset_path = layer.gee_asset_path
-        style_url = dataset.style_name
+        style_url = (
+            dataset.misc["style_url"]
+            if dataset.misc and "style_url" in dataset.misc
+            else ""
+        )
 
         if layer_type in [LayerType.VECTOR, LayerType.POINT]:
             layer_url = get_url(workspace, layer_name)
@@ -92,11 +101,12 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
         layer_data.append(
             {
-                "layer_name": dataset.name,
+                "layer_name": layer_name,
+                "dataset_name": dataset.name,
                 "layer_type": layer_type,
                 "layer_url": layer_url,
                 "layer_version": layer.layer_version,
-                "style_url": "",
+                "style_url": style_url,
                 "gee_asset_path": gee_asset_path,
             }
         )
@@ -155,7 +165,7 @@ def get_mws_id_by_lat_lon(lon, lat):
             point = ee.Geometry.Point([lon, lat])
             matching_feature = mws_fc.filterBounds(point).first()
             uid = ee.String(matching_feature.get("uid")).getInfo()
-            data_dict["uid"] = uid
+            data_dict["mws_id"] = uid
             return data_dict
         else:
             return Response(
@@ -241,7 +251,6 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
                     if "-" in key and key.count("-") == 2:
                         all_dates.add(key)
 
-        # Build time series
         time_series = []
         for date in sorted(all_dates):
             # Parse hydrology metrix from JSON string
@@ -286,6 +295,7 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
 
             time_series.append(entry)
 
+        time_series.sort(key=lambda x: x["date"])
         return {"mws_id": mws_id, "time_series": time_series}
 
     except Exception as e:

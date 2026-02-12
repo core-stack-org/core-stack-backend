@@ -55,10 +55,10 @@ from .utils import (
     format_text_demands,
     get_vector_layer_geoserver,
     sort_key,
-    sync_db_odk,
     to_utf8,
     transform_name,
 )
+from moderation.views import sync_odk_to_csdb
 
 logger = setup_logger(__name__)
 
@@ -75,15 +75,17 @@ def create_dpr_document(plan):
 
     doc = initialize_document()  # doc init
 
-    sync_db_odk()
+    logger.info("Database sync started") # db sync
+    sync_odk_to_csdb()
     logger.info("Database sync complete")
 
-    logger.info("Details of the plan")
+    logger.info("Plan Details")
     logger.info(plan)
     logger.info(transform_name(str(plan.district_soi.district_name)))
     logger.info(transform_name(str(plan.tehsil_soi.tehsil_name)))
 
     total_settlements = get_settlement_count_for_plan(plan.id)
+    logger.info(f"Total settlements found in the plan: {total_settlements}")
 
     mws_fortnight = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
@@ -93,29 +95,38 @@ def create_dpr_document(plan):
         + "_"
         + transform_name(str(plan.tehsil_soi.tehsil_name)),
     )
+    logger.info(f"MWS Fortnight layer fetched successfully")
 
+    # MARK: - Sections
     add_section_a(doc, plan)
     add_section_separator(doc)
+    logger.info("Section A completed")
 
     settlement_mws_ids, mws_gdf = add_section_b(
         doc, plan, total_settlements, mws_fortnight
     )
     add_section_separator(doc)
-
+    logger.info("Section B completed")
+    
     add_section_c(doc, plan)
     add_section_separator(doc)
-
+    logger.info("Section C completed")
+    
     add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
     add_section_separator(doc)
-
+    logger.info("Section D completed")
+    
     add_section_e(doc, plan)
     add_section_separator(doc)
-
+    logger.info("Section E completed")
+    
     add_section_f(doc, plan, mws_fortnight)
     add_section_separator(doc)
-
+    logger.info("Section F completed")
+    
     add_section_g(doc, plan, mws_fortnight)
     add_section_separator(doc)
+    logger.info("Section G completed")
 
     # MARK: local save /var/www/tmp/dpr/
     # if DEBUG:
@@ -127,139 +138,15 @@ def create_dpr_document(plan):
     return doc
 
 
-def send_dpr_email(
-    doc,
-    email_id,
-    plan_name,
-    mws_reports,
-    mws_Ids,
-    resource_report,
-    resource_report_url,
-    state_name="",
-    district_name="",
-    tehsil_name="",
-):
-    try:
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        doc_bytes = buffer.getvalue()
-        buffer.close()
-
-        mws_table_html = ""
-        if mws_reports and mws_Ids:
-            mws_rows = "".join(
-                f'<tr><td style="padding: 10px 16px; border-bottom: 1px solid #eee;">{mws_id}</td>'
-                f'<td style="padding: 10px 16px; border-bottom: 1px solid #eee; text-align: center;">'
-                f'<a href="{report_url}" style="color: #2563eb; text-decoration: none;">View Report</a></td></tr>'
-                for mws_id, report_url in zip(mws_Ids, mws_reports)
-            )
-            mws_table_html = f"""
-            <div style="margin: 24px 0;">
-                <p style="font-weight: 600; color: #374151; margin-bottom: 12px;">MWS Reports</p>
-                <table style="width: 100%; border-collapse: collapse; background: #f9fafb; border-radius: 8px; overflow: hidden;">
-                    <thead>
-                        <tr style="background: #f3f4f6;">
-                            <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: #374151;">MWS ID</th>
-                            <th style="padding: 12px 16px; text-align: center; font-weight: 600; color: #374151;">Report</th>
-                        </tr>
-                    </thead>
-                    <tbody>{mws_rows}</tbody>
-                </table>
-            </div>
-            """
-
-        email_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="UTF-8"></head>
-        <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-                <div style="background: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
-                    <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 32px; text-align: center;">
-                        <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Detailed Project Report</h1>
-                        <p style="color: #bfdbfe; margin: 12px 0 0 0; font-size: 16px; font-weight: 500;">{to_utf8(plan_name)}</p>
-                        <p style="color: #93c5fd; margin: 8px 0 0 0; font-size: 13px;">{to_utf8(tehsil_name)} · {to_utf8(district_name)} · {to_utf8(state_name)}</p>
-                    </div>
-                    <div style="padding: 32px;">
-                        <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">
-                            Hi,<br><br>
-                            Please find attached the Detailed Project Report for <strong>{to_utf8(plan_name)}</strong>.
-                        </p>
-                        {mws_table_html}
-                        <div style="margin: 24px 0; padding: 16px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #22c55e;">
-                            <p style="margin: 0; color: #166534; font-weight: 600;">Resource Report</p>
-                            <a href="{resource_report_url}" style="color: #15803d; text-decoration: none; font-size: 14px;">View Report →</a>
-                        </div>
-                    </div>
-                    <div style="background: #f9fafb; padding: 24px 32px; border-top: 1px solid #e5e7eb;">
-                        <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                            Thanks and Regards,<br>
-                            <strong style="color: #374151;">CoRE Stack Team</strong>
-                        </p>
-                    </div>
-                </div>
-                <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px;">
-                    This is an automated email from CoRE Stack.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-
-        backend = EmailBackend(
-            host=EMAIL_HOST,
-            port=EMAIL_PORT,
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_ssl=EMAIL_USE_SSL,
-            timeout=EMAIL_TIMEOUT,
-            ssl_context=ssl.create_default_context(),
-        )
-
-        email = EmailMessage(
-            subject=f"DPR of plan: {plan_name}",
-            body=email_body,
-            from_email=EMAIL_HOST_USER,
-            to=[email_id],
-            connection=backend,
-        )
-
-        # Set content type to HTML
-        email.content_subtype = "html"
-
-        email.attach(
-            f"DPR_{plan_name}.docx",
-            doc_bytes,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-
-        if resource_report is not None:
-            email.attach(
-                f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
-            )
-
-        logger.info("Sending DPR email to %s", email_id)
-        email.send(fail_silently=False)
-        logger.info("DPR email sent.")
-        backend.close()
-
-    except socket.error as e:
-        logger.error(f"Socket error: {e}")
-    except ssl.SSLError as e:
-        logger.error(f"SSL error: {e}")
-    except Exception as e:
-        logger.error(f"Failed to send email: {e}")
-
-
 def get_data_for_settlement(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected")
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").exclude(is_deleted=True)
 
 
 def get_settlement_count_for_plan(planid):
     return (
         ODK_settlement.objects.filter(plan_id=planid)
         .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
         .count()
     )
 
@@ -268,6 +155,7 @@ def get_settlement_coordinates_for_plan(planid):
     settlements = (
         ODK_settlement.objects.filter(plan_id=planid)
         .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
         .values("settlement_name", "latitude", "longitude")
     )
     return [
@@ -621,7 +509,7 @@ def create_table_mgnrega_info(doc, plan, settlement_data):
 def create_table_crop_info(doc, plan):
     crops_in_plan = ODK_crop.objects.filter(plan_id=str(plan.id)).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     headers_cropping_pattern = [
         "Name of the Settlement",
@@ -693,7 +581,9 @@ def create_table_crop_info(doc, plan):
 
 
 def create_table_livestock(doc, plan):
-    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id)
+    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id).exclude(
+        status_re="rejected"
+    ).exclude(is_deleted=True)
     headers_livelihood = [
         "Name of the Settlement",
         "Goats",
@@ -777,7 +667,7 @@ def get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all wells across all MWS IDs with their corresponding MWS assignment"""
     wells_in_plan = ODK_well.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     all_wells_with_mws = []
 
     for well in wells_in_plan:
@@ -804,7 +694,7 @@ def get_all_waterbodies_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all waterbodies across all MWS IDs with their corresponding MWS assignment"""
     waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     all_waterbodies_with_mws = []
 
     for waterbody in waterbodies_in_plan:
@@ -1154,7 +1044,7 @@ def maintenance_gw_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in GW_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in GW_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
@@ -1224,7 +1114,7 @@ def maintenance_agri_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
@@ -1295,7 +1185,7 @@ def maintenance_waterstructures_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
@@ -1358,7 +1248,7 @@ def maintenance_rs_waterstructures_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
             format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
@@ -1408,10 +1298,10 @@ def add_section_f(doc, plan, mws):
 def create_nrm_works_table(doc, plan, mws):
     recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     recharge_works = [structure for structure in recharge_st_in_plan]
     irrigation_works = [irr_work for irr_work in irrigation_works_in_plan]
@@ -1493,7 +1383,7 @@ def add_section_g(doc, plan, mws):
 
     livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     # Table for Livestock and Fisheries
     doc.add_heading("G.1 Livestock and Fisheries", level=2)
