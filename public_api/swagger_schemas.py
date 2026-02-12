@@ -53,6 +53,15 @@ mws_id_param = openapi.Parameter(
     required=True,
 )
 
+# Village Parameters
+village_id_param = openapi.Parameter(
+    "village_id",
+    openapi.IN_QUERY,
+    description="Unique Village identifier (e.g. '8234647')",
+    type=openapi.TYPE_STRING,
+    required=True,
+)
+
 # File Type Parameters
 file_type_param = openapi.Parameter(
     "file_type",
@@ -540,4 +549,195 @@ generate_active_locations_schema = {
         ),
     },
     "tags": ["Dataset APIs"],
+}
+
+
+### Get MWS Geometry
+### Get MWS Geometry
+get_mws_geometries_schema = {
+    "method": "get",
+    "operation_id": "get_mws_geometries",
+    "operation_summary": "Get MWS Geometry",
+    "operation_description": """
+    Retrieve MWS geometry/polygon data for a given state, district, tehsil, and MWS ID (uid).
+
+    **Response format:**
+    Returns a GeoJSON geometry object containing the polygon coordinates of the MWS boundary.
+
+    **Example response:**
+    ```json
+    {
+        "type": "MultiPolygon",
+        "coordinates": [
+            [
+                [
+                    [88.35529485, 21.85344786],
+                    [88.35556238, 21.85344778],
+                    [88.35556238, 21.84806127],
+                    [88.35582991, 21.84806119],
+                    [88.35582991, 21.84644254],
+                    [88.35556238, 21.84644262],
+                    [88.35556238, 21.8450959]
+                ]
+            ]
+        ]
+    }
+    ```
+
+    **Note:** This API returns only the raw geometry object without any wrapper.
+    The coordinates follow the [GeoJSON format](https://geojson.org/) with longitude, latitude pairs.
+    """,
+    "manual_parameters": [
+        state_param,
+        district_param,
+        tehsil_param,
+        mws_id_param,
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - Returns MWS geometry/polygon data",
+            examples={
+                "application/json": {
+                    "type": "MultiPolygon",
+                    "coordinates": [
+                        [
+                            [
+                                [88.35529485, 21.85344786],
+                                [88.35556238, 21.85344778],
+                                [88.35556238, 21.84806127],
+                                [88.35582991, 21.84806119],
+                                [88.35582991, 21.84644254],
+                                [88.35556238, 21.84644262],
+                                [88.35556238, 21.8450959],
+                            ]
+                        ]
+                    ],
+                }
+            },
+        ),
+        400: openapi.Response(
+            description="Bad Request - Missing required parameters or invalid format",
+            examples={
+                "application/json": {
+                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                }
+            },
+        ),
+        401: openapi.Response(
+            description="Unauthorized - Invalid or missing API key",
+            examples={
+                "application/json": {
+                    "error": "Authentication credentials were not provided."
+                }
+            },
+        ),
+        404: openapi.Response(
+            description="Not Found - MWS ID not found",
+            examples={
+                "application/json": {"error": "No MWS found with uid: 12_339480"}
+            },
+        ),
+        500: openapi.Response(
+            description="Internal Server Error",
+            examples={
+                "application/json": {
+                    "error": "Internal server error: Unexpected error occurred"
+                }
+            },
+        ),
+    },
+    "tags": ["Dataset APIs"],  # Or ["Geometry APIs"] if you want a separate category
+}
+
+
+### Get Village Geometries
+get_village_geometries_schema = {
+    "method": "get",
+    "operation_id": "get_village_geometries",
+    "operation_summary": "Get Village Geometry",
+    "operation_description": """
+    Retrieve village geometry/polygon data for a given state, district, tehsil, and village ID.
+
+    **Response format:**
+    Returns a GeoJSON geometry object containing the polygon coordinates of the village boundary.
+
+    **Example response:**
+    ```json
+    {
+        "type": "MultiPolygon",
+        "coordinates": [
+            [
+                [
+                    [88.27983, 21.944884],
+                    [88.280062, 21.945069],
+                    [88.280332, 21.946053],
+                    [88.280332, 21.946058]
+                ]
+            ]
+        ]
+    }
+    ```
+
+    **Note:** This API returns only the raw geometry object without any wrapper.
+    The coordinates follow the [GeoJSON format](https://geojson.org/) with longitude, latitude pairs.
+    """,
+    "manual_parameters": [
+        state_param,
+        district_param,
+        tehsil_param,
+        village_id_param,  # Use the parameter variable
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - Returns village geometry/polygon data",
+            examples={
+                "application/json": {
+                    "type": "MultiPolygon",
+                    "coordinates": [
+                        [
+                            [
+                                [88.27983, 21.944884],
+                                [88.280062, 21.945069],
+                                [88.280332, 21.946053],
+                                [88.280332, 21.946058],
+                            ]
+                        ]
+                    ],
+                }
+            },
+        ),
+        400: openapi.Response(
+            description="Bad Request - Missing required parameters or invalid format",
+            examples={
+                "application/json": {
+                    "error": "'state', 'district', 'tehsil', and 'village_id' parameters are required."
+                }
+            },
+        ),
+        401: openapi.Response(
+            description="Unauthorized - Invalid or missing API key",
+            examples={
+                "application/json": {
+                    "error": "Authentication credentials were not provided."
+                }
+            },
+        ),
+        404: openapi.Response(
+            description="Not Found - Village ID not found",
+            examples={
+                "application/json": {"error": "No village found with ID: 334670"}
+            },
+        ),
+        500: openapi.Response(
+            description="Internal Server Error",
+            examples={
+                "application/json": {
+                    "error": "Internal server error: Unexpected error occurred"
+                }
+            },
+        ),
+    },
+    "tags": ["Dataset APIs"],  # Or ["Geometry APIs"] if you want a separate category
 }

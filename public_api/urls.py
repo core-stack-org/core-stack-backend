@@ -2,7 +2,11 @@ from django.urls import path
 from . import api
 
 urlpatterns = [
-    path("get_admin_details_by_latlon/", api.get_admin_details_by_lat_lon, name="get_admin_details_by_lat_lon"),
+    path(
+        "get_admin_details_by_latlon/",
+        api.get_admin_details_by_lat_lon,
+        name="get_admin_details_by_lat_lon",
+    ),
     path("get_mwsid_by_latlon/", api.get_mws_by_lat_lon, name="get-mws-id-by-lat-lon"),
     path("get_tehsil_data/", api.generate_tehsil_data, name="get-tehsil-data"),
     path("get_mws_data/", api.get_mws_data, name="get-mws-data"),
@@ -21,5 +25,11 @@ urlpatterns = [
         "get_active_locations/",
         api.generate_active_locations,
         name="get_active_locations",
+    ),
+    path("get_mws_geometries/", api.get_mws_geometries, name="get-mws-geometries"),
+    path(
+        "get_village_geometries/",
+        api.get_village_geometries,
+        name="get-village-geometries",
     ),
 ]
