@@ -12,6 +12,7 @@ from dpr.models import (
     GW_maintenance,
     SWB_maintenance,
     SWB_RS_maintenance,
+    ODK_agrohorticulture,
 )
 from dpr.utils import determine_caste_fields
 
@@ -30,9 +31,11 @@ def extract_lat_lon_from_gps(gps):
 
 def sync_edited_updated_settlement(sub):
     settlement_id = sub.get("Settlements_id")
-    if ODK_settlement.objects.filter(
-        settlement_id=settlement_id
-    ).filter(Q(is_moderated=True) | Q(is_deleted=True)).exists():
+    if (
+        ODK_settlement.objects.filter(settlement_id=settlement_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     system = sub.get("__system", {})
@@ -49,7 +52,11 @@ def sync_edited_updated_settlement(sub):
     if isinstance(nrega_issues, str) and "other" in nrega_issues.lower():
         other_text = nrega.get("select_multiple_issues_other", "")
         if other_text:
-            nrega_issues = f"{nrega_issues}: {other_text}" if nrega_issues.lower() != "other" else other_text
+            nrega_issues = (
+                f"{nrega_issues}: {other_text}"
+                if nrega_issues.lower() != "other"
+                else other_text
+            )
 
     mapped = {
         "settlement_name": sub.get("Settlements_name"),
@@ -90,9 +97,11 @@ def sync_edited_updated_settlement(sub):
 
 def sync_edited_updated_well(well_submission):
     well_id = well_submission.get("well_id")
-    if ODK_well.objects.filter(well_id=well_id).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        ODK_well.objects.filter(well_id=well_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     Well_usage = well_submission.get("Well_usage", {})
@@ -130,9 +139,11 @@ def sync_edited_updated_well(well_submission):
 
 def sync_edited_updated_waterbody(waterbody_submission):
     waterbody_id = waterbody_submission.get("waterbodies_id")
-    if ODK_waterbody.objects.filter(waterbody_id=waterbody_id).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        ODK_waterbody.objects.filter(waterbody_id=waterbody_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = waterbody_submission.get("GPS_point", {})
@@ -143,17 +154,25 @@ def sync_edited_updated_waterbody(waterbody_submission):
         "uuid": waterbody_submission.get("__id") or "NA",
         "submission_time": system.get("submissionDate"),
         "block_name": waterbody_submission.get("block_name") or "NA",
-        "beneficiary_settlement": waterbody_submission.get("beneficiary_settlement") or "NA",
-        "beneficiary_contact": waterbody_submission.get("Beneficiary_contact_number") or "NA",
+        "beneficiary_settlement": waterbody_submission.get("beneficiary_settlement")
+        or "NA",
+        "beneficiary_contact": waterbody_submission.get("Beneficiary_contact_number")
+        or "NA",
         "who_manages": waterbody_submission.get("select_one_manages") or "NA",
         "specify_other_manager": waterbody_submission.get("text_one_manages") or "NA",
         "owner": waterbody_submission.get("select_one_owns") or "NA",
         "caste_who_uses": waterbody_submission.get("select_multiple_caste_use") or "NA",
         "household_benefitted": waterbody_submission.get("households_benefited") or 0,
-        "water_structure_type": waterbody_submission.get("select_one_water_structure") or "NA",
-        "water_structure_other": waterbody_submission.get("select_one_water_structure_other") or "NA",
-        "identified_by": waterbody_submission.get("select_one_identified") or "No Data Provided",
-        "need_maintenance": waterbody_submission.get("select_one_maintenance") or "No Data Provided",
+        "water_structure_type": waterbody_submission.get("select_one_water_structure")
+        or "NA",
+        "water_structure_other": waterbody_submission.get(
+            "select_one_water_structure_other"
+        )
+        or "NA",
+        "identified_by": waterbody_submission.get("select_one_identified")
+        or "No Data Provided",
+        "need_maintenance": waterbody_submission.get("select_one_maintenance")
+        or "No Data Provided",
         "plan_id": waterbody_submission.get("plan_id") or "0",
         "plan_name": waterbody_submission.get("plan_name") or "0",
         "latitude": lat,
@@ -169,9 +188,11 @@ def sync_edited_updated_waterbody(waterbody_submission):
 
 def sync_edited_updated_gw(gw_submission):
     recharge_structure_id = gw_submission.get("work_id")
-    if ODK_groundwater.objects.filter(recharge_structure_id=recharge_structure_id).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        ODK_groundwater.objects.filter(recharge_structure_id=recharge_structure_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = gw_submission.get("GPS_point", {})
@@ -204,14 +225,18 @@ def sync_edited_updated_gw(gw_submission):
     work_types = ["Check_dam", "Loose_Boulder_Structure", "Trench_cum_bunds"]
     for work_type in work_types:
         if work_type in gw_submission:
-            obj.update_work_dimensions(work_type=work_type, work_details=gw_submission[work_type])
+            obj.update_work_dimensions(
+                work_type=work_type, work_details=gw_submission[work_type]
+            )
 
 
 def sync_edited_updated_agri(agri_submission):
     irrigation_work_id = agri_submission.get("work_id")
-    if ODK_agri.objects.filter(irrigation_work_id=irrigation_work_id).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        ODK_agri.objects.filter(irrigation_work_id=irrigation_work_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = agri_submission.get("GPS_point", {})
@@ -240,14 +265,18 @@ def sync_edited_updated_agri(agri_submission):
     work_types = ["new_well", "Land_leveling", "Farm_pond"]
     for work_type in work_types:
         if work_type in agri_submission:
-            obj.update_work_dimensions(work_type=work_type, work_details=agri_submission[work_type])
+            obj.update_work_dimensions(
+                work_type=work_type, work_details=agri_submission[work_type]
+            )
 
 
 def sync_edited_updated_livelihood(livelihood_submission):
     livelihood_id = livelihood_submission.get("work_id")
-    if ODK_livelihood.objects.filter(livelihood_id=livelihood_id).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        ODK_livelihood.objects.filter(livelihood_id=livelihood_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = livelihood_submission.get("GPS_point", {})
@@ -256,10 +285,15 @@ def sync_edited_updated_livelihood(livelihood_submission):
 
     mapped = {
         "uuid": livelihood_submission.get("__id") or "0",
-        "beneficiary_settlement": livelihood_submission.get("beneficiary_settlement") or "0",
+        "beneficiary_settlement": livelihood_submission.get("beneficiary_settlement")
+        or "0",
         "block_name": livelihood_submission.get("block_name") or "0",
-        "beneficiary_contact": livelihood_submission.get("Beneficiary_Contact_Number") or "0",
-        "livestock_development": livelihood_submission.get("select_one_promoting_livestock") or "0",
+        "beneficiary_contact": livelihood_submission.get("Beneficiary_Contact_Number")
+        or "0",
+        "livestock_development": livelihood_submission.get(
+            "select_one_promoting_livestock"
+        )
+        or "0",
         "submission_time": system.get("submissionDate"),
         "fisheries": livelihood_submission.get("select_one_promoting_fisheries") or "0",
         "common_asset": livelihood_submission.get("select_one_common_asset") or "0",
@@ -273,17 +307,23 @@ def sync_edited_updated_livelihood(livelihood_submission):
         "data_livelihood": livelihood_submission,
     }
 
-    ODK_livelihood.objects.update_or_create(livelihood_id=livelihood_id, defaults=mapped)
+    ODK_livelihood.objects.update_or_create(
+        livelihood_id=livelihood_id, defaults=mapped
+    )
 
 
 def sync_edited_updated_cropping_pattern(cp_submission):
     uuid_val = cp_submission.get("__id", "") or "NA"
     crop_grid_id = cp_submission.get("crop_Grid_id", "")
-    crop_grid_id = crop_grid_id if crop_grid_id and crop_grid_id != "undefined" else uuid_val
+    crop_grid_id = (
+        crop_grid_id if crop_grid_id and crop_grid_id != "undefined" else uuid_val
+    )
 
-    if ODK_crop.objects.filter(crop_grid_id=crop_grid_id).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        ODK_crop.objects.filter(crop_grid_id=crop_grid_id)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     system = cp_submission.get("__system", {})
@@ -302,9 +342,15 @@ def sync_edited_updated_cropping_pattern(cp_submission):
         "irrigation_source": cp_submission.get("select_multiple_widgets") or "NA",
         "submission_time": system.get("submissionDate"),
         "land_classification": cp_submission.get("select_one_classified") or "NA",
-        "cropping_patterns_kharif": get_crop_pattern("select_multiple_cropping_kharif", "select_multiple_cropping_kharif_other"),
-        "cropping_patterns_rabi": get_crop_pattern("select_multiple_cropping_Rabi", "select_multiple_cropping_Rabi_other"),
-        "cropping_patterns_zaid": get_crop_pattern("select_multiple_cropping_Zaid", "select_multiple_cropping_Zaid_other"),
+        "cropping_patterns_kharif": get_crop_pattern(
+            "select_multiple_cropping_kharif", "select_multiple_cropping_kharif_other"
+        ),
+        "cropping_patterns_rabi": get_crop_pattern(
+            "select_multiple_cropping_Rabi", "select_multiple_cropping_Rabi_other"
+        ),
+        "cropping_patterns_zaid": get_crop_pattern(
+            "select_multiple_cropping_Zaid", "select_multiple_cropping_Zaid_other"
+        ),
         "agri_productivity": cp_submission.get("select_one_productivity") or "NA",
         "plan_id": cp_submission.get("plan_id") or "NA",
         "plan_name": cp_submission.get("plan_name") or "NA",
@@ -318,9 +364,11 @@ def sync_edited_updated_cropping_pattern(cp_submission):
 
 def sync_edited_updated_agri_maintenance(am_submission):
     uuid_val = am_submission.get("__id") or "0"
-    if Agri_maintenance.objects.filter(uuid=uuid_val).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        Agri_maintenance.objects.filter(uuid=uuid_val)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = am_submission.get("GPS_point", {})
@@ -344,9 +392,11 @@ def sync_edited_updated_agri_maintenance(am_submission):
 
 def sync_edited_updated_gw_maintenance(gwm_submission):
     uuid_val = gwm_submission.get("__id") or "0"
-    if GW_maintenance.objects.filter(uuid=uuid_val).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        GW_maintenance.objects.filter(uuid=uuid_val)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = gwm_submission.get("GPS_point", {})
@@ -370,9 +420,11 @@ def sync_edited_updated_gw_maintenance(gwm_submission):
 
 def sync_edited_updated_swb_maintenance(swbm_submission):
     uuid_val = swbm_submission.get("__id") or "0"
-    if SWB_maintenance.objects.filter(uuid=uuid_val).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        SWB_maintenance.objects.filter(uuid=uuid_val)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = swbm_submission.get("GPS_point", {})
@@ -396,9 +448,11 @@ def sync_edited_updated_swb_maintenance(swbm_submission):
 
 def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
     uuid_val = swb_rs_submission.get("__id") or "0"
-    if SWB_RS_maintenance.objects.filter(uuid=uuid_val).filter(
-        Q(is_moderated=True) | Q(is_deleted=True)
-    ).exists():
+    if (
+        SWB_RS_maintenance.objects.filter(uuid=uuid_val)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
         return
 
     gps = swb_rs_submission.get("GPS_point", {})
@@ -418,6 +472,31 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
     }
 
     SWB_RS_maintenance.objects.update_or_create(uuid=uuid_val, defaults=mapped)
+
+
+def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
+    gps = agrohorticulture_submission.get("GPS_point", {})
+    system = agrohorticulture_submission.get("__system", {})
+    lat = None
+    lon = None
+    try:
+        coords = gps.get("point_mapsappearance", {}).get("coordinates", [])
+        if len(coords) >= 2:
+            lon, lat = coords[0], coords[1]
+    except Exception:
+        pass
+    mapped = {
+        "uuid": agrohorticulture_submission.get("__id"),
+        "plan_id": agrohorticulture_submission.get("plan_id"),
+        "plan_name": agrohorticulture_submission.get("plan_name"),
+        "latitude": lat,
+        "longitude": lon,
+        "status_re": system.get("reviewState") or "",
+        "data_agohorticulture": agrohorticulture_submission,
+    }
+    ODK_agrohorticulture.objects.update_or_create(
+        uuid=agrohorticulture_submission.get("__id"), defaults=mapped
+    )
 
 
 def _extract_settlement_fields(data):

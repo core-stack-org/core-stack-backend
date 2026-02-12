@@ -9,8 +9,6 @@ from moderation.utils.get_submissions import ODKSubmissionsChecker
 from moderation.utils.form_mapping import feedback_form
 from moderation.models import SyncMetadata
 
-
-
 FETCH_FIELD_MAP = {
     ODK_settlement: "data_settlement",
     ODK_well: "data_well",
@@ -23,6 +21,7 @@ FETCH_FIELD_MAP = {
     GW_maintenance: "data_gw_maintenance",
     SWB_maintenance: "data_swb_maintenance",
     SWB_RS_maintenance: "data_swb_rs_maintenance",
+    ODK_agrohorticulture: "data_agohorticulture",
 }
 
 
@@ -110,6 +109,9 @@ class SubmissionsOfPlan:
     def get_swb_rs_maintenance(plan_id, page=1):
         return SubmissionsOfPlan._fetch(SWB_RS_maintenance, plan_id, page)
 
+    @staticmethod
+    def get_agrohorticulture(plan_id, page=1):
+        return SubmissionsOfPlan._fetch(ODK_agrohorticulture, plan_id, page)
 
 
 def sync_odk_to_csdb():
