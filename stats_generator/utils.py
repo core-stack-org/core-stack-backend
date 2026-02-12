@@ -228,12 +228,36 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_stream_order(geojson_data, writer)
             elif workspace == "mws_connectivity":
                 create_excel_for_mws_connectivity(geojson_data, writer)
+            elif workspace == "mws":
+                create_excel_for_mws(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_mws(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "watershed_code": properties.get("wsconc", ""),
+            "basin_code": properties.get("bacode", ""),
+            "sub_basin_code": properties.get("sbcode", ""),
+        }
+
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="mws", index=False)
+    print("Excel file created for mws")
 
 
 def create_excel_for_mws_connectivity(data, writer):
