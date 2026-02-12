@@ -47,6 +47,7 @@ def get_paginated_submissions(request, form, plan_id):
         "GroundWater Maintenance": SubmissionsOfPlan.get_gw_maintenance,
         "Surface Water Body Maintenance": SubmissionsOfPlan.get_swb_maintenance,
         "Surface Water Body Remotely Sensed Maintenance": SubmissionsOfPlan.get_swb_rs_maintenance,
+        "Agrohorticulture": SubmissionsOfPlan.get_agrohorticulture,
     }
 
     if form not in mapping:
@@ -93,7 +94,9 @@ def update_submission(request, form_name, uuid):
     obj.is_moderated = True
     obj.moderated_at = timezone.now()
     obj.moderated_by = request.user if request.user.is_authenticated else None
-    obj.moderation_reason = request.data.get("moderation_reason") or obj.moderation_reason
+    obj.moderation_reason = (
+        request.data.get("moderation_reason") or obj.moderation_reason
+    )
 
     update_fields = [
         field_name,
@@ -136,22 +139,17 @@ def delete_submission(request, form_name, uuid):
 @api_view(["POST"])
 @schema(None)
 def trigger_odk_sync(request):
-    
+
     async_mode = request.query_params.get("async", "true").lower() == "true"
-    
+
     if async_mode:
         task = sync_odk_data_task.delay()
-        return Response({
-            "status": "queued",
-            "task_id": task.id,
-            "message": "ODK sync task queued"
-        })
+        return Response(
+            {"status": "queued", "task_id": task.id, "message": "ODK sync task queued"}
+        )
     else:
         result = sync_odk_to_csdb()
-        return Response({
-            "status": "completed",
-            "result": str(result)
-        })
+        return Response({"status": "completed", "result": str(result)})
 
 
 @api_view(["GET"])

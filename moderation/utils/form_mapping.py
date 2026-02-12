@@ -15,6 +15,7 @@ corestack = {
     "new irrigation form": "NRM_form_Agri_Screen_V1.0.0",
     "new recharge structure form": "NRM_form_propose_new_recharge_structure_V1.0.0",
     "water body analysis feedback form": "rm_waterbody_analysis_feedback_form_V1.0.0",
+    "Agrohorticulture": "Agrohorticulture",
 }
 
 model_map = {
