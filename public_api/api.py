@@ -16,6 +16,8 @@ from .views import (
     get_mws_json_from_kyl_indicator,
     get_tehsil_json,
     generate_mws_report_url,
+    get_mws_geometries_data,
+    get_village_geometries_data,
 )
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
@@ -28,6 +30,8 @@ from .swagger_schemas import (
     kyl_indicators_schema,
     generate_active_locations_schema,
     get_mws_data_schema,
+    get_village_geometries_schema,
+    get_mws_geometries_schema,
 )
 from geoadmin.utils import (
     transform_data,
@@ -136,9 +140,9 @@ def get_mws_data(request):
     """
     print("Inside mws data by excel api")
     try:
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        state = request.query_params.get("state").lower()
+        district = request.query_params.get("district").lower()
+        tehsil = request.query_params.get("tehsil").lower()
         mws_id = request.query_params.get("mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
@@ -416,4 +420,78 @@ def generate_active_locations(request):
         print("Exception in proposed_blocks api :: ", e)
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@swagger_auto_schema(**get_mws_geometries_schema)
+@api_security_check(auth_type="API_key")
+def get_mws_geometries(request):
+    try:
+        state = valid_gee_text(request.query_params.get("state", "").lower())
+        district = valid_gee_text(request.query_params.get("district", "").lower())
+        tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
+        mws_id = request.query_params.get("mws_id")
+
+        if not all([state, district, tehsil, mws_id]):
+            return Response(
+                {
+                    "error": "All parameters (state, district, tehsil, mws_id) are required"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get geometry data
+        success, result = get_mws_geometries_data(state, district, tehsil, mws_id)
+
+        if not success:
+            return Response(
+                {"error": result},  # result contains error message
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Return geometry
+        return Response(result, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"Internal server error: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@swagger_auto_schema(**get_village_geometries_schema)
+@api_security_check(auth_type="API_key")
+def get_village_geometries(request):
+    try:
+        state = valid_gee_text(request.query_params.get("state", "").lower())
+        district = valid_gee_text(request.query_params.get("district", "").lower())
+        tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
+        village_id = request.query_params.get("village_id")
+
+        if not all([state, district, tehsil, village_id]):
+            return Response(
+                {
+                    "error": "All parameters (state, district, tehsil, village_id) are required"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get geometry data
+        success, result = get_village_geometries_data(
+            state, district, tehsil, village_id
+        )
+
+        if not success:
+            return Response(
+                {"error": result},  # result contains error message
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Return geometry
+        return Response(result, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"Internal server error: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

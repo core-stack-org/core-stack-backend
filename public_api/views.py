@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
+from computing.models import Layer
 
 from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
@@ -177,51 +178,128 @@ def get_mws_id_by_lat_lon(lon, lat):
 
 
 def get_mws_time_series_data(state, district, tehsil, mws_id):
-    base_url = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows"
+    """Fetch and merge water and NDVI time series data for a specific MWS location."""
 
-    params = {
-        "service": "WFS",
-        "version": "1.0.0",
-        "request": "GetFeature",
-        "typeName": f"mws_layers:deltaG_fortnight_{district}_{tehsil}",
-        "outputFormat": "application/json",
-        "CQL_FILTER": f"uid='{mws_id}'",
-    }
-
-    try:
+    def fetch_geoserver_data(base_url, layer_name, mws_id):
+        """Generic GeoServer WFS request."""
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": layer_name,
+            "outputFormat": "json",
+            "CQL_FILTER": f"uid='{mws_id}'",
+        }
         response = requests.get(base_url, params=params, verify=True, timeout=10)
         response.raise_for_status()
-        geojson = response.json()
+        data = response.json()
+        return data["features"][0]["properties"] if data["features"] else {}
 
-        if not geojson.get("features"):
-            return {"error": f"MWS ID {mws_id} not found"}
+    try:
+        # Validate geographic hierarchy
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
+            district_name__iexact=district, state=state_obj
+        )
+        tehsil_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=tehsil, district=district_obj
+        )
 
-        properties = geojson["features"][0]["properties"]
+        # Check if water layer exists
+        district = valid_gee_text(district.lower())
+        tehsil = valid_gee_text(tehsil.lower())
+        layer_name = f"deltaG_fortnight_{district}_{tehsil}"
+        water_layer_exists = Layer.objects.filter(
+            state=state_obj,
+            district=district_obj,
+            block=tehsil_obj,
+            dataset__name="Hydrology",
+            layer_version="1.0",
+            algorithm_version="1.1",
+            layer_name=layer_name,
+        ).exists()
 
-        date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+        # Fetch hydrology data
+        water_url = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows"
+        water_data = fetch_geoserver_data(water_url, f"mws_layers:{layer_name}", mws_id)
 
-        def roundoff_value(value):
-            return round(value, 2) if value is not None else None
+        # Fetch NDVI data only if water layer exists
+        ndvi_layers = {}
+        if water_layer_exists:
+            ndvi_url = (
+                "https://geoserver.core-stack.org:8443/geoserver/ndvi_timeseries/ows"
+            )
+            for veg_type in ["crop", "shrub", "tree"]:
+                try:
+                    ndvi_layers[veg_type] = fetch_geoserver_data(
+                        ndvi_url,
+                        f"ndvi_timeseries:ndvi_timeseries_{district}_{tehsil}_{veg_type}",
+                        mws_id,
+                    )
+                except:
+                    ndvi_layers[veg_type] = {}
+
+        # Collect all unique dates
+        all_dates = set()
+        for key in water_data:
+            if "-" in key and key.count("-") == 2:
+                all_dates.add(key)
+
+        if water_layer_exists:
+            for layer_data in ndvi_layers.values():
+                for key in layer_data:
+                    if "-" in key and key.count("-") == 2:
+                        all_dates.add(key)
 
         time_series = []
-        for key, value in properties.items():
-            if not date_pattern.match(key):
-                continue
-            values = json.loads(value)
-            time_series.append(
-                {
-                    "date": key,
-                    "et": roundoff_value(values.get("ET")),
-                    "runoff": roundoff_value(values.get("RunOff")),
-                    "precipitation": roundoff_value(values.get("Precipitation")),
+        for date in sorted(all_dates):
+            # Parse hydrology metrix from JSON string
+            hydrology_metrix = {}
+            try:
+                values = json.loads(water_data.get(date, "{}"))
+                hydrology_metrix = {
+                    "et": round(values.get("ET"), 2) if values.get("ET") else "",
+                    "runoff": (
+                        round(values.get("RunOff"), 2) if values.get("RunOff") else ""
+                    ),
+                    "precipitation": (
+                        round(values.get("Precipitation"), 2)
+                        if values.get("Precipitation")
+                        else ""
+                    ),
                 }
-            )
+            except:
+                hydrology_metrix = {"et": "", "runoff": "", "precipitation": ""}
+
+            entry = {
+                "date": date,
+                **hydrology_metrix,
+            }
+
+            # Add NDVI data if available
+            if water_layer_exists:
+                entry["ndvi_crop"] = ndvi_layers.get("crop", {}).get(date, "")
+                entry["ndvi_shrub"] = ndvi_layers.get("shrub", {}).get(date, "")
+                entry["ndvi_tree"] = ndvi_layers.get("tree", {}).get(date, "")
+
+                # Round NDVI values if they're numbers
+                for ndvi_field in ["ndvi_crop", "ndvi_shrub", "ndvi_tree"]:
+                    val = entry[ndvi_field]
+                    if isinstance(val, (int, float)):
+                        entry[ndvi_field] = round(val, 2)
+                    elif isinstance(val, str):
+                        try:
+                            entry[ndvi_field] = round(float(val), 2)
+                        except:
+                            entry[ndvi_field] = ""
+
+            time_series.append(entry)
 
         time_series.sort(key=lambda x: x["date"])
         return {"mws_id": mws_id, "time_series": time_series}
 
     except Exception as e:
-        return {"error": "Error in get mws data", "message": str(e)}
+        return {"error": str(e)}
 
 
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
@@ -318,3 +396,87 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
     report_url = f"{base_url}/api/v1/generate_mws_report/?state={state}&district={district}&block={tehsil}&uid={mws_id}"
 
     return {"Mws_report_url": report_url}, None
+
+
+def get_mws_geometries_data(state, district, tehsil, mws_id):
+    try:
+        base_url = "https://geoserver.core-stack.org:8443/geoserver/mws/ows"
+
+        # Construct MWS layer name
+        layer_name = f"mws_{district}_{tehsil}"
+
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"mws:{layer_name}",
+            "outputFormat": "application/json",
+            "CQL_FILTER": f"uid='{mws_id}'",
+        }
+
+        response = requests.get(base_url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            error_msg = f"GeoServer request failed with status {response.status_code}"
+            print(error_msg)
+            return False, error_msg
+
+        data = response.json()
+
+        if not data.get("features") or len(data["features"]) == 0:
+            error_msg = f"No MWS found with uid: {mws_id}"
+            print(error_msg)
+            return False, error_msg
+
+        geometry = data["features"][0].get("geometry")
+
+        if not geometry:
+            error_msg = "MWS feature found but no geometry data"
+            print(error_msg)
+            return False, error_msg
+
+        print(f"Successfully retrieved geometry for MWS uid: {mws_id}")
+        return True, geometry
+
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        print(error_msg)
+        return False, error_msg
+
+
+def get_village_geometries_data(state, district, tehsil, village_id):
+    try:
+        base_url = (
+            "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows"
+        )
+        layer_name = f"{district}_{tehsil}"
+
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"panchayat_boundaries:{layer_name}",
+            "outputFormat": "application/json",
+            "CQL_FILTER": f"vill_ID={village_id}",
+            "propertyName": "the_geom",
+        }
+
+        response = requests.get(base_url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            return False, f"GeoServer request failed with status {response.status_code}"
+
+        geojson_data = response.json()
+
+        if not geojson_data.get("features") or len(geojson_data["features"]) == 0:
+            return False, f"No village found with ID: {village_id}"
+
+        geometry = geojson_data["features"][0].get("geometry")
+
+        if not geometry:
+            return False, "Feature found but no geometry data"
+
+        return True, geometry
+
+    except Exception as e:
+        return False, f"Internal error: {str(e)}"
