@@ -171,4 +171,9 @@ urlpatterns = [
         api.generate_mws_connectivity,
         name="generate_mws_connectivity_data",
     ),
+    path(
+        "generate_mws_centroid/",
+        api.generate_mws_centroid,
+        name="generate-mws-centroid",
+    ),
 ]
