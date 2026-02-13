@@ -5,6 +5,11 @@ from django.utils.translation import gettext_lazy as _
 from organization.models import Organization
 
 
+class AccountType(models.TextChoices):
+    INDIVIDUAL = "individual", "Individual"
+    ORGANIZATION = "org", "Organization"
+
+
 class User(AbstractUser):
     GENDER_CHOICES = [
         ("M", "Male"),
@@ -13,6 +18,11 @@ class User(AbstractUser):
     ]
 
     id = models.AutoField(primary_key=True)
+    account_type = models.CharField(
+        max_length=20,
+        choices=AccountType.choices,
+        null=True,
+    )
     organization = models.ForeignKey(
         Organization, on_delete=models.SET_NULL, null=True, related_name="users"
     )

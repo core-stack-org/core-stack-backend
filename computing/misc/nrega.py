@@ -175,6 +175,22 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     ]
     block_metadata_df = block_metadata_df.replace({np.nan: None})
 
+    for col in block_metadata_df.columns:
+        if col != "geometry":
+            # Check if column contains datetime objects
+            if pd.api.types.is_datetime64_any_dtype(block_metadata_df[col]):
+                # Convert to string format
+                block_metadata_df[col] = (
+                    block_metadata_df[col].astype(str).replace("NaT", None)
+                )
+            # Also check for actual date objects (not just datetime64)
+            elif (
+                block_metadata_df[col]
+                .apply(lambda x: isinstance(x, (pd.Timestamp, pd.DatetimeTZDtype)))
+                .any()
+            ):
+                block_metadata_df[col] = block_metadata_df[col].astype(str)
+
     description = (
         "nrega_"
         + valid_gee_text(district.lower())

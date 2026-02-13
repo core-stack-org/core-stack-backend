@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from users.permissions import IsOrganizationMember
 from users.serializers import UserProjectGroup, UserProjectGroupSerializer
 
-from .models import Project
+from .models import AppType, Project
 from .serializers import (
     AppTypeSerializer,
     ProjectDetailSerializer,
@@ -20,12 +20,27 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        include_disabled = self.action == "enable"
 
         if user.is_superadmin or user.is_superuser:
-            return Project.objects.filter(enabled=True)
+            qs = Project.objects.all() if include_disabled else Project.objects.filter(enabled=True)
+
+            organization_id = self.request.query_params.get("organization")
+            if organization_id:
+                qs = qs.filter(organization_id=organization_id)
+
+            return qs
+
+        if user.groups.filter(name="Test Plan Reviewer").exists():
+            return Project.objects.filter(
+                app_type=AppType.WATERSHED, enabled=True
+            )
 
         if user.organization:
-            return Project.objects.filter(organization=user.organization, enabled=True)
+            qs = Project.objects.filter(organization=user.organization)
+            if not include_disabled:
+                qs = qs.filter(enabled=True)
+            return qs
 
         return Project.objects.none()
 
@@ -75,3 +90,33 @@ class ProjectViewSet(viewsets.ModelViewSet):
         user_roles = UserProjectGroup.objects.filter(project=project)
         serializer = UserProjectGroupSerializer(user_roles, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def enable(self, request, pk=None):
+        project = self.get_object()
+        project.enabled = True
+        project.updated_by = request.user
+        project.save(update_fields=["enabled", "updated_by", "updated_at"])
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"])
+    def disable(self, request, pk=None):
+        project = self.get_object()
+        project.enabled = False
+        project.updated_by = request.user
+        project.save(update_fields=["enabled", "updated_by", "updated_at"])
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"])
+    def disabled(self, request):
+        user = request.user
+
+        if user.is_superadmin or user.is_superuser:
+            queryset = Project.objects.filter(enabled=False)
+        elif user.organization:
+            queryset = Project.objects.filter(organization=user.organization, enabled=False)
+        else:
+            queryset = Project.objects.none()
+
+        serializer = ProjectSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

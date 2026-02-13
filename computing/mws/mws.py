@@ -1,6 +1,12 @@
 import ee
 from nrm_app.celery import app
 
+from computing.utils import (
+    sync_fc_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+
 from utilities.constants import GEE_DATASET_PATH
 from utilities.gee_utils import (
     ee_initialize,
@@ -35,6 +41,9 @@ def mws_layer(self, state, district, block, gee_account_id):
         + "_uid"
     )
     asset_id = get_gee_asset_path(state, district, block) + description
+    layer_name = (
+        f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+    )
 
     if not is_gee_asset_exists(asset_id):
         mwses_uid_fc = ee.FeatureCollection(
@@ -58,15 +67,26 @@ def mws_layer(self, state, district, block, gee_account_id):
     layer_generated = False
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
-        save_layer_info_to_db(
+        layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+            layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="MWS",
             algorithm_version="1.2",
         )
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(
+            fc,
+            state,
+            layer_name,
+            "mws",
+        )
+
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
         layer_generated = True
     return layer_generated
 

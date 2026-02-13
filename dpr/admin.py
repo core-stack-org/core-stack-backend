@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import (
     Agri_maintenance,
@@ -12,7 +13,8 @@ from .models import (
     ODK_well,
     SWB_maintenance,
     SWB_RS_maintenance,
-    Overpass_Block_Details
+    Overpass_Block_Details,
+    DPR_Report,
 )
 
 
@@ -25,6 +27,8 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "number_of_households",
         "settlement_status",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
     list_filter = [
         "block_name",
@@ -33,6 +37,8 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "largest_caste",
         "plan_id",
         "plan_name",
+        "is_moderated",
+        "is_deleted",
     ]
     search_fields = ["settlement_name", "settlement_id", "block_name", "submitted_by"]
     readonly_fields = [
@@ -41,6 +47,7 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "gps_point",
         "farmer_family",
         "livestock_census",
+        "data_before_moderation",
     ]
     ordering = ["-submission_time"]
 
@@ -94,6 +101,27 @@ class ODKSettlementAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "settlement_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Metadata",
             {
                 "fields": (
@@ -126,6 +154,8 @@ class ODKWellAdmin(admin.ModelAdmin):
         "households_benefitted",
         "is_functional",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
     list_filter = [
         "block_name",
@@ -135,9 +165,11 @@ class ODKWellAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
+        "is_deleted",
     ]
     search_fields = ["well_id", "beneficiary_settlement", "owner", "block_name"]
-    readonly_fields = ["uuid", "system", "gps_point"]
+    readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -158,6 +190,27 @@ class ODKWellAdmin(admin.ModelAdmin):
             {"fields": ("owner", "households_benefitted", "caste_uses")},
         ),
         ("Status", {"fields": ("is_functional", "need_maintenance", "status_re")}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "well_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Location",
             {
@@ -185,6 +238,8 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "household_benefitted",
         "who_manages",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
     list_filter = [
         "block_name",
@@ -194,6 +249,8 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
+        "is_deleted",
     ]
     search_fields = [
         "waterbody_id",
@@ -201,7 +258,7 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "block_name",
         "beneficiary_contact",
     ]
-    readonly_fields = ["uuid", "system", "gps_point", "water_structure_dimension"]
+    readonly_fields = ["uuid", "system", "gps_point", "water_structure_dimension", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -250,6 +307,27 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         ),
         ("Status", {"fields": ("need_maintenance", "status_re")}),
         (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "waterbody_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Location",
             {
                 "fields": ("latitude", "longitude", "gps_point"),
@@ -274,10 +352,20 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         "block_name",
         "work_type",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
-    list_filter = ["block_name", "work_type", "status_re", "plan_id", "plan_name"]
+    list_filter = [
+        "block_name",
+        "work_type",
+        "status_re",
+        "plan_id",
+        "plan_name",
+        "is_moderated",
+        "is_deleted",
+    ]
     search_fields = ["recharge_structure_id", "beneficiary_settlement", "block_name"]
-    readonly_fields = ["uuid", "system", "gps_point", "work_dimensions"]
+    readonly_fields = ["uuid", "system", "gps_point", "work_dimensions", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -295,6 +383,27 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         ),
         ("Work Details", {"fields": ("work_type", "work_dimensions")}),
         ("Status", {"fields": ("status_re",)}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "recharge_structure_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Location",
             {
@@ -320,10 +429,20 @@ class ODKAgriAdmin(admin.ModelAdmin):
         "block_name",
         "work_type",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
-    list_filter = ["block_name", "work_type", "status_re", "plan_id", "plan_name"]
+    list_filter = [
+        "block_name",
+        "work_type",
+        "status_re",
+        "plan_id",
+        "plan_name",
+        "is_moderated",
+        "is_deleted",
+    ]
     search_fields = ["irrigation_work_id", "beneficiary_settlement", "block_name"]
-    readonly_fields = ["uuid", "system", "gps_point", "work_dimensions"]
+    readonly_fields = ["uuid", "system", "gps_point", "work_dimensions", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -341,6 +460,27 @@ class ODKAgriAdmin(admin.ModelAdmin):
         ),
         ("Work Details", {"fields": ("work_type", "work_dimensions")}),
         ("Status", {"fields": ("status_re",)}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "irrigation_structure_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Location",
             {
@@ -366,6 +506,8 @@ class ODKCropAdmin(admin.ModelAdmin):
         "land_classification",
         "irrigation_source",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
     list_filter = [
         "land_classification",
@@ -373,9 +515,11 @@ class ODKCropAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
+        "is_deleted",
     ]
     search_fields = ["crop_grid_id", "beneficiary_settlement"]
-    readonly_fields = ["uuid", "system"]
+    readonly_fields = ["uuid", "system", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -412,6 +556,27 @@ class ODKCropAdmin(admin.ModelAdmin):
         ),
         ("Status", {"fields": ("status_re",)}),
         (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "crop_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
             "Metadata",
             {
                 "fields": ("submission_time", "uuid", "system", "data_crop"),
@@ -430,6 +595,8 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "livestock_development",
         "fisheries",
         "submission_time",
+        "is_moderated",
+        "is_deleted",
     ]
     list_filter = [
         "block_name",
@@ -439,9 +606,11 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "status_re",
         "plan_id",
         "plan_name",
+        "is_moderated",
+        "is_deleted",
     ]
     search_fields = ["beneficiary_settlement", "block_name", "beneficiary_contact"]
-    readonly_fields = ["uuid", "system", "gps_point"]
+    readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -463,6 +632,27 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         ),
         ("Contact", {"fields": ("beneficiary_contact",)}),
         ("Status", {"fields": ("status_re",)}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "livelihood_demand_status",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Location",
             {
@@ -488,10 +678,12 @@ class GWMaintenanceAdmin(admin.ModelAdmin):
         "corresponding_work_id",
         "plan_name",
         "status_re",
+        "is_moderated",
+        "is_deleted",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid"]
+    readonly_fields = ["uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -506,8 +698,28 @@ class GWMaintenanceAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Status", {"fields": ("status_re",)}),
+        ("Status", {"fields": ("status_re", "recharge_structure_maintenance_status")}),
         ("Location", {"fields": ("latitude", "longitude")}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Metadata",
             {"fields": ("uuid", "data_gw_maintenance"), "classes": ("collapse",)},
@@ -523,10 +735,12 @@ class SWBRSMaintenanceAdmin(admin.ModelAdmin):
         "corresponding_work_id",
         "plan_name",
         "status_re",
+        "is_moderated",
+        "is_deleted",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid"]
+    readonly_fields = ["uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -541,8 +755,28 @@ class SWBRSMaintenanceAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Status", {"fields": ("status_re",)}),
+        ("Status", {"fields": ("status_re", "swb_rs_maintenance_status")}),
         ("Location", {"fields": ("latitude", "longitude")}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Metadata",
             {"fields": ("uuid", "data_swb_rs_maintenance"), "classes": ("collapse",)},
@@ -558,10 +792,12 @@ class SWBMaintenanceAdmin(admin.ModelAdmin):
         "corresponding_work_id",
         "plan_name",
         "status_re",
+        "is_moderated",
+        "is_deleted",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid"]
+    readonly_fields = ["uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -576,8 +812,28 @@ class SWBMaintenanceAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Status", {"fields": ("status_re",)}),
+        ("Status", {"fields": ("status_re", "swb_maintenance_status")}),
         ("Location", {"fields": ("latitude", "longitude")}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Metadata",
             {"fields": ("uuid", "data_swb_maintenance"), "classes": ("collapse",)},
@@ -593,10 +849,12 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
         "corresponding_work_id",
         "plan_name",
         "status_re",
+        "is_moderated",
+        "is_deleted",
     ]
-    list_filter = ["status_re", "plan_id", "plan_name"]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid"]
+    readonly_fields = ["uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -611,8 +869,28 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Status", {"fields": ("status_re",)}),
+        ("Status", {"fields": ("status_re", "irrigation_structure_maintenance_status")}),
         ("Location", {"fields": ("latitude", "longitude")}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
         (
             "Metadata",
             {"fields": ("uuid", "data_agri_maintenance"), "classes": ("collapse",)},
@@ -632,22 +910,75 @@ class OverpassBlockDetailsAdmin(admin.ModelAdmin):
 
     def has_overpass_response(self, obj):
         return obj.overpass_response is not None
+
     has_overpass_response.boolean = True
     has_overpass_response.short_description = "Has Response"
 
     fieldsets = (
         (
             "Basic Information",
-            {
-                "fields": (
-                    "location",
-                )
-            },
+            {"fields": ("location",)},
         ),
         (
             "Overpass Response Data",
             {
                 "fields": ("overpass_response",),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+
+@admin.register(DPR_Report)
+class DPRReportAdmin(admin.ModelAdmin):
+    list_display = [
+        "dpr_report_id",
+        "plan_name",
+        "plan_id",
+        "status",
+        "dpr_generated_at",
+        "created_at",
+        "s3_link",
+    ]
+    list_filter = ["status", "created_at", "dpr_generated_at"]
+    search_fields = ["plan_name", "plan_id__plan"]
+    readonly_fields = ["dpr_report_id", "created_at", "dpr_generated_at", "s3_link_display"]
+    ordering = ["-created_at"]
+    date_hierarchy = "created_at"
+
+    def s3_link(self, obj):
+        if obj.dpr_report_s3_url:
+            return format_html('<a href="{}" target="_blank">Download</a>', obj.dpr_report_s3_url)
+        return "-"
+    s3_link.short_description = "S3 Link"
+
+    def s3_link_display(self, obj):
+        if obj.dpr_report_s3_url:
+            return format_html(
+                '<a href="{}" target="_blank" style="word-break: break-all;">{}</a>',
+                obj.dpr_report_s3_url,
+                obj.dpr_report_s3_url
+            )
+        return "-"
+    s3_link_display.short_description = "S3 URL"
+
+    fieldsets = (
+        (
+            "Plan Information",
+            {
+                "fields": ("plan_id", "plan_name"),
+            },
+        ),
+        (
+            "DPR Details",
+            {
+                "fields": ("status", "s3_link_display", "dpr_generated_at"),
+            },
+        ),
+        (
+            "Audit",
+            {
+                "fields": ("created_at", "created_by", "last_updated_at", "last_updated_by"),
                 "classes": ("collapse",),
             },
         ),

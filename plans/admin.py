@@ -1,7 +1,31 @@
 # plans/admin.py
 from django.contrib import admin
 
-from .models import Plan, PlanApp
+from .models import ODKSyncLog, Plan, PlanApp
+
+
+@admin.register(ODKSyncLog)
+class ODKSyncLogAdmin(admin.ModelAdmin):
+    list_display = ("id", "category", "sync_type", "status", "odk_url", "created_at")
+    list_filter = ("category", "sync_type", "status", "created_at")
+    search_fields = ("sync_type", "odk_url", "error_details")
+    readonly_fields = (
+        "category",
+        "sync_type",
+        "xml_content",
+        "odk_url",
+        "status",
+        "odk_response",
+        "error_details",
+        "created_at",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PlanApp)
@@ -11,9 +35,6 @@ class PlanAppAdmin(admin.ModelAdmin):
         "plan",
         "organization",
         "project",
-        "state",
-        "district",
-        "block",
         "state_soi",
         "district_soi",
         "tehsil_soi",
@@ -30,9 +51,9 @@ class PlanAppAdmin(admin.ModelAdmin):
     list_filter = (
         "organization",
         "project",
-        "state",
-        "district",
-        "block",
+        "state_soi",
+        "district_soi",
+        "tehsil_soi",
         "created_by",
         "created_at",
         "enabled",

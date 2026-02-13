@@ -41,7 +41,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     os.makedirs(district_path, exist_ok=True)
     xlsx_file = os.path.join(district_path, f"{district}_{block}.xlsx")
 
-    workspaces_to_process = set(specific_sheets) if specific_sheets else None
+    workspaces_to_process = specific_sheets
 
     # Handle existing sheets when adding specific workspaces
     results = []
@@ -228,12 +228,36 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_stream_order(geojson_data, writer)
             elif workspace == "mws_connectivity":
                 create_excel_for_mws_connectivity(geojson_data, writer)
+            elif workspace == "mws":
+                create_excel_for_mws(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_mws(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "watershed_code": properties.get("wsconc", ""),
+            "basin_code": properties.get("bacode", ""),
+            "sub_basin_code": properties.get("sbcode", ""),
+        }
+
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="mws", index=False)
+    print("Excel file created for mws")
 
 
 def create_excel_for_mws_connectivity(data, writer):
@@ -747,13 +771,15 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
             {
                 "UID": uid,
                 "area_in_ha": properties.get("area_in_ha", None),
-                "double_to_single_area_in_ha": properties.get("do_si", None),
-                "double_to_triple_area_in_ha": properties.get("do_tr", None),
+                "single_to_single_area_in_ha": properties.get("si_si", None),
                 "single_to_double_area_in_ha": properties.get("si_do", None),
                 "single_to_triple_area_in_ha": properties.get("si_tr", None),
-                "triple_to_double_area_in_ha": properties.get("tr_do", None),
+                "double_to_single_area_in_ha": properties.get("do_si", None),
+                "double_to_double_area_in_ha": properties.get("do_do", None),
+                "double_to_triple_area_in_ha": properties.get("do_tr", None),
                 "triple_to_single_area_in_ha": properties.get("tr_si", None),
-                "no_change_area_in_ha": properties.get("same", None),
+                "triple_to_double_area_in_ha": properties.get("tr_do", None),
+                "triple_to_triple_area_in_ha": properties.get("tr_tr", None),
                 "total_change_crop_intensity_area_in_ha": properties.get(
                     "total_chan", None
                 ),
@@ -1876,14 +1902,14 @@ def generate_stats_excel_file(state, district, block):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-            from .mws_indicators import generate_mws_data_for_kyl_filters
-            from .village_indicators import get_generate_filter_data_village
-            from public_api.views import get_tehsil_json
+        from .mws_indicators import generate_mws_data_for_kyl_filters
+        from .village_indicators import get_generate_filter_data_village
+        from public_api.views import get_tehsil_json
 
-            get_vector_layer_geoserver(state, district, block)
-            get_tehsil_json(state, district, block, 1)
-            generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
-            get_generate_filter_data_village(state, district, block, 1)
+        get_vector_layer_geoserver(state, district, block)
+        get_tehsil_json(state, district, block, 1)
+        generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
+        get_generate_filter_data_village(state, district, block, 1)
 
         if not os.path.exists(file_path):
             return Response(

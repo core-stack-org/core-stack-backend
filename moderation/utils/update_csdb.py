@@ -3,26 +3,31 @@ from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from .utils import *
 from .get_submissions import get_edited_updated_all_submissions
 from .form_mapping import corestack
-from utilities.constants import ODK_BASE_URL
+from utilities.constants import ODK_BASE_URL, project_id
+from moderation.models import SyncMetadata
 
 
-def sync_settlement_odk_data(get_edited_updated_all_submissions):
+def get_dynamic_filter_query():
+    from datetime import timezone as dt_tz
+
+    metadata = SyncMetadata.get_odk_sync_metadata()
+    filter_date = metadata.get_filter_date()
+    filter_date_utc = filter_date.astimezone(dt_tz.utc)
+    date_str = filter_date_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    return (
+        f"$filter=__system/submissionDate ge {date_str} "
+        f"or __system/updatedAt ge {date_str}"
+    )
+
+
+def sync_odk_data(get_edited_updated_all_submissions):
+    filter_query = get_dynamic_filter_query()
+
     get_edited_updated_all_submissions = get_edited_updated_all_submissions(
         username=ODK_USERNAME,
         password=ODK_PASSWORD,
         base_url=ODK_BASE_URL,
     )
-
-    filter_query = (
-        "$filter=(day(__system/submissionDate) ge 14 "
-        "and month(__system/submissionDate) ge 12 "
-        "and year(__system/submissionDate) ge 2025) "
-        "or (day(__system/updatedAt) ge 14 "
-        "and month(__system/updatedAt) ge 12 "
-        "and year(__system/updatedAt) eq 2025)"
-    )
-
-    project_id = 2
 
     settlement_submissions = (
         get_edited_updated_all_submissions.get_edited_updated_submissions(
@@ -114,6 +119,14 @@ def sync_settlement_odk_data(get_edited_updated_all_submissions):
         )
     )
 
+    agrohorticulture_submissions = (
+        get_edited_updated_all_submissions.get_edited_updated_submissions(
+            project_id=project_id,
+            form_id=corestack["Agrohorticulture"],
+            filter_query=filter_query,
+        )
+    )
+
     return (
         settlement_submissions,
         well_submissions,
@@ -126,6 +139,7 @@ def sync_settlement_odk_data(get_edited_updated_all_submissions):
         gw_maintenance_submissions,
         swb_maintenance_submissions,
         swb_rs_maintenance_submissions,
+        agrohorticulture_submissions,
     )
 
 
@@ -172,7 +186,7 @@ def resync_agri(agri_submissions):
 def resync_livelihood(livelihood_submissions):
     count = 0
     for livelihood_submission in livelihood_submissions:
-        sync_edited_updated_livelihhod(livelihood_submission)
+        sync_edited_updated_livelihood(livelihood_submission)
         count += 1
     print(f"{count} livelihood submissions synced")
 
@@ -217,6 +231,14 @@ def resync_swb_rs_maintenance(swb_rs_maintenance_submissions):
     print(f"{count} swb rs maintenance submissions synced")
 
 
+def resync_agrohorticulture(agrohorticulture_submissions):
+    count = 0
+    for agrohorticulture_submission in agrohorticulture_submissions:
+        sync_edited_updated_agrohorticulture(agrohorticulture_submission)
+        count += 1
+    print(f"{count} agrohorticulture submissions synced")
+
+
 def resync_db_odk():
     (
         settlement_submissions,
@@ -230,7 +252,8 @@ def resync_db_odk():
         gw_maintenance_submissions,
         swb_maintenance_submissions,
         swb_rs_maintenance_submissions,
-    ) = sync_settlement_odk_data(get_edited_updated_all_submissions)
+        agrohorticulture_submissions,
+    ) = sync_odk_data(get_edited_updated_all_submissions)
 
     resync_settlement(settlement_submissions)
     resync_well(well_submissions)
@@ -243,4 +266,5 @@ def resync_db_odk():
     resync_gw_maintenance(gw_maintenance_submissions)
     resync_swb_maintenance(swb_maintenance_submissions)
     resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
+    resync_agrohorticulture(agrohorticulture_submissions)
     print("ODK data resynced successfully")

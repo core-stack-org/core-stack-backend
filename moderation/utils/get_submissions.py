@@ -2,7 +2,7 @@ import requests
 from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
 from plans.utils import fetch_bearer_token
 from .form_mapping import corestack
-from utilities.constants import ODK_BASE_URL
+from utilities.constants import ODK_BASE_URL, filter_query_updated, filter_query_edited
 
 
 class get_edited_updated_all_submissions:
@@ -11,6 +11,16 @@ class get_edited_updated_all_submissions:
         self.token = fetch_bearer_token(username, password)
 
     def get_edited_updated_submissions(self, project_id, form_id, filter_query):
+        """
+        Args:
+            project_id:
+            form_id:
+            filter_query:
+
+        Returns:
+            list of submissions for all forms after certain date
+
+        """
         url = f"{self.base_url}{project_id}/forms/{form_id}.svc/Submissions?{filter_query}"
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -37,10 +47,6 @@ def form_submissions_edited_updated_url(form_id, filter_query):
     return url
 
 
-filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
-filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
-
-
 class ODKSubmissionsChecker:
     def __init__(self):
         self.token = fetch_bearer_token(ODK_USERNAME, ODK_PASSWORD)
@@ -52,7 +58,12 @@ class ODKSubmissionsChecker:
 
     def process(self, mode="updated"):
         """
-        mode = "updated" or "edited"
+
+        Args:
+            mode: edited/updated
+
+        Returns:
+            flag for each submissions whether edited/updated
         """
         filter_query = (
             filter_query_updated if mode == "updated" else filter_query_edited

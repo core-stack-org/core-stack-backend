@@ -291,10 +291,17 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Method**: GET
 - **Description**: List projects based on permissions
 - **Authentication**: Required
+- **Query Parameters**:
+  - `organization` (optional, superadmin only): Filter projects by organization ID
 - **Notes**:
-  - Super admins see all projects
+  - Super admins see all projects (can filter by organization using `?organization=<org_id>`)
   - Organization admins see all projects in their organization
   - Other users see projects they have access to
+
+**Example (Superadmin filtering by organization)**:
+```
+GET /api/v1/projects/?organization=5
+```
 
 ### Create Project
 - **URL**: `/api/v1/projects/`
@@ -374,6 +381,64 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Description**: Delete a project
 - **Authentication**: Required
 - **Permissions**: Super admin or organization admin
+
+### Enable Project
+- **URL**: `/api/v1/projects/{project_id}/enable/`
+- **Method**: POST
+- **Description**: Enable a project (sets enabled=True)
+- **Authentication**: Required
+- **Permissions**: Super admin, organization admin, or user with project access
+- **Response**: Returns the updated project object
+- **Notes**: 
+  - Updates the `updated_by` field to the current user
+  - Updates the `updated_at` timestamp
+
+### Disable Project
+- **URL**: `/api/v1/projects/{project_id}/disable/`
+- **Method**: POST
+- **Description**: Disable a project (sets enabled=False)
+- **Authentication**: Required
+- **Permissions**: Super admin, organization admin, or user with project access
+- **Response**: Returns the updated project object
+- **Notes**: 
+  - Updates the `updated_by` field to the current user
+  - Updates the `updated_at` timestamp
+  - Disabled projects are not included in project listings by default
+
+### List Disabled Projects
+- **URL**: `/api/v1/projects/disabled/`
+- **Method**: GET
+- **Description**: Retrieve all disabled projects based on user permissions
+- **Authentication**: Required
+- **Permissions**: 
+  - Super admins: Can see all disabled projects across all organizations
+  - Organization users: Can see only their organization's disabled projects
+  - Users without organization: Receive empty result
+- **Response**: Returns an array of disabled project objects
+- **Response Body**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Disabled Project Name",
+      "description": "Project Description",
+      "app_type": "plantation",
+      "enabled": false,
+      "organization": "organization-uuid",
+      "organization_name": "Organization Name",
+      "state_soi": 1,
+      "district_soi": 10,
+      "tehsil_soi": 100,
+      "created_at": "2025-01-15T10:30:00.000000+05:30",
+      "updated_at": "2025-01-20T15:45:00.000000+05:30",
+      "created_by": 1,
+      "updated_by": 2
+    }
+  ]
+  ```
+- **Notes**: 
+  - This endpoint provides visibility into projects that have been disabled
+  - Useful for auditing and re-enabling previously disabled projects
 
 ## Project App Type Management
 
@@ -844,6 +909,26 @@ These endpoints are maintained for backward compatibility:
 4. View the uploaded KML files:
    ```bash
    curl -X GET http://api.example.com/api/v1/projects/{project_id}/plantation/kml/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+### Managing Project Status
+
+1. Enable a project:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/{project_id}/enable/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+2. Disable a project:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/{project_id}/disable/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+3. List all disabled projects:
+   ```bash
+   curl -X GET http://api.example.com/api/v1/projects/disabled/ \
      -H "Authorization: Bearer {access_token}"
    ```
 

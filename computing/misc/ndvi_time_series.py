@@ -166,7 +166,7 @@ def ndvi_timeseries(
                 print("sync to geoserver flag is updated")
 
                 layer_at_geoserver = True
-        return layer_at_geoserver
+    return layer_at_geoserver
 
 
 def extract_class_fc(asset_id, cls_prefix):

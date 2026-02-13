@@ -15,6 +15,7 @@ corestack = {
     "new irrigation form": "NRM_form_Agri_Screen_V1.0.0",
     "new recharge structure form": "NRM_form_propose_new_recharge_structure_V1.0.0",
     "water body analysis feedback form": "rm_waterbody_analysis_feedback_form_V1.0.0",
+    "Agrohorticulture": "Agrohorticulture",
 }
 
 model_map = {
@@ -28,5 +29,11 @@ model_map = {
     "Agri Maintenance": Agri_maintenance,
     "GroundWater Maintenance": GW_maintenance,
     "Surface Water Body Maintenance": SWB_maintenance,
-    "Surface Water Body Recharge Structure Maintenance": SWB_RS_maintenance,
+    "Surface Water Body Remotely Sensed Maintenance": SWB_RS_maintenance,
 }
+
+feedback_form = [
+    "agri analysis feedback form",
+    "groundwater analysis feedback form",
+    "water body analysis feedback form",
+]

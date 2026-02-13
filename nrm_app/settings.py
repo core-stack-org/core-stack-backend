@@ -16,6 +16,7 @@ from pathlib import Path
 
 import environ
 from corsheaders.defaults import default_headers
+from celery.schedules import crontab
 
 env = environ.Env()
 
@@ -32,7 +33,7 @@ SECRET_KEY = env("SECRET_KEY")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
 TMP_LOCATION = env("TMP_LOCATION")
@@ -55,15 +56,16 @@ USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 
 STATIC_ROOT = "static/"
-GEE_HELPER_ACCOUNT_ID = 2
-GEE_DEFAULT_ACCOUNT_ID = 1
+GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
+GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
+ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
     "api-doc.core-stack.org",
-    "2bb02f703cef.ngrok-free.app",
+    "2f2de623c34b.ngrok-free.app",
     "odk.core-stack.org",
     "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
@@ -78,6 +80,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_celery_beat",
     # core apps
     "computing",
     "dpr",
@@ -91,7 +94,6 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework_api_key",
     # project applications
-    "users",
     "organization.apps.OrganizationConfig",
     "projects",
     "plantations",
@@ -103,6 +105,7 @@ INSTALLED_APPS = [
     "waterrejuvenation",
     "apiadmin",
     "moderation",
+    "users.apps.UsersConfig",
 ]
 
 # MARK: CORS Settings
@@ -265,6 +268,17 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Celery Beat Schedule
+
+
+CELERY_BEAT_SCHEDULE = {
+    "daily-odk-sync": {
+        "task": "moderation.sync_odk_data_task",
+        "schedule": crontab(hour=6, minute=0),  # 6:00 AM IST daily
+    },
+}
+CELERY_TIMEZONE = "Asia/Kolkata"
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
@@ -366,6 +380,13 @@ S3_ACCESS_KEY = env("S3_ACCESS_KEY")
 # S3 settings
 S3_BUCKET = env("S3_BUCKET")
 S3_REGION = env("S3_REGION")
+
+# DPR S3 settings
+DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY")
+DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY")
+DPR_S3_REGION = env("DPR_S3_REGION")
+DPR_S3_BUCKET = env("DPR_S3_BUCKET")
+DPR_S3_FOLDER = env("DPR_S3_FOLDER")
 
 # bot_interface settings
 AUTH_TOKEN_360 = env("AUTH_TOKEN_360")

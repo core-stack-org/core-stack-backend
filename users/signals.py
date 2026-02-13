@@ -2,14 +2,23 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 
+from users.models import AccountType
+
 User = get_user_model()
-from nrm_app.settings import BASE_URL
+from nrm_app.settings import BASE_URL, ADMIN_GROUP_ID
 from geoadmin.tasks import send_email_notification
+from django.contrib.auth.models import Group
 
 
 @receiver(post_save, sender=User)
 def send_email_to_org_admin(sender, instance, created, **kwargs):
+    print("send email")
     if created:
+        print("instace")
+        if instance.account_type == AccountType.INDIVIDUAL:
+            print("adding account to admin")
+            group = Group.objects.get(pk=ADMIN_GROUP_ID)
+            instance.groups.add(group)
         subject = f"New User Registered – Assign to Project"
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
         superuser_emails = list(
