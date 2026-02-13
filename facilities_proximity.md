@@ -380,3 +380,132 @@ chmod +x tests/test_facilities_api.sh
 ## Column Name Compatibility
 
 The module handles both `subdistrict` and `block` column names in the GeoJSON files. If your data uses `block` instead of `subdistrict`, the module will automatically detect and use the correct column. The API consistently uses `block` as the parameter name for clarity.
+
+## Celery Integration
+
+The facilities proximity module includes Celery tasks for asynchronous processing, following the patterns established in other `computing/misc` modules.
+
+### Available Tasks
+
+#### 1. `generate_facilities_layer`
+
+Generates facilities proximity layer for a given administrative area and optionally syncs to GeoServer.
+
+```python
+from computing.misc.facilities_proximity import generate_facilities_layer
+
+# Generate for a block (async)
+result = generate_facilities_layer.delay(
+    state="Karnataka",
+    district="Raichur",
+    block="Devadurga",
+    sync_to_geoserver=True
+)
+
+# Check task status
+task_id = result.id
+status = result.status  # PENDING, STARTED, SUCCESS, FAILURE
+
+# Get result (blocks until complete)
+layer_info = result.get()
+```
+
+**Parameters**:
+- `state` (required): State name
+- `district` (optional): District name
+- `block` (optional): Block name
+- `gee_account_id` (optional): GEE account ID (placeholder for future GEE integration)
+- `sync_to_geoserver` (optional): Whether to sync to GeoServer (default: `True`)
+
+**Returns**:
+```json
+{
+  "status": "success",
+  "state": "Karnataka",
+  "district": "Raichur",
+  "block": "Devadurga",
+  "layer_at_geoserver": true,
+  "villages_count": 150,
+  "output_path": "/path/to/output/facilities_raichur_devadurga.geojson"
+}
+```
+
+#### 2. `generate_facilities_report`
+
+Generates facilities proximity report with aggregated statistics.
+
+```python
+from computing.misc.facilities_proximity import generate_facilities_report
+
+# Generate summary report for a block
+result = generate_facilities_report.delay(
+    state="Karnataka",
+    district="Raichur",
+    block="Devadurga",
+    report_type="summary"
+)
+
+# Generate detailed report for MWS
+result = generate_facilities_report.delay(
+    state="Karnataka",
+    village_codes=[624783, 624784, 624785],
+    report_type="detailed"
+)
+```
+
+**Parameters**:
+- `state` (required): State name
+- `district` (optional): District name
+- `block` (optional): Block name
+- `village_codes` (optional): List of village codes for MWS level
+- `report_type` (optional): "summary", "detailed", or "geojson" (default: "summary")
+
+### Integration Pattern
+
+The Celery tasks follow the same pattern as other `computing/misc` modules:
+
+1. **Task Definition**: Uses `@app.task(bind=True)` decorator
+2. **Parameters**: Accepts `state`, `district`, `block`, `gee_account_id` like other modules
+3. **Return Value**: Returns a dictionary with status and metadata
+4. **GeoServer Sync**: Optional sync to GeoServer for visualization
+5. **Future GEE Integration**: Placeholder functions for GEE export
+
+### Future Enhancements (Placeholders)
+
+The following functions are hashed out as placeholders for future integration:
+
+```python
+# Export to Google Earth Engine
+# def _export_to_gee(geojson, state, district, block, gee_account_id):
+#     """Export facilities layer to Google Earth Engine."""
+#     pass
+
+# Clip from admin boundary
+# def _clip_from_admin_boundary(state, district, block):
+#     """Clip facilities data from admin boundary layer."""
+#     pass
+
+# Integrate with other layers
+# def _integrate_with_other_layers(state, district, block, facilities_geojson):
+#     """Integrate facilities data with other layers (drainage, roads, etc.)."""
+#     pass
+```
+
+### Output Directory
+
+Generated files are saved to:
+```
+data/facilities_output/
+├── Karnataka/
+│   ├── facilities_raichur_devadurga.geojson
+│   ├── facilities_raichur.geojson
+│   └── facilities_karnataka.geojson
+└── ...
+```
+
+### GeoServer Workspace
+
+Layers are published to the `facilities` workspace in GeoServer with layer names like:
+- `facilities_raichur_devadurga` (block level)
+- `facilities_raichur` (district level)
+- `facilities_karnataka` (state level)

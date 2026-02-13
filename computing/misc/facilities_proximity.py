@@ -6,6 +6,11 @@ for villages across different administrative levels (village, MWS, block/tehsil,
 
 The data is sourced from state-wise GeoJSON files containing distance information
 to various facilities like healthcare, education, agriculture, and markets.
+
+Celery Integration:
+- Async tasks for generating facilities layers for blocks/districts
+- Sync to GeoServer for visualization
+- Placeholder functions for GEE integration (future)
 """
 
 import os
@@ -13,9 +18,13 @@ import json
 from typing import Dict, List, Optional, Union
 from collections import defaultdict
 from nrm_app.settings import BASE_DIR
+from nrm_app.celery import app
 
 # Path to the facilities GeoJSON data
 FACILITIES_DATA_PATH = os.path.join(BASE_DIR, "data", "statewise_geojsons_facilities")
+
+# Output directory for generated shapefiles
+FACILITIES_OUTPUT_DIR = os.path.join(BASE_DIR, "data", "facilities_output")
 
 # Facility categories for organized access
 FACILITY_CATEGORIES = {
@@ -107,6 +116,380 @@ FACILITY_DISPLAY_NAMES = {
     "universities_distance": "University",
 }
 
+
+# =============================================================================
+# CELERY TASKS
+# =============================================================================
+
+@app.task(bind=True)
+def generate_facilities_layer(
+    self,
+    state: str,
+    district: Optional[str] = None,
+    block: Optional[str] = None,
+    gee_account_id: Optional[int] = None,
+    sync_to_geoserver: bool = True,
+):
+    """
+    Celery task to generate facilities proximity layer for a given administrative area.
+    
+    Currently works with local GeoJSON data. Future versions will integrate with:
+    - Google Earth Engine (GEE) for processing
+    - Clipping from other boundary layers
+    - Generating derived metrics
+    
+    Args:
+        self: Celery task instance
+        state: State name
+        district: Optional district name (for district/block level)
+        block: Optional block name (for block level)
+        gee_account_id: GEE account ID (placeholder for future GEE integration)
+        sync_to_geoserver: Whether to sync the layer to GeoServer
+    
+    Returns:
+        dict: Status of layer generation with metadata
+    """
+    print(f"Generating facilities layer for state={state}, district={district}, block={block}")
+    
+    # Initialize result
+    result = {
+        "status": "pending",
+        "state": state,
+        "district": district,
+        "block": block,
+        "layer_at_geoserver": False,
+        "villages_count": 0,
+    }
+    
+    try:
+        # Get facilities data
+        facilities_data = FacilitiesProximityData()
+        
+        if block and district:
+            # Block level
+            villages = facilities_data.get_villages_by_block(state, block, district)
+            layer_name = f"facilities_{district}_{block}".lower().replace(" ", "_")
+        elif district:
+            # District level
+            villages = facilities_data.get_villages_by_district(state, district)
+            layer_name = f"facilities_{district}".lower().replace(" ", "_")
+        else:
+            # State level
+            villages = facilities_data.get_all_villages(state)
+            layer_name = f"facilities_{state}".lower().replace(" ", "_")
+        
+        result["villages_count"] = len(villages)
+        
+        if not villages:
+            result["status"] = "no_data"
+            result["message"] = "No villages found for the specified area"
+            return result
+        
+        # Generate GeoJSON
+        geojson = facilities_data.get_facilities_geojson(
+            state=state,
+            district=district,
+            block=block
+        )
+        
+        # Save to output directory
+        output_path = _save_facilities_geojson(geojson, state, district, block)
+        result["output_path"] = output_path
+        
+        # Sync to GeoServer if requested
+        if sync_to_geoserver:
+            geoserver_result = _sync_facilities_to_geoserver(
+                geojson=geojson,
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name
+            )
+            result["layer_at_geoserver"] = geoserver_result.get("success", False)
+            result["geoserver_response"] = geoserver_result
+        
+        # TODO: Future GEE integration
+        # if gee_account_id:
+        #     _export_to_gee(geojson, state, district, block, gee_account_id)
+        
+        # TODO: Save layer info to database
+        # layer_id = save_layer_info_to_db(
+        #     state=state,
+        #     district=district,
+        #     block=block,
+        #     layer_name=layer_name,
+        #     asset_id=asset_id,
+        #     dataset_name="Facilities Proximity",
+        # )
+        
+        result["status"] = "success"
+        
+    except Exception as e:
+        print(f"Error generating facilities layer: {e}")
+        result["status"] = "error"
+        result["error"] = str(e)
+    
+    return result
+
+
+@app.task(bind=True)
+def generate_facilities_report(
+    self,
+    state: str,
+    district: Optional[str] = None,
+    block: Optional[str] = None,
+    village_codes: Optional[List] = None,
+    report_type: str = "summary",
+):
+    """
+    Celery task to generate facilities proximity report.
+    
+    Args:
+        self: Celery task instance
+        state: State name
+        district: Optional district name
+        block: Optional block name
+        village_codes: Optional list of village codes (for MWS level)
+        report_type: Type of report - "summary", "detailed", or "geojson"
+    
+    Returns:
+        dict: Report data with statistics and metadata
+    """
+    print(f"Generating facilities report for state={state}, district={district}, block={block}")
+    
+    facilities_data = FacilitiesProximityData()
+    
+    # Get villages based on administrative level
+    if village_codes:
+        villages = facilities_data.get_villages_by_mws(state, village_codes)
+    elif block and district:
+        villages = facilities_data.get_villages_by_block(state, block, district)
+    elif district:
+        villages = facilities_data.get_villages_by_district(state, district)
+    else:
+        villages = facilities_data.get_all_villages(state)
+    
+    if not villages:
+        return {
+            "status": "no_data",
+            "message": "No villages found for the specified area"
+        }
+    
+    # Generate report based on type
+    if report_type == "geojson":
+        report = facilities_data.get_facilities_geojson(
+            state=state,
+            district=district,
+            block=block,
+            village_codes=village_codes
+        )
+    elif report_type == "detailed":
+        report = {
+            "villages": villages,
+            "aggregated_stats": facilities_data.get_aggregated_stats(villages),
+            "category_summary": facilities_data.get_category_summary(villages),
+        }
+    else:  # summary
+        report = {
+            "total_villages": len(villages),
+            "aggregated_stats": facilities_data.get_aggregated_stats(villages),
+            "category_summary": facilities_data.get_category_summary(villages),
+        }
+    
+    return {
+        "status": "success",
+        "report_type": report_type,
+        "data": report
+    }
+
+
+# =============================================================================
+# HELPER FUNCTIONS FOR CELERY TASKS
+# =============================================================================
+
+def _save_facilities_geojson(geojson: Dict, state: str, district: Optional[str] = None, block: Optional[str] = None) -> str:
+    """
+    Save facilities GeoJSON to output directory.
+    
+    Args:
+        geojson: GeoJSON FeatureCollection
+        state: State name
+        district: Optional district name
+        block: Optional block name
+    
+    Returns:
+        str: Path to saved file
+    """
+    # Create output directory
+    state_dir = os.path.join(FACILITIES_OUTPUT_DIR, state.replace(" ", "_"))
+    os.makedirs(state_dir, exist_ok=True)
+    
+    # Generate filename
+    if block and district:
+        filename = f"facilities_{district}_{block}".lower().replace(" ", "_")
+    elif district:
+        filename = f"facilities_{district}".lower().replace(" ", "_")
+    else:
+        filename = f"facilities_{state}".lower().replace(" ", "_")
+    
+    filepath = os.path.join(state_dir, f"{filename}.geojson")
+    
+    # Write GeoJSON
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(geojson, f, ensure_ascii=False, indent=2)
+    
+    print(f"Saved facilities GeoJSON to: {filepath}")
+    return filepath
+
+
+def _sync_facilities_to_geoserver(
+    geojson: Dict,
+    state: str,
+    district: Optional[str] = None,
+    block: Optional[str] = None,
+    layer_name: Optional[str] = None,
+    workspace: str = "facilities",
+):
+    """
+    Sync facilities layer to GeoServer.
+    
+    Args:
+        geojson: GeoJSON FeatureCollection
+        state: State name
+        district: Optional district name
+        block: Optional block name
+        layer_name: Layer name for GeoServer
+        workspace: GeoServer workspace name
+    
+    Returns:
+        dict: Result of GeoServer sync operation
+    """
+    try:
+        import geopandas as gpd
+        from computing.utils import push_shape_to_geoserver, generate_shape_files
+        
+        # Create state directory
+        state_dir = os.path.join(FACILITIES_OUTPUT_DIR, state.replace(" ", "_"))
+        os.makedirs(state_dir, exist_ok=True)
+        
+        # Generate layer name if not provided
+        if not layer_name:
+            if block and district:
+                layer_name = f"facilities_{district}_{block}".lower().replace(" ", "_")
+            elif district:
+                layer_name = f"facilities_{district}".lower().replace(" ", "_")
+            else:
+                layer_name = f"facilities_{state}".lower().replace(" ", "_")
+        
+        # Path for shapefile
+        path = os.path.join(state_dir, layer_name)
+        
+        # Write GeoJSON to file first
+        with open(path + ".json", "w", encoding="utf-8") as f:
+            json.dump(geojson, f, ensure_ascii=False)
+        
+        # Convert to shapefile
+        gdf = gpd.GeoDataFrame.from_features(geojson["features"])
+        gdf.crs = "EPSG:4326"
+        
+        # Save as shapefile
+        gdf.to_file(path, driver="ESRI Shapefile", encoding="UTF-8")
+        
+        # Push to GeoServer
+        res = push_shape_to_geoserver(path, workspace=workspace, layer_name=layer_name)
+        
+        return {
+            "success": res.get("status_code") == 201,
+            "status_code": res.get("status_code"),
+            "layer_name": layer_name,
+            "workspace": workspace,
+        }
+        
+    except Exception as e:
+        print(f"Error syncing to GeoServer: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+# =============================================================================
+# PLACEHOLDER FUNCTIONS FOR FUTURE INTEGRATION
+# =============================================================================
+
+# def _export_to_gee(geojson, state, district, block, gee_account_id):
+#     """
+#     Export facilities layer to Google Earth Engine.
+#     
+#     TODO: Implement GEE integration
+#     - Initialize GEE with account
+#     - Create asset in GEE
+#     - Upload GeoJSON as GEE FeatureCollection
+#     - Make asset public
+#     - Return asset ID
+#     """
+#     from utilities.gee_utils import (
+#         ee_initialize,
+#         export_vector_asset_to_gee,
+#         make_asset_public,
+#         get_gee_asset_path,
+#         valid_gee_text,
+#     )
+#     import ee
+#     
+#     ee_initialize(gee_account_id)
+#     
+#     # Build asset path
+#     description = f"facilities_{valid_gee_text(district)}_{valid_gee_text(block)}"
+#     asset_id = get_gee_asset_path(state, district, block) + description
+#     
+#     # Convert GeoJSON to EE FeatureCollection
+#     features = []
+#     for feature in geojson["features"]:
+#         geom = ee.Geometry(feature["geometry"])
+#         ee_feature = ee.Feature(geom, feature["properties"])
+#         features.append(ee_feature)
+#     
+#     fc = ee.FeatureCollection(features)
+#     
+#     # Export to GEE
+#     task = export_vector_asset_to_gee(fc, description, asset_id)
+#     check_task_status([task])
+#     
+#     # Make public
+#     if is_gee_asset_exists(asset_id):
+#         make_asset_public(asset_id)
+#     
+#     return asset_id
+
+
+# def _clip_from_admin_boundary(state, district, block):
+#     """
+#     Clip facilities data from admin boundary layer.
+#     
+#     TODO: Implement clipping from admin boundary
+#     - Load admin boundary layer
+#     - Clip facilities data to boundary
+#     - Return clipped GeoJSON
+#     """
+#     pass
+
+
+# def _integrate_with_other_layers(state, district, block, facilities_geojson):
+#     """
+#     Integrate facilities data with other layers.
+#     
+#     TODO: Implement integration with other layers
+#     - Load reference layers (drainage, roads, etc.)
+#     - Calculate additional metrics
+#     - Enrich facilities data
+#     """
+#     pass
+
+
+# =============================================================================
+# MAIN DATA CLASS
+# =============================================================================
 
 class FacilitiesProximityData:
     """
@@ -383,6 +766,42 @@ class FacilitiesProximityData:
 
         return villages
 
+    def get_all_villages(
+        self, state: str,
+        include_geometry: bool = False
+    ) -> List[Dict]:
+        """
+        Get all villages in a state with their facility distances.
+
+        Args:
+            state: State name
+            include_geometry: Whether to include geometry in response
+
+        Returns:
+            List of village dictionaries with facility data
+        """
+        data = self._load_state_data(state)
+        if not data:
+            return []
+
+        villages = []
+
+        for feature in data.get("features", []):
+            props = feature.get("properties", {})
+            villages.append({
+                "village_info": {
+                    "censuscode2011": props.get("censuscode2011"),
+                    "name": props.get("name"),
+                    "subdistrict": self._get_subdistrict_value(props),
+                    "district": props.get("district"),
+                    "state": props.get("state"),
+                },
+                "facilities": self._extract_facilities(props),
+                "geometry": feature.get("geometry") if include_geometry else None,
+            })
+
+        return villages
+
     def _extract_facilities(self, props: Dict) -> Dict:
         """Extract facility distances from properties."""
         facilities = {}
@@ -507,16 +926,11 @@ class FacilitiesProximityData:
         Returns:
             GeoJSON FeatureCollection with facility distance properties
         """
-        # print(f"DEBUG get_facilities_geojson: state={state}, district={district}, block={block}, village_codes={village_codes}")
-        
         data = self._load_state_data(state)
         if not data:
-            # print(f"DEBUG: No data loaded for state={state}")
             return {"type": "FeatureCollection", "features": []}
 
         features = []
-        total_features = len(data.get("features", []))
-        # print(f"DEBUG: Total features in state data: {total_features}")
 
         for feature in data.get("features", []):
             props = feature.get("properties", {})
@@ -549,7 +963,6 @@ class FacilitiesProximityData:
                 }
                 features.append(new_feature)
 
-        # print(f"DEBUG: Returning {len(features)} features")
         return {
             "type": "FeatureCollection",
             "features": features,
@@ -570,7 +983,10 @@ class FacilitiesProximityData:
 facilities_data = FacilitiesProximityData()
 
 
-# Convenience functions for direct access
+# =============================================================================
+# CONVENIENCE FUNCTIONS FOR DIRECT ACCESS
+# =============================================================================
+
 def get_village_facilities(
     state: str, 
     censuscode: Optional[Union[int, str]] = None,
