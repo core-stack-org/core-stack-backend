@@ -67,6 +67,7 @@ from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainag
 from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid import generate_mws_centroid_data
 
 
 @api_security_check(allowed_methods="POST")
@@ -1512,4 +1513,24 @@ def generate_mws_connectivity(request):
         )
     except Exception as e:
         print("Exception in generate_mws_connectivity_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_mws_centroid(request):
+    print("Inside generate_mws_centroid API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_mws_centroid_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mws_centroid api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
