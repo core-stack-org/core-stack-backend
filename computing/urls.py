@@ -171,4 +171,30 @@ urlpatterns = [
         api.generate_mws_connectivity,
         name="generate_mws_connectivity_data",
     ),
+    # Facilities Proximity API endpoints
+    path(
+        "facilities-available-states/",
+        api.get_facilities_available_states,
+        name="get_facilities_available_states",
+    ),
+    path(
+        "facilities-village/",
+        api.get_village_facilities_data,
+        name="get_village_facilities_data",
+    ),
+    path(
+        "facilities-block/",
+        api.get_block_facilities_data,
+        name="get_block_facilities_data",
+    ),
+    path(
+        "facilities-district/",
+        api.get_district_facilities_data,
+        name="get_district_facilities_data",
+    ),
+    path(
+        "facilities-mws/",
+        api.get_mws_facilities_data,
+        name="get_mws_facilities_data",
+    ),
 ]

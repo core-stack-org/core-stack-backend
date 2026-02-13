@@ -67,6 +67,7 @@ from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainag
 from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
+from .misc.facilities_proximity import facilities_data, get_facilities_summary
 
 
 @api_security_check(allowed_methods="POST")
@@ -1513,3 +1514,278 @@ def generate_mws_connectivity(request):
     except Exception as e:
         print("Exception in generate_mws_connectivity_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Facilities Proximity APIs
+
+@api_view(["GET"])
+@schema(None)
+def get_facilities_available_states(request):
+    """
+    Get list of states for which facilities proximity data is available.
+    
+    Returns:
+        Response: List of state names with available data
+    """
+    print("Inside get_facilities_available_states API.")
+    try:
+        states = facilities_data.get_available_states()
+        return Response(
+            {"states": states, "count": len(states)},
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in get_facilities_available_states api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def get_village_facilities_data(request):
+    """
+    Get facility distances for a specific village.
+    
+    Query Parameters:
+        state: State name (required)
+        censuscode: Village census code (2011) - use either this OR name-based lookup
+        district: District name (required for name-based lookup)
+        block: Block/subdistrict name (required for name-based lookup)
+        village_name: Village name (required for name-based lookup)
+        include-geometry: Set to 'true' to include geometry (default: false)
+    
+    Returns:
+        Response: Village info and facility distances (with optional geometry)
+    """
+    print("Inside get_village_facilities_data API.")
+    try:
+        state = request.query_params.get("state")
+        censuscode = request.query_params.get("censuscode")
+        district = request.query_params.get("district")
+        block = request.query_params.get("block")
+        village_name = request.query_params.get("village_name")
+        include_geometry = request.query_params.get("include-geometry", "false").lower() == "true"
+        
+        if not state:
+            return Response(
+                {"error": "'state' parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Determine lookup method
+        if censuscode:
+            # Direct lookup by census code
+            data = facilities_data.get_village_facilities(
+                state, censuscode=censuscode, include_geometry=include_geometry
+            )
+        elif village_name and district and block:
+            # Lookup by name (requires district and block)
+            data = facilities_data.get_village_facilities(
+                state, 
+                district=district, 
+                block=block, 
+                village_name=village_name,
+                include_geometry=include_geometry
+            )
+        else:
+            return Response(
+                {"error": "Either 'censuscode' OR ('village_name', 'district', 'block') parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if data is None:
+            return Response(
+                {"error": f"No data found for the specified village in {state}"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return Response(data, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_village_facilities_data api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def get_block_facilities_data(request):
+    """
+    Get all villages with facility distances in a block/subdistrict/tehsil.
+    
+    Query Parameters:
+        state: State name (required)
+        block: Block/Subdistrict/Tehsil name (required)
+        district: Optional district name for filtering
+        include-geometry: Set to 'true' to return GeoJSON FeatureCollection (default: false)
+    
+    Returns:
+        Response: List of villages with facility data and aggregated statistics,
+                  or GeoJSON FeatureCollection if include-geometry=true
+    """
+    print("Inside get_block_facilities_data API.")
+    try:
+        state = request.query_params.get("state")
+        block = request.query_params.get("block")
+        district = request.query_params.get("district")
+        include_geometry = request.query_params.get("include-geometry", "false").lower() == "true"
+        
+        # print(f"DEBUG: state={state}, block={block}, district={district}, include_geometry={include_geometry}")
+        
+        if not state or not block:
+            return Response(
+                {"error": "Both 'state' and 'block' parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if include_geometry:
+            # Return as GeoJSON FeatureCollection
+            # print(f"DEBUG: Calling get_facilities_geojson with state={state}, district={district}, block={block}")
+            geojson = facilities_data.get_facilities_geojson(
+                state=state,
+                district=district,
+                block=block,
+            )
+            # print(f"DEBUG: GeoJSON returned with {len(geojson.get('features', []))} features")
+            return Response(geojson, status=status.HTTP_200_OK)
+        
+        # Return as regular data (without geometry)
+        villages = facilities_data.get_villages_by_block(state, block, district, include_geometry=False)
+        
+        if not villages:
+            return Response(
+                {"error": f"No data found for block {block} in {state}"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        summary = get_facilities_summary(villages)
+        
+        return Response(
+            {
+                "villages": villages,
+                "summary": summary,
+                "total_villages": len(villages),
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in get_block_facilities_data api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def get_district_facilities_data(request):
+    """
+    Get all villages with facility distances in a district.
+    
+    Query Parameters:
+        state: State name (required)
+        district: District name (required)
+        include-geometry: Set to 'true' to return GeoJSON FeatureCollection (default: false)
+    
+    Returns:
+        Response: Summary with aggregated statistics, or GeoJSON FeatureCollection if include-geometry=true
+    """
+    print("Inside get_district_facilities_data API.")
+    try:
+        state = request.query_params.get("state")
+        district = request.query_params.get("district")
+        include_geometry = request.query_params.get("include-geometry", "false").lower() == "true"
+        
+        if not state or not district:
+            return Response(
+                {"error": "Both 'state' and 'district' parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if include_geometry:
+            # Return as GeoJSON FeatureCollection
+            geojson = facilities_data.get_facilities_geojson(
+                state=state,
+                district=district,
+            )
+            return Response(geojson, status=status.HTTP_200_OK)
+        
+        # Return as regular data (without geometry)
+        villages = facilities_data.get_villages_by_district(state, district, include_geometry=False)
+        
+        if not villages:
+            return Response(
+                {"error": f"No data found for district {district} in {state}"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        summary = get_facilities_summary(villages)
+        
+        return Response(
+            {
+                "summary": summary,
+                "total_villages": len(villages),
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in get_district_facilities_data api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def get_mws_facilities_data(request):
+    """
+    Get villages with facility distances for an MWS (list of village codes).
+    
+    Request Body:
+        state: State name (required)
+        village_codes: List of village census codes (required)
+        include-geometry: Set to true to return GeoJSON FeatureCollection (default: false)
+    
+    Returns:
+        Response: List of villages with facility data and aggregated statistics,
+                  or GeoJSON FeatureCollection if include-geometry=true
+    """
+    print("Inside get_mws_facilities_data API.")
+    try:
+        state = request.data.get("state")
+        village_codes = request.data.get("village_codes")
+        include_geometry = request.data.get("include-geometry", False)
+        
+        if not state or not village_codes:
+            return Response(
+                {"error": "Both 'state' and 'village_codes' parameters are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not isinstance(village_codes, list):
+            return Response(
+                {"error": "'village_codes' must be a list of census codes"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if include_geometry:
+            # Return as GeoJSON FeatureCollection
+            geojson = facilities_data.get_facilities_geojson(
+                state=state,
+                village_codes=village_codes,
+            )
+            return Response(geojson, status=status.HTTP_200_OK)
+        
+        # Return as regular data (without geometry)
+        villages = facilities_data.get_villages_by_mws(state, village_codes, include_geometry=False)
+        
+        if not villages:
+            return Response(
+                {"error": f"No data found for the provided village codes in {state}"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        summary = get_facilities_summary(villages)
+        
+        return Response(
+            {
+                "villages": villages,
+                "summary": summary,
+                "total_villages": len(villages),
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in get_mws_facilities_data api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
