@@ -726,45 +726,50 @@
 
             const url =
                 "https://geoserver.core-stack.org:8443/geoserver/resources/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=resources:settlement_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
-            const resp = await fetch(url);
-            const data = await resp.json();
+            
+            try {
+                const resp = await fetch(url);
+                const data = await resp.json();
 
-            const vectorSource = new ol.source.Vector({
-                features: readFeaturesFromGeoJSON(data) // ensure projections match your map
-            });
+                const vectorSource = new ol.source.Vector({
+                    features: readFeaturesFromGeoJSON(data) // ensure projections match your map
+                });
 
-            const settlementLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: (feature) => {
-                    const name = (feature.get('Settleme_1') || '').toString();
-                    return new ol.style.Style({
-                        image: new ol.style.Icon({
-                            src: settlementIconUrl,
-                            anchor: [0.5, 1],
-                            anchorXUnits: 'fraction',
-                            anchorYUnits: 'fraction',
-                            scale: 0.4
-                        }),
-                        text: new ol.style.Text({
-                            text: name,
-                            font: '12px sans-serif',
-                            textAlign: 'center',
-                            fill: new ol.style.Fill({ color: '#111' }),
-                            stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
-                            overflow: true
-                        })
-                    });
-                },
-                zIndex: 20
-            });
+                const settlementLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: (feature) => {
+                        const name = (feature.get('Settleme_1') || '').toString();
+                        return new ol.style.Style({
+                            image: new ol.style.Icon({
+                                src: settlementIconUrl,
+                                anchor: [0.5, 1],
+                                anchorXUnits: 'fraction',
+                                anchorYUnits: 'fraction',
+                                scale: 0.4
+                            }),
+                            text: new ol.style.Text({
+                                text: name,
+                                font: '12px sans-serif',
+                                textAlign: 'center',
+                                fill: new ol.style.Fill({ color: '#111' }),
+                                stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                                overflow: true
+                            })
+                        });
+                    },
+                    zIndex: 20
+                });
 
-            mainMap.addLayer(settlementLayer);
-            const arr = vectorSource.getExtent();
-            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            mainMap.getView().setZoom(16)
-            mainMap.getView().setCenter(mapcenter);
-            villageMap.getView().setCenter(mapcenter);
-            villageMap.getView().setZoom(15)
+                mainMap.addLayer(settlementLayer);
+                const arr = vectorSource.getExtent();
+                const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+                mainMap.getView().setZoom(16);
+                mainMap.getView().setCenter(mapcenter);
+                villageMap.getView().setCenter(mapcenter);
+                villageMap.getView().setZoom(15);
+            } catch (error) {
+                console.log(error);
+            }
         }
 
         async function addWellLayer() {
@@ -778,75 +783,80 @@
 
             const url =
                 "https://geoserver.core-stack.org:8443/geoserver/resources/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=resources:well_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
-            const resp = await fetch(url);
-            const data = await resp.json();
+            
+            try {
+                const resp = await fetch(url);
+                const data = await resp.json();
 
-            const vectorSource = new ol.source.Vector({
-                features: readFeaturesFromGeoJSON(data) // ensure projections match your map
-            });
+                const vectorSource = new ol.source.Vector({
+                    features: readFeaturesFromGeoJSON(data) // ensure projections match your map
+                });
 
-            const wellLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: (feature) => {
-                    const name = (feature.get('ben_settle') || '').toString();
-                    const status = feature.values_;
-                    let wellMaintenance = false
-                    if (status.Well_condi !== undefined) {
-                        const m = status.Well_condi.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
-                        wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
-                    }
-                    else {
-                        const m = status.Well_usage.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
-                        wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
-                    }
+                const wellLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: (feature) => {
+                        const name = (feature.get('ben_settle') || '').toString();
+                        const status = feature.values_;
+                        let wellMaintenance = false;
+                        if (status.Well_condi !== undefined) {
+                            const m = status.Well_condi.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
+                            wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
+                        }
+                        else {
+                            const m = status.Well_usage.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
+                            wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
+                        }
 
-                    if (wellMaintenance) {
-                        return new ol.style.Style({
-                            image: new ol.style.Icon({
-                                src: wellMaintainUrl,
-                                anchor: [0.5, 1],
-                                anchorXUnits: 'fraction',
-                                anchorYUnits: 'fraction',
-                                scale: 0.6
-                            }),
-                            text: new ol.style.Text({
-                                text: name,
-                                font: '12px sans-serif',
-                                textAlign: 'center',
-                                fill: new ol.style.Fill({ color: '#111' }),
-                                stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
-                                overflow: true
-                            })
-                        });
-                    }
-                    else {
-                        return new ol.style.Style({
-                            image: new ol.style.Icon({
-                                src: wellIconsUrl,
-                                anchor: [0.5, 1],
-                                anchorXUnits: 'fraction',
-                                anchorYUnits: 'fraction',
-                                scale: 0.6
-                            }),
-                            text: new ol.style.Text({
-                                text: name,
-                                font: '12px sans-serif',
-                                textAlign: 'center',
-                                fill: new ol.style.Fill({ color: '#111' }),
-                                stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
-                                overflow: true
-                            })
-                        });
-                    }
-                },
-                zIndex: 20
-            });
+                        if (wellMaintenance) {
+                            return new ol.style.Style({
+                                image: new ol.style.Icon({
+                                    src: wellMaintainUrl,
+                                    anchor: [0.5, 1],
+                                    anchorXUnits: 'fraction',
+                                    anchorYUnits: 'fraction',
+                                    scale: 0.6
+                                }),
+                                text: new ol.style.Text({
+                                    text: name,
+                                    font: '12px sans-serif',
+                                    textAlign: 'center',
+                                    fill: new ol.style.Fill({ color: '#111' }),
+                                    stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                                    overflow: true
+                                })
+                            });
+                        }
+                        else {
+                            return new ol.style.Style({
+                                image: new ol.style.Icon({
+                                    src: wellIconsUrl,
+                                    anchor: [0.5, 1],
+                                    anchorXUnits: 'fraction',
+                                    anchorYUnits: 'fraction',
+                                    scale: 0.6
+                                }),
+                                text: new ol.style.Text({
+                                    text: name,
+                                    font: '12px sans-serif',
+                                    textAlign: 'center',
+                                    fill: new ol.style.Fill({ color: '#111' }),
+                                    stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                                    overflow: true
+                                })
+                            });
+                        }
+                    },
+                    zIndex: 20
+                });
 
-            wellMap.addLayer(wellLayer);
-            const arr = vectorSource.getExtent();
-            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            wellMap.getView().setZoom(16)
-            wellMap.getView().setCenter(mapcenter);
+                wellMap.addLayer(wellLayer);
+                const arr = vectorSource.getExtent();
+                const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+                wellMap.getView().setZoom(16);
+                wellMap.getView().setCenter(mapcenter);
+            } catch (error) {
+                console.log(error);
+            }
         }
 
         async function addWaterLayer() {
@@ -860,64 +870,69 @@
 
             const url =
                 "https://geoserver.core-stack.org:8443/geoserver/resources/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=resources:waterbody_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
-            const resp = await fetch(url);
-            const data = await resp.json();
+            
+            try {
+                const resp = await fetch(url);
+                const data = await resp.json();
 
-            const vectorSource = new ol.source.Vector({
-                features: readFeaturesFromGeoJSON(data) // ensure projections match your map
-            });
+                const vectorSource = new ol.source.Vector({
+                    features: readFeaturesFromGeoJSON(data) // ensure projections match your map
+                });
 
-            const waterLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: (feature) => {
-                    const maintain = (feature.get('need_maint') || '').toString();
-                    if (maintain === "Yes") {
-                        const type = (feature.get('wbs_type') || '').toString();
-                        return new ol.style.Style({
-                            image: new ol.style.Icon({
-                                src: waterMaintainUrl,
-                                anchor: [0.5, 1],
-                                anchorXUnits: 'fraction',
-                                anchorYUnits: 'fraction',
-                            }),
-                            text: new ol.style.Text({
-                                text: type,
-                                font: '12px sans-serif',
-                                textAlign: 'center',
-                                fill: new ol.style.Fill({ color: '#111' }),
-                                stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
-                                overflow: true
-                            })
-                        });
-                    }
-                    else {
-                        const type = (feature.get('wbs_type') || '').toString();
-                        return new ol.style.Style({
-                            image: new ol.style.Icon({
-                                src: waterIconsUrl,
-                                anchor: [0.5, 1],
-                                anchorXUnits: 'fraction',
-                                anchorYUnits: 'fraction',
-                            }),
-                            text: new ol.style.Text({
-                                text: type,
-                                font: '12px sans-serif',
-                                textAlign: 'center',
-                                fill: new ol.style.Fill({ color: '#111' }),
-                                stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
-                                overflow: true
-                            })
-                        });
-                    }
-                },
-                zIndex: 20
-            });
+                const waterLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: (feature) => {
+                        const maintain = (feature.get('need_maint') || '').toString();
+                        if (maintain === "Yes") {
+                            const type = (feature.get('wbs_type') || '').toString();
+                            return new ol.style.Style({
+                                image: new ol.style.Icon({
+                                    src: waterMaintainUrl,
+                                    anchor: [0.5, 1],
+                                    anchorXUnits: 'fraction',
+                                    anchorYUnits: 'fraction',
+                                }),
+                                text: new ol.style.Text({
+                                    text: type,
+                                    font: '12px sans-serif',
+                                    textAlign: 'center',
+                                    fill: new ol.style.Fill({ color: '#111' }),
+                                    stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                                    overflow: true
+                                })
+                            });
+                        }
+                        else {
+                            const type = (feature.get('wbs_type') || '').toString();
+                            return new ol.style.Style({
+                                image: new ol.style.Icon({
+                                    src: waterIconsUrl,
+                                    anchor: [0.5, 1],
+                                    anchorXUnits: 'fraction',
+                                    anchorYUnits: 'fraction',
+                                }),
+                                text: new ol.style.Text({
+                                    text: type,
+                                    font: '12px sans-serif',
+                                    textAlign: 'center',
+                                    fill: new ol.style.Fill({ color: '#111' }),
+                                    stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                                    overflow: true
+                                })
+                            });
+                        }
+                    },
+                    zIndex: 20
+                });
 
-            waterStructureMap.addLayer(waterLayer);
-            const arr = vectorSource.getExtent();
-            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            waterStructureMap.getView().setZoom(16)
-            waterStructureMap.getView().setCenter(mapcenter);
+                waterStructureMap.addLayer(waterLayer);
+                const arr = vectorSource.getExtent();
+                const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+                waterStructureMap.getView().setZoom(16);
+                waterStructureMap.getView().setCenter(mapcenter);
+            } catch (error) {
+                console.log(error);
+            }
         }
         async function addDemandLayer() {
             const svgMarkupIrrigation = `{% include 'icons/irrigation_icon.svg' %}`;
