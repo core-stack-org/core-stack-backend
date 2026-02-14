@@ -52,8 +52,10 @@ class SubmissionsOfPlan:
         field_name = FETCH_FIELD_MAP.get(model)
         if not field_name:
             raise ValueError(f"No fetch field configured for {model.__name__}")
-        qs = model.objects.filter(plan_id=plan_id).exclude(is_deleted=True).values_list(
-            field_name, "is_moderated"
+        qs = (
+            model.objects.filter(plan_id=plan_id)
+            .exclude(is_deleted=True)
+            .values_list(field_name, "is_moderated")
         )
         if page is None:
             data = list(qs)
@@ -127,6 +129,7 @@ def sync_odk_to_csdb():
         gw_maintenance_submissions,
         swb_maintenance_submissions,
         swb_rs_maintenance_submissions,
+        agrohorticulture_submissions,
     ) = sync_odk_data(get_edited_updated_all_submissions)
     checker = ODKSubmissionsChecker()
     res = checker.process("updated")
@@ -160,6 +163,8 @@ def sync_odk_to_csdb():
                 == "propose maintenance of remotely sensed water structure form"
             ):
                 resync_swb_rs_maintenance(swb_rs_maintenance_submissions)
+            elif form_name == "Agrohorticulture":
+                resync_agrohorticulture(agrohorticulture_submissions)
             else:
                 print("passed wrong form name")
 
