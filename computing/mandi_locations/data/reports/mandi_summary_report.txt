@@ -1,0 +1,56 @@
+======================================================================
+MANDI LOCATIONS VECTOR MAP - DEMONSTRATION REPORT
+======================================================================
+Generated on: 2025-10-31 14:42:45
+
+SUMMARY STATISTICS:
+  Total Mandis: 20
+  States Covered: 13
+  Districts Covered: 20
+
+GEOGRAPHIC EXTENT:
+  Latitude Range: 13.0282° to 31.6340°
+  Longitude Range: 70.8022° to 88.3639°
+
+STATE-WISE DISTRIBUTION:
+  Maharashtra: 2 mandi(s)
+  Punjab: 2 mandi(s)
+  Gujarat: 2 mandi(s)
+  Uttar Pradesh: 2 mandi(s)
+  Karnataka: 2 mandi(s)
+  Madhya Pradesh: 2 mandi(s)
+  Rajasthan: 2 mandi(s)
+  West Bengal: 1 mandi(s)
+  Tamil Nadu: 1 mandi(s)
+  Andhra Pradesh: 1 mandi(s)
+  Telangana: 1 mandi(s)
+  Bihar: 1 mandi(s)
+  Haryana: 1 mandi(s)
+
+TOP COMMODITIES:
+  Vegetables: 11 mandis
+  Wheat: 11 mandis
+  Cotton: 6 mandis
+  Rice: 5 mandis
+  Fruits: 4 mandis
+  Soybean: 3 mandis
+  Flowers: 3 mandis
+  Chilli: 2 mandis
+  Potato: 2 mandis
+  Onion: 2 mandis
+  Total Unique Commodities: 19
+
+SAMPLE MANDI ENTRIES:
+  - Lasalgaon (Maharashtra)
+    Location: 19.9975°N, 73.7898°E
+    Commodities: Onion,Tomato,Potato
+
+  - Vashi (Maharashtra)
+    Location: 19.0771°N, 73.0087°E
+    Commodities: Vegetables,Fruits
+
+  - Amritsar (Punjab)
+    Location: 31.6340°N, 74.8723°E
+    Commodities: Wheat,Rice,Maize
+
+======================================================================
