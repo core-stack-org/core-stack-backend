@@ -470,7 +470,7 @@ class ODK_agrohorticulture(models.Model):
         db_table = "odk_agrohorticulture"
 
     def __str__(self) -> str:
-        return self.agrohorticulture_id
+        return str(self.agrohorticulture_id)
 
 
 class Overpass_Block_Details(models.Model):
