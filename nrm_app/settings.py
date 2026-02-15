@@ -16,7 +16,7 @@ from pathlib import Path
 
 import environ
 from corsheaders.defaults import default_headers
-from celery.schedules import crontab
+
 
 env = environ.Env()
 
@@ -268,16 +268,9 @@ USE_I18N = True
 
 USE_TZ = True
 
-# Celery Beat Schedule
-
-
-CELERY_BEAT_SCHEDULE = {
-    "daily-odk-sync": {
-        "task": "moderation.sync_odk_data_task",
-        "schedule": crontab(hour=6, minute=0),  # 6:00 AM IST daily
-    },
-}
+# Celery
 CELERY_TIMEZONE = "Asia/Kolkata"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/

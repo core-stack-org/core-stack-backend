@@ -13,6 +13,7 @@ from .models import (
     ODK_well,
     SWB_maintenance,
     SWB_RS_maintenance,
+    ODK_agrohorticulture,
     Overpass_Block_Details,
     DPR_Report,
 )
@@ -898,6 +899,60 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(ODK_agrohorticulture)
+class ODKAgrohorticultureAdmin(admin.ModelAdmin):
+    list_display = [
+        "agrohorticulture_id",
+        "plan_name",
+        "status_re",
+        "is_moderated",
+        "is_deleted",
+    ]
+    list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
+    search_fields = ["agrohorticulture_id", "plan_name", "uuid"]
+    readonly_fields = ["uuid", "data_before_moderation"]
+    ordering = ["-agrohorticulture_id"]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": (
+                    "agrohorticulture_id",
+                    "plan_id",
+                    "plan_name",
+                )
+            },
+        ),
+        ("Status", {"fields": ("status_re", "agrohorticulture_demand_status")}),
+        ("Location", {"fields": ("latitude", "longitude")}),
+        (
+            "Moderation",
+            {
+                "fields": (
+                    "is_moderated",
+                    "moderated_at",
+                    "moderated_by",
+                    "moderation_reason",
+                    "moderation_bookmark",
+                    "data_before_moderation",
+                ),
+            },
+        ),
+        (
+            "Soft Delete",
+            {
+                "fields": ("is_deleted", "deleted_at", "deleted_by"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            "Metadata",
+            {"fields": ("uuid", "data_agohorticulture"), "classes": ("collapse",)},
+        ),
+    )
+
+
 @admin.register(Overpass_Block_Details)
 class OverpassBlockDetailsAdmin(admin.ModelAdmin):
     list_display = [
@@ -933,8 +988,8 @@ class OverpassBlockDetailsAdmin(admin.ModelAdmin):
 class DPRReportAdmin(admin.ModelAdmin):
     list_display = [
         "dpr_report_id",
+        "plan_id__id",
         "plan_name",
-        "plan_id",
         "status",
         "dpr_generated_at",
         "created_at",
