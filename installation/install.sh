@@ -1,6 +1,6 @@
-#script to install
-
 #!/bin/bash
+
+#script to install
 
 set -e
 
