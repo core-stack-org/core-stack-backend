@@ -136,7 +136,7 @@ def generate_raster_thumbnail_url(workspace, layer_name, bbox, geoserver_base_ur
         f"service=WMS&version=1.1.0&request=GetMap&"
         f"layers={workspace}:{layer_name}&"
         f"bbox={bbox_str}&"
-        f"width=180&height=180&srs=EPSG:4326&styles=&format=image/png"
+        f"width=300&height=300&srs=EPSG:4326&styles=&format=image/png"
     )
     return thumbnail_url
 
@@ -1339,7 +1339,7 @@ def generate_vector_thumbnail(vector_gdf, style_file_url, output_path, STYLE_FIL
         style_info = parse_vector_style_file(style_file_url, STYLE_FILE_DIR)
 
         print("style_info=", style_info)  # TODO: temporary debug print
-        fig, ax = plt.subplots(figsize=(6, 6))
+        fig, ax = plt.subplots(figsize=(3, 3))
 
         default_fill_color = (0.8, 0.8, 0.8, 1.0)  # Light gray
         default_outline_color = (0, 0, 0, 1.0)  # Black
