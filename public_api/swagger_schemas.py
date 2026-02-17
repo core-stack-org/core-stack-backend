@@ -181,7 +181,7 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS time series data, including ET, Runoff, and Precipitation for a given state, district, tehsil, and MWS ID.
+    Retrieve MWS time series data, including ET, Runoff, Precipitation and NDVI(crop, tree, shrubs) for a given state, district, tehsil, and MWS ID.
     
     **Response dataset details:**
     ```
@@ -192,13 +192,19 @@ get_mws_data_schema = {
                 "date": "2024-01-01",
                 "et": 2.5,
                 "runoff": 1.3,
-                "precipitation": 10.2
+                "precipitation": 10.2,
+                "ndvi_crop": "0.4",
+                "ndvi_shrub": "0.3",
+                "ndvi_tree": "0.3"
             },
             {
                 "date": "2024-01-15",
                 "et": 3.1,
                 "runoff": 0.8,
-                "precipitation": 5.4
+                "precipitation": 5.4,
+                "ndvi_crop": "0.2",
+                "ndvi_shrub": "0.4",
+                "ndvi_tree": "0.4"
             }
         ]
     }
@@ -223,12 +229,18 @@ get_mws_data_schema = {
                             "et": 2.5,
                             "runoff": 1.3,
                             "precipitation": 10.2,
+                            "ndvi_crop": 0.4,
+                            "ndvi_shrub": 0.3,
+                            "ndvi_tree": 0.3,
                         },
                         {
                             "date": "2024-01-15",
                             "et": 3.1,
                             "runoff": 0.8,
                             "precipitation": 5.4,
+                            "ndvi_crop": 0.2,
+                            "ndvi_shrub": 0.4,
+                            "ndvi_tree": 0.4,
                         },
                     ],
                 }
@@ -693,34 +705,34 @@ get_village_geometries_schema = {
 
     **Example response:**
     ```json
-    {
-        "type": "FeatureCollection",
-        "features": [
-            {
-                "type": "Feature",
-                "id": "amaravati_achalpur.3",
-                "geometry": {
-                    "type": "MultiPolygon",
-                    "coordinates": [
-                        [
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "amaravati_achalpur.3",
+                    "geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": [
                             [
-                                [77.311209, 21.226113],
-                                [77.311195, 21.22611],
-                                [77.311185, 21.226108],
-                                [77.311552, 21.226182],
-                                [77.311209, 21.226113]
+                                [
+                                    [77.311209, 21.226113],
+                                    [77.311195, 21.22611],
+                                    [77.311185, 21.226108],
+                                    [77.311552, 21.226182],
+                                    [77.311209, 21.226113]
+                                ]
                             ]
                         ]
-                    ]
-                },
-                "geometry_name": "the_geom",
-                "properties": {
-                    "vill_ID": 34522,
-                    "vill_name": "ALIPUR"
+                    },
+                    "geometry_name": "the_geom",
+                    "properties": {
+                        "vill_ID": 0,
+                        "vill_name": "ALIPUR"
+                    }
                 }
-            }
-        ]
-    }
+            ]
+        }
     ```
     """,
     "manual_parameters": [
@@ -731,19 +743,50 @@ get_village_geometries_schema = {
     ],
     "responses": {
         200: openapi.Response(
-            description="Success - Returns village geometry/polygon data",
+            description="Success - Returns GeoJSON FeatureCollection with all village geometries",
             examples={
                 "application/json": {
-                    "type": "MultiPolygon",
-                    "coordinates": [
-                        [
-                            [
-                                [88.27983, 21.944884],
-                                [88.280062, 21.945069],
-                                [88.280332, 21.946053],
-                                [88.280332, 21.946058],
-                            ]
-                        ]
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": "amaravati_achalpur.3",
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [
+                                    [
+                                        [
+                                            [77.311209, 21.226113],
+                                            [77.311195, 21.22611],
+                                            [77.311185, 21.226108],
+                                            [77.311552, 21.226182],
+                                            [77.311209, 21.226113],
+                                        ]
+                                    ]
+                                ],
+                            },
+                            "geometry_name": "the_geom",
+                            "properties": {"vill_ID": 0, "vill_name": "ALIPUR"},
+                        },
+                        {
+                            "type": "Feature",
+                            "id": "amaravati_achalpur.4",
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [
+                                    [
+                                        [
+                                            [77.312345, 21.227890],
+                                            [77.312456, 21.228000],
+                                            [77.312567, 21.228111],
+                                            [77.312345, 21.227890],
+                                        ]
+                                    ]
+                                ],
+                            },
+                            "geometry_name": "the_geom",
+                            "properties": {"vill_ID": 1, "vill_name": "BHAGPUR"},
+                        },
                     ],
                 }
             },
