@@ -171,3 +171,9 @@ def sync_odk_to_csdb():
     metadata = SyncMetadata.get_odk_sync_metadata()
     metadata.update_last_synced()
     return JsonResponse({"status": "Sync complete", "result": res})
+
+
+class DemandValidator:
+    """
+    validate demands on the basis of pre-decided rules
+    """
