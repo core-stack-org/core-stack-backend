@@ -432,17 +432,13 @@ def get_mws_geometries(request):
         district = valid_gee_text(request.query_params.get("district", "").lower())
         tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
 
-        print("AAAAAAAAAAAAAAAAAAAA")
         if not all([state, district, tehsil]):
             return Response(
                 {"error": "All parameters (state, district, tehsil) are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        print("BBBBBBBBBBBBBBBBBBBBB")
         # Get geometry data
         success, result = get_mws_geometries_data(state, district, tehsil)
-        print("CCCCCCCCCCCCCCCC", success)
-        print("DDDDDDDDDDDDDDD", result)
         if not success:
             return Response(
                 {"error": result},  # result contains error message
