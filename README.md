@@ -37,6 +37,8 @@ chmod +x install.sh
 > The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run
 > migrations, and configure Apache.
 
+> For any installation issues, check [Installation Documentation](.\installation\INSTALLATION.md) and [Troubleshooting Guide](.\installation\TROUBLESHOOTING.md).
+
 #### 3. Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:
 ```bash
