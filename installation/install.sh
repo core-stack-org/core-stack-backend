@@ -184,14 +184,6 @@ function generate_env_file() {
         return 1
     fi
     
-    # Extract all env() calls from settings.py
-    # Pattern matches: env("VAR_NAME") or env.str("VAR_NAME") or env.bool("VAR_NAME", default=...) etc.
-    # Also matches: env("VAR_NAME", default=...)
-    
-    echo "# Auto-generated .env file from settings.py" > "$ENV_FILE"
-    echo "# Generated on $(date)" >> "$ENV_FILE"
-    echo "" >> "$ENV_FILE"
-    
     # Extract variable names using grep and sed
     # This regex matches env("VAR_NAME") patterns and captures VAR_NAME
     local env_vars
@@ -209,39 +201,72 @@ function generate_env_file() {
     local all_vars
     all_vars=$(echo -e "${env_vars}\n${env_vars_simple}" | sort -u | grep -v '^$')
     
-    # Write each variable with blank value to .env
-    while IFS= read -r var_name; do
-        if [ -n "$var_name" ]; then
-            echo "${var_name}=\"\"" >> "$ENV_FILE"
-        fi
-    done <<< "$all_vars"
-    
-    echo "" >> "$ENV_FILE"
-    echo "# === CONFIGURATION OVERRIDES ===" >> "$ENV_FILE"
-    
-    # Override with values from script configuration
-    # DB settings mapping
-    if [ -n "$ENV_DB_NAME" ]; then
-        sed -i "s|^DB_NAME=\"\"|DB_NAME=\"$ENV_DB_NAME\"|" "$ENV_FILE"
-        echo "# DB_NAME overridden from POSTGRES_DB config" >> "$ENV_FILE"
+    # Check if .env file already exists
+    if [ -f "$ENV_FILE" ]; then
+        echo "Existing .env file found. Adding missing variables..."
+        local added_count=0
+        
+        # Read existing variable names from .env
+        local existing_vars
+        existing_vars=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE" | cut -d'=' -f1 | sort -u)
+        
+        # Add missing variables with blank values
+        while IFS= read -r var_name; do
+            if [ -n "$var_name" ]; then
+                # Check if variable already exists in .env
+                if ! echo "$existing_vars" | grep -q "^${var_name}$"; then
+                    echo "${var_name}=\"\"" >> "$ENV_FILE"
+                    ((added_count++))
+                fi
+            fi
+        done <<< "$all_vars"
+        
+        echo "✅ Added $added_count missing variables to existing .env file"
+    else
+        # Create new .env file
+        echo "# Auto-generated .env file from settings.py" > "$ENV_FILE"
+        echo "# Generated on $(date)" >> "$ENV_FILE"
+        echo "" >> "$ENV_FILE"
+        
+        # Write each variable with blank value to .env
+        while IFS= read -r var_name; do
+            if [ -n "$var_name" ]; then
+                echo "${var_name}=\"\"" >> "$ENV_FILE"
+            fi
+        done <<< "$all_vars"
+        
+        echo "" >> "$ENV_FILE"
+        echo "# === CONFIGURATION OVERRIDES ===" >> "$ENV_FILE"
+        
+        echo "✅ .env file generated at $ENV_FILE"
     fi
     
-    if [ -n "$ENV_DB_USER" ]; then
-        sed -i "s|^DB_USER=\"\"|DB_USER=\"$ENV_DB_USER\"|" "$ENV_FILE"
-        echo "# DB_USER overridden from POSTGRES_USER config" >> "$ENV_FILE"
-    fi
-    
-    if [ -n "$ENV_DB_PASSWORD" ]; then
-        sed -i "s|^DB_PASSWORD=\"\"|DB_PASSWORD=\"$ENV_DB_PASSWORD\"|" "$ENV_FILE"
-        echo "# DB_PASSWORD overridden from POSTGRES_PASSWORD config" >> "$ENV_FILE"
-    fi
+    # Apply configuration overrides (for both new and existing files)
+    apply_env_overrides "$ENV_FILE"
     
     # Set proper permissions
     sudo chown www-data:www-data "$ENV_FILE"
     sudo chmod 640 "$ENV_FILE"
     
-    echo "✅ .env file generated at $ENV_FILE"
-    echo "   Total variables extracted: $(grep -c '^[A-Za-z_]' "$ENV_FILE")"
+    echo "   Total variables in .env: $(grep -c '^[A-Za-z_]' "$ENV_FILE")"
+}
+
+function apply_env_overrides() {
+    local ENV_FILE="$1"
+    
+    # Override with values from script configuration
+    # DB settings mapping - only override if value is blank or variable was just added
+    if [ -n "$ENV_DB_NAME" ]; then
+        sed -i "s|^DB_NAME=\"\"|DB_NAME=\"$ENV_DB_NAME\"|" "$ENV_FILE"
+    fi
+    
+    if [ -n "$ENV_DB_USER" ]; then
+        sed -i "s|^DB_USER=\"\"|DB_USER=\"$ENV_DB_USER\"|" "$ENV_FILE"
+    fi
+    
+    if [ -n "$ENV_DB_PASSWORD" ]; then
+        sed -i "s|^DB_PASSWORD=\"\"|DB_PASSWORD=\"$ENV_DB_PASSWORD\"|" "$ENV_FILE"
+    fi
 }
 
 # === MAIN ===
