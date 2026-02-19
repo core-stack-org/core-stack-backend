@@ -123,7 +123,7 @@ def ccd_vector(roi, year, asset_folder_list, asset_suffix, app_type):
             collection=fc,
             reducer=ee.Reducer.sum(),
             scale=25,
-            crs=raster_cc.projection(),
+            crs="EPSG:4326",
         )
 
         def process_feature(feature):
