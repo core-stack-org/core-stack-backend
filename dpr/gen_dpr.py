@@ -22,7 +22,7 @@ from dpr.mapping import (
     WATER_STRUCTURE_REVERSE_MAPPING,
     populate_maintenance_from_waterbody,
 )
-from dpr.utils import get_waterbody_repair_activities, transform_name
+from dpr.utils import ensure_str, get_waterbody_repair_activities, transform_name
 from nrm_app.settings import (
     DEBUG,
     EMAIL_HOST,
@@ -783,7 +783,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         well_usage = "NA"
         if well.data_well and "Well_usage" in well.data_well:
             well_usage_data = well.data_well["Well_usage"]
-            select_one_well_used = well_usage_data.get("select_one_well_used")
+            select_one_well_used = ensure_str(well_usage_data.get("select_one_well_used"))
             select_one_well_used_other = well_usage_data.get(
                 "select_one_well_used_other"
             )
@@ -800,7 +800,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         repair_activities = "NA"
         if well.data_well and "Well_usage" in well.data_well:
             well_usage_data = well.data_well["Well_usage"]
-            well_repairs_type = well_usage_data.get("repairs_type")
+            well_repairs_type = ensure_str(well_usage_data.get("repairs_type"))
             well_repairs_type_other = well_usage_data.get("repairs_type_other")
 
             if (
@@ -819,7 +819,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
             and "Well_condition" in well.data_well
         ):
             well_condition_data = well.data_well["Well_condition"]
-            well_repairs_type = well_condition_data.get("select_one_repairs_well")
+            well_repairs_type = ensure_str(well_condition_data.get("select_one_repairs_well"))
             well_repairs_type_other = well_condition_data.get(
                 "select_one_repairs_well_other"
             )
@@ -1076,7 +1076,7 @@ def maintenance_gw_table(doc, plan):
             and recharge_structure_type in RECHARGE_STRUCTURE_REVERSE_MAPPING
         ):
             repair_key = RECHARGE_STRUCTURE_REVERSE_MAPPING[recharge_structure_type]
-            repair_key_value = maintenance.data_gw_maintenance.get(repair_key)
+            repair_key_value = ensure_str(maintenance.data_gw_maintenance.get(repair_key))
 
             if repair_key_value and repair_key_value.lower() == "other":
                 repair_activities = maintenance.data_gw_maintenance.get(
@@ -1146,7 +1146,7 @@ def maintenance_agri_table(doc, plan):
             and irr_structure_type in IRRIGATION_STRUCTURE_REVERSE_MAPPING
         ):
             repair_key = IRRIGATION_STRUCTURE_REVERSE_MAPPING[irr_structure_type]
-            repair_key_value = maintenance.data_agri_maintenance.get(repair_key)
+            repair_key_value = ensure_str(maintenance.data_agri_maintenance.get(repair_key))
 
             if repair_key_value and repair_key_value.lower() == "other":
                 repair_activities = maintenance.data_agri_maintenance.get(
@@ -1409,20 +1409,20 @@ def add_section_g(doc, plan, mws):
         livestock_group = record.data_livelihood.get("Livestock")
         if (
             livestock_group.get("is_demand_livestock")
-            and livestock_group.get("is_demand_livestock").lower() == "yes"
+            and ensure_str(livestock_group.get("is_demand_livestock")).lower() == "yes"
         ) or (
             record.data_livelihood.get("select_one_demand_promoting_livestock")
-            and record.data_livelihood.get(
+            and ensure_str(record.data_livelihood.get(
                 "select_one_demand_promoting_livestock"
-            ).lower()
+            )).lower()
             == "yes"
         ):
             row_cells = table.add_row().cells
             row_cells[0].text = "Livestock"
             row_cells[1].text = to_utf8(livestock_group.get("livestock_demand") or "NA")
-            demands_promoting_livestock = livestock_group.get(
+            demands_promoting_livestock = ensure_str(livestock_group.get(
                 "demands_promoting_livestock"
-            )
+            ))
             if (
                 demands_promoting_livestock
                 and demands_promoting_livestock.lower() == "other"
@@ -1433,9 +1433,9 @@ def add_section_g(doc, plan, mws):
 
             # check old keys
             if not demands_promoting_livestock or demands_promoting_livestock == "NA":
-                demands_promoting_livestock = record.data_livelihood.get(
+                demands_promoting_livestock = ensure_str(record.data_livelihood.get(
                     "select_one_promoting_livestock"
-                )
+                ))
                 if (
                     demands_promoting_livestock
                     and demands_promoting_livestock.lower() == "other"
@@ -1468,11 +1468,11 @@ def add_section_g(doc, plan, mws):
         fisheries_group = record.data_livelihood.get("fisheries")
         if (
             fisheries_group.get("is_demand_fisheris")
-            and fisheries_group.get("is_demand_fisheris").lower() == "yes"
+            and ensure_str(fisheries_group.get("is_demand_fisheris")).lower() == "yes"
             or record.data_livelihood.get("select_one_demand_promoting_fisheries")
-            and record.data_livelihood.get(
+            and ensure_str(record.data_livelihood.get(
                 "select_one_demand_promoting_fisheries"
-            ).lower()
+            )).lower()
             == "yes"
         ):
             row_cells = table.add_row().cells
@@ -1480,19 +1480,19 @@ def add_section_g(doc, plan, mws):
             row_cells[1].text = to_utf8(
                 fisheries_group.get("demand_type_fisheries") or "NA"
             )
-            demands_promoting_fisheries = fisheries_group.get(
+            demands_promoting_fisheries = ensure_str(fisheries_group.get(
                 "select_one_promoting_fisheries"
-            )
-            if demands_promoting_fisheries or demands_promoting_fisheries == "other":
+            ))
+            if demands_promoting_fisheries and demands_promoting_fisheries.lower() == "other":
                 demands_promoting_fisheries = fisheries_group.get(
                     "select_one_promoting_fisheries_other", "NA"
                 )
 
             # check old keys
             if not demands_promoting_fisheries or demands_promoting_fisheries == "NA":
-                demands_promoting_fisheries = record.data_livelihood.get(
+                demands_promoting_fisheries = ensure_str(record.data_livelihood.get(
                     "select_one_promoting_fisheries"
-                )
+                ))
                 if (
                     demands_promoting_fisheries
                     and demands_promoting_fisheries.lower() == "other"
@@ -1546,10 +1546,10 @@ def add_section_g(doc, plan, mws):
         kitchen_garden_group = record.data_livelihood.get("kitchen_gardens")
         if (
             record.data_livelihood.get("select_one_demand_plantation")
-            and record.data_livelihood.get("select_one_demand_plantation").lower()
+            and ensure_str(record.data_livelihood.get("select_one_demand_plantation")).lower()
             == "yes"
             or plantation_group.get("select_plantation_demands")
-            and plantation_group.get("select_plantation_demands").lower() == "yes"
+            and ensure_str(plantation_group.get("select_plantation_demands")).lower() == "yes"
         ):
             row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Plantations"
@@ -1586,9 +1586,9 @@ def add_section_g(doc, plan, mws):
         # kitchen garden
         if (
             record.data_livelihood.get("indi_assets")
-            and record.data_livelihood.get("indi_assets").lower() == "yes"
+            and ensure_str(record.data_livelihood.get("indi_assets")).lower() == "yes"
             or kitchen_garden_group.get("assets_kg")
-            and kitchen_garden_group.get("assets_kg").lower() == "yes"
+            and ensure_str(kitchen_garden_group.get("assets_kg")).lower() == "yes"
         ):
             row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Kitchen Garden"
