@@ -181,7 +181,7 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS time series data, including ET, Runoff, and Precipitation for a given state, district, tehsil, and MWS ID.
+    Retrieve MWS time series data, including ET, Runoff, Precipitation and NDVI(crop, tree, shrubs) for a given state, district, tehsil, and MWS ID.
     
     **Response dataset details:**
     ```
@@ -192,13 +192,19 @@ get_mws_data_schema = {
                 "date": "2024-01-01",
                 "et": 2.5,
                 "runoff": 1.3,
-                "precipitation": 10.2
+                "precipitation": 10.2,
+                "ndvi_crop": "0.4",
+                "ndvi_shrub": "0.3",
+                "ndvi_tree": "0.3"
             },
             {
                 "date": "2024-01-15",
                 "et": 3.1,
                 "runoff": 0.8,
-                "precipitation": 5.4
+                "precipitation": 5.4,
+                "ndvi_crop": "0.2",
+                "ndvi_shrub": "0.4",
+                "ndvi_tree": "0.4"
             }
         ]
     }
@@ -223,12 +229,18 @@ get_mws_data_schema = {
                             "et": 2.5,
                             "runoff": 1.3,
                             "precipitation": 10.2,
+                            "ndvi_crop": 0.4,
+                            "ndvi_shrub": 0.3,
+                            "ndvi_tree": 0.3,
                         },
                         {
                             "date": "2024-01-15",
                             "et": 3.1,
                             "runoff": 0.8,
                             "precipitation": 5.4,
+                            "ndvi_crop": 0.2,
+                            "ndvi_shrub": 0.4,
+                            "ndvi_tree": 0.4,
                         },
                     ],
                 }
@@ -557,61 +569,96 @@ generate_active_locations_schema = {
 get_mws_geometries_schema = {
     "method": "get",
     "operation_id": "get_mws_geometries",
-    "operation_summary": "Get MWS Geometry",
+    "operation_summary": "Get MWS Geometries",
     "operation_description": """
-    Retrieve MWS geometry/polygon data for a given state, district, tehsil, and MWS ID (uid).
+    Retrieve MWS geometries for a given state, district, tehsil.
 
     **Response format:**
-    Returns a GeoJSON geometry object containing the polygon coordinates of the MWS boundary.
+    Returns a GeoJSON geometry object containing the polygon coordinates of all the MWS boundary in a tehsil.
 
     **Example response:**
     ```json
     {
-        "type": "MultiPolygon",
-        "coordinates": [
-            [
-                [
-                    [88.35529485, 21.85344786],
-                    [88.35556238, 21.85344778],
-                    [88.35556238, 21.84806127],
-                    [88.35582991, 21.84806119],
-                    [88.35582991, 21.84644254],
-                    [88.35556238, 21.84644262],
-                    [88.35556238, 21.8450959]
-                ]
+        "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "mws_amaravati_achalpur.1",
+                    "geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": [
+                            [
+                                [
+                                    [77.311209, 21.226113],
+                                    [77.311195, 21.22611],
+                                    [77.311185, 21.226108],
+                                    [77.311552, 21.226182],
+                                    [77.311209, 21.226113]
+                                ]
+                            ]
+                        ]
+                    },
+                    "geometry_name": "the_geom",
+                    "properties": {
+                        "uid": "1_523"
+                    }
+                }
             ]
-        ]
-    }
+        }
     ```
-
-    **Note:** This API returns only the raw geometry object without any wrapper.
-    The coordinates follow the [GeoJSON format](https://geojson.org/) with longitude, latitude pairs.
     """,
     "manual_parameters": [
         state_param,
         district_param,
         tehsil_param,
-        mws_id_param,
         authorization_param,
     ],
     "responses": {
         200: openapi.Response(
-            description="Success - Returns MWS geometry/polygon data",
+            description="Success - Returns GeoJSON FeatureCollection with all MWS geometries",
             examples={
                 "application/json": {
-                    "type": "MultiPolygon",
-                    "coordinates": [
-                        [
-                            [
-                                [88.35529485, 21.85344786],
-                                [88.35556238, 21.85344778],
-                                [88.35556238, 21.84806127],
-                                [88.35582991, 21.84806119],
-                                [88.35582991, 21.84644254],
-                                [88.35556238, 21.84644262],
-                                [88.35556238, 21.8450959],
-                            ]
-                        ]
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": "mws_amaravati_achalpur.1",
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [
+                                    [
+                                        [
+                                            [77.311209, 21.226113],
+                                            [77.311195, 21.22611],
+                                            [77.311185, 21.226108],
+                                            [77.311552, 21.226182],
+                                            [77.311209, 21.226113],
+                                        ]
+                                    ]
+                                ],
+                            },
+                            "geometry_name": "the_geom",
+                            "properties": {"uid": "1_235"},
+                        },
+                        {
+                            "type": "Feature",
+                            "id": "mws_amaravati_achalpur.2",
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [
+                                    [
+                                        [
+                                            [77.312345, 21.227890],
+                                            [77.312456, 21.228000],
+                                            [77.312567, 21.228111],
+                                            [77.312345, 21.227890],
+                                        ]
+                                    ]
+                                ],
+                            },
+                            "geometry_name": "the_geom",
+                            "properties": {"uid": "1_424"},
+                        },
                     ],
                 }
             },
@@ -620,7 +667,7 @@ get_mws_geometries_schema = {
             description="Bad Request - Missing required parameters or invalid format",
             examples={
                 "application/json": {
-                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                    "error": "'state', 'district', and 'tehsil' parameters are required."
                 }
             },
         ),
@@ -633,21 +680,15 @@ get_mws_geometries_schema = {
             },
         ),
         404: openapi.Response(
-            description="Not Found - MWS ID not found",
-            examples={
-                "application/json": {"error": "No MWS found with uid: 12_339480"}
-            },
+            description="Not Found - No MWS features found in layer",
+            examples={"application/json": {"error": "No features found in layer"}},
         ),
         500: openapi.Response(
             description="Internal Server Error",
-            examples={
-                "application/json": {
-                    "error": "Internal server error: Unexpected error occurred"
-                }
-            },
+            examples={"application/json": {"error": "Internal server error"}},
         ),
     },
-    "tags": ["Dataset APIs"],  # Or ["Geometry APIs"] if you want a separate category
+    "tags": ["Dataset APIs"],
 }
 
 
@@ -655,55 +696,97 @@ get_mws_geometries_schema = {
 get_village_geometries_schema = {
     "method": "get",
     "operation_id": "get_village_geometries",
-    "operation_summary": "Get Village Geometry",
+    "operation_summary": "Get Village Geometries",
     "operation_description": """
-    Retrieve village geometry/polygon data for a given state, district, tehsil, and village ID.
+    Retrieve village geometries for a given state, district and tehsil.
 
     **Response format:**
-    Returns a GeoJSON geometry object containing the polygon coordinates of the village boundary.
+    Returns a GeoJSON geometry object containing the polygon coordinates of all the village boundary in a tehsil.
 
     **Example response:**
     ```json
-    {
-        "type": "MultiPolygon",
-        "coordinates": [
-            [
-                [
-                    [88.27983, 21.944884],
-                    [88.280062, 21.945069],
-                    [88.280332, 21.946053],
-                    [88.280332, 21.946058]
-                ]
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "amaravati_achalpur.3",
+                    "geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": [
+                            [
+                                [
+                                    [77.311209, 21.226113],
+                                    [77.311195, 21.22611],
+                                    [77.311185, 21.226108],
+                                    [77.311552, 21.226182],
+                                    [77.311209, 21.226113]
+                                ]
+                            ]
+                        ]
+                    },
+                    "geometry_name": "the_geom",
+                    "properties": {
+                        "vill_ID": 0,
+                        "vill_name": "ALIPUR"
+                    }
+                }
             ]
-        ]
-    }
+        }
     ```
-
-    **Note:** This API returns only the raw geometry object without any wrapper.
-    The coordinates follow the [GeoJSON format](https://geojson.org/) with longitude, latitude pairs.
     """,
     "manual_parameters": [
         state_param,
         district_param,
         tehsil_param,
-        village_id_param,  # Use the parameter variable
         authorization_param,
     ],
     "responses": {
         200: openapi.Response(
-            description="Success - Returns village geometry/polygon data",
+            description="Success - Returns GeoJSON FeatureCollection with all village geometries",
             examples={
                 "application/json": {
-                    "type": "MultiPolygon",
-                    "coordinates": [
-                        [
-                            [
-                                [88.27983, 21.944884],
-                                [88.280062, 21.945069],
-                                [88.280332, 21.946053],
-                                [88.280332, 21.946058],
-                            ]
-                        ]
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": "amaravati_achalpur.3",
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [
+                                    [
+                                        [
+                                            [77.311209, 21.226113],
+                                            [77.311195, 21.22611],
+                                            [77.311185, 21.226108],
+                                            [77.311552, 21.226182],
+                                            [77.311209, 21.226113],
+                                        ]
+                                    ]
+                                ],
+                            },
+                            "geometry_name": "the_geom",
+                            "properties": {"vill_ID": 0, "vill_name": "ALIPUR"},
+                        },
+                        {
+                            "type": "Feature",
+                            "id": "amaravati_achalpur.4",
+                            "geometry": {
+                                "type": "MultiPolygon",
+                                "coordinates": [
+                                    [
+                                        [
+                                            [77.312345, 21.227890],
+                                            [77.312456, 21.228000],
+                                            [77.312567, 21.228111],
+                                            [77.312345, 21.227890],
+                                        ]
+                                    ]
+                                ],
+                            },
+                            "geometry_name": "the_geom",
+                            "properties": {"vill_ID": 1, "vill_name": "BHAGPUR"},
+                        },
                     ],
                 }
             },
@@ -712,7 +795,7 @@ get_village_geometries_schema = {
             description="Bad Request - Missing required parameters or invalid format",
             examples={
                 "application/json": {
-                    "error": "'state', 'district', 'tehsil', and 'village_id' parameters are required."
+                    "error": "'state', 'district', and 'tehsil' parameters are required."
                 }
             },
         ),
@@ -724,12 +807,6 @@ get_village_geometries_schema = {
                 }
             },
         ),
-        404: openapi.Response(
-            description="Not Found - Village ID not found",
-            examples={
-                "application/json": {"error": "No village found with ID: 334670"}
-            },
-        ),
         500: openapi.Response(
             description="Internal Server Error",
             examples={
@@ -739,5 +816,5 @@ get_village_geometries_schema = {
             },
         ),
     },
-    "tags": ["Dataset APIs"],  # Or ["Geometry APIs"] if you want a separate category
+    "tags": ["Dataset APIs"],
 }
