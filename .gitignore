@@ -15,6 +15,7 @@ venv/
 **/tests/
 .rough/
 .kilocode/
+.kilocodeignore
 .tldr/
 .tldrignore
 **/.local/
