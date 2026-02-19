@@ -1,4 +1,4 @@
-data/
+data/*
 app_controller/migrations/__pycache__/
 computing/lulc/__pycache__
 computing/mws/__pycache__
@@ -9,6 +9,15 @@ venv/
 *.pyc
 .idea/
 .DS_Store
+
+# Local Work
+.history/
+**/tests/
+.rough/
+.kilocode/
+.tldr/
+.tldrignore
+**/.local/
 
 # Django
 *.log
@@ -47,3 +56,5 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
+
+
