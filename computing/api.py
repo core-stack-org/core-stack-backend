@@ -818,15 +818,7 @@ def tree_health_vector(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        tree_health_overall_change_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
-        )
+
         tree_health_ch_vector.apply_async(
             kwargs={
                 "state": state,
@@ -838,6 +830,7 @@ def tree_health_vector(request):
             },
             queue="nrm",
         )
+
         tree_health_ccd_vector.apply_async(
             kwargs={
                 "state": state,
@@ -845,6 +838,16 @@ def tree_health_vector(request):
                 "block": block,
                 "start_year": start_year,
                 "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+
+        tree_health_overall_change_vector.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
                 "gee_account_id": gee_account_id,
             },
             queue="nrm",
