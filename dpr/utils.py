@@ -250,6 +250,8 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
         for field in repair_fields:
             if data_waterbody.get(field):
                 repair_value = data_waterbody.get(field)
+                if isinstance(repair_value, list):
+                    repair_value = " ".join(repair_value)
                 other_field = field + "_other"
                 if (
                     repair_value
@@ -270,6 +272,9 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
 
     if not repair_activity:
         return "NA"
+
+    if isinstance(repair_activity, list):
+        repair_activity = " ".join(repair_activity)
 
     if repair_activity.lower() == "other":
         other_field = repair_field + "_other"
