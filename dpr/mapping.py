@@ -5,7 +5,7 @@ from dpr.models import (
     ODK_well,
     SWB_maintenance,
 )
-from dpr.utils import format_text
+from dpr.utils import ensure_str, format_text
 from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -191,7 +191,7 @@ def get_activity_type_from_waterbody(waterbody):
     print(f"Expected repair key: {expected_repair_key}")
 
     if expected_repair_key:
-        repair_value = data.get(expected_repair_key)
+        repair_value = ensure_str(data.get(expected_repair_key))
 
         if repair_value and repair_value.lower() == "other":
             other_value = data.get(f"{expected_repair_key}_other")
@@ -231,11 +231,11 @@ def get_activity_type_from_well(well):
     # Navigate to the Well_condition section
     well_condition = data.get("Well_condition", {})
 
-    repair_type = well_condition.get("select_one_repairs_well")
+    repair_type = ensure_str(well_condition.get("select_one_repairs_well"))
     print(f"Repair type well: {repair_type}")
 
     if repair_type:
-        if repair_type and repair_type.lower() == "other":
+        if repair_type.lower() == "other":
             other_value = well_condition.get("select_one_repairs_well_other")
             if other_value:
                 print(
