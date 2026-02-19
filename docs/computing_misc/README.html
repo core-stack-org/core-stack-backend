@@ -1,0 +1,574 @@
+<!DOCTYPE html><html><head>
+      <title>README</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\kamit\.vscode-insiders\extensions\shd101wyy.markdown-preview-enhanced-0.8.20\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      <script type="text/javascript" src="file:///c:\Users\kamit\.vscode-insiders\extensions\shd101wyy.markdown-preview-enhanced-0.8.20\crossnote\dependencies\mermaid\mermaid.min.js" charset="UTF-8"></script>
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <!-- The content below will be included at the end of the <head> element. --><script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script></head><body for="html-export">
+    
+    
+      <div class="crossnote markdown-preview  ">
+      
+<h1 id="core-stack-computing-pipeline-documentation">CoRE Stack Computing Pipeline Documentation </h1>
+<h2 id="overview">Overview </h2>
+<p>The <code>computing/misc</code> directory contains Celery tasks for processing geospatial data layers for the CoRE (Community Resource Enhancement) Stack platform. These modules transform raw geospatial data into actionable layers distributed across multiple platforms.</p>
+<h2 id="architecture-overview">Architecture Overview </h2>
+<div class="mermaid">flowchart TD
+    subgraph Triggers
+        A[API Request]
+        B[Scheduled Task]
+        C[Manual Trigger]
+    end
+    
+    subgraph Celery Queue
+        D[Task Processing]
+    end
+    
+    subgraph Processing Modules
+        E[Admin Boundary]
+        F[NREGA Assets]
+        G[Pan-India Clip Modules]
+        H[Raster Processing]
+        I[Complex Analysis]
+    end
+    
+    subgraph Output Platforms
+        J[Google Earth Engine]
+        K[GeoServer]
+        L[Database]
+        M[STAC Catalog]
+    end
+    
+    A --&gt; D
+    B --&gt; D
+    C --&gt; D
+    D --&gt; E
+    D --&gt; F
+    D --&gt; G
+    D --&gt; H
+    D --&gt; I
+    E --&gt; J
+    E --&gt; K
+    E --&gt; L
+    E --&gt; M
+    F --&gt; J
+    F --&gt; K
+    F --&gt; L
+    F --&gt; M
+    G --&gt; J
+    G --&gt; K
+    G --&gt; L
+    H --&gt; J
+    H --&gt; K
+    H --&gt; L
+    I --&gt; J
+    I --&gt; K
+    I --&gt; L
+    I --&gt; M
+</div><h2 id="module-categories">Module Categories </h2>
+<h3 id="1-boundary-processing">1. Boundary Processing </h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+<th>Output Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="admin_boundary.md"><code>admin_boundary.py</code></a></td>
+<td>Village/tehsil boundaries with census data</td>
+<td>Vector</td>
+</tr>
+<tr>
+<td><a href="nrega.md"><code>nrega.py</code></a></td>
+<td>NREGA work site locations</td>
+<td>Vector (Points)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-pan-india-clip-modules-vector">2. Pan-India Clip Modules (Vector) </h3>
+<p>These modules share an identical pattern - clipping pan-India vector data to block boundaries.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Data Source</th>
+<th>Workspace</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="agroecological_space.md"><code>agroecological_space.py</code></a></td>
+<td>Agroecological zones</td>
+<td><code>agroecological</code></td>
+</tr>
+<tr>
+<td><a href="pan_india_clip_modules.md"><code>factory_csr.py</code></a></td>
+<td>Factory CSR projects</td>
+<td><code>factory_csr</code></td>
+</tr>
+<tr>
+<td><a href="pan_india_clip_modules.md"><code>green_credit.py</code></a></td>
+<td>Green Credit projects</td>
+<td><code>green_credit</code></td>
+</tr>
+<tr>
+<td><a href="pan_india_clip_modules.md"><code>lcw_conflict.py</code></a></td>
+<td>Land conflict data</td>
+<td><code>lcw</code></td>
+</tr>
+<tr>
+<td><a href="pan_india_clip_modules.md"><code>mining_data.py</code></a></td>
+<td>Mining sites</td>
+<td><code>mining</code></td>
+</tr>
+<tr>
+<td><a href="drainage_lines.md"><code>drainage_lines.py</code></a></td>
+<td>Drainage network</td>
+<td><code>drainage</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-raster-processing-modules">3. Raster Processing Modules </h3>
+<p>These modules clip pan-India raster data and sync via Google Cloud Storage.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Data Type</th>
+<th>Workspace</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="catchment_area.md"><code>catchment_area.py</code></a></td>
+<td>Catchment area</td>
+<td><code>catchment_area_singleflow</code></td>
+</tr>
+<tr>
+<td><a href="distancetonearestdrainage.md"><code>distancetonearestdrainage.py</code></a></td>
+<td>Distance to drainage</td>
+<td><code>distance_nearest_upstream_DL</code></td>
+</tr>
+<tr>
+<td><a href="naturaldepression.md"><code>naturaldepression.py</code></a></td>
+<td>Natural depressions</td>
+<td><code>natural_depression</code></td>
+</tr>
+<tr>
+<td><a href="slope_percentage.md"><code>slope_percentage.py</code></a></td>
+<td>Slope gradient</td>
+<td><code>slope_percentage</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-complex-analysis-modules">4. Complex Analysis Modules </h3>
+<p>These modules perform advanced spatial analysis.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="aquifer_vector.md"><code>aquifer_vector.py</code></a></td>
+<td>Aquifer intersection analysis</td>
+<td>Vector with yield data</td>
+</tr>
+<tr>
+<td><a href="soge_vector.md"><code>soge_vector.py</code></a></td>
+<td>Groundwater extraction stage</td>
+<td>Vector with GW data</td>
+</tr>
+<tr>
+<td><a href="restoration_opportunity.md"><code>restoration_opportunity.py</code></a></td>
+<td>Forest restoration potential</td>
+<td>Raster + Vector</td>
+</tr>
+<tr>
+<td><a href="stream_order.md"><code>stream_order.py</code></a></td>
+<td>Stream network analysis</td>
+<td>Raster + Vector</td>
+</tr>
+<tr>
+<td><a href="ndvi_time_series.md"><code>ndvi_time_series.py</code></a></td>
+<td>Vegetation time series</td>
+<td>Vector (time series)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-utility-modules">5. Utility Modules </h3>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="hls_interpolated_ndvi.md"><code>hls_interpolated_ndvi.py</code></a></td>
+<td>NDVI gap-filling utilities</td>
+</tr>
+</tbody>
+</table>
+<h2 id="processing-patterns">Processing Patterns </h2>
+<h3 id="pattern-1-pan-india-vector-clip">Pattern 1: Pan-India Vector Clip </h3>
+<div class="mermaid">flowchart LR
+    A[Load Pan-India FC] --&gt; B[Load MWS ROI]
+    B --&gt; C[filterBounds]
+    C --&gt; D[Spatial Join for UID]
+    D --&gt; E[Export to GEE]
+    E --&gt; F[Sync to GeoServer]
+</div><p><strong>Used by:</strong> <code>agroecological_space.py</code>, <code>factory_csr.py</code>, <code>green_credit.py</code>, <code>lcw_conflict.py</code>, <code>mining_data.py</code></p>
+<h3 id="pattern-2-simple-raster-clip">Pattern 2: Simple Raster Clip </h3>
+<div class="mermaid">flowchart LR
+    A[Load Pan-India Raster] --&gt; B[Load MWS ROI]
+    B --&gt; C[Clip to ROI]
+    C --&gt; D[Export to GEE]
+    D --&gt; E[Sync to GCS]
+    E --&gt; F[Sync to GeoServer]
+</div><p><strong>Used by:</strong> <code>catchment_area.py</code>, <code>distancetonearestdrainage.py</code>, <code>naturaldepression.py</code>, <code>slope_percentage.py</code></p>
+<h3 id="pattern-3-raster-to-vector-conversion">Pattern 3: Raster-to-Vector Conversion </h3>
+<div class="mermaid">flowchart LR
+    A[Load Raster] --&gt; B[Clip to ROI]
+    B --&gt; C[Export Raster]
+    C --&gt; D[Calculate Class Areas]
+    D --&gt; E[Export Vector]
+    E --&gt; F[Sync Both to GeoServer]
+</div><p><strong>Used by:</strong> <code>restoration_opportunity.py</code>, <code>stream_order.py</code></p>
+<h3 id="pattern-4-mws-join-analysis">Pattern 4: MWS-Join Analysis </h3>
+<div class="mermaid">flowchart LR
+    A[Load MWS] --&gt; B[Load Reference Data]
+    B --&gt; C[For Each MWS]
+    C --&gt; D[Find Intersections]
+    D --&gt; E[Calculate Areas]
+    E --&gt; F[Join Properties]
+    F --&gt; G[Export]
+</div><p><strong>Used by:</strong> <code>aquifer_vector.py</code>, <code>soge_vector.py</code></p>
+<h3 id="pattern-5-local-data-processing">Pattern 5: Local Data Processing </h3>
+<div class="mermaid">flowchart LR
+    A[Load Local/S3 Data] --&gt; B[Load SOI Boundary]
+    B --&gt; C[Spatial Filter]
+    C --&gt; D[Save Shapefile]
+    D --&gt; E[Upload to GEE]
+    E --&gt; F[Sync to GeoServer]
+</div><p><strong>Used by:</strong> <code>admin_boundary.py</code>, <code>nrega.py</code></p>
+<h2 id="common-integration-points">Common Integration Points </h2>
+<h3 id="utility-functions">Utility Functions </h3>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>computing.utils
+├── push_shape_to_geoserver()   # Direct shapefile upload
+├── sync_fc_to_geoserver()      # FeatureCollection sync
+├── sync_layer_to_geoserver()   # Layer sync
+├── sync_raster_to_gcs()        # Raster to GCS
+├── sync_raster_gcs_to_geoserver() # GCS to GeoServer
+├── save_layer_info_to_db()     # Database persistence
+├── update_layer_sync_status()  # Status tracking
+├── generate_shape_files()      # JSON to Shapefile
+└── get_directory_size()        # File size calculation
+</code></pre><h3 id="gee-utilities">GEE Utilities </h3>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>utilities.gee_utils
+├── ee_initialize()             # GEE authentication
+├── valid_gee_text()            # Text sanitization
+├── get_gee_asset_path()        # Asset path generation
+├── get_gee_dir_path()          # Directory path generation
+├── is_gee_asset_exists()       # Asset existence check
+├── create_gee_directory()      # GEE folder creation
+├── upload_shp_to_gee()         # Shapefile upload
+├── export_vector_asset_to_gee() # Vector export
+├── export_raster_asset_to_gee() # Raster export
+├── check_task_status()         # Task monitoring
+├── make_asset_public()         # ACL management
+├── gdf_to_ee_fc()              # GeoDataFrame to EE FC
+└── merge_fc_into_existing_fc() # FC merge
+</code></pre><h3 id="stac-generation">STAC Generation </h3>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>computing.STAC_specs
+├── generate_vector_stac()      # Vector STAC metadata
+└── generate_raster_stac()      # Raster STAC metadata
+</code></pre><h2 id="data-flow">Data Flow </h2>
+<h3 id="input-sources">Input Sources </h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Type</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Census 2011 GeoJSON</td>
+<td>Local</td>
+<td><code>admin_boundary.py</code></td>
+</tr>
+<tr>
+<td>SOI Tehsil GeoJSON</td>
+<td>Local</td>
+<td><code>admin_boundary.py</code>, <code>nrega.py</code></td>
+</tr>
+<tr>
+<td>NREGA S3 Bucket</td>
+<td>AWS S3</td>
+<td><code>nrega.py</code></td>
+</tr>
+<tr>
+<td>GEE External Datasets</td>
+<td>GEE</td>
+<td>Pan-India clip modules</td>
+</tr>
+<tr>
+<td>Pan-India Rasters</td>
+<td>GEE</td>
+<td>Raster processing modules</td>
+</tr>
+<tr>
+<td>HLS/MODIS</td>
+<td>GEE</td>
+<td><code>ndvi_time_series.py</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="output-destinations">Output Destinations </h3>
+<table>
+<thead>
+<tr>
+<th>Destination</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Google Earth Engine</td>
+<td>Cloud analysis, asset storage</td>
+</tr>
+<tr>
+<td>GeoServer</td>
+<td>WMS/WFS services for visualization</td>
+</tr>
+<tr>
+<td>PostgreSQL Database</td>
+<td>Layer metadata, sync status</td>
+</tr>
+<tr>
+<td>STAC Catalog</td>
+<td>Standardized metadata for discovery</td>
+</tr>
+</tbody>
+</table>
+<h2 id="task-parameters">Task Parameters </h2>
+<h3 id="standard-parameters">Standard Parameters </h3>
+<p>Most tasks accept these common parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>state</code></td>
+<td>str</td>
+<td>State name</td>
+</tr>
+<tr>
+<td><code>district</code></td>
+<td>str</td>
+<td>District name</td>
+</tr>
+<tr>
+<td><code>block</code></td>
+<td>str</td>
+<td>Block/tehsil name</td>
+</tr>
+<tr>
+<td><code>gee_account_id</code></td>
+<td>int</td>
+<td>GEE account identifier</td>
+</tr>
+</tbody>
+</table>
+<h3 id="custom-project-parameters">Custom Project Parameters </h3>
+<p>Some tasks support custom project mode:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>proj_id</code></td>
+<td>int</td>
+<td>Project database ID</td>
+</tr>
+<tr>
+<td><code>roi_path</code></td>
+<td>str</td>
+<td>Custom ROI asset path</td>
+</tr>
+<tr>
+<td><code>asset_suffix</code></td>
+<td>str</td>
+<td>Custom asset naming suffix</td>
+</tr>
+<tr>
+<td><code>asset_folder</code></td>
+<td>list</td>
+<td>Custom folder path</td>
+</tr>
+<tr>
+<td><code>app_type</code></td>
+<td>str</td>
+<td>Application type (MWS, WATERBODY, etc.)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="naming-conventions">Naming Conventions </h2>
+<h3 id="gee-asset-naming">GEE Asset Naming </h3>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>projects/earthengine-legacy/assets/projects/nrm/{state}/{district}/{block}/{layer_name}
+</code></pre><p>Example:</p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>projects/earthengine-legacy/assets/projects/nrm/Rajasthan/Jaipur/Sanganer/admin_boundary_jaipur_sanganer
+</code></pre><h3 id="geoserver-layer-naming">GeoServer Layer Naming </h3>
+<ul>
+<li><strong>Workspace:</strong> Specific to data type (e.g., <code>panchayat_boundaries</code>, <code>nrega_assets</code>)</li>
+<li><strong>Layer Name:</strong> <code>{layer_type}_{district}_{block}</code></li>
+</ul>
+<h3 id="stac-layer-naming">STAC Layer Naming </h3>
+<p>Standardized names for catalog:</p>
+<ul>
+<li><code>admin_boundaries_vector</code></li>
+<li><code>nrega_vector</code></li>
+<li><code>drainage_lines_vector</code></li>
+<li><code>aquifer_vector</code></li>
+<li><code>stage_of_groundwater_extraction_vector</code></li>
+</ul>
+<h2 id="error-handling">Error Handling </h2>
+<p>All modules implement:</p>
+<ol>
+<li><strong>Graceful degradation</strong> - Continue with fallback data if primary source fails</li>
+<li><strong>Task status monitoring</strong> - Check GEE export task completion</li>
+<li><strong>Database tracking</strong> - Record sync status for each layer</li>
+<li><strong>Logging</strong> - Print statements for debugging</li>
+</ol>
+<h2 id="dependencies">Dependencies </h2>
+<h3 id="python-packages">Python Packages </h3>
+<ul>
+<li><strong>ee</strong> - Google Earth Engine Python API</li>
+<li><strong>geopandas</strong> - Geospatial data manipulation</li>
+<li><strong>shapely</strong> - Geometry operations</li>
+<li><strong>celery</strong> - Distributed task queue</li>
+<li><strong>boto3</strong> - AWS S3 access (NREGA module)</li>
+<li><strong>unidecode</strong> - Text normalization</li>
+</ul>
+<h3 id="django-models">Django Models </h3>
+<ul>
+<li><code>projects.models.Project</code> - Custom project support</li>
+<li><code>gee_computing.models.GEEAccount</code> - GEE account management</li>
+</ul>
+<h2 id="performance-considerations">Performance Considerations </h2>
+<ol>
+<li>
+<p><strong>File Size Thresholds</strong></p>
+<ul>
+<li>NREGA module uses different upload methods based on file size (&gt;10MB uses direct shapefile upload)</li>
+</ul>
+</li>
+<li>
+<p><strong>Scale Parameters</strong></p>
+<ul>
+<li>Raster exports typically use 30m scale</li>
+<li>Some analyses use tileScale=4 for large polygons</li>
+</ul>
+</li>
+<li>
+<p><strong>Batch Processing</strong></p>
+<ul>
+<li>NDVI time series processes year-by-year for multi-year requests</li>
+<li>Incremental updates supported for existing assets</li>
+</ul>
+</li>
+</ol>
+<h2 id="monitoring">Monitoring </h2>
+<p>Each task returns a boolean indicating GeoServer sync success:</p>
+<ul>
+<li><code>True</code> - Layer successfully synced to GeoServer</li>
+<li><code>False</code> - Sync failed or skipped</li>
+</ul>
+<p>Database records track:</p>
+<ul>
+<li>Layer metadata (name, asset ID, dataset name)</li>
+<li>Sync status (GEE, GeoServer, STAC)</li>
+<li>Creation/update timestamps</li>
+</ul>
+
+      </div>
+      
+      
+    
+    
+    <script type="module">
+// TODO: If ZenUML gets integrated into mermaid in the future,
+//      we can remove the following lines.
+
+
+var MERMAID_CONFIG = ({"startOnLoad":false});
+if (typeof MERMAID_CONFIG !== 'undefined') {
+  MERMAID_CONFIG.startOnLoad = false
+  MERMAID_CONFIG.cloneCssStyles = false
+  MERMAID_CONFIG.theme = "default"
+}
+
+mermaid.initialize(MERMAID_CONFIG || {})
+if (typeof(window['Reveal']) !== 'undefined') {
+  function mermaidRevealHelper(event) {
+    var currentSlide = event.currentSlide
+    var diagrams = currentSlide.querySelectorAll('.mermaid')
+    for (var i = 0; i < diagrams.length; i++) {
+      var diagram = diagrams[i]
+      if (!diagram.hasAttribute('data-processed')) {
+        mermaid.init(null, diagram, ()=> {
+          Reveal.slide(event.indexh, event.indexv)
+        })
+      }
+    }
+  }
+  Reveal.addEventListener('slidetransitionend', mermaidRevealHelper)
+  Reveal.addEventListener('ready', mermaidRevealHelper)
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
+} else {
+  await mermaid.run({
+    nodes: document.querySelectorAll('.mermaid')
+  })
+}
+</script>
+    
+    
+    
+  
+    </body></html>

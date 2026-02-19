@@ -1,0 +1,2302 @@
+{
+  "root": "Y:\\core-stack-org\\core-stack-backend",
+  "languages": [
+    "python"
+  ],
+  "files": [
+    {
+      "path": "manage.py",
+      "functions": [
+        "main"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "os",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "sys",
+          "names": [],
+          "is_from": false
+        }
+      ]
+    },
+    {
+      "path": "token_merge.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "apiadmin\\admin.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.contrib",
+          "names": [
+            "admin"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "apiadmin\\apps.py",
+      "functions": [],
+      "classes": [
+        "ApiadminConfig"
+      ],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.apps",
+          "names": [
+            "AppConfig"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "apiadmin\\middleware.py",
+      "functions": [
+        "__init__",
+        "__call__",
+        "get_client_ip",
+        "get_auth_api_key"
+      ],
+      "classes": [
+        "ApiHitLoggerMiddleware"
+      ],
+      "methods": [
+        "__init__",
+        "__call__",
+        "get_client_ip",
+        "get_auth_api_key"
+      ],
+      "imports": [
+        {
+          "module": "models",
+          "names": [
+            "ApiHitLog"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "apiadmin\\models.py",
+      "functions": [
+        "__str__"
+      ],
+      "classes": [
+        "ApiHitLog"
+      ],
+      "methods": [
+        "__str__"
+      ],
+      "imports": [
+        {
+          "module": "django.db",
+          "names": [
+            "models"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.conf",
+          "names": [
+            "settings"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "apiadmin\\tests.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.test",
+          "names": [
+            "TestCase"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "apiadmin\\views.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.shortcuts",
+          "names": [
+            "render"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "apiadmin\\__init__.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "app_controller\\admin.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.contrib",
+          "names": [
+            "admin"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "app_controller\\apps.py",
+      "functions": [],
+      "classes": [
+        "AppControllerConfig"
+      ],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.apps",
+          "names": [
+            "AppConfig"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "app_controller\\models.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.db",
+          "names": [
+            "models"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "app_controller\\tasks.py",
+      "functions": [
+        "Reading"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "copy",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "logging",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "asyncio.log",
+          "names": [
+            "logger"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "celery",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "celery",
+          "names": [
+            "shared_task"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "app_controller\\tests.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.test",
+          "names": [
+            "TestCase"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "app_controller\\utils.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "app_controller\\views.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.shortcuts",
+          "names": [
+            "render"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "app_controller\\__init__.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "bot_interface\\admin.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.contrib",
+          "names": [
+            "admin"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "models",
+          "names": [
+            "Bot",
+            "SMJ",
+            "BotUsers"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\api.py",
+      "functions": [
+        "mark_message_as_read",
+        "whatsapp_webhook",
+        "send_text_url",
+        "send_text",
+        "send_url",
+        "send_items",
+        "send_audio_with_retries",
+        "send_button_msg",
+        "create_reply_json",
+        "send_list_msg",
+        "create_reply_json",
+        "send_location_request",
+        "download_image",
+        "download_audio",
+        "is_audio_file",
+        "get_audio_extension",
+        "convert_wav_to_mp3",
+        "convert_ogg_to_wav",
+        "download_media_from_url"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "rest_framework.decorators",
+          "names": [
+            "api_view",
+            "schema"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.response",
+          "names": [
+            "Response"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework",
+          "names": [
+            "status"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.models",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.utils",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.tasks",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.auth",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "requests",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "os",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "emoji",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "utilities.auth_utils",
+          "names": [
+            "auth_free"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "time",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "datetime",
+          "names": [
+            "datetime",
+            "timedelta"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "subprocess",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "requests.exceptions",
+          "names": [
+            "RequestException"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.conf",
+          "names": [
+            "settings"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.http",
+          "names": [
+            "HttpResponse",
+            "HttpResponseForbidden",
+            "JsonResponse"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\apps.py",
+      "functions": [
+        "ready"
+      ],
+      "classes": [
+        "BotInterfaceConfig"
+      ],
+      "methods": [
+        "ready"
+      ],
+      "imports": [
+        {
+          "module": "django.apps",
+          "names": [
+            "AppConfig"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "logging",
+          "names": [],
+          "is_from": false
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\auth.py",
+      "functions": [
+        "get_bsp_url_headers"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "bot_interface.models",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "nrm_app.settings",
+          "names": [
+            "AUTH_TOKEN_360",
+            "ES_AUTH",
+            "CALL_PATCH_API_KEY",
+            "AUTH_TOKEN_FB_META"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\data_classes.py",
+      "functions": [
+        "to_dict"
+      ],
+      "classes": [
+        "EventPacket"
+      ],
+      "methods": [
+        "to_dict"
+      ],
+      "imports": [
+        {
+          "module": "dataclasses",
+          "names": [
+            "dataclass",
+            "field",
+            "asdict"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "typing",
+          "names": [
+            "Any",
+            "Dict",
+            "Optional"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\flow_logger.py",
+      "functions": [
+        "get_bot_instance",
+        "get_user_session",
+        "get_bot_user",
+        "get_smj",
+        "build_community_context",
+        "create_user_log",
+        "log_flow_completion",
+        "log_work_demand_completion",
+        "log_grievance_completion"
+      ],
+      "classes": [
+        "FlowLoggerMixin"
+      ],
+      "methods": [
+        "get_bot_instance",
+        "get_user_session",
+        "get_bot_user",
+        "get_smj",
+        "build_community_context",
+        "create_user_log",
+        "log_flow_completion",
+        "log_work_demand_completion",
+        "log_grievance_completion"
+      ],
+      "imports": [
+        {
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface",
+          "names": [
+            "models"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.tasks",
+          "names": [
+            "process_work_demand_task"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\helper.py",
+      "functions": [
+        "_extract_whatsapp_value",
+        "_load_user_session",
+        "_extract_lat_lon_from_session",
+        "_normalize_location_response",
+        "_normalize_location",
+        "_get_user_session",
+        "_prepare_and_send_list",
+        "_extract_ids_from_session",
+        "_build_community_data",
+        "_extract_community_id_from_session",
+        "_load_bot_and_session",
+        "_get_bot_user_and_phone",
+        "_send_text",
+        "_resolve_community_id",
+        "_get_user_session",
+        "_extract_location_data",
+        "_archive_user_session",
+        "_reset_user_session",
+        "_get_bot_instance",
+        "_get_user_session",
+        "_get_bot_user",
+        "_get_smj",
+        "_detect_flow_type",
+        "_extract_media_data",
+        "_build_misc_payload"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "typing",
+          "names": [
+            "Any",
+            "Dict"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "logging",
+          "names": [],
+          "is_from": false
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\models.py",
+      "functions": [
+        "build_interface",
+        "__str__",
+        "__str__",
+        "__str__",
+        "__str__",
+        "__str__",
+        "__str__"
+      ],
+      "classes": [
+        "FactoryInterface",
+        "SMJ",
+        "Bot",
+        "Meta",
+        "BotUsers",
+        "Meta",
+        "UserSessions",
+        "Meta",
+        "UserLogs",
+        "UserArchive"
+      ],
+      "methods": [
+        "build_interface",
+        "__str__",
+        "__str__",
+        "__str__",
+        "__str__",
+        "__str__",
+        "__str__"
+      ],
+      "imports": [
+        {
+          "module": "django.db",
+          "names": [
+            "models"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.utils",
+          "names": [
+            "timezone"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "users.models",
+          "names": [
+            "User"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.interface.whatsapp",
+          "names": [
+            "WhatsAppInterface"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\signals.py",
+      "functions": [
+        "async_process_work_demand",
+        "process_work_demand_on_completion"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "threading",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "logging",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "django.db.models.signals",
+          "names": [
+            "post_save"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.dispatch",
+          "names": [
+            "receiver"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.utils",
+          "names": [
+            "timezone"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "community_engagement.api",
+          "names": [
+            "item_type"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "models",
+          "names": [
+            "UserLogs"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "interface.whatsapp",
+          "names": [
+            "WhatsAppInterface"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tasks",
+          "names": [
+            "process_and_submit_work_demand"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\statemachine.py",
+      "functions": [
+        "findTransitionState",
+        "__init__",
+        "jumpToSmj",
+        "jumpTodefaultSmj",
+        "setSmjId",
+        "getSmjId",
+        "setCurrentState",
+        "getCurrentState",
+        "getStates",
+        "setStates",
+        "findStateinMap",
+        "ifStateExists",
+        "getpreActionList",
+        "getpostActionList",
+        "findTransitiondict",
+        "preAction",
+        "_is_valid_transition_event",
+        "postAction",
+        "findAndDoTransition",
+        "handleInternalTransition",
+        "__init__",
+        "_update_user_session_context",
+        "_load_correct_smj_states",
+        "runSmj"
+      ],
+      "classes": [
+        "StateMapData",
+        "SmjController"
+      ],
+      "methods": [
+        "__init__",
+        "jumpToSmj",
+        "jumpTodefaultSmj",
+        "setSmjId",
+        "getSmjId",
+        "setCurrentState",
+        "getCurrentState",
+        "getStates",
+        "setStates",
+        "findStateinMap",
+        "ifStateExists",
+        "getpreActionList",
+        "getpostActionList",
+        "findTransitiondict",
+        "preAction",
+        "_is_valid_transition_event",
+        "postAction",
+        "findAndDoTransition",
+        "handleInternalTransition",
+        "__init__",
+        "_update_user_session_context",
+        "_load_correct_smj_states",
+        "runSmj"
+      ],
+      "imports": [
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\tasks.py",
+      "functions": [
+        "StartUserSession",
+        "_handle_user_onboarding",
+        "_load_or_create_user_session",
+        "process_and_submit_work_demand"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "os",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.models",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.statemachine",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.utils",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "nrm_app.celery",
+          "names": [
+            "app"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "typing",
+          "names": [
+            "Dict",
+            "Any",
+            "Tuple"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.core.exceptions",
+          "names": [
+            "ObjectDoesNotExist"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "requests",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "logging",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "nrm_app.settings",
+          "names": [
+            "CE_API_URL"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\tests.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.test",
+          "names": [
+            "TestCase"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\urls.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.urls",
+          "names": [
+            "path"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "",
+          "names": [
+            "api"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\utils.py",
+      "functions": [
+        "get_community_membership",
+        "add_community_membership",
+        "is_user_in_community",
+        "sync_community_data_from_database",
+        "check_event_type",
+        "create_media_entry",
+        "detect_url",
+        "convert_image_hdpi",
+        "push_to_s3",
+        "get_filename_extension",
+        "get_s3_file_url",
+        "check_and_create_user",
+        "check_user_community_status_direct",
+        "check_user_community_status_http",
+        "get_community_by_lat_lon",
+        "fetch_states",
+        "check_user_community_status",
+        "jumpToSmj",
+        "callFunctionByName"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "datetime",
+          "names": [
+            "datetime"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "dateutil.relativedelta",
+          "names": [
+            "relativedelta"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "re",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "requests",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "requests.auth",
+          "names": [
+            "HTTPBasicAuth"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.api",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.models",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.interface.generic",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.interface.whatsapp",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "PIL",
+          "names": [
+            "Image"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "decimal",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "ast",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "boto3.dynamodb.conditions",
+          "names": [
+            "Key"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "botocore.exceptions",
+          "names": [
+            "ClientError"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "speech_recognition",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "subprocess",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "mimetypes",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "collections",
+          "names": [
+            "OrderedDict"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.api",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.models",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.interface.generic",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "bot_interface.interface.whatsapp",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "typing",
+          "names": [
+            "Dict",
+            "Any",
+            "Tuple"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.core.exceptions",
+          "names": [
+            "ObjectDoesNotExist"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "logging",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "nrm_app.settings",
+          "names": [
+            "CE_API_URL"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\views.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.shortcuts",
+          "names": [
+            "render"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "bot_interface\\__init__.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "community_engagement\\admin.py",
+      "functions": [
+        "locations_display",
+        "get_queryset"
+      ],
+      "classes": [
+        "LocationInline",
+        "LocationAdmin",
+        "CommunityAdmin",
+        "CommunityUserMappingAdmin"
+      ],
+      "methods": [
+        "locations_display",
+        "get_queryset"
+      ],
+      "imports": [
+        {
+          "module": "django.contrib",
+          "names": [
+            "admin"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "models",
+          "names": [
+            "Location",
+            "Community",
+            "Community_user_mapping",
+            "Item_category"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\api.py",
+      "functions": [
+        "attach_media_files",
+        "handle_media_upload",
+        "upsert_item",
+        "attach_media_to_item",
+        "get_community_details",
+        "get_communities_by_location",
+        "get_communities_by_lat_lon",
+        "get_community_by_user",
+        "map_users_to_community",
+        "add_user_to_community",
+        "is_user_in_community",
+        "get_districts_with_community",
+        "get_tehsils_with_community",
+        "update_last_accessed_community",
+        "get_items_by_community",
+        "get_items_status",
+        "create_community"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "ast",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "boto3",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "json",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "pandas",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "traceback",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "uuid",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "collections",
+          "names": [
+            "defaultdict"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.http",
+          "names": [
+            "HttpRequest"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework",
+          "names": [
+            "status"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.decorators",
+          "names": [
+            "api_view",
+            "parser_classes",
+            "schema"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.parsers",
+          "names": [
+            "MultiPartParser",
+            "FormParser"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.response",
+          "names": [
+            "Response"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "drf_yasg",
+          "names": [
+            "openapi"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "drf_yasg.utils",
+          "names": [
+            "swagger_auto_schema"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "models",
+          "names": [
+            "Community",
+            "Item",
+            "Community_user_mapping",
+            "Media",
+            "Media_type",
+            "Location",
+            "Item_type",
+            "Item_state",
+            "ITEM_TYPE_STATE_MAP",
+            "Item_category"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utils",
+          "names": [
+            "get_media_type",
+            "get_community_summary_data",
+            "get_communities",
+            "generate_item_title"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "geoadmin.models",
+          "names": [
+            "State",
+            "District",
+            "Block"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "projects.models",
+          "names": [
+            "Project",
+            "AppType"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "users.models",
+          "names": [
+            "User"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.models",
+          "names": [
+            "Bot"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "public_api.views",
+          "names": [
+            "get_location_info_by_lat_lon"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utilities.auth_utils",
+          "names": [
+            "auth_free"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "nrm_app.settings",
+          "names": [
+            "S3_BUCKET",
+            "S3_REGION"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utilities.auth_check_decorator",
+          "names": [
+            "api_security_check"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utils",
+          "names": [
+            "create_community_for_project"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\apps.py",
+      "functions": [],
+      "classes": [
+        "CommunityEngagementConfig"
+      ],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.apps",
+          "names": [
+            "AppConfig"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\models.py",
+      "functions": [
+        "__str__",
+        "__str__",
+        "__str__"
+      ],
+      "classes": [
+        "LocationLevel",
+        "Meta",
+        "Location",
+        "Community",
+        "Community_user_mapping",
+        "Media_type",
+        "Media_source",
+        "Media",
+        "Item_category",
+        "Item_type",
+        "Item_state",
+        "Item"
+      ],
+      "methods": [
+        "__str__",
+        "__str__",
+        "__str__"
+      ],
+      "imports": [
+        {
+          "module": "django.db",
+          "names": [
+            "models"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "uuid",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "geoadmin.models",
+          "names": [
+            "State",
+            "District",
+            "Block"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "projects.models",
+          "names": [
+            "Project"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "users.models",
+          "names": [
+            "User"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "bot_interface.models",
+          "names": [
+            "Bot"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\tests.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.test",
+          "names": [
+            "TestCase"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\urls.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.urls",
+          "names": [
+            "path"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "",
+          "names": [
+            "api"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\utils.py",
+      "functions": [
+        "get_media_type",
+        "get_community_summary_data",
+        "get_communities",
+        "create_community_for_project",
+        "generate_item_title"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "models",
+          "names": [
+            "Media_type",
+            "Community",
+            "Location",
+            "LocationLevel"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "geoadmin.models",
+          "names": [
+            "State",
+            "District",
+            "Block"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.db.models",
+          "names": [
+            "Q"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.utils.timezone",
+          "names": [
+            "now",
+            "localtime"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "projects.models",
+          "names": [
+            "Project"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\views.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.shortcuts",
+          "names": [
+            "render"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "community_engagement\\__init__.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "computing\\admin.py",
+      "functions": [],
+      "classes": [
+        "LayerAdmin",
+        "LayerAdmin"
+      ],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.contrib",
+          "names": [
+            "admin"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "models",
+          "names": [
+            "*"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "computing\\api.py",
+      "functions": [
+        "generate_admin_boundary",
+        "generate_nrega_layer",
+        "generate_drainage_layer",
+        "create_workspace",
+        "delete_layer",
+        "upload_kml",
+        "generate_mws_layer",
+        "generate_fortnightly_hydrology",
+        "generate_annual_hydrology",
+        "lulc_for_tehsil",
+        "lulc_v2_river_basin",
+        "lulc_v3_river_basin",
+        "lulc_v3",
+        "lulc_vector",
+        "lulc_v4",
+        "get_gee_layer",
+        "generate_ci_layer",
+        "generate_swb",
+        "generate_drought_layer",
+        "generate_terrain_descriptor",
+        "generate_terrain_raster",
+        "terrain_lulc_slope_cluster",
+        "terrain_lulc_plain_cluster",
+        "generate_clart",
+        "change_detection",
+        "change_detection_vector",
+        "crop_grid",
+        "mws_drought_causality",
+        "tree_health_raster",
+        "tree_health_vector",
+        "gee_task_status",
+        "stream_order",
+        "restoration_opportunity",
+        "plantation_site_suitability",
+        "aquifer_vector",
+        "soge_vector",
+        "fes_clart_upload_layer",
+        "swb_pond_merging",
+        "lulc_farm_boundary",
+        "ponds_compute",
+        "wells_compute",
+        "generate_layer_in_order",
+        "layer_status_dashboard",
+        "generate_lcw",
+        "generate_agroecological",
+        "generate_factory_csr",
+        "generate_green_credit",
+        "generate_mining",
+        "get_layers_for_workspace",
+        "generate_natural_depression",
+        "generate_distance_nearest_upstream_DL",
+        "generate_catchment_area_SF",
+        "generate_slope_percentage",
+        "generate_ndvi_timeseries",
+        "generate_zoi_to_gee",
+        "generate_mws_connectivity",
+        "generate_mws_centroid"
+      ],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "os",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "requests",
+          "names": [],
+          "is_from": false
+        },
+        {
+          "module": "nrm_app.settings",
+          "names": [
+            "BASE_DIR",
+            "LOCAL_COMPUTE_API_URL"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.decorators",
+          "names": [
+            "api_view",
+            "parser_classes",
+            "schema"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.response",
+          "names": [
+            "Response"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework",
+          "names": [
+            "status"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "rest_framework.parsers",
+          "names": [
+            "MultiPartParser",
+            "FormParser"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "computing.change_detection.change_detection_vector",
+          "names": [
+            "vectorise_change_detection"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.lulc_vector",
+          "names": [
+            "vectorise_lulc"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.river_basin_lulc.lulc_v2_river_basin",
+          "names": [
+            "lulc_river_basin_v2"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.river_basin_lulc.lulc_v3_river_basin_using_v2",
+          "names": [
+            "lulc_river_basin_v3"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.tehsil_level.lulc_v2",
+          "names": [
+            "generate_lulc_v2_tehsil"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.tehsil_level.lulc_v3",
+          "names": [
+            "generate_lulc_v3_tehsil"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.v4.lulc_v4",
+          "names": [
+            "generate_lulc_v4"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.ndvi_time_series",
+          "names": [
+            "ndvi_timeseries"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.restoration_opportunity",
+          "names": [
+            "generate_restoration_opportunity"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.stream_order",
+          "names": [
+            "generate_stream_order"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "mws.generate_hydrology",
+          "names": [
+            "generate_hydrology"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utils",
+          "names": [
+            "Geoserver",
+            "kml_to_shp"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utilities.gee_utils",
+          "names": [
+            "download_gee_layer",
+            "check_gee_task_status"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.core.files.storage",
+          "names": [
+            "FileSystemStorage"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utilities.constants",
+          "names": [
+            "KML_PATH"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "mws.mws",
+          "names": [
+            "mws_layer"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "cropping_intensity.cropping_intensity",
+          "names": [
+            "generate_cropping_intensity"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "surface_water_bodies.swb",
+          "names": [
+            "generate_swb_layer"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "drought.drought",
+          "names": [
+            "calculate_drought"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "terrain_descriptor.terrain_clusters",
+          "names": [
+            "generate_terrain_clusters"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "terrain_descriptor.terrain_raster_fabdem",
+          "names": [
+            "generate_terrain_raster_clip"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "computing.misc.drainage_lines",
+          "names": [
+            "clip_drainage_lines"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc_X_terrain.lulc_on_slope_cluster",
+          "names": [
+            "lulc_on_slope_cluster"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc_X_terrain.lulc_on_plain_cluster",
+          "names": [
+            "lulc_on_plain_cluster"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "clart.clart",
+          "names": [
+            "generate_clart_layer"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.admin_boundary",
+          "names": [
+            "generate_tehsil_shape_file_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.nrega",
+          "names": [
+            "clip_nrega_district_block"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "computing.change_detection.change_detection",
+          "names": [
+            "get_change_detection"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "lulc.lulc_v3",
+          "names": [
+            "clip_lulc_v3"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "crop_grid.crop_grid",
+          "names": [
+            "create_crop_grids"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tree_health.ccd",
+          "names": [
+            "tree_health_ccd_raster"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tree_health.canopy_height",
+          "names": [
+            "tree_health_ch_raster"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tree_health.overall_change",
+          "names": [
+            "tree_health_overall_change_raster"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "drought.drought_causality",
+          "names": [
+            "drought_causality"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tree_health.overall_change_vector",
+          "names": [
+            "tree_health_overall_change_vector"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tree_health.canopy_height_vector",
+          "names": [
+            "tree_health_ch_vector"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "tree_health.ccd_vector",
+          "names": [
+            "tree_health_ccd_vector"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "plantation.site_suitability",
+          "names": [
+            "site_suitability"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.aquifer_vector",
+          "names": [
+            "generate_aquifer_vector"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.soge_vector",
+          "names": [
+            "generate_soge_vector"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "clart.fes_clart_to_geoserver",
+          "names": [
+            "generate_fes_clart_layer"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "surface_water_bodies.merge_swb_ponds",
+          "names": [
+            "merge_swb_ponds"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "utilities.auth_check_decorator",
+          "names": [
+            "api_security_check"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "computing.layer_dependency.layer_generation_in_order",
+          "names": [
+            "layer_generate_map"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "views",
+          "names": [
+            "layer_status",
+            "get_layers_of_workspace"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.lcw_conflict",
+          "names": [
+            "generate_lcw_conflict_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.agroecological_space",
+          "names": [
+            "generate_agroecological_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.factory_csr",
+          "names": [
+            "generate_factory_csr_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.green_credit",
+          "names": [
+            "generate_green_credit_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.mining_data",
+          "names": [
+            "generate_mining_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.slope_percentage",
+          "names": [
+            "generate_slope_percentage_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.naturaldepression",
+          "names": [
+            "generate_natural_depression_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.distancetonearestdrainage",
+          "names": [
+            "generate_distance_to_nearest_drainage_line"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "misc.catchment_area",
+          "names": [
+            "generate_catchment_area_singleflow"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "zoi_layers.zoi",
+          "names": [
+            "generate_zoi"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "mws.mws_connectivity",
+          "names": [
+            "generate_mws_connectivity_data"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "mws.mws_centroid",
+          "names": [
+            "generate_mws_centroid_data"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "computing\\apps.py",
+      "functions": [],
+      "classes": [
+        "ComputingConfig"
+      ],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.apps",
+          "names": [
+            "AppConfig"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "computing\\models.py",
+      "functions": [
+        "__str__",
+        "__str__"
+      ],
+      "classes": [
+        "LayerType",
+        "Meta",
+        "Dataset",
+        "Meta",
+        "Layer"
+      ],
+      "methods": [
+        "__str__",
+        "__str__"
+      ],
+      "imports": [
+        {
+          "module": "django.db",
+          "names": [
+            "models"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "geoadmin.models",
+          "names": [
+            "StateSOI",
+            "DistrictSOI",
+            "TehsilSOI"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "computing\\path_constants.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "computing\\scratch.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": []
+    },
+    {
+      "path": "computing\\tests.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "django.test",
+          "names": [
+            "TestCase"
+          ],
+          "is_from": true
+        }
+      ]
+    },
+    {
+      "path": "computing\\urls.py",
+      "functions": [],
+      "classes": [],
+      "methods": [],
+      "imports": [
+        {
+          "module": "tkinter.font",
+          "names": [
+            "names"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "django.urls",
+          "names": [
+            "path"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "",
+          "names": [
+            "api"
+          ],
+          "is_from": true
+        },
+        {
+          "module": "views",
+          "names": [
+            "layer_status"
+          ],
+          "is_from": true
+        }
+      ]
+    }
+  ]
+}

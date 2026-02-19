@@ -1,0 +1,2145 @@
+{
+  "name": "",
+  "type": "dir",
+  "children": [
+    {
+      "name": "apiadmin",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "apiadmin\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "apiadmin\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "apiadmin\\apps.py"
+        },
+        {
+          "name": "middleware.py",
+          "type": "file",
+          "path": "apiadmin\\middleware.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "apiadmin\\models.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "apiadmin\\tests.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "apiadmin\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "app_controller",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "app_controller\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "app_controller\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "app_controller\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "app_controller\\models.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "app_controller\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "app_controller\\tests.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "app_controller\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "app_controller\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "bot_interface",
+      "type": "dir",
+      "children": [
+        {
+          "name": "interface",
+          "type": "dir",
+          "children": [
+            {
+              "name": "generic.py",
+              "type": "file",
+              "path": "bot_interface\\interface\\generic.py"
+            },
+            {
+              "name": "whatsapp.py",
+              "type": "file",
+              "path": "bot_interface\\interface\\whatsapp.py"
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "bot_interface\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "bot_interface\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "bot_interface\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "bot_interface\\apps.py"
+        },
+        {
+          "name": "auth.py",
+          "type": "file",
+          "path": "bot_interface\\auth.py"
+        },
+        {
+          "name": "data_classes.py",
+          "type": "file",
+          "path": "bot_interface\\data_classes.py"
+        },
+        {
+          "name": "flow_logger.py",
+          "type": "file",
+          "path": "bot_interface\\flow_logger.py"
+        },
+        {
+          "name": "helper.py",
+          "type": "file",
+          "path": "bot_interface\\helper.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "bot_interface\\models.py"
+        },
+        {
+          "name": "signals.py",
+          "type": "file",
+          "path": "bot_interface\\signals.py"
+        },
+        {
+          "name": "statemachine.py",
+          "type": "file",
+          "path": "bot_interface\\statemachine.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "bot_interface\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "bot_interface\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "bot_interface\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "bot_interface\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "bot_interface\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "community_engagement",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "community_engagement\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "community_engagement\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "community_engagement\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "community_engagement\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "community_engagement\\models.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "community_engagement\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "community_engagement\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "community_engagement\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "community_engagement\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "computing",
+      "type": "dir",
+      "children": [
+        {
+          "name": "catchment_area",
+          "type": "dir",
+          "children": [
+            {
+              "name": "catchmentarea.py",
+              "type": "file",
+              "path": "computing\\catchment_area\\catchmentarea.py"
+            }
+          ]
+        },
+        {
+          "name": "change_detection",
+          "type": "dir",
+          "children": [
+            {
+              "name": "__init__.py",
+              "type": "file",
+              "path": "computing\\change_detection\\__init__.py"
+            },
+            {
+              "name": "change_detection.py",
+              "type": "file",
+              "path": "computing\\change_detection\\change_detection.py"
+            },
+            {
+              "name": "change_detection_vector.py",
+              "type": "file",
+              "path": "computing\\change_detection\\change_detection_vector.py"
+            }
+          ]
+        },
+        {
+          "name": "clart",
+          "type": "dir",
+          "children": [
+            {
+              "name": "__init__.py",
+              "type": "file",
+              "path": "computing\\clart\\__init__.py"
+            },
+            {
+              "name": "clart.py",
+              "type": "file",
+              "path": "computing\\clart\\clart.py"
+            },
+            {
+              "name": "drainage_density.py",
+              "type": "file",
+              "path": "computing\\clart\\drainage_density.py"
+            },
+            {
+              "name": "fes_clart_to_geoserver.py",
+              "type": "file",
+              "path": "computing\\clart\\fes_clart_to_geoserver.py"
+            },
+            {
+              "name": "lithology.py",
+              "type": "file",
+              "path": "computing\\clart\\lithology.py"
+            },
+            {
+              "name": "rasterize_vector.py",
+              "type": "file",
+              "path": "computing\\clart\\rasterize_vector.py"
+            }
+          ]
+        },
+        {
+          "name": "crop_grid",
+          "type": "dir",
+          "children": [
+            {
+              "name": "crop_grid.py",
+              "type": "file",
+              "path": "computing\\crop_grid\\crop_grid.py"
+            },
+            {
+              "name": "crop_gridXlulc.py",
+              "type": "file",
+              "path": "computing\\crop_grid\\crop_gridXlulc.py"
+            }
+          ]
+        },
+        {
+          "name": "cropping_intensity",
+          "type": "dir",
+          "children": [
+            {
+              "name": "cropping_intensity.py",
+              "type": "file",
+              "path": "computing\\cropping_intensity\\cropping_intensity.py"
+            }
+          ]
+        },
+        {
+          "name": "drought",
+          "type": "dir",
+          "children": [
+            {
+              "name": "drought.py",
+              "type": "file",
+              "path": "computing\\drought\\drought.py"
+            },
+            {
+              "name": "drought_causality.py",
+              "type": "file",
+              "path": "computing\\drought\\drought_causality.py"
+            },
+            {
+              "name": "generate_layers.py",
+              "type": "file",
+              "path": "computing\\drought\\generate_layers.py"
+            },
+            {
+              "name": "merge_layers.py",
+              "type": "file",
+              "path": "computing\\drought\\merge_layers.py"
+            }
+          ]
+        },
+        {
+          "name": "layer_dependency",
+          "type": "dir",
+          "children": [
+            {
+              "name": "layer_generation_in_order.py",
+              "type": "file",
+              "path": "computing\\layer_dependency\\layer_generation_in_order.py"
+            }
+          ]
+        },
+        {
+          "name": "lulc",
+          "type": "dir",
+          "children": [
+            {
+              "name": "river_basin_lulc",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "lulc_v2_river_basin.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\river_basin_lulc\\lulc_v2_river_basin.py"
+                },
+                {
+                  "name": "lulc_v3_river_basin_using_v2.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\river_basin_lulc\\lulc_v3_river_basin_using_v2.py"
+                }
+              ]
+            },
+            {
+              "name": "tehsil_level",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "lulc_v2.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\tehsil_level\\lulc_v2.py"
+                },
+                {
+                  "name": "lulc_v3.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\tehsil_level\\lulc_v3.py"
+                }
+              ]
+            },
+            {
+              "name": "utils",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "built_up.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\built_up.py"
+                },
+                {
+                  "name": "cropland.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\cropland.py"
+                },
+                {
+                  "name": "lulc_v2.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\lulc_v2.py"
+                },
+                {
+                  "name": "lulc_v3.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\lulc_v3.py"
+                },
+                {
+                  "name": "lulc_v3_using_v2_river_basin.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\lulc_v3_using_v2_river_basin.py"
+                },
+                {
+                  "name": "temporal_correction.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\temporal_correction.py"
+                },
+                {
+                  "name": "water_body.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\utils\\water_body.py"
+                }
+              ]
+            },
+            {
+              "name": "v4",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "classify_raster.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\classify_raster.py"
+                },
+                {
+                  "name": "create_classifier.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\create_classifier.py"
+                },
+                {
+                  "name": "cropping_frequency_detection.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\cropping_frequency_detection.py"
+                },
+                {
+                  "name": "farm_boundaries_clustering.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\farm_boundaries_clustering.py"
+                },
+                {
+                  "name": "lulc_v4.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\lulc_v4.py"
+                },
+                {
+                  "name": "misc.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\misc.py"
+                },
+                {
+                  "name": "time_series.py",
+                  "type": "file",
+                  "path": "computing\\lulc\\v4\\time_series.py"
+                }
+              ]
+            },
+            {
+              "name": "cropping_frequency.py",
+              "type": "file",
+              "path": "computing\\lulc\\cropping_frequency.py"
+            },
+            {
+              "name": "lulc_v3.py",
+              "type": "file",
+              "path": "computing\\lulc\\lulc_v3.py"
+            },
+            {
+              "name": "lulc_vector.py",
+              "type": "file",
+              "path": "computing\\lulc\\lulc_vector.py"
+            },
+            {
+              "name": "misc.py",
+              "type": "file",
+              "path": "computing\\lulc\\misc.py"
+            }
+          ]
+        },
+        {
+          "name": "lulc_X_terrain",
+          "type": "dir",
+          "children": [
+            {
+              "name": "lulc_on_plain_cluster.py",
+              "type": "file",
+              "path": "computing\\lulc_X_terrain\\lulc_on_plain_cluster.py"
+            },
+            {
+              "name": "lulc_on_slope_cluster.py",
+              "type": "file",
+              "path": "computing\\lulc_X_terrain\\lulc_on_slope_cluster.py"
+            },
+            {
+              "name": "terrain_classifier.py",
+              "type": "file",
+              "path": "computing\\lulc_X_terrain\\terrain_classifier.py"
+            },
+            {
+              "name": "utils.py",
+              "type": "file",
+              "path": "computing\\lulc_X_terrain\\utils.py"
+            }
+          ]
+        },
+        {
+          "name": "misc",
+          "type": "dir",
+          "children": [
+            {
+              "name": "admin_boundary.py",
+              "type": "file",
+              "path": "computing\\misc\\admin_boundary.py"
+            },
+            {
+              "name": "agroecological_space.py",
+              "type": "file",
+              "path": "computing\\misc\\agroecological_space.py"
+            },
+            {
+              "name": "aquifer_vector.py",
+              "type": "file",
+              "path": "computing\\misc\\aquifer_vector.py"
+            },
+            {
+              "name": "catchment_area.py",
+              "type": "file",
+              "path": "computing\\misc\\catchment_area.py"
+            },
+            {
+              "name": "distancetonearestdrainage.py",
+              "type": "file",
+              "path": "computing\\misc\\distancetonearestdrainage.py"
+            },
+            {
+              "name": "drainage_lines.py",
+              "type": "file",
+              "path": "computing\\misc\\drainage_lines.py"
+            },
+            {
+              "name": "factory_csr.py",
+              "type": "file",
+              "path": "computing\\misc\\factory_csr.py"
+            },
+            {
+              "name": "green_credit.py",
+              "type": "file",
+              "path": "computing\\misc\\green_credit.py"
+            },
+            {
+              "name": "hls_interpolated_ndvi.py",
+              "type": "file",
+              "path": "computing\\misc\\hls_interpolated_ndvi.py"
+            },
+            {
+              "name": "lcw_conflict.py",
+              "type": "file",
+              "path": "computing\\misc\\lcw_conflict.py"
+            },
+            {
+              "name": "mining_data.py",
+              "type": "file",
+              "path": "computing\\misc\\mining_data.py"
+            },
+            {
+              "name": "naturaldepression.py",
+              "type": "file",
+              "path": "computing\\misc\\naturaldepression.py"
+            },
+            {
+              "name": "ndvi_time_series.py",
+              "type": "file",
+              "path": "computing\\misc\\ndvi_time_series.py"
+            },
+            {
+              "name": "nrega.py",
+              "type": "file",
+              "path": "computing\\misc\\nrega.py"
+            },
+            {
+              "name": "restoration_opportunity.py",
+              "type": "file",
+              "path": "computing\\misc\\restoration_opportunity.py"
+            },
+            {
+              "name": "slope_percentage.py",
+              "type": "file",
+              "path": "computing\\misc\\slope_percentage.py"
+            },
+            {
+              "name": "soge_vector.py",
+              "type": "file",
+              "path": "computing\\misc\\soge_vector.py"
+            },
+            {
+              "name": "stream_order.py",
+              "type": "file",
+              "path": "computing\\misc\\stream_order.py"
+            }
+          ]
+        },
+        {
+          "name": "mws",
+          "type": "dir",
+          "children": [
+            {
+              "name": "calculateG.py",
+              "type": "file",
+              "path": "computing\\mws\\calculateG.py"
+            },
+            {
+              "name": "delta_g.py",
+              "type": "file",
+              "path": "computing\\mws\\delta_g.py"
+            },
+            {
+              "name": "evapotranspiration.py",
+              "type": "file",
+              "path": "computing\\mws\\evapotranspiration.py"
+            },
+            {
+              "name": "generate_hydrology.py",
+              "type": "file",
+              "path": "computing\\mws\\generate_hydrology.py"
+            },
+            {
+              "name": "mws.py",
+              "type": "file",
+              "path": "computing\\mws\\mws.py"
+            },
+            {
+              "name": "mws_centroid.py",
+              "type": "file",
+              "path": "computing\\mws\\mws_centroid.py"
+            },
+            {
+              "name": "mws_connectivity.py",
+              "type": "file",
+              "path": "computing\\mws\\mws_connectivity.py"
+            },
+            {
+              "name": "net_value.py",
+              "type": "file",
+              "path": "computing\\mws\\net_value.py"
+            },
+            {
+              "name": "precipitation.py",
+              "type": "file",
+              "path": "computing\\mws\\precipitation.py"
+            },
+            {
+              "name": "run_off.py",
+              "type": "file",
+              "path": "computing\\mws\\run_off.py"
+            },
+            {
+              "name": "utils.py",
+              "type": "file",
+              "path": "computing\\mws\\utils.py"
+            },
+            {
+              "name": "well_depth.py",
+              "type": "file",
+              "path": "computing\\mws\\well_depth.py"
+            }
+          ]
+        },
+        {
+          "name": "plantation",
+          "type": "dir",
+          "children": [
+            {
+              "name": "utils",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "harmonized_ndvi.py",
+                  "type": "file",
+                  "path": "computing\\plantation\\utils\\harmonized_ndvi.py"
+                },
+                {
+                  "name": "lulc_attachment.py",
+                  "type": "file",
+                  "path": "computing\\plantation\\utils\\lulc_attachment.py"
+                },
+                {
+                  "name": "ndvi_attachment.py",
+                  "type": "file",
+                  "path": "computing\\plantation\\utils\\ndvi_attachment.py"
+                },
+                {
+                  "name": "plantation_utils.py",
+                  "type": "file",
+                  "path": "computing\\plantation\\utils\\plantation_utils.py"
+                },
+                {
+                  "name": "process_profile.py",
+                  "type": "file",
+                  "path": "computing\\plantation\\utils\\process_profile.py"
+                },
+                {
+                  "name": "site_properties.py",
+                  "type": "file",
+                  "path": "computing\\plantation\\utils\\site_properties.py"
+                }
+              ]
+            },
+            {
+              "name": "site_suitability.py",
+              "type": "file",
+              "path": "computing\\plantation\\site_suitability.py"
+            },
+            {
+              "name": "site_suitability_raster.py",
+              "type": "file",
+              "path": "computing\\plantation\\site_suitability_raster.py"
+            },
+            {
+              "name": "site_suitability_vector.py",
+              "type": "file",
+              "path": "computing\\plantation\\site_suitability_vector.py"
+            }
+          ]
+        },
+        {
+          "name": "STAC_specs",
+          "type": "dir",
+          "children": [
+            {
+              "name": "constants.py",
+              "type": "file",
+              "path": "computing\\STAC_specs\\constants.py"
+            },
+            {
+              "name": "generate_STAC_layerwise.py",
+              "type": "file",
+              "path": "computing\\STAC_specs\\generate_STAC_layerwise.py"
+            },
+            {
+              "name": "generate_STAC_layerwise_collection.py",
+              "type": "file",
+              "path": "computing\\STAC_specs\\generate_STAC_layerwise_collection.py"
+            },
+            {
+              "name": "generate_STAC_layerwise_collection_new_URL.py",
+              "type": "file",
+              "path": "computing\\STAC_specs\\generate_STAC_layerwise_collection_new_URL.py"
+            }
+          ]
+        },
+        {
+          "name": "surface_water_bodies",
+          "type": "dir",
+          "children": [
+            {
+              "name": "merge_swb_ponds.py",
+              "type": "file",
+              "path": "computing\\surface_water_bodies\\merge_swb_ponds.py"
+            },
+            {
+              "name": "swb.py",
+              "type": "file",
+              "path": "computing\\surface_water_bodies\\swb.py"
+            },
+            {
+              "name": "swb1.py",
+              "type": "file",
+              "path": "computing\\surface_water_bodies\\swb1.py"
+            },
+            {
+              "name": "swb2.py",
+              "type": "file",
+              "path": "computing\\surface_water_bodies\\swb2.py"
+            },
+            {
+              "name": "swb3.py",
+              "type": "file",
+              "path": "computing\\surface_water_bodies\\swb3.py"
+            },
+            {
+              "name": "swb4.py",
+              "type": "file",
+              "path": "computing\\surface_water_bodies\\swb4.py"
+            }
+          ]
+        },
+        {
+          "name": "terrain_descriptor",
+          "type": "dir",
+          "children": [
+            {
+              "name": "terrain_clusters.py",
+              "type": "file",
+              "path": "computing\\terrain_descriptor\\terrain_clusters.py"
+            },
+            {
+              "name": "terrain_raster.py",
+              "type": "file",
+              "path": "computing\\terrain_descriptor\\terrain_raster.py"
+            },
+            {
+              "name": "terrain_raster_fabdem.py",
+              "type": "file",
+              "path": "computing\\terrain_descriptor\\terrain_raster_fabdem.py"
+            },
+            {
+              "name": "terrain_utils.py",
+              "type": "file",
+              "path": "computing\\terrain_descriptor\\terrain_utils.py"
+            }
+          ]
+        },
+        {
+          "name": "tree_health",
+          "type": "dir",
+          "children": [
+            {
+              "name": "canopy_height.py",
+              "type": "file",
+              "path": "computing\\tree_health\\canopy_height.py"
+            },
+            {
+              "name": "canopy_height_vector.py",
+              "type": "file",
+              "path": "computing\\tree_health\\canopy_height_vector.py"
+            },
+            {
+              "name": "ccd.py",
+              "type": "file",
+              "path": "computing\\tree_health\\ccd.py"
+            },
+            {
+              "name": "ccd_vector.py",
+              "type": "file",
+              "path": "computing\\tree_health\\ccd_vector.py"
+            },
+            {
+              "name": "overall_change.py",
+              "type": "file",
+              "path": "computing\\tree_health\\overall_change.py"
+            },
+            {
+              "name": "overall_change_vector.py",
+              "type": "file",
+              "path": "computing\\tree_health\\overall_change_vector.py"
+            }
+          ]
+        },
+        {
+          "name": "water_rejuvenation",
+          "type": "dir",
+          "children": [
+            {
+              "name": "water_rejuventation.py",
+              "type": "file",
+              "path": "computing\\water_rejuvenation\\water_rejuventation.py"
+            }
+          ]
+        },
+        {
+          "name": "zoi_layers",
+          "type": "dir",
+          "children": [
+            {
+              "name": "zoi_layers",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "zoi.py",
+                  "type": "file",
+                  "path": "computing\\zoi_layers\\zoi_layers\\zoi.py"
+                },
+                {
+                  "name": "zoi1.py",
+                  "type": "file",
+                  "path": "computing\\zoi_layers\\zoi_layers\\zoi1.py"
+                },
+                {
+                  "name": "zoi2.py",
+                  "type": "file",
+                  "path": "computing\\zoi_layers\\zoi_layers\\zoi2.py"
+                },
+                {
+                  "name": "zoi3.py",
+                  "type": "file",
+                  "path": "computing\\zoi_layers\\zoi_layers\\zoi3.py"
+                },
+                {
+                  "name": "zoi4.py",
+                  "type": "file",
+                  "path": "computing\\zoi_layers\\zoi_layers\\zoi4.py"
+                }
+              ]
+            },
+            {
+              "name": "zoi.py",
+              "type": "file",
+              "path": "computing\\zoi_layers\\zoi.py"
+            },
+            {
+              "name": "zoi1.py",
+              "type": "file",
+              "path": "computing\\zoi_layers\\zoi1.py"
+            },
+            {
+              "name": "zoi2.py",
+              "type": "file",
+              "path": "computing\\zoi_layers\\zoi2.py"
+            },
+            {
+              "name": "zoi3.py",
+              "type": "file",
+              "path": "computing\\zoi_layers\\zoi3.py"
+            },
+            {
+              "name": "zoi4.py",
+              "type": "file",
+              "path": "computing\\zoi_layers\\zoi4.py"
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "computing\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "computing\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "computing\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "computing\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "computing\\models.py"
+        },
+        {
+          "name": "path_constants.py",
+          "type": "file",
+          "path": "computing\\path_constants.py"
+        },
+        {
+          "name": "scratch.py",
+          "type": "file",
+          "path": "computing\\scratch.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "computing\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "computing\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "computing\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "computing\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "constants",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "constants\\__init__.py"
+        },
+        {
+          "name": "pan_india_path.py",
+          "type": "file",
+          "path": "constants\\pan_india_path.py"
+        },
+        {
+          "name": "pan_india_urls.py",
+          "type": "file",
+          "path": "constants\\pan_india_urls.py"
+        }
+      ]
+    },
+    {
+      "name": "docs",
+      "type": "dir",
+      "children": [
+        {
+          "name": "challenges",
+          "type": "dir",
+          "children": [
+            {
+              "name": "core_stack_innovation_2025",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "core_stack_layer_load.py",
+                  "type": "file",
+                  "path": "docs\\challenges\\core_stack_innovation_2025\\core_stack_layer_load.py"
+                },
+                {
+                  "name": "core_stack_mws_intersections.py",
+                  "type": "file",
+                  "path": "docs\\challenges\\core_stack_innovation_2025\\core_stack_mws_intersections.py"
+                },
+                {
+                  "name": "core_stack_orm.py",
+                  "type": "file",
+                  "path": "docs\\challenges\\core_stack_innovation_2025\\core_stack_orm.py"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dpr",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "dpr\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "dpr\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "dpr\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "dpr\\apps.py"
+        },
+        {
+          "name": "gen_dpr.py",
+          "type": "file",
+          "path": "dpr\\gen_dpr.py"
+        },
+        {
+          "name": "gen_multi_mws_report.py",
+          "type": "file",
+          "path": "dpr\\gen_multi_mws_report.py"
+        },
+        {
+          "name": "gen_mws_report.py",
+          "type": "file",
+          "path": "dpr\\gen_mws_report.py"
+        },
+        {
+          "name": "gen_report_download.py",
+          "type": "file",
+          "path": "dpr\\gen_report_download.py"
+        },
+        {
+          "name": "gen_tehsil_report.py",
+          "type": "file",
+          "path": "dpr\\gen_tehsil_report.py"
+        },
+        {
+          "name": "mapping.py",
+          "type": "file",
+          "path": "dpr\\mapping.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "dpr\\models.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "dpr\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "dpr\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "dpr\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "dpr\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "dpr\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "gee_computing",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "gee_computing\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "gee_computing\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "gee_computing\\apps.py"
+        },
+        {
+          "name": "compute.py",
+          "type": "file",
+          "path": "gee_computing\\compute.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "gee_computing\\models.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "gee_computing\\serializers.py"
+        },
+        {
+          "name": "signals.py",
+          "type": "file",
+          "path": "gee_computing\\signals.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "gee_computing\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "gee_computing\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "gee_computing\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "gee_computing\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "gee_computing\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "geoadmin",
+      "type": "dir",
+      "children": [
+        {
+          "name": "management",
+          "type": "dir",
+          "children": [
+            {
+              "name": "commands",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "populate_district_soi.py",
+                  "type": "file",
+                  "path": "geoadmin\\management\\commands\\populate_district_soi.py"
+                },
+                {
+                  "name": "populate_state_soi.py",
+                  "type": "file",
+                  "path": "geoadmin\\management\\commands\\populate_state_soi.py"
+                },
+                {
+                  "name": "populate_tehsil_soi.py",
+                  "type": "file",
+                  "path": "geoadmin\\management\\commands\\populate_tehsil_soi.py"
+                },
+                {
+                  "name": "sync_active_status.py",
+                  "type": "file",
+                  "path": "geoadmin\\management\\commands\\sync_active_status.py"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "geoadmin\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "geoadmin\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "geoadmin\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "geoadmin\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "geoadmin\\models.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "geoadmin\\serializers.py"
+        },
+        {
+          "name": "signals.py",
+          "type": "file",
+          "path": "geoadmin\\signals.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "geoadmin\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "geoadmin\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "geoadmin\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "geoadmin\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "geoadmin\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "moderation",
+      "type": "dir",
+      "children": [
+        {
+          "name": "utils",
+          "type": "dir",
+          "children": [
+            {
+              "name": "__init__.py",
+              "type": "file",
+              "path": "moderation\\utils\\__init__.py"
+            },
+            {
+              "name": "form_mapping.py",
+              "type": "file",
+              "path": "moderation\\utils\\form_mapping.py"
+            },
+            {
+              "name": "get_submissions.py",
+              "type": "file",
+              "path": "moderation\\utils\\get_submissions.py"
+            },
+            {
+              "name": "update_csdb.py",
+              "type": "file",
+              "path": "moderation\\utils\\update_csdb.py"
+            },
+            {
+              "name": "utils.py",
+              "type": "file",
+              "path": "moderation\\utils\\utils.py"
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "moderation\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "moderation\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "moderation\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "moderation\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "moderation\\models.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "moderation\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "moderation\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "moderation\\urls.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "moderation\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "nrm_app",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "nrm_app\\__init__.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "nrm_app\\api.py"
+        },
+        {
+          "name": "asgi.py",
+          "type": "file",
+          "path": "nrm_app\\asgi.py"
+        },
+        {
+          "name": "celery.py",
+          "type": "file",
+          "path": "nrm_app\\celery.py"
+        },
+        {
+          "name": "settings.py",
+          "type": "file",
+          "path": "nrm_app\\settings.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "nrm_app\\urls.py"
+        },
+        {
+          "name": "wsgi.py",
+          "type": "file",
+          "path": "nrm_app\\wsgi.py"
+        }
+      ]
+    },
+    {
+      "name": "organization",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "organization\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "organization\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "organization\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "organization\\models.py"
+        },
+        {
+          "name": "schemas.py",
+          "type": "file",
+          "path": "organization\\schemas.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "organization\\serializers.py"
+        },
+        {
+          "name": "signals.py",
+          "type": "file",
+          "path": "organization\\signals.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "organization\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "organization\\urls.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "organization\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "plans",
+      "type": "dir",
+      "children": [
+        {
+          "name": "management",
+          "type": "dir",
+          "children": [
+            {
+              "name": "commands",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "__init__.py",
+                  "type": "file",
+                  "path": "plans\\management\\commands\\__init__.py"
+                },
+                {
+                  "name": "copy_plans_to_planapp.py",
+                  "type": "file",
+                  "path": "plans\\management\\commands\\copy_plans_to_planapp.py"
+                },
+                {
+                  "name": "fill_plan_coordinates.py",
+                  "type": "file",
+                  "path": "plans\\management\\commands\\fill_plan_coordinates.py"
+                },
+                {
+                  "name": "sync_soi_fields.py",
+                  "type": "file",
+                  "path": "plans\\management\\commands\\sync_soi_fields.py"
+                }
+              ]
+            },
+            {
+              "name": "__init__.py",
+              "type": "file",
+              "path": "plans\\management\\__init__.py"
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "plans\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "plans\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "plans\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "plans\\apps.py"
+        },
+        {
+          "name": "build_layer.py",
+          "type": "file",
+          "path": "plans\\build_layer.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "plans\\models.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "plans\\serializers.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "plans\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "plans\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "plans\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "plans\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "plantations",
+      "type": "dir",
+      "children": [
+        {
+          "name": "utils",
+          "type": "dir",
+          "children": [
+            {
+              "name": "kml_converter.py",
+              "type": "file",
+              "path": "plantations\\utils\\kml_converter.py"
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "plantations\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "plantations\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "plantations\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "plantations\\models.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "plantations\\serializers.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "plantations\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "plantations\\urls.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "plantations\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "projects",
+      "type": "dir",
+      "children": [
+        {
+          "name": "management",
+          "type": "dir",
+          "children": [
+            {
+              "name": "commands",
+              "type": "dir",
+              "children": [
+                {
+                  "name": "__init__.py",
+                  "type": "file",
+                  "path": "projects\\management\\commands\\__init__.py"
+                },
+                {
+                  "name": "copy_census_to_soi.py",
+                  "type": "file",
+                  "path": "projects\\management\\commands\\copy_census_to_soi.py"
+                }
+              ]
+            },
+            {
+              "name": "__init__.py",
+              "type": "file",
+              "path": "projects\\management\\__init__.py"
+            }
+          ]
+        },
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "projects\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "projects\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "projects\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "projects\\models.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "projects\\serializers.py"
+        },
+        {
+          "name": "signals.py",
+          "type": "file",
+          "path": "projects\\signals.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "projects\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "projects\\urls.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "projects\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "public_api",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "public_api\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "public_api\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "public_api\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "public_api\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "public_api\\models.py"
+        },
+        {
+          "name": "swagger_schemas.py",
+          "type": "file",
+          "path": "public_api\\swagger_schemas.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "public_api\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "public_api\\urls.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "public_api\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "public_dataservice",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "public_dataservice\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "public_dataservice\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "public_dataservice\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "public_dataservice\\models.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "public_dataservice\\tests.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "public_dataservice\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "stats_generator",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "stats_generator\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "stats_generator\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "stats_generator\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "stats_generator\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "stats_generator\\models.py"
+        },
+        {
+          "name": "mws_indicators.py",
+          "type": "file",
+          "path": "stats_generator\\mws_indicators.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "stats_generator\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "stats_generator\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "stats_generator\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "stats_generator\\views.py"
+        },
+        {
+          "name": "village_indicators.py",
+          "type": "file",
+          "path": "stats_generator\\village_indicators.py"
+        }
+      ]
+    },
+    {
+      "name": "tests",
+      "type": "dir",
+      "children": [
+        {
+          "name": "test_facilities_api.py",
+          "type": "file",
+          "path": "tests\\test_facilities_api.py"
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "users\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "users\\admin.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "users\\apps.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "users\\models.py"
+        },
+        {
+          "name": "permissions.py",
+          "type": "file",
+          "path": "users\\permissions.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "users\\serializers.py"
+        },
+        {
+          "name": "signals.py",
+          "type": "file",
+          "path": "users\\signals.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "users\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "users\\urls.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "users\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "utilities",
+      "type": "dir",
+      "children": [
+        {
+          "name": "scripts",
+          "type": "dir",
+          "children": [
+            {
+              "name": "data_to_db.py",
+              "type": "file",
+              "path": "utilities\\scripts\\data_to_db.py"
+            }
+          ]
+        },
+        {
+          "name": "auth_check_decorator.py",
+          "type": "file",
+          "path": "utilities\\auth_check_decorator.py"
+        },
+        {
+          "name": "auth_utils.py",
+          "type": "file",
+          "path": "utilities\\auth_utils.py"
+        },
+        {
+          "name": "cloud_utils.py",
+          "type": "file",
+          "path": "utilities\\cloud_utils.py"
+        },
+        {
+          "name": "config.py",
+          "type": "file",
+          "path": "utilities\\config.py"
+        },
+        {
+          "name": "constants.py",
+          "type": "file",
+          "path": "utilities\\constants.py"
+        },
+        {
+          "name": "gee_utils.py",
+          "type": "file",
+          "path": "utilities\\gee_utils.py"
+        },
+        {
+          "name": "gen_utils.py",
+          "type": "file",
+          "path": "utilities\\gen_utils.py"
+        },
+        {
+          "name": "generate_json_data.py",
+          "type": "file",
+          "path": "utilities\\generate_json_data.py"
+        },
+        {
+          "name": "geoserver_styles.py",
+          "type": "file",
+          "path": "utilities\\geoserver_styles.py"
+        },
+        {
+          "name": "geoserver_utils.py",
+          "type": "file",
+          "path": "utilities\\geoserver_utils.py"
+        },
+        {
+          "name": "get_odk_data.py",
+          "type": "file",
+          "path": "utilities\\get_odk_data.py"
+        },
+        {
+          "name": "location_excel_update.py",
+          "type": "file",
+          "path": "utilities\\location_excel_update.py"
+        },
+        {
+          "name": "logger.py",
+          "type": "file",
+          "path": "utilities\\logger.py"
+        },
+        {
+          "name": "mailutils.py",
+          "type": "file",
+          "path": "utilities\\mailutils.py"
+        },
+        {
+          "name": "nrega_asset_categ.py",
+          "type": "file",
+          "path": "utilities\\nrega_asset_categ.py"
+        },
+        {
+          "name": "nrega_bhuvan_script.py",
+          "type": "file",
+          "path": "utilities\\nrega_bhuvan_script.py"
+        },
+        {
+          "name": "tiff_to_geoserver.py",
+          "type": "file",
+          "path": "utilities\\tiff_to_geoserver.py"
+        },
+        {
+          "name": "update_excel_script.py",
+          "type": "file",
+          "path": "utilities\\update_excel_script.py"
+        },
+        {
+          "name": "zip_to_geoserver.py",
+          "type": "file",
+          "path": "utilities\\zip_to_geoserver.py"
+        }
+      ]
+    },
+    {
+      "name": "waterrejuvenation",
+      "type": "dir",
+      "children": [
+        {
+          "name": "__init__.py",
+          "type": "file",
+          "path": "waterrejuvenation\\__init__.py"
+        },
+        {
+          "name": "admin.py",
+          "type": "file",
+          "path": "waterrejuvenation\\admin.py"
+        },
+        {
+          "name": "api.py",
+          "type": "file",
+          "path": "waterrejuvenation\\api.py"
+        },
+        {
+          "name": "apps.py",
+          "type": "file",
+          "path": "waterrejuvenation\\apps.py"
+        },
+        {
+          "name": "email_texts.py",
+          "type": "file",
+          "path": "waterrejuvenation\\email_texts.py"
+        },
+        {
+          "name": "models.py",
+          "type": "file",
+          "path": "waterrejuvenation\\models.py"
+        },
+        {
+          "name": "serializers.py",
+          "type": "file",
+          "path": "waterrejuvenation\\serializers.py"
+        },
+        {
+          "name": "swagger_schemas.py",
+          "type": "file",
+          "path": "waterrejuvenation\\swagger_schemas.py"
+        },
+        {
+          "name": "tasks.py",
+          "type": "file",
+          "path": "waterrejuvenation\\tasks.py"
+        },
+        {
+          "name": "tests.py",
+          "type": "file",
+          "path": "waterrejuvenation\\tests.py"
+        },
+        {
+          "name": "urls.py",
+          "type": "file",
+          "path": "waterrejuvenation\\urls.py"
+        },
+        {
+          "name": "utils.py",
+          "type": "file",
+          "path": "waterrejuvenation\\utils.py"
+        },
+        {
+          "name": "views.py",
+          "type": "file",
+          "path": "waterrejuvenation\\views.py"
+        }
+      ]
+    },
+    {
+      "name": "manage.py",
+      "type": "file",
+      "path": "manage.py"
+    },
+    {
+      "name": "token_merge.py",
+      "type": "file",
+      "path": "token_merge.py"
+    }
+  ]
+}
