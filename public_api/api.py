@@ -426,23 +426,19 @@ def generate_active_locations(request):
 @swagger_auto_schema(**get_mws_geometries_schema)
 @api_security_check(auth_type="API_key")
 def get_mws_geometries(request):
+    print("Inside get MWS geometries")
     try:
         state = valid_gee_text(request.query_params.get("state", "").lower())
         district = valid_gee_text(request.query_params.get("district", "").lower())
         tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
-        mws_id = request.query_params.get("mws_id")
 
-        if not all([state, district, tehsil, mws_id]):
+        if not all([state, district, tehsil]):
             return Response(
-                {
-                    "error": "All parameters (state, district, tehsil, mws_id) are required"
-                },
+                {"error": "All parameters (state, district, tehsil) are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         # Get geometry data
-        success, result = get_mws_geometries_data(state, district, tehsil, mws_id)
-
+        success, result = get_mws_geometries_data(state, district, tehsil)
         if not success:
             return Response(
                 {"error": result},  # result contains error message
@@ -462,24 +458,20 @@ def get_mws_geometries(request):
 @swagger_auto_schema(**get_village_geometries_schema)
 @api_security_check(auth_type="API_key")
 def get_village_geometries(request):
+    print("Inside get Village geometries")
     try:
         state = valid_gee_text(request.query_params.get("state", "").lower())
         district = valid_gee_text(request.query_params.get("district", "").lower())
         tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
-        village_id = request.query_params.get("village_id")
 
-        if not all([state, district, tehsil, village_id]):
+        if not all([state, district, tehsil]):
             return Response(
-                {
-                    "error": "All parameters (state, district, tehsil, village_id) are required"
-                },
+                {"error": "All parameters (state, district, tehsil) are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Get geometry data
-        success, result = get_village_geometries_data(
-            state, district, tehsil, village_id
-        )
+        success, result = get_village_geometries_data(state, district, tehsil)
 
         if not success:
             return Response(
