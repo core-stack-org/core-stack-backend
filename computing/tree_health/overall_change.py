@@ -129,7 +129,7 @@ def tree_health_overall_change_raster(
 def mask_raster(
     app_type, asset_folder_list, asset_suffix, tree_change, start_year, end_year
 ):
-    # Load IndiaSAT layers (25 m)
+    # STEP 1: Load IndiaSAT and Tree change layers and reproject to 25m
     deforestation = ee.Image(
         get_gee_dir_path(
             asset_folder_list,
@@ -149,35 +149,36 @@ def mask_raster(
     # Overall tree change raster (DW + IndiaSAT)
     tree_change = tree_change.reproject(crs="EPSG:4326", scale=25)
 
-    # Start from an empty canvas
+    # STEP 2: Start from an empty canvas
     BACKGROUND = -9999
     masked_change_layer = ee.Image(BACKGROUND).rename(tree_change.bandNames())
 
-    # STEP 1: IndiaSAT no-change area
+    # STEP 3: IndiaSAT no-change area
     no_change_mask = afforestation.eq(1)
     masked_change_layer = masked_change_layer.where(no_change_mask, 0)
 
-    # STEP 2: IndiaSAT deforestation --> -2
+    # STEP 4: IndiaSAT deforestation --> -2
     defr_mask = deforestation.gte(2).And(deforestation.lte(5))
     masked_change_layer = masked_change_layer.where(defr_mask, -2)
 
-    # STEP 3: IndiaSAT afforestation → 2
+    # STEP 5: IndiaSAT afforestation → 2
     aff_mask = afforestation.gte(2).And(afforestation.lte(5))
     masked_change_layer = masked_change_layer.where(aff_mask, 2)
 
-    # STEP 4: Inside no-change, allow ONLY selected classes from tree change raster
+    # STEP 6: Inside no-change, allow ONLY selected classes from tree change raster
     allowed_inside_no_change = (
         tree_change.eq(-1)  # degradation
         .Or(tree_change.eq(1))  # improvement
         .Or(tree_change.eq(3))  # partial degraded
         .Or(tree_change.eq(4))  # partial degraded
+        .Or(tree_change.eq(5))  # missing data
     )
 
     masked_change_layer = masked_change_layer.where(
         no_change_mask.And(allowed_inside_no_change), tree_change
     )
 
-    # STEP 5: Mask background
+    # STEP 7: Mask background
     masked_change_layer = masked_change_layer.updateMask(
         masked_change_layer.neq(BACKGROUND)
     )
