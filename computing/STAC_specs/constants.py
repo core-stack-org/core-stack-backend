@@ -52,3 +52,4 @@ S3_STAC_BUCKET_URL = (
     "https://spatio-temporal-asset-catalog.s3.ap-south-1.amazonaws.com/"
 )
 S3_STAC_BUCKET_NAME = "spatio-temporal-asset-catalog"
+S3_STAC_URI='s3://spatio-temporal-asset-catalog/'
