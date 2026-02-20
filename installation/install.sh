@@ -1,5 +1,3 @@
-#script to install
-
 #!/bin/bash
 
 set -e
@@ -9,6 +7,7 @@ MINICONDA_DIR="$HOME/miniconda3"
 CONDA_ENV_NAME="corestack-backend"
 CONDA_ENV_YAML="environment.yml"
 BACKEND_GIT_REPO="https://github.com/core-stack-org/core-stack-backend.git"
+LOCAL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND_DIR="/var/www/data/corestack"
 POSTGRES_USER="nrm"
 POSTGRES_DB="nrm"
@@ -17,6 +16,86 @@ APACHE_CONF="/etc/apache2/sites-available/corestack.conf"
 SHELL_RC="$HOME/.bashrc"  # Change to .zshrc if using zsh
 
 # === FUNCTIONS ===
+
+function create_env_file() {
+    echo "Creating .env file..."
+    cat > $LOCAL_DIR/nrm_app/.env <<EOL
+ODK_USERNAME=xxxxxxx
+ODK_PASSWORD=xxxxxxx
+
+# DB development architecture
+DB_NAME='corestack'
+DB_USER='corestack_user'
+DB_PASSWORD='ProUser#8487'
+
+# Django settings
+DEBUG=True
+SECRET_KEY=xxxxxxx
+
+USERNAME_GESDISC=xxxxxxx
+PASSWORD_GESDISC=xxxxxxx
+
+EMAIL_HOST_USER=xxxxxxx
+EMAIL_HOST_PASSWORD=xxxxxxx
+
+GEOSERVER_URL=xxxxxxx
+GEOSERVER_USERNAME=xxxxxxx
+GEOSERVER_PASSWORD=xxxxxxx
+
+EARTH_DATA_USER=xxxxxxx
+EARTH_DATA_PASSWORD=xxxxxxx
+
+OVERPASS_URL=xxxxxxx
+EXCEL_DIR=xxxxxxx
+
+GEE_SERVICE_ACCOUNT_KEY_PATH=xxxxxxx
+GEE_SERVICE_ACCOUNT_KEY_PATH=xxxxxxx
+GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH=xxxxxxx
+
+EXCEL_PATH=xxxxxxx
+
+ODK_USER_EMAIL_SYNC=xxxxxxx
+ODK_USER_PASSWORD_SYNC=xxxxxxx
+
+ADMIN_GROUP_ID=xxxxxxx
+
+LOCAL_COMPUTE_API_URL=xxxxxxx
+NREGA_BUCKET=xxxxxxx
+NREGA_ACCESS_KEY=xxxxxxx
+NREGA_SECRET_KEY=xxxxxxx
+
+GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH=xxxxxxx
+
+S3_BUCKET=xxxxxxx
+S3_REGION=xxxxxxx
+AUTH_TOKEN_360=xxxxxxx
+ES_AUTH=xxxxxxx
+CALL_PATCH_API_KEY=xxxxxxx
+COMMUNITY_ENGAGEMENT_API_URL=xxxxxxx
+WHATSAPP_MEDIA_PATH=xxxxxxx
+
+FERNET_KEY=xxxxxxx
+S3_ACCESS_KEY=xxxxxxx
+S3_SECRET_KEY=xxxxxxx
+TMP_LOCATION=xxxxxxx
+DEPLOYMENT_DIR=xxxxxxx
+AUTH_TOKEN_FB_META=xxxxxxx
+CE_BUCKET_URL=xxxxxxx
+DEFAUL_GEE_ACCOUNT=xxxxxxx
+CE_API_URL=xxxxxxx
+CE_BUCKET_NAME=xxxxxxx
+
+GEE_DEFAULT_ACCOUNT_ID=xxxxxxx
+GEE_HELPER_ACCOUNT_ID=xxxxxxx
+
+DPR_S3_SECRET_KEY=xxxxxxx
+DPR_S3_ACCESS_KEY=xxxxxxx
+DPR_S3_REGION=xxxxxxx
+DPR_S3_FOLDER=xxxxxxx
+DPR_S3_BUCKET=xxxxxxx
+EOL
+    echo "✅ .env file created at $LOCAL_DIR/nrm_app/.env"
+}
 
 function install_miniconda() {
     if [ -d "$MINICONDA_DIR" ]; then
@@ -167,6 +246,7 @@ EOL
 }
 
 # === MAIN ===
+create_env_file
 install_miniconda
 ensure_conda
 install_postgres
