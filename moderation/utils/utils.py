@@ -623,6 +623,21 @@ def _extract_crop_fields(data):
     }
 
 
+_COMMUNITY_DEMAND_VALUES = {"public", "shared among families"}
+_INDIVIDUAL_DEMAND_VALUES = {"private"}
+
+
+def normalize_demand_type(value):
+    if not value:
+        return None
+    normalized = str(value).strip().lower()
+    if normalized in _COMMUNITY_DEMAND_VALUES:
+        return "Community Demand"
+    if normalized in _INDIVIDUAL_DEMAND_VALUES:
+        return "Individual Demand"
+    return value
+
+
 MODEL_FIELD_EXTRACTORS = {
     ODK_settlement: _extract_settlement_fields,
     ODK_well: _extract_well_fields,

@@ -58,6 +58,7 @@ from .utils import (
     to_utf8,
     transform_name,
 )
+from moderation.utils.utils import normalize_demand_type
 from moderation.views import sync_odk_to_csdb
 
 logger = setup_logger(__name__)
@@ -1029,7 +1030,6 @@ def maintenance_gw_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Recharge Structure",
         "Repair Activities",
@@ -1047,7 +1047,7 @@ def maintenance_gw_table(doc, plan):
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
+            normalize_demand_type(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_gw_maintenance.get("beneficiary_settlement") or "NA"
@@ -1056,12 +1056,9 @@ def maintenance_gw_table(doc, plan):
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "NA"
         )
         row_cells[3].text = to_utf8(
-            maintenance.data_gw_maintenance.get("select_gender") or "NA"
-        )
-        row_cells[4].text = to_utf8(
             maintenance.data_gw_maintenance.get("ben_father") or "NA"
         )
-        row_cells[5].text = to_utf8(
+        row_cells[4].text = to_utf8(
             maintenance.data_gw_maintenance.get("select_one_recharge_structure")
             or maintenance.data_gw_maintenance.get("select_one_water_structure")
             or "NA"
@@ -1089,9 +1086,9 @@ def maintenance_gw_table(doc, plan):
             repair_activities = maintenance.data_gw_maintenance.get(
                 "select_one_activities"
             )
-        row_cells[6].text = to_utf8(repair_activities or "NA")
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_agri_table(doc, plan):
@@ -1117,7 +1114,7 @@ def maintenance_agri_table(doc, plan):
     for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
+            normalize_demand_type(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_agri_maintenance.get("beneficiary_settlement") or "NA"
@@ -1188,7 +1185,7 @@ def maintenance_waterstructures_table(doc, plan):
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
+            normalize_demand_type(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_swb_maintenance.get("beneficiary_settlement") or "NA"
@@ -1251,7 +1248,7 @@ def maintenance_rs_waterstructures_table(doc, plan):
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
+            normalize_demand_type(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"
