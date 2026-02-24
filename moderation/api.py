@@ -25,6 +25,7 @@ from .views import (
     resync_swb_maintenance,
     resync_swb_rs_maintenance,
     get_edited_updated_all_submissions,
+    DemandValidator,
 )
 from .utils.form_mapping import model_map
 from .utils.get_submissions import ODKSubmissionsChecker
@@ -200,3 +201,29 @@ def sync_updated_submissions(request):
             else:
                 print("passed wrong form name")
     return JsonResponse({"status": "Sync complete", "result": res})
+
+
+@api_view(["GET"])
+@schema(None)
+def site_paln(request):
+    plan_id = request.query_params.get("plan_id")
+    district = request.query_params.get("district").lower()
+    block = request.query_params.get("block").lower()
+    layer_type = request.query_params.get("layer_type").lower()
+    plan_site = DemandValidator.plan_sites(
+        plan_number=plan_id, district=district, block=block, layer_type=layer_type
+    )
+    return JsonResponse(plan_site, safe=False)
+
+
+@api_view(["GET"])
+@schema(None)
+def site_validate(request):
+    lat = request.query_params.get("lat")
+    lon = request.query_params.get("lon")
+    structure_type = request.query_params.get("structure_type").lower()
+    lulc_class = request.query_params.get("lulc_class").lower()
+    validate_site = DemandValidator.validate_site(
+        lat=lat, lon=lon, structure_type=structure_type, lulc_class=lulc_class
+    )
+    return JsonResponse(validate_site, safe=False)

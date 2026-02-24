@@ -12,6 +12,7 @@ import ee
 import math
 import re
 import json
+from utils.demand_validator_lulc import compute_lulc_auto
 
 FETCH_FIELD_MAP = {
     ODK_settlement: "data_settlement",
@@ -179,7 +180,14 @@ def sync_odk_to_csdb():
 
 # DEMAND VALIDATOR LOGICS
 
-EE_AVAILABLE = True
+try:
+    ee.Initialize(project="pawan-457506")
+    EE_AVAILABLE = True
+    print(f"Earth Engine initialized...")
+except Exception as e:
+    EE_AVAILABLE = False
+    print("WARNING: Could not initialize Earth Engine:", e)
+
 
 DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
@@ -293,54 +301,53 @@ def compute_drainage_distance_m(lat: float, lon: float, scale: int = 30) -> floa
     return round(float(d or 0.0), 2)
 
 
-STRUCTURE_ALIASES = {
-    "continuous_contour_trenches": "continuous_contour_trench",
-    "continuous_contour_trench_cct": "continuous_contour_trench",
-    "continuous_contour_trenches_cct": "continuous_contour_trench",
-    "staggered_contour_trenches": "staggered_contour_trench",
-    "earthen_gully_plug": "earthen_gully_plugs",
-    "earthen_gully_plugs_egp": "earthen_gully_plugs",
-    "drainage_soakage_channel": "drainage_soakage_channels",
-    "drainage_soakage_channels": "drainage_soakage_channels",
-    "trench_cum_bund_network": "trench_cum_bund",
-    # 5% model variations
-    "5_model_structure": "5_percent_model",
-    "5_percent_model_structure": "5_percent_model",
-    "5_percent_model": "5_percent_model",
-    # 30_40 model variations
-    "30_40_model_structure": "30_40_model",
-    "30_40_model": "30_40_model",
-}
+# STRUCTURE_ALIASES = {
+#     "continuous_contour_trenches": "continuous_contour_trench",
+#     "continuous_contour_trench_cct": "continuous_contour_trench",
+#     "continuous_contour_trenches_cct": "continuous_contour_trench",
+#     "staggered_contour_trenches": "staggered_contour_trench",
+#     "earthen_gully_plug": "earthen_gully_plugs",
+#     "earthen_gully_plugs_egp": "earthen_gully_plugs",
+#     "drainage_soakage_channel": "drainage_soakage_channels",
+#     "drainage_soakage_channels": "drainage_soakage_channels",
+#     "trench_cum_bund_network": "trench_cum_bund",
+#     # 5% model variations
+#     "5_model_structure": "5_percent_model",
+#     "5_percent_model_structure": "5_percent_model",
+#     "5_percent_model": "5_percent_model",
+#     # 30_40 model variations
+#     "30_40_model_structure": "30_40_model",
+#     "30_40_model": "30_40_model",
+# }
 
-
-def normalize_structure_name(structure_type: str) -> str:
-    if not structure_type:
-        return ""
-
-    s = str(structure_type).strip().lower()
-
-    # remove anything inside brackets/parentheses: "(cct)" "(egp)" etc.
-    s = re.sub(r"\(.*?\)", " ", s)
-
-    # IMPORTANT: handle % BEFORE underscore-joining
-    s = s.replace("%", " percent ")
-
-    # normalize separators
-    s = s.replace("&", " and ")
-    s = s.replace("/", " ")
-    s = s.replace("-", " ")
-
-    # remove non-alphanumeric (keep spaces for now)
-    s = re.sub(r"[^a-z0-9\s]", " ", s)
-
-    # optional plural standardization
-    s = s.replace("trenches", "trench")
-
-    # collapse whitespace -> underscores (FINAL canonical form)
-    s = "_".join(s.split()).strip("_")
-
-    # apply aliases
-    return STRUCTURE_ALIASES.get(s, s)
+# def normalize_structure_name(structure_type: str) -> str:
+#     if not structure_type:
+#         return ""
+#
+#     s = str(structure_type).strip().lower()
+#
+#     # remove anything inside brackets/parentheses: "(cct)" "(egp)" etc.
+#     s = re.sub(r"\(.*?\)", " ", s)
+#
+#     # IMPORTANT: handle % BEFORE underscore-joining
+#     s = s.replace("%", " percent ")
+#
+#     # normalize separators
+#     s = s.replace("&", " and ")
+#     s = s.replace("/", " ")
+#     s = s.replace("-", " ")
+#
+#     # remove non-alphanumeric (keep spaces for now)
+#     s = re.sub(r"[^a-z0-9\s]", " ", s)
+#
+#     # optional plural standardization
+#     s = s.replace("trenches", "trench")
+#
+#     # collapse whitespace -> underscores (FINAL canonical form)
+#     s = "_".join(s.split()).strip("_")
+#
+#     # apply aliases
+#     return STRUCTURE_ALIASES.get(s, s)
 
 
 with open("moderation/utils/rules.json", "r", encoding="utf-8") as f:
@@ -673,8 +680,9 @@ class DemandValidator:
     validate demands on the basis of pre-decided rules
     """
 
-    def validate_site(self, lat, lon, struc_type, lulc_class):
-        if lat is None or lon is None or not struc_type:
+    @staticmethod
+    def validate_site(lat, lon, structure_type, lulc_class=None):
+        if lat is None or lon is None or not structure_type:
             return "lat, lon, structure_type are required"
         try:
             lat = float(lat)
@@ -684,6 +692,9 @@ class DemandValidator:
 
         if not EE_AVAILABLE:
             return "Earth Engine not available"
+
+        if not lulc_class:
+            lulc_class = compute_lulc_auto(lat, lon, structure_type)
 
         # Compute values from GEE
         slope = compute_slope_mean_30m(lat, lon, buffer_m=30)
@@ -695,7 +706,7 @@ class DemandValidator:
         catchment_rep = ca_range["max"]
 
         site = {
-            "structure_type": struc_type,
+            "structure_type": structure_type,
             "slope": slope,
             "catchment_area": catchment_rep,
             "stream_order": stream_order,
@@ -708,7 +719,7 @@ class DemandValidator:
         return {
             "lat": lat,
             "lon": lon,
-            "structure_type": struc_type,
+            "structure_type": structure_type,
             "raw_values": {
                 "slope_mean_30m": slope,
                 "catchment_min_30m": ca_range["min"],
@@ -720,7 +731,8 @@ class DemandValidator:
             "evaluation": evaluation,
         }
 
-    def api_plan_sites(self, plan_number, district, block, layer_type):
+    @staticmethod
+    def plan_sites(plan_number, district, block, layer_type):
         """
         Input:
         {
