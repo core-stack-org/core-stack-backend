@@ -635,15 +635,15 @@ def create_excel_for_ccd(data, xlsx_file, writer, start_year, end_year):
             "area_in_ha": properties["area_in_ha"],
         }
 
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             row["high_density_area_in_ha_" + str(year)] = properties.get(
-                "hi_de_" + str(year), None
+                "High_Density_" + str(year), None
             )
             row["low_density_area_in_ha_" + str(year)] = properties.get(
-                "lo_de_" + str(year), None
+                "Low_Density_" + str(year), None
             )
             row["missing_data_area_in_ha_" + str(year)] = properties.get(
-                "mi_da_" + str(year), None
+                "Missing_Data_" + str(year), None
             )
 
         df_data.append(row)
@@ -670,18 +670,18 @@ def create_excel_for_ch(data, xlsx_file, writer, start_year, end_year):
             "area_in_ha": properties["area_in_ha"],
         }
 
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             row["short_trees_area_in_ha_" + str(year)] = properties.get(
-                "sh_tr_" + str(year), None
+                "Short_Trees_" + str(year), None
             )
             row["medium_trees_area_in_ha_" + str(year)] = properties.get(
-                "md_tr_" + str(year), None
+                "Medium_Height_Trees_" + str(year), None
             )
             row["tall_trees_area_in_ha_" + str(year)] = properties.get(
-                "tl_tr_" + str(year), None
+                "Tall_Trees_" + str(year), None
             )
             row["missing_data_area_in_ha_" + str(year)] = properties.get(
-                "mi_da_" + str(year), None
+                "Missing_Data_" + str(year), None
             )
 
         df_data.append(row)
