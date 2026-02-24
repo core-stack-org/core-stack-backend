@@ -603,13 +603,13 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "afforestation_area_in_ha": properties["Afforestat"],
-            "deforestation_area_in_ha": properties["Deforestat"],
-            "degradation_area_in_ha": properties["Degradatio"],
-            "improvement_area_in_ha": properties["Improvemen"],
-            "missing_data_in_ha": properties["Missing Da"],
+            "afforestation_area_in_ha": properties["Afforestation"],
+            "deforestation_area_in_ha": properties["Deforestation"],
+            "degradation_area_in_ha": properties["Degradation"],
+            "improvement_area_in_ha": properties["Improvement"],
+            "missing_data_in_ha": properties["Missing Data"],
             "no_change_area_in_ha": properties["No_Change"],
-            "partially_degraded_area_in_ha": properties["Partially_"],
+            "partially_degraded_area_in_ha": properties["Partially_Degraded"],
         }
 
         df_data.append(row)

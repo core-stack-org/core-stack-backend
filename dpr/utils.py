@@ -190,6 +190,13 @@ def format_text_demands(text):
     return formatted_text
 
 
+def ensure_str(value):
+    """Normalize a value that may be a list (from Kobo multi-select fields) into a string."""
+    if isinstance(value, list):
+        return " ".join(str(v) for v in value)
+    return value if value is not None else ""
+
+
 def format_text(text):
     """
     Converts text with underscores to properly formatted text.
@@ -198,6 +205,7 @@ def format_text(text):
     if not text:
         return ""
 
+    text = ensure_str(text)
     formatted_text = text.replace("_", " ")
     return formatted_text.capitalize() + "\n\n"
 
@@ -249,7 +257,7 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
         ]
         for field in repair_fields:
             if data_waterbody.get(field):
-                repair_value = data_waterbody.get(field)
+                repair_value = ensure_str(data_waterbody.get(field))
                 other_field = field + "_other"
                 if (
                     repair_value
@@ -266,7 +274,7 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
     if not repair_field:
         return "NA"
 
-    repair_activity = data_waterbody.get(repair_field)
+    repair_activity = ensure_str(data_waterbody.get(repair_field))
 
     if not repair_activity:
         return "NA"
@@ -304,6 +312,8 @@ def to_utf8(value):
     """
     if value is None:
         return "NA"
+    if isinstance(value, list):
+        value = " ".join(str(v) for v in value)
     if isinstance(value, bytes):
         try:
             return value.decode('utf-8')

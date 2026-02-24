@@ -45,36 +45,44 @@ def tree_health_overall_change_vector(
             + f"filtered_mws_{asset_suffix}_uid"
         )
 
-    description = f"overall_change_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-
-    asset_id, task_id = overall_change_vector(
-        roi, asset_folder_list, asset_suffix, app_type
+    description = f"overall_change_vector_{asset_suffix}"
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
     )
-    task_id_list = check_task_status([task_id])
-    print("task_id_list ", task_id_list)
+
+    if not is_gee_asset_exists(asset_id):
+        fc = overall_change_vector(roi, asset_folder_list, asset_suffix, app_type)
+
+        task_id = export_vector_asset_to_gee(fc, description, asset_id)
+
+        task_id_list = check_task_status([task_id])
+        print("task_id_list ", task_id_list)
 
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            description,
-            asset_id,
-            "Tree Overall Change Vector",
-        )
+        # layer_id = save_layer_info_to_db(
+        #     state,
+        #     district,
+        #     block,
+        #     description,
+        #     asset_id,
+        #     "Tree Overall Change Vector",
+        # )
         layer_at_geoserver = False
         merged_fc = ee.FeatureCollection(asset_id)
         sync_res = sync_fc_to_geoserver(
             merged_fc, state, description, "tree_overall_ch"
         )
-        if sync_res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag is updated")
-            layer_at_geoserver = True
-
-        return layer_at_geoserver
-    return None
+    #     if sync_res["status_code"] == 201 and layer_id:
+    #         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+    #         print("sync to geoserver flag is updated")
+    #         layer_at_geoserver = True
+    #
+    #     return layer_at_geoserver
+    # return None
 
 
 def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
@@ -105,7 +113,6 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
                 ored_str = (
                     ored_str + ".Or(raster.eq(ee.Number(" + str(arg["value"][i]) + ")))"
                 )
-            print(ored_str)
             mask = eval(ored_str)
         else:
             mask = raster.eq(ee.Number(arg["value"]))
@@ -114,7 +121,7 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
         forest_area = pixel_area.updateMask(mask)
 
         fc = forest_area.reduceRegions(
-            collection=fc, reducer=ee.Reducer.sum(), scale=25, crs=raster.projection()
+            collection=fc, reducer=ee.Reducer.sum(), scale=25, crs="EPSG:4326"
         )
 
         def remove_property(feat, prop):
@@ -133,12 +140,4 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
 
     fc = ee.FeatureCollection(fc)
 
-    description = f"overall_change_vector_{asset_suffix}"
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + description
-    )
-    task_id = export_vector_asset_to_gee(fc, description, asset_id)
-    return asset_id, task_id
+    return fc

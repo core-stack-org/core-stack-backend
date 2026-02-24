@@ -209,15 +209,20 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
         district = valid_gee_text(district.lower())
         tehsil = valid_gee_text(tehsil.lower())
         layer_name = f"deltaG_fortnight_{district}_{tehsil}"
-        water_layer_exists = Layer.objects.filter(
-            state=state_obj,
-            district=district_obj,
-            block=tehsil_obj,
-            dataset__name="Hydrology",
-            layer_version="1.0",
-            algorithm_version="1.1",
-            layer_name=layer_name,
-        ).exists()
+        water_layer_exists = (
+            Layer.objects.filter(
+                state=state_obj,
+                district=district_obj,
+                block=tehsil_obj,
+                dataset__name="Hydrology",
+                layer_name=layer_name,
+            )
+            .exclude(
+                layer_version="1.0",
+                algorithm_version="1.0",
+            )
+            .exists()
+        )
 
         # Fetch hydrology data
         water_url = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows"
@@ -258,14 +263,16 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
             try:
                 values = json.loads(water_data.get(date, "{}"))
                 hydrology_metrix = {
-                    "et": round(values.get("ET"), 2) if values.get("ET") else "",
+                    "et": round(values.get("ET"), 2) if values.get("ET") else "0.0",
                     "runoff": (
-                        round(values.get("RunOff"), 2) if values.get("RunOff") else ""
+                        round(values.get("RunOff"), 2)
+                        if values.get("RunOff")
+                        else "0.0"
                     ),
                     "precipitation": (
                         round(values.get("Precipitation"), 2)
                         if values.get("Precipitation")
-                        else ""
+                        else "0.0"
                     ),
                 }
             except:
@@ -292,6 +299,10 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
                             entry[ndvi_field] = round(float(val), 2)
                         except:
                             entry[ndvi_field] = ""
+            else:
+                entry["ndvi_crop"] = ""
+                entry["ndvi_shrub"] = ""
+                entry["ndvi_tree"] = ""
 
             time_series.append(entry)
 
@@ -398,7 +409,7 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
     return {"Mws_report_url": report_url}, None
 
 
-def get_mws_geometries_data(state, district, tehsil, mws_id):
+def get_mws_geometries_data(state, district, tehsil):
     try:
         base_url = "https://geoserver.core-stack.org:8443/geoserver/mws/ows"
 
@@ -411,7 +422,7 @@ def get_mws_geometries_data(state, district, tehsil, mws_id):
             "request": "GetFeature",
             "typeName": f"mws:{layer_name}",
             "outputFormat": "application/json",
-            "CQL_FILTER": f"uid='{mws_id}'",
+            "propertyName": "geom,uid",  # Only request needed fields
         }
 
         response = requests.get(base_url, params=params, timeout=30)
@@ -421,30 +432,60 @@ def get_mws_geometries_data(state, district, tehsil, mws_id):
             print(error_msg)
             return False, error_msg
 
-        data = response.json()
+        geojson_data = response.json()
 
-        if not data.get("features") or len(data["features"]) == 0:
-            error_msg = f"No MWS found with uid: {mws_id}"
+        if not geojson_data.get("features"):
+            error_msg = "No features found in layer"
             print(error_msg)
             return False, error_msg
 
-        geometry = data["features"][0].get("geometry")
-
-        if not geometry:
-            error_msg = "MWS feature found but no geometry data"
-            print(error_msg)
-            return False, error_msg
-
-        print(f"Successfully retrieved geometry for MWS uid: {mws_id}")
-        return True, geometry
+        print(f"Successfully retrieved {len(geojson_data['features'])} MWS geometries")
+        return True, geojson_data
 
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
-        print(error_msg)
         return False, error_msg
 
 
-def get_village_geometries_data(state, district, tehsil, village_id):
+# def get_village_geometries_data(state, district, tehsil, village_id):
+#     try:
+#         base_url = (
+#             "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows"
+#         )
+#         layer_name = f"{district}_{tehsil}"
+
+#         params = {
+#             "service": "WFS",
+#             "version": "1.0.0",
+#             "request": "GetFeature",
+#             "typeName": f"panchayat_boundaries:{layer_name}",
+#             "outputFormat": "application/json",
+#             "CQL_FILTER": f"vill_ID={village_id}",
+#             "propertyName": "the_geom",
+#         }
+
+#         response = requests.get(base_url, params=params, timeout=30)
+
+#         if response.status_code != 200:
+#             return False, f"GeoServer request failed with status {response.status_code}"
+
+#         geojson_data = response.json()
+
+#         if not geojson_data.get("features") or len(geojson_data["features"]) == 0:
+#             return False, f"No village found with ID: {village_id}"
+
+#         geometry = geojson_data["features"][0].get("geometry")
+
+#         if not geometry:
+#             return False, "Feature found but no geometry data"
+
+#         return True, geometry
+
+#     except Exception as e:
+#         return False, f"Internal error: {str(e)}"
+
+
+def get_village_geometries_data(state, district, tehsil):
     try:
         base_url = (
             "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows"
@@ -457,8 +498,7 @@ def get_village_geometries_data(state, district, tehsil, village_id):
             "request": "GetFeature",
             "typeName": f"panchayat_boundaries:{layer_name}",
             "outputFormat": "application/json",
-            "CQL_FILTER": f"vill_ID={village_id}",
-            "propertyName": "the_geom",
+            "propertyName": "the_geom,vill_ID,vill_name",
         }
 
         response = requests.get(base_url, params=params, timeout=30)
@@ -468,15 +508,10 @@ def get_village_geometries_data(state, district, tehsil, village_id):
 
         geojson_data = response.json()
 
-        if not geojson_data.get("features") or len(geojson_data["features"]) == 0:
-            return False, f"No village found with ID: {village_id}"
+        if not geojson_data.get("features"):
+            return False, "No features found in layer"
 
-        geometry = geojson_data["features"][0].get("geometry")
-
-        if not geometry:
-            return False, "Feature found but no geometry data"
-
-        return True, geometry
+        return True, geojson_data
 
     except Exception as e:
         return False, f"Internal error: {str(e)}"

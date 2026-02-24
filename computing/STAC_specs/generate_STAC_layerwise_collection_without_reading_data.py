@@ -42,6 +42,8 @@ import json
 import tqdm
 import glob
 
+import subprocess
+
 import re
 
 import sys
@@ -101,6 +103,8 @@ VECTOR_COLUMN_DESC_GITHUB_URL = constants.VECTOR_COLUMN_DESC_GITHUB_URL
 S3_STAC_BUCKET_NAME = constants.S3_STAC_BUCKET_NAME
 # S3_STAC_BUCKET_NAME
 
+S3_STAC_URI = constants.S3_STAC_URI
+
 # %%
 layer_STAC_generated = False  # output flag
 
@@ -118,7 +122,7 @@ def valid_gee_text(description):
 
 
 def generate_raster_describe_url(workspace, layer_name, geoserver_base_url):
-    
+
     describe_url = (
         f"{geoserver_base_url}/{workspace}/wcs?"
         f"service=WCS&version=2.0.1&request=DescribeCoverage&"
@@ -126,21 +130,24 @@ def generate_raster_describe_url(workspace, layer_name, geoserver_base_url):
     )
     return describe_url
 
-#%%
+
+# %%
 def generate_raster_thumbnail_url(workspace, layer_name, bbox, geoserver_base_url):
-  
+
     bbox_str = ",".join(map(str, bbox))
-    
+
     thumbnail_url = (
         f"{geoserver_base_url}/{workspace}/wms?"
         f"service=WMS&version=1.1.0&request=GetMap&"
         f"layers={workspace}:{layer_name}&"
         f"bbox={bbox_str}&"
-        f"width=180&height=180&srs=EPSG:4326&styles=&format=image/png"
+        f"width=300&height=300&srs=EPSG:4326&styles=&format=image/png"
     )
     return thumbnail_url
 
-#%%
+
+# %%
+
 
 def get_metadata_from_wcs(describe_url):
     response = requests.get(describe_url, verify=False)
@@ -148,55 +155,58 @@ def get_metadata_from_wcs(describe_url):
         root = ET.fromstring(response.content)
         # GeoServer uses these standard namespaces for WCS 2.0.1
         ns = {
-            'gml': 'http://www.opengis.net/gml/3.2', 
-            'wcs': 'http://www.opengis.net/wcs/2.0'
+            "gml": "http://www.opengis.net/gml/3.2",
+            "wcs": "http://www.opengis.net/wcs/2.0",
         }
-        
+
         # 1. Fetch Bounding Box (Envelope)
-        envelope = root.find('.//gml:Envelope', ns)
+        envelope = root.find(".//gml:Envelope", ns)
         if envelope is not None:
-            lower = envelope.find('gml:lowerCorner', ns).text.split()
-            upper = envelope.find('gml:upperCorner', ns).text.split()
-            
-            
+            lower = envelope.find("gml:lowerCorner", ns).text.split()
+            upper = envelope.find("gml:upperCorner", ns).text.split()
+
             bbox = [float(lower[1]), float(lower[0]), float(upper[1]), float(upper[0])]
-            
-            footprint = Polygon([
-                [bbox[0], bbox[1]],
-                [bbox[0], bbox[3]],
-                [bbox[2], bbox[3]],
-                [bbox[2], bbox[1]]
-            ])
+
+            footprint = Polygon(
+                [
+                    [bbox[0], bbox[1]],
+                    [bbox[0], bbox[3]],
+                    [bbox[2], bbox[3]],
+                    [bbox[2], bbox[1]],
+                ]
+            )
 
             # 2. Fetch Actual Pixel Shape (GridEnvelope)
-            grid_low = root.find('.//gml:low', ns)
-            grid_high = root.find('.//gml:high', ns)
-            
+            grid_low = root.find(".//gml:low", ns)
+            grid_high = root.find(".//gml:high", ns)
+
             if grid_low is not None and grid_high is not None:
                 low_coords = grid_low.text.split()
                 high_coords = grid_high.text.split()
-                
-               
+
                 actual_width = int(high_coords[0]) - int(low_coords[0]) + 1
                 actual_height = int(high_coords[1]) - int(low_coords[1]) + 1
-                shape = [actual_height, actual_width] 
+                shape = [actual_height, actual_width]
             else:
-                shape = [0, 0] 
+                shape = [0, 0]
 
             return bbox, mapping(footprint), "EPSG:4326", shape
-            
+
     return None
 
-#%%
+
+# %%
+
 
 def download_wms_thumbnail(wms_url, output_path):
     response = requests.get(wms_url, verify=False)
     if response.status_code == 200:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        with open(output_path, 'wb') as f:
+        with open(output_path, "wb") as f:
             f.write(response.content)
         return True
     return False
+
 
 # %%
 def read_layer_description(filepath, layer_name, overwrite_existing):
@@ -282,72 +292,87 @@ def generate_raster_url(
 
 
 # %%
-def create_raster_item(describe_url,
-                       id,
-                       layer_title,
-                       layer_description,
-                       display_name,
-                       theme,
-                       start_date='',
-                       end_date='',
-                       gsd=pd.NA
-                       ):
+def create_raster_item(
+    describe_url,
+    id,
+    layer_title,
+    layer_description,
+    display_name,
+    theme,
+    start_date="",
+    end_date="",
+    gsd=pd.NA,
+):
 
-    
     metadata = get_metadata_from_wcs(describe_url)
     if metadata is None:
         print(f"STAC_Error: Could not fetch metadata for {id}")
         return None
-        
+
     bbox, footprint, crs, shape = metadata
     keyword = display_name.lower()
 
-    if ((start_date != '') & (end_date != '') & (not pd.isna(gsd))):
-        raster_item = pystac.Item(id=id,
-                                  geometry=footprint,
-                                  bbox=bbox,
-                                  datetime=datetime.datetime.now(datetime.timezone.utc),
-                                  properties={
-                                        "title" : layer_title,
-                                        "description" : layer_description,
-                                        "start_datetime": start_date.isoformat() + 'Z',
-                                        "end_datetime": end_date.isoformat() + 'Z',
-                                        "gsd": gsd,
-                                        "keywords": [theme]
-                                  })
-    elif (not pd.isna(gsd)): 
-         raster_item = pystac.Item(id=id,
-                                  geometry=footprint,
-                                  bbox=bbox,
-                                  datetime=datetime.datetime.now(datetime.timezone.utc),  
-                                  properties={
-                                        "title" : layer_title,
-                                        "description" : layer_description,
-                                      "gsd": gsd,
-                                      "start_datetime": constants.DEFAULT_START_DATE.strftime('%Y-%m-%dT%H:%M:%SZ'), 
-                                      "end_datetime": constants.DEFAULT_END_DATE.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                      "keywords": [theme]                                                 
-                                  })       
+    if (start_date != "") & (end_date != "") & (not pd.isna(gsd)):
+        raster_item = pystac.Item(
+            id=id,
+            geometry=footprint,
+            bbox=bbox,
+            datetime=datetime.datetime.now(datetime.timezone.utc),
+            properties={
+                "title": layer_title,
+                "description": layer_description,
+                "start_datetime": start_date.isoformat() + "Z",
+                "end_datetime": end_date.isoformat() + "Z",
+                "gsd": gsd,
+                "keywords": [theme],
+            },
+        )
+    elif not pd.isna(gsd):
+        raster_item = pystac.Item(
+            id=id,
+            geometry=footprint,
+            bbox=bbox,
+            datetime=datetime.datetime.now(datetime.timezone.utc),
+            properties={
+                "title": layer_title,
+                "description": layer_description,
+                "gsd": gsd,
+                "start_datetime": constants.DEFAULT_START_DATE.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "end_datetime": constants.DEFAULT_END_DATE.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "keywords": [theme],
+            },
+        )
     else:
-         raster_item = pystac.Item(id=id,
-                                  geometry=footprint,
-                                  bbox=bbox,
-                                  datetime=datetime.datetime.now(datetime.timezone.utc),
-                                  properties={
-                                        "title" : layer_title,
-                                        "description" : layer_description,
-                                        "gsd": gsd,
-                                        "start_datetime": constants.DEFAULT_START_DATE.strftime('%Y-%m-%dT%H:%M:%SZ'), 
-                                        "end_datetime": constants.DEFAULT_END_DATE.strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                        "keywords": [theme]
-                                  })            
-    
-    
-    proj_ext = pystac.extensions.projection.ProjectionExtension.ext(raster_item, add_if_missing=True)
+        raster_item = pystac.Item(
+            id=id,
+            geometry=footprint,
+            bbox=bbox,
+            datetime=datetime.datetime.now(datetime.timezone.utc),
+            properties={
+                "title": layer_title,
+                "description": layer_description,
+                "gsd": gsd,
+                "start_datetime": constants.DEFAULT_START_DATE.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "end_datetime": constants.DEFAULT_END_DATE.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "keywords": [theme],
+            },
+        )
+
+    proj_ext = pystac.extensions.projection.ProjectionExtension.ext(
+        raster_item, add_if_missing=True
+    )
     proj_ext.epsg = crs
     proj_ext.shape = [shape[0], shape[1]]
 
-    return raster_item 
+    return raster_item
 
 
 # %%
@@ -612,82 +637,110 @@ def read_layer_mapping(
 
 
 # %%
-def generate_raster_item(state, district, block, layer_name, layer_map_csv_path, 
-                         layer_desc_csv_path, start_year, overwrite_existing): 
-    
+def generate_raster_item(
+    state,
+    district,
+    block,
+    layer_name,
+    layer_map_csv_path,
+    layer_desc_csv_path,
+    start_year,
+    overwrite_existing,
+):
+
     # 1. read layer description
-    layer_description = read_layer_description(filepath=layer_desc_csv_path,
-                                             layer_name=layer_name,
-                                             overwrite_existing=overwrite_existing)
-    
-    #2. get geoserver url parameters from the layer details
-    geoserver_workspace_name, geoserver_layer_name, style_file_url, layer_display_name, ee_layer_name, gsd ,theme = \
-        read_layer_mapping(layer_map_csv_path=layer_map_csv_path,
-                          district=district, block=block, layer_name=layer_name, start_year=start_year)
+    layer_description = read_layer_description(
+        filepath=layer_desc_csv_path,
+        layer_name=layer_name,
+        overwrite_existing=overwrite_existing,
+    )
+
+    # 2. get geoserver url parameters from the layer details
+    (
+        geoserver_workspace_name,
+        geoserver_layer_name,
+        style_file_url,
+        layer_display_name,
+        ee_layer_name,
+        gsd,
+        theme,
+    ) = read_layer_mapping(
+        layer_map_csv_path=layer_map_csv_path,
+        district=district,
+        block=block,
+        layer_name=layer_name,
+        start_year=start_year,
+    )
 
     # 3.generate describe url
-    geoserver_url = generate_raster_url(workspace=geoserver_workspace_name,
-                                       layer_name=geoserver_layer_name,
-                                       geoserver_base_url=GEOSERVER_BASE_URL)
+    geoserver_url = generate_raster_url(
+        workspace=geoserver_workspace_name,
+        layer_name=geoserver_layer_name,
+        geoserver_base_url=GEOSERVER_BASE_URL,
+    )
 
     # 4. create raster item using the describe_url
-    start_date = ''
-    end_date = ''
-    layer_title = layer_display_name 
-    layer_id = f"{state}_{district}_{block}_{layer_name}" 
+    start_date = ""
+    end_date = ""
+    layer_title = layer_display_name
+    layer_id = f"{state}_{district}_{block}_{layer_name}"
 
     if start_year != "":
         layer_title = f"{layer_display_name} : {start_year}"
         layer_id = f"{state}_{district}_{block}_{layer_name}_{start_year}"
-        start_date = start_year + '-' + constants.AGRI_YEAR_START_DATE
+        start_date = start_year + "-" + constants.AGRI_YEAR_START_DATE
         start_date = pd.to_datetime(start_date)
-        end_date = str(int(start_year) + 1) + '-' + constants.AGRI_YEAR_END_DATE
+        end_date = str(int(start_year) + 1) + "-" + constants.AGRI_YEAR_END_DATE
         end_date = pd.to_datetime(end_date)
-    
+
     DESCRIBE_URL = generate_raster_describe_url(
-        workspace=geoserver_workspace_name, 
-        layer_name=geoserver_layer_name, 
-        geoserver_base_url=GEOSERVER_BASE_URL
+        workspace=geoserver_workspace_name,
+        layer_name=geoserver_layer_name,
+        geoserver_base_url=GEOSERVER_BASE_URL,
     )
-    
-    raster_item = create_raster_item(describe_url=DESCRIBE_URL, 
-                                     id=layer_id,
-                                     layer_title=layer_title,
-                                     layer_description=layer_description,
-                                     display_name=layer_display_name,
-                                     theme=theme,
-                                     start_date=start_date,
-                                     end_date=end_date,
-                                     gsd=gsd)
-    
+
+    raster_item = create_raster_item(
+        describe_url=DESCRIBE_URL,
+        id=layer_id,
+        layer_title=layer_title,
+        layer_description=layer_description,
+        display_name=layer_display_name,
+        theme=theme,
+        start_date=start_date,
+        end_date=end_date,
+        gsd=gsd,
+    )
+
     if raster_item is None:
         return None
 
     # 5. Add Raster Data Asset
     raster_item = add_raster_data_asset(raster_item, geoserver_url=geoserver_url)
-    
+
     # 6. Add Classification Extension
-    raster_item, style_info = add_classification_extension(raster_style_url=style_file_url,
-                                                          raster_item=raster_item,
-                                                          STYLE_FILE_DIR=STYLE_FILE_DIR)
-    
+    raster_item, style_info = add_classification_extension(
+        raster_style_url=style_file_url,
+        raster_item=raster_item,
+        STYLE_FILE_DIR=STYLE_FILE_DIR,
+    )
+
     # 7. Add Style File Asset
     add_stylefile_asset(STAC_item=raster_item, style_file_url=style_file_url)
 
-    # 8. GENERATE  THUMBNAIL URL 
-    if (start_year != ''):
-        thumbnail_filename = f'{state}_{district}_{block}_{layer_name}_{start_year}.png'
+    # 8. GENERATE  THUMBNAIL URL
+    if start_year != "":
+        thumbnail_filename = f"{state}_{district}_{block}_{layer_name}_{start_year}.png"
     else:
-        thumbnail_filename = f'{state}_{district}_{block}_{layer_name}.png' #TODO:
-    
+        thumbnail_filename = f"{state}_{district}_{block}_{layer_name}.png"  # TODO:
+
     THUMBNAIL_PATH = os.path.join(THUMBNAIL_DIR, thumbnail_filename)
-    
+
     # Generate the thumbnail URL using the bbox from the pystac item metadata
     THUMBNAIL_URL = generate_raster_thumbnail_url(
         workspace=geoserver_workspace_name,
         layer_name=geoserver_layer_name,
         bbox=raster_item.bbox,
-        geoserver_base_url=GEOSERVER_BASE_URL
+        geoserver_base_url=GEOSERVER_BASE_URL,
     )
 
     # 9. Download and Add Thumbnail Asset
@@ -696,13 +749,13 @@ def generate_raster_item(state, district, block, layer_name, layer_map_csv_path,
             STAC_item=raster_item,
             THUMBNAIL_PATH=THUMBNAIL_PATH,
             LOCAL_DATA_DIR=LOCAL_DATA_DIR,
-            THUMBNAIL_DATA_URL=THUMBNAIL_DATA_URL
+            THUMBNAIL_DATA_URL=THUMBNAIL_DATA_URL,
         )
 
     return raster_item
 
 
-#%%
+# %%
 
 
 def update_STAC_files(state, district, block, STAC_item):
@@ -1336,10 +1389,25 @@ def generate_vector_thumbnail(vector_gdf, style_file_url, output_path, STYLE_FIL
 
     try:
         # vector_gdf = gpd.read_file(vector_path)
+        vector_gdf = vector_gdf[
+            vector_gdf.geometry.type.isin(
+                ["Polygon", "MultiPolygon", "Point", "LineString"]
+            )
+        ]
+
+        vector_gdf = vector_gdf[
+            vector_gdf.geometry.notnull() & ~vector_gdf.geometry.is_empty
+        ]
+        vector_gdf = vector_gdf.reset_index(drop=True)
+
+        if vector_gdf.empty:
+            print("No valid polygon data remaining after filtering.")
+            return
+
         style_info = parse_vector_style_file(style_file_url, STYLE_FILE_DIR)
 
         print("style_info=", style_info)  # TODO: temporary debug print
-        fig, ax = plt.subplots(figsize=(6, 6))
+        fig, ax = plt.subplots(figsize=(3, 3))
 
         default_fill_color = (0.8, 0.8, 0.8, 1.0)  # Light gray
         default_outline_color = (0, 0, 0, 1.0)  # Black
@@ -1694,6 +1762,30 @@ def upload_folder_to_s3(aws_creds, folderpath, s3_bucket):
         )
 
 
+def sync_folder_to_s3(folderpath, s3_uri, aws_creds):
+    os.environ["AWS_ACCESS_KEY_ID"] = aws_creds["aws_access_key_id"]
+    os.environ["AWS_SECRET_ACCESS_KEY"] = aws_creds["aws_secret_access_key"]
+
+    source = os.path.basename(folderpath)
+    destination = s3_uri + source + "/"
+
+    command = ["aws", "s3", "sync", source, destination]
+
+    # Run the command and capture output/return code
+    result = subprocess.run(command, capture_output=True, text=True)
+
+    # Parse the return code into a variable
+    exit_code = result.returncode
+
+    if exit_code == 0:
+        print("Sync successful.")
+    else:
+        print(f"Sync failed with code: {exit_code}")
+        print(f"Error: {result.stderr}")
+
+    return exit_code
+
+
 # %% [markdown]
 # Making a combined function to generate raster/vector STAC :
 # The function generates the item, and updates the files
@@ -1739,14 +1831,22 @@ def generate_vector_stac(
     )
 
     if upload_to_s3:
-        upload_folder_to_s3(
-            aws_creds=aws_creds,
-            folderpath=STAC_FILES_DIR,
-            s3_bucket=S3_STAC_BUCKET_NAME,
+        # upload_folder_to_s3(
+        # aws_creds=aws_creds,
+        # folderpath=STAC_FILES_DIR,
+        # s3_bucket=S3_STAC_BUCKET_NAME)
+
+        # upload_folder_to_s3(
+        # aws_creds=aws_creds,
+        # folderpath=THUMBNAIL_DIR,
+        # s3_bucket=S3_STAC_BUCKET_NAME)
+
+        sync_status_json_folder = sync_folder_to_s3(
+            aws_creds=aws_creds, folderpath=STAC_FILES_DIR, s3_uri=S3_STAC_URI
         )
 
-        upload_folder_to_s3(
-            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+        sync_status_thumbnail_folder = sync_folder_to_s3(
+            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_uri=S3_STAC_URI
         )
 
     return layer_STAC_generated
@@ -1791,15 +1891,34 @@ def generate_raster_stac(
         state, district, block, STAC_item=raster_item
     )
 
+    # if upload_to_s3:
+    #     upload_folder_to_s3(
+    #         aws_creds=aws_creds,
+    #         folderpath=STAC_FILES_DIR,
+    #         s3_bucket=S3_STAC_BUCKET_NAME,
+    #     )
+
+    #     upload_folder_to_s3(
+    #         aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+    #     )
+
     if upload_to_s3:
-        upload_folder_to_s3(
-            aws_creds=aws_creds,
-            folderpath=STAC_FILES_DIR,
-            s3_bucket=S3_STAC_BUCKET_NAME,
+        # upload_folder_to_s3(
+        # aws_creds=aws_creds,
+        # folderpath=STAC_FILES_DIR,
+        # s3_bucket=S3_STAC_BUCKET_NAME)
+
+        # upload_folder_to_s3(
+        # aws_creds=aws_creds,
+        # folderpath=THUMBNAIL_DIR,
+        # s3_bucket=S3_STAC_BUCKET_NAME)
+
+        sync_status_json_folder = sync_folder_to_s3(
+            aws_creds=aws_creds, folderpath=STAC_FILES_DIR, s3_uri=S3_STAC_URI
         )
 
-        upload_folder_to_s3(
-            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_bucket=S3_STAC_BUCKET_NAME
+        sync_status_thumbnail_folder = sync_folder_to_s3(
+            aws_creds=aws_creds, folderpath=THUMBNAIL_DIR, s3_uri=S3_STAC_URI
         )
 
     return layer_STAC_generated
@@ -1852,7 +1971,6 @@ def generate_raster_stac(
 #                     #  layer_desc_csv_path='../data/input/metadata/layer_descriptions.csv',
 #                     #  column_desc_csv_path='../data/input/metadata/vector_column_descriptions.csv'
 #                     )
-
 
 
 # %%

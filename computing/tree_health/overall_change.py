@@ -32,7 +32,7 @@ def tree_health_overall_change_raster(
     app_type="MWS",
     gee_account_id=None,
 ):
-    print("Inside process Tree health ch raster")
+    print("Inside process Tree health overall change raster")
     ee_initialize(gee_account_id)
 
     if state and district and block:
@@ -50,12 +50,7 @@ def tree_health_overall_change_raster(
             + "_uid"
         )
 
-    description = (
-        "overall_change_raster_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
+    description = f"overall_change_raster_{asset_suffix}"
 
     asset_id = (
         get_gee_dir_path(
@@ -66,25 +61,29 @@ def tree_health_overall_change_raster(
 
     # Skip if asset already exists
     if not is_gee_asset_exists(asset_id):
-
-        overall_change_raster = ee.ImageCollection(TREE_OVERALL_CHANGE)
-
-        raster = (
-            overall_change_raster.filterBounds(roi.geometry())
+        overall_change_clipped = (
+            ee.ImageCollection(TREE_OVERALL_CHANGE)
+            .filterBounds(roi.geometry())
             .mean()
             .clip(roi.geometry())
         )
 
-        raster = mask_raster(
-            app_type, asset_folder_list, asset_suffix, raster, start_year, end_year
+        overall_change_clipped = mask_raster(
+            app_type,
+            asset_folder_list,
+            asset_suffix,
+            overall_change_clipped,
+            start_year,
+            end_year,
         )
 
         task_id = export_raster_asset_to_gee(
-            image=raster,
+            image=overall_change_clipped,
             description=description,
             asset_id=asset_id,
             scale=25,
             region=roi.geometry(),
+            crs="EPSG:4326",
         )
 
         task_id_list = check_task_status([task_id])
@@ -128,51 +127,60 @@ def tree_health_overall_change_raster(
 
 
 def mask_raster(
-    app_type, asset_folder_list, asset_suffix, raster, start_year, end_year
+    app_type, asset_folder_list, asset_suffix, tree_change, start_year, end_year
 ):
+    # STEP 1: Load IndiaSAT and Tree change layers and reproject to 25m
     deforestation = ee.Image(
         get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
-        + f"change_{asset_suffix}_Deforestation_{start_year}_{int(end_year)+1}"  # TODO Fix later with some better logic
-    )
+        + f"change_{asset_suffix}_Deforestation_{start_year}_{int(end_year)+1}"
+    ).reproject(crs="EPSG:4326", scale=25)
+
     afforestation = ee.Image(
         get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
         + f"change_{asset_suffix}_Afforestation_{start_year}_{int(end_year)+1}"
-    )
+    ).reproject(crs="EPSG:4326", scale=25)
 
-    # Ignore Deforestation (-2) and Afforestation (2) pixels
-    ignore_mask = raster.neq(-2).And(raster.neq(2))
-    raster = raster.updateMask(ignore_mask)
+    # Overall tree change raster (DW + IndiaSAT)
+    tree_change = tree_change.reproject(crs="EPSG:4326", scale=25)
 
-    # Apply no change mask to the raster
-    no_change_mask = afforestation.eq(1)
-    raster = raster.updateMask(no_change_mask)
-
-    # Join Degradation and Afforestation (to cover for tree cover gain/loss)
-    defr_mask = (
-        deforestation.eq(2)
-        .Or(deforestation.eq(3))
-        .Or(deforestation.eq(4))
-        .Or(deforestation.eq(5))
-    )
-    aff_mask = (
-        afforestation.eq(2)
-        .Or(afforestation.eq(3))
-        .Or(afforestation.eq(4))
-        .Or(afforestation.eq(5))
-    )
-    # Apply the IndiaSAT LULC change pixel values into the raster
-    # Deforestation pixels: write values from degradation
+    # STEP 2: Start from an empty canvas
     BACKGROUND = -9999
-    raster = raster.unmask(BACKGROUND)
-    raster = raster.where(defr_mask, -2)
+    masked_change_layer = ee.Image(BACKGROUND).rename(tree_change.bandNames())
 
-    # Afforestation pixels: write values from afforestation
-    raster = raster.where(aff_mask, 2)
+    # STEP 3: IndiaSAT no-change area
+    no_change_mask = afforestation.eq(1)
+    masked_change_layer = masked_change_layer.where(no_change_mask, 0)
 
-    raster = raster.updateMask(raster.neq(BACKGROUND))
+    # STEP 4: IndiaSAT deforestation --> -2
+    defr_mask = deforestation.gte(2).And(deforestation.lte(5))
+    masked_change_layer = masked_change_layer.where(defr_mask, -2)
 
-    return raster
+    # STEP 5: IndiaSAT afforestation → 2
+    aff_mask = afforestation.gte(2).And(afforestation.lte(5))
+    masked_change_layer = masked_change_layer.where(aff_mask, 2)
+
+    # STEP 6: Inside no-change, allow ONLY selected classes from tree change raster
+    allowed_inside_no_change = (
+        tree_change.eq(-1)  # degradation
+        .Or(tree_change.eq(1))  # improvement
+        .Or(tree_change.eq(3))  # partial degraded
+        .Or(tree_change.eq(4))  # partial degraded
+        .Or(tree_change.eq(5))  # missing data
+    )
+
+    masked_change_layer = masked_change_layer.where(
+        no_change_mask.And(allowed_inside_no_change), tree_change
+    )
+
+    # STEP 7: Mask background
+    masked_change_layer = masked_change_layer.updateMask(
+        masked_change_layer.neq(BACKGROUND)
+    )
+
+    return masked_change_layer

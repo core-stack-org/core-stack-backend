@@ -83,7 +83,7 @@ def tree_health_ch_raster(
             )
 
             # Apply tree mask to the raster; Tree: class 6
-            tree_mask = lulc.eq(6)
+            tree_mask = lulc.eq(6).reproject(crs="EPSG:4326", scale=25)
             raster = raster.updateMask(tree_mask)
 
             task_id = export_raster_asset_to_gee(
