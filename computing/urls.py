@@ -176,4 +176,25 @@ urlpatterns = [
         api.generate_mws_centroid,
         name="generate-mws-centroid",
     ),
+    # Drought Live Alerts
+    path(
+        "drought_alerts/generate/",
+        api.generate_drought_alerts,
+        name="generate_drought_alerts",
+    ),
+    path(
+        "drought_alerts/ingest_idm/",
+        api.ingest_idm_drought_alerts,
+        name="ingest_idm_drought_alerts",
+    ),
+    path(
+        "drought_alerts/list/",
+        api.list_drought_alerts,
+        name="list_drought_alerts",
+    ),
+    path(
+        "drought_alerts/detail/",
+        api.get_drought_alert_detail,
+        name="get_drought_alert_detail",
+    ),
 ]
