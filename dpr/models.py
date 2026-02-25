@@ -505,24 +505,29 @@ class DPR_Report(models.Model):
         return f"{self.plan_name} - {self.dpr_report_id}"
 
     @staticmethod
-    def get_latest_submission_time(plan_id):
+    def get_latest_change_time(plan_id):
         pid = str(plan_id)
         all_models = [
             ODK_settlement, ODK_well, ODK_waterbody,
             ODK_groundwater, ODK_agri, ODK_crop, ODK_livelihood,
             GW_maintenance, SWB_RS_maintenance, SWB_maintenance, Agri_maintenance,
         ]
-        times = [
-            m.objects.filter(plan_id=pid).aggregate(t=Max('submission_time'))['t']
-            for m in all_models
-        ]
-        times = [t for t in times if t]
+        times = []
+        for m in all_models:
+            agg = m.objects.filter(plan_id=pid).aggregate(
+                latest_submission=Max('submission_time'),
+                latest_deletion=Max('deleted_at'),
+            )
+            if agg['latest_submission']:
+                times.append(agg['latest_submission'])
+            if agg['latest_deletion']:
+                times.append(agg['latest_deletion'])
         return max(times) if times else None
 
     def needs_regeneration(self):
         if not self.dpr_generated_at or not self.dpr_report_s3_url:
             return True
-        latest_submission = self.get_latest_submission_time(self.plan_id_id)
-        if not latest_submission:
+        latest_change = self.get_latest_change_time(self.plan_id_id)
+        if not latest_change:
             return False
-        return latest_submission > self.dpr_generated_at
+        return latest_change > self.dpr_generated_at
