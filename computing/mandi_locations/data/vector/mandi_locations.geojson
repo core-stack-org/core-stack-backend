@@ -1,0 +1,351 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          73.7898,
+          19.9975
+        ]
+      },
+      "properties": {
+        "mandi_code": "MH001",
+        "mandi_name": "Lasalgaon",
+        "state_name": "Maharashtra",
+        "district_name": "Nashik",
+        "commodities": "Onion,Tomato,Potato"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          73.0087,
+          19.0771
+        ]
+      },
+      "properties": {
+        "mandi_code": "MH002",
+        "mandi_name": "Vashi",
+        "state_name": "Maharashtra",
+        "district_name": "Mumbai",
+        "commodities": "Vegetables,Fruits"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          74.8723,
+          31.634
+        ]
+      },
+      "properties": {
+        "mandi_code": "PB001",
+        "mandi_name": "Amritsar",
+        "state_name": "Punjab",
+        "district_name": "Amritsar",
+        "commodities": "Wheat,Rice,Maize"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.8573,
+          30.901
+        ]
+      },
+      "properties": {
+        "mandi_code": "PB002",
+        "mandi_name": "Ludhiana",
+        "state_name": "Punjab",
+        "district_name": "Ludhiana",
+        "commodities": "Wheat,Cotton,Vegetables"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          72.5714,
+          23.0225
+        ]
+      },
+      "properties": {
+        "mandi_code": "GJ001",
+        "mandi_name": "Ahmedabad",
+        "state_name": "Gujarat",
+        "district_name": "Ahmedabad",
+        "commodities": "Cotton,Groundnut,Wheat"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          70.8022,
+          22.3039
+        ]
+      },
+      "properties": {
+        "mandi_code": "GJ002",
+        "mandi_name": "Rajkot",
+        "state_name": "Gujarat",
+        "district_name": "Rajkot",
+        "commodities": "Groundnut,Cotton,Vegetables"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          78.0081,
+          27.1767
+        ]
+      },
+      "properties": {
+        "mandi_code": "UP001",
+        "mandi_name": "Agra",
+        "state_name": "Uttar Pradesh",
+        "district_name": "Agra",
+        "commodities": "Potato,Vegetables,Wheat"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          80.3319,
+          26.4499
+        ]
+      },
+      "properties": {
+        "mandi_code": "UP002",
+        "mandi_name": "Kanpur",
+        "state_name": "Uttar Pradesh",
+        "district_name": "Kanpur",
+        "commodities": "Wheat,Rice,Pulses"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.5876,
+          13.0282
+        ]
+      },
+      "properties": {
+        "mandi_code": "KA001",
+        "mandi_name": "Yeshwantpur",
+        "state_name": "Karnataka",
+        "district_name": "Bangalore",
+        "commodities": "Vegetables,Fruits,Flowers"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.124,
+          15.3647
+        ]
+      },
+      "properties": {
+        "mandi_code": "KA002",
+        "mandi_name": "Hubli",
+        "state_name": "Karnataka",
+        "district_name": "Dharwad",
+        "commodities": "Cotton,Chilli,Onion"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.8577,
+          22.7196
+        ]
+      },
+      "properties": {
+        "mandi_code": "MP001",
+        "mandi_name": "Indore",
+        "state_name": "Madhya Pradesh",
+        "district_name": "Indore",
+        "commodities": "Soybean,Wheat,Cotton"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          77.4126,
+          23.2599
+        ]
+      },
+      "properties": {
+        "mandi_code": "MP002",
+        "mandi_name": "Bhopal",
+        "state_name": "Madhya Pradesh",
+        "district_name": "Bhopal",
+        "commodities": "Wheat,Soybean,Vegetables"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.7873,
+          26.9124
+        ]
+      },
+      "properties": {
+        "mandi_code": "RJ001",
+        "mandi_name": "Jaipur",
+        "state_name": "Rajasthan",
+        "district_name": "Jaipur",
+        "commodities": "Wheat,Mustard,Vegetables"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          75.8648,
+          25.2138
+        ]
+      },
+      "properties": {
+        "mandi_code": "RJ002",
+        "mandi_name": "Kota",
+        "state_name": "Rajasthan",
+        "district_name": "Kota",
+        "commodities": "Soybean,Wheat,Coriander"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          88.3639,
+          22.5726
+        ]
+      },
+      "properties": {
+        "mandi_code": "WB001",
+        "mandi_name": "Koley Market",
+        "state_name": "West Bengal",
+        "district_name": "Kolkata",
+        "commodities": "Vegetables,Rice,Fish"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          80.2013,
+          13.0695
+        ]
+      },
+      "properties": {
+        "mandi_code": "TN001",
+        "mandi_name": "Koyambedu",
+        "state_name": "Tamil Nadu",
+        "district_name": "Chennai",
+        "commodities": "Vegetables,Fruits,Flowers"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          80.4365,
+          16.3067
+        ]
+      },
+      "properties": {
+        "mandi_code": "AP001",
+        "mandi_name": "Guntur",
+        "state_name": "Andhra Pradesh",
+        "district_name": "Guntur",
+        "commodities": "Chilli,Cotton,Tobacco"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          78.4864,
+          17.4817
+        ]
+      },
+      "properties": {
+        "mandi_code": "TS001",
+        "mandi_name": "Bowenpally",
+        "state_name": "Telangana",
+        "district_name": "Hyderabad",
+        "commodities": "Vegetables,Fruits,Flowers"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          85.1376,
+          25.5941
+        ]
+      },
+      "properties": {
+        "mandi_code": "BR001",
+        "mandi_name": "Patna",
+        "state_name": "Bihar",
+        "district_name": "Patna",
+        "commodities": "Rice,Wheat,Vegetables"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          76.9905,
+          29.6857
+        ]
+      },
+      "properties": {
+        "mandi_code": "HR001",
+        "mandi_name": "Karnal",
+        "state_name": "Haryana",
+        "district_name": "Karnal",
+        "commodities": "Wheat,Rice,Sugarcane"
+      }
+    }
+  ],
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  }
+}
