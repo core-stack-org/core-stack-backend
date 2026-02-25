@@ -10,9 +10,19 @@ from moderation.utils.form_mapping import feedback_form
 from moderation.models import SyncMetadata
 import ee
 import math
-import re
 import json
-from utils.demand_validator_lulc import compute_lulc_auto
+from moderation.utils.demand_validator_lulc import (
+    compute_lulc_auto,
+    normalize_structure_name,
+)
+from utilities.constants import (
+    DRAINAGE_LINES_ASSET,
+    GLOBAL_DRAINAGE_EPS_M,
+    GEOSERVER_BASE,
+    WORKS_WORKSPACE,
+    RESOURCES_WORKSPACE,
+)
+from utilities.gee_utils import ee_initialize
 
 FETCH_FIELD_MAP = {
     ODK_settlement: "data_settlement",
@@ -179,19 +189,7 @@ def sync_odk_to_csdb():
 
 
 # DEMAND VALIDATOR LOGICS
-
-try:
-    ee.Initialize(project="pawan-457506")
-    EE_AVAILABLE = True
-    print(f"Earth Engine initialized...")
-except Exception as e:
-    EE_AVAILABLE = False
-    print("WARNING: Could not initialize Earth Engine:", e)
-
-
-DRAINAGE_LINES_ASSET = (
-    "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
-)
+EE_AVAILABLE = ee_initialize(account_id=17)
 
 
 def compute_slope_mean_30m(lat: float, lon: float, buffer_m: int = 30) -> float:
@@ -301,55 +299,6 @@ def compute_drainage_distance_m(lat: float, lon: float, scale: int = 30) -> floa
     return round(float(d or 0.0), 2)
 
 
-# STRUCTURE_ALIASES = {
-#     "continuous_contour_trenches": "continuous_contour_trench",
-#     "continuous_contour_trench_cct": "continuous_contour_trench",
-#     "continuous_contour_trenches_cct": "continuous_contour_trench",
-#     "staggered_contour_trenches": "staggered_contour_trench",
-#     "earthen_gully_plug": "earthen_gully_plugs",
-#     "earthen_gully_plugs_egp": "earthen_gully_plugs",
-#     "drainage_soakage_channel": "drainage_soakage_channels",
-#     "drainage_soakage_channels": "drainage_soakage_channels",
-#     "trench_cum_bund_network": "trench_cum_bund",
-#     # 5% model variations
-#     "5_model_structure": "5_percent_model",
-#     "5_percent_model_structure": "5_percent_model",
-#     "5_percent_model": "5_percent_model",
-#     # 30_40 model variations
-#     "30_40_model_structure": "30_40_model",
-#     "30_40_model": "30_40_model",
-# }
-
-# def normalize_structure_name(structure_type: str) -> str:
-#     if not structure_type:
-#         return ""
-#
-#     s = str(structure_type).strip().lower()
-#
-#     # remove anything inside brackets/parentheses: "(cct)" "(egp)" etc.
-#     s = re.sub(r"\(.*?\)", " ", s)
-#
-#     # IMPORTANT: handle % BEFORE underscore-joining
-#     s = s.replace("%", " percent ")
-#
-#     # normalize separators
-#     s = s.replace("&", " and ")
-#     s = s.replace("/", " ")
-#     s = s.replace("-", " ")
-#
-#     # remove non-alphanumeric (keep spaces for now)
-#     s = re.sub(r"[^a-z0-9\s]", " ", s)
-#
-#     # optional plural standardization
-#     s = s.replace("trenches", "trench")
-#
-#     # collapse whitespace -> underscores (FINAL canonical form)
-#     s = "_".join(s.split()).strip("_")
-#
-#     # apply aliases
-#     return STRUCTURE_ALIASES.get(s, s)
-
-
 with open("moderation/utils/rules.json", "r", encoding="utf-8") as f:
     RULES = json.load(f)
 
@@ -426,9 +375,6 @@ def classify_stream_order(value, rule: dict):
         "not_accepted",
         f"Stream order {v} not in accepted/partial sets → not accepted.",
     )
-
-
-GLOBAL_DRAINAGE_EPS_M = 10.0
 
 
 def classify_lulc(value, rule: dict):
@@ -559,10 +505,6 @@ def evaluate_site_from_rules(site: dict) -> dict:
         "overall_comment": overall_comment,
     }
 
-
-GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
-WORKS_WORKSPACE = "works"
-RESOURCES_WORKSPACE = "resources"
 
 LAYER_CONFIG = {
     "plan_agri": WORKS_WORKSPACE,

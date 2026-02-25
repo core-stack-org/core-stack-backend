@@ -199,3 +199,12 @@ filter_query = (
     "and year(__system/updatedAt) eq 2025)"
 )
 project_id = 2
+
+DRAINAGE_LINES_ASSET = (
+    "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
+)
+GLOBAL_DRAINAGE_EPS_M = 10.0
+GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
+WORKS_WORKSPACE = "works"
+RESOURCES_WORKSPACE = "resources"
+LULC_ASSET = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2024_2025"

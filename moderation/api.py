@@ -221,8 +221,8 @@ def site_paln(request):
 def site_validate(request):
     lat = request.query_params.get("lat")
     lon = request.query_params.get("lon")
-    structure_type = request.query_params.get("structure_type").lower()
-    lulc_class = request.query_params.get("lulc_class").lower()
+    structure_type = request.query_params.get("structure_type")
+    lulc_class = request.query_params.get("lulc_class")
     validate_site = DemandValidator.validate_site(
         lat=lat, lon=lon, structure_type=structure_type, lulc_class=lulc_class
     )
