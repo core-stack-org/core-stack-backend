@@ -517,11 +517,11 @@ class DPR_Report(models.Model):
             agg = m.objects.filter(plan_id=pid).aggregate(
                 latest_submission=Max('submission_time'),
                 latest_deletion=Max('deleted_at'),
+                latest_moderation=Max('moderated_at'),
             )
-            if agg['latest_submission']:
-                times.append(agg['latest_submission'])
-            if agg['latest_deletion']:
-                times.append(agg['latest_deletion'])
+            for key in ('latest_submission', 'latest_deletion', 'latest_moderation'):
+                if agg[key]:
+                    times.append(agg[key])
         return max(times) if times else None
 
     def needs_regeneration(self):
