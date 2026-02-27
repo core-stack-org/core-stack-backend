@@ -392,6 +392,8 @@ WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
 BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
 
+PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
+
 FERNET_KEY = env("FERNET_KEY")
 
 
