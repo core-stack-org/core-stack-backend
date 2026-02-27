@@ -30,6 +30,8 @@ from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
+from .drought.drought_alert_tasks import compute_spei_alerts, ingest_idm_alerts_task
+from .drought.models import DroughtAlert
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from computing.misc.drainage_lines import clip_drainage_lines
@@ -1537,3 +1539,222 @@ def generate_mws_centroid(request):
     except Exception as e:
         print("Exception in generate_mws_centroid api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================
+# Drought Live Alerts API Endpoints
+# ============================================================
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_drought_alerts(request):
+    """
+    Trigger SPEI-based drought alert computation for an AoI.
+
+    Request body:
+        - state (str): State name
+        - district (str): District name
+        - block (str): Block name
+        - target_date (str, optional): ISO date (YYYY-MM-DD), defaults to today
+        - accumulation_months (int, optional): SPEI period (1,3,6,12), default 1
+        - gee_account_id (int, optional): GEE service account ID
+    """
+    print("Inside generate_drought_alerts API")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        target_date = request.data.get("target_date")
+        accumulation_months = int(request.data.get("accumulation_months", 1))
+        gee_account_id = request.data.get("gee_account_id")
+        roi_path = request.data.get("roi_path")
+
+        compute_spei_alerts.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "roi_path": roi_path,
+                "target_date": target_date,
+                "accumulation_months": accumulation_months,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Drought alert SPEI computation task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_drought_alerts api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["POST"])
+@schema(None)
+def ingest_idm_drought_alerts(request):
+    """
+    Ingest drought alerts from India Drought Monitor.
+
+    Request body:
+        - state (str, optional): Filter by state
+        - district (str, optional): Filter by district
+        - block (str, optional): Filter by block
+    """
+    print("Inside ingest_idm_drought_alerts API")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+
+        ingest_idm_alerts_task.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "IDM drought alert ingestion task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in ingest_idm_drought_alerts api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@schema(None)
+def list_drought_alerts(request):
+    """
+    List active drought alerts with optional filters.
+
+    Query params:
+        - state (str, optional)
+        - district (str, optional)
+        - block (str, optional)
+        - severity (str, optional): D0, D1, D2, D3, D4
+        - alert_type (str, optional): spei, idm
+        - is_active (bool, optional): default True
+        - limit (int, optional): max results, default 100
+    """
+    print("Inside list_drought_alerts API")
+    try:
+        filters = {}
+
+        state = request.query_params.get("state")
+        district = request.query_params.get("district")
+        block = request.query_params.get("block")
+        severity = request.query_params.get("severity")
+        alert_type = request.query_params.get("alert_type")
+        is_active = request.query_params.get("is_active", "true")
+        limit = int(request.query_params.get("limit", 100))
+
+        if state:
+            filters["state__iexact"] = state
+        if district:
+            filters["district__iexact"] = district
+        if block:
+            filters["block__iexact"] = block
+        if severity:
+            filters["severity"] = severity.upper()
+        if alert_type:
+            filters["alert_type"] = alert_type.lower()
+        if is_active.lower() == "true":
+            filters["is_active"] = True
+
+        alerts = DroughtAlert.objects.filter(**filters).order_by(
+            "-alert_date", "-created_at"
+        )[:limit]
+
+        results = []
+        for alert in alerts:
+            results.append(
+                {
+                    "id": alert.id,
+                    "severity": alert.severity,
+                    "severity_label": alert.get_severity_display(),
+                    "alert_type": alert.alert_type,
+                    "spei_value": alert.spei_value,
+                    "aoi_name": alert.aoi_name,
+                    "state": alert.state,
+                    "district": alert.district,
+                    "block": alert.block,
+                    "area_sq_km": alert.area_sq_km,
+                    "alert_date": str(alert.alert_date),
+                    "is_active": alert.is_active,
+                    "created_at": str(alert.created_at),
+                    "metadata": alert.metadata,
+                }
+            )
+
+        return Response(
+            {
+                "count": len(results),
+                "alerts": results,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in list_drought_alerts api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@schema(None)
+def get_drought_alert_detail(request):
+    """
+    Get details of a specific drought alert by ID.
+
+    Query params:
+        - id (int): Alert ID
+    """
+    print("Inside get_drought_alert_detail API")
+    try:
+        alert_id = request.query_params.get("id")
+        if not alert_id:
+            return Response(
+                {"error": "Alert ID is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        alert = DroughtAlert.objects.get(id=int(alert_id))
+        result = {
+            "id": alert.id,
+            "severity": alert.severity,
+            "severity_label": alert.get_severity_display(),
+            "alert_type": alert.alert_type,
+            "alert_type_label": alert.get_alert_type_display(),
+            "spei_value": alert.spei_value,
+            "aoi_name": alert.aoi_name,
+            "state": alert.state,
+            "district": alert.district,
+            "block": alert.block,
+            "area_sq_km": alert.area_sq_km,
+            "geometry": alert.geometry,
+            "alert_date": str(alert.alert_date),
+            "is_active": alert.is_active,
+            "created_at": str(alert.created_at),
+            "updated_at": str(alert.updated_at),
+            "metadata": alert.metadata,
+        }
+        return Response(result, status=status.HTTP_200_OK)
+
+    except DroughtAlert.DoesNotExist:
+        return Response(
+            {"error": f"Drought alert with ID {alert_id} not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    except Exception as e:
+        print("Exception in get_drought_alert_detail api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
