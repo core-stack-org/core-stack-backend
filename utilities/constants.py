@@ -169,6 +169,7 @@ GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 
 GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
 
+GEE_FACILITIES_DATASET_PATH = "projects/corestack-datasets/assets/datasets/pan_india_facilities"
 
 GEE_PATHS = {
     "MWS": {
