@@ -16,6 +16,13 @@ POSTGRES_PASSWORD="nrm@123"
 APACHE_CONF="/etc/apache2/sites-available/corestack.conf"
 SHELL_RC="$HOME/.bashrc"  # Change to .zshrc if using zsh
 
+# === ENV FILE CONFIGURATION ===
+# Map script config variables to .env variable names
+# These will override blank values in the generated .env
+ENV_DB_NAME="$POSTGRES_DB"
+ENV_DB_USER="$POSTGRES_USER"
+ENV_DB_PASSWORD="$POSTGRES_PASSWORD"
+
 # === FUNCTIONS ===
 
 function install_miniconda() {
@@ -166,6 +173,102 @@ EOL
     echo "Apache configured."
 }
 
+function generate_env_file() {
+    echo "Generating .env file from settings.py..."
+    
+    local SETTINGS_FILE="$BACKEND_DIR/nrm_app/settings.py"
+    local ENV_FILE="$BACKEND_DIR/nrm_app/.env"
+    
+    if [ ! -f "$SETTINGS_FILE" ]; then
+        echo "ERROR: settings.py not found at $SETTINGS_FILE"
+        return 1
+    fi
+    
+    # Extract variable names using grep and sed
+    # This regex matches env("VAR_NAME") patterns and captures VAR_NAME
+    local env_vars
+    env_vars=$(grep -oE 'env\.[a-z]*\s*\(\s*"[A-Za-z_][A-Za-z0-9_]*"' "$SETTINGS_FILE" 2>/dev/null | \
+               sed -E 's/env\.[a-z]*\s*\(\s*"([^"]+)"/\1/' | \
+               sort -u)
+    
+    # Also capture simple env("VAR_NAME") calls
+    local env_vars_simple
+    env_vars_simple=$(grep -oE 'env\s*\(\s*"[A-Za-z_][A-Za-z0-9_]*"' "$SETTINGS_FILE" 2>/dev/null | \
+                      sed -E 's/env\s*\(\s*"([^"]+)"/\1/' | \
+                      sort -u)
+    
+    # Combine and deduplicate
+    local all_vars
+    all_vars=$(echo -e "${env_vars}\n${env_vars_simple}" | sort -u | grep -v '^$')
+    
+    # Check if .env file already exists
+    if [ -f "$ENV_FILE" ]; then
+        echo "Existing .env file found. Adding missing variables..."
+        local added_count=0
+        
+        # Read existing variable names from .env
+        local existing_vars
+        existing_vars=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE" | cut -d'=' -f1 | sort -u)
+        
+        # Add missing variables with blank values
+        while IFS= read -r var_name; do
+            if [ -n "$var_name" ]; then
+                # Check if variable already exists in .env
+                if ! echo "$existing_vars" | grep -q "^${var_name}$"; then
+                    echo "${var_name}=\"\"" >> "$ENV_FILE"
+                    ((added_count++))
+                fi
+            fi
+        done <<< "$all_vars"
+        
+        echo "✅ Added $added_count missing variables to existing .env file"
+    else
+        # Create new .env file
+        echo "# Auto-generated .env file from settings.py" > "$ENV_FILE"
+        echo "# Generated on $(date)" >> "$ENV_FILE"
+        echo "" >> "$ENV_FILE"
+        
+        # Write each variable with blank value to .env
+        while IFS= read -r var_name; do
+            if [ -n "$var_name" ]; then
+                echo "${var_name}=\"\"" >> "$ENV_FILE"
+            fi
+        done <<< "$all_vars"
+        
+        echo "" >> "$ENV_FILE"
+        echo "# === CONFIGURATION OVERRIDES ===" >> "$ENV_FILE"
+        
+        echo "✅ .env file generated at $ENV_FILE"
+    fi
+    
+    # Apply configuration overrides (for both new and existing files)
+    apply_env_overrides "$ENV_FILE"
+    
+    # Set proper permissions
+    sudo chown www-data:www-data "$ENV_FILE"
+    sudo chmod 640 "$ENV_FILE"
+    
+    echo "   Total variables in .env: $(grep -c '^[A-Za-z_]' "$ENV_FILE")"
+}
+
+function apply_env_overrides() {
+    local ENV_FILE="$1"
+    
+    # Override with values from script configuration
+    # DB settings mapping - only override if value is blank or variable was just added
+    if [ -n "$ENV_DB_NAME" ]; then
+        sed -i "s|^DB_NAME=\"\"|DB_NAME=\"$ENV_DB_NAME\"|" "$ENV_FILE"
+    fi
+    
+    if [ -n "$ENV_DB_USER" ]; then
+        sed -i "s|^DB_USER=\"\"|DB_USER=\"$ENV_DB_USER\"|" "$ENV_FILE"
+    fi
+    
+    if [ -n "$ENV_DB_PASSWORD" ]; then
+        sed -i "s|^DB_PASSWORD=\"\"|DB_PASSWORD=\"$ENV_DB_PASSWORD\"|" "$ENV_FILE"
+    fi
+}
+
 # === MAIN ===
 install_miniconda
 ensure_conda
@@ -174,6 +277,7 @@ install_apache
 setup_conda_env
 clone_backend
 setup_logs_dir
+generate_env_file
 collect_static_files
 run_migrations
 configure_apache
@@ -183,3 +287,6 @@ echo "Deployment complete!"
 echo "Visit: http://localhost"
 echo "Activate env: conda activate $CONDA_ENV_NAME"
 echo "Apache serves /, /static, and /media automatically."
+echo ""
+echo "⚠️  IMPORTANT: Review and update the .env file at $BACKEND_DIR/nrm_app/.env"
+echo "   with your actual credentials before running in production."
