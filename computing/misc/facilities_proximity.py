@@ -11,7 +11,7 @@ Usage:
         import django
         django.setup()
         from computing.misc.facilities_proximity import generate_facilities_proximity
-        generate_facilities_proximity('Odisha', 'Koraput', 'Jaypur', gee_account_id=21)
+        generate_facilities_proximity('Odisha', 'Koraput', 'Jaypur', gee_account_id=1)
     "
 
 GEE Asset: projects/corestack-datasets/assets/datasets/pan_india_facilities
@@ -49,7 +49,7 @@ FACILITIES_GEOSERVER_WORKSPACE = "testworkspace"
 FACILITIES_DATASET_NAME = "Facilities Proximity"
 
 
-def generate_facilities_proximity(state, district, block, gee_account_id=21):
+def generate_facilities_proximity(state, district, block, gee_account_id):
     """
     Generate facilities proximity layer for a tehsil/block.
     
