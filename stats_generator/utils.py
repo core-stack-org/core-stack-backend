@@ -211,7 +211,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "restoration":
                 create_excel_for_restoration(geojson_data, xlsx_file, writer)
             elif workspace == "aquifer":
-                create_excel_for_aquifer(geojson_data, xlsx_file, writer)
+                create_excel_for_aquifer(geojson_data, writer)
             elif workspace == "soge":
                 create_excel_for_soge(geojson_data, xlsx_file, writer)
             elif workspace == "lcw":
@@ -454,117 +454,72 @@ def create_excel_for_soge(data, xlsx_file, writer):
     print(f"Excel file created for soge_vector")
 
 
-def create_excel_for_aquifer(data, xlsx_file, writer):
+def create_excel_for_aquifer(data, writer):
     df_data = []
     features = data["features"]
 
-    # List of all principal aquifers
-    principal_aquifers = [
-        "Laterite",
-        "Basalt",
-        "Sandstone",
-        "Shale",
-        "Limestone",
-        "Granite",
-        "Schist",
-        "Quartzite",
-        "Charnockite",
-        "Khondalite",
-        "Banded Gneissic Complex",
-        "Gneiss",
-        "Intrusive",
-        "Alluvium",
-        "None",
-    ]
-
-    # First pass - collect all data
     for feature in features:
         properties = feature["properties"]
-        area_aquifer = properties.get("%_area_aquifer") or properties.get("%_area_aqu")
-
         row = {
-            "UID": properties.get("uid"),
-            "area_in_ha": properties.get("area_in_ha"),
-            "principal_aquifer": properties.get("Principal_"),
-            "%_area_aquifer": area_aquifer,
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "aquifer_class": properties.get("aquifer_class", ""),
+            "principle_aq_Alluvium_percent": properties.get(
+                "principle_aq_Alluvium_percent", "0"
+            ),
+            "principle_aq_Banded Gneissic Complex_percent": properties.get(
+                "principle_aq_Banded Gneissic Complex_percent", "0"
+            ),
+            "principle_aq_Basalt_percent": properties.get(
+                "principle_aq_Basalt_percent", "0"
+            ),
+            "principle_aq_Charnockite_percent": properties.get(
+                "principle_aq_Charnockite_percent", "0"
+            ),
+            "principle_aq_Gneiss_percent": properties.get(
+                "principle_aq_Gneiss_percent", "0"
+            ),
+            "principle_aq_Granite_percent": properties.get(
+                "principle_aq_Granite_percent", "0"
+            ),
+            "principle_aq_Intrusive_percent": properties.get(
+                "principle_aq_Intrusive_percent", "0"
+            ),
+            "principle_aq_Khondalite_percent": properties.get(
+                "principle_aq_Khondalite_percent", "0"
+            ),
+            "principle_aq_Laterite_percent": properties.get(
+                "principle_aq_Laterite_percent", "0"
+            ),
+            "principle_aq_Limestone_percent": properties.get(
+                "principle_aq_Limestone_percent", "0"
+            ),
+            "principle_aq_Quartzite_percent": properties.get(
+                "principle_aq_Quartzite_percent", "0"
+            ),
+            "principle_aq_Sandstone_percent": properties.get(
+                "principle_aq_Sandstone_percent", "0"
+            ),
+            "principle_aq_Schist_percent": properties.get(
+                "principle_aq_Schist_percent", "0"
+            ),
+            "principle_aq_Shale_percent": properties.get(
+                "principle_aq_Shale_percent", "0"
+            ),
+            "principle_aq_None_percent": properties.get(
+                "principle_aq_None_percent", "0"
+            ),
         }
 
         df_data.append(row)
 
-    df = pd.DataFrame(df_data).sort_values(["UID"])
-
-    # Create empty columns for all aquifer percentages
-    for aquifer in principal_aquifers:
-        df[f"principle_aq_{aquifer}_percent"] = 0
-
-    # Group by UID
-    grouped = df.groupby("UID")
-
-    processed_rows = []
-    for uid, group in grouped:
-        # Create a base row with common values
-        base_row = {
-            "UID": uid,
-            "area_in_ha": group["area_in_ha"].iloc[
-                0
-            ],  # Should be same for all rows with same UID
-            "aquifer_count": len(group),  # Count of unique aquifers for this UID
-        }
-
-        # Initialize all percentage columns
-        aquifer_percentages = {
-            f"principle_aq_{aq}_percent": 0 for aq in principal_aquifers
-        }
-
-        # Process each entry in the group
-        for _, row in group.iterrows():
-            # Set aquifer percentage - handle None case
-            aquifer = (
-                row["principal_aquifer"] if row["principal_aquifer"] != "" else "None"
-            )
-            if aquifer in principal_aquifers:
-                aquifer_percentages[f"principle_aq_{aquifer}_percent"] += row[
-                    "%_area_aquifer"
-                ]
-
-        # Find the dominant aquifer (the one with the highest percentage)
-        max_aquifer = None
-        max_percentage = 0
-
-        for aquifer in principal_aquifers:
-            percentage = aquifer_percentages[f"principle_aq_{aquifer}_percent"]
-            if percentage > max_percentage:
-                max_percentage = percentage
-                max_aquifer = aquifer
-
-        aquifer_class = "Alluvium" if max_aquifer == "Alluvium" else "Hard Rock"
-
-        # Combine all data for this UID
-        combined_row = {
-            **base_row,
-            "aquifer_class": aquifer_class,
-            **aquifer_percentages,
-        }
-
-        processed_rows.append(combined_row)
-
-    # Create final dataframe
-    final_df = pd.DataFrame(processed_rows)
-
+    df = pd.DataFrame(df_data)
     # Round numeric values
-    numeric_cols = final_df.select_dtypes(include=["number"]).columns
-    final_df[numeric_cols] = final_df[numeric_cols].round(2)
-
-    # Reorder columns for better readability
-    original_cols = ["UID", "area_in_ha", "aquifer_class"]
-    aquifer_cols = sorted(
-        [col for col in final_df.columns if col.startswith("principle_aq_")]
-    )
-
-    final_df = final_df[original_cols + aquifer_cols]
-
-    final_df.to_excel(writer, sheet_name="aquifer_vector", index=False)
-    print(f"Excel file created for aquifer_vector")
+    numeric_cols = df.select_dtypes(include=["number"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="aquifer_vector", index=False)
+    print("Excel file created for aquifer_vector")
 
 
 def create_excel_for_restoration(data, xlsx_file, writer):

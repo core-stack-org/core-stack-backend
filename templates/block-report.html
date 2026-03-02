@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,697 +23,718 @@
     <link href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.css" rel="stylesheet">
 
     <style>
-    * {
-        box-sizing: border-box;
-    }
-    
-    body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-        color: #333;
-        overflow-x: hidden;
-    }
-    .container {
-        width: 90%;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-    header {
-        background-color: #2c3e50;
-        color: white;
-        padding: 20px 0;
-        text-align: center;
-    }
-    h1, h2, h3 {
-        margin-top: 0;
-    }
-    .section {
-        margin-bottom: 40px;
-        page-break-inside: avoid;
-    }
-    .map {
-        height: 400px;
-        width: 100%;
-        margin: 20px 0;
-        border: 1px solid #ddd;
-        max-width: 100%;
-        position: relative;
-    }
-
-    .map-group{
-        width: 100%;
-        display: flex;
-        flex-direction: row;
-        gap: 10px;
-    }
-    .chart-container {
-        position: relative;
-        height: 300px;
-        width: 100%;
-        max-width: 100%;
-        margin: 20px 0 10px 0;
-    }
-    .chart-container canvas {
-        max-width: 100% !important;
-        height: auto !important;
-    }
-    .legend {
-        display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin: 10px 0;
-    }
-    .legend-below-map {
-        margin-top: 15px;
-        background: white;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        max-width: 100%;
-    }
-
-    .legend-below-map h4 {
-        margin: 0 0 10px 0;
-        font-size: 14px;
-        font-weight: 600;
-        color: #333;
-    }
-
-    .legend-gradient-container {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .legend-gradient-bar {
-        height: 20px;
-        width: 100%;
-        border-radius: 4px;
-        background: linear-gradient(to right, 
-            rgba(100, 200, 100, 0.7) 0%,
-            rgba(200, 200, 100, 0.7) 25%,
-            rgba(255, 200, 100, 0.7) 50%,
-            rgba(255, 100, 50, 0.7) 75%,
-            rgba(255, 0, 0, 0.7) 100%
-        );
-        border: 1px solid rgba(0, 0, 0, 0.2);
-    }
-
-    .legend-gradient-labels {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        color: #666;
-    }
-
-    .legend-gradient-labels span {
-        font-weight: 500;
-    }
-    
-    .legend-item {
-        display: flex;
-        align-items: center;
-        margin: 0 10px;
-    }
-    .legend-color {
-        width: 15px;
-        height: 15px;
-        margin-right: 5px;
-        border-radius: 2px;
-    }
-    footer {
-        margin-top: 40px;
-        border-top: 1px solid #ddd;
-        padding-top: 20px;
-        text-align: center;
-        color: #7f8c8d;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.85em;
-        table-layout: fixed;
-    }
-    th, td {
-        border: 1px solid black;
-        padding: 6px;
-        text-align: left;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-    }
-    th {
-        background-color: #f2f2f2;
-        font-size: 0.9em;
-    }
-
-    .legend-note {
-        color: #6c757d;
-        text-align: center;
-        font-size: 0.9rem;
-        font-style: italic;
-        margin: 6px 0 0;
-    }
-
-    /* Pattern Summary */
-    .pattern-summary {
-        font-size: 1rem;
-        line-height: 1.6;
-        margin-bottom: 15px;
-        color: #333;
-    }
-
-    /* Container for side-by-side cards */
-    .pattern-info-container {
-        display: flex;
-        gap: 15px;
-        margin: 15px 0 20px 0;
-    }
-
-    /* Pattern Conditions Box */
-    .pattern-conditions {
-        flex: 1;
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
-        padding: 15px 20px;
-        border-radius: 4px;
-    }
-
-    .pattern-conditions h4 {
-        margin: 0 0 10px 0;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #856404;
-    }
-
-    .pattern-conditions ul {
-        margin: 0;
-        padding-left: 20px;
-        list-style-type: disc;
-    }
-
-    .pattern-conditions li {
-        margin: 8px 0;
-        font-size: 0.9rem;
-        color: #856404;
-        line-height: 1.5;
-    }
-
-    .pattern-conditions li strong {
-        font-weight: 700;
-    }
-
-    /* Pattern Recommendations Box */
-    .pattern-recommendations {
-        flex: 1;
-        background-color: #d1ecf1;
-        border-left: 4px solid #17a2b8;
-        padding: 15px 20px;
-        border-radius: 4px;
-    }
-
-    .pattern-recommendations h4 {
-        margin: 0 0 10px 0;
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #0c5460;
-    }
-
-    .pattern-recommendations ul {
-        margin: 0;
-        padding-left: 20px;
-        list-style-type: circle;
-    }
-
-    .pattern-recommendations li {
-        margin: 8px 0;
-        font-size: 0.9rem;
-        color: #0c5460;
-        line-height: 1.5;
-    }
-
-    /* Print Button Styles */
-    .print-button {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        background-color: #27ae60;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        transition: background-color 0.3s;
-    }
-    
-    .print-button:hover {
-        background-color: #2ecc71;
-    }
-    
-    .print-button svg {
-        margin-right: 5px;
-    }
-    
-    .doc-button {
-        position: absolute;
-        top: 20px;
-        right: 140px;
-        background-color: #0078d4;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        transition: background-color 0.3s;
-    }
-
-    .doc-button:hover { 
-        background-color: #005a9e; 
-    }
-
-    .hidden-item {
-        display: none;
-    }
-
-    /* Container for map and chart side by side */
-    .map-chart-container {
-        display: flex;
-        gap: 20px;
-        width: 100%;
-        margin: 20px 0;
-        align-items: flex-start;
-    }
-
-    .map-chart-container .map {
-        flex: 1;
-        min-width: 0;
-        height: 400px;
-    }
-
-    .map-chart-container .chart-container {
-        flex: 1;
-        min-width: 0;
-        height: 400px;
-        margin: 0;
-    }
-
-    /* For sections with only map, keep full width */
-    .map-only {
-        width: 100%;
-        height: 400px;
-    }
-
-    /* Grid Layout for Maps */
-    .maps-grid-section {
-        margin: 40px 0;
-    }
-
-    .maps-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-top: 20px;
-    }
-
-    .map-card {
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        overflow: hidden;
-        background: white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .map-card-header {
-        background: #34495e;
-        color: white;
-        padding: 12px 15px;
-        font-weight: 600;
-        font-size: 14px;
-    }
-
-    .map-card-body {
-        position: relative;
-        height: 300px;
-        background: #f5f5f5;
-    }
-
-    .map-placeholder {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        flex-direction: column;
-        gap: 15px;
-    }
-
-    .load-map-btn {
-        background-color: #3498db;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: 500;
-        font-size: 14px;
-        transition: background-color 0.3s;
-    }
-
-    .load-map-btn:hover {
-        background-color: #2980b9;
-    }
-
-    .load-map-btn:disabled {
-        background-color: #95a5a6;
-        cursor: not-allowed;
-    }
-
-    .map-card-body .map {
-        height: 100%;
-        margin: 0;
-        border: none;
-    }
-
-    .number-class {
-        font-weight : bold;
-    }
-
-    /* Responsive - stack on smaller screens */
-    @media screen and (max-width: 768px) {
-        .map-chart-container {
-            flex-direction: column;
-        }
-        
-        .map-chart-container .map,
-        .map-chart-container .chart-container {
-            width: 100%;
-        }
-
-        .pattern-info-container {
-            flex-direction: column;
-        }
-    }
-            
-    @media print { 
-        .doc-button { display: none; }   
-        .legend-note {
-            margin-top: 3em;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-        } 
-        
-        .show-more-button {
-            display: none !important;
-        }
-        .print-button {
-            display: none;
-        }
-        .hidden-item {
-            display: none !important;
-        }
-    }
-
-   /* Print-specific styles */
-    @media print {
         * {
             box-sizing: border-box;
         }
-        
-        html, body {
-            width: 100%;
-            height: 100%;
+
+        body {
+            font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            overflow: visible;
+            color: #333;
+            overflow-x: hidden;
         }
 
         .container {
-            width: 100%;
-            max-width: 100%;
-            padding: 10px;
-            margin: 0;
+            width: 90%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
         header {
-            background-color: #2c3e50 !important;
-            color: white !important;
-            padding: 15px 0;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
         }
 
-        .chart-container {
-            height: 250px !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 10px 0 !important;
+        h1,
+        h2,
+        h3 {
+            margin-top: 0;
+        }
+
+        .section {
+            margin-bottom: 40px;
             page-break-inside: avoid;
-            break-inside: avoid;
-            overflow: visible;
         }
 
-        /* AGGRESSIVE MAP PRINT STYLES */
         .map {
-            width: 100% !important;
-            height: 500px !important;
-            min-height: 500px !important;
-            max-height: 500px !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            position: relative !important;
-            overflow: visible !important;
-            margin: 20px 0 !important;
-        }
-
-        /* Target all OpenLayers elements inside maps */
-        .map,
-        .map > div,
-        .map .ol-viewport,
-        .map .ol-overlaycontainer,
-        .map .ol-overlaycontainer-stopevent {
-            width: 100% !important;
-            height: 500px !important;
-            min-height: 500px !important;
-            max-height: 500px !important;
-        }
-
-        /* Force canvas to respect container size during print */
-        .map canvas,
-        .map .ol-layer canvas {
-            width: 100% !important;
-            height: 500px !important;
-            max-width: none !important;
-            max-height: none !important;
-            min-width: 100% !important;
-            min-height: 500px !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            height: 400px;
+            width: 100%;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            max-width: 100%;
+            position: relative;
         }
 
         .map-group {
-            width: 100% !important;
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            max-width: 100%;
+            margin: 20px 0 10px 0;
+        }
+
+        .chart-container canvas {
             max-width: 100% !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin: 20px 0 40px 0 !important;
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 10px !important;
+            height: auto !important;
         }
 
-        .map-group .map {
-            width: 48% !important;
-            flex: 1 1 48% !important;
-            height: 400px !important;
-            min-height: 400px !important;
-            max-height: 400px !important;
+        .legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 10px 0;
         }
 
-        .map-group .map,
-        .map-group .map > div,
-        .map-group .map .ol-viewport,
-        .map-group .map .ol-overlaycontainer,
-        .map-group .map .ol-overlaycontainer-stopevent {
-            height: 400px !important;
-            min-height: 400px !important;
-            max-height: 400px !important;
+        .legend-below-map {
+            margin-top: 15px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
         }
 
-        .map-group .map canvas,
-        .map-group .map .ol-layer canvas {
-            height: 400px !important;
-            min-height: 400px !important;
-            max-height: 400px !important;
-            max-width: none !important;
+        .legend-below-map h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
         }
 
-        /* Target specific map IDs */
-        #mainMap,
-        #mainMap > div,
-        #mainMap .ol-viewport {
-            width: 100% !important;
-            height: 500px !important;
-            min-height: 500px !important;
+        .legend-gradient-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
-        #mainMap canvas,
-        #swbMap canvas {
-            width: 100% !important;
-            height: 500px !important;
-            min-height: 500px !important;
+        .legend-gradient-bar {
+            height: 20px;
+            width: 100%;
+            border-radius: 4px;
+            background: linear-gradient(to right,
+                    rgba(100, 200, 100, 0.7) 0%,
+                    rgba(200, 200, 100, 0.7) 25%,
+                    rgba(255, 200, 100, 0.7) 50%,
+                    rgba(255, 100, 50, 0.7) 75%,
+                    rgba(255, 0, 0, 0.7) 100%);
+            border: 1px solid rgba(0, 0, 0, 0.2);
         }
 
-        /* Force OpenLayers viewport to match container */
-        .ol-viewport {
-            position: absolute !important;
-            width: 100% !important;
-            height: 100% !important;
-            top: 0 !important;
-            left: 0 !important;
-        }
-        
-        /* Ensure canvas fills the viewport */
-        .ol-layer canvas {
-            position: absolute !important;
-            width: 100% !important;
-            height: 100% !important;
-            transform: none !important;
+        .legend-gradient-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
         }
 
-        .map .ol-viewport {
-            height: 500px !important;
+        .legend-gradient-labels span {
+            font-weight: 500;
         }
 
-        .map-group .map .ol-viewport {
-            height: 400px !important;
-        }
-
-        /* Ensure no transform interference */
-        .map .ol-layer {
-            width: 100% !important;
-            height: 100% !important;
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 10px;
         }
 
         .legend-color {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            background-clip: content-box !important;
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 2px;
         }
 
-        canvas {
-            max-width: 100% !important;
-            image-rendering: -webkit-optimize-contrast !important;
+        footer {
+            margin-top: 40px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+            text-align: center;
+            color: #7f8c8d;
         }
 
         table {
-            width: 100% !important;
-            page-break-inside: auto;
-            font-size: 0.7em !important;
-            table-layout: fixed !important;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+            table-layout: fixed;
         }
 
-        th, td {
-            padding: 4px !important;
-            font-size: 0.75em !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
+        th,
+        td {
+            border: 1px solid black;
+            padding: 6px;
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
 
-        tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
+        th {
+            background-color: #f2f2f2;
+            font-size: 0.9em;
         }
 
-        thead {
-            display: table-header-group;
-        }
-
-        tfoot {
-            display: table-footer-group;
-        }
-
-        /* Collapsible sections - hide buttons */
-        .show-more-button {
-            display: none !important;
-        }
-
-        .doc-button, .print-button { 
-            display: none; 
-        }   
-        
         .legend-note {
-            margin-top: 1em;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            color: #6c757d;
+            text-align: center;
+            font-size: 0.9rem;
+            font-style: italic;
+            margin: 15px 0 25px;
         }
 
-        /* Print adjustments for side-by-side layout */
-        .map-chart-container {
-            display: flex !important;
-            gap: 10px !important;
-            page-break-inside: avoid;
-        }
-        
-        .map-chart-container .map {
-            flex: 1 !important;
-            height: 350px !important;
-            min-height: 350px !important;
-            max-height: 350px !important;
-        }
-        
-        .map-chart-container .chart-container {
-            flex: 1 !important;
-            height: 350px !important;
-            margin: 0 !important;
-        }
-        
-        .map-chart-container .map,
-        .map-chart-container .map > div,
-        .map-chart-container .map .ol-viewport {
-            height: 350px !important;
-            min-height: 350px !important;
-        }
-        
-        .map-chart-container .map canvas {
-            height: 350px !important;
-            min-height: 350px !important;
+        /* Pattern Summary */
+        .pattern-summary {
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            color: #333;
         }
 
+        /* Container for side-by-side cards */
         .pattern-info-container {
-            display: flex !important;
-            gap: 10px !important;
-            page-break-inside: avoid;
-        }
-        
-        .pattern-conditions,
-        .pattern-recommendations {
-            flex: 1 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
+            display: flex;
+            gap: 15px;
+            margin: 15px 0 20px 0;
         }
 
-        /* Page setup for better printing */
-        @page {
-            size: A4 portrait;
-            margin: 1cm;
+        /* Pattern Conditions Box */
+        .pattern-conditions {
+            flex: 1;
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px 20px;
+            border-radius: 4px;
         }
-    }
-</style>
+
+        .pattern-conditions h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #856404;
+        }
+
+        .pattern-conditions ul {
+            margin: 0;
+            padding-left: 20px;
+            list-style-type: disc;
+        }
+
+        .pattern-conditions li {
+            margin: 8px 0;
+            font-size: 0.9rem;
+            color: #856404;
+            line-height: 1.5;
+        }
+
+        .pattern-conditions li strong {
+            font-weight: 700;
+        }
+
+        /* Pattern Recommendations Box */
+        .pattern-recommendations {
+            flex: 1;
+            background-color: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px 20px;
+            border-radius: 4px;
+        }
+
+        .pattern-recommendations h4 {
+            margin: 0 0 10px 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #0c5460;
+        }
+
+        .pattern-recommendations ul {
+            margin: 0;
+            padding-left: 20px;
+            list-style-type: circle;
+        }
+
+        .pattern-recommendations li {
+            margin: 8px 0;
+            font-size: 0.9rem;
+            color: #0c5460;
+            line-height: 1.5;
+        }
+
+        /* Print Button Styles */
+        .print-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .print-button:hover {
+            background-color: #2ecc71;
+        }
+
+        .print-button svg {
+            margin-right: 5px;
+        }
+
+        .doc-button {
+            position: absolute;
+            top: 20px;
+            right: 140px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.3s;
+        }
+
+        .doc-button:hover {
+            background-color: #005a9e;
+        }
+
+        .hidden-item {
+            display: none;
+        }
+
+        /* Container for map and chart side by side */
+        .map-chart-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            margin: 20px 0;
+            align-items: flex-start;
+        }
+
+        .map-chart-container .map {
+            flex: 1;
+            min-width: 0;
+            height: 400px;
+        }
+
+        .map-chart-container .chart-container {
+            flex: 1;
+            min-width: 0;
+            height: 400px;
+            margin: 0;
+        }
+
+        /* For sections with only map, keep full width */
+        .map-only {
+            width: 100%;
+            height: 400px;
+        }
+
+        /* Grid Layout for Maps */
+        .maps-grid-section {
+            margin: 40px 0;
+        }
+
+        .maps-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .map-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .map-card-header {
+            background: #34495e;
+            color: white;
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .map-card-body {
+            position: relative;
+            height: 300px;
+            background: #f5f5f5;
+        }
+
+        .map-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .load-map-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        .load-map-btn:hover {
+            background-color: #2980b9;
+        }
+
+        .load-map-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .map-card-body .map {
+            height: 100%;
+            margin: 0;
+            border: none;
+        }
+
+        .number-class {
+            font-weight: bold;
+        }
+
+        /* Responsive - stack on smaller screens */
+        @media screen and (max-width: 768px) {
+            .map-chart-container {
+                flex-direction: column;
+            }
+
+            .map-chart-container .map,
+            .map-chart-container .chart-container {
+                width: 100%;
+            }
+
+            .pattern-info-container {
+                flex-direction: column;
+            }
+        }
+
+        @media print {
+            .doc-button {
+                display: none;
+            }
+
+            .legend-note {
+                margin-top: 3em;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .show-more-button {
+                display: none !important;
+            }
+
+            .print-button {
+                display: none;
+            }
+
+            .hidden-item {
+                display: none !important;
+            }
+        }
+
+        /* Print-specific styles */
+        @media print {
+            * {
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow: visible;
+            }
+
+            .container {
+                width: 100%;
+                max-width: 100%;
+                padding: 10px;
+                margin: 0;
+            }
+
+            header {
+                background-color: #2c3e50 !important;
+                color: white !important;
+                padding: 15px 0;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .chart-container {
+                height: 250px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 10px 0 !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                overflow: visible;
+            }
+
+            /* AGGRESSIVE MAP PRINT STYLES */
+            .map {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+                max-height: 500px !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                position: relative !important;
+                overflow: visible !important;
+                margin: 20px 0 !important;
+            }
+
+            /* Target all OpenLayers elements inside maps */
+            .map,
+            .map>div,
+            .map .ol-viewport,
+            .map .ol-overlaycontainer,
+            .map .ol-overlaycontainer-stopevent {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+                max-height: 500px !important;
+            }
+
+            /* Force canvas to respect container size during print */
+            .map canvas,
+            .map .ol-layer canvas {
+                width: 100% !important;
+                height: 500px !important;
+                max-width: none !important;
+                max-height: none !important;
+                min-width: 100% !important;
+                min-height: 500px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .map-group {
+                width: 100% !important;
+                max-width: 100% !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin: 20px 0 40px 0 !important;
+                display: flex !important;
+                flex-direction: row !important;
+                gap: 10px !important;
+            }
+
+            .map-group .map {
+                width: 48% !important;
+                flex: 1 1 48% !important;
+                height: 400px !important;
+                min-height: 400px !important;
+                max-height: 400px !important;
+            }
+
+            .map-group .map,
+            .map-group .map>div,
+            .map-group .map .ol-viewport,
+            .map-group .map .ol-overlaycontainer,
+            .map-group .map .ol-overlaycontainer-stopevent {
+                height: 400px !important;
+                min-height: 400px !important;
+                max-height: 400px !important;
+            }
+
+            .map-group .map canvas,
+            .map-group .map .ol-layer canvas {
+                height: 400px !important;
+                min-height: 400px !important;
+                max-height: 400px !important;
+                max-width: none !important;
+            }
+
+            /* Target specific map IDs */
+            #mainMap,
+            #mainMap>div,
+            #mainMap .ol-viewport {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+            }
+
+            #mainMap canvas,
+            #swbMap canvas {
+                width: 100% !important;
+                height: 500px !important;
+                min-height: 500px !important;
+            }
+
+            /* Force OpenLayers viewport to match container */
+            .ol-viewport {
+                position: absolute !important;
+                width: 100% !important;
+                height: 100% !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+
+            /* Ensure canvas fills the viewport */
+            .ol-layer canvas {
+                position: absolute !important;
+                width: 100% !important;
+                height: 100% !important;
+                transform: none !important;
+            }
+
+            .map .ol-viewport {
+                height: 500px !important;
+            }
+
+            .map-group .map .ol-viewport {
+                height: 400px !important;
+            }
+
+            /* Ensure no transform interference */
+            .map .ol-layer {
+                width: 100% !important;
+                height: 100% !important;
+            }
+
+            .legend-color {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                background-clip: content-box !important;
+            }
+
+            canvas {
+                max-width: 100% !important;
+                image-rendering: -webkit-optimize-contrast !important;
+            }
+
+            table {
+                width: 100% !important;
+                page-break-inside: auto;
+                font-size: 0.7em !important;
+                table-layout: fixed !important;
+            }
+
+            th,
+            td {
+                padding: 4px !important;
+                font-size: 0.75em !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            thead {
+                display: table-header-group;
+            }
+
+            tfoot {
+                display: table-footer-group;
+            }
+
+            /* Collapsible sections - hide buttons */
+            .show-more-button {
+                display: none !important;
+            }
+
+            .doc-button,
+            .print-button {
+                display: none;
+            }
+
+            /* Print adjustments for side-by-side layout */
+            .map-chart-container {
+                display: flex !important;
+                gap: 10px !important;
+                page-break-inside: avoid;
+            }
+
+            .map-chart-container .map {
+                flex: 1 !important;
+                height: 350px !important;
+                min-height: 350px !important;
+                max-height: 350px !important;
+            }
+
+            .map-chart-container .chart-container {
+                flex: 1 !important;
+                height: 350px !important;
+                margin: 0 !important;
+            }
+
+            .map-chart-container .map,
+            .map-chart-container .map>div,
+            .map-chart-container .map .ol-viewport {
+                height: 350px !important;
+                min-height: 350px !important;
+            }
+
+            .map-chart-container .map canvas {
+                height: 350px !important;
+                min-height: 350px !important;
+            }
+
+            .pattern-info-container {
+                display: flex !important;
+                gap: 10px !important;
+                page-break-inside: avoid;
+            }
+
+            .pattern-conditions,
+            .pattern-recommendations {
+                flex: 1 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Page setup for better printing */
+            @page {
+                size: A4 portrait;
+                margin: 1cm;
+            }
+        }
+    </style>
 
 </head>
+
 <body>
     <header>
         <div class="container">
             <h1>Tehsil Data Analysis Report</h1>
             <p>Spatial and Temporal Analysis of Key Metrics</p>
             <button class="print-button" onclick="printReport()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 6 2 18 2 18 9"></polyline>
                     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
                     <rect x="6" y="14" width="12" height="8"></rect>
@@ -720,37 +742,51 @@
                 Save as PDF
             </button>
         </div>
-
-
     </header>
-
     <div class="container">
         <section class="section">
-            <h2>Overview of Tehsil characteristics</h2>
+            <h1>Overview of Tehsil characteristics</h1>
             <p>{{block_osm}}</p>
+
+            <h2>Socio-ecological patterns across Tehsil</h2>
+            <p>
+                The following map shows the variation of different socio-ecological stress patterns across
+                microwatersheds in the Tehsil. As the number of stress patterns in a microwatershed increases, its
+                gradient moves from green to red color.
+            </p>
+            <div class="pattern-conditions">
+                <h4>Current stresses patterns in the tehsil include:</h4>
+                <ul>
+                    {% for pattern in active_pattern %}
+                    <li><strong>{{ pattern }}</strong></li>
+                    {% endfor %}
+                </ul>
+            </div>
 
             <div id="mainMap" class="map"></div>
 
             <div class="legend-below-map">
-            <h4>Stress Pattern Intensity</h4>
-            <div class="legend-gradient-container">
-                <div class="legend-gradient-bar"></div>
-                <div class="legend-gradient-labels">
-                    <span>Low (<span id="legend-min-value">0</span>)</span>
-                    <span>High (<span id="legend-max-value">0</span>)</span>
+                <h4>Stress Pattern Intensity</h4>
+                <div class="legend-gradient-container">
+                    <div class="legend-gradient-bar"></div>
+                    <div class="legend-gradient-labels">
+                        <span>Low (<span id="legend-min-value">0</span>)</span>
+                        <span>High (<span id="legend-max-value">0</span>)</span>
+                    </div>
                 </div>
+                <p class="legend-note">
+                    This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate
+                    compounding stresses. In this report we highlight areas in tehsil that seems to have various
+                    stresses.
+                </p>
             </div>
-            <p class="legend-note">
-                This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate compounding stresses. In this report we highlight areas in tehsil that seems to have various stresses.
-            </p>
-        </div>
         </section>
 
         <!-- Grid Maps Section -->
         {% comment %} <section class="section maps-grid-section">
             <h2>Hydrology Maps</h2>
             <p>Click the "Load Map" button below each map to view it.</p>
-            
+
             <div class="maps-grid">
                 <!-- Map Card 1 -->
                 <div class="map-card" id="grid1-map1-card">
@@ -788,20 +824,21 @@
         </section> {% endcomment %}
 
         <section class="section" id="agriculture-section">
-            <h2>Agriculture</h2>
-            
+            <h2>Stress patterns affecting agriculture</h2>
+
             <div id="groundwater-section">
                 <h3>Groundwater Stress</h3>
                 <p class="pattern-summary">
-                    <span id="groundwater-area" class="number-class"></span> hectares out of 
-                    <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in the tehsil appears to be groundwater stressed.
+                    <span id="groundwater-area" class="number-class"></span> hectares out of
+                    <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in the
+                    tehsil appears to be groundwater stressed.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
                         <h4>Pattern identified where:</h4>
                         <ul>
                             <li>Stage of groundwater extraction is <strong>unsafe</strong></li>
-                            <li>Water balance is <strong>negative</strong></li>
+                            <li>Water balance trend is <strong>negative</strong></li>
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
@@ -813,14 +850,32 @@
                         </ul>
                     </div>
                 </div>
+                <p>
+                    Areas where either stage of groundwater stress is unsafe or water balance trend over the years
+                    <span id="GWStressyearRange"></span>
+                    is negative, are color coded as yellow. Areas with an unsafe groundwater stress and negative water
+                    balance trend are shown in red.
+                </p>
+
                 <div id="agriMap" class="map map-only"></div>
+                <p class="legend-note">
+                    Note: The stage of groundwater extraction refers to the current level or intensity at which
+                    groundwater is withdrawn from aquifers compared to its natural replenishment rate. Based on this
+                    ratio, agencies like the Central Ground Water Board (CGWB) in India classify areas into categories
+                    indicating the extent of extraction. The water balance for a year is computed by subtracting
+                    outgoing vertical fluxes (runoff and evapotranspiration) from incoming water (precipitation). This
+                    calculation does not include horizontal fluxes of subsurface flows in the underlying aquifer or
+                    surface flows such as canals and rivers within the micro-watershed.
+                </p>
+
             </div>
 
             <div id="drought-section">
                 <h3>High Drought Incidence</h3>
                 <p class="pattern-summary">
-                    <span id="drought-area" class="number-class"></span> hectares out of 
-                    <span id="drought-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have a high drought incidence.
+                    <span id="drought-area" class="number-class"></span> hectares out of
+                    <span id="drought-area-1" class="number-class"></span> hectares of cropping area in the tehsil
+                    appears to have a high drought incidence.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
@@ -839,26 +894,43 @@
                         </ul>
                     </div>
                 </div>
-                
+                <p>Areas where there have been at least two drought years or at least two intensive dry-spell years
+                    during the <span class="HDIncidenceyearRange"></span>, are color coded as yellow. Areas which
+                    experienced both of these conditions
+                    are shown in red.</p>
+
                 <div class="map-chart-container">
                     <div id="agriDroughtMap" class="map"></div>
                     <div class="chart-container">
                         <canvas id="weighted_drought_timeline"></canvas>
                     </div>
                 </div>
+                <p class="legend-note">
+                    Note: Drought is defined as per the Government of India's Drought Manual and considered moderate or
+                    severe if the number of weeks of drought is five or more, which means that rainfall deficit was more
+                    than 25% for more than 5 weeks during the monsoon of that year. Drought weeks are identified based
+                    on whether meteorological drought occurred in that week (i.e. the rains were less than usual in that
+                    week as compared to previous years, possibly intensified by dry spells defined as consecutive weeks
+                    of low rainfall) and/or agricultural drought occurred in that week (i.e. cropped area or crop health
+                    were lower than usual in that week as compared to previous years). Severe drought weeks are those
+                    when meteorological and agricultural drought are both coincident. The occurrence of intensive dry
+                    spell is defined across four consecutive weeks with each week of these four weeks incurring a
+                    rainfall deviation of more than 50% from the historical average.
+                </p>
             </div>
 
             <div id="irrigation-section">
                 <h3>High Irrigation Risk</h3>
                 <p class="pattern-summary">
-                    <span id="irrigation-area" class="number-class"></span> hectares out of 
-                    <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have a high irrigation risk.
+                    <span id="irrigation-area" class="number-class"></span> hectares out of
+                    <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in the tehsil
+                    appears to have a high irrigation risk.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
                         <h4>Pattern identified where:</h4>
                         <ul>
-                            <li>Surface water during Rabi is  <strong>low</strong></li>
+                            <li>Surface water during Rabi is <strong>low</strong></li>
                             <li>Surface water trends over the years are <strong>negative</strong></li>
                         </ul>
                     </div>
@@ -872,19 +944,26 @@
                         </ul>
                     </div>
                 </div>
+                <p>Areas where the surface water availability during Rabi season is less than 30% or where surface water
+                    availability trend is negative over the years <span id="HIrriRiskyearRange"></span>, are color coded
+                    as yellow. Areas which experienced both of these conditions are shown in red.</p>
                 <div class="map-chart-container">
                     <div id="agriIrrigationMap" class="map"></div>
                     <div class="chart-container">
                         <canvas id="seasonal_water_timeline"></canvas>
                     </div>
                 </div>
+                <p>Timeline chart of weighted average of seasonal water availability over time.</p>
+                <p class="legend-note">Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif
+                    season and Dynamic World to detect water pixels in Rabi and Zaid seasons. </p>
             </div>
 
             <div id="yield-section">
-                <h3>Low Yield</h3>
+                <h3>Likely stress in cropping yield</h3>
                 <p class="pattern-summary">
-                    <span id="yield-area" class="number-class"></span> hectares out of 
-                    <span id="yield-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears to have had a reduction in cropping area.
+                    <span id="yield-area" class="number-class"></span> hectares out of
+                    <span id="yield-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears
+                    to have had a reduction in cropping area.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
@@ -913,11 +992,12 @@
         </section>
 
         <section class="section" id="forest-section">
-            <h2>Forests and livestock</h2>
-            <h3>Forest Degradation</h3>
+            <h2>Stress patterns affecting forests and biodiversity</h2>
+            <h3>Tree Health Degradation</h3>
             <p class="pattern-summary">
-                <span id="forest-area" class="number-class"></span> hectares out of 
-                <span id="forest-area-1" class="number-class"></span> hectares of area under tree cover in the tehsil appears to have reduced.
+                <span id="forest-area" class="number-class"></span> hectares out of
+                <span id="forest-area-1" class="number-class"></span> hectares of area under tree cover in the tehsil
+                appears to have reduced.
             </p>
             <div class="pattern-info-container">
                 <div class="pattern-conditions">
@@ -943,9 +1023,11 @@
         </section>
 
         <section class="section" id="health-section">
-            <h2>Health</h2>
+            <h2>Patterns linked to environmental pollution</h2>
+            <h3>Mining Presence</h3>
             <p class="pattern-summary">
-                <span id="mining-area" class="number-class"></span> hectares could be at risk of air, water, or soil pollution from industries.
+                <span id="mining-area" class="number-class"></span> hectares could be at risk of air, water, or soil
+                pollution from industries.
             </p>
             <div class="pattern-info-container">
                 <div class="pattern-conditions">
@@ -968,74 +1050,101 @@
                     <canvas id="miningPieChart"></canvas>
                 </div>
             </div>
+            <p class="legend-note">Note: The dataset of mining areas is sourced from environmental clearance
+                applications compiled by Rohini Pande and Anant Sudarshan (2019).</p>
         </section>
 
         <section class="section" id="socioeconomic-section">
-            <h2>Socio-economic</h2>
-            
+            <h2>Socio-economic patterns</h2>
+
             <div id="caste-section">
-                <h3>Caste</h3>
-                <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages" class="number-class"></span> villages are from marginalized groups defined as SC or ST population is high
-                Positive discrimination in access to social entitlements should be considered.</p>
-                
+                <h3>High density of marginalized caste communities</h3>
+                <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages"
+                        class="number-class"></span> villages are from marginalized groups defined as SC or ST
+                    population is high
+                    Positive discrimination in access to social entitlements should be considered.</p>
+
                 <div class="map-chart-container">
                     <div id="casteMap" class="map"></div>
                     <div class="chart-container">
                         <canvas id="castePieChart"></canvas>
                     </div>
                 </div>
+                <p class="legend-note">Note: The demographic details on caste based population density is taken from
+                    Census 2011.</p>
             </div>
 
             <div id="nrega-section">
-                <h3>NREGA</h3>
-                <p><span id="nrega-villages" class="number-class"></span> villages out of <span id="nrega-villages-1" class="number-class"></span>  have a low (less than 100 NREGA work) number of NREGA works. Positive discrimination in access to NREGA assets should be considered.</p>
-                
+                <h3>Poor uptake of MGNREGA works</h3>
+                <p><span id="nrega-villages" class="number-class"></span> villages out of <span id="nrega-villages-1"
+                        class="number-class"></span> have had a low (less than 100 NREGA work) number of NREGA works
+                    during 2005-2025.
+                    Positive discrimination in access to NREGA assets should be considered.</p>
+
                 <div class="map-chart-container">
                     <div id="nregaMap" class="map"></div>
                     <div class="chart-container">
                         <canvas id="nregaPieChart"></canvas>
                     </div>
                 </div>
+                <p class="legend-note">Note: The metadata of MGNREGA assets such as work name and work type has been
+                    obtained from the NREGA MIS.</p>
             </div>
         </section>
 
         <section class="section" id="fishery-section">
-            <h2>Fishery</h2>
-            <p>Up to <span id="fishery-area" class="number-class"></span>% area in the tehsil appears to have good potential for fishery due to a reasonable amount of surface water retained throughout the year. Currently <span id="fishery-area-1" class="number-class"></span> hectares of land is under Perennial surface water in these areas, out of <span id="fishery-area-2" class="number-class"></span> hectare Perennial surface water area in hectares in the tehsil.</p>
-            
+            <h2>Intervention opportunities</h2>
+            <h3>Fishery</h3>
+            <p>Up to <span id="fishery-area" class="number-class"></span>% area in the tehsil appears to have good
+                potential for fishery due to a reasonable amount of surface water retained throughout the year.
+                Currently <span id="fishery-area-1" class="number-class"></span> hectares of land is under Perennial
+                surface water in these areas, out of <span id="fishery-area-2" class="number-class"></span> hectare
+                Perennial surface water area in hectares in the tehsil. Good water potential in a microwatershed is
+                assessed based on three conditions including the surface water availability during Rabi season being
+                more than a threshold value of 30%, surface water availability during Zaid season similarly being more
+                than 30%, and a non declining trend in annual surface water availability observed over the years <span
+                    id="FishryyearRange"></span>. In the map below, the micro-watersheds are mapped to a gradient of
+                green, depending on the number of conditions satisfied for a particular micro-watershed (light green
+                corresponds to one of the conditions being met, and dark green corresponds to all the conditions being
+                true).</p>
+
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
                 <div class="chart-container">
                     <canvas id="fisheryTimelineChart"></canvas>
                 </div>
             </div>
+            <p class="legend-note">Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif season
+                and Dynamic World to detect water pixels in Rabi and Zaid seasons.</p>
         </section>
 
         {% comment %} <section class="section" id="agroforestry-section">
             <h2>Agroforestry</h2>
-            <p>Up to <span id="agroforestry-area" class="number-class"></span> hectares out of <span id="agroforestry-area-1" class="number-class"></span> hectares of cropping area in the tehsil could benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
-            
+            <p>Up to <span id="agroforestry-area" class="number-class"></span> hectares out of <span
+                    id="agroforestry-area-1" class="number-class"></span> hectares of cropping area in the tehsil could
+                benefit from agroforestry since cropping intensity seems to be reducing in several areas.</p>
+
             <!-- Map on the left -->
             <div style="width: 100%; margin: 20px 0;">
                 <div id="agroforestryMap" class="map map-only"></div>
             </div>
-            
+
             <!-- Three stacked Sankey charts below the map -->
             <div style="width: 100%; margin: 20px 0;">
-                 <div style="margin-bottom: 30px;">
+                <div style="margin-bottom: 30px;">
                     <h4 style="text-align: center; margin-bottom: 10px;">Single Cropping Transitions</h4>
                     <div style="height: 300px; width: 100%;">
                         <canvas id="singleSankeyChart"></canvas>
                     </div>
-                </div> 
-                
+                </div>
+
                 <div style="margin-bottom: 30px;">
                     <h4 style="text-align: center; margin-bottom: 10px;">Double Cropping Transitions</h4>
                     <div style="height: 300px; width: 100%;">
                         <canvas id="doubleSankeyChart"></canvas>
                     </div>
                 </div>
-                
+
                 <div>
                     <h4 style="text-align: center; margin-bottom: 10px;">Triple Cropping Transitions</h4>
                     <div style="height: 300px; width: 100%;">
@@ -1049,33 +1158,43 @@
     <footer>
         <div class="container">
             <p>Report generated on <span id="report-date"></span> | CoRE Stack Team</p>
-            <p>Refer to our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view" target="_blank">technical manual</a> for more details on how data was collected and processed.</p>
+            <p>Refer to our <a href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view"
+                    target="_blank">technical manual</a> for more details on how data was collected and processed.</p>
             <p>
-                Do note that while the underlying datasets have been validated against ground‑truth in some locations, we need your feedback if the outputs shown here are in agreement with your observations about this area. Please do share your feedback with
+                Do note that while the underlying datasets have been validated against ground‑truth in some locations,
+                we need your feedback if the outputs shown here are in agreement with your observations about this area.
+                Please do share your feedback with
                 <a href="mailto:contact@core-stack.org">contact@core-stack.org</a>.
             </p>
         </div>
     </footer>
     <script>
         // Parse all data from Django context
-        const mwsPatternIntensity = {{mws_pattern_intensity_json|safe}};
-        const groundwaterStress = {{groundwater_stress_json|safe}};
-        const highDroughtIncidence = {{high_drought_incidence_json|safe}};
-        const highIrrigationRisk = {{high_irrigation_risk_json|safe}};
-        const lowYield = {{low_yield_json|safe}};
-        const droughtTimeline = {{drought_timeline_json|safe}};
-        const yieldSankey = {{yield_sankey_json|safe}};
-        const irrigationTimeline = {{irrigation_timeline_json|safe}};
-        const forestDegradation = {{forest_degradation_json|safe}};
-        const forestSankey = {{forest_sankey_json|safe}};
-        const miningPresence = {{mining_presence_json|safe}};
-        const miningPie = {{mining_pie_json|safe}};
-        const socioCaste = {{socio_caste_json|safe}};
-        const castePie = {{caste_pie_json|safe}};
-        const socioNrega = {{socio_nrega_json|safe}};
-        const nregaPie = {{nrega_pie_json|safe}};
-        const fisheryPotential = {{fishery_potential_json|safe}};
-        const fisheryTimeline = {{fishery_timeline_json|safe}};
+        const mwsPatternIntensity = {{ mws_pattern_intensity_json| safe}};
+        const groundwaterStress = {{ groundwater_stress_json| safe}};
+        const highDroughtIncidence = {{ high_drought_incidence_json| safe}};
+        const highIrrigationRisk = {{ high_irrigation_risk_json| safe}};
+        const lowYield = {{ low_yield_json| safe}};
+        const droughtTimeline = {{ drought_timeline_json| safe}};
+        const yieldSankey = {{ yield_sankey_json| safe}};
+        const irrigationTimeline = {{ irrigation_timeline_json| safe}};
+        const forestDegradation = {{ forest_degradation_json| safe}};
+        const forestSankey = {{ forest_sankey_json| safe}};
+        const miningPresence = {{ mining_presence_json| safe}};
+        const miningPie = {{ mining_pie_json| safe}};
+        const socioCaste = {{ socio_caste_json| safe}};
+        const castePie = {{ caste_pie_json| safe}};
+        const socioNrega = {{ socio_nrega_json| safe}};
+        const nregaPie = {{ nrega_pie_json| safe}};
+        const fisheryPotential = {{ fishery_potential_json| safe}};
+        const fisheryTimeline = {{ fishery_timeline_json| safe}};
+        const HDIncidenceyearRange = highDroughtIncidence.year_range || "";
+        const mwsActivePatterns = {{ mws_active_patterns_json| safe }};
+        const patternDisplayMapping = {{ pattern_display_mapping_json| safe }};
+        // const HIRiskyearRange = highIrrigationRisk.year_range || "";
+        const mwsActivePatternsSafe = mwsActivePatterns || {};
+        const patternDisplayMappingSafe = patternDisplayMapping || {};
+
         //const agroforestryTransition = {{agroforestry_transition_json|safe}};
         //const agroforestrySankey = {{agroforestry_sankey_json|safe}};
 
@@ -1110,14 +1229,28 @@
         document.getElementById('fishery-area-2').textContent = fisheryPotential.total_swb_area.toFixed(2);
         //document.getElementById('agroforestry-area-1').textContent = agroforestryTransition.total_all_area.toFixed(2);
 
+        //Others Params access
+        document.getElementById("GWStressyearRange").innerText = groundwaterStress.year_range;
+        const GWSyearRange = document.getElementById("GWStressyearRange").innerText;
+
+        document.querySelectorAll(".HDIncidenceyearRange").forEach(span => {
+            span.textContent = HDIncidenceyearRange;
+        });
+        const specificElement = document.getElementById("HDIncidenceyearRange");
+        if (specificElement) {
+            specificElement.textContent = HDIncidenceyearRange;
+        }
+        document.getElementById("HIrriRiskyearRange").innerText = highIrrigationRisk.year_range;
+        document.getElementById("FishryyearRange").innerText = fisheryPotential.year_range;
+
         function getColorForIntensity(intensity) {
 
             if (maxIntensity === minIntensity) {
                 return 'rgba(135, 206, 235, 0.6)';
             }
-            
+
             const normalized = (intensity - minIntensity) / (maxIntensity - minIntensity);
-            
+
             if (normalized < 0.25) {
                 const r = Math.round(100 + normalized * 4 * 155);
                 const g = 200;
@@ -1194,7 +1327,7 @@
                 new ol.interaction.KeyboardZoom(),
             ])
         })
-        
+
         const AgriDroughtMap = new ol.Map({
             target: 'agriDroughtMap',
             layers: [
@@ -1474,7 +1607,7 @@
                 new ol.interaction.KeyboardZoom(),
             ])
         })
-        
+
         const SogeMap = new ol.Map({
             target: 'grid1Map2',
             layers: [
@@ -1549,23 +1682,23 @@
 
         // Fetch GeoJSON and render all maps
         const geoJsonUrl = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json";
-        
+
         const villageJsonUrl = "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=	panchayat_boundaries:{{district}}_{{block}}&outputFormat=application/json"
-        
+
         // Function to create style based on pattern data
         function createStyleFunction(patternData, colorScheme = "default") {
-            return function(feature) {
+            return function (feature) {
                 const uid = feature.get('uid');
-                
+
                 // Check for both mws_intensity and village_intensity
-                const intensity = (patternData.mws_intensity && patternData.mws_intensity[uid]) || 
-                                (patternData.village_intensity && patternData.village_intensity[uid]) || 
-                                0.0;
+                const intensity = (patternData.mws_intensity && patternData.mws_intensity[uid]) ||
+                    (patternData.village_intensity && patternData.village_intensity[uid]) ||
+                    0.0;
                 const pattern = (patternData.mws_pattern[uid]) || false;
-                
+
                 let strokeColor = 'black';
                 let fillColor;
-                
+
                 if (colorScheme === "fishery") {
                     if (intensity === 0) {
                         fillColor = 'rgba(240, 240, 240, 0.3)';  // Light gray - no potential
@@ -1581,7 +1714,7 @@
                 }
                 else {
                     const hasIntensity = patternData.mws_intensity || patternData.village_intensity;
-                    
+
                     if (!hasIntensity && intensity === 0.0) {
                         if (pattern) {
                             fillColor = 'rgba(244, 67, 54, 0.8)';     // Red - pattern detected (mining present)
@@ -1602,7 +1735,7 @@
                         }
                     }
                 }
-                
+
                 return new ol.style.Style({
                     stroke: new ol.style.Stroke({
                         color: strokeColor,
@@ -1614,27 +1747,27 @@
                 });
             };
         }
-        
+
         fetch(geoJsonUrl).then(response => response.json()).then(data => {
             const vectorSource = new ol.source.Vector({
                 features: new ol.format.GeoJSON().readFeatures(data),
             });
 
-            const styleFunction = (feature, name="") => {
+            const styleFunction = (feature, name = "") => {
                 const uid = feature.get('UID');
                 const intensity = groundwaterIntensity[uid] || 0.0;
-                
+
                 let fillColor;
                 if (intensity === 0) {
-                    fillColor = 'rgba(135, 206, 235, 0.3)';  
+                    fillColor = 'rgba(135, 206, 235, 0.3)';
                 } else if (intensity < 0.5) {
-                    fillColor = 'rgba(255, 235, 59, 0.5)';   
+                    fillColor = 'rgba(255, 235, 59, 0.5)';
                 } else if (intensity < 1.0) {
-                    fillColor = 'rgba(255, 152, 0, 0.7)';   
+                    fillColor = 'rgba(255, 152, 0, 0.7)';
                 } else {
-                    fillColor = 'rgba(244, 67, 54, 0.8)';  
+                    fillColor = 'rgba(244, 67, 54, 0.8)';
                 }
-                
+
                 return new ol.style.Style({
                     stroke: new ol.style.Stroke({
                         color: 'black',
@@ -1669,17 +1802,17 @@
             const vectorLayer5 = new ol.layer.Vector({
                 source: vectorSource,
                 style: createStyleFunction(forestDegradation),
-            }); 
+            });
 
             const vectorLayer6 = new ol.layer.Vector({
                 source: vectorSource,
                 style: createStyleFunction(miningPresence),
-            }); 
+            });
 
             const vectorLayer9 = new ol.layer.Vector({
                 source: vectorSource,
                 style: createStyleFunction(fisheryPotential, "fishery"),
-            }); 
+            });
 
             //const vectorLayer10 = new ol.layer.Vector({
             //    source: vectorSource,
@@ -1708,44 +1841,44 @@
             //AgroforestryMap.getView().setCenter(mapcenter);
         }).catch(error => console.error('Error fetching GeoJSON for Groundwater:', error));
 
-        
+
         // Main Map (Pattern Intensity)
         fetch(geoJsonUrl)
-        .then(response => response.json())
-        .then(data => {
-            const vectorSource = new ol.source.Vector({
-                features: new ol.format.GeoJSON().readFeatures(data),
-            });
-
-            const styleFunction = feature => {
-                const uid = feature.get('uid');
-                const intensity = mwsPatternIntensity[uid] || 0;
-                const fillColor = getColorForIntensity(intensity);
-                
-                return new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: 'black',
-                        width: 1.5,
-                    }),
-                    fill: new ol.style.Fill({
-                        color: fillColor,
-                    }),
+            .then(response => response.json())
+            .then(data => {
+                const vectorSource = new ol.source.Vector({
+                    features: new ol.format.GeoJSON().readFeatures(data),
                 });
-            };
 
-            const vectorLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: styleFunction,
-            });
+                const styleFunction = feature => {
+                    const uid = feature.get('uid');
+                    const intensity = mwsPatternIntensity[uid] || 0;
+                    const fillColor = getColorForIntensity(intensity);
 
-            mainMap.addLayer(vectorLayer);
+                    return new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: 'black',
+                            width: 1.5,
+                        }),
+                        fill: new ol.style.Fill({
+                            color: fillColor,
+                        }),
+                    });
+                };
 
-            const arr = vectorSource.getExtent();
-            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            mainMap.getView().setCenter(mapcenter);
-        })
-        .catch(error => console.error('Error fetching GeoJSON for Main Map:', error));
-        
+                const vectorLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: styleFunction,
+                });
+
+                mainMap.addLayer(vectorLayer);
+
+                const arr = vectorSource.getExtent();
+                const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+                mainMap.getView().setCenter(mapcenter);
+            })
+            .catch(error => console.error('Error fetching GeoJSON for Main Map:', error));
+
         // Village Map
         fetch(villageJsonUrl).then(response => response.json()).then(data => {
             const villageVectorSource = new ol.source.Vector({
@@ -1756,9 +1889,9 @@
                 // Try different possible village ID field names
                 const villageId = feature.get('vill_ID')
 
-                
+
                 const intensity = socioCaste.village_intensity ? (socioCaste.village_intensity[villageId] || 0.0) : 0.0;
-                
+
                 let strokeColor = 'black';
                 let fillColor;
 
@@ -1773,7 +1906,7 @@
                 } else {
                     fillColor = 'rgba(244, 67, 54, 0.8)';
                 }
-                
+
                 return new ol.style.Style({
                     stroke: new ol.style.Stroke({
                         color: strokeColor,
@@ -1788,9 +1921,9 @@
 
             const nregaVillageStyleFunction = feature => {
                 const villageId = feature.get('vill_ID')
-                
+
                 const intensity = socioNrega.village_intensity ? (socioNrega.village_intensity[villageId] || 0.0) : 0.0;
-                
+
                 let strokeColor = 'black';
                 let fillColor;
 
@@ -1799,7 +1932,7 @@
                 } else {
                     fillColor = 'rgba(244, 67, 54, 0.8)';    // Red - low NREGA works
                 }
-                
+
                 return new ol.style.Style({
                     stroke: new ol.style.Stroke({
                         color: strokeColor,
@@ -1830,8 +1963,8 @@
             NREGAMap.getView().setCenter(villageCenter);
 
         }).catch(error => console.error('Error fetching Village Json for Map:', error));
-        
-        
+
+
         // Function to load custom grid map
         function loadCustomMap(mapId) {
             // Prevent duplicate loading
@@ -1963,7 +2096,7 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Weighted Average Drought Incidence Over Time',
+                        text: 'Timeline chart of weighted average of drought affected area to cropping area of the micro-watersheds over the years.',
                         font: {
                             size: 16
                         }
@@ -1974,7 +2107,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 return context.dataset.label + ': ' + context.parsed.y + '%';
                             }
                         }
@@ -1989,7 +2122,7 @@
                             text: 'Percentage of Cropping Area Affected (%)'
                         },
                         ticks: {
-                            callback: function(value) {
+                            callback: function (value) {
                                 return value.toFixed(1) + '%';
                             }
                         }
@@ -2058,7 +2191,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const item = context.dataset.data[context.dataIndex];
                                 return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
                             }
@@ -2140,7 +2273,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
                             }
                         }
@@ -2155,7 +2288,7 @@
                             text: 'Water Availability (%)'
                         },
                         ticks: {
-                            callback: function(value) {
+                            callback: function (value) {
                                 return value + '%';
                             }
                         }
@@ -2226,7 +2359,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const item = context.dataset.data[context.dataIndex];
                                 return item.from + ' → ' + item.to + ': ' + item.flow.toFixed(2) + ' ha';
                             }
@@ -2293,7 +2426,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const label = context.label || '';
                                 const value = context.parsed || 0;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -2308,7 +2441,7 @@
                 }
             }
         });
-        
+
         const castePieChart = new Chart(document.getElementById('castePieChart'), {
             type: 'pie',
             data: {
@@ -2352,7 +2485,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const label = context.label || '';
                                 const value = context.parsed || 0;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -2419,7 +2552,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 const label = context.label || '';
                                 const value = context.parsed || 0;
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
@@ -2495,7 +2628,7 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Seasonal Water Availability for Fishery (Weighted by SWB Area)',
+                        text: 'Timeline chart of weighted average of seasonal water availability over time.',
                         font: {
                             size: 16
                         }
@@ -2506,7 +2639,7 @@
                     },
                     tooltip: {
                         callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                                 return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
                             }
                         }
@@ -2521,7 +2654,7 @@
                             text: 'Water Availability (%)'
                         },
                         ticks: {
-                            callback: function(value) {
+                            callback: function (value) {
                                 return value + '%';
                             }
                         }
@@ -2539,26 +2672,26 @@
             }
         });
 
-        
+
         //? Data Check
         function hasSectionData(dataObj) {
             if (!dataObj) return false;
-            
+
             // Check for total_area
             if (dataObj.hasOwnProperty('total_area')) {
                 return dataObj.total_area > 0;
             }
-            
+
             // Check for total_population
             if (dataObj.hasOwnProperty('total_population')) {
                 return dataObj.total_population > 0;
             }
-            
+
             // Check for total_villages
             if (dataObj.hasOwnProperty('total_villages')) {
                 return dataObj.total_villages > 0;
             }
-            
+
             return false;
         }
 
@@ -2586,9 +2719,9 @@
         }
 
         // Check if entire Agriculture section should be hidden
-        if (!hasSectionData(groundwaterStress) && 
-            !hasSectionData(highDroughtIncidence) && 
-            !hasSectionData(highIrrigationRisk) && 
+        if (!hasSectionData(groundwaterStress) &&
+            !hasSectionData(highDroughtIncidence) &&
+            !hasSectionData(highIrrigationRisk) &&
             !hasSectionData(lowYield)) {
             hideSection('agriculture-section');
         }
@@ -2643,9 +2776,9 @@
         window.addEventListener('beforeprint', function () {
             console.log('Preparing for print...');
             const allMaps = [
-                mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap, 
-                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap, 
-                NREGAMap, FisheryMap, AgroforestryMap, AquiferMap, 
+                mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap,
+                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap,
+                NREGAMap, FisheryMap, AgroforestryMap, AquiferMap,
                 SogeMap, wellDepthMap
             ];
 
@@ -2674,9 +2807,9 @@
 
             // Force maps to restore to normal size
             const allMaps = [
-                mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap, 
-                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap, 
-                NREGAMap, FisheryMap, AgroforestryMap, AquiferMap, 
+                mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap,
+                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap,
+                NREGAMap, FisheryMap, AgroforestryMap, AquiferMap,
                 SogeMap, wellDepthMap
             ];
 
@@ -2700,6 +2833,271 @@
             day: 'numeric'
         });
 
-   </script>
+
+        function initClickPopup() {
+            console.log('Initializing simple click popup...');
+
+            // Check if mainMap exists
+            if (typeof mainMap === 'undefined' || !mainMap) {
+                console.log('mainMap not ready, retrying...');
+                setTimeout(initClickPopup, 500);
+                return;
+            }
+
+            // Create popup element - SIMPLE AND SMALL
+            const popupElement = document.createElement('div');
+            popupElement.style.cssText = `
+                background: white;
+                border-radius: 6px;
+                padding: 12px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                border: 1px solid #ddd;
+                min-width: 250px;
+                max-width: 300px;
+                font-size: 12px;
+                pointer-events: auto;
+                line-height: 1.5;
+            `;
+
+            const popup = new ol.Overlay({
+                element: popupElement,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+                autoPan: true,
+                autoPanAnimation: { duration: 250 }
+            });
+
+            mainMap.addOverlay(popup);
+
+            // Click handler
+            // Click handler
+            mainMap.on('click', function (evt) {
+                const feature = mainMap.forEachFeatureAtPixel(evt.pixel, f => f);
+
+                if (feature) {
+                    const uid = feature.get('uid') || feature.get('UID') || feature.getId() || 'Unknown';
+
+                    // ============ GET AREA FROM FEATURE ============
+                    const areaHa = feature.get('area_in_ha') || feature.get('area_ha') || feature.get('area') || 'N/A';
+                    const formattedArea = typeof areaHa === 'number' ? areaHa.toFixed(2) : areaHa;
+                    // ==============================================
+
+                    const intensity = (mwsPatternIntensity && mwsPatternIntensity[uid]) ? mwsPatternIntensity[uid] : 0;
+
+                    // Get pattern keys and convert to display names
+                    const patternKeys = (mwsActivePatternsSafe && mwsActivePatternsSafe[uid]) || [];
+                    const patternDisplayNames = patternKeys.map(key =>
+                        (patternDisplayMappingSafe && patternDisplayMappingSafe[key]) ||
+                        key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                    );
+                    const currentState = "{{ state }}";
+                    const currentDistrict = "{{ district }}";
+                    const currentBlock = "{{ block }}";
+                    const MWSReportUrl = `https://geoserver.core-stack.org/api/v1/generate_mws_report/?state=${currentState}&district=${currentDistrict}&block=${currentBlock}&uid=${uid}`;
+                    console.log("MWS report Url", MWSReportUrl)
+                    // Determine stress color
+                    let intensityColor, intensityText;
+                    if (intensity === 0) {
+                        intensityColor = '#27ae60';
+                        intensityText = 'No Stress Pattern';
+                    } else {
+                        intensityColor = '#c0392b';
+                        intensityText = `(${intensity}) Stress Patterns`;
+                    }
+
+                    // ============ SIMPLE POPUP CONTENT WITH AREA ============
+                    let html = `
+                        <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-weight: bold; color: #2c3e50;"> MWS: ${uid}</span>
+                                <span style="
+                                    background-color: ${intensityColor};
+                                    color: white;
+                                    padding: 2px 8px;
+                                    border-radius: 12px;
+                                    font-size: 11px;
+                                    font-weight: bold;
+                                ">${intensityText}</span>
+                            </div>
+                            <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                                <span style="font-weight: bold;">Area:</span> ${formattedArea} ha
+                            </div>
+                        </div>
+                    `;
+
+                    // Add patterns
+                    if (patternDisplayNames.length > 0) {
+                        patternDisplayNames.forEach(pattern => {
+                            html += `
+                                <div style="
+                                    padding: 4px 0 4px 8px;
+                                    border-left: 3px solid #e74c3c;
+                                    margin-bottom: 3px;
+                                    font-size: 12px;
+                                    color: #555;
+                                ">• ${pattern}</div>
+                            `;
+                        });
+                    } else {
+                        html += `<div style="color: #27ae60; font-size: 12px; padding: 4px 0;">✓ No active patterns</div>`;
+                    }
+
+                    // ============ ADD BUTTON WITH CORRECT URL ============
+                    html += `
+                        <div style="margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
+                            <a href="${MWSReportUrl}" 
+                            target="_blank" 
+                            style="
+                                display: inline-block;
+                                background-color: #3498db;
+                                color: white;
+                                padding: 6px 16px;
+                                border-radius: 20px;
+                                text-decoration: none;
+                                font-size: 12px;
+                                font-weight: bold;
+                                transition: background-color 0.2s;
+                                border: none;
+                                cursor: pointer;
+                            "
+                            onmouseover="this.style.backgroundColor='#2980b9'"
+                            onmouseout="this.style.backgroundColor='#3498db'"
+                            >
+                                View Micro-Watershed Profile
+                            </a>
+                        </div>
+                    `;
+
+                    popupElement.innerHTML = html;
+                    popup.setPosition(evt.coordinate);
+
+                } else {
+                    popup.setPosition(undefined);
+                }
+            });
+            // Change cursor on hover
+            mainMap.on('pointermove', function (evt) {
+                const hit = mainMap.hasFeatureAtPixel(evt.pixel);
+                mainMap.getTargetElement().style.cursor = hit ? 'pointer' : 'default';
+            });
+
+            console.log('✅ Simple popup initialized');
+        }
+
+        // ============ TEST POPUP WITH FIRST FEATURE ============
+        setTimeout(() => {
+            // Get first feature for testing
+            let testFeature = null;
+            mainMap.getLayers().forEach(layer => {
+                if (layer instanceof ol.layer.Vector) {
+                    const source = layer.getSource();
+                    if (source) {
+                        source.forEachFeature(f => {
+                            if (!testFeature) testFeature = f;
+                        });
+                    }
+                }
+            });
+
+            if (testFeature) {
+                console.log('Test feature available:', testFeature.get('uid') || testFeature.get('UID'));
+            } else {
+                console.log('No features found on map yet');
+            }
+        }, 2000);
+
+
+        // ============ MINIMAL DEBUG VERSION ============
+        // Use this if the above doesn't work - this is guaranteed to work
+
+        function initMinimalClickPopup() {
+            if (!mainMap) {
+                setTimeout(initMinimalClickPopup, 200);
+                return;
+            }
+
+            console.log('Initializing minimal click popup...');
+
+            // Simple popup
+            const popupDiv = document.createElement('div');
+            popupDiv.style.cssText = `
+            background: white;
+            border-radius: 6px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border: 1px solid #ddd;
+            font-size: 13px;
+            pointer-events: auto;
+            max-width: 300px;
+            word-wrap: break-word;
+        `;
+
+            const popup = new ol.Overlay({
+                element: popupDiv,
+                positioning: 'bottom-center',
+                offset: [0, -10]
+            });
+            mainMap.addOverlay(popup);
+
+            // Click handler
+            mainMap.on('click', function (e) {
+                const feature = mainMap.forEachFeatureAtPixel(e.pixel, f => f);
+
+                if (feature) {
+                    const uid = feature.get('uid') || feature.get('UID') || 'Unknown';
+                    const intensity = mwsPatternIntensity?.[uid] || 0;
+                    const patterns = mwsActivePatterns?.[uid] || [];
+
+                    let html = `
+                    <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                        📍 ${uid}
+                    </div>
+                    <div style="margin-bottom: 5px;">
+                        <span style="font-weight: bold;">Stress Level:</span> 
+                        <span style="color: ${intensity > 3 ? '#c0392b' : intensity > 1 ? '#e67e22' : '#27ae60'};">
+                            ${intensity}
+                        </span>
+                    </div>
+                `;
+
+                    if (patterns.length > 0) {
+                        html += `<div style="font-weight: bold; margin-top: 8px; margin-bottom: 3px;">Patterns:</div>`;
+                        html += `<div style="max-height: 150px; overflow-y: auto;">`;
+                        patterns.forEach(p => {
+                            const display = patternDisplayMapping?.[p] || p.replace(/_/g, ' ');
+                            html += `<div style="padding: 3px 0; font-size: 12px;">• ${display}</div>`;
+                        });
+                        html += `</div>`;
+                    }
+
+                    popupDiv.innerHTML = html;
+                    popup.setPosition(e.coordinate);
+                } else {
+                    popup.setPosition(undefined);
+                }
+            });
+
+            // Cursor change
+            mainMap.on('pointermove', function (e) {
+                const hit = mainMap.hasFeatureAtPixel(e.pixel);
+                mainMap.getTargetElement().style.cursor = hit ? 'pointer' : 'default';
+            });
+
+            console.log('Minimal click popup ready');
+        }
+
+        // Start initialization
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(initClickPopup, 1000);
+                setTimeout(initMinimalClickPopup, 1500); // Backup
+            });
+        } else {
+            setTimeout(initClickPopup, 1000);
+            setTimeout(initMinimalClickPopup, 1500); // Backup
+        }
+
+    </script>
 </body>
+
 </html>
