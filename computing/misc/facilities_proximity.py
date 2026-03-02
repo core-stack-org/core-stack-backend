@@ -29,7 +29,6 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     is_gee_asset_exists,
-    create_gee_directory,
     get_gee_dir_path,
     get_gee_asset_path,
     export_vector_asset_to_gee,
@@ -45,7 +44,7 @@ from computing.utils import (
 logger = logging.getLogger(__name__)
 
 # Constants
-FACILITIES_GEOSERVER_WORKSPACE = "testworkspace"
+FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
 FACILITIES_DATASET_NAME = "Facilities Proximity"
 
 
@@ -55,11 +54,11 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
     
     Steps:
         1. Initialize GEE
-        2. Filter facilities by admin boundary (spatial clipping)
-        3. Export to GEE asset
-        4. Make asset public
-        5. Sync to GeoServer
-        6. Update database
+        2. Create Output Asset ID
+        3. Filter facilities by admin boundary (spatial clipping)
+        4. Export as GEE asset
+        5. Make asset public and Register in database
+        6. Sync to GeoServer
     
     Args:
         state: State name (e.g., "Odisha")
@@ -106,8 +105,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
         admin_boundary = ee.FeatureCollection(admin_boundary_path)
         filtered_fc = facilities_fc.filterBounds(admin_boundary.geometry())
         
-        # Step 4: Create GEE directory and export
-        # create_gee_directory(state, district, block, GEE_PATHS["MWS"]["GEE_ASSET_PATH"])
+        # Step 4: Export as GEE asset
         
         if not is_gee_asset_exists(asset_id):
             print(f"[{datetime.now()}] Exporting to GEE asset...")
