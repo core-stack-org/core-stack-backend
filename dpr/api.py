@@ -114,7 +114,9 @@ def generate_dpr(request):
 
         logger.info(
             "Generating DPR for plan ID: %s and email ID: %s (regenerate=%s)",
-            plan_id, email_id, regenerate
+            plan_id,
+            email_id,
+            regenerate,
         )
 
         valid_email = validate_email(email_id)
@@ -434,8 +436,20 @@ def generate_tehsil_report(request):
         )
 
         # ? Pattern intensity
-        mws_pattern_intensity = get_pattern_intensity(
+        mws_pattern_intensity_with_active_pattern = get_pattern_intensity(
             result["state"], result["district"], result["block"]
+        )
+
+        mws_pattern_intensity = mws_pattern_intensity_with_active_pattern.get(
+            "intensity", None
+        )
+
+        mws_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "mws_active_patterns", []
+        )
+
+        pattern_display_mapping = mws_pattern_intensity_with_active_pattern.get(
+            "pattern_display_mapping", []
         )
 
         # ? Agriculture data
@@ -470,11 +484,77 @@ def generate_tehsil_report(request):
             result["state"], result["district"], result["block"]
         )
 
+        # ============ MATCHING hasSectionData LOGIC FROM HTML ============
+        def has_section_data(data_obj):
+            if not data_obj:
+                return False
+
+            # Check for total_area > 0 (EXACTLY like HTML)
+            if isinstance(data_obj, dict) and "total_area" in data_obj:
+                return data_obj["total_area"] > 0
+
+            # Check for total_population > 0 (EXACTLY like HTML)
+            if isinstance(data_obj, dict) and "total_population" in data_obj:
+                return data_obj["total_population"] > 0
+
+            # Check for total_villages > 0 (EXACTLY like HTML)
+            if isinstance(data_obj, dict) and "total_villages" in data_obj:
+                return data_obj["total_villages"] > 0
+
+            return False
+
+        # ==============================================================
+
+        # ============ BUILD ACTIVE PATTERN LIST ============
+        active_pattern = []
+
+        # Pattern display names mapping (from your HTML)
+        PATTERN_DISPLAY_NAMES = {
+            "groundwater_stress": "Groundwater Stress",
+            "high_drought_incidence": "High drought incidence",
+            "high_irrigation_risk": "High irrigation risk",
+            "low_yield": "Likely stress in cropping yield",
+            "forest_degradation": "Tree Health Degradation",
+            "mining_presence": "Mining Presence",
+            "caste": "High density of marginalized caste communities",
+            "nrega": "Poor uptake of MGNREGA works",
+        }
+
+        # Check each pattern and ONLY add if has_section_data returns True
+        if has_section_data(groundwater_stress):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["groundwater_stress"])
+
+        if has_section_data(high_drought_incidence):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["high_drought_incidence"])
+
+        if has_section_data(high_irrigation_risk):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["high_irrigation_risk"])
+
+        if has_section_data(low_yield):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["low_yield"])
+
+        if has_section_data(forest_degradation):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["forest_degradation"])
+
+        if has_section_data(mining_presence):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["mining_presence"])
+
+        if has_section_data(socio_caste):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["caste"])
+
+        if has_section_data(socio_nrega):
+            active_pattern.append(PATTERN_DISPLAY_NAMES["nrega"])
+        # =====================================================
+
         context = {
+            "state": result["state"],
             "district": result["district"],
             "block": result["block"],
             "block_osm": parameter_block,
             "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
+            "active_pattern": active_pattern,  # Now matches HTML hide logic
+            "pattern_display_mapping_json": pattern_display_mapping,
+            "mws_active_patterns_json": json.dumps(mws_active_pattern),
             "groundwater_stress_json": json.dumps(groundwater_stress),
             "high_drought_incidence_json": json.dumps(high_drought_incidence),
             "drought_timeline_json": json.dumps(weighted_drought_timeline),
