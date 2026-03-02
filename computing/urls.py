@@ -176,4 +176,9 @@ urlpatterns = [
         api.generate_mws_centroid,
         name="generate-mws-centroid",
     ),
+    path(
+        "generate_facilities_proximity/",
+        api.generate_facilities_proximity,
+        name="generate_facilities_proximity",
+    ),    
 ]
