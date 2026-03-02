@@ -850,14 +850,11 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         )
         add_well_data(7, "Households Benefitted", well.households_benefitted)
         add_well_data(8, "Which Caste uses the well?", well.caste_uses)
-        add_well_data(
-            9, "Is the well functional or non-functional?", well.is_functional
-        )
-        add_well_data(10, "Well Usage", well_usage)
-        add_well_data(11, "Need Maintenance?", well.need_maintenance)
-        add_well_data(12, "Repair Activities", repair_activities)
-        add_well_data(13, "Latitude", well.latitude)
-        add_well_data(14, "Longitude", well.longitude)
+        add_well_data(9, "Well Usage", well_usage)
+        add_well_data(10, "Need Maintenance?", well.need_maintenance)
+        add_well_data(11, "Repair Activities", repair_activities)
+        add_well_data(12, "Latitude", well.latitude)
+        add_well_data(13, "Longitude", well.longitude)
 
 
 def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
@@ -1029,7 +1026,6 @@ def maintenance_gw_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Recharge Structure",
         "Repair Activities",
@@ -1056,12 +1052,9 @@ def maintenance_gw_table(doc, plan):
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "NA"
         )
         row_cells[3].text = to_utf8(
-            maintenance.data_gw_maintenance.get("select_gender") or "NA"
-        )
-        row_cells[4].text = to_utf8(
             maintenance.data_gw_maintenance.get("ben_father") or "NA"
         )
-        row_cells[5].text = to_utf8(
+        row_cells[4].text = to_utf8(
             maintenance.data_gw_maintenance.get("select_one_recharge_structure")
             or maintenance.data_gw_maintenance.get("select_one_water_structure")
             or "NA"
@@ -1089,9 +1082,9 @@ def maintenance_gw_table(doc, plan):
             repair_activities = maintenance.data_gw_maintenance.get(
                 "select_one_activities"
             )
-        row_cells[6].text = to_utf8(repair_activities or "NA")
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_agri_table(doc, plan):
@@ -1099,7 +1092,6 @@ def maintenance_agri_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Irrigation Structure",
         "Repair Activity",
@@ -1126,12 +1118,9 @@ def maintenance_agri_table(doc, plan):
             maintenance.data_agri_maintenance.get("Beneficiary_Name") or "NA"
         )
         row_cells[3].text = to_utf8(
-            maintenance.data_agri_maintenance.get("gender") or "NA"
-        )
-        row_cells[4].text = to_utf8(
             maintenance.data_agri_maintenance.get("ben_father") or "NA"
         )
-        row_cells[5].text = to_utf8(
+        row_cells[4].text = to_utf8(
             maintenance.data_agri_maintenance.get("select_one_water_structure")
             or maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
             or "NA"
@@ -1160,9 +1149,9 @@ def maintenance_agri_table(doc, plan):
                 maintenance.data_agri_maintenance.get("select_one_activities") or "NA"
             )
 
-        row_cells[6].text = to_utf8(repair_activities or "NA")
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_waterstructures_table(doc, plan):
@@ -1170,7 +1159,6 @@ def maintenance_waterstructures_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Work",
         "Repair Activities",
@@ -1197,12 +1185,9 @@ def maintenance_waterstructures_table(doc, plan):
             maintenance.data_swb_maintenance.get("Beneficiary_Name") or "NA"
         )
         row_cells[3].text = to_utf8(
-            maintenance.data_swb_maintenance.get("select_gender") or "NA"
-        )
-        row_cells[4].text = to_utf8(
             maintenance.data_swb_maintenance.get("ben_father") or "NA"
         )
-        row_cells[5].text = to_utf8(
+        row_cells[4].text = to_utf8(
             maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
             or maintenance.data_swb_maintenance.get("select_one_water_structure")
             or "NA"
@@ -1224,9 +1209,9 @@ def maintenance_waterstructures_table(doc, plan):
             repair_activities = maintenance.data_swb_maintenance.get(
                 "select_one_activities"
             )
-        row_cells[6].text = to_utf8(repair_activities or "NA")
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_rs_waterstructures_table(doc, plan):
@@ -1234,7 +1219,6 @@ def maintenance_rs_waterstructures_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Work",
         "Repair Activities",
@@ -1260,15 +1244,12 @@ def maintenance_rs_waterstructures_table(doc, plan):
             maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "NA"
         )
         row_cells[3].text = to_utf8(
-            maintenance.data_swb_rs_maintenance.get("gender") or "NA"
-        )
-        row_cells[4].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("ben_father") or "NA"
         )
         rs_structure_type = (
             maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "NA"
         )
-        row_cells[5].text = to_utf8(rs_structure_type)
+        row_cells[4].text = to_utf8(rs_structure_type)
         repair_activities = "NA"
         if (
             rs_structure_type != "NA"
