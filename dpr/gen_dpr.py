@@ -414,11 +414,12 @@ def create_table_socio_eco(doc, plan, settlement_data):
         row_cells = table_socio.add_row().cells
         row_cells[0].text = to_utf8(item.settlement_name)
         row_cells[1].text = str(item.number_of_households)
+        largest_caste = (item.largest_caste or "").lower()
         row_cells[2].text = to_utf8(item.largest_caste)
 
-        if item.largest_caste.lower() == "single caste group":
+        if largest_caste == "single caste group":
             row_cells[3].text = to_utf8(item.smallest_caste)
-        elif item.largest_caste.lower() == "mixed caste group":
+        elif largest_caste == "mixed caste group":
             row_cells[3].text = to_utf8(item.settlement_status)
         else:
             row_cells[3].text = "NA"
@@ -762,10 +763,8 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
     all_wells_with_mws_sorted = sorted(
         all_wells_with_mws,
         key=lambda x: (
-            x[0].beneficiary_settlement == "NA",
-            x[0].beneficiary_settlement.lower()
-            if x[0].beneficiary_settlement != "NA"
-            else "",
+            not x[0].beneficiary_settlement or x[0].beneficiary_settlement == "NA",
+            (x[0].beneficiary_settlement or "").lower(),
         ),
     )
 
@@ -928,13 +927,13 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
             row_cells[0].paragraphs[0].add_run(label).bold = True
             row_cells[1].text = to_utf8(value) if value is not None else "NA"
 
-        who_manages = waterbody.who_manages
-        if waterbody.who_manages.lower() == "other":
-            who_manages = "Other: " + waterbody.specify_other_manager
+        who_manages = waterbody.who_manages or "NA"
+        if who_manages.lower() == "other":
+            who_manages = "Other: " + (waterbody.specify_other_manager or "")
 
-        water_structure_type = waterbody.water_structure_type
-        if waterbody.water_structure_type.lower() == "other":
-            water_structure_type = "Other: " + waterbody.water_structure_other
+        water_structure_type = waterbody.water_structure_type or "NA"
+        if water_structure_type.lower() == "other":
+            water_structure_type = "Other: " + (waterbody.water_structure_other or "")
 
         repair_activities = get_waterbody_repair_activities(
             waterbody.data_waterbody, water_structure_type
@@ -1338,7 +1337,7 @@ def create_nrm_works_table(doc, plan, mws):
         row_cells[1].text = "Irrigation Work"
         row_cells[2].text = to_utf8(irr_work.data_agri.get("demand_type") or "NA")
         if (
-            irr_work.work_type.lower() == "other"
+            (irr_work.work_type or "").lower() == "other"
             and irr_work.data_agri
             and "TYPE_OF_WORK_ID_other" in irr_work.data_agri
         ):
