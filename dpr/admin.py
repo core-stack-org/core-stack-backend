@@ -25,6 +25,8 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "settlement_id",
         "settlement_name",
         "block_name",
+        "plan_id",
+        "plan_name",
         "number_of_households",
         "settlement_status",
         "submission_time",
@@ -41,7 +43,7 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["settlement_name", "settlement_id", "block_name", "submitted_by"]
+    search_fields = ["settlement_name", "settlement_id", "block_name", "submitted_by", "plan_name"]
     readonly_fields = [
         "uuid",
         "system",
@@ -151,6 +153,8 @@ class ODKWellAdmin(admin.ModelAdmin):
         "well_id",
         "beneficiary_settlement",
         "block_name",
+        "plan_id",
+        "plan_name",
         "owner",
         "households_benefitted",
         "is_functional",
@@ -169,7 +173,7 @@ class ODKWellAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["well_id", "beneficiary_settlement", "owner", "block_name"]
+    search_fields = ["well_id", "beneficiary_settlement", "owner", "block_name", "plan_name"]
     readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
     ordering = ["-submission_time"]
 
@@ -235,6 +239,8 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "waterbody_id",
         "beneficiary_settlement",
         "block_name",
+        "plan_id",
+        "plan_name",
         "water_structure_type",
         "household_benefitted",
         "who_manages",
@@ -258,6 +264,7 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "beneficiary_settlement",
         "block_name",
         "beneficiary_contact",
+        "plan_name",
     ]
     readonly_fields = ["uuid", "system", "gps_point", "water_structure_dimension", "data_before_moderation"]
     ordering = ["-submission_time"]
@@ -351,6 +358,8 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         "recharge_structure_id",
         "beneficiary_settlement",
         "block_name",
+        "plan_id",
+        "plan_name",
         "work_type",
         "submission_time",
         "is_moderated",
@@ -365,7 +374,7 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["recharge_structure_id", "beneficiary_settlement", "block_name"]
+    search_fields = ["recharge_structure_id", "beneficiary_settlement", "block_name", "plan_name"]
     readonly_fields = ["uuid", "system", "gps_point", "work_dimensions", "data_before_moderation"]
     ordering = ["-submission_time"]
 
@@ -428,6 +437,8 @@ class ODKAgriAdmin(admin.ModelAdmin):
         "irrigation_work_id",
         "beneficiary_settlement",
         "block_name",
+        "plan_id",
+        "plan_name",
         "work_type",
         "submission_time",
         "is_moderated",
@@ -442,7 +453,7 @@ class ODKAgriAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["irrigation_work_id", "beneficiary_settlement", "block_name"]
+    search_fields = ["irrigation_work_id", "beneficiary_settlement", "block_name", "plan_name"]
     readonly_fields = ["uuid", "system", "gps_point", "work_dimensions", "data_before_moderation"]
     ordering = ["-submission_time"]
 
@@ -504,6 +515,8 @@ class ODKCropAdmin(admin.ModelAdmin):
     list_display = [
         "crop_grid_id",
         "beneficiary_settlement",
+        "plan_id",
+        "plan_name",
         "land_classification",
         "irrigation_source",
         "submission_time",
@@ -519,7 +532,7 @@ class ODKCropAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["crop_grid_id", "beneficiary_settlement"]
+    search_fields = ["crop_grid_id", "beneficiary_settlement", "plan_name"]
     readonly_fields = ["uuid", "system", "data_before_moderation"]
     ordering = ["-submission_time"]
 
@@ -593,6 +606,8 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "livelihood_id",
         "beneficiary_settlement",
         "block_name",
+        "plan_id",
+        "plan_name",
         "livestock_development",
         "fisheries",
         "submission_time",
@@ -610,7 +625,7 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["beneficiary_settlement", "block_name", "beneficiary_contact"]
+    search_fields = ["beneficiary_settlement", "block_name", "beneficiary_contact", "plan_name"]
     readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
     ordering = ["-submission_time"]
 
