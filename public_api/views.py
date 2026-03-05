@@ -16,6 +16,7 @@ from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL, GEE_HELPER_ACCOUNT_ID
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
+from django.db.models import Q
 
 # Create your views here.
 
@@ -57,8 +58,6 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
     tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
-
-    from django.db.models import Q
 
     EXCLUDE_LAYER_KEYWORDS = [
         "run_off",
@@ -457,7 +456,7 @@ def get_mws_geometries_data(state, district, tehsil):
             "request": "GetFeature",
             "typeName": f"mws:{layer_name}",
             "outputFormat": "application/json",
-            "propertyName": "geom,uid",  # Only request needed fields
+            "propertyName": "geom,uid",  
         }
 
         response = requests.get(base_url, params=params, timeout=30)
