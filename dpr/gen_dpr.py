@@ -1259,9 +1259,9 @@ def maintenance_rs_waterstructures_table(doc, plan):
 
             repair_activities = repair_key_value
 
-        row_cells[6].text = to_utf8(repair_activities or "NA")
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 # MARK: - Section F
