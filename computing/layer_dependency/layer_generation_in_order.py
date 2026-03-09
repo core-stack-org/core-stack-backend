@@ -46,6 +46,8 @@ from computing.misc.mining_data import generate_mining_data
 from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
 from computing.misc.ndvi_time_series import ndvi_timeseries
+from computing.zoi_layers.zoi import generate_zoi
+from computing.mws.mws_centroid import generate_mws_centroid_data
 from utilities.gee_utils import valid_gee_text
 import os
 from nrm_app.celery import app
@@ -180,6 +182,56 @@ def load_end_year_rules():
         return json.load(f)
 
 
+# check the dependency layer is available or not
+class DependencyValidator:
+
+    @staticmethod
+    def clip_lulc_v3(district, block):
+        return (
+            Layer.objects.filter(
+                layer_name__icontains=f"{valid_gee_text(district)}_{valid_gee_text(block)}_level_"
+            ).count()
+            == 24
+        )
+
+    @staticmethod
+    def terrain_raster(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_terrain_raster"
+        ).exists()
+
+    @staticmethod
+    def generate_catchment_area_singleflow(district, block):
+        return Layer.objects.filter(
+            layer_name=f"catchment_area_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
+        ).exists()
+
+    @staticmethod
+    def generate_stream_order(district, block):
+        return Layer.objects.filter(
+            layer_name=f"stream_order_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector"
+        ).exists()
+
+    @staticmethod
+    def clip_drainage_lines(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+            dataset__name="Drainage",
+        ).exists()
+
+    @staticmethod
+    def generate_cropping_intensity(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_intensity"
+        ).exists()
+
+    @staticmethod
+    def generate_swb_layer(district, block):
+        return Layer.objects.filter(
+            layer_name=f"surface_waterbodies_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        ).exists()
+
+
 def run_layer_with_dependency(
     deps, node_func_name, node_func_obj, state, district, block, args
 ):
@@ -187,49 +239,9 @@ def run_layer_with_dependency(
     This function checks dependency of layer if it is generated or not and call the pipeline functions and maintain status of each function,
     """
     for dep in deps:
-        if dep == "clip_lulc_v3":
-            l = Layer.objects.filter(
-                layer_name__icontains=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_level_"
-            )
-            status[dep] = True if len(l) == 24 else False
-        elif dep == "terrain_raster":
-            l = (
-                Layer.objects.filter(
-                    layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_terrain_raster"
-                )
-                .order_by("-layer_version")
-                .first()
-            )
-            status[dep] = True if l else False
-        elif dep == "generate_catchment_area_singleflow":
-            l = (
-                Layer.objects.filter(
-                    layer_name=f"catchment_area_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
-                )
-                .order_by("-layer_version")
-                .first()
-            )
-            status[dep] = True if l else False
-        elif dep == "generate_stream_order":
-            l = (
-                Layer.objects.filter(
-                    layer_name=f"stream_order_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector"
-                )
-                .order_by("-layer_version")
-                .first()
-            )
-            status[dep] = True if l else False
-        elif dep == "clip_drainage_lines":
-            l = (
-                Layer.objects.filter(
-                    layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
-                    dataset__name="Drainage",
-                )
-                .order_by("-layer_version")
-                .first()
-            )
-            status[dep] = True if l else False
-        if not status.get(dep, False):
+        checker = getattr(DependencyValidator, dep, None)
+        status[dep] = checker(district, block) if checker else False
+        if not status[dep]:
             print(
                 f"Skipping {node_func_name} because dependency {dep} failed or not executed."
             )

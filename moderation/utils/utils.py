@@ -14,7 +14,7 @@ from dpr.models import (
     SWB_RS_maintenance,
     ODK_agrohorticulture,
 )
-from dpr.utils import determine_caste_fields
+from dpr.utils import determine_caste_fields, to_utf8
 
 
 def extract_lat_lon_from_gps(gps):
@@ -59,19 +59,19 @@ def sync_edited_updated_settlement(sub):
             )
 
     mapped = {
-        "settlement_name": sub.get("Settlements_name"),
+        "settlement_name": to_utf8(sub.get("Settlements_name")),
         "submission_time": system.get("submissionDate"),
-        "submitted_by": system.get("submitterName"),
+        "submitted_by": to_utf8(system.get("submitterName")),
         "status_re": system.get("reviewState") or "in progress",
         "latitude": lat,
         "longitude": lon,
-        "block_name": sub.get("block_name"),
+        "block_name": to_utf8(sub.get("block_name")),
         "number_of_households": sub.get("number_households") or 0,
-        "largest_caste": largest_caste,
-        "smallest_caste": smallest_caste,
-        "settlement_status": settlement_status,
+        "largest_caste": to_utf8(largest_caste),
+        "smallest_caste": to_utf8(smallest_caste),
+        "settlement_status": to_utf8(settlement_status),
         "plan_id": sub.get("plan_id") or "NA",
-        "plan_name": sub.get("plan_name") or "NA",
+        "plan_name": to_utf8(sub.get("plan_name") or "NA"),
         "uuid": sub.get("__id") or "NA",
         "system": system,
         "gps_point": gps,
@@ -82,11 +82,11 @@ def sync_edited_updated_settlement(sub):
         "nrega_job_card": nrega.get("NREGA_have_job_card", "") or 0,
         "nrega_without_job_card": nrega.get("total_household", "") or 0,
         "nrega_work_days": nrega.get("NREGA_work_days", "") or 0,
-        "nrega_past_work": nrega.get("work_demands", "") or "NA",
-        "nrega_raise_demand": nrega.get("select_one_Y_N", "") or "NA",
-        "nrega_demand": nrega.get("select_one_demands", "") or "NA",
-        "nrega_issues": nrega_issues,
-        "nrega_community": nrega.get("select_one_contributions", "") or "NA",
+        "nrega_past_work": to_utf8(nrega.get("work_demands", "") or "NA"),
+        "nrega_raise_demand": to_utf8(nrega.get("select_one_Y_N", "") or "NA"),
+        "nrega_demand": to_utf8(nrega.get("select_one_demands", "") or "NA"),
+        "nrega_issues": to_utf8(nrega_issues),
+        "nrega_community": to_utf8(nrega.get("select_one_contributions", "") or "NA"),
         "data_settlement": sub,
     }
 
@@ -117,15 +117,15 @@ def sync_edited_updated_well(well_submission):
     mapped = {
         "uuid": well_submission.get("__id") or "NA",
         "submission_time": system.get("submissionDate"),
-        "beneficiary_settlement": well_submission.get("beneficiary_settlement") or "NA",
-        "block_name": well_submission.get("block_name") or "NA",
-        "owner": well_submission.get("select_one_owns") or "NA",
+        "beneficiary_settlement": to_utf8(well_submission.get("beneficiary_settlement") or "NA"),
+        "block_name": to_utf8(well_submission.get("block_name") or "NA"),
+        "owner": to_utf8(well_submission.get("select_one_owns") or "NA"),
         "households_benefitted": well_submission.get("households_benefited") or 0,
-        "caste_uses": well_submission.get("select_multiple_caste_use") or "NA",
-        "is_functional": Well_usage.get("select_one_Functional_Non_functional") or "NA",
+        "caste_uses": to_utf8(well_submission.get("select_multiple_caste_use") or "NA"),
+        "is_functional": well_submission.get("select_one_Functional_Non_functional") or "NA",
         "need_maintenance": need_maintenance,
         "plan_id": well_submission.get("plan_id") or "NA",
-        "plan_name": well_submission.get("plan_name") or "NA",
+        "plan_name": to_utf8(well_submission.get("plan_name") or "NA"),
         "status_re": system.get("reviewState") or "in progress",
         "latitude": lat,
         "longitude": lon,
@@ -153,28 +153,20 @@ def sync_edited_updated_waterbody(waterbody_submission):
     mapped = {
         "uuid": waterbody_submission.get("__id") or "NA",
         "submission_time": system.get("submissionDate"),
-        "block_name": waterbody_submission.get("block_name") or "NA",
-        "beneficiary_settlement": waterbody_submission.get("beneficiary_settlement")
-        or "NA",
-        "beneficiary_contact": waterbody_submission.get("Beneficiary_contact_number")
-        or "NA",
-        "who_manages": waterbody_submission.get("select_one_manages") or "NA",
-        "specify_other_manager": waterbody_submission.get("text_one_manages") or "NA",
-        "owner": waterbody_submission.get("select_one_owns") or "NA",
-        "caste_who_uses": waterbody_submission.get("select_multiple_caste_use") or "NA",
+        "block_name": to_utf8(waterbody_submission.get("block_name") or "NA"),
+        "beneficiary_settlement": to_utf8(waterbody_submission.get("beneficiary_settlement") or "NA"),
+        "beneficiary_contact": waterbody_submission.get("Beneficiary_contact_number") or "NA",
+        "who_manages": to_utf8(waterbody_submission.get("select_one_manages") or "NA"),
+        "specify_other_manager": to_utf8(waterbody_submission.get("text_one_manages") or "NA"),
+        "owner": to_utf8(waterbody_submission.get("select_one_owns") or "NA"),
+        "caste_who_uses": to_utf8(waterbody_submission.get("select_multiple_caste_use") or "NA"),
         "household_benefitted": waterbody_submission.get("households_benefited") or 0,
-        "water_structure_type": waterbody_submission.get("select_one_water_structure")
-        or "NA",
-        "water_structure_other": waterbody_submission.get(
-            "select_one_water_structure_other"
-        )
-        or "NA",
-        "identified_by": waterbody_submission.get("select_one_identified")
-        or "No Data Provided",
-        "need_maintenance": waterbody_submission.get("select_one_maintenance")
-        or "No Data Provided",
+        "water_structure_type": to_utf8(waterbody_submission.get("select_one_water_structure") or "NA"),
+        "water_structure_other": to_utf8(waterbody_submission.get("select_one_water_structure_other") or "NA"),
+        "identified_by": to_utf8(waterbody_submission.get("select_one_identified") or "No Data Provided"),
+        "need_maintenance": to_utf8(waterbody_submission.get("select_one_maintenance") or "No Data Provided"),
         "plan_id": waterbody_submission.get("plan_id") or "0",
-        "plan_name": waterbody_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(waterbody_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -206,11 +198,11 @@ def sync_edited_updated_gw(gw_submission):
     mapped = {
         "uuid": gw_submission.get("__id") or "0",
         "submission_time": system.get("submissionDate"),
-        "beneficiary_settlement": gw_submission.get("beneficiary_settlement") or "NA",
-        "block_name": gw_submission.get("block_name") or "NA",
-        "work_type": gw_submission.get("TYPE_OF_WORK_ID") or "NA",
+        "beneficiary_settlement": to_utf8(gw_submission.get("beneficiary_settlement") or "NA"),
+        "block_name": to_utf8(gw_submission.get("block_name") or "NA"),
+        "work_type": to_utf8(gw_submission.get("TYPE_OF_WORK_ID") or "NA"),
         "plan_id": gw_submission.get("plan_id") or "NA",
-        "plan_name": gw_submission.get("plan_name") or "NA",
+        "plan_name": to_utf8(gw_submission.get("plan_name") or "NA"),
         "latitude": lat,
         "longitude": lon,
         "status_re": status_re,
@@ -246,11 +238,11 @@ def sync_edited_updated_agri(agri_submission):
     mapped = {
         "uuid": agri_submission.get("__id") or "0",
         "submission_time": system.get("submissionDate"),
-        "beneficiary_settlement": agri_submission.get("beneficiary_settlement") or "0",
-        "block_name": agri_submission.get("block_name") or "",
-        "work_type": agri_submission.get("TYPE_OF_WORK_ID") or "",
+        "beneficiary_settlement": to_utf8(agri_submission.get("beneficiary_settlement") or "0"),
+        "block_name": to_utf8(agri_submission.get("block_name") or ""),
+        "work_type": to_utf8(agri_submission.get("TYPE_OF_WORK_ID") or ""),
         "plan_id": agri_submission.get("plan_id") or "0",
-        "plan_name": agri_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(agri_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -285,20 +277,15 @@ def sync_edited_updated_livelihood(livelihood_submission):
 
     mapped = {
         "uuid": livelihood_submission.get("__id") or "0",
-        "beneficiary_settlement": livelihood_submission.get("beneficiary_settlement")
-        or "0",
-        "block_name": livelihood_submission.get("block_name") or "0",
-        "beneficiary_contact": livelihood_submission.get("Beneficiary_Contact_Number")
-        or "0",
-        "livestock_development": livelihood_submission.get(
-            "select_one_promoting_livestock"
-        )
-        or "0",
+        "beneficiary_settlement": to_utf8(livelihood_submission.get("beneficiary_settlement") or "0"),
+        "block_name": to_utf8(livelihood_submission.get("block_name") or "0"),
+        "beneficiary_contact": livelihood_submission.get("Beneficiary_Contact_Number") or "0",
+        "livestock_development": to_utf8(livelihood_submission.get("select_one_promoting_livestock") or "0"),
         "submission_time": system.get("submissionDate"),
-        "fisheries": livelihood_submission.get("select_one_promoting_fisheries") or "0",
-        "common_asset": livelihood_submission.get("select_one_common_asset") or "0",
+        "fisheries": to_utf8(livelihood_submission.get("select_one_promoting_fisheries") or "0"),
+        "common_asset": to_utf8(livelihood_submission.get("select_one_common_asset") or "0"),
         "plan_id": livelihood_submission.get("plan_id") or "0",
-        "plan_name": livelihood_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(livelihood_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -338,22 +325,22 @@ def sync_edited_updated_cropping_pattern(cp_submission):
 
     mapped = {
         "uuid": uuid_val,
-        "beneficiary_settlement": cp_submission.get("beneficiary_settlement") or "NA",
-        "irrigation_source": cp_submission.get("select_multiple_widgets") or "NA",
+        "beneficiary_settlement": to_utf8(cp_submission.get("beneficiary_settlement") or "NA"),
+        "irrigation_source": to_utf8(cp_submission.get("select_multiple_widgets") or "NA"),
         "submission_time": system.get("submissionDate"),
-        "land_classification": cp_submission.get("select_one_classified") or "NA",
-        "cropping_patterns_kharif": get_crop_pattern(
+        "land_classification": to_utf8(cp_submission.get("select_one_classified") or "NA"),
+        "cropping_patterns_kharif": to_utf8(get_crop_pattern(
             "select_multiple_cropping_kharif", "select_multiple_cropping_kharif_other"
-        ),
-        "cropping_patterns_rabi": get_crop_pattern(
+        )),
+        "cropping_patterns_rabi": to_utf8(get_crop_pattern(
             "select_multiple_cropping_Rabi", "select_multiple_cropping_Rabi_other"
-        ),
-        "cropping_patterns_zaid": get_crop_pattern(
+        )),
+        "cropping_patterns_zaid": to_utf8(get_crop_pattern(
             "select_multiple_cropping_Zaid", "select_multiple_cropping_Zaid_other"
-        ),
-        "agri_productivity": cp_submission.get("select_one_productivity") or "NA",
+        )),
+        "agri_productivity": to_utf8(cp_submission.get("select_one_productivity") or "NA"),
         "plan_id": cp_submission.get("plan_id") or "NA",
-        "plan_name": cp_submission.get("plan_name") or "NA",
+        "plan_name": to_utf8(cp_submission.get("plan_name") or "NA"),
         "status_re": system.get("reviewState") or "in progress",
         "system": system,
         "data_crop": cp_submission,
@@ -377,7 +364,7 @@ def sync_edited_updated_agri_maintenance(am_submission):
 
     mapped = {
         "plan_id": am_submission.get("plan_id") or "0",
-        "plan_name": am_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(am_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -405,7 +392,7 @@ def sync_edited_updated_gw_maintenance(gwm_submission):
 
     mapped = {
         "plan_id": gwm_submission.get("plan_id") or "0",
-        "plan_name": gwm_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(gwm_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -433,7 +420,7 @@ def sync_edited_updated_swb_maintenance(swbm_submission):
 
     mapped = {
         "plan_id": swbm_submission.get("plan_id") or "0",
-        "plan_name": swbm_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(swbm_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -461,7 +448,7 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
 
     mapped = {
         "plan_id": swb_rs_submission.get("plan_id") or "0",
-        "plan_name": swb_rs_submission.get("plan_name") or "0",
+        "plan_name": to_utf8(swb_rs_submission.get("plan_name") or "0"),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "in progress",
@@ -488,7 +475,7 @@ def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
     mapped = {
         "uuid": agrohorticulture_submission.get("__id"),
         "plan_id": agrohorticulture_submission.get("plan_id"),
-        "plan_name": agrohorticulture_submission.get("plan_name"),
+        "plan_name": to_utf8(agrohorticulture_submission.get("plan_name")),
         "latitude": lat,
         "longitude": lon,
         "status_re": system.get("reviewState") or "",
@@ -514,8 +501,8 @@ def _extract_settlement_fields(data):
                 else other_text
             )
     fields = {
-        "settlement_name": data.get("Settlements_name") or "",
-        "block_name": data.get("block_name") or "",
+        "settlement_name": to_utf8(data.get("Settlements_name") or ""),
+        "block_name": to_utf8(data.get("block_name") or ""),
         "number_of_households": data.get("number_households") or 0,
         "farmer_family": data.get("farmer_family", {}),
         "livestock_census": data.get("Livestock_Census", {}),
@@ -524,16 +511,16 @@ def _extract_settlement_fields(data):
         "nrega_job_card": nrega.get("NREGA_have_job_card", "") or 0,
         "nrega_without_job_card": nrega.get("total_household", "") or 0,
         "nrega_work_days": nrega.get("NREGA_work_days", "") or 0,
-        "nrega_past_work": nrega.get("work_demands", "") or "NA",
-        "nrega_raise_demand": nrega.get("select_one_Y_N", "") or "NA",
-        "nrega_demand": nrega.get("select_one_demands", "") or "NA",
-        "nrega_issues": nrega_issues,
-        "nrega_community": nrega.get("select_one_contributions", "") or "NA",
+        "nrega_past_work": to_utf8(nrega.get("work_demands", "") or "NA"),
+        "nrega_raise_demand": to_utf8(nrega.get("select_one_Y_N", "") or "NA"),
+        "nrega_demand": to_utf8(nrega.get("select_one_demands", "") or "NA"),
+        "nrega_issues": to_utf8(nrega_issues),
+        "nrega_community": to_utf8(nrega.get("select_one_contributions", "") or "NA"),
     }
     if not use_existing:
-        fields["largest_caste"] = largest_caste
-        fields["smallest_caste"] = smallest_caste
-        fields["settlement_status"] = settlement_status
+        fields["largest_caste"] = to_utf8(largest_caste)
+        fields["smallest_caste"] = to_utf8(smallest_caste)
+        fields["settlement_status"] = to_utf8(settlement_status)
     return fields
 
 
@@ -544,56 +531,56 @@ def _extract_well_fields(data):
     if need_maintenance == "NA":
         need_maintenance = well_condition.get("select_one_maintenance") or "NA"
     return {
-        "beneficiary_settlement": data.get("beneficiary_settlement") or "NA",
-        "block_name": data.get("block_name") or "NA",
-        "owner": data.get("select_one_owns") or "NA",
+        "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "NA"),
+        "block_name": to_utf8(data.get("block_name") or "NA"),
+        "owner": to_utf8(data.get("select_one_owns") or "NA"),
         "households_benefitted": data.get("households_benefited") or 0,
-        "caste_uses": data.get("select_multiple_caste_use") or "NA",
-        "is_functional": well_usage.get("select_one_Functional_Non_functional") or "NA",
+        "caste_uses": to_utf8(data.get("select_multiple_caste_use") or "NA"),
+        "is_functional": data.get("select_one_Functional_Non_functional") or "NA",
         "need_maintenance": need_maintenance,
     }
 
 
 def _extract_waterbody_fields(data):
     return {
-        "beneficiary_settlement": data.get("beneficiary_settlement") or "NA",
-        "block_name": data.get("block_name") or "NA",
-        "who_manages": data.get("select_one_manages") or "NA",
-        "specify_other_manager": data.get("text_one_manages") or "NA",
-        "owner": data.get("select_one_owns") or "NA",
-        "caste_who_uses": data.get("select_multiple_caste_use") or "NA",
+        "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "NA"),
+        "block_name": to_utf8(data.get("block_name") or "NA"),
+        "who_manages": to_utf8(data.get("select_one_manages") or "NA"),
+        "specify_other_manager": to_utf8(data.get("text_one_manages") or "NA"),
+        "owner": to_utf8(data.get("select_one_owns") or "NA"),
+        "caste_who_uses": to_utf8(data.get("select_multiple_caste_use") or "NA"),
         "household_benefitted": data.get("households_benefited") or 0,
-        "water_structure_type": data.get("select_one_water_structure") or "NA",
-        "water_structure_other": data.get("select_one_water_structure_other") or "NA",
-        "identified_by": data.get("select_one_identified") or "No Data Provided",
-        "need_maintenance": data.get("select_one_maintenance") or "No Data Provided",
+        "water_structure_type": to_utf8(data.get("select_one_water_structure") or "NA"),
+        "water_structure_other": to_utf8(data.get("select_one_water_structure_other") or "NA"),
+        "identified_by": to_utf8(data.get("select_one_identified") or "No Data Provided"),
+        "need_maintenance": to_utf8(data.get("select_one_maintenance") or "No Data Provided"),
     }
 
 
 def _extract_groundwater_fields(data):
     return {
-        "beneficiary_settlement": data.get("beneficiary_settlement") or "NA",
-        "block_name": data.get("block_name") or "NA",
-        "work_type": data.get("TYPE_OF_WORK_ID") or "NA",
+        "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "NA"),
+        "block_name": to_utf8(data.get("block_name") or "NA"),
+        "work_type": to_utf8(data.get("TYPE_OF_WORK_ID") or "NA"),
     }
 
 
 def _extract_agri_fields(data):
     return {
-        "beneficiary_settlement": data.get("beneficiary_settlement") or "0",
-        "block_name": data.get("block_name") or "",
-        "work_type": data.get("TYPE_OF_WORK_ID") or "",
+        "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "0"),
+        "block_name": to_utf8(data.get("block_name") or ""),
+        "work_type": to_utf8(data.get("TYPE_OF_WORK_ID") or ""),
     }
 
 
 def _extract_livelihood_fields(data):
     return {
-        "beneficiary_settlement": data.get("beneficiary_settlement") or "0",
-        "block_name": data.get("block_name") or "0",
+        "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "0"),
+        "block_name": to_utf8(data.get("block_name") or "0"),
         "beneficiary_contact": data.get("Beneficiary_Contact_Number") or "0",
-        "livestock_development": data.get("select_one_promoting_livestock") or "0",
-        "fisheries": data.get("select_one_promoting_fisheries") or "0",
-        "common_asset": data.get("select_one_common_asset") or "0",
+        "livestock_development": to_utf8(data.get("select_one_promoting_livestock") or "0"),
+        "fisheries": to_utf8(data.get("select_one_promoting_fisheries") or "0"),
+        "common_asset": to_utf8(data.get("select_one_common_asset") or "0"),
     }
 
 
@@ -607,19 +594,19 @@ def _extract_crop_fields(data):
         return crops or "NA"
 
     return {
-        "beneficiary_settlement": data.get("beneficiary_settlement") or "NA",
-        "irrigation_source": data.get("select_multiple_widgets") or "NA",
-        "land_classification": data.get("select_one_classified") or "NA",
-        "cropping_patterns_kharif": _crop_pattern(
+        "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "NA"),
+        "irrigation_source": to_utf8(data.get("select_multiple_widgets") or "NA"),
+        "land_classification": to_utf8(data.get("select_one_classified") or "NA"),
+        "cropping_patterns_kharif": to_utf8(_crop_pattern(
             "select_multiple_cropping_kharif", "select_multiple_cropping_kharif_other"
-        ),
-        "cropping_patterns_rabi": _crop_pattern(
+        )),
+        "cropping_patterns_rabi": to_utf8(_crop_pattern(
             "select_multiple_cropping_Rabi", "select_multiple_cropping_Rabi_other"
-        ),
-        "cropping_patterns_zaid": _crop_pattern(
+        )),
+        "cropping_patterns_zaid": to_utf8(_crop_pattern(
             "select_multiple_cropping_Zaid", "select_multiple_cropping_Zaid_other"
-        ),
-        "agri_productivity": data.get("select_one_productivity") or "NA",
+        )),
+        "agri_productivity": to_utf8(data.get("select_one_productivity") or "NA"),
     }
 
 
