@@ -14,6 +14,7 @@ import json
 from moderation.utils.demand_validator_lulc import (
     compute_lulc_auto,
     normalize_structure_name,
+    LULC_MODE_BY_STRUCTURE,
 )
 from utilities.constants import (
     DRAINAGE_LINES_ASSET,
@@ -189,7 +190,7 @@ def sync_odk_to_csdb():
 
 
 # DEMAND VALIDATOR LOGICS
-EE_AVAILABLE = ee_initialize(account_id=17)
+EE_AVAILABLE = ee_initialize()
 
 
 def compute_slope_mean_30m(lat: float, lon: float, buffer_m: int = 30) -> float:
@@ -302,6 +303,170 @@ def compute_drainage_distance_m(lat: float, lon: float, scale: int = 30) -> floa
 with open("moderation/utils/rules.json", "r", encoding="utf-8") as f:
     RULES = json.load(f)
 
+ALLOWED_PARAMS = {
+    "slope",
+    "stream_order",
+    "catchment_area",
+    "drainage_distance",
+    "lulc",
+}
+
+
+def _is_num(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def _is_range_dict(d):
+    if not isinstance(d, dict):
+        return False
+    keys = set(d.keys())
+    if not keys.issubset({"min", "max"}):
+        return False
+    if "min" in d and not _is_num(d["min"]):
+        return False
+    if "max" in d and not _is_num(d["max"]):
+        return False
+    if "min" in d and "max" in d and float(d["min"]) > float(d["max"]):
+        return False
+    return True
+
+
+def _is_num_list(lst):
+    return isinstance(lst, list) and all(isinstance(x, int) for x in lst)
+
+
+def _is_str_list(lst):
+    return isinstance(lst, list) and all(isinstance(x, str) for x in lst)
+
+
+def validate_rules_schema(rules: dict):
+    issues = []
+    if not isinstance(rules, dict):
+        return ["RULES is not a dict (rules.json root must be an object)."]
+
+    for struct_name, struct_rules in rules.items():
+        if not isinstance(struct_rules, dict):
+            issues.append(f"[{struct_name}] structure rules must be an object/dict.")
+            continue
+
+        # Support new format {required_inputs, rules:{...}}
+        if "rules" in struct_rules:
+            struct_rules = struct_rules.get("rules") or {}
+        unknown_params = set(struct_rules.keys()) - ALLOWED_PARAMS
+        if unknown_params:
+            issues.append(
+                f"[{struct_name}] has unknown params: {sorted(list(unknown_params))}"
+            )
+
+        if "slope" in struct_rules:
+            sr = struct_rules["slope"]
+            if not isinstance(sr, dict):
+                issues.append(f"[{struct_name}.slope] must be an object.")
+            else:
+                if "max" in sr and "accepted" not in sr:
+                    if not _is_num(sr["max"]):
+                        issues.append(f"[{struct_name}.slope.max] must be a number.")
+                else:
+                    if "accepted" not in sr or not _is_range_dict(sr.get("accepted")):
+                        issues.append(
+                            f"[{struct_name}.slope.accepted] must be a range dict."
+                        )
+                    if "partially_accepted" in sr and not _is_range_dict(
+                        sr.get("partially_accepted")
+                    ):
+                        issues.append(
+                            f"[{struct_name}.slope.partially_accepted] must be a range dict if present."
+                        )
+
+        if "catchment_area" in struct_rules:
+            cr = struct_rules["catchment_area"]
+            if not isinstance(cr, dict):
+                issues.append(f"[{struct_name}.catchment_area] must be an object.")
+            else:
+                if "accepted" not in cr or not _is_range_dict(cr.get("accepted")):
+                    issues.append(
+                        f"[{struct_name}.catchment_area.accepted] must be a range dict."
+                    )
+                if "partially_accepted" in cr and not _is_range_dict(
+                    cr.get("partially_accepted")
+                ):
+                    issues.append(
+                        f"[{struct_name}.catchment_area.partially_accepted] must be a range dict if present."
+                    )
+
+        if "drainage_distance" in struct_rules:
+            dr = struct_rules["drainage_distance"]
+            if not isinstance(dr, dict):
+                issues.append(f"[{struct_name}.drainage_distance] must be an object.")
+            else:
+                if "accepted" not in dr or not _is_range_dict(dr.get("accepted")):
+                    issues.append(
+                        f"[{struct_name}.drainage_distance.accepted] must be a range dict."
+                    )
+                if "partially_accepted" in dr and not _is_range_dict(
+                    dr.get("partially_accepted")
+                ):
+                    issues.append(
+                        f"[{struct_name}.drainage_distance.partially_accepted] must be a range dict if present."
+                    )
+
+        if "stream_order" in struct_rules:
+            sor = struct_rules["stream_order"]
+            if not isinstance(sor, dict):
+                issues.append(f"[{struct_name}.stream_order] must be an object.")
+            else:
+                if "accepted" in sor:
+                    if not _is_num_list(sor["accepted"]):
+                        issues.append(
+                            f"[{struct_name}.stream_order.accepted] must be a list of ints."
+                        )
+                elif "valid" in sor:
+                    if not _is_num_list(sor["valid"]):
+                        issues.append(
+                            f"[{struct_name}.stream_order.valid] must be a list of ints."
+                        )
+                else:
+                    issues.append(
+                        f"[{struct_name}.stream_order] must contain 'accepted' (or legacy 'valid')."
+                    )
+                if "partially_accepted" in sor and not _is_num_list(
+                    sor["partially_accepted"]
+                ):
+                    issues.append(
+                        f"[{struct_name}.stream_order.partially_accepted] must be a list of ints if present."
+                    )
+
+        if "lulc" in struct_rules:
+            lr = struct_rules["lulc"]
+            if not isinstance(lr, dict):
+                issues.append(f"[{struct_name}.lulc] must be an object.")
+            else:
+                if "accepted" not in lr or not _is_str_list(lr.get("accepted")):
+                    issues.append(
+                        f"[{struct_name}.lulc.accepted] must be a list of strings."
+                    )
+                if "partially_accepted" in lr and not _is_str_list(
+                    lr.get("partially_accepted")
+                ):
+                    issues.append(
+                        f"[{struct_name}.lulc.partially_accepted] must be a list of strings if present."
+                    )
+                if "not_accepted" in lr and not _is_str_list(lr.get("not_accepted")):
+                    issues.append(
+                        f"[{struct_name}.lulc.not_accepted] must be a list of strings if present."
+                    )
+
+    return issues
+
+
+schema_issues = validate_rules_schema(RULES)
+if schema_issues:
+    print("RULES SCHEMA ISSUES FOUND:")
+    for i in schema_issues:
+        print(" -", i)
+else:
+    print("rules.json schema validated (all patterns OK).")
+
 
 def in_range(v: float, r: dict) -> bool:
     if not isinstance(r, dict):
@@ -399,8 +564,19 @@ def classify_lulc(value, rule: dict):
 
 def evaluate_site_from_rules(site: dict) -> dict:
     key = normalize_structure_name(site.get("structure_type", ""))
-    rules = RULES.get(key)
+    cfg = RULES.get(key)
+    if not cfg:
+        return {
+            "suitable": False,
+            "parameters": {},
+            "overall_comment": f"No rules found for structure '{key}'.",
+        }
 
+    required = cfg.get("required_inputs", [])
+    if required:
+        rules = {k: v for k, v in cfg.get("rules", {}).items() if k in required}
+    else:
+        rules = cfg.get("rules") if isinstance(cfg, dict) and "rules" in cfg else cfg
     if not rules:
         return {
             "suitable": False,
@@ -493,15 +669,19 @@ def evaluate_site_from_rules(site: dict) -> dict:
         if cat == "not_accepted":
             failures.append(expl)
 
-    suitable = "not_accepted" not in statuses
+    is_recommended = "not_accepted" not in statuses
+
+    final_decision = "Recommended" if is_recommended else "Not Recommended"
 
     overall_comment = "Rule-based evaluation completed."
-    if not suitable and failures:
+    if not is_recommended and failures:
         overall_comment += " Failures: " + " | ".join(failures[:3])
 
     return {
-        "suitable": suitable,
+        "recommended": is_recommended,
+        "final_decision": final_decision,
         "parameters": params,
+        "suitable": is_recommended,
         "overall_comment": overall_comment,
     }
 
@@ -617,6 +797,37 @@ def fetch_sites_from_layer(prefix: str, plan_number: str, district: str, block: 
     return layer_name, sites
 
 
+def get_structure_config(structure_type: str):
+    """
+    Supports both formats:
+      NEW:
+        RULES[key] = {"required_inputs":[...], "rules":{...}}
+      OLD:
+        RULES[key] = {"slope":{...}, "lulc":{...}, ...}
+    Returns:
+      required_inputs: list[str]
+      rules: dict (parameter -> rule dict)
+    """
+    key = normalize_structure_name(structure_type)
+    cfg = RULES.get(key)
+
+    if not isinstance(cfg, dict) or not cfg:
+        return [], None, key
+
+    # New format
+    if "rules" in cfg:
+        rules = cfg.get("rules") or {}
+        required = cfg.get("required_inputs")
+        if not required:
+            required = list(rules.keys())
+        return required, rules, key
+
+    # Old format fallback
+    rules = cfg
+    required = list(rules.keys())
+    return required, rules, key
+
+
 class DemandValidator:
     """
     validate demands on the basis of pre-decided rules
@@ -638,14 +849,33 @@ class DemandValidator:
         if not lulc_class:
             lulc_class = compute_lulc_auto(lat, lon, structure_type)
 
-        # Compute values from GEE
-        slope = compute_slope_mean_30m(lat, lon, buffer_m=30)
-        ca_range = compute_catchment_minmax_30m(lat, lon, buffer_m=30)
-        stream_order = compute_stream_order(lat, lon)
-        drainage_distance = compute_drainage_distance_m(lat, lon, scale=30)
+        required_inputs, struct_rules, key = get_structure_config(structure_type)
+        if not struct_rules:
+            return f"No rules found for structure '{key}'"
 
-        # Representative catchment: max in 30m buffer
-        catchment_rep = ca_range["max"]
+        # Compute only what is required
+        slope = None
+        ca_range = {"min": None, "max": None}
+        stream_order = None
+        drainage_distance = None
+
+        if "lulc" in required_inputs:
+            if not lulc_class:
+                lulc_class = compute_lulc_auto(lat, lon, structure_type)
+
+        if "slope" in required_inputs:
+            slope = compute_slope_mean_30m(lat, lon, buffer_m=30)
+
+        if "catchment_area" in required_inputs:
+            ca_range = compute_catchment_minmax_30m(lat, lon, buffer_m=30)
+
+        if "stream_order" in required_inputs:
+            stream_order = compute_stream_order(lat, lon)
+
+        if "drainage_distance" in required_inputs:
+            drainage_distance = compute_drainage_distance_m(lat, lon, scale=30)
+
+        catchment_rep = ca_range["max"] if ca_range["max"] is not None else None
 
         site = {
             "structure_type": structure_type,
@@ -669,6 +899,9 @@ class DemandValidator:
                 "stream_order": stream_order,
                 "drainage_distance": drainage_distance,
                 "lulc_class": lulc_class,
+                "lulc_mode": LULC_MODE_BY_STRUCTURE.get(
+                    normalize_structure_name(structure_type), "point"
+                ),
             },
             "evaluation": evaluation,
         }

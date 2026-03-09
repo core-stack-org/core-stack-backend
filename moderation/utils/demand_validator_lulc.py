@@ -3,7 +3,7 @@ import ee
 from utilities.constants import LULC_ASSET
 from utilities.gee_utils import ee_initialize
 
-EE_AVAILABLE = ee_initialize(account_id=17)
+EE_AVAILABLE = ee_initialize()
 
 STRUCTURE_ALIASES = {
     "continuous_contour_trenches": "continuous_contour_trench",
@@ -95,7 +95,7 @@ LULC_NAMES = {
     3: "Kharif and rabi water",
     4: "Kharif and rabi and zaid water",
     5: "Croplands",
-    6: "Trees/forests",
+    6: "Trees/forest",
     7: "Barren land",
     8: "Single Kharif cropping",
     9: "Single Non-Kharif cropping",
