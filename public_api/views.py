@@ -23,7 +23,7 @@ from stats_generator.utils import get_url
 def is_valid_string(value):
     if not value:
         return True
-    cleaned = value.replace(" ", "").replace("_", "")
+    cleaned = value.replace(" ", "").replace("_", "").replace("(", "").replace(")", "")
     return cleaned.isalpha()
 
 
