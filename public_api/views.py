@@ -24,7 +24,7 @@ from django.db.models import Q
 def is_valid_string(value):
     if not value:
         return True
-    cleaned = value.replace(" ", "").replace("_", "")
+    cleaned = value.replace(" ", "").replace("_", "").replace("(", "").replace(")", "")
     return cleaned.isalpha()
 
 
@@ -456,7 +456,7 @@ def get_mws_geometries_data(state, district, tehsil):
             "request": "GetFeature",
             "typeName": f"mws:{layer_name}",
             "outputFormat": "application/json",
-            "propertyName": "geom,uid",  
+            "propertyName": "geom,uid",
         }
 
         response = requests.get(base_url, params=params, timeout=30)
