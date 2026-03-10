@@ -1,4 +1,4 @@
-# Developer Guide: Documenting APIs with Swagger
+# Developer Guide: Documentation for the Public APIs
 
 This guide provides a professional walkthrough for documenting new API endpoints in the `public_api` app using `drf-yasg`.
 
@@ -9,7 +9,7 @@ This guide provides a professional walkthrough for documenting new API endpoints
 | Resource | URL |
 | :--- | :--- |
 | **Swagger UI** | [http://127.0.0.1:8000/swagger/](http://127.0.0.1:8000/swagger/) |
-| **ReDoc** | [http://127.0.0.1:8000/redoc/](http://127.0.0.1:8000/redoc/) |
+| **ReDoc** | [http://127.0.0.1:8000/](http://127.0.0.1:8000/) |
 
 ---
 
