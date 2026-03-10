@@ -1,10 +1,10 @@
-# 🛠️ Developer Guide: Documenting APIs with Swagger
+# Developer Guide: Documenting APIs with Swagger
 
 This guide provides a professional walkthrough for documenting new API endpoints in the `public_api` app using `drf-yasg`.
 
 ---
 
-## 📍 Quick Access
+## Quick Access
 
 | Resource | URL |
 | :--- | :--- |
@@ -13,7 +13,7 @@ This guide provides a professional walkthrough for documenting new API endpoints
 
 ---
 
-## 🏗️ How it Works
+## How it Works
 
 We follow a **"Schema-First"** approach to keep documentation decoupled from API logic.
 
@@ -30,7 +30,7 @@ The key idea is that all Swagger metadata lives in `swagger_schemas.py`, and vie
 
 ---
 
-## 🚀 Implementation Workflow
+## Implementation Workflow
 
 ### Step 1 — Define Parameters (`swagger_schemas.py`)
 
@@ -164,7 +164,7 @@ def get_admin_details_by_lat_lon(request):
 
 ---
 
-## 📁 File Structure Reference
+## File Structure Reference
 
 ```
 public_api/
@@ -176,7 +176,7 @@ public_api/
 
 ---
 
-## ✅ Developer Checklist
+## Developer Checklist
 
 When adding a new API, ensure you've completed all of these steps:
 
@@ -191,9 +191,9 @@ When adding a new API, ensure you've completed all of these steps:
 
 ---
 
-## 💡 Troubleshooting
+## Troubleshooting
 
-### ❗ Swagger page fails to load
+### Swagger page fails to load
 
 **Cause:** Syntax errors in `swagger_schemas.py` — most commonly missing commas, unclosed brackets, or incorrect dictionary nesting.
 
@@ -202,19 +202,19 @@ When adding a new API, ensure you've completed all of these steps:
 - Unclosed `{` or `[` in the `responses` block
 - Incorrect indentation in nested `openapi.Response(...)` calls
 
-### ❗ `operation_id` conflict warning
+### `operation_id` conflict warning
 
 **Cause:** Two schema dictionaries share the same `operation_id` value.
 
 **Fix:** Ensure every `operation_id` is globally unique across the entire project. Use a naming convention such as `verb_resource_by_qualifier` (e.g., `get_admin_details_by_latlon`).
 
-### ❗ API key not being sent in requests
+### API key not being sent in requests
 
 **Cause:** The Swagger UI prompts for authorization using the header field label, and users may enter the key in the wrong field.
 
 **Fix:** In the Swagger UI, the API key must be provided in the `X-API-Key` **header field**, not as a query parameter. Inform API consumers of this when sharing documentation.
 
-### ❗ Parameters not showing up in Swagger UI
+### Parameters not showing up in Swagger UI
 
 **Cause:** The parameter was defined but not added to `manual_parameters` in the schema dictionary.
 
@@ -222,7 +222,7 @@ When adding a new API, ensure you've completed all of these steps:
 
 ---
 
-## 📘 Quick Reference: `openapi` Types
+## Quick Reference: `openapi` Types
 
 | Constant | Value | Use Case |
 | :--- | :--- | :--- |
@@ -237,8 +237,3 @@ When adding a new API, ensure you've completed all of these steps:
 
 ---
 
-## 🔗 Related Resources
-
-- [drf-yasg Documentation](https://drf-yasg.readthedocs.io/en/stable/)
-- [OpenAPI 2.0 Specification](https://swagger.io/specification/v2/)
-- [Django REST Framework Docs](https://www.django-rest-framework.org/)
