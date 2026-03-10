@@ -31,10 +31,10 @@ def is_valid_string(value):
         .replace("(", "")
         .replace(")", "")
         .replace(".", "")
+        .replace("-", "")
     )
 
-    # allow hyphen but ensure other characters are alphabetic
-    return all(part.isalpha() for part in cleaned.split("-"))
+    return cleaned.isalpha()
 
 
 def is_valid_mws_id(value):

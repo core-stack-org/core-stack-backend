@@ -28,7 +28,6 @@ def fetch_layers_for_excel_generation():
 def get_url(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
     geojson_url = f"{GEOSERVER_URL}/{workspace}/ows?service=WFS&version=1.0.0&request=GetFeature&typeName={workspace}:{layer_name}&outputFormat=application/json"
-    print("Geojson url", geojson_url)
     return geojson_url
 
 

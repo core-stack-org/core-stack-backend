@@ -149,7 +149,6 @@ def check_task_status(task_id_list, sleep_time=60):
 
 
 def valid_gee_text(description):
-    description = description.replace(".", "")
     description = re.sub(r"[^a-zA-Z0-9 ,:;_-]", "", description)
     return description.replace(" ", "_")
 
