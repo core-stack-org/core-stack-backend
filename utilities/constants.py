@@ -169,7 +169,9 @@ GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 
 GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
 
-GEE_FACILITIES_DATASET_PATH = "projects/corestack-datasets/assets/datasets/pan_india_facilities"
+GEE_FACILITIES_DATASET_PATH = (
+    "projects/corestack-datasets/assets/datasets/pan_india_facilities"
+)
 
 GEE_PATHS = {
     "MWS": {
@@ -201,6 +203,9 @@ filter_query = (
 )
 project_id = 2
 
+
+# demand vaidator constants
+
 DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
@@ -209,3 +214,8 @@ GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
 LULC_ASSET = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2024_2025"
+SLOPE_ASSET = "USGS/SRTMGL1_003"
+CATCHMENT_ASSET = "projects/ext-datasets/assets/datasets/catchment_area_multiflow"
+STREAM_ORDER_ASSET = (
+    "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
+)

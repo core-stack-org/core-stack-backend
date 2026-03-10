@@ -13,7 +13,6 @@ import math
 import json
 from moderation.utils.demand_validator_lulc import (
     compute_lulc_auto,
-    normalize_structure_name,
     LULC_MODE_BY_STRUCTURE,
 )
 from utilities.constants import (
@@ -22,6 +21,9 @@ from utilities.constants import (
     GEOSERVER_BASE,
     WORKS_WORKSPACE,
     RESOURCES_WORKSPACE,
+    SLOPE_ASSET,
+    CATCHMENT_ASSET,
+    STREAM_ORDER_ASSET,
 )
 from utilities.gee_utils import ee_initialize
 
@@ -198,7 +200,7 @@ def compute_slope_mean_30m(lat: float, lon: float, buffer_m: int = 30) -> float:
     if not EE_AVAILABLE:
         return 0.0
 
-    dem = ee.Image("USGS/SRTMGL1_003")
+    dem = ee.Image(SLOPE_ASSET)
     slope_deg = ee.Terrain.slope(dem)
 
     slope_pct = (
@@ -226,12 +228,7 @@ def compute_catchment_minmax_30m(lat: float, lon: float, buffer_m: int = 30) -> 
     if not EE_AVAILABLE:
         return {"min": 0.0, "max": 0.0}
 
-    ca = (
-        ee.Image("projects/ext-datasets/assets/datasets/catchment_area_multiflow")
-        .select(0)
-        .rename("ha")
-        .unmask(0)
-    )
+    ca = ee.Image(CATCHMENT_ASSET).select(0).rename("ha").unmask(0)
 
     pt = ee.Geometry.Point([lon, lat])
     buf = pt.buffer(buffer_m)
@@ -259,14 +256,7 @@ def compute_stream_order(lat: float, lon: float) -> int:
     if not EE_AVAILABLE:
         return 0
 
-    so = (
-        ee.Image(
-            "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
-        )
-        .select(0)
-        .rename("so")
-        .unmask(0)
-    )
+    so = ee.Image(STREAM_ORDER_ASSET).select(0).rename("so").unmask(0)
 
     pt = ee.Geometry.Point([lon, lat])
     scale = so.projection().nominalScale()
@@ -563,7 +553,7 @@ def classify_lulc(value, rule: dict):
 
 
 def evaluate_site_from_rules(site: dict) -> dict:
-    key = normalize_structure_name(site.get("structure_type", ""))
+    key = site.get("structure_type", "")
     cfg = RULES.get(key)
     if not cfg:
         return {
@@ -808,11 +798,10 @@ def get_structure_config(structure_type: str):
       required_inputs: list[str]
       rules: dict (parameter -> rule dict)
     """
-    key = normalize_structure_name(structure_type)
-    cfg = RULES.get(key)
+    cfg = RULES.get(structure_type)
 
     if not isinstance(cfg, dict) or not cfg:
-        return [], None, key
+        return [], None, structure_type
 
     # New format
     if "rules" in cfg:
@@ -820,12 +809,12 @@ def get_structure_config(structure_type: str):
         required = cfg.get("required_inputs")
         if not required:
             required = list(rules.keys())
-        return required, rules, key
+        return required, rules, structure_type
 
     # Old format fallback
     rules = cfg
     required = list(rules.keys())
-    return required, rules, key
+    return required, rules, structure_type
 
 
 class DemandValidator:
@@ -846,9 +835,6 @@ class DemandValidator:
         if not EE_AVAILABLE:
             return "Earth Engine not available"
 
-        if not lulc_class:
-            lulc_class = compute_lulc_auto(lat, lon, structure_type)
-
         required_inputs, struct_rules, key = get_structure_config(structure_type)
         if not struct_rules:
             return f"No rules found for structure '{key}'"
@@ -858,10 +844,11 @@ class DemandValidator:
         ca_range = {"min": None, "max": None}
         stream_order = None
         drainage_distance = None
+        lulc = lulc_class
 
         if "lulc" in required_inputs:
-            if not lulc_class:
-                lulc_class = compute_lulc_auto(lat, lon, structure_type)
+            if not lulc:
+                lulc = compute_lulc_auto(lat, lon, structure_type)
 
         if "slope" in required_inputs:
             slope = compute_slope_mean_30m(lat, lon, buffer_m=30)
@@ -883,7 +870,7 @@ class DemandValidator:
             "catchment_area": catchment_rep,
             "stream_order": stream_order,
             "drainage_distance": drainage_distance,
-            "lulc_class": lulc_class,
+            "lulc_class": lulc,
         }
 
         evaluation = evaluate_site_from_rules(site)
@@ -899,9 +886,7 @@ class DemandValidator:
                 "stream_order": stream_order,
                 "drainage_distance": drainage_distance,
                 "lulc_class": lulc_class,
-                "lulc_mode": LULC_MODE_BY_STRUCTURE.get(
-                    normalize_structure_name(structure_type), "point"
-                ),
+                "lulc_mode": LULC_MODE_BY_STRUCTURE.get(structure_type, "point"),
             },
             "evaluation": evaluation,
         }
