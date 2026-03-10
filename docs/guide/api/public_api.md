@@ -13,22 +13,6 @@ This guide provides a professional walkthrough for documenting new API endpoints
 
 ---
 
-## How it Works
-
-We follow a **"Schema-First"** approach to keep documentation decoupled from API logic.
-
-```mermaid
-graph TD
-    A[swagger_schemas.py] -->|1. Define Parameters| B(Common Params)
-    A -->|2. Define Schema| C{API Schema Dictionary}
-    D[api.py] -->|3. Import Schema| E[View Function]
-    E -->|4. Apply Decorator| F[@swagger_auto_schema]
-    F -->|5. Pass Schema| C
-```
-
-The key idea is that all Swagger metadata lives in `swagger_schemas.py`, and view functions in `api.py` simply import and apply the schema via decorator. This keeps your business logic clean and documentation easy to maintain.
-
----
 
 ## Implementation Workflow
 
