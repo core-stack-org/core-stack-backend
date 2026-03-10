@@ -24,8 +24,17 @@ from django.db.models import Q
 def is_valid_string(value):
     if not value:
         return True
-    cleaned = value.replace(" ", "").replace("_", "").replace("(", "").replace(")", "")
-    return cleaned.isalpha()
+
+    cleaned = (
+        value.replace(" ", "")
+        .replace("_", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(".", "")
+    )
+
+    # allow hyphen but ensure other characters are alphabetic
+    return all(part.isalpha() for part in cleaned.split("-"))
 
 
 def is_valid_mws_id(value):
