@@ -121,6 +121,70 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
   - After password change, all refresh tokens are invalidated (user will be logged out from all devices)
   - The user will need to log in again with the new password
 
+### Forgot Password
+- **URL**: `/api/v1/auth/forgot-password/`
+- **Method**: POST
+- **Description**: Request a password reset link. The client sends the username; if the account has an email on file the reset link is sent immediately. If not, the API responds asking for an email, and the client re-submits with both username and email.
+- **Authentication**: Not required
+- **Step 1 — Request Body**:
+  ```json
+  {
+    "username": "user123"
+  }
+  ```
+- **Step 1 — Success Response** (`200 OK`): Reset link sent to the email on file.
+- **Step 1 — No email on file** (`400 Bad Request`):
+  ```json
+  {
+    "detail": "No email address on file for this account. Please provide an email to receive the reset link.",
+    "email_required": true
+  }
+  ```
+- **Step 2 (if `email_required`)** — Re-submit with email:
+  ```json
+  {
+    "username": "user123",
+    "email": "user@example.com"
+  }
+  ```
+  The provided email is saved to the user's profile and the reset link is sent to it.
+- **Notes**:
+  - The reset link is valid for 3 days (`PASSWORD_RESET_TIMEOUT`)
+  - `username` is always required
+  - `email` is only needed when the account has no email on file
+  - The provided email is persisted on the user profile so future resets work directly
+
+### Reset Password (via link)
+- **URL**: `/api/v1/auth/reset-password/<uidb64>/<token>/`
+- **Methods**: GET, POST
+- **Description**: Backend-served HTML page for resetting a password using the link from the forgot-password email
+- **Authentication**: Not required (token-based validation)
+- **GET**: Renders a form to enter a new password
+- **POST**: Validates the token and sets the new password
+- **Notes**:
+  - The token is single-use — once the password is reset, the same link cannot be reused
+  - All existing JWT sessions are invalidated after a successful reset
+  - Password must be at least 8 characters
+
+### Admin Reset Password
+- **URL**: `/api/v1/users/{user_id}/reset_password/`
+- **Method**: POST
+- **Description**: Allows an org admin or superadmin to reset another user's password (useful when the user has no email)
+- **Request Body**:
+  ```json
+  {
+    "new_password": "new-secure-password"
+  }
+  ```
+- **Response**: Success message
+- **Authentication**: Required
+- **Permissions**:
+  - Superadmins can reset any user's password
+  - Organization admins can only reset passwords for users in their organization
+- **Notes**:
+  - The new password must meet the system's password validation requirements
+  - All of the target user's JWT sessions are invalidated after reset
+
 ## User Management Endpoints
 
 ### List Users
@@ -1095,9 +1159,35 @@ Superadmins have multiple ways to access watershed plans depending on their cont
 - **Organization Admins**: Limited to their organization's plans through existing project-level endpoints
 - **Regular Users**: Limited to plans from projects they're assigned to
 
+### Password Reset Flow
+
+1. Request a password reset:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/auth/forgot-password/ \
+     -H "Content-Type: application/json" \
+     -d '{"username": "user123"}'
+   ```
+
+2. If the API responds with `"email_required": true`, re-submit with an email:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/auth/forgot-password/ \
+     -H "Content-Type: application/json" \
+     -d '{"username": "user123", "email": "user@example.com"}'
+   ```
+
+3. The user receives an email with a reset link and opens it in their browser to set a new password.
+
+3. For users without email, an admin can reset the password directly:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/users/{user_id}/reset_password/ \
+     -H "Authorization: Bearer {access_token}" \
+     -H "Content-Type: application/json" \
+     -d '{"new_password": "new-secure-password"}'
+   ```
+
 ## API Security
 
-1. **Authentication**: All API endpoints (except registration and login) require JWT authentication.
+1. **Authentication**: All API endpoints (except registration, login, and forgot-password) require JWT authentication.
 2. **Authorization**: Permissions are checked at multiple levels:
    - Organization level
    - Project level
@@ -1163,6 +1253,7 @@ Below are ASCII diagrams showing the permission hierarchy and capabilities for d
 | Assign superadmin role       | ✓          | ✗         | ✗               | ✗        |
 | Assign org admin role        | ✓          | ✗         | ✗               | ✗        |
 | Assign project roles         | ✓          | ✓         | ✓               | ✗        |
+| Reset other user's password  | ✓          | ✓ (org)   | ✗               | ✗        |
 | View global watershed plans  | ✓          | ✗         | ✗               | ✗        |
 | View org watershed plans     | ✓          | ✗         | ✗               | ✗        |
 | Filter plans by geography    | ✓          | ✗         | ✗               | ✗        |

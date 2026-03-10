@@ -220,6 +220,17 @@ class UserProjectGroupSerializer(serializers.ModelSerializer):
         fields = ["id", "user_id", "username", "group_id", "group_name", "project_id"]
 
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=False)
+
+
+class AdminResetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(
+        required=True, write_only=True, validators=[validate_password]
+    )
+
+
 class PasswordChangeSerializer(serializers.Serializer):
     """Serializer for changing user password."""
 
