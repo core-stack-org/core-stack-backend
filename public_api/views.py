@@ -1,27 +1,22 @@
 import ee
 import os
+import json
+import requests
+import pandas as pd
+import numpy as np
+from rest_framework.response import Response
+from rest_framework import status
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
 )
-from rest_framework.response import Response
-from rest_framework import status
-from nrm_app.settings import EXCEL_PATH
-import json
-import requests
-import pandas as pd
-import numpy as np
-from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
+from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL, GEE_HELPER_ACCOUNT_ID
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
-from computing.models import Layer
-
 from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
-from nrm_app.settings import GEOSERVER_URL
-from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
-import re
+from django.db.models import Q
 
 # Create your views here.
 
@@ -29,7 +24,16 @@ import re
 def is_valid_string(value):
     if not value:
         return True
-    cleaned = value.replace(" ", "").replace("_", "")
+
+    cleaned = (
+        value.replace(" ", "")
+        .replace("_", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(".", "")
+        .replace("-", "")
+    )
+
     return cleaned.isalpha()
 
 
@@ -64,14 +68,10 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
 
-    from django.db.models import Q
-
     EXCLUDE_LAYER_KEYWORDS = [
-        "run off",
         "run_off",
         "evapotranspiration",
         "precipitation",
-        "MWS",
     ]
     for word in EXCLUDE_LAYER_KEYWORDS:
         layers = layers.exclude(
@@ -111,69 +111,116 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
             }
         )
 
-    return layer_data
+    latest_layers = {}
+    for entry in layer_data:
+        name = entry["layer_name"].lower()
+        if name not in latest_layers:
+            latest_layers[name] = entry
+        else:
+            current_version = float(latest_layers[name]["layer_version"] or 0)
+            new_version = float(entry["layer_version"] or 0)
+            if new_version > current_version:
+                latest_layers[name] = entry
+
+    return list(latest_layers.values())
 
 
 def get_location_info_by_lat_lon(lat, lon):
-    ee_initialize()
-    point = ee.Geometry.Point([lon, lat])
-    feature_collection = ee.FeatureCollection(
-        "projects/corestack-datasets/assets/datasets/SOI_tehsil"
-    )
+    base_url = f"{GEOSERVER_URL}/pan_india_asset/ows"
+    params = {
+        "service": "WFS",
+        "version": "1.0.0",
+        "request": "GetFeature",
+        "typeName": "pan_india_asset:SOI_tehsil_pan_india_dataset",
+        "outputFormat": "application/json",
+        "CQL_FILTER": f"INTERSECTS(geom,POINT({lon} {lat}))",  # lon lat order
+    }
+
     try:
-        intersected = feature_collection.filterBounds(point)
-        collection_size = intersected.size().getInfo()
-        if collection_size == 0:
+        response = requests.get(base_url, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        features = data.get("features", [])
+        if not features:
             return Response(
                 {"error": "Latitude and longitude is not in SOI boundary."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        features = intersected.toList(intersected.size())
-        for i in range(intersected.size().getInfo()):
-            feature = ee.Feature(features.get(i))
-            feature_loc = feature.getInfo()["properties"]
-            locat_details = {
-                "State": feature_loc.get("STATE"),
-                "District": feature_loc.get("District"),
-                "Tehsil": feature_loc.get("TEHSIL"),
-            }
-            return locat_details
-    except Exception as e:
+
+        properties = features[0].get("properties", {})
+        return {
+            "State": properties.get("STATE", ""),
+            "District": properties.get("District", ""),
+            "Tehsil": properties.get("TEHSIL", ""),
+        }
+
+    except requests.exceptions.RequestException as e:
         print("Exception while getting admin details", str(e))
         return {"State": "", "District": "", "Tehsil": ""}
 
 
 def get_mws_id_by_lat_lon(lon, lat):
     data_dict = get_location_info_by_lat_lon(lat, lon)
+
     if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
         return Response(
             {"error": "Latitude and longitude is not in SOI boundary."},
             status=status.HTTP_404_NOT_FOUND,
         )
-    state = data_dict.get("State")
-    district = data_dict.get("District")
-    tehsil = data_dict.get("Tehsil")
+
+    district = valid_gee_text(data_dict.get("District").lower())
+    tehsil = valid_gee_text(data_dict.get("Tehsil").lower())
 
     try:
-        asset_path = get_gee_asset_path(state, district, tehsil)
-        mws_asset_id = (
-            asset_path
-            + f"filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid"
-        )
-        if is_gee_asset_exists(mws_asset_id):
-            mws_fc = ee.FeatureCollection(mws_asset_id)
-            point = ee.Geometry.Point([lon, lat])
-            matching_feature = mws_fc.filterBounds(point).first()
-            uid = ee.String(matching_feature.get("uid")).getInfo()
-            data_dict["mws_id"] = uid
-            return data_dict
-        else:
+        layer_name = f"mws:mws_{district}_{tehsil}"
+        GEOSERVER_MWS_URL = f"{GEOSERVER_URL}/mws/ows"
+
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": layer_name,
+            "outputFormat": "application/json",
+            "CQL_FILTER": f"INTERSECTS(geom,POINT({lon} {lat}))",
+        }
+
+        response = requests.get(GEOSERVER_MWS_URL, params=params, timeout=30)
+
+        # Check status before parsing
+        if response.status_code in (400, 404):
+            print("MWS layer not found:", layer_name)
             return Response(
                 {"error": "Mws Layer is not generated for the given lat lon location."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            print("Invalid JSON response:", response.text[:500])
+            return Response(
+                {"error": "Invalid response from MWS GeoServer."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        features = data.get("features", [])
+        if not features:
+            return Response(
+                {"error": "No MWS feature found for the given lat lon location."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        properties = features[0].get("properties", {})
+        uid = properties.get("uid")
+
+        data_dict["mws_id"] = uid
+        return data_dict
+
     except Exception as e:
-        print("Exception while getting mws_id using lat lon", str(e))
+        print("Exception while getting the mws_id by lat long", str(e))
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -225,15 +272,13 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
         )
 
         # Fetch hydrology data
-        water_url = "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows"
+        water_url = f"{GEOSERVER_URL}/mws_layers/ows"
         water_data = fetch_geoserver_data(water_url, f"mws_layers:{layer_name}", mws_id)
 
         # Fetch NDVI data only if water layer exists
         ndvi_layers = {}
         if water_layer_exists:
-            ndvi_url = (
-                "https://geoserver.core-stack.org:8443/geoserver/ndvi_timeseries/ows"
-            )
+            ndvi_url = f"{GEOSERVER_URL}/ndvi_timeseries/ows"
             for veg_type in ["crop", "shrub", "tree"]:
                 try:
                     ndvi_layers[veg_type] = fetch_geoserver_data(
@@ -263,16 +308,14 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
             try:
                 values = json.loads(water_data.get(date, "{}"))
                 hydrology_metrix = {
-                    "et": round(values.get("ET"), 2) if values.get("ET") else "0.0",
+                    "et": round(values.get("ET"), 2) if values.get("ET") else 0.0,
                     "runoff": (
-                        round(values.get("RunOff"), 2)
-                        if values.get("RunOff")
-                        else "0.0"
+                        round(values.get("RunOff"), 2) if values.get("RunOff") else 0.0
                     ),
                     "precipitation": (
                         round(values.get("Precipitation"), 2)
                         if values.get("Precipitation")
-                        else "0.0"
+                        else 0.0
                     ),
                 }
             except:
@@ -411,7 +454,7 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
 
 def get_mws_geometries_data(state, district, tehsil):
     try:
-        base_url = "https://geoserver.core-stack.org:8443/geoserver/mws/ows"
+        base_url = f"{GEOSERVER_URL}/mws/ows"
 
         # Construct MWS layer name
         layer_name = f"mws_{district}_{tehsil}"
@@ -422,7 +465,7 @@ def get_mws_geometries_data(state, district, tehsil):
             "request": "GetFeature",
             "typeName": f"mws:{layer_name}",
             "outputFormat": "application/json",
-            "propertyName": "geom,uid",  # Only request needed fields
+            "propertyName": "geom,uid",
         }
 
         response = requests.get(base_url, params=params, timeout=30)
@@ -487,9 +530,7 @@ def get_mws_geometries_data(state, district, tehsil):
 
 def get_village_geometries_data(state, district, tehsil):
     try:
-        base_url = (
-            "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows"
-        )
+        base_url = f"{GEOSERVER_URL}/panchayat_boundaries/ows"
         layer_name = f"{district}_{tehsil}"
 
         params = {

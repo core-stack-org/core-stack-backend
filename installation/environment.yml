@@ -31,7 +31,6 @@ dependencies:
     - ca-certificates=2025.2.25
     - cachetools=5.5.1
     - cairo=1.16.0
-    - celery=4.4.0
     - certifi=2025.1.31
     - cffi=1.17.1
     - cfitsio=4.2.0
@@ -52,7 +51,6 @@ dependencies:
     - dbus=1.13.18
     - deprecated=1.2.18
     - distributed=2023.3.0
-    - django=5.2
     - django-cors-headers=4.7.0
     - djangorestframework=3.15.2
     - double-conversion=3.3.1
@@ -354,10 +352,10 @@ dependencies:
     - geemap
 
     - pip:
+          - Django
           - annotated-types==0.7.0
           - anyio==4.9.0
           - cryptography==44.0.1
-          - django-celery-beat==2.8.1
           - django-environ==0.12.0
           - djangorestframework-simplejwt==5.5.0
           - drf-nested-routers==0.94.1
@@ -387,4 +385,5 @@ dependencies:
           - emoji
           - webdriver-manager
           - pystac==1.13.0
+          - celery
           - django-celery-beat
