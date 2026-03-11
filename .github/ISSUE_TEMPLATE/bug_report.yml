@@ -113,9 +113,9 @@ body:
       label: Logs / Error Messages
       description: Paste relevant log output or stack traces. Use code blocks for formatting.
       placeholder: |
-```
+        ```
         Paste your logs or stack trace here
-```
+        ```
 
   - type: textarea
     id: screenshots
