@@ -1,0 +1,73 @@
+name: Bug Report
+description: Report a bug in the Core Stack Backend
+title: "[Bug]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill in the details so we can reproduce it.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component / Module
+      description: Which part of the backend is affected?
+      options:
+        - API Admin (/apiadmin)
+        - Bot Interface (/bot_interface)
+        - Computing (/computing)
+        - Data Service (/public_dataservice)
+        - GEE Computing (/gee_computing)
+        - Utilities (/utilities)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Describe what went wrong.
+      placeholder: Explain the issue clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Access endpoint /...
+        2. Provide payload ...
+        3. Observe error response
+        4. Check logs
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+  
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Python version, OS, specific library versions etc.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Error Messages
+      description: Please paste relevant log output or stack traces here.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Low
+        - Medium
+        - High
+        - Critical

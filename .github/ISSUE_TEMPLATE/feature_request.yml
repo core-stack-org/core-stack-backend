@@ -1,0 +1,55 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe it clearly.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Related Component
+      options:
+        - API Admin (/apiadmin)
+        - Bot Interface (/bot_interface)
+        - Computing (/computing)
+        - Data Service (/public_dataservice)
+        - GEE Computing (/gee_computing)
+        - Utilities (/utilities)
+        - Entire Application
+        - Other
+
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: Feature Description
+      description: What feature would you like to see?
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem it Solves
+      description: Why is this feature needed?
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Suggested Implementation
+      description: How could this feature be implemented?
+      placeholder: |
+        Example:
+        - Add new API endpoint
+        - Update GEE utility function
+        - Add new celery task
+
+  - type: textarea
+    id: diagrams
+    attributes:
+      label: Diagrams / Mockups
+      description: Upload any architectural ideas or flowcharts.
