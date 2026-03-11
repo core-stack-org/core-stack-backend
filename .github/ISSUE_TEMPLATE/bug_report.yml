@@ -8,6 +8,17 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug! Please fill in the details so we can reproduce it.
+        > ⚠️ Search existing issues before submitting to avoid duplicates.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I can reproduce this bug consistently
+          required: true
 
   - type: dropdown
     id: component
@@ -15,13 +26,29 @@ body:
       label: Component / Module
       description: Which part of the backend is affected?
       options:
-        - API Admin (/apiadmin)
         - Bot Interface (/bot_interface)
-        - Computing (/computing)
-        - Data Service (/public_dataservice)
-        - GEE Computing (/gee_computing)
-        - Utilities (/utilities)
+        - Layer Generation (/computing)
+        - DPR (/dpr)
+        - Installation (/installation)
+        - Plans (/plans)
+        - Plantations (/plantations)
+        - Moderation (/moderation)
+        - Layer stats (/stats_generator)
+        - Public API (/public_api)
         - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severely does this bug impact you?
+      options:
+        - Low (minor inconvenience, workaround exists)
+        - Medium (feature partially broken, workaround exists)
+        - High (feature broken, no workaround)
+        - Critical (system crash / data loss / security issue)
     validations:
       required: true
 
@@ -30,7 +57,7 @@ body:
     attributes:
       label: Bug Description
       description: Describe what went wrong.
-      placeholder: Explain the issue clearly.
+      placeholder: A clear and concise description of the bug.
     validations:
       required: true
 
@@ -38,36 +65,69 @@ body:
     id: steps
     attributes:
       label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the bug.
       placeholder: |
         1. Access endpoint /...
         2. Provide payload ...
         3. Observe error response
         4. Check logs
+    validations:
+      required: true
 
   - type: textarea
     id: expected
     attributes:
       label: Expected Behavior
       description: What should have happened?
-  
+      placeholder: Describe what you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened instead.
+    validations:
+      required: true
+
   - type: textarea
     id: environment
     attributes:
       label: Environment Details
-      description: Python version, OS, specific library versions etc.
+      description: Provide relevant environment information.
+      placeholder: |
+        - OS: (e.g. Ubuntu 22.04 / macOS 14 / Windows 11)
+        - Python version: (e.g. 3.11.2)
+        - Django version:
+        - Celery version:
+        - Deployment: (e.g. Docker / bare metal / k8s)
+        - Branch / Commit hash:
+    validations:
+      required: true
 
   - type: textarea
     id: logs
     attributes:
       label: Logs / Error Messages
-      description: Please paste relevant log output or stack traces here.
+      description: Paste relevant log output or stack traces. Use code blocks for formatting.
+      placeholder: |
+```
+        Paste your logs or stack trace here
+```
 
-  - type: dropdown
-    id: severity
+  - type: textarea
+    id: screenshots
     attributes:
-      label: Severity
-      options:
-        - Low
-        - Medium
-        - High
-        - Critical
+      label: Screenshots / Screen Recordings
+      description: |
+        Drag and drop screenshots or screen recordings directly into this box.
+        GitHub supports uploading images (PNG, JPG, GIF) and videos (MP4, MOV) directly in issue fields.
+      placeholder: Drag & drop your screenshots or recordings here, or paste an image URL.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, related issues, or possible fixes you'd like to mention.

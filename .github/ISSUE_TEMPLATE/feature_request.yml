@@ -7,27 +7,54 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a feature! Please describe it clearly.
+        Thanks for suggesting a feature! Please describe it clearly and check for duplicate issues before submitting.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate
+          required: true
+        - label: I have described the problem this feature solves
+          required: true
 
   - type: dropdown
     id: component
     attributes:
       label: Related Component
       options:
-        - API Admin (/apiadmin)
         - Bot Interface (/bot_interface)
-        - Computing (/computing)
-        - Data Service (/public_dataservice)
-        - GEE Computing (/gee_computing)
-        - Utilities (/utilities)
+        - Layer Generation (/computing)
+        - DPR (/dpr)
+        - Installation (/installation)
+        - Plans (/plans)
+        - Plantations (/plantations)
+        - Moderation (/moderation)
+        - Layer stats (/stats_generator)
+        - Public API (/public_api)
         - Entire Application
         - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - Low (nice to have)
+        - Medium (would improve workflow)
+        - High (blocking or critical)
+    validations:
+      required: true
 
   - type: textarea
     id: feature_description
     attributes:
       label: Feature Description
       description: What feature would you like to see?
+      placeholder: A clear and concise description of the feature you're requesting.
     validations:
       required: true
 
@@ -35,7 +62,17 @@ body:
     id: problem
     attributes:
       label: Problem it Solves
-      description: Why is this feature needed?
+      description: Why is this feature needed? What pain point does it address?
+      placeholder: "Example: As a user, I find it difficult to... / Currently there is no way to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe any alternatives you've considered or currently use.
 
   - type: textarea
     id: implementation
@@ -52,4 +89,4 @@ body:
     id: diagrams
     attributes:
       label: Diagrams / Mockups
-      description: Upload any architectural ideas or flowcharts.
+      description: Upload any architectural ideas, flowcharts, or mockups.
