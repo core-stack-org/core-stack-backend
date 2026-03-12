@@ -1,0 +1,1038 @@
+{
+  "check_dam": {
+    "slope": {
+      "max": 15
+    },
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4, 5, 6],
+      "not_accepted": ">6"
+    },
+    "catchment_area": {
+      "accepted": { "min": 10, "max": 40 },
+      "partially_accepted": { "min": 40, "max": 100 },
+      "not_accepted": "<10 or >100"
+    },
+    
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+      "not_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Kharif water",
+        "Kharif, rabi and zaid water",
+        "Kharif and rabi water"
+      ]
+    }
+  },
+
+  "farm_pond": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+    },
+    "catchment_area": {
+      "accepted": { "min": 1, "max": 2 },
+      "not_accepted": "<1 or >2"
+    },
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+    "lulc": {
+      "accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Croplands",
+        "Shrubs/Scrubs",
+        "Barren lands",
+        "Double cropping"
+      ],
+      "not_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water",
+        "Triple cropping"
+      ]
+    }
+  },
+
+  "farm_bund": {
+    "lulc": {
+      "accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Shrubs/Scrubs",
+        "Barren lands"
+      ],
+
+      "not_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "30_40_model_structure": {
+    "slope": {
+      "accepted": { "min": 3, "max": 10 },
+      "not_accepted": "<3 or >10"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+      
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 1, "max": 10 },
+      "not_accepted": "<1 or >10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping",
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+
+      "partially_accepted": [
+        "Trees/forest"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "well": {
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]      
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Triple cropping",
+        "Double cropping"
+      ],
+
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest",
+        "Built-up"
+      ],
+
+      "not_accepted": [
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "soakage_pits": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6] 
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 2, "max": 10 },
+      "not_accepted": "<2 or >10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      
+      "accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Triple cropping",
+        "Double cropping",
+        "Croplands",
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+
+      "not_accepted": [
+        "Trees/forest",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "rock_fill_dam": {
+    "slope": {
+      "accepted": { "min": 5, "max": 15 },
+      "not_accepted": ">15"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]      
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 40, "max": 250 },
+      "not_accepted": "<40 or >250"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+
+      "partially_accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Triple cropping",
+        "Double cropping"
+      ],
+
+      "not_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+"canal": {
+  "required_inputs": ["lulc"],
+  "rules": {
+    "lulc": {
+      "accepted": [
+        "Single Kharif cropping",
+        "Single Non-Kharif cropping",
+        "Triple cropping",
+        "Double cropping"
+      ],
+      "partially_accepted": [
+        "Barren land",
+        "Shrubs/Scrubs"
+      ],
+      "not_accepted": [
+        "Trees/forest",
+        "Built up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif and rabi and zaid water"
+      ]
+    },
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]      
+    }
+  }
+},
+
+  "diversion_drains": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+      
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 2, "max": 40 },
+      "partially_accepted": { "min": 40, "max": 250 },
+      "not_accepted": ">250"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+
+      "not_accepted": [
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "drainage_soakage_channels": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 2, "max": 40 },
+      "partially_accepted": { "min": 40, "max": 250 },
+      "not_accepted": "<2 or >250"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+
+      "not_accepted": [
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "percolation_tank": {
+    "slope": {
+      "accepted": { "min": 3, "max": 6 },
+      "not_accepted": "<3 or >6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3],
+      "partially_accepted": [4]
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 10, "max": 40 },
+      "partially_accepted": { "min": 40, "max": 100 },
+      "not_accepted": "<10 or >100"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs"
+      ],
+
+      "not_accepted": [
+        "Trees/forest",
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+ "recharge_pits": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+      
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 2, "max": 10 },
+      "not_accepted": "<2 or >10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Triple cropping",
+        "Double cropping"
+      ],
+
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "community_pond": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+      
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 10, "max": 40 },
+      "partially_accepted": { "min": 40, "max": 100 },
+      "not_accepted": "<10 or >100"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "large_water_body": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6},
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [2, 3, 4, 5, 6]
+      
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 40, "max": 250 },
+      "not_accepted": "<40 or >250"
+    },
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ],
+
+      "not_accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Croplands",
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Double cropping",
+        "Triple cropping",
+        "Trees/forest",
+        "Built-up"
+      ]
+    }
+  },
+
+  "contour_bund": {
+    "slope": {
+      "accepted": { "min": 1, "max": 6 },
+      "not_accepted": "<1 or >6"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 2 },
+      "not_accepted": ">2"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Croplands",
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Double cropping",
+        "Trees/forest",
+        "Triple cropping"
+      ],
+      "not_accepted": [      
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+        
+      ]
+    }
+  },
+
+  "graded_bund": {
+    "slope": {
+      "accepted": { "min": 1, "max": 10 },
+      "not_accepted": "<1 or >10"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 2 },
+      "not_accepted": ">2"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Croplands",
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Double cropping",
+        "Triple cropping",
+        "Trees/forest"
+
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+        
+      ]
+    }
+  },
+
+  "stone_bunding": {
+    "slope": {
+      "accepted": { "min": 1, "max": 10 },
+      "not_accepted": ">10"
+    },
+
+    "stream_order": {
+      "accepted": [1],
+      "partially_accepted": [2, 3],
+      "not_accepted": ">3"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 1 },
+      "partially_accepted": { "min": 1, "max": 10 },
+      "not_accepted": ">10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "earthen_gully_plug": {
+    "slope": {
+      "accepted": { "min": 10, "max": 20 },
+      "not_accepted": "<10 or >20"
+    },
+
+    "stream_order": {
+      "accepted": [1],
+      "partially_accepted": [2, 3],
+      "not_accepted": ">3"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 2 },
+      "partially_accepted": { "min": 2, "max": 10 },
+      "not_accepted": ">10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Trees/forest",
+        "Shrubs/Scrubs",
+        "Barren lands"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water",
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ]
+    }
+  },
+
+  "trench_cum_bund_network": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": {"max": 2 },
+      "not_accepted": "<2"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping"
+      ],
+
+      "partially_accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "loose_boulder_structure": {
+    "slope": {
+      "accepted": { "min": 1, "max": 10 },
+      "partially_accepted": { "min": 6, "max": 20 },
+      "not_accepted": ">20"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 2, "max": 10 },
+      "not_accepted": "<2 or >10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping",
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "continuous_contour_trenches_cct": {
+    "slope": {
+      "accepted": { "min": 1, "max": 10 },
+      "not_accepted": "<1 or >10"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "min": 2, "max": 10 },
+      "partially_accepted": { "min": 10, "max": 20 },
+      "not_accepted": "<2 or >20"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "partially_accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping",
+        "Croplands"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  
+  "staggered_contour_trenches_sct": {
+    "slope": {
+      "accepted": { "min": 10, "max": 25 },
+      "not_accepted": "<10 or >25"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 2 },
+      "partially_accepted": { "min": 2, "max": 10 },
+      "not_accepted": ">10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "partially_accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping",
+        "Croplands"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+
+"water_absorption_trenches_wat": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": " >6"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 2 },
+      "partially_accepted": { "min": 2, "max": 10 },
+      "not_accepted": ">10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "partially_accepted": [
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping",
+        "Croplands"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  },
+
+  "5_percent_model_structure": {
+    "slope": {
+      "accepted": { "min": 0, "max": 6 },
+      "not_accepted": ">6"
+    },
+
+    "stream_order": {
+      "accepted": [1, 2, 3],
+      "partially_accepted": [4],
+      "not_accepted": ">4"
+    },
+
+    "catchment_area": {
+      "accepted": { "max": 2 },
+      "partially_accepted": { "min": 2, "max": 10 },
+      "not_accepted": "<2 or >10"
+    },
+
+    "drainage_distance": {
+      "accepted": { "min": 0, "max": 60 },
+      "partially_accepted": { "min": 60, "max": 150 },
+      "not_accepted": ">150"
+    },
+
+    "lulc": {
+      "accepted": [
+        "Croplands",
+        "Single Kharif Cropping",
+        "Single non-Kharif cropping",
+        "Double cropping",
+        "Triple cropping",
+        "Barren lands",
+        "Shrubs/Scrubs",
+        "Trees/forest"
+      ],
+
+      "not_accepted": [
+        "Built-up",
+        "Kharif water",
+        "Kharif and rabi water",
+        "Kharif, rabi and zaid water"
+      ]
+    }
+  }
+
+}
+
