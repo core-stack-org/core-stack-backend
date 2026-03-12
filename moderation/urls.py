@@ -6,6 +6,8 @@ from .api import (
     delete_submission,
     sync_updated_submissions,
     trigger_odk_sync,
+    site_paln,
+    site_validate,
 )
 
 urlpatterns = [
@@ -19,4 +21,6 @@ urlpatterns = [
     path("submissions/<str:form_name>/<path:uuid>/delete/", delete_submission),
     path("ODKSubmissionEvent", sync_updated_submissions),
     path("sync/", trigger_odk_sync, name="trigger_odk_sync"),
+    path("plan_site/", site_paln, name="plan_site"),
+    path("validate_site/", site_validate, name="validate_site"),
 ]
