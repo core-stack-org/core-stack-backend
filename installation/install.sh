@@ -1,12 +1,11 @@
-#script to install
-
 #!/bin/bash
+# script to install
 
 set -e
 
 # === CONFIGURATION ===
 MINICONDA_DIR="$HOME/miniconda3"
-CONDA_ENV_NAME="corestack-backend"
+CONDA_ENV_NAME="corestackenv"
 CONDA_ENV_YAML="environment.yml"
 BACKEND_GIT_REPO="https://github.com/core-stack-org/core-stack-backend.git"
 BACKEND_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -73,14 +72,30 @@ function install_postgres() {
     else
         echo "Installing PostgreSQL..."
         sudo apt-get update
-        sudo apt-get install -y postgresql postgresql-contrib libpq-dev
+        sudo apt-get install -y postgresql postgresql-contrib postgis libpq-dev
     fi
+    sudo systemctl start postgresql
+    sudo systemctl enable postgresql
     echo "Setting up PostgreSQL user/database..."
     sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$POSTGRES_USER'" | grep -q 1 || \
         sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH PASSWORD '$POSTGRES_PASSWORD';"
+    sudo -u postgres psql -c "ALTER USER $POSTGRES_USER WITH PASSWORD '$POSTGRES_PASSWORD';"
     sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$POSTGRES_DB'" | grep -q 1 || \
         sudo -u postgres psql -c "CREATE DATABASE $POSTGRES_DB OWNER $POSTGRES_USER;"
+    sudo -u postgres psql -c "ALTER USER $POSTGRES_USER WITH SUPERUSER;"
     echo "PostgreSQL ready."
+}
+
+function install_rabbitmq() {
+    if command -v rabbitmqctl &> /dev/null; then
+        echo "RabbitMQ already installed. Skipping install."
+    else
+        echo "Installing RabbitMQ..."
+        sudo apt-get install -y rabbitmq-server
+    fi
+    sudo systemctl start rabbitmq-server
+    sudo systemctl enable rabbitmq-server
+    echo "RabbitMQ ready."
 }
 
 function install_apache() {
@@ -399,14 +414,30 @@ function ensure_logs_dir() {
     echo "Logs directory ready at $logs_dir"
 }
 
+function download_admin_boundary_data() {
+    local output_dir="$BACKEND_DIR/data/admin-boundary/input"
+    if [ -d "$output_dir" ] && [ "$(ls -A "$output_dir" 2>/dev/null)" ]; then
+        echo "Admin boundary data already exists at $output_dir. Skipping download."
+        return
+    fi
+    mkdir -p "$output_dir"
+    echo "Downloading admin boundary data (this may take a while)..."
+    pip install gdown
+    gdown --folder https://drive.google.com/drive/folders/1B-LBukxh1tk5wG90laDzKCI9WHFBwNCy?usp=sharing --output "$output_dir" &
+    GDOWN_PID=$!
+    echo "Download started in background (PID: $GDOWN_PID)"
+    echo "Check progress: tail -f /proc/$GDOWN_PID/fd/1 or wait for PID $GDOWN_PID"
+}
+
 # === MAIN ===
-sudo apt-get install rabbitmq-server
-sudo apt install unzip
+sudo apt-get install -y unzip
 ensure_logs_dir
 install_miniconda
 ensure_conda
 install_postgres
+install_rabbitmq
 setup_conda_env
+download_admin_boundary_data
 generate_env_file
 collect_static_files
 reset_django_migrations
@@ -414,6 +445,11 @@ run_django_migrations
 create_django_superuser
 #install_geoserver_on_tomcat
 
+if [ -n "$GDOWN_PID" ] && kill -0 "$GDOWN_PID" 2>/dev/null; then
+    echo "Waiting for admin boundary data download (PID: $GDOWN_PID) to finish..."
+    wait "$GDOWN_PID"
+    echo "Admin boundary data download complete."
+fi
 
 echo ""
 echo "Deployment complete!"
