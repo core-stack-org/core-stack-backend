@@ -11,6 +11,7 @@ from moderation.models import SyncMetadata
 import ee
 import math
 import json
+import os
 from moderation.utils.demand_validator_lulc import (
     compute_lulc_auto,
     LULC_MODE_BY_STRUCTURE,
@@ -290,7 +291,9 @@ def compute_drainage_distance_m(lat: float, lon: float, scale: int = 30) -> floa
     return round(float(d or 0.0), 2)
 
 
-with open("moderation/utils/rules.json", "r", encoding="utf-8") as f:
+from django.conf import settings as django_settings
+
+with open(os.path.join(django_settings.BASE_DIR, "moderation", "utils", "rules.json"), "r", encoding="utf-8") as f:
     RULES = json.load(f)
 
 ALLOWED_PARAMS = {
