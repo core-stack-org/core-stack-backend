@@ -9,7 +9,7 @@ MINICONDA_DIR="$HOME/miniconda3"
 CONDA_ENV_NAME="corestack-backend"
 CONDA_ENV_YAML="environment.yml"
 BACKEND_GIT_REPO="https://github.com/core-stack-org/core-stack-backend.git"
-BACKEND_DIR="/var/www/data/corestack"
+BACKEND_DIR="$HOME/corestack-backend"
 POSTGRES_USER="nrm"
 POSTGRES_DB="nrm"
 POSTGRES_PASSWORD="nrm@123"
@@ -104,7 +104,6 @@ function setup_logs_dir() {
     echo "Setting up logs directory..."
     sudo mkdir -p $BACKEND_DIR/logs
     sudo touch $BACKEND_DIR/logs/nrm_app.log
-    sudo chown -R www-data:www-data $BACKEND_DIR/logs
     sudo chmod -R 755 $BACKEND_DIR/logs
     echo "✅ Logs directory ready."
 }
@@ -112,7 +111,7 @@ function setup_logs_dir() {
 function run_manage_command() {
     # Run any Django manage.py command as www-data
     local cmd="$1"
-    sudo -u www-data bash -c "
+    bash -c "
     source $MINICONDA_DIR/etc/profile.d/conda.sh
     conda activate $CONDA_ENV_NAME
     cd $BACKEND_DIR
@@ -130,6 +129,42 @@ function run_migrations() {
     echo "Running Django migrations..."
     run_manage_command "migrate --noinput"
     echo "Migrations applied."
+}
+
+reset_django_migrations() {
+
+    echo "Resetting Django migrations..."
+
+    cd "$BACKEND_DIR"
+
+    # Remove old migration files
+    find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
+    find . -path "*/migrations/*.pyc" -delete
+
+    # Recreate migrations folders
+    find . -maxdepth 2 -name "apps.py" -type f | while IFS= read -r f; do
+        d=$(dirname "$f")
+        mkdir -p "$d/migrations"
+        touch "$d/migrations/__init__.py"
+    done
+
+    echo "Migrations cleaned."
+
+}
+
+run_django_migrations() {
+
+    echo "Running Django migrations..."
+
+    source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+    conda activate "$CONDA_ENV_NAME"
+
+    cd "$BACKEND_DIR"
+
+    python manage.py makemigrations
+    python manage.py migrate --plan
+    python manage.py migrate --fake-initial
+
 }
 
 function configure_apache() {
@@ -174,81 +209,93 @@ EOL
 }
 
 function generate_env_file() {
+
     echo "Generating .env file from settings.py..."
-    
+
     local SETTINGS_FILE="$BACKEND_DIR/nrm_app/settings.py"
-    local ENV_FILE="$BACKEND_DIR/nrm_app/.env"
-    
+    local ENV_FILE="$BACKEND_DIR/.env"
+
     if [ ! -f "$SETTINGS_FILE" ]; then
         echo "ERROR: settings.py not found at $SETTINGS_FILE"
         return 1
     fi
-    
-    # Extract variable names using grep and sed
-    # This regex matches env("VAR_NAME") patterns and captures VAR_NAME
+
+    # Extract env("VAR_NAME") patterns
     local env_vars
     env_vars=$(grep -oE 'env\.[a-z]*\s*\(\s*"[A-Za-z_][A-Za-z0-9_]*"' "$SETTINGS_FILE" 2>/dev/null | \
                sed -E 's/env\.[a-z]*\s*\(\s*"([^"]+)"/\1/' | \
                sort -u)
-    
-    # Also capture simple env("VAR_NAME") calls
+
+    # Extract env("VAR_NAME") simple calls
     local env_vars_simple
     env_vars_simple=$(grep -oE 'env\s*\(\s*"[A-Za-z_][A-Za-z0-9_]*"' "$SETTINGS_FILE" 2>/dev/null | \
                       sed -E 's/env\s*\(\s*"([^"]+)"/\1/' | \
                       sort -u)
-    
-    # Combine and deduplicate
+
+    # Combine variables
     local all_vars
     all_vars=$(echo -e "${env_vars}\n${env_vars_simple}" | sort -u | grep -v '^$')
-    
-    # Check if .env file already exists
-    if [ -f "$ENV_FILE" ]; then
-        echo "Existing .env file found. Adding missing variables..."
-        local added_count=0
-        
-        # Read existing variable names from .env
-        local existing_vars
-        existing_vars=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE" | cut -d'=' -f1 | sort -u)
-        
-        # Add missing variables with blank values
-        while IFS= read -r var_name; do
-            if [ -n "$var_name" ]; then
-                # Check if variable already exists in .env
-                if ! echo "$existing_vars" | grep -q "^${var_name}$"; then
-                    echo "${var_name}=\"\"" >> "$ENV_FILE"
-                    ((added_count++))
-                fi
-            fi
-        done <<< "$all_vars"
-        
-        echo "✅ Added $added_count missing variables to existing .env file"
-    else
-        # Create new .env file
-        echo "# Auto-generated .env file from settings.py" > "$ENV_FILE"
+
+    # Create .env if it does not exist
+    if [ ! -f "$ENV_FILE" ]; then
+
+        echo "Creating new .env file..."
+
+        echo "# Auto-generated .env file" > "$ENV_FILE"
         echo "# Generated on $(date)" >> "$ENV_FILE"
         echo "" >> "$ENV_FILE"
-        
-        # Write each variable with blank value to .env
-        while IFS= read -r var_name; do
-            if [ -n "$var_name" ]; then
+
+        # Required Django variables
+        echo "SECRET_KEY=$(openssl rand -base64 32)" >> "$ENV_FILE"
+        echo "DEBUG=True" >> "$ENV_FILE"
+        echo "" >> "$ENV_FILE"
+
+    else
+        echo "Existing .env file found. Updating missing variables..."
+    fi
+
+    # Read existing variables
+    local existing_vars
+    existing_vars=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$ENV_FILE" | cut -d'=' -f1 | sort -u)
+
+while IFS= read -r var_name; do
+    if [ -n "$var_name" ] && [ "$var_name" != "SECRET_KEY" ] && [ "$var_name" != "DEBUG" ]; then
+        if ! echo "$existing_vars" | grep -q "^${var_name}$"; then
+
+            if [ "$var_name" = "WHATSAPP_MEDIA_PATH" ]; then
+                echo "WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media" >> "$ENV_FILE"
+                mkdir -p "$BACKEND_DIR/bot_interface/whatsapp_media"
+
+            elif [ "$var_name" = "EXCEL_DIR" ]; then
+                echo "EXCEL_DIR=$BACKEND_DIR/data/excel_files" >> "$ENV_FILE"
+                mkdir -p "$BACKEND_DIR/excel_files"
+
+            else
                 echo "${var_name}=\"\"" >> "$ENV_FILE"
             fi
-        done <<< "$all_vars"
-        
-        echo "" >> "$ENV_FILE"
-        echo "# === CONFIGURATION OVERRIDES ===" >> "$ENV_FILE"
-        
-        echo "✅ .env file generated at $ENV_FILE"
+
+        fi
     fi
-    
-    # Apply configuration overrides (for both new and existing files)
+done <<< "$all_vars"
+if ! grep -q "^EXCEL_DIR=" "$ENV_FILE"; then
+    echo "EXCEL_DIR=$BACKEND_DIR/data/excel_files" >> "$ENV_FILE"
+    mkdir -p "$BACKEND_DIR/data/excel_files"
+fi
+    # Apply database overrides
     apply_env_overrides "$ENV_FILE"
-    
-    # Set proper permissions
-    sudo chown www-data:www-data "$ENV_FILE"
-    sudo chmod 640 "$ENV_FILE"
-    
-    echo "   Total variables in .env: $(grep -c '^[A-Za-z_]' "$ENV_FILE")"
+
+    # Fix permissions
+    chown $USER:$USER "$ENV_FILE"
+    chmod 640 "$ENV_FILE"
+
+    echo "Total variables in .env: $(grep -c '^[A-Za-z_]' "$ENV_FILE")"
+    echo ".env ready at $ENV_FILE"
+# Copy .env to nrm_app directory
+cp "$ENV_FILE" "$BACKEND_DIR/nrm_app/.env"
+
+echo ".env copied to $BACKEND_DIR/nrm_app/.env"
+
+
 }
 
 function apply_env_overrides() {
@@ -269,18 +316,76 @@ function apply_env_overrides() {
     fi
 }
 
+create_django_superuser() {
+
+    echo ""
+    echo "Create Django superuser"
+    
+    source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+    conda activate "$CONDA_ENV_NAME"
+
+    cd "$BACKEND_DIR"
+
+    python manage.py createsuperuser
+
+}
+
+install_geoserver_on_tomcat() {
+
+    echo "Installing Java..."
+    sudo apt-get update
+    sudo apt-get install -y openjdk-17-jdk
+
+    echo "Installing Tomcat..."
+    sudo apt-get install -y tomcat10 tomcat10-admin
+
+    echo "Starting Tomcat..."
+    sudo systemctl enable tomcat10
+    sudo systemctl start tomcat10
+
+    echo "Downloading GeoServer..."
+
+    GEOSERVER_VERSION="2.24.2"
+    TMP_DIR="/tmp/geoserver_install"
+
+    mkdir -p "$TMP_DIR"
+    cd "$TMP_DIR"
+
+    wget https://sourceforge.net/projects/geoserver/files/GeoServer/${GEOSERVER_VERSION}/geoserver-${GEOSERVER_VERSION}-war.zip
+
+    unzip geoserver-${GEOSERVER_VERSION}-war.zip
+
+    echo "Deploying GeoServer to Tomcat..."
+
+    sudo cp geoserver.war /var/lib/tomcat10/webapps/
+
+    echo "Restarting Tomcat..."
+    sudo systemctl restart tomcat10
+
+    echo "GeoServer installation complete."
+
+    echo "Access GeoServer at:"
+    echo "http://localhost:8080/geoserver"
+
+    echo "Default credentials:"
+    echo "Username: admin"
+    echo "Password: geoserver"
+
+}
+
 # === MAIN ===
+sudo apt-get install rabbitmq-server, unzip
 install_miniconda
 ensure_conda
 install_postgres
-install_apache
 setup_conda_env
-clone_backend
-setup_logs_dir
 generate_env_file
 collect_static_files
-run_migrations
-configure_apache
+reset_django_migrations
+run_django_migrations
+create_django_superuser
+#install_geoserver_on_tomcat
+
 
 echo ""
 echo "Deployment complete!"
