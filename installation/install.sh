@@ -1,18 +1,17 @@
-#script to install
-
 #!/bin/bash
+# script to install
 
 set -e
 
 # === CONFIGURATION ===
 MINICONDA_DIR="$HOME/miniconda3"
-CONDA_ENV_NAME="corestack-backend"
+CONDA_ENV_NAME="corestackenv"
 CONDA_ENV_YAML="environment.yml"
 BACKEND_GIT_REPO="https://github.com/core-stack-org/core-stack-backend.git"
-BACKEND_DIR="$HOME/corestack-backend"
-POSTGRES_USER="nrm"
-POSTGRES_DB="nrm"
-POSTGRES_PASSWORD="nrm@123"
+BACKEND_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+POSTGRES_USER="corestack_admin"
+POSTGRES_DB="corestack_db"
+POSTGRES_PASSWORD="corestack@123"
 APACHE_CONF="/etc/apache2/sites-available/corestack.conf"
 SHELL_RC="$HOME/.bashrc"  # Change to .zshrc if using zsh
 
@@ -26,22 +25,27 @@ ENV_DB_PASSWORD="$POSTGRES_PASSWORD"
 # === FUNCTIONS ===
 
 function install_miniconda() {
-    if [ -d "$MINICONDA_DIR" ]; then
-        echo "Miniconda already installed at $MINICONDA_DIR"
-    else
-        echo "Installing Miniconda..."
-        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-        bash miniconda.sh -b -p "$MINICONDA_DIR"
-        rm miniconda.sh
-        echo "Miniconda installed."
-        echo "Adding Conda to your shell profile ($SHELL_RC)..."
-        {
-            echo "# >>> conda initialize >>>"
-            echo "source \"$MINICONDA_DIR/etc/profile.d/conda.sh\""
-            echo "# <<< conda initialize <<<"
-        } >> "$SHELL_RC"
-        source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+    if command -v conda &> /dev/null; then
+        echo "Conda already available ($(conda --version)). Skipping Miniconda install."
+        return
     fi
+    if [ -d "$MINICONDA_DIR" ]; then
+        echo "Miniconda found at $MINICONDA_DIR but not on PATH. Sourcing it..."
+        source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+        return
+    fi
+    echo "Installing Miniconda..."
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    bash miniconda.sh -b -p "$MINICONDA_DIR"
+    rm miniconda.sh
+    echo "Miniconda installed."
+    echo "Adding Conda to your shell profile ($SHELL_RC)..."
+    {
+        echo "# >>> conda initialize >>>"
+        echo "source \"$MINICONDA_DIR/etc/profile.d/conda.sh\""
+        echo "# <<< conda initialize <<<"
+    } >> "$SHELL_RC"
+    source "$MINICONDA_DIR/etc/profile.d/conda.sh"
 }
 
 function ensure_conda() {
@@ -63,15 +67,35 @@ function setup_conda_env() {
 }
 
 function install_postgres() {
-    echo "Installing PostgreSQL..."
-    sudo apt-get update
-    sudo apt-get install -y postgresql postgresql-contrib libpq-dev
+    if command -v psql &> /dev/null; then
+        echo "PostgreSQL already installed ($(psql --version)). Skipping install."
+    else
+        echo "Installing PostgreSQL..."
+        sudo apt-get update
+        sudo apt-get install -y postgresql postgresql-contrib postgis libpq-dev
+    fi
+    sudo systemctl start postgresql
+    sudo systemctl enable postgresql
     echo "Setting up PostgreSQL user/database..."
     sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$POSTGRES_USER'" | grep -q 1 || \
         sudo -u postgres psql -c "CREATE USER $POSTGRES_USER WITH PASSWORD '$POSTGRES_PASSWORD';"
+    sudo -u postgres psql -c "ALTER USER $POSTGRES_USER WITH PASSWORD '$POSTGRES_PASSWORD';"
     sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname = '$POSTGRES_DB'" | grep -q 1 || \
         sudo -u postgres psql -c "CREATE DATABASE $POSTGRES_DB OWNER $POSTGRES_USER;"
+    sudo -u postgres psql -c "ALTER USER $POSTGRES_USER WITH SUPERUSER;"
     echo "PostgreSQL ready."
+}
+
+function install_rabbitmq() {
+    if command -v rabbitmqctl &> /dev/null; then
+        echo "RabbitMQ already installed. Skipping install."
+    else
+        echo "Installing RabbitMQ..."
+        sudo apt-get install -y rabbitmq-server
+    fi
+    sudo systemctl start rabbitmq-server
+    sudo systemctl enable rabbitmq-server
+    echo "RabbitMQ ready."
 }
 
 function install_apache() {
@@ -290,10 +314,20 @@ fi
 
     echo "Total variables in .env: $(grep -c '^[A-Za-z_]' "$ENV_FILE")"
     echo ".env ready at $ENV_FILE"
-# Copy .env to nrm_app directory
-cp "$ENV_FILE" "$BACKEND_DIR/nrm_app/.env"
 
-echo ".env copied to $BACKEND_DIR/nrm_app/.env"
+    # Generate and append FERNET_KEY
+    local FERNET_KEY
+    FERNET_KEY=$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | openssl base64 | tr +/ -_)
+    if grep -q '^FERNET_KEY=' "$ENV_FILE"; then
+        sed -i "s|^FERNET_KEY=.*|FERNET_KEY=$FERNET_KEY|" "$ENV_FILE"
+    else
+        echo "FERNET_KEY=$FERNET_KEY" >> "$ENV_FILE"
+    fi
+    echo "FERNET_KEY generated and added to .env"
+
+    # Copy .env to nrm_app directory
+    cp "$ENV_FILE" "$BACKEND_DIR/nrm_app/.env"
+    echo ".env copied to $BACKEND_DIR/nrm_app/.env"
 
 
 }
@@ -373,25 +407,68 @@ install_geoserver_on_tomcat() {
 
 }
 
+function ensure_logs_dir() {
+    local logs_dir="$BACKEND_DIR/logs"
+    mkdir -p "$logs_dir"
+    touch "$logs_dir/app.log" "$logs_dir/nrm_app.log"
+    echo "Logs directory ready at $logs_dir"
+}
+
+function load_seed_data() {
+    local seed_file="$BACKEND_DIR/installation/seed/seed_data.json"
+    if [ ! -f "$seed_file" ]; then
+        echo "No seed data found at $seed_file. Skipping."
+        return
+    fi
+    echo "Loading seed data..."
+    cd "$BACKEND_DIR"
+    conda run -n "$CONDA_ENV_NAME" python manage.py loaddata "$seed_file"
+    echo "Seed data loaded."
+}
+
+function download_admin_boundary_data() {
+    local output_dir="$BACKEND_DIR/data/admin-boundary/input"
+    if [ -d "$output_dir" ] && [ "$(ls -A "$output_dir" 2>/dev/null)" ]; then
+        echo "Admin boundary data already exists at $output_dir. Skipping download."
+        return
+    fi
+    mkdir -p "$output_dir"
+    echo "Downloading admin boundary data (this may take a while)..."
+    pip install gdown
+    gdown --folder https://drive.google.com/drive/folders/1B-LBukxh1tk5wG90laDzKCI9WHFBwNCy?usp=sharing --output "$output_dir" &
+    GDOWN_PID=$!
+    echo "Download started in background (PID: $GDOWN_PID)"
+    echo "Check progress: tail -f /proc/$GDOWN_PID/fd/1 or wait for PID $GDOWN_PID"
+}
+
 # === MAIN ===
-sudo apt-get install rabbitmq-server, unzip
+sudo apt-get install -y unzip
+ensure_logs_dir
 install_miniconda
 ensure_conda
 install_postgres
+install_rabbitmq
 setup_conda_env
+download_admin_boundary_data
 generate_env_file
 collect_static_files
 reset_django_migrations
 run_django_migrations
+load_seed_data
 create_django_superuser
 #install_geoserver_on_tomcat
 
+if [ -n "$GDOWN_PID" ] && kill -0 "$GDOWN_PID" 2>/dev/null; then
+    echo "Waiting for admin boundary data download (PID: $GDOWN_PID) to finish..."
+    wait "$GDOWN_PID"
+    echo "Admin boundary data download complete."
+fi
 
 echo ""
 echo "Deployment complete!"
-echo "Visit: http://localhost"
 echo "Activate env: conda activate $CONDA_ENV_NAME"
+echo "Visit: http://localhost"
 echo "Apache serves /, /static, and /media automatically."
 echo ""
-echo "⚠️  IMPORTANT: Review and update the .env file at $BACKEND_DIR/nrm_app/.env"
+echo "IMPORTANT: Review and update the .env file at $BACKEND_DIR/nrm_app/.env"
 echo "   with your actual credentials before running in production."
