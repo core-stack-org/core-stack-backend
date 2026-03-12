@@ -414,6 +414,18 @@ function ensure_logs_dir() {
     echo "Logs directory ready at $logs_dir"
 }
 
+function load_seed_data() {
+    local seed_file="$BACKEND_DIR/installation/seed/seed_data.json"
+    if [ ! -f "$seed_file" ]; then
+        echo "No seed data found at $seed_file. Skipping."
+        return
+    fi
+    echo "Loading seed data..."
+    cd "$BACKEND_DIR"
+    conda run -n "$CONDA_ENV_NAME" python manage.py loaddata "$seed_file"
+    echo "Seed data loaded."
+}
+
 function download_admin_boundary_data() {
     local output_dir="$BACKEND_DIR/data/admin-boundary/input"
     if [ -d "$output_dir" ] && [ "$(ls -A "$output_dir" 2>/dev/null)" ]; then
@@ -442,6 +454,7 @@ generate_env_file
 collect_static_files
 reset_django_migrations
 run_django_migrations
+load_seed_data
 create_django_superuser
 #install_geoserver_on_tomcat
 
@@ -453,8 +466,8 @@ fi
 
 echo ""
 echo "Deployment complete!"
-echo "Visit: http://localhost"
 echo "Activate env: conda activate $CONDA_ENV_NAME"
+echo "Visit: http://localhost"
 echo "Apache serves /, /static, and /media automatically."
 echo ""
 echo "IMPORTANT: Review and update the .env file at $BACKEND_DIR/nrm_app/.env"
