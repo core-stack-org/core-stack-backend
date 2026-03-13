@@ -39,7 +39,6 @@ def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
     )
     ee.Initialize(credentials)
 
-    # Return both ee and the service account email for reference
     return ee, credentials.service_account_email
 
 

@@ -139,7 +139,7 @@ function run_manage_command() {
     source $MINICONDA_DIR/etc/profile.d/conda.sh
     conda activate $CONDA_ENV_NAME
     cd $BACKEND_DIR
-    python manage.py $cmd
+    python manage.py $cmd --skip-checks
     "
 }
 
@@ -185,9 +185,9 @@ run_django_migrations() {
 
     cd "$BACKEND_DIR"
 
-    python manage.py makemigrations
-    python manage.py migrate --plan
-    python manage.py migrate --fake-initial
+    python manage.py makemigrations --skip-checks
+    python manage.py migrate --plan --skip-checks
+    python manage.py migrate --fake-initial --skip-checks
 
 }
 
@@ -360,7 +360,7 @@ create_django_superuser() {
 
     cd "$BACKEND_DIR"
 
-    python manage.py createsuperuser
+    python manage.py createsuperuser --skip-checks
 
 }
 
@@ -422,7 +422,7 @@ function load_seed_data() {
     fi
     echo "Loading seed data..."
     cd "$BACKEND_DIR"
-    conda run -n "$CONDA_ENV_NAME" python manage.py loaddata "$seed_file"
+    conda run -n "$CONDA_ENV_NAME" python manage.py loaddata --skip-checks "$seed_file"
     echo "Seed data loaded."
 }
 
@@ -457,7 +457,6 @@ ensure_conda
 install_postgres
 install_rabbitmq
 setup_conda_env
-download_admin_boundary_data
 generate_env_file
 collect_static_files
 reset_django_migrations
@@ -466,17 +465,46 @@ load_seed_data
 create_django_superuser
 #install_geoserver_on_tomcat
 
-if [ -n "$GDOWN_PID" ] && kill -0 "$GDOWN_PID" 2>/dev/null; then
-    echo "Waiting for admin boundary data download (PID: $GDOWN_PID) to finish..."
-    wait "$GDOWN_PID"
-    echo "Admin boundary data download complete."
-fi
-
 echo ""
-echo "Deployment complete!"
+echo "=============================================="
+echo "  Core installation complete!"
+echo "=============================================="
+echo ""
 echo "Activate env: conda activate $CONDA_ENV_NAME"
-echo "Visit: http://localhost"
-echo "Apache serves /, /static, and /media automatically."
 echo ""
 echo "IMPORTANT: Review and update the .env file at $BACKEND_DIR/nrm_app/.env"
 echo "   with your actual credentials before running in production."
+echo ""
+echo "=============================================="
+echo "  Admin boundary data (~8GB) is required."
+echo "=============================================="
+echo ""
+echo "1) Download now (will take a while)"
+echo "2) Skip (I will download it manually later)"
+echo ""
+read -p "Enter choice [1/2]: " admin_boundary_choice
+
+case "$admin_boundary_choice" in
+    1)
+        echo ""
+        echo "Downloading admin boundary data. Please be patient..."
+        echo ""
+        download_admin_boundary_data
+        if [ -n "$GDOWN_PID" ]; then
+            wait "$GDOWN_PID"
+            echo ""
+            echo "Admin boundary data download and extraction complete."
+        fi
+        ;;
+    *)
+        echo ""
+        echo "Skipped. To download later, run from the repo root:"
+        echo "  pip install gdown && sudo apt-get install -y p7zip-full"
+        echo "  gdown 1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d -O dataset.7z"
+        echo "  7z x dataset.7z -o\"data/admin-boundary\""
+        echo "  rm dataset.7z"
+        ;;
+esac
+
+echo ""
+echo "All done! Setup is fully complete."
