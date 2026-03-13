@@ -133,7 +133,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
             # Step 6: Sync to GeoServer
             print(f"[{datetime.now()}] Syncing to GeoServer...")
             fc = ee.FeatureCollection(asset_id)
-            res = sync_fc_to_geoserver(fc, state, f"facilities_{layer_name}", FACILITIES_GEOSERVER_WORKSPACE)
+            res = sync_fc_to_geoserver(fc, state, f"{layer_name}", FACILITIES_GEOSERVER_WORKSPACE)
         
             if res and res.get("status_code") == 201 and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
