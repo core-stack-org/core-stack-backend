@@ -427,18 +427,26 @@ function load_seed_data() {
 }
 
 function download_admin_boundary_data() {
-    local output_dir="$BACKEND_DIR/data/admin-boundary/input"
-    if [ -d "$output_dir" ] && [ "$(ls -A "$output_dir" 2>/dev/null)" ]; then
-        echo "Admin boundary data already exists at $output_dir. Skipping download."
+    local admin_boundary_dir="$BACKEND_DIR/data/admin-boundary"
+    if [ -d "$admin_boundary_dir/input" ] && [ "$(ls -A "$admin_boundary_dir/input" 2>/dev/null)" ]; then
+        echo "Admin boundary data already exists at $admin_boundary_dir. Skipping download."
         return
     fi
-    mkdir -p "$output_dir"
-    echo "Downloading admin boundary data (this may take a while)..."
+    mkdir -p "$BACKEND_DIR/data"
+    echo "Downloading admin boundary data (~8GB, this may take a while)..."
     pip install gdown
-    gdown --folder https://drive.google.com/drive/folders/1B-LBukxh1tk5wG90laDzKCI9WHFBwNCy?usp=sharing --output "$output_dir" &
+    sudo apt-get install -y p7zip-full
+    local fileid="1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d"
+    (
+        cd "$BACKEND_DIR"
+        gdown "$fileid" -O dataset.7z
+        7z x dataset.7z -o"data/admin-boundary"
+        rm dataset.7z
+        mkdir -p "$admin_boundary_dir/input" "$admin_boundary_dir/output"
+        echo "Admin boundary data extracted to $admin_boundary_dir"
+    ) &
     GDOWN_PID=$!
     echo "Download started in background (PID: $GDOWN_PID)"
-    echo "Check progress: tail -f /proc/$GDOWN_PID/fd/1 or wait for PID $GDOWN_PID"
 }
 
 # === MAIN ===
