@@ -1,6 +1,8 @@
 #!/bin/bash
 # script to install
 
+#script to install
+
 set -e
 
 # === CONFIGURATION ===
