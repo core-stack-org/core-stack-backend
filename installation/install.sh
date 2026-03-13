@@ -407,11 +407,11 @@ install_geoserver_on_tomcat() {
 
 }
 
-function ensure_logs_dir() {
-    local logs_dir="$BACKEND_DIR/logs"
-    mkdir -p "$logs_dir"
-    touch "$logs_dir/app.log" "$logs_dir/nrm_app.log"
-    echo "Logs directory ready at $logs_dir"
+function ensure_dirs() {
+    mkdir -p "$BACKEND_DIR/logs"
+    touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
+    mkdir -p "$BACKEND_DIR/data/activated_locations"
+    echo "Required directories ready."
 }
 
 function load_seed_data() {
@@ -451,7 +451,7 @@ function download_admin_boundary_data() {
 
 # === MAIN ===
 sudo apt-get install -y unzip
-ensure_logs_dir
+ensure_dirs
 install_miniconda
 ensure_conda
 install_postgres
