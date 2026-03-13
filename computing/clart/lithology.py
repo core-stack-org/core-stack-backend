@@ -85,11 +85,11 @@ def generate_lithology_layer(self, state):
                 )
 
                 if (
-                    score_5 > 0
-                    and score_1 == 0
-                    and score_2 == 0
-                    and score_3 == 0
-                    and score_4 == 0
+                        score_5 > 0
+                        and score_1 == 0
+                        and score_2 == 0
+                        and score_3 == 0
+                        and score_4 == 0
                 ):
                     continue
 

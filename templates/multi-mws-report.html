@@ -178,199 +178,205 @@
             max-width: auto !important;
         }
       }
-      
+
     </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Micro-Watershed Data Analysis Report</h1>
-            <p>Spatial and Temporal Analysis of Key Metrics</p>
-            <button class="print-button" onclick="printReport()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                    <rect x="6" y="14" width="12" height="8"></rect>
-                </svg>
-                Save as PDF
-            </button>
-        </div>
-    </header>
-
+<header>
     <div class="container">
+        <h1>Micro-Watershed Data Analysis Report</h1>
+        <p>Spatial and Temporal Analysis of Key Metrics</p>
+        <button class="print-button" onclick="printReport()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Save as PDF
+        </button>
+    </div>
+</header>
 
-        <section class="section">
-            
-            <h2>Overview of block characteristics</h2>
-            <p>{{block_osm}}</p>
+<div class="container">
 
-            <div id="mainMap" class="map"></div>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #000000;"></div>
-                    <span>Farm - Farm</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #87CEEB;"></div>
-                    <span>Selected MWS</span>
-                </div>
+    <section class="section">
+
+        <h2>Overview of block characteristics</h2>
+        <p>{{block_osm}}</p>
+
+        <div id="mainMap" class="map"></div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #000000;"></div>
+                <span>Farm - Farm</span>
             </div>
-        </section>
-
-        <section class="section">
-            <h3>Terrain Description</h3>
-            <p>{{terrain_desc}}</p>
-            <div id="terrainMap" class="map"></div>
-
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #313695;"></div>
-                    <span>V-shape river valleys, Deep narrow canyons</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #4575b4;"></div>
-                    <span>Lateral midslope incised drainages, Local valleys in plains</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #a50026;"></div>
-                    <span>Upland incised drainages, Stream headwaters</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #e0f3f8;"></div>
-                    <span>U-shape valleys</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #fffc00;"></div>
-                    <span>Broad Flat Areas</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #feb24c;"></div>
-                    <span>Broad open slopes</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #f46d43;"></div>
-                    <span>Mesa tops</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #d73027;"></div>
-                    <span>Upper Slopes</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #91bfdb;"></div>
-                    <span>Local ridge/hilltops within broad valleys</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #800000;"></div>
-                    <span>Lateral midslope drainage divides, Local ridges in plains</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #4d0000;"></div>
-                    <span>Mountain tops, high ridges</span>
-                </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #87CEEB;"></div>
+                <span>Selected MWS</span>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <section class="section">
-            <h3>Land use on Slopes and Plains Description</h3>
-            <p>{{lulc_desc}}</p>
-        </section>
+    <section class="section">
+        <h3>Terrain Description</h3>
+        <p>{{terrain_desc}}</p>
+        <div id="terrainMap" class="map"></div>
 
-        {% if land_degrad_desc %}
-            <section class="section">
-                <h4>Degradation of land</h4>
-                <p>{{land_degrad_desc}}</p>
-
-                <div id="landDegredMap" class="map"></div>
-
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Farm - Farm</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Farm - Built Up</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Farm - Barren</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Farm - Scrub Land</span>
-                    </div>
-                </div>
-
-            </section>
-        {% endif %}
-
-        {% if tree_reduce_desc %}
-            <section class="section">
-                <h4>Reduction of Tree Cover</h4>
-                <p>{{tree_reduce_desc}}</p>
-
-                <div id="treeReduceMap" class="map"></div>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #73bb53;"></div>
-                        <span>Forest - Forest</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #ff0000;"></div>
-                        <span>Forest - Built Up</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eee05d;"></div>
-                        <span>Forest - Farm</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                        <span>Forest - Barren</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background-color: #eaa4f0;"></div>
-                        <span>Forest - Scrub land</span>
-                    </div>
-                </div>
-
-            </section>
-        {% endif %}
-
-        {% if urban_desc %}
-            <section class="section">
-                <h4>Urbanization</h4>
-                <p>{{urban_desc}}</p>
-            </section>
-        {% endif %}
-        
-        <section class="section">
-            <h4>Cropping Intensity</h4>
-            <p>{{inten_desc1}}</p>
-            <p>{{inten_desc2}}</p>
-            <p>{{inten_desc3}}</p>
-
-            <div class="chart-container">
-                <canvas id="barChart-intensity"></canvas>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #313695;"></div>
+                <span>V-shape river valleys, Deep narrow canyons</span>
             </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4575b4;"></div>
+                <span>Lateral midslope incised drainages, Local valleys in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a50026;"></div>
+                <span>Upland incised drainages, Stream headwaters</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #e0f3f8;"></div>
+                <span>U-shape valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #fffc00;"></div>
+                <span>Broad Flat Areas</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #feb24c;"></div>
+                <span>Broad open slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f46d43;"></div>
+                <span>Mesa tops</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d73027;"></div>
+                <span>Upper Slopes</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #91bfdb;"></div>
+                <span>Local ridge/hilltops within broad valleys</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #800000;"></div>
+                <span>Lateral midslope drainage divides, Local ridges in plains</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #4d0000;"></div>
+                <span>Mountain tops, high ridges</span>
+            </div>
+        </div>
+    </section>
 
-        </section>
-   
-        <section class="section">
-            <h4>Surface water bodies</h4>
-            <p>{{swb_desc}}</p>
-            <p>{{rabi_desc}}</p>
-            <p>{{kh_desc_1}}</p>
-            <p>{{kh_desc_2}}</p>
-            <p>{{kh_desc_3}}</p>
-        </section>
+    <section class="section">
+        <h3>Land use on Slopes and Plains Description</h3>
+        <p>{{lulc_desc}}</p>
+    </section>
 
-        <section class="section">
-            <h4>Water Balance</h4>
-            <p>A water balance study of the micro watersheds indicates whether it is helping conserve water or deplete water from the underlying aquifer. Incoming water into a microwatershed is through rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more water.</p>
-            <p>{{deltag_desc}}</p>
-            <p>{{good_rainfall_desc}}</p>
-            <p>{{bad_rainfall_desc}}</p>
-        </section>
+    {% if land_degrad_desc %}
+    <section class="section">
+        <h4>Degradation of land</h4>
+        <p>{{land_degrad_desc}}</p>
+
+        <div id="landDegredMap" class="map"></div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eee05d;"></div>
+                <span>Farm - Farm</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <span>Farm - Built Up</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                <span>Farm - Barren</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                <span>Farm - Scrub Land</span>
+            </div>
+        </div>
+
+    </section>
+    {% endif %}
+
+    {% if tree_reduce_desc %}
+    <section class="section">
+        <h4>Reduction of Tree Cover</h4>
+        <p>{{tree_reduce_desc}}</p>
+
+        <div id="treeReduceMap" class="map"></div>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #73bb53;"></div>
+                <span>Forest - Forest</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <span>Forest - Built Up</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eee05d;"></div>
+                <span>Forest - Farm</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                <span>Forest - Barren</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                <span>Forest - Scrub land</span>
+            </div>
+        </div>
+
+    </section>
+    {% endif %}
+
+    {% if urban_desc %}
+    <section class="section">
+        <h4>Urbanization</h4>
+        <p>{{urban_desc}}</p>
+    </section>
+    {% endif %}
+
+    <section class="section">
+        <h4>Cropping Intensity</h4>
+        <p>{{inten_desc1}}</p>
+        <p>{{inten_desc2}}</p>
+        <p>{{inten_desc3}}</p>
+
+        <div class="chart-container">
+            <canvas id="barChart-intensity"></canvas>
+        </div>
+
+    </section>
+
+    <section class="section">
+        <h4>Surface water bodies</h4>
+        <p>{{swb_desc}}</p>
+        <p>{{rabi_desc}}</p>
+        <p>{{kh_desc_1}}</p>
+        <p>{{kh_desc_2}}</p>
+        <p>{{kh_desc_3}}</p>
+    </section>
+
+    <section class="section">
+        <h4>Water Balance</h4>
+        <p>A water balance study of the micro watersheds indicates whether it is helping conserve water or deplete water
+            from the underlying aquifer. Incoming water into a microwatershed is through rainfall. Some of this is lost
+            as runoff while the rest percolates into the ground. Crops pull some of this groundwater, and borewells for
+            irrigation may pull groundwater from deeper aquifers too. A positive water balance indicates that less of
+            the incoming water is lost, while a negative water balance indicates that the microwatershed takes away more
+            water.</p>
+        <p>{{deltag_desc}}</p>
+        <p>{{good_rainfall_desc}}</p>
+        <p>{{bad_rainfall_desc}}</p>
+    </section>
 
 
     <footer>

@@ -18,6 +18,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from utilities.constants import GEE_DATASET_PATH
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -53,22 +54,21 @@ def generate_restoration_opportunity(self, state, district, block, gee_account_i
 
 def clip_raster(roi, state, district, block, description):
     asset_id = get_gee_asset_path(state, district, block) + description + "_raster"
-    if is_gee_asset_exists(asset_id):
-        return asset_id
 
     restoration_raster = ee.Image(
         GEE_DATASET_PATH + "/WRI/LandscapeRestorationOpportunities"
     )
 
-    clipped_raster = restoration_raster.clip(roi.geometry())
-    task_id = export_raster_asset_to_gee(
-        image=clipped_raster,
-        description=description + "_raster",
-        asset_id=asset_id,
-        scale=60,
-        region=roi.geometry(),
-    )
-    check_task_status([task_id])
+    if not is_gee_asset_exists(asset_id):
+        clipped_raster = restoration_raster.clip(roi.geometry())
+        task_id = export_raster_asset_to_gee(
+            image=clipped_raster,
+            description=description + "_raster",
+            asset_id=asset_id,
+            scale=60,
+            region=roi.geometry(),
+        )
+        check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
         layer_id = save_layer_info_to_db(
@@ -93,6 +93,19 @@ def clip_raster(roi, state, district, block, description):
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+
+            layer_STAC_generated = False
+            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                state=state,
+                district=district,
+                block=block,
+                layer_name="wri_restoration_raster",
+            )
+
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
+
         return asset_id
     return None
 

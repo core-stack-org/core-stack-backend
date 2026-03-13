@@ -1,4 +1,5 @@
 import os
+import re
 import socket
 import ssl
 from collections import defaultdict
@@ -21,7 +22,7 @@ from dpr.mapping import (
     WATER_STRUCTURE_REVERSE_MAPPING,
     populate_maintenance_from_waterbody,
 )
-from dpr.utils import get_waterbody_repair_activities
+from dpr.utils import ensure_str, get_waterbody_repair_activities, transform_name
 from nrm_app.settings import (
     DEBUG,
     EMAIL_HOST,
@@ -31,6 +32,7 @@ from nrm_app.settings import (
     EMAIL_TIMEOUT,
     EMAIL_USE_SSL,
     GEOSERVER_URL,
+    TMP_LOCATION,
 )
 from plans.models import PlanApp
 from utilities.logger import setup_logger
@@ -53,8 +55,10 @@ from .utils import (
     format_text_demands,
     get_vector_layer_geoserver,
     sort_key,
-    sync_db_odk,
+    to_utf8,
+    transform_name,
 )
+from moderation.views import sync_odk_to_csdb
 
 logger = setup_logger(__name__)
 
@@ -71,149 +75,78 @@ def create_dpr_document(plan):
 
     doc = initialize_document()  # doc init
 
-    sync_db_odk()
+    logger.info("Database sync started") # db sync
+    sync_odk_to_csdb()
     logger.info("Database sync complete")
 
-    logger.info("Details of the plan")
+    logger.info("Plan Details")
     logger.info(plan)
-    logger.info(str(plan.district.district_name).lower())
-    logger.info(str(plan.block.block_name).lower())
+    logger.info(transform_name(str(plan.district_soi.district_name)))
+    logger.info(transform_name(str(plan.tehsil_soi.tehsil_name)))
 
     total_settlements = get_settlement_count_for_plan(plan.id)
+    logger.info(f"Total settlements found in the plan: {total_settlements}")
 
     mws_fortnight = get_vector_layer_geoserver(
         geoserver_url=GEOSERVER_URL,
         workspace="mws_layers",
         layer_name="deltaG_fortnight_"
-        + str(plan.district.district_name).lower().replace(" ", "_")
+        + transform_name(str(plan.district_soi.district_name))
         + "_"
-        + str(plan.block.block_name).lower().replace(" ", "_"),
+        + transform_name(str(plan.tehsil_soi.tehsil_name)),
     )
+    logger.info(f"MWS Fortnight layer fetched successfully")
 
+    # MARK: - Sections
     add_section_a(doc, plan)
     add_section_separator(doc)
+    logger.info("Section A completed")
 
     settlement_mws_ids, mws_gdf = add_section_b(
         doc, plan, total_settlements, mws_fortnight
     )
     add_section_separator(doc)
-
+    logger.info("Section B completed")
+    
     add_section_c(doc, plan)
     add_section_separator(doc)
-
+    logger.info("Section C completed")
+    
     add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
     add_section_separator(doc)
-
+    logger.info("Section D completed")
+    
     add_section_e(doc, plan)
     add_section_separator(doc)
-
+    logger.info("Section E completed")
+    
     add_section_f(doc, plan, mws_fortnight)
     add_section_separator(doc)
-
+    logger.info("Section F completed")
+    
     add_section_g(doc, plan, mws_fortnight)
     add_section_separator(doc)
+    logger.info("Section G completed")
 
-    # MARK: local save /tmp/dpr/
-    # operations on the document
-    if DEBUG:
-        file_path = "/tmp/dpr/"
+    # MARK: local save /var/www/tmp/dpr/
+    # if DEBUG:
+    #     file_path = TMP_LOCATION + "dpr/"
 
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
-        doc.save(file_path + plan.plan + ".docx")
+    #     if not os.path.exists(file_path):
+    #         os.makedirs(file_path)
+    #     doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
-def send_dpr_email(
-    doc, email_id, plan_name, mws_reports, mws_Ids, resource_report, resource_report_url
-):
-    try:
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        doc_bytes = buffer.getvalue()
-        buffer.close()
-
-        # Create MWS links section
-        mws_links_html = ""
-        if mws_reports and mws_Ids:
-            mws_links_html = "<p><strong>MWS Reports:</strong></p><ul>"
-            for mws_id, report_url in zip(mws_Ids, mws_reports):
-                mws_links_html += f'<li>{mws_id}: <a href="{report_url}">View Report</a></li>'
-            mws_links_html += "</ul>"
-
-        email_body = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;">
-                <p>Hi,</p>
-                
-                <p>Please find attached the Detailed Project Report for <strong>{plan_name}</strong>.</p>
-                
-                {mws_links_html}
-                
-                <p><strong>Resource Report:</strong> <a href="{resource_report_url}">View Report</a></p>
-                
-                <br>
-                <p>Thanks and Regards,<br>
-                <strong>CoRE Stack Team</strong></p>
-            </body>
-        </html>
-        """
-
-
-        backend = EmailBackend(
-            host=EMAIL_HOST,
-            port=EMAIL_PORT,
-            username=EMAIL_HOST_USER,
-            password=EMAIL_HOST_PASSWORD,
-            use_ssl=EMAIL_USE_SSL,
-            timeout=EMAIL_TIMEOUT,
-            ssl_context=ssl.create_default_context(),
-        )
-
-        email = EmailMessage(
-            subject=f"DPR of plan: {plan_name}",
-            body=email_body,
-            from_email=EMAIL_HOST_USER,
-            to=[email_id],
-            connection=backend,
-        )
-
-        # Set content type to HTML
-        email.content_subtype = "html"
-
-        email.attach(
-            f"DPR_{plan_name}.docx",
-            doc_bytes,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-
-        if resource_report is not None:
-            email.attach(
-                f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
-            )
-
-        logger.info("Sending DPR email to %s", email_id)
-        email.send(fail_silently=False)
-        logger.info("DPR email sent.")
-        backend.close()
-
-    except socket.error as e:
-        logger.error(f"Socket error: {e}")
-    except ssl.SSLError as e:
-        logger.error(f"SSL error: {e}")
-    except Exception as e:
-        logger.error(f"Failed to send email: {e}")
-
-
 def get_data_for_settlement(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected")
+    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").exclude(is_deleted=True)
 
 
 def get_settlement_count_for_plan(planid):
     return (
         ODK_settlement.objects.filter(plan_id=planid)
         .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
         .count()
     )
 
@@ -222,6 +155,7 @@ def get_settlement_coordinates_for_plan(planid):
     settlements = (
         ODK_settlement.objects.filter(plan_id=planid)
         .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
         .values("settlement_name", "latitude", "longitude")
     )
     return [
@@ -273,9 +207,9 @@ def get_mws_ids_for_report(plan):
         geoserver_url=GEOSERVER_URL,
         workspace="mws_layers",
         layer_name="deltaG_fortnight_"
-        + str(plan.district.district_name).lower().replace(" ", "_")
+        + transform_name(str(plan.district_soi.district_name))
         + "_"
-        + str(plan.block.block_name).lower().replace(" ", "_"),
+        + transform_name(str(plan.tehsil_soi.tehsil_name)),
     )
     mws_gdf = gpd.GeoDataFrame.from_features(mws_fortnight["features"])
 
@@ -290,7 +224,7 @@ def get_mws_ids_for_report(plan):
 ############################## Sections #######################################
 
 
-# MARK: - Section A
+# MARK: -  A
 def add_section_a(doc, plan):
     """
     Brief about team details.
@@ -305,19 +239,19 @@ def create_table_team_details(doc, plan):
 
     row1_cells = table.rows[0].cells
     row1_cells[0].text = "Organization"
-    row1_cells[1].text = plan.organization.name if plan.organization else "NA"
+    row1_cells[1].text = to_utf8(plan.organization.name) if plan.organization else "NA"
 
     row2_cells = table.rows[1].cells
     row2_cells[0].text = "Project"
-    row2_cells[1].text = plan.project.name if plan.project else "NA"
+    row2_cells[1].text = to_utf8(plan.project.name) if plan.project else "NA"
 
     row3_cells = table.rows[2].cells
     row3_cells[0].text = "Plan"
-    row3_cells[1].text = plan.plan
+    row3_cells[1].text = to_utf8(plan.plan)
 
     row4_cells = table.rows[3].cells
     row4_cells[0].text = "Facilitator"
-    row4_cells[1].text = plan.facilitator_name
+    row4_cells[1].text = to_utf8(plan.facilitator_name)
 
     row5_cells = table.rows[4].cells
     row5_cells[0].text = "Process involved in the preparation of DPR PRA"
@@ -377,11 +311,11 @@ def create_table_village_brief(
         centroid = None
 
     headers_data = [
-        ("Name of the Village", plan.village_name),
-        ("Name of the Gram Panchayat", plan.gram_panchayat),
-        ("Tehsil", plan.block.block_name),
-        ("District", plan.district.district_name),
-        ("State", plan.state.state_name),
+        ("Name of the Village", to_utf8(plan.village_name)),
+        ("Name of the Gram Panchayat", to_utf8(plan.gram_panchayat)),
+        ("Tehsil", to_utf8(plan.tehsil_soi.tehsil_name)),
+        ("District", to_utf8(plan.district_soi.district_name)),
+        ("State", to_utf8(plan.state_soi.state_name)),
         ("Number of Settlements in the Village", str(total_settlements)),
         ("Intersecting Micro Watershed IDs", None),  # Will be handled separately
         (
@@ -420,12 +354,12 @@ def create_table_village_brief(
 
                 for idx, (settlement, mws_id) in enumerate(settlement_mws_pairs, 1):
                     data_cells = nested_table.rows[idx].cells
-                    data_cells[0].text = settlement
-                    data_cells[1].text = mws_id
+                    data_cells[0].text = to_utf8(settlement)
+                    data_cells[1].text = to_utf8(mws_id)
             else:
                 row_cells[1].text = "No intersecting watersheds"
         else:
-            row_cells[1].text = value
+            row_cells[1].text = to_utf8(value) if value else "NA"
 
     for row in table.rows:
         for paragraph in row.cells[0].paragraphs:
@@ -465,6 +399,7 @@ def create_table_socio_eco(doc, plan, settlement_data):
         "Total Number of Households",
         "Settlement Type",
         "Caste Group",
+        "Total Households",
         "Total marginal farmers (<2 acres)",
     ]
 
@@ -477,18 +412,53 @@ def create_table_socio_eco(doc, plan, settlement_data):
 
     for item in settlement_data:
         row_cells = table_socio.add_row().cells
-        row_cells[0].text = item.settlement_name
+        row_cells[0].text = to_utf8(item.settlement_name)
         row_cells[1].text = str(item.number_of_households)
-        row_cells[2].text = item.largest_caste
+        largest_caste = (item.largest_caste or "").lower()
+        row_cells[2].text = to_utf8(item.largest_caste)
 
-        if item.largest_caste.lower() == "single caste group":
-            row_cells[3].text = item.smallest_caste
-        elif item.largest_caste.lower() == "mixed caste group":
-            row_cells[3].text = item.settlement_status
+        if largest_caste == "single caste group":
+            row_cells[3].text = to_utf8(item.smallest_caste)
+        elif largest_caste == "mixed caste group":
+            row_cells[3].text = to_utf8(item.settlement_status)
         else:
             row_cells[3].text = "NA"
 
-        row_cells[4].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
+        sub_table = row_cells[4].add_table(rows=4, cols=2)
+        sub_table.style = "Table Grid"
+        sub_table.autofit = False
+        sub_table.allow_autofit = False
+
+        count_sc = str(item.data_settlement.get("count_sc", "")) or "NA"
+        count_st = str(item.data_settlement.get("count_st", "")) or "NA"
+        count_obc = str(item.data_settlement.get("count_obc", "")) or "NA"
+        count_general = str(item.data_settlement.get("count_general", "")) or "NA"
+
+        caste_data = [
+            ("SC", count_sc),
+            ("ST", count_st),
+            ("OBC", count_obc),
+            ("General", count_general),
+        ]
+
+        for i, (label, value) in enumerate(caste_data):
+            label_cell = sub_table.rows[i].cells[0]
+            value_cell = sub_table.rows[i].cells[1]
+
+            label_cell.text = label
+            label_cell.width = Pt(50)
+            label_para = label_cell.paragraphs[0]
+            label_para.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
+            label_para.runs[0].bold = True
+            label_para.runs[0].font.size = Pt(9)
+
+            value_cell.text = to_utf8(value)
+            value_cell.width = Pt(40)
+            value_para = value_cell.paragraphs[0]
+            value_para.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+            value_para.runs[0].font.size = Pt(9)
+
+        row_cells[5].text = str(item.farmer_family.get("marginal_farmers", "")) or "NA"
 
 
 def create_table_mgnrega_info(doc, plan, settlement_data):
@@ -509,7 +479,7 @@ def create_table_mgnrega_info(doc, plan, settlement_data):
 
     for settlement_nrega in settlement_data:
         row_cells = table_nrega.add_row().cells
-        row_cells[0].text = settlement_nrega.settlement_name
+        row_cells[0].text = to_utf8(settlement_nrega.settlement_name)
         row_cells[1].text = (
             "applied: "
             + (
@@ -530,15 +500,17 @@ def create_table_mgnrega_info(doc, plan, settlement_data):
             if settlement_nrega.nrega_work_days == 0
             else str(settlement_nrega.nrega_work_days)
         )
-        row_cells[3].text = format_text_demands(settlement_nrega.nrega_past_work)
-        row_cells[4].text = format_text(settlement_nrega.nrega_demand)
-        row_cells[5].text = format_text(settlement_nrega.nrega_issues)
+        row_cells[3].text = to_utf8(
+            format_text_demands(settlement_nrega.nrega_past_work)
+        )
+        row_cells[4].text = to_utf8(format_text(settlement_nrega.nrega_demand))
+        row_cells[5].text = to_utf8(format_text(settlement_nrega.nrega_issues))
 
 
 def create_table_crop_info(doc, plan):
-    crops_in_plan = ODK_crop.objects.filter(plan_id=plan.id).exclude(
+    crops_in_plan = ODK_crop.objects.filter(plan_id=str(plan.id)).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     headers_cropping_pattern = [
         "Name of the Settlement",
@@ -560,9 +532,9 @@ def create_table_crop_info(doc, plan):
 
     for crop in crops_in_plan:
         row_cells = table_cropping_pattern.add_row().cells
-        row_cells[0].text = crop.beneficiary_settlement
-        row_cells[1].text = crop.irrigation_source
-        row_cells[2].text = format_text(crop.cropping_patterns_kharif)
+        row_cells[0].text = to_utf8(crop.beneficiary_settlement)
+        row_cells[1].text = to_utf8(crop.irrigation_source)
+        row_cells[2].text = to_utf8(format_text(crop.cropping_patterns_kharif))
         # acres = hectares * 2.47105; in the form we are capturing the data in hectares
         kharif_area = (
             crop.data_crop.get("total_area_cultivation_kharif", "NA")
@@ -577,7 +549,7 @@ def create_table_crop_info(doc, plan):
                 row_cells[3].text = "NA"
         else:
             row_cells[3].text = "NA"
-        row_cells[4].text = format_text(crop.cropping_patterns_rabi)
+        row_cells[4].text = to_utf8(format_text(crop.cropping_patterns_rabi))
         rabi_area = (
             crop.data_crop.get("total_area_cultivation_Rabi", "NA")
             if crop.data_crop
@@ -591,7 +563,7 @@ def create_table_crop_info(doc, plan):
                 row_cells[5].text = "NA"
         else:
             row_cells[5].text = "NA"
-        row_cells[6].text = format_text(crop.cropping_patterns_zaid)
+        row_cells[6].text = to_utf8(format_text(crop.cropping_patterns_zaid))
         zaid_area = (
             crop.data_crop.get("total_area_cultivation_Zaid", "NA")
             if crop.data_crop
@@ -605,12 +577,14 @@ def create_table_crop_info(doc, plan):
                 row_cells[7].text = "NA"
         else:
             row_cells[7].text = "NA"
-        row_cells[8].text = crop.agri_productivity
-        row_cells[9].text = crop.land_classification
+        row_cells[8].text = to_utf8(crop.agri_productivity)
+        row_cells[9].text = to_utf8(crop.land_classification)
 
 
 def create_table_livestock(doc, plan):
-    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id)
+    livestock_in_plan = ODK_settlement.objects.filter(plan_id=plan.id).exclude(
+        status_re="rejected"
+    ).exclude(is_deleted=True)
     headers_livelihood = [
         "Name of the Settlement",
         "Goats",
@@ -633,13 +607,13 @@ def create_table_livestock(doc, plan):
 
     for livelihood in livestock_in_plan:
         row_cells = livestock_table.add_row().cells
-        row_cells[0].text = livelihood.settlement_name
+        row_cells[0].text = to_utf8(livelihood.settlement_name)
 
         livestock_data = livelihood.livestock_census or {}
         livestock_types = ["Goats", "Sheep", "Cattle", "Piggery", "Poultry"]
         for i, livestock_type in enumerate(livestock_types, start=1):
             value = livestock_data.get(livestock_type, "")
-            row_cells[i].text = format_livestock_value(value)
+            row_cells[i].text = to_utf8(format_livestock_value(value))
 
 
 # MARK: - Section D
@@ -680,7 +654,7 @@ def create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids):
 
     for i, mws_id in enumerate(unique_mws_ids, start=1):
         row_cells = table_mws.rows[i].cells
-        row_cells[0].text = mws_id
+        row_cells[0].text = to_utf8(mws_id)
 
         matching_feature = mws_gdf[mws_gdf["uid"] == mws_id]
         if not matching_feature.empty:
@@ -694,7 +668,7 @@ def get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all wells across all MWS IDs with their corresponding MWS assignment"""
     wells_in_plan = ODK_well.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     all_wells_with_mws = []
 
     for well in wells_in_plan:
@@ -721,7 +695,7 @@ def get_all_waterbodies_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all waterbodies across all MWS IDs with their corresponding MWS assignment"""
     waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     all_waterbodies_with_mws = []
 
     for waterbody in waterbodies_in_plan:
@@ -780,7 +754,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
 
     for i, (settlement, num_wells, num_households) in enumerate(wells_info, start=1):
         row_cells = table_well_info.rows[i].cells
-        row_cells[0].text = settlement
+        row_cells[0].text = to_utf8(settlement)
         row_cells[1].text = str(num_wells)
         row_cells[2].text = str(num_households)
 
@@ -789,15 +763,13 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
     all_wells_with_mws_sorted = sorted(
         all_wells_with_mws,
         key=lambda x: (
-            x[0].beneficiary_settlement == "NA",
-            x[0].beneficiary_settlement.lower()
-            if x[0].beneficiary_settlement != "NA"
-            else "",
+            not x[0].beneficiary_settlement or x[0].beneficiary_settlement == "NA",
+            (x[0].beneficiary_settlement or "").lower(),
         ),
     )
 
     for i, (well, mws_id) in enumerate(all_wells_with_mws_sorted, 1):
-        doc.add_heading(f"{well.beneficiary_settlement}", level=4)
+        doc.add_heading(to_utf8(well.beneficiary_settlement), level=4)
 
         table_well = doc.add_table(rows=15, cols=2)
         table_well.style = "Table Grid"
@@ -805,12 +777,12 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         def add_well_data(row_idx, label, value):
             row_cells = table_well.rows[row_idx].cells
             row_cells[0].paragraphs[0].add_run(label).bold = True
-            row_cells[1].text = str(value) if value is not None else "NA"
+            row_cells[1].text = to_utf8(value) if value is not None else "NA"
 
         well_usage = "NA"
         if well.data_well and "Well_usage" in well.data_well:
             well_usage_data = well.data_well["Well_usage"]
-            select_one_well_used = well_usage_data.get("select_one_well_used")
+            select_one_well_used = ensure_str(well_usage_data.get("select_one_well_used"))
             select_one_well_used_other = well_usage_data.get(
                 "select_one_well_used_other"
             )
@@ -827,7 +799,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         repair_activities = "NA"
         if well.data_well and "Well_usage" in well.data_well:
             well_usage_data = well.data_well["Well_usage"]
-            well_repairs_type = well_usage_data.get("repairs_type")
+            well_repairs_type = ensure_str(well_usage_data.get("repairs_type"))
             well_repairs_type_other = well_usage_data.get("repairs_type_other")
 
             if (
@@ -846,7 +818,7 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
             and "Well_condition" in well.data_well
         ):
             well_condition_data = well.data_well["Well_condition"]
-            well_repairs_type = well_condition_data.get("select_one_repairs_well")
+            well_repairs_type = ensure_str(well_condition_data.get("select_one_repairs_well"))
             well_repairs_type_other = well_condition_data.get(
                 "select_one_repairs_well_other"
             )
@@ -877,14 +849,11 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         )
         add_well_data(7, "Households Benefitted", well.households_benefitted)
         add_well_data(8, "Which Caste uses the well?", well.caste_uses)
-        add_well_data(
-            9, "Is the well functional or non-functional?", well.is_functional
-        )
-        add_well_data(10, "Well Usage", well_usage)
-        add_well_data(11, "Need Maintenance?", well.need_maintenance)
-        add_well_data(12, "Repair Activities", repair_activities)
-        add_well_data(13, "Latitude", well.latitude)
-        add_well_data(14, "Longitude", well.longitude)
+        add_well_data(9, "Well Usage", well_usage)
+        add_well_data(10, "Need Maintenance?", well.need_maintenance)
+        add_well_data(11, "Repair Activities", repair_activities)
+        add_well_data(12, "Latitude", well.latitude)
+        add_well_data(13, "Longitude", well.longitude)
 
 
 def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
@@ -936,8 +905,8 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
         waterbody_info, start=1
     ):
         row_cells = table_waterbody_summary.rows[i].cells
-        row_cells[0].text = settlement
-        row_cells[1].text = waterbody_type
+        row_cells[0].text = to_utf8(settlement)
+        row_cells[1].text = to_utf8(waterbody_type)
         row_cells[2].text = str(num_waterbodies)
         row_cells[3].text = str(num_households)
 
@@ -948,7 +917,7 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
     )
 
     for i, (waterbody, mws_id) in enumerate(all_waterbodies_with_mws_sorted, 1):
-        doc.add_heading(f"{waterbody.beneficiary_settlement}", level=4)
+        doc.add_heading(to_utf8(waterbody.beneficiary_settlement), level=4)
 
         table_water_structure = doc.add_table(rows=14, cols=2)
         table_water_structure.style = "Table Grid"
@@ -956,15 +925,15 @@ def populate_consolidated_waterbody_tables(doc, all_waterbodies_with_mws):
         def add_waterbody_data(row_idx, label, value):
             row_cells = table_water_structure.rows[row_idx].cells
             row_cells[0].paragraphs[0].add_run(label).bold = True
-            row_cells[1].text = str(value) if value is not None else "NA"
+            row_cells[1].text = to_utf8(value) if value is not None else "NA"
 
-        who_manages = waterbody.who_manages
-        if waterbody.who_manages.lower() == "other":
-            who_manages = "Other: " + waterbody.specify_other_manager
+        who_manages = waterbody.who_manages or "NA"
+        if who_manages.lower() == "other":
+            who_manages = "Other: " + (waterbody.specify_other_manager or "")
 
-        water_structure_type = waterbody.water_structure_type
-        if waterbody.water_structure_type.lower() == "other":
-            water_structure_type = "Other: " + waterbody.water_structure_other
+        water_structure_type = waterbody.water_structure_type or "NA"
+        if water_structure_type.lower() == "other":
+            water_structure_type = "Other: " + (waterbody.water_structure_other or "")
 
         repair_activities = get_waterbody_repair_activities(
             waterbody.data_waterbody, water_structure_type
@@ -1056,7 +1025,6 @@ def maintenance_gw_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Recharge Structure",
         "Repair Activities",
@@ -1071,18 +1039,21 @@ def maintenance_gw_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in GW_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in GW_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_gw_maintenance.get("demand_type") or "NA"
-        row_cells[1].text = (
+        row_cells[0].text = to_utf8(
+            format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
+        )
+        row_cells[1].text = to_utf8(
             maintenance.data_gw_maintenance.get("beneficiary_settlement") or "NA"
         )
-        row_cells[2].text = (
+        row_cells[2].text = to_utf8(
             maintenance.data_gw_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = maintenance.data_gw_maintenance.get("select_gender") or "NA"
-        row_cells[4].text = maintenance.data_gw_maintenance.get("ben_father") or "NA"
-        row_cells[5].text = (
+        row_cells[3].text = to_utf8(
+            maintenance.data_gw_maintenance.get("ben_father") or "NA"
+        )
+        row_cells[4].text = to_utf8(
             maintenance.data_gw_maintenance.get("select_one_recharge_structure")
             or maintenance.data_gw_maintenance.get("select_one_water_structure")
             or "NA"
@@ -1097,7 +1068,7 @@ def maintenance_gw_table(doc, plan):
             and recharge_structure_type in RECHARGE_STRUCTURE_REVERSE_MAPPING
         ):
             repair_key = RECHARGE_STRUCTURE_REVERSE_MAPPING[recharge_structure_type]
-            repair_key_value = maintenance.data_gw_maintenance.get(repair_key)
+            repair_key_value = ensure_str(maintenance.data_gw_maintenance.get(repair_key))
 
             if repair_key_value and repair_key_value.lower() == "other":
                 repair_activities = maintenance.data_gw_maintenance.get(
@@ -1110,9 +1081,9 @@ def maintenance_gw_table(doc, plan):
             repair_activities = maintenance.data_gw_maintenance.get(
                 "select_one_activities"
             )
-        row_cells[6].text = repair_activities or "NA"
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_agri_table(doc, plan):
@@ -1120,7 +1091,6 @@ def maintenance_agri_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Irrigation Structure",
         "Repair Activity",
@@ -1135,18 +1105,21 @@ def maintenance_agri_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_agri_maintenance.get("demand_type") or "NA"
-        row_cells[1].text = (
+        row_cells[0].text = to_utf8(
+            format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
+        )
+        row_cells[1].text = to_utf8(
             maintenance.data_agri_maintenance.get("beneficiary_settlement") or "NA"
         )
-        row_cells[2].text = (
+        row_cells[2].text = to_utf8(
             maintenance.data_agri_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = maintenance.data_agri_maintenance.get("gender") or "NA"
-        row_cells[4].text = maintenance.data_agri_maintenance.get("ben_father") or "NA"
-        row_cells[5].text = (
+        row_cells[3].text = to_utf8(
+            maintenance.data_agri_maintenance.get("ben_father") or "NA"
+        )
+        row_cells[4].text = to_utf8(
             maintenance.data_agri_maintenance.get("select_one_water_structure")
             or maintenance.data_agri_maintenance.get("select_one_irrigation_structure")
             or "NA"
@@ -1161,7 +1134,7 @@ def maintenance_agri_table(doc, plan):
             and irr_structure_type in IRRIGATION_STRUCTURE_REVERSE_MAPPING
         ):
             repair_key = IRRIGATION_STRUCTURE_REVERSE_MAPPING[irr_structure_type]
-            repair_key_value = maintenance.data_agri_maintenance.get(repair_key)
+            repair_key_value = ensure_str(maintenance.data_agri_maintenance.get(repair_key))
 
             if repair_key_value and repair_key_value.lower() == "other":
                 repair_activities = maintenance.data_agri_maintenance.get(
@@ -1175,9 +1148,9 @@ def maintenance_agri_table(doc, plan):
                 maintenance.data_agri_maintenance.get("select_one_activities") or "NA"
             )
 
-        row_cells[6].text = repair_activities or "NA"
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 def maintenance_waterstructures_table(doc, plan):
@@ -1185,7 +1158,6 @@ def maintenance_waterstructures_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Work",
         "Repair Activities",
@@ -1200,20 +1172,21 @@ def maintenance_waterstructures_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
-        row_cells[0].text = maintenance.data_swb_maintenance.get("demand_type") or "NA"
-        row_cells[1].text = (
+        row_cells[0].text = to_utf8(
+            format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
+        )
+        row_cells[1].text = to_utf8(
             maintenance.data_swb_maintenance.get("beneficiary_settlement") or "NA"
         )
-        row_cells[2].text = (
+        row_cells[2].text = to_utf8(
             maintenance.data_swb_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = (
-            maintenance.data_swb_maintenance.get("select_gender") or "NA"
+        row_cells[3].text = to_utf8(
+            maintenance.data_swb_maintenance.get("ben_father") or "NA"
         )
-        row_cells[4].text = maintenance.data_swb_maintenance.get("ben_father") or "NA"
-        row_cells[5].text = (
+        row_cells[4].text = to_utf8(
             maintenance.data_swb_maintenance.get("TYPE_OF_WORK")
             or maintenance.data_swb_maintenance.get("select_one_water_structure")
             or "NA"
@@ -1235,7 +1208,7 @@ def maintenance_waterstructures_table(doc, plan):
             repair_activities = maintenance.data_swb_maintenance.get(
                 "select_one_activities"
             )
-        row_cells[6].text = repair_activities or "NA"
+        row_cells[5].text = to_utf8(repair_activities or "NA")
         row_cells[6].text = str(maintenance.latitude)
         row_cells[7].text = str(maintenance.longitude)
 
@@ -1245,7 +1218,6 @@ def maintenance_rs_waterstructures_table(doc, plan):
         "Type of demand",
         "Name of the Beneficiary Settlement",
         "Beneficiary Name",
-        "Gender",
         "Beneficiary's Father's Name",
         "Type of Work",
         "Repair Activities",
@@ -1259,25 +1231,24 @@ def maintenance_rs_waterstructures_table(doc, plan):
         header_cells[i].text = header
         header_cells[i].paragraphs[0].runs[0].bold = True
 
-    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id):
+    for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
-        row_cells[0].text = (
-            maintenance.data_swb_rs_maintenance.get("demand_type") or "NA"
+        row_cells[0].text = to_utf8(
+            format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
         )
-        row_cells[1].text = (
+        row_cells[1].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"
         )
-        row_cells[2].text = (
+        row_cells[2].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("Beneficiary_Name") or "NA"
         )
-        row_cells[3].text = maintenance.data_swb_rs_maintenance.get("gender") or "NA"
-        row_cells[4].text = (
+        row_cells[3].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("ben_father") or "NA"
         )
         rs_structure_type = (
             maintenance.data_swb_rs_maintenance.get("TYPE_OF_WORK") or "NA"
         )
-        row_cells[5].text = rs_structure_type
+        row_cells[4].text = to_utf8(rs_structure_type)
         repair_activities = "NA"
         if (
             rs_structure_type != "NA"
@@ -1288,9 +1259,9 @@ def maintenance_rs_waterstructures_table(doc, plan):
 
             repair_activities = repair_key_value
 
-        row_cells[6].text = repair_activities or "NA"
-        row_cells[7].text = str(maintenance.latitude)
-        row_cells[8].text = str(maintenance.longitude)
+        row_cells[5].text = to_utf8(repair_activities or "NA")
+        row_cells[6].text = str(maintenance.latitude)
+        row_cells[7].text = str(maintenance.longitude)
 
 
 # MARK: - Section F
@@ -1307,10 +1278,10 @@ def add_section_f(doc, plan, mws):
 def create_nrm_works_table(doc, plan, mws):
     recharge_st_in_plan = ODK_groundwater.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
     irrigation_works_in_plan = ODK_agri.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     recharge_works = [structure for structure in recharge_st_in_plan]
     irrigation_works = [irr_work for irr_work in irrigation_works_in_plan]
@@ -1341,12 +1312,20 @@ def create_nrm_works_table(doc, plan, mws):
         row_cells = table.rows[i].cells
         row_cells[0].text = str(i)  # S.No
         row_cells[1].text = "Recharge Structure"  # Work Category
-        row_cells[2].text = structure.data_groundwater.get("demand_type") or "NA"
-        row_cells[3].text = structure.work_type
-        row_cells[4].text = structure.beneficiary_settlement
-        row_cells[5].text = structure.data_groundwater.get("Beneficiary_Name") or "NA"
-        row_cells[6].text = structure.data_groundwater.get("select_gender") or "NA"
-        row_cells[7].text = structure.data_groundwater.get("ben_father") or "NA"
+        row_cells[2].text = to_utf8(
+            structure.data_groundwater.get("demand_type") or "NA"
+        )
+        row_cells[3].text = to_utf8(structure.work_type)
+        row_cells[4].text = to_utf8(structure.beneficiary_settlement)
+        row_cells[5].text = to_utf8(
+            structure.data_groundwater.get("Beneficiary_Name") or "NA"
+        )
+        row_cells[6].text = to_utf8(
+            structure.data_groundwater.get("select_gender") or "NA"
+        )
+        row_cells[7].text = to_utf8(
+            structure.data_groundwater.get("ben_father") or "NA"
+        )
         row_cells[8].text = str(structure.latitude)
         row_cells[9].text = str(structure.longitude)
 
@@ -1356,24 +1335,24 @@ def create_nrm_works_table(doc, plan, mws):
         row_cells = table.rows[i].cells
         row_cells[0].text = str(i)  # S.No
         row_cells[1].text = "Irrigation Work"
-        row_cells[2].text = irr_work.data_agri.get("demand_type") or "NA"
+        row_cells[2].text = to_utf8(irr_work.data_agri.get("demand_type") or "NA")
         if (
-            irr_work.work_type.lower() == "other"
+            (irr_work.work_type or "").lower() == "other"
             and irr_work.data_agri
             and "TYPE_OF_WORK_ID_other" in irr_work.data_agri
         ):
             custom_work_type = irr_work.data_agri.get("TYPE_OF_WORK_ID_other")
-            row_cells[3].text = (
-                str(custom_work_type)
+            row_cells[3].text = to_utf8(
+                custom_work_type
                 if custom_work_type is not None
                 else "Other (unspecified)"
             )
         else:
-            row_cells[3].text = irr_work.work_type
-        row_cells[4].text = irr_work.beneficiary_settlement
-        row_cells[5].text = irr_work.data_agri.get("Beneficiary_Name") or "NA"
-        row_cells[6].text = irr_work.data_agri.get("gender") or "NA"
-        row_cells[7].text = irr_work.data_agri.get("ben_father") or "NA"
+            row_cells[3].text = to_utf8(irr_work.work_type)
+        row_cells[4].text = to_utf8(irr_work.beneficiary_settlement)
+        row_cells[5].text = to_utf8(irr_work.data_agri.get("Beneficiary_Name") or "NA")
+        row_cells[6].text = to_utf8(irr_work.data_agri.get("gender") or "NA")
+        row_cells[7].text = to_utf8(irr_work.data_agri.get("ben_father") or "NA")
         row_cells[8].text = str(irr_work.latitude)
         row_cells[9].text = str(irr_work.longitude)
 
@@ -1384,7 +1363,7 @@ def add_section_g(doc, plan, mws):
 
     livelihood_records = ODK_livelihood.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
-    )
+    ).exclude(is_deleted=True)
 
     # Table for Livestock and Fisheries
     doc.add_heading("G.1 Livestock and Fisheries", level=2)
@@ -1410,20 +1389,20 @@ def add_section_g(doc, plan, mws):
         livestock_group = record.data_livelihood.get("Livestock")
         if (
             livestock_group.get("is_demand_livestock")
-            and livestock_group.get("is_demand_livestock").lower() == "yes"
+            and ensure_str(livestock_group.get("is_demand_livestock")).lower() == "yes"
         ) or (
             record.data_livelihood.get("select_one_demand_promoting_livestock")
-            and record.data_livelihood.get(
+            and ensure_str(record.data_livelihood.get(
                 "select_one_demand_promoting_livestock"
-            ).lower()
+            )).lower()
             == "yes"
         ):
             row_cells = table.add_row().cells
             row_cells[0].text = "Livestock"
-            row_cells[1].text = livestock_group.get("livestock_demand") or "NA"
-            demands_promoting_livestock = livestock_group.get(
+            row_cells[1].text = to_utf8(livestock_group.get("livestock_demand") or "NA")
+            demands_promoting_livestock = ensure_str(livestock_group.get(
                 "demands_promoting_livestock"
-            )
+            ))
             if (
                 demands_promoting_livestock
                 and demands_promoting_livestock.lower() == "other"
@@ -1434,9 +1413,9 @@ def add_section_g(doc, plan, mws):
 
             # check old keys
             if not demands_promoting_livestock or demands_promoting_livestock == "NA":
-                demands_promoting_livestock = record.data_livelihood.get(
+                demands_promoting_livestock = ensure_str(record.data_livelihood.get(
                     "select_one_promoting_livestock"
-                )
+                ))
                 if (
                     demands_promoting_livestock
                     and demands_promoting_livestock.lower() == "other"
@@ -1445,15 +1424,19 @@ def add_section_g(doc, plan, mws):
                         "select_one_promoting_livestock_other", "NA"
                     )
 
-            row_cells[2].text = format_text(demands_promoting_livestock) or "NA"
-            row_cells[3].text = record.beneficiary_settlement or "NA"
-            row_cells[4].text = (
+            row_cells[2].text = to_utf8(
+                format_text(demands_promoting_livestock) or "NA"
+            )
+            row_cells[3].text = to_utf8(record.beneficiary_settlement or "NA")
+            row_cells[4].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
                 or livestock_group.get("ben_livestock")
                 or "NA"
             )
-            row_cells[5].text = livestock_group.get("gender_livestock") or "NA"
-            row_cells[6].text = livestock_group.get("ben_father_livestock") or "NA"
+            row_cells[5].text = to_utf8(livestock_group.get("gender_livestock") or "NA")
+            row_cells[6].text = to_utf8(
+                livestock_group.get("ben_father_livestock") or "NA"
+            )
             row_cells[7].text = (
                 "{:.6f}".format(record.latitude) if record.latitude else "NA"
             )
@@ -1465,29 +1448,31 @@ def add_section_g(doc, plan, mws):
         fisheries_group = record.data_livelihood.get("fisheries")
         if (
             fisheries_group.get("is_demand_fisheris")
-            and fisheries_group.get("is_demand_fisheris").lower() == "yes"
+            and ensure_str(fisheries_group.get("is_demand_fisheris")).lower() == "yes"
             or record.data_livelihood.get("select_one_demand_promoting_fisheries")
-            and record.data_livelihood.get(
+            and ensure_str(record.data_livelihood.get(
                 "select_one_demand_promoting_fisheries"
-            ).lower()
+            )).lower()
             == "yes"
         ):
             row_cells = table.add_row().cells
             row_cells[0].text = "Fisheries"
-            row_cells[1].text = fisheries_group.get("demand_type_fisheries") or "NA"
-            demands_promoting_fisheries = fisheries_group.get(
-                "select_one_promoting_fisheries"
+            row_cells[1].text = to_utf8(
+                fisheries_group.get("demand_type_fisheries") or "NA"
             )
-            if demands_promoting_fisheries or demands_promoting_fisheries == "other":
+            demands_promoting_fisheries = ensure_str(fisheries_group.get(
+                "select_one_promoting_fisheries"
+            ))
+            if demands_promoting_fisheries and demands_promoting_fisheries.lower() == "other":
                 demands_promoting_fisheries = fisheries_group.get(
                     "select_one_promoting_fisheries_other", "NA"
                 )
 
             # check old keys
             if not demands_promoting_fisheries or demands_promoting_fisheries == "NA":
-                demands_promoting_fisheries = record.data_livelihood.get(
+                demands_promoting_fisheries = ensure_str(record.data_livelihood.get(
                     "select_one_promoting_fisheries"
-                )
+                ))
                 if (
                     demands_promoting_fisheries
                     and demands_promoting_fisheries.lower() == "other"
@@ -1496,15 +1481,19 @@ def add_section_g(doc, plan, mws):
                         "select_one_promoting_fisheries_other", "NA"
                     )
 
-            row_cells[2].text = format_text(demands_promoting_fisheries) or "NA"
-            row_cells[3].text = record.beneficiary_settlement or "NA"
-            row_cells[4].text = (
+            row_cells[2].text = to_utf8(
+                format_text(demands_promoting_fisheries) or "NA"
+            )
+            row_cells[3].text = to_utf8(record.beneficiary_settlement or "NA")
+            row_cells[4].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
                 or fisheries_group.get("ben_fisheries")
                 or "NA"
             )
-            row_cells[5].text = fisheries_group.get("gender_fisheries") or "NA"
-            row_cells[6].text = fisheries_group.get("ben_father_fisheries") or "NA"
+            row_cells[5].text = to_utf8(fisheries_group.get("gender_fisheries") or "NA")
+            row_cells[6].text = to_utf8(
+                fisheries_group.get("ben_father_fisheries") or "NA"
+            )
             row_cells[7].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
@@ -1537,34 +1526,36 @@ def add_section_g(doc, plan, mws):
         kitchen_garden_group = record.data_livelihood.get("kitchen_gardens")
         if (
             record.data_livelihood.get("select_one_demand_plantation")
-            and record.data_livelihood.get("select_one_demand_plantation").lower()
+            and ensure_str(record.data_livelihood.get("select_one_demand_plantation")).lower()
             == "yes"
             or plantation_group.get("select_plantation_demands")
-            and plantation_group.get("select_plantation_demands").lower() == "yes"
+            and ensure_str(plantation_group.get("select_plantation_demands")).lower() == "yes"
         ):
             row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Plantations"
-            row_cells[1].text = plantation_group.get("demand_type_plantations") or "NA"
-            row_cells[2].text = record.beneficiary_settlement or "NA"
-            row_cells[3].text = (
+            row_cells[1].text = to_utf8(
+                plantation_group.get("demand_type_plantations") or "NA"
+            )
+            row_cells[2].text = to_utf8(record.beneficiary_settlement or "NA")
+            row_cells[3].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
                 or plantation_group.get("ben_plantation")
                 or "NA"
             )
-            row_cells[4].text = plantation_group.get("gender") or "NA"
-            row_cells[5].text = plantation_group.get("ben_father") or "NA"
+            row_cells[4].text = to_utf8(plantation_group.get("gender") or "NA")
+            row_cells[5].text = to_utf8(plantation_group.get("ben_father") or "NA")
             plantation_crop_type = (
                 record.data_livelihood.get("Plantation")
                 or plantation_group.get("crop_name")
                 or "NA"
             )
-            row_cells[6].text = plantation_crop_type
+            row_cells[6].text = to_utf8(plantation_crop_type)
             plantation_crop_area = (
                 record.data_livelihood.get("Plantation_crop")
                 or plantation_group.get("crop_area")
                 or "NA"
             )
-            row_cells[7].text = plantation_crop_area
+            row_cells[7].text = to_utf8(plantation_crop_area)
             row_cells[8].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )
@@ -1575,35 +1566,35 @@ def add_section_g(doc, plan, mws):
         # kitchen garden
         if (
             record.data_livelihood.get("indi_assets")
-            and record.data_livelihood.get("indi_assets").lower() == "yes"
+            and ensure_str(record.data_livelihood.get("indi_assets")).lower() == "yes"
             or kitchen_garden_group.get("assets_kg")
-            and kitchen_garden_group.get("assets_kg").lower() == "yes"
+            and ensure_str(kitchen_garden_group.get("assets_kg")).lower() == "yes"
         ):
             row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Kitchen Garden"
-            row_cells[1].text = (
+            row_cells[1].text = to_utf8(
                 kitchen_garden_group.get("demand_type_kitchen_garden") or "NA"
             )
-            row_cells[2].text = record.beneficiary_settlement or "NA"
-            row_cells[3].text = (
+            row_cells[2].text = to_utf8(record.beneficiary_settlement or "NA")
+            row_cells[3].text = to_utf8(
                 record.data_livelihood.get("beneficiary_name")
                 or kitchen_garden_group.get("ben_kitchen_gardens")
                 or "NA"
             )
-            row_cells[4].text = (
+            row_cells[4].text = to_utf8(
                 kitchen_garden_group.get("gender_kitchen_gardens") or "NA"
             )
-            row_cells[5].text = (
+            row_cells[5].text = to_utf8(
                 kitchen_garden_group.get("ben_father_kitchen_gardens") or "NA"
             )
             kg_type = record.data_livelihood.get("Plantation") or "NA"
-            row_cells[6].text = kg_type
+            row_cells[6].text = to_utf8(kg_type)
             kg_area = (
                 record.data_livelihood.get("area_didi_badi")
                 or kitchen_garden_group.get("area_kg")
                 or "NA"
             )
-            row_cells[7].text = kg_area
+            row_cells[7].text = to_utf8(kg_area)
             row_cells[8].text = (
                 "{:.6}".format(record.latitude) if record.latitude else "NA"
             )

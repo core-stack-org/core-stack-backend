@@ -30,7 +30,7 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
     # Loop over each year
     while start_year <= end_year:
         start_date = f"{start_year}-07-01"
-        end_date = f"{start_year+1}-06-30"
+        end_date = f"{start_year + 1}-06-30"
 
         # Define export task details
         ndvi_description = f"ndvi_{start_year}_{description}"

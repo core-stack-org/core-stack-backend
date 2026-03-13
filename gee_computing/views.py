@@ -5,9 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import GEEAccount
-from .serializers import (
-   GeeAccountSerializers
-)
+from .serializers import GeeAccountSerializers
 
 from organization.models import Organization
 import logging
@@ -15,7 +13,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class GEEAccountView(mixins.ListModelMixin, viewsets.GenericViewSet, generics.CreateAPIView):
+class GEEAccountView(
+    mixins.ListModelMixin, viewsets.GenericViewSet, generics.CreateAPIView
+):
     """API endpoint for user registration."""
 
     queryset = GEEAccount.objects.filter(is_visible=True)

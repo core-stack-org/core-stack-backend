@@ -6,18 +6,13 @@
         "text": [
           {
             "en": ":folded_hands: Hello. Welcome to Community engagement Platform bot.",
-            "hi": "नमस्कार। सामुदायिक सहभागिता प्लेटफ़ॉर्म बॉट में आपका स्वागत है।",
-            "default": "Hello. Welcome to Community engagement Platform bot."
+            "hi": " नमस्ते! प्राकृतिक संसाधन (NRM) से जुड़ी मदद के लिए आपका स्वागत है। यहाँ आप अपने गाँव के लिए माँग उठा सकते हैं और अपनी कहानियाँ भी शेयर कर सकते हैं। शुरू करने के लिए अपनी लोकेशन शेयर करें और अपने इलाके की कम्युनिटी से जुड़ें।",
+            "default": "Namaskar. Welcome to natural resource management bot. You can use the bot to raise NRM related demands for your village and share stories with your community!\n"
           }
         ]
       },
       {
         "menu": [
-          {
-            "label": "सूची से चुनें",
-            "value": "state_district",
-            "caption": "आपकी बेहतर सेवा के लिए, हमें आपकी लोकेशन की आवश्यकता है। आप अपनी लोकेशन कैसे भेजना चाहते हैं? \n1. आप राज्य और ज़िले की सूची में से अपनी लोकेशन चुन सकते हैं। \n2. बस अपनी लोकेशन भेजें।"
-          },
           {
             "label": "स्थान भेज देंगे",
             "value": "location_pin"
@@ -39,6 +34,31 @@
       },
       {
         "Welcome": [
+          "failed"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ExitSession",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "\"We could not find any community linked to this location. Please type 'Hi' to start again.\"\n",
+            "hi": "\"हमें इस स्थान से जुड़ा कोई समुदाय नहीं मिला। कृपया दोबारा शुरू करने के लिए 'Hi' लिखें।\"\n",
+            "default":"We could not find any community linked to this location. Please type 'Hi' to start again."
+          }
+        ]
+      },
+      {
+        "function": "archive_and_end_session"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "ExitSession": [
           "failure"
         ]
       }
@@ -47,6 +67,15 @@
   {
     "name": "SendState",
     "preAction": [
+      {
+        "text": [
+          {
+            "en": ":folded_hands: We are providing you with a list of states. Please select a state from the list.",
+            "hi": "🙏 नमस्कार। हम आपको राज्यों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक राज्य चुनें।",
+            "default": "Please select a state from the list."
+          }
+        ]
+      },
       {
         "function": "send_states"
       }
@@ -73,10 +102,20 @@
     "name": "SendDistrict",
     "preAction": [
       {
-        "function": "send_districts",
         "data": {
-          "getDataFrom": {"state":"SendState", "field":"misc"}
-        }
+          "getDataFrom": {
+            "field": "misc",
+            "state": "SendState"
+          }
+        },
+        "text": [
+          {
+            "en": "We are providing you with a list of districts. Please select a district from the list.",
+            "hi": "हम आपको जिलों की सूची प्रदान कर रहे हैं। कृपया सूची में से एक जिला चुनें।",
+            "default": "Please select a district from the list."
+          }
+        ],
+        "function": "send_districts"
       }
     ],
     "postAction": [
@@ -122,25 +161,24 @@
     "name": "CommunityByLocation",
     "preAction": [
       {
-        "function": "send_community_by_location",
         "data": {
-          "getDataFrom": {"state":"SendLocationRequest","field": "data"}
-        }
+          "getDataFrom": {
+            "field": "data",
+            "state": "SendLocationRequest"
+          }
+        },
+        "function": "send_community_by_location"
       }
     ],
-    "postAction": [
-      {
-        "function": "move_forward"
-      }
-    ],
+    "postAction": [],
     "transition": [
       {
-        "AddUserToCommunityLoc": [
+        "AddUserToCommunityByLocation": [
           "success"
         ]
       },
       {
-        "NoCommunitiesMsg": [
+        "ExitSession": [
           "no_communities"
         ]
       },
@@ -155,13 +193,19 @@
     "name": "CommunityByStateDistrict",
     "preAction": [
       {
-        "function": "send_community_by_state_district",
         "data": {
           "getDataFrom": [
-            {"state":"SendState", "field":"misc"},
-            {"state":"SendDistrict", "field":"misc"}
+            {
+              "field": "misc",
+              "state": "SendState"
+            },
+            {
+              "field": "misc",
+              "state": "SendDistrict"
+            }
           ]
-        }
+        },
+        "function": "send_community_by_state_district"
       }
     ],
     "postAction": [
@@ -183,18 +227,19 @@
     ]
   },
   {
-    "name": "AddUserToCommunityLoc",
+    "name": "AddUserToCommunityByLocation",
     "preAction": [
       {
-        "function": "add_user_to_community",
         "data": {
-          "getDataFrom": {"state":"CommunityByLocation", "field":"misc"}
-        }
+          "getDataFrom": {
+            "field": "misc",
+            "state": "CommunityByLocation"
+          }
+        },
+        "function": "add_user_to_community"
       }
     ],
-    "postAction": [
-      
-    ],
+    "postAction": [],
     "transition": [
       {
         "PostOnboardingMenu": [
@@ -202,7 +247,7 @@
         ]
       },
       {
-        "AddUserToCommunityLoc": [
+        "AddUserToCommunity": [
           "failure"
         ]
       }
@@ -212,15 +257,16 @@
     "name": "AddUserToCommunity",
     "preAction": [
       {
-        "function": "add_user_to_community",
         "data": {
-          "getDataFrom": {"state":"CommunityByStateDistrict", "field":"misc"}
-        }
+          "getDataFrom": {
+            "field": "misc",
+            "state": "CommunityByStateDistrict"
+          }
+        },
+        "function": "add_user_to_community"
       }
     ],
-    "postAction": [
-      
-    ],
+    "postAction": [],
     "transition": [
       {
         "PostOnboardingMenu": [
@@ -240,8 +286,8 @@
       {
         "text": [
           {
-            "hi": "बधाई हो! आप सफलतापूर्वक समुदाय में शामिल हो गए हैं।",
             "en": "Congratulations! You have successfully joined the community.",
+            "hi": "बधाई हो! आप सफलतापूर्वक समुदाय में शामिल हो गए हैं।",
             "default": "Congratulations! You have successfully joined the community."
           }
         ]
@@ -249,8 +295,8 @@
       {
         "text": [
           {
-            "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",
             "en": "Redirecting you to community services...",
+            "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",
             "default": "Redirecting you to community services..."
           }
         ]
@@ -274,8 +320,8 @@
       {
         "text": [
           {
-            "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",
             "en": "Redirecting you to community services...",
+            "hi": "आपको समुदायिक सेवाओं में स्थानांतरित कर रहे हैं...",
             "default": "Redirecting you to community services..."
           }
         ]
@@ -292,30 +338,5 @@
     ],
     "postAction": [],
     "transition": []
-  },
-  {
-    "name": "NoCommunitiesMsg",
-    "preAction": [
-      {
-        "text": [
-          {
-            "en": "Sorry we don't have any communities for you exact location.\n\n🙏 Send \"Hi\" to restart the chat.",
-            "hi": "क्षमा करें, आपके सटीक स्थान के लिए हमारे पास कोई समुदाय नहीं है।\n\n🙏 चैट को फिर से शुरू करने के लिए \"Hi\" भेजें।",
-            "default": "Sorry we don't have any communities for you exact location.\n\n🙏 Send \"Hi\" to restart the chat."
-          }
-        ]
-      },
-      {
-        "function": "archive_and_end_session"
-      }
-    ],
-    "postAction": [],
-    "transition": [
-      {
-        "NoCommunitiesMsg": [
-          "failure"
-        ]
-      }
-    ]
   }
 ]

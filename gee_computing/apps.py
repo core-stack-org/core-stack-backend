@@ -6,4 +6,4 @@ class GeeComputingConfig(AppConfig):
     name = "gee_computing"
 
     def ready(self):
-        import  gee_computing.signals
+        import gee_computing.signals

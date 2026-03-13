@@ -9,11 +9,10 @@ from utilities.gee_utils import valid_gee_text
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 
-
 logger = setup_logger(__name__)
 
-overwrite_storage = FileSystemStorage(   
-    allow_overwrite=True            
+overwrite_storage = FileSystemStorage(
+    allow_overwrite=True
 )
 
 def kml_file_path(instance, filename):
@@ -23,24 +22,24 @@ def kml_file_path(instance, filename):
     
     This function creates the directory if it doesn't exist and uses the original filename.
     """
-    
+
     logger.info(f"Generating KML file path for project: {instance.project.name}")
     
     project_id = instance.project.id
     org_name = instance.project.organization.name
     app_type = instance.project.app_type
     project_name = instance.project.name
-    
+
     relative_directory = f"site_data/{org_name}/{app_type}/{project_id}_{valid_gee_text(project_name)}"
-    
+
     full_path = os.path.join(settings.MEDIA_ROOT, relative_directory)
-    
+
     logger.info(f"Ensuring directory exists: {full_path}")
     try:
         os.makedirs(full_path, exist_ok=True)
     except Exception as e:
         logger.error(f"Error creating directory: {e}")
-    
+
     logger.info(f"Returning path: {relative_directory}/{filename}")
     return f"{relative_directory}/{filename}"
 

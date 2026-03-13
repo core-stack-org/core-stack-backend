@@ -1,24 +1,6 @@
 from rest_framework import serializers
 
-from .models import Plan, PlanApp
-
-
-class PlanSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Plan
-        fields = "__all__"
-
-    def validate(self, data):
-        if not data["state"].active_status:
-            raise serializers.ValidationError("The state is not active.")
-
-        if not data["district"].active_status:
-            raise serializers.ValidationError("The district is not active.")
-
-        if not data["block"].active_status:
-            raise serializers.ValidationError("The block is not active.")
-
-        return data
+from .models import PlanApp
 
 
 class PlanAppSerializer(serializers.ModelSerializer):
@@ -35,9 +17,9 @@ class PlanAppSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "plan",
-            "state",
-            "district",
-            "block",
+            "state_soi",
+            "district_soi",
+            "tehsil_soi",
             "village_name",
             "gram_panchayat",
             "facilitator_name",
@@ -54,6 +36,8 @@ class PlanAppSerializer(serializers.ModelSerializer):
             "is_dpr_generated",
             "is_dpr_reviewed",
             "is_dpr_approved",
+            "latitude",
+            "longitude",
         ]
         read_only_fields = [
             "id",
@@ -97,13 +81,12 @@ class PlanCreateSerializer(serializers.ModelSerializer):
         model = PlanApp
         fields = [
             "plan",
-            "state",
-            "district",
-            "block",
+            "state_soi",
+            "district_soi",
+            "tehsil_soi",
             "village_name",
             "gram_panchayat",
             "facilitator_name",
-            # Optional fields
             "enabled",
             "is_completed",
             "is_dpr_generated",
@@ -117,9 +100,8 @@ class PlanCreateSerializer(serializers.ModelSerializer):
         """
         required_fields = [
             "plan",
-            "state",
-            "district",
-            "block",
+            "state_soi",
+            "district_soi",
             "village_name",
             "gram_panchayat",
             "facilitator_name",
@@ -127,6 +109,9 @@ class PlanCreateSerializer(serializers.ModelSerializer):
         for field in required_fields:
             if field not in data or not data[field]:
                 raise serializers.ValidationError(f"{field} is required")
+
+        if not data.get("tehsil_soi"):
+            raise serializers.ValidationError("tehsil_soi is required")
 
         request = self.context.get("request")
         if request and request.parser_context.get("kwargs"):
@@ -143,14 +128,14 @@ class PlanCreateSerializer(serializers.ModelSerializer):
                         }
                     )
 
-        if not data["state"].active_status:
+        if not data["state_soi"].active_status:
             raise serializers.ValidationError("The state is not active.")
 
-        if not data["district"].active_status:
+        if not data["district_soi"].active_status:
             raise serializers.ValidationError("The district is not active.")
 
-        if not data["block"].active_status:
-            raise serializers.ValidationError("The block is not active.")
+        if data.get("tehsil_soi") and not data["tehsil_soi"].active_status:
+            raise serializers.ValidationError("The tehsil is not active.")
 
         return data
 
@@ -165,9 +150,9 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
         model = PlanApp
         fields = [
             "plan",
-            "state",
-            "district",
-            "block",
+            "state_soi",
+            "district_soi",
+            "tehsil_soi",
             "village_name",
             "gram_panchayat",
             "facilitator_name",
@@ -185,7 +170,7 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
                 project = instance.project
                 if project:
                     existing_plan = (
-                        PlanApp.objects.filter(project=project, plan=data["plab"])
+                        PlanApp.objects.filter(project=project, plan=data["plan"])
                         .exclude(id=instance.id)
                         .exists()
                     )
@@ -197,12 +182,12 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
                             }
                         )
 
-        if "state" in data and not data["state"].active_status:
+        if "state_soi" in data and not data["state_soi"].active_status:
             raise serializers.ValidationError("The state is not active.")
-        if "district" in data and not data["district"].active_status:
+        if "district_soi" in data and not data["district_soi"].active_status:
             raise serializers.ValidationError("The district is not active.")
-        if "block" in data and not data["block"].active_status:
-            raise serializers.ValidationError("The block is not active.")
+        if "tehsil_soi" in data and not data["tehsil_soi"].active_status:
+            raise serializers.ValidationError("The tehsil is not active.")
 
         return data
 

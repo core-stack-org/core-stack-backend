@@ -1,5 +1,6 @@
 import ee
 from nrm_app.celery import app
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -10,139 +11,143 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
+    get_gee_dir_path,
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.STAC_specs import generate_STAC_layerwise
+from constants.pan_india_urls import CH_RASTER
 
 
+# Celery task to generate canopy height raster
 @app.task(bind=True)
 def tree_health_ch_raster(
-    self, state, district, block, start_year, end_year, gee_account_id
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=None,
+    end_year=None,
+    app_type="MWS",
+    gee_account_id=None,
 ):
-    ee_initialize(gee_account_id)
-    print("Inside process tree_health_ch_raster")
-    # ch_palette = [
-    #     "FFA500",
-    #     "FFA500",
-    #     "DEE64C",
-    #     "DEE64C",
-    #     "DEE64C",
-    #     "DEE64C",
-    #     "007500",
-    #     "007500",
-    #     "000000"
-    # ]
+    print("Inside process Tree health ch raster")
 
-    block_mws = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
-    )
+    # Initialize Earth Engine
+    ee_initialize(gee_account_id)
+
+    # Prepare ROI and asset folder path
+    if state and district and block:
+        asset_suffix = (
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
+
+        # Load ROI FeatureCollection
+        roi = ee.FeatureCollection(
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + "filtered_mws_"
+            + asset_suffix
+            + "_uid"
+        )
+
     layer_at_geoserver = False
-    for year in range(start_year, end_year):
+
+    # Loop for each year
+    for year in range(start_year, end_year + 1):
+
+        # Create asset name
         description = (
-            "tree_health_ch_raster_"
+            "ch_raster_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
             + "_"
             + str(year)
         )
-        asset_id = get_gee_asset_path(state, district, block) + description
 
-        if is_gee_asset_exists(asset_id):
-            return True
-
-        # Define the path for CH data based on start year
-        if year == 2016 or year == 2022:
-            ch_path = "projects/ee-mtpictd/assets/harsh/ch_" + str(year)
-        else:
-            ch_path = "projects/ee-mtpictd/assets/dhruvi/modal_ch_" + str(year)
-
-        # Load and process the CH Image Collection
-        ch_img = (
-            ee.ImageCollection(ch_path).filterBounds(block_mws).mean().clip(block_mws)
+        asset_id = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description
         )
 
-        # visualization = {"min": 0, "max": 8, "palette": ch_palette}
+        # Create raster asset if it does not exist
+        if not is_gee_asset_exists(asset_id):
+            ch_raster = ee.ImageCollection(CH_RASTER + str(year))
 
-        ch_composite = ch_img.rename(["classification"])
+            # Filter by ROI and take mean image
+            raster = ch_raster.filterBounds(roi.geometry()).mean().clip(roi.geometry())
 
-        # Function to compute the change statistics per block
-        def change_stats(feature):
-            stats = ch_composite.reduceRegion(
-                reducer=ee.Reducer.frequencyHistogram().unweighted(),
-                geometry=feature.geometry(),
+            # Load LULC map for tree masking
+            lulc = ee.Image(
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
+                )
+                + f"{asset_suffix}_{year}-07-01_{year + 1}-06-30_LULCmap_10m"
+            )
+
+            # Apply tree mask (class 6 = tree)
+            tree_mask = lulc.eq(6).reproject(crs="EPSG:4326", scale=25)
+            raster = raster.updateMask(tree_mask)
+
+            # Export raster to GEE asset
+            task_id = export_raster_asset_to_gee(
+                image=raster,
+                description=description,
+                asset_id=asset_id,
                 scale=25,
-                maxPixels=1e10,
-            )
-            pixelCounts = ee.Dictionary(stats.get("classification"))
-
-            # Return feature with additional properties representing the change statistics
-            return feature.set(
-                {
-                    "ch_0": ee.Number(pixelCounts.get("0.0", 0)).add(
-                        ee.Number(pixelCounts.get("1.0", 0))
-                    ),  # Short Trees
-                    "ch_1": ee.Number(pixelCounts.get("2.0", 0))
-                    .add(ee.Number(pixelCounts.get("3.0", 0)))
-                    .add(ee.Number(pixelCounts.get("4.0", 0)))
-                    .add(ee.Number(pixelCounts.get("5.0", 0))),  # Medium Height Trees
-                    "ch_2": ee.Number(pixelCounts.get("6.0", 0)).add(
-                        ee.Number(pixelCounts.get("7.0", 0))
-                    ),  # Tall Trees
-                    "ch_3": pixelCounts.get("8.0", 0),  # Missing Data
-                }
+                region=roi.geometry(),
             )
 
-        block_mws = block_mws.map(change_stats)
+            check_task_status([task_id])
 
-        # Export the result to GEE
-        task_id = export_raster_asset_to_gee(
-            image=ch_img.clip(block_mws.geometry()),
-            description=description,
-            asset_id=asset_id,
-            scale=25,
-            region=block_mws.geometry(),
-        )
-        task_id_list = check_task_status([task_id])
-        print("CH task_id_list", task_id_list)
-
+        # If asset exists, make public and sync
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
-            layer_name = (
-                "tree_health_ch_raster_"
-                + valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
-                + "_"
-                + str(year)
+
+            # Save layer metadata in DB
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                description,
+                asset_id,
+                "Canopy Height Raster",
+                misc={"start_year": start_year, "end_year": end_year},
             )
 
-            # layer_id = save_layer_info_to_db(
-            #     state,
-            #     district,
-            #     block,
-            #     layer_name,
-            #     asset_id,
-            #     "Canopy Height Raster",
-            #     misc={"start_year": start_year, "end_year": end_year},
-            # )
+            # Export raster to Google Cloud Storage
+            task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, description)
 
-            # Sync image to Google Cloud Storage and Geoserver
-            task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
+            check_task_status([task_id])
 
-            task_id_list = check_task_status([task_id])
-            print("task_id_list sync to GCS", task_id_list)
-
+            # Sync raster from GCS to GeoServer
             res = sync_raster_gcs_to_geoserver(
-                "canopy_height", layer_name, layer_name, "ch_style"
+                "canopy_height", description, description, "ch_style"
             )
-            # if res and layer_id:
-            #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            #     print("sync to geoserver flag is updated")
-            if res:
+
+            if res and layer_id:
                 layer_at_geoserver = True
+
+                # layer_STAC_generated = False
+                # layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                #     state=state,
+                #     district=district,
+                #     block=block,
+                #     layer_name="ch_raster",
+                #     start_year=year,
+                # )
+
+                # Update sync flag in DB
+                update_layer_sync_status(
+                    layer_id=layer_id,
+                    sync_to_geoserver=layer_at_geoserver,
+                )
+
     return layer_at_geoserver

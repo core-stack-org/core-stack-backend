@@ -33,12 +33,16 @@ SECRET_KEY = env("SECRET_KEY")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
+
+# TMP File location
+TMP_LOCATION = env("TMP_LOCATION")
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
+AUTH_TOKEN_FB_META = env("AUTH_TOKEN_FB_META")
 ODK_PASSWORD = env("ODK_PASSWORD")
-
+DEPLOYMENT_DIR = env("DEPLOYMENT_DIR")
 # MARK: ODK Sync Creds
 ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
 ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
@@ -50,6 +54,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
+
 STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = 2
 GEE_DEFAULT_ACCOUNT_ID = 1
@@ -60,9 +65,12 @@ ALLOWED_HOSTS = [
     "localhost",
     "0.0.0.0",
     "api-doc.core-stack.org",
-    "0cb52a0325c7.ngrok-free.app",
+    "2f2de623c34b.ngrok-free.app",
+    "odk.core-stack.org",
+    "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
-
+CE_API_URL = env("CE_API_URL")
+CE_BUCKET_NAME = env("CE_BUCKET_NAME")
 # MARK: Django Apps
 
 INSTALLED_APPS = [
@@ -72,6 +80,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_celery_beat",
     # core apps
     "computing",
     "dpr",
@@ -85,7 +94,6 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework_api_key",
     # project applications
-    "users",
     "organization.apps.OrganizationConfig",
     "projects",
     "plantations",
@@ -94,6 +102,10 @@ INSTALLED_APPS = [
     "community_engagement",
     "bot_interface",
     "gee_computing",
+    "waterrejuvenation",
+    "apiadmin",
+    "moderation",
+    "users.apps.UsersConfig",
 ]
 
 # MARK: CORS Settings
@@ -117,7 +129,6 @@ else:
         "http://localhost:3000",
         "http://localhost:3001",
     ]
-
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -187,6 +198,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
+    # "apiadmin.middleware.ApiHitLoggerMiddleware",
 ]
 
 ROOT_URLCONF = "nrm_app.urls"
@@ -264,6 +277,10 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Celery
+CELERY_TIMEZONE = "Asia/Kolkata"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
@@ -282,7 +299,6 @@ EXCEL_PATH = env("EXCEL_PATH")
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 
 LOGGING = {
     "version": 1,
@@ -328,7 +344,6 @@ LOGGING = {
     },
 }
 
-
 # MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
 
@@ -341,11 +356,14 @@ EMAIL_USE_TLS = False
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 EMAIL_TIMEOUT = 30
+PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 
 GEOSERVER_URL = env("GEOSERVER_URL")
 GEOSERVER_USERNAME = env("GEOSERVER_USERNAME")
 GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD")
 
+
+CE_BUCKET_URL = env("CE_BUCKET_URL")
 EARTH_DATA_USER = env("EARTH_DATA_USER")
 EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 
@@ -357,12 +375,21 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
-NREGA_ACCESS_KEY = env("NREGA_ACCESS_KEY")
-NREGA_SECRET_KEY = env("NREGA_SECRET_KEY")
+
+# S3 access keys
+S3_SECRET_KEY = env("S3_SECRET_KEY")
+S3_ACCESS_KEY = env("S3_ACCESS_KEY")
 
 # S3 settings
 S3_BUCKET = env("S3_BUCKET")
 S3_REGION = env("S3_REGION")
+
+# DPR S3 settings
+DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY")
+DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY")
+DPR_S3_REGION = env("DPR_S3_REGION")
+DPR_S3_BUCKET = env("DPR_S3_BUCKET")
+DPR_S3_FOLDER = env("DPR_S3_FOLDER")
 
 # bot_interface settings
 AUTH_TOKEN_360 = env("AUTH_TOKEN_360")
@@ -375,4 +402,18 @@ WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
 BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
 
+PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
+
 FERNET_KEY = env("FERNET_KEY")
+
+
+lulc_years = [
+    "2017_2018",
+    "2018_2019",
+    "2019_2020",
+    "2020_2021",
+    "2021_2022",
+    "2022_2023",
+    "2023_2024",
+]
+water_classes = [2, 3, 4]

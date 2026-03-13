@@ -1,0 +1,15 @@
+{
+  "team_name": "Your team name",
+  "members": [
+    { "name": "Team member 1", "role": "Geospatial Analyst", "affiliation": "Independent" },
+    { "name": "Team member 2", "role": "Ecologist", "affiliation": "Your institution" },
+    { "name": "Team member 3", "role": "Software Engineer", "affiliation": "Your institution" }
+  ],
+  "contact_email": "email@example.com",
+  "track": "Data Exploration",
+  "project_title": "Agroforestry Potential Scoring for Micro-Watersheds",
+  "abstract": "We build an open-source agroforestry potential scoring system using CoRE Stack layers such as cropping intensity, runoff, slope, groundwater stress, and tree cover change. The tool generates tehsil-level score maps, provides village-level summaries, and includes a reproducible notebook that automatically fetches all required datasets using CoRE stack APIs. The outputs are designed to be actionable for watershed planners and community-based organizations.",
+  "repository_url": "https://github.com/yourlab/agroforestry-scoring",
+  "demo_video_url": "https://youtu.be/example-demo",
+  "submission_date": "2025-01-15"
+}

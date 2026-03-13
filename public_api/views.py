@@ -1,52 +1,59 @@
 import ee
 import os
+import json
+import requests
+import pandas as pd
+import numpy as np
+from rest_framework.response import Response
+from rest_framework import status
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
 )
-from datetime import datetime
-from rest_framework.response import Response
-from rest_framework import status
-from nrm_app.settings import EXCEL_PATH
-import json
-import pandas as pd
-import numpy as np
-from stats_generator.mws_indicators import get_generate_filter_mws_data
-import json
+from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL, GEE_HELPER_ACCOUNT_ID
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
-
-from stats_generator.models import LayerInfo
-from computing.models import Layer, Dataset, LayerType
+from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
-from nrm_app.settings import GEOSERVER_URL
+from django.db.models import Q
 
 # Create your views here.
+
 
 def is_valid_string(value):
     if not value:
         return True
-    cleaned = value.replace(" ", "").replace("_", "")
+
+    cleaned = (
+        value.replace(" ", "")
+        .replace("_", "")
+        .replace("(", "")
+        .replace(")", "")
+        .replace(".", "")
+        .replace("-", "")
+    )
+
     return cleaned.isalpha()
+
 
 def is_valid_mws_id(value):
     if not value:
         return True
-    return all(c.isdigit() or c == '_' for c in value)
+    return all(c.isdigit() or c == "_" for c in value)
+
 
 def excel_file_exists(state, district, tehsil):
-    base_path = os.path.join(EXCEL_PATH, 'data/stats_excel_files')
+    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
     state_path = os.path.join(base_path, state.upper())
     district_path = os.path.join(state_path, district.upper())
     filename = f"{district}_{tehsil}.xlsx"
     file_path = os.path.join(district_path, filename)
-    return os.path.exists(file_path)
+    return file_path, os.path.exists(file_path)
 
 
 def raster_tiff_download_url(workspace, layer_name):
     geotiff_url = f"{GEOSERVER_URL}/{workspace}/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId={workspace}:{layer_name}&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
-    print("Geojson url",  geotiff_url)
     return geotiff_url
 
 
@@ -58,8 +65,19 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
     state = StateSOI.objects.get(state_name__iexact=state_name)
     district = DistrictSOI.objects.get(district_name__iexact=district_name, state=state)
     tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
-    
+
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
+
+    EXCLUDE_LAYER_KEYWORDS = [
+        "run_off",
+        "evapotranspiration",
+        "precipitation",
+    ]
+    for word in EXCLUDE_LAYER_KEYWORDS:
+        layers = layers.exclude(
+            Q(layer_name__icontains=word) & ~Q(layer_name__icontains="mws_connectivity")
+        )
+
     layer_data = []
 
     for layer in layers:
@@ -68,10 +86,11 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         layer_type = dataset.layer_type
         layer_name = layer.layer_name
         gee_asset_path = layer.gee_asset_path
-
-        # Safely get misc data
-        misc = dataset.misc or {}
-        style_url = dataset.style_name
+        style_url = (
+            dataset.misc["style_url"]
+            if dataset.misc and "style_url" in dataset.misc
+            else ""
+        )
 
         if layer_type in [LayerType.VECTOR, LayerType.POINT]:
             layer_url = get_url(workspace, layer_name)
@@ -80,146 +99,294 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         else:
             continue  # Skip unknown types
 
-        layer_data.append({
-            "layer_name": dataset.name,
-            "layer_type": layer_type,
-            "layer_url": layer_url,
-            "layer_version": layer.layer_version,
-            "style_url": '',
-            "gee_asset_path": gee_asset_path
-        })
+        layer_data.append(
+            {
+                "layer_name": layer_name,
+                "dataset_name": dataset.name,
+                "layer_type": layer_type,
+                "layer_url": layer_url,
+                "layer_version": layer.layer_version,
+                "style_url": style_url,
+                "gee_asset_path": gee_asset_path,
+            }
+        )
 
-    return layer_data
-        
+    latest_layers = {}
+    for entry in layer_data:
+        name = entry["layer_name"].lower()
+        if name not in latest_layers:
+            latest_layers[name] = entry
+        else:
+            current_version = float(latest_layers[name]["layer_version"] or 0)
+            new_version = float(entry["layer_version"] or 0)
+            if new_version > current_version:
+                latest_layers[name] = entry
 
+    return list(latest_layers.values())
 
 
 def get_location_info_by_lat_lon(lat, lon):
-    ee_initialize()
-    point = ee.Geometry.Point([lon, lat])
-    feature_collection = ee.FeatureCollection("projects/corestack-datasets/assets/datasets/SOI_tehsil")
+    base_url = f"{GEOSERVER_URL}/pan_india_asset/ows"
+    params = {
+        "service": "WFS",
+        "version": "1.0.0",
+        "request": "GetFeature",
+        "typeName": "pan_india_asset:SOI_tehsil_pan_india_dataset",
+        "outputFormat": "application/json",
+        "CQL_FILTER": f"INTERSECTS(geom,POINT({lon} {lat}))",  # lon lat order
+    }
+
     try:
-        intersected = feature_collection.filterBounds(point)
-        collection_size = intersected.size().getInfo()
-        if collection_size == 0:
-            return Response({"error": "Latitude and longitude is not in SOI boundary."}, status=status.HTTP_404_NOT_FOUND)
-        features = intersected.toList(intersected.size())
-        for i in range(intersected.size().getInfo()):
-            feature = ee.Feature(features.get(i))
-            feature_loc = feature.getInfo()['properties']
-            locat_details = {"State": feature_loc.get('STATE'), "District": feature_loc.get('District'), "Tehsil": feature_loc.get('TEHSIL')}
-            return locat_details
-    except Exception as e:
+        response = requests.get(base_url, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        features = data.get("features", [])
+        if not features:
+            return Response(
+                {"error": "Latitude and longitude is not in SOI boundary."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        properties = features[0].get("properties", {})
+        return {
+            "State": properties.get("STATE", ""),
+            "District": properties.get("District", ""),
+            "Tehsil": properties.get("TEHSIL", ""),
+        }
+
+    except requests.exceptions.RequestException as e:
         print("Exception while getting admin details", str(e))
         return {"State": "", "District": "", "Tehsil": ""}
 
 
-
 def get_mws_id_by_lat_lon(lon, lat):
     data_dict = get_location_info_by_lat_lon(lat, lon)
-    print("Data dict for the lat lon", data_dict)
+
     if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
         return Response(
-            {"error": "Latitude and longitude is not in SOI boundary."},status=status.HTTP_404_NOT_FOUND)
-    state = data_dict.get('State')
-    district = data_dict.get('District')
-    tehsil = data_dict.get('Tehsil')
+            {"error": "Latitude and longitude is not in SOI boundary."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    district = valid_gee_text(data_dict.get("District").lower())
+    tehsil = valid_gee_text(data_dict.get("Tehsil").lower())
 
     try:
-        asset_path = get_gee_asset_path(state, district, tehsil)
-        mws_asset_id = asset_path + f'filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(tehsil.lower())}_uid'
-        if is_gee_asset_exists(mws_asset_id):
-            mws_fc = ee.FeatureCollection(mws_asset_id)
-            point = ee.Geometry.Point([lon, lat])
-            matching_feature = mws_fc.filterBounds(point).first()
-            uid = ee.String(matching_feature.get('uid')).getInfo()
-            data_dict["uid"] = uid
-            return data_dict
-        else:
-            return Response({"error": "Mws Layer is not generated for the given lat lon location."}, status=status.HTTP_404_NOT_FOUND)
+        layer_name = f"mws:mws_{district}_{tehsil}"
+        GEOSERVER_MWS_URL = f"{GEOSERVER_URL}/mws/ows"
+
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": layer_name,
+            "outputFormat": "application/json",
+            "CQL_FILTER": f"INTERSECTS(geom,POINT({lon} {lat}))",
+        }
+
+        response = requests.get(GEOSERVER_MWS_URL, params=params, timeout=30)
+
+        # Check status before parsing
+        if response.status_code in (400, 404):
+            print("MWS layer not found:", layer_name)
+            return Response(
+                {"error": "Mws Layer is not generated for the given lat lon location."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            print("Invalid JSON response:", response.text[:500])
+            return Response(
+                {"error": "Invalid response from MWS GeoServer."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        features = data.get("features", [])
+        if not features:
+            return Response(
+                {"error": "No MWS feature found for the given lat lon location."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        properties = features[0].get("properties", {})
+        uid = properties.get("uid")
+
+        data_dict["mws_id"] = uid
+        return data_dict
+
     except Exception as e:
-        print("Exception while getting mws_id using lat lon", str(e))
+        print("Exception while getting the mws_id by lat long", str(e))
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def get_mws_time_series_data(state, district, tehsil, mws_id):
+    """Fetch and merge water and NDVI time series data for a specific MWS location."""
 
-def get_mws_json_from_stats_excel(state, district, tehsil, mws_id):
-    state_folder = state.replace(" ", "_").upper()
-    district_folder = district.replace(" ", "_").upper() 
-    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + tehsil
-    xlsx_file = file_xl_path + '.xlsx'
-
-    sheets = {
-        'hydrological_annual': -1,
-        'terrain': -1,
-        'croppingIntensity_annual': -1,
-        'surfaceWaterBodies_annual': -1,
-        'croppingDrought_kharif': -1,
-        'nrega_annual': -1,
-        'mws_intersect_villages': -1,
-        'change_detection_degradation': -1,
-        'change_detection_afforestation': -1,
-        'change_detection_deforestation': -1,
-        'change_detection_urbanization': -1,
-        'change_detection_cropintensity': -1,
-        'terrain_lulc_slope': -1,
-        'terrain_lulc_plain': -1,
-        'restoration_vector': -1,
-        'aquifer_vector': -1,
-        'soge_vector': -1,
-    }
-
-    result = {}
+    def fetch_geoserver_data(base_url, layer_name, mws_id):
+        """Generic GeoServer WFS request."""
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": layer_name,
+            "outputFormat": "json",
+            "CQL_FILTER": f"uid='{mws_id}'",
+        }
+        response = requests.get(base_url, params=params, verify=True, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data["features"][0]["properties"] if data["features"] else {}
 
     try:
-        xls = pd.ExcelFile(xlsx_file)
-    except Exception as e:
-        return {"error": f"Failed to read Excel file: {str(e)}"}
+        # Validate geographic hierarchy
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
+            district_name__iexact=district, state=state_obj
+        )
+        tehsil_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=tehsil, district=district_obj
+        )
 
-    for sheet_name in sheets:
-        if sheet_name not in xls.sheet_names:
-            print(sheet_name, "is not available for this location")
-            continue
+        # Check if water layer exists
+        district = valid_gee_text(district.lower())
+        tehsil = valid_gee_text(tehsil.lower())
+        layer_name = f"deltaG_fortnight_{district}_{tehsil}"
+        water_layer_exists = (
+            Layer.objects.filter(
+                state=state_obj,
+                district=district_obj,
+                block=tehsil_obj,
+                dataset__name="Hydrology",
+                layer_name=layer_name,
+            )
+            .exclude(
+                layer_version="1.0",
+                algorithm_version="1.0",
+            )
+            .exists()
+        )
 
-        try:
-            df = xls.parse(sheet_name)
-            df.columns = [col.strip().lower() for col in df.columns]
-            if sheet_name=='nrega_annual':
-                filtered_df = df[df['mws_id'] == mws_id]
-            elif sheet_name=='mws_intersect_villages':
-                filtered_df = df[df['mws uid'] == mws_id]
+        # Fetch hydrology data
+        water_url = f"{GEOSERVER_URL}/mws_layers/ows"
+        water_data = fetch_geoserver_data(water_url, f"mws_layers:{layer_name}", mws_id)
+
+        # Fetch NDVI data only if water layer exists
+        ndvi_layers = {}
+        if water_layer_exists:
+            ndvi_url = f"{GEOSERVER_URL}/ndvi_timeseries/ows"
+            for veg_type in ["crop", "shrub", "tree"]:
+                try:
+                    ndvi_layers[veg_type] = fetch_geoserver_data(
+                        ndvi_url,
+                        f"ndvi_timeseries:ndvi_timeseries_{district}_{tehsil}_{veg_type}",
+                        mws_id,
+                    )
+                except:
+                    ndvi_layers[veg_type] = {}
+
+        # Collect all unique dates
+        all_dates = set()
+        for key in water_data:
+            if "-" in key and key.count("-") == 2:
+                all_dates.add(key)
+
+        if water_layer_exists:
+            for layer_data in ndvi_layers.values():
+                for key in layer_data:
+                    if "-" in key and key.count("-") == 2:
+                        all_dates.add(key)
+
+        time_series = []
+        for date in sorted(all_dates):
+            # Parse hydrology metrix from JSON string
+            hydrology_metrix = {}
+            try:
+                values = json.loads(water_data.get(date, "{}"))
+                hydrology_metrix = {
+                    "et": round(values.get("ET"), 2) if values.get("ET") else 0.0,
+                    "runoff": (
+                        round(values.get("RunOff"), 2) if values.get("RunOff") else 0.0
+                    ),
+                    "precipitation": (
+                        round(values.get("Precipitation"), 2)
+                        if values.get("Precipitation")
+                        else 0.0
+                    ),
+                }
+            except:
+                hydrology_metrix = {"et": "", "runoff": "", "precipitation": ""}
+
+            entry = {
+                "date": date,
+                **hydrology_metrix,
+            }
+
+            # Add NDVI data if available
+            if water_layer_exists:
+                entry["ndvi_crop"] = ndvi_layers.get("crop", {}).get(date, "")
+                entry["ndvi_shrub"] = ndvi_layers.get("shrub", {}).get(date, "")
+                entry["ndvi_tree"] = ndvi_layers.get("tree", {}).get(date, "")
+
+                # Round NDVI values if they're numbers
+                for ndvi_field in ["ndvi_crop", "ndvi_shrub", "ndvi_tree"]:
+                    val = entry[ndvi_field]
+                    if isinstance(val, (int, float)):
+                        entry[ndvi_field] = round(val, 2)
+                    elif isinstance(val, str):
+                        try:
+                            entry[ndvi_field] = round(float(val), 2)
+                        except:
+                            entry[ndvi_field] = ""
             else:
-                filtered_df = df[df['uid'] == mws_id]
+                entry["ndvi_crop"] = ""
+                entry["ndvi_shrub"] = ""
+                entry["ndvi_tree"] = ""
 
-            if not filtered_df.empty:
-                result[sheet_name] = filtered_df.to_dict(orient='records')
+            time_series.append(entry)
 
-        except Exception as e:
-            result[sheet_name] = {"error": f"Error processing sheet: {str(e)}"}
+        time_series.sort(key=lambda x: x["date"])
+        return {"mws_id": mws_id, "time_series": time_series}
 
-    return result
+    except Exception as e:
+        return {"error": str(e)}
 
 
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
-    get_generate_filter_mws_data(state, district, tehsil, 'xlsx')
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = EXCEL_PATH + 'data/stats_excel_files/' + state_folder + '/' + district_folder + '/' + district + '_' + tehsil
-    xlsx_file = file_xl_path + '_KYL_filter_data.xlsx'
+    file_xl_path = (
+        EXCEL_PATH
+        + "data/stats_excel_files/"
+        + state_folder
+        + "/"
+        + district_folder
+        + "/"
+        + district
+        + "_"
+        + tehsil
+    )
+    json_file = file_xl_path + "_KYL_filter_data.json"
 
     try:
-        df = pd.read_excel(xlsx_file)
+        with open(json_file, "r") as f:
+            data = json.load(f)
+
+        df = pd.DataFrame(data)
         df.columns = [col.strip().lower() for col in df.columns]
 
-        if 'mws_id' not in df.columns:
-            return {"error": "'mws_id' column not found in Excel file."}
+        if "mws_id" not in df.columns:
+            return {"error": "'mws_id' column not found in JSON file."}
 
-        filtered_df = df[df['mws_id'] == mws_id]
+        filtered_df = df[df["mws_id"] == mws_id]
         filtered_df = filtered_df.replace([np.inf, -np.inf], np.nan)
 
-        # Convert to dict with null-safe serialization
         json_compatible = json.loads(
-            filtered_df.to_json(orient='records', default_handler=str)
+            filtered_df.to_json(orient="records", default_handler=str)
         )
 
         return json_compatible
@@ -228,3 +395,164 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         return {"error": f"Error reading or processing file: {str(e)}"}
 
 
+def get_tehsil_json(state, district, tehsil, regenerate):
+    file_path, file_exists = excel_file_exists(state, district, tehsil)
+    json_path = file_path.replace(".xlsx", ".json")
+
+    if not regenerate and os.path.exists(json_path):
+        with open(json_path, "r") as f:
+            return json.load(f)
+
+    xls = pd.read_excel(file_path, sheet_name=None)
+    json_data = {}
+
+    for sheet_name, df in xls.items():
+        df.columns = [col.strip().lower() for col in df.columns]
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df = df.where(pd.notnull(df), None)
+        json_data[sheet_name] = df.to_dict(orient="records")
+
+    # Save JSON file
+    with open(json_path, "w") as f:
+        json.dump(json_data, f)
+    return json_data
+
+
+def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
+    ee_initialize(GEE_HELPER_ACCOUNT_ID)
+    asset_path = get_gee_asset_path(state, district, tehsil)
+    mws_asset_id = asset_path + f"filtered_mws_{district}_{tehsil}_uid"
+
+    if not is_gee_asset_exists(mws_asset_id):
+        return None, Response(
+            {"error": "Mws Layer not found for the given location."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Filter feature collection by MWS ID
+    mws_fc = ee.FeatureCollection(mws_asset_id)
+    matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
+
+    if matching_feature is None or matching_feature.getInfo() is None:
+        return None, Response(
+            {"error": "Data not found for the given mws_id"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Check if Excel file exists
+    if not excel_file_exists(state, district, tehsil):
+        return None, Response(
+            {"Message": "Data not found for this state, district, tehsil."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # Generate report URL
+    report_url = f"{base_url}/api/v1/generate_mws_report/?state={state}&district={district}&block={tehsil}&uid={mws_id}"
+
+    return {"Mws_report_url": report_url}, None
+
+
+def get_mws_geometries_data(state, district, tehsil):
+    try:
+        base_url = f"{GEOSERVER_URL}/mws/ows"
+
+        # Construct MWS layer name
+        layer_name = f"mws_{district}_{tehsil}"
+
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"mws:{layer_name}",
+            "outputFormat": "application/json",
+            "propertyName": "geom,uid",
+        }
+
+        response = requests.get(base_url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            error_msg = f"GeoServer request failed with status {response.status_code}"
+            print(error_msg)
+            return False, error_msg
+
+        geojson_data = response.json()
+
+        if not geojson_data.get("features"):
+            error_msg = "No features found in layer"
+            print(error_msg)
+            return False, error_msg
+
+        print(f"Successfully retrieved {len(geojson_data['features'])} MWS geometries")
+        return True, geojson_data
+
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        return False, error_msg
+
+
+# def get_village_geometries_data(state, district, tehsil, village_id):
+#     try:
+#         base_url = (
+#             "https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows"
+#         )
+#         layer_name = f"{district}_{tehsil}"
+
+#         params = {
+#             "service": "WFS",
+#             "version": "1.0.0",
+#             "request": "GetFeature",
+#             "typeName": f"panchayat_boundaries:{layer_name}",
+#             "outputFormat": "application/json",
+#             "CQL_FILTER": f"vill_ID={village_id}",
+#             "propertyName": "the_geom",
+#         }
+
+#         response = requests.get(base_url, params=params, timeout=30)
+
+#         if response.status_code != 200:
+#             return False, f"GeoServer request failed with status {response.status_code}"
+
+#         geojson_data = response.json()
+
+#         if not geojson_data.get("features") or len(geojson_data["features"]) == 0:
+#             return False, f"No village found with ID: {village_id}"
+
+#         geometry = geojson_data["features"][0].get("geometry")
+
+#         if not geometry:
+#             return False, "Feature found but no geometry data"
+
+#         return True, geometry
+
+#     except Exception as e:
+#         return False, f"Internal error: {str(e)}"
+
+
+def get_village_geometries_data(state, district, tehsil):
+    try:
+        base_url = f"{GEOSERVER_URL}/panchayat_boundaries/ows"
+        layer_name = f"{district}_{tehsil}"
+
+        params = {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"panchayat_boundaries:{layer_name}",
+            "outputFormat": "application/json",
+            "propertyName": "the_geom,vill_ID,vill_name",
+        }
+
+        response = requests.get(base_url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            return False, f"GeoServer request failed with status {response.status_code}"
+
+        geojson_data = response.json()
+
+        if not geojson_data.get("features"):
+            return False, "No features found in layer"
+
+        return True, geojson_data
+
+    except Exception as e:
+        return False, f"Internal error: {str(e)}"

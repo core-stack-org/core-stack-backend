@@ -66,8 +66,17 @@ class TehsilSOI(models.Model):
         return self.tehsil_name
 
 
+class State_Disritct_Block_Properties(models.Model):
+    state = models.ForeignKey(StateSOI, on_delete=models.CASCADE)
+    district = models.ForeignKey(DistrictSOI, on_delete=models.CASCADE)
+    tehsil = models.ForeignKey(TehsilSOI, on_delete=models.CASCADE)
+    dashboard_geojson = models.JSONField(null=True, blank=True)
+
+
 class UserAPIKey(AbstractAPIKey):
-    user = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys")
+    user = models.ForeignKey(
+        AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="api_keys"
+    )
     name = models.CharField(max_length=255)
     api_key = models.CharField(max_length=255, null=True, blank=True)
     is_active = models.BooleanField(default=True)

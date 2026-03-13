@@ -591,7 +591,8 @@ class Geoserver:
         if r.status_code == 200:
             return "Status code: {}, delete layer".format(r.status_code)
         else:
-            raise GeoserverException(r.status_code, r.content)
+            return "Status code: {}, delete layer".format(r.status_code)
+            # raise GeoserverException(r.status_code, r.content)
 
     # _______________________________________________________________________________________________
     #

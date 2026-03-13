@@ -180,7 +180,14 @@
             "label": "शिकायत दर्ज करें",
             "value": "grievance",
             "description": "शिकायत या प्रभाव जमा करें"
-          }
+          },
+
+        {
+          "label": "कहानी साझा करें",
+          "value": "story",
+          "description": "अपनी जलवायु या पर्यावरण से जुड़ी कहानी जमा करें"
+      }
+
         ]
       }
     ],
@@ -199,6 +206,11 @@
       {
         "JumpToGrievanceSMJ": [
           "grievance"
+        ]
+      },
+      {
+        "JumpToStorySMJ": [
+          "story"
         ]
       },
       {
@@ -238,6 +250,11 @@
             "description": "एक अतिरिक्त समुदाय में शामिल हों"
           },
           {
+          "label": "कहानी साझा करें",
+          "value": "story",
+          "description": "अपनी जलवायु या पर्यावरण से जुड़ी कहानी जमा करें"
+      },
+          {
             "label": "चैट समाप्त करें",
             "value": "exit_session",
             "description": "चैट सेशन बंद करें"
@@ -264,6 +281,11 @@
       {
         "JumpToGrievanceSMJ": [
           "grievance"
+        ]
+      },
+            {
+        "JumpToStorySMJ": [
+          "story"
         ]
       },
       {
@@ -368,6 +390,69 @@
           "failure"
         ]
       }
+    ]
+  },
+  {
+    "name": "JumpToWorkDemandStatusSMJ",
+    "preAction": [
+      {
+        "text": [
+          {
+            "en": "📊 Opening asset demand status...",
+            "hi": "📊 संसाधन मांग स्थिति खोली जा रही है...",
+            "default": "Opening asset demand status..."
+          }
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "work_demand_status",
+            "initState": "WorkDemandStatusWelcome"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "JumpToWorkDemandStatusSMJ": [
+          "failure"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "JumpToStorySMJ",
+    "preAction": [
+      {
+        "text": [
+          {
+  "en": "📋 Opening story submission...",
+  "hi": "📋 कहानी जमा करने की प्रक्रिया खोल रहे हैं...",
+  "default": "📋 Opening story submission..."
+}
+
+        ]
+      },
+      {
+        "data": [
+          {
+            "smjName": "story",
+            "initState": "StoryWelcome"
+          }
+        ],
+        "function": "jumpToSmj"
+      }
+    ],
+    "postAction": [],
+    "transition": [
+      {
+        "JumpToStorySMJ": [
+          "failure"
+        ]
+      }`1
     ]
   },
   {

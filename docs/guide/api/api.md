@@ -121,6 +121,70 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
   - After password change, all refresh tokens are invalidated (user will be logged out from all devices)
   - The user will need to log in again with the new password
 
+### Forgot Password
+- **URL**: `/api/v1/auth/forgot-password/`
+- **Method**: POST
+- **Description**: Request a password reset link. The client sends the username; if the account has an email on file the reset link is sent immediately. If not, the API responds asking for an email, and the client re-submits with both username and email.
+- **Authentication**: Not required
+- **Step 1 — Request Body**:
+  ```json
+  {
+    "username": "user123"
+  }
+  ```
+- **Step 1 — Success Response** (`200 OK`): Reset link sent to the email on file.
+- **Step 1 — No email on file** (`400 Bad Request`):
+  ```json
+  {
+    "detail": "No email address on file for this account. Please provide an email to receive the reset link.",
+    "email_required": true
+  }
+  ```
+- **Step 2 (if `email_required`)** — Re-submit with email:
+  ```json
+  {
+    "username": "user123",
+    "email": "user@example.com"
+  }
+  ```
+  The provided email is saved to the user's profile and the reset link is sent to it.
+- **Notes**:
+  - The reset link is valid for 3 days (`PASSWORD_RESET_TIMEOUT`)
+  - `username` is always required
+  - `email` is only needed when the account has no email on file
+  - The provided email is persisted on the user profile so future resets work directly
+
+### Reset Password (via link)
+- **URL**: `/api/v1/auth/reset-password/<uidb64>/<token>/`
+- **Methods**: GET, POST
+- **Description**: Backend-served HTML page for resetting a password using the link from the forgot-password email
+- **Authentication**: Not required (token-based validation)
+- **GET**: Renders a form to enter a new password
+- **POST**: Validates the token and sets the new password
+- **Notes**:
+  - The token is single-use — once the password is reset, the same link cannot be reused
+  - All existing JWT sessions are invalidated after a successful reset
+  - Password must be at least 8 characters
+
+### Admin Reset Password
+- **URL**: `/api/v1/users/{user_id}/reset_password/`
+- **Method**: POST
+- **Description**: Allows an org admin or superadmin to reset another user's password (useful when the user has no email)
+- **Request Body**:
+  ```json
+  {
+    "new_password": "new-secure-password"
+  }
+  ```
+- **Response**: Success message
+- **Authentication**: Required
+- **Permissions**:
+  - Superadmins can reset any user's password
+  - Organization admins can only reset passwords for users in their organization
+- **Notes**:
+  - The new password must meet the system's password validation requirements
+  - All of the target user's JWT sessions are invalidated after reset
+
 ## User Management Endpoints
 
 ### List Users
@@ -291,10 +355,17 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Method**: GET
 - **Description**: List projects based on permissions
 - **Authentication**: Required
+- **Query Parameters**:
+  - `organization` (optional, superadmin only): Filter projects by organization ID
 - **Notes**:
-  - Super admins see all projects
+  - Super admins see all projects (can filter by organization using `?organization=<org_id>`)
   - Organization admins see all projects in their organization
   - Other users see projects they have access to
+
+**Example (Superadmin filtering by organization)**:
+```
+GET /api/v1/projects/?organization=5
+```
 
 ### Create Project
 - **URL**: `/api/v1/projects/`
@@ -304,16 +375,18 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
 - **Permissions**: Super admin or organization admin
 
 #### For Regular Users (Organization Members)
+
 Regular users create projects under their own organization automatically.
 
 **Request Body**:
+
 ```json
 {
   "name": "Project Name",
   "description": "Project Description",
-  "state": "state-id",
-  "district": "district-id",
-  "block": "block-id",
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "app_type": "plantation",
   "enabled": true,
   "created_by": "user-id",
@@ -322,17 +395,19 @@ Regular users create projects under their own organization automatically.
 ```
 
 #### For Superadmins
+
 Superadmins must specify the organization ID since they can create projects for any organization.
 
 **Request Body**:
+
 ```json
 {
   "name": "Project Name",
   "description": "Project Description",
   "organization": "org-id",
-  "state": "state-id",
-  "district": "district-id",
-  "block": "block-id",
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "app_type": "plantation",
   "enabled": true,
   "created_by": "user-id",
@@ -340,10 +415,13 @@ Superadmins must specify the organization ID since they can create projects for 
 }
 ```
 
-**Notes**: 
+**Notes**:
+
 - For regular users, the organization is automatically set to the user's organization
 - For superadmins, the organization field is required and must be provided
-- `district` and `block` fields are optional for both user types
+- `state_soi` is the State SOI ID from geoadmin
+- `district_soi` is the District SOI ID from geoadmin (optional)
+- `tehsil_soi` is the Tehsil SOI ID from geoadmin (optional)
 - Valid app_type values include 'plantation', 'watershed', etc. (as defined in AppType choices)
 - The enabled field defaults to true if not specified
 
@@ -367,6 +445,64 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Description**: Delete a project
 - **Authentication**: Required
 - **Permissions**: Super admin or organization admin
+
+### Enable Project
+- **URL**: `/api/v1/projects/{project_id}/enable/`
+- **Method**: POST
+- **Description**: Enable a project (sets enabled=True)
+- **Authentication**: Required
+- **Permissions**: Super admin, organization admin, or user with project access
+- **Response**: Returns the updated project object
+- **Notes**: 
+  - Updates the `updated_by` field to the current user
+  - Updates the `updated_at` timestamp
+
+### Disable Project
+- **URL**: `/api/v1/projects/{project_id}/disable/`
+- **Method**: POST
+- **Description**: Disable a project (sets enabled=False)
+- **Authentication**: Required
+- **Permissions**: Super admin, organization admin, or user with project access
+- **Response**: Returns the updated project object
+- **Notes**: 
+  - Updates the `updated_by` field to the current user
+  - Updates the `updated_at` timestamp
+  - Disabled projects are not included in project listings by default
+
+### List Disabled Projects
+- **URL**: `/api/v1/projects/disabled/`
+- **Method**: GET
+- **Description**: Retrieve all disabled projects based on user permissions
+- **Authentication**: Required
+- **Permissions**: 
+  - Super admins: Can see all disabled projects across all organizations
+  - Organization users: Can see only their organization's disabled projects
+  - Users without organization: Receive empty result
+- **Response**: Returns an array of disabled project objects
+- **Response Body**:
+  ```json
+  [
+    {
+      "id": 1,
+      "name": "Disabled Project Name",
+      "description": "Project Description",
+      "app_type": "plantation",
+      "enabled": false,
+      "organization": "organization-uuid",
+      "organization_name": "Organization Name",
+      "state_soi": 1,
+      "district_soi": 10,
+      "tehsil_soi": 100,
+      "created_at": "2025-01-15T10:30:00.000000+05:30",
+      "updated_at": "2025-01-20T15:45:00.000000+05:30",
+      "created_by": 1,
+      "updated_by": 2
+    }
+  ]
+  ```
+- **Notes**: 
+  - This endpoint provides visibility into projects that have been disabled
+  - Useful for auditing and re-enabling previously disabled projects
 
 ## Project App Type Management
 
@@ -476,12 +612,13 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Method**: GET
 - **Description**: List watershed plans for a specific project
 - **Authentication**: Required
-- **Permissions**: 
-  - Superadmins: Can access any project
-  - Org Admins: Can access projects in their organization
-  - App Users: Can access assigned projects only
+- **Permissions**:
+    - Superadmins: Can access any project
+    - Org Admins: Can access projects in their organization
+    - App Users: Can access assigned projects only
 
 ### List Watershed Plans (Organization Level)
+
 - **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/`
 - **Method**: GET
 - **Description**: List all watershed plans for a specific organization
@@ -489,43 +626,49 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Permissions**: Superadmins only
 
 ### List Watershed Plans (Global Level)
+
 - **URL**: `/api/v1/watershed/plans/`
 - **Method**: GET
 - **Description**: List all watershed plans across all organizations and projects
 - **Authentication**: Required
 - **Permissions**: Superadmins only
 - **Query Parameters**:
-  - `block`: Filter plans by block ID (e.g., `?block=311011`)
-  - `district`: Filter plans by district ID (e.g., `?district=3110101`)
-  - `state`: Filter plans by state ID (e.g., `?state=69`)
+    - `tehsil`: Filter plans by tehsil ID (e.g., `?tehsil=123`)
+    - `district`: Filter plans by district ID (e.g., `?district=456`)
+    - `state`: Filter plans by state ID (e.g., `?state=789`)
 
 ### Create Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/`
 - **Method**: POST
 - **Description**: Create a new watershed plan for a specific project
 - **Authentication**: Required
-- **Permissions**: 
-  - Superadmins: Can create plans in any project
-  - Org Admins: Can create plans in their organization's projects
-  - Project Users: Must have 'add_watershed' permission for the project
+- **Permissions**:
+    - Superadmins: Can create plans in any project
+    - Org Admins: Can create plans in their organization's projects
+    - Project Users: Must have 'add_watershed' permission for the project
 
 #### Required Fields:
+
 - `plan` (string): Name of the watershed plan
-- `state` (integer): State ID from geoadmin
-- `district` (integer): District ID from geoadmin  
-- `block` (integer): Block ID from geoadmin
+- `state_soi` (integer): State SOI ID from geoadmin
+- `district_soi` (integer): District SOI ID from geoadmin
+- `tehsil_soi` (integer): Tehsil SOI ID from geoadmin
 - `village_name` (string): Name of the village
 - `gram_panchayat` (string): Name of the gram panchayat
+- `facilitator_name` (string): Name of the plan facilitator
 
 #### Optional Fields:
-- `facilitator_name` (string): Name of the plan facilitator
+
 - `enabled` (boolean): Whether the plan is enabled (default: true)
 - `is_completed` (boolean): Whether the plan is completed (default: false)
 - `is_dpr_generated` (boolean): Whether DPR is generated (default: false)
 - `is_dpr_reviewed` (boolean): Whether DPR is reviewed (default: false)
 - `is_dpr_approved` (boolean): Whether DPR is approved (default: false)
+- `latitude` (decimal): Latitude coordinate (optional)
+- `longitude` (decimal): Longitude coordinate (optional)
 
 #### Auto-set Fields:
+
 - `project`: Set automatically from URL parameter
 - `organization`: Set automatically from project's organization
 - `created_by`: Set automatically from authenticated user
@@ -534,24 +677,27 @@ Superadmins must specify the organization ID since they can create projects for 
 #### Request Examples:
 
 **Minimal Plan Creation:**
+
 ```json
 {
   "plan": "Basic Watershed Plan 2025",
-  "state": 69,
-  "district": 3110101,
-  "block": 311011,
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "village_name": "Example Village",
-  "gram_panchayat": "Example GP"
+  "gram_panchayat": "Example GP",
+  "facilitator_name": "John Doe"
 }
 ```
 
 **Complete Plan Creation:**
+
 ```json
 {
   "plan": "Comprehensive Watershed Management Plan 2025",
-  "state": 69,
-  "district": 3110101,
-  "block": 311011,
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "village_name": "Hauz Khas Village",
   "gram_panchayat": "Hauz Khas Gram Panchayat",
   "facilitator_name": "Dr. Rajesh Kumar",
@@ -559,11 +705,14 @@ Superadmins must specify the organization ID since they can create projects for 
   "is_completed": false,
   "is_dpr_generated": false,
   "is_dpr_reviewed": false,
-  "is_dpr_approved": false
+  "is_dpr_approved": false,
+  "latitude": 28.5494,
+  "longitude": 77.1960
 }
 ```
 
 #### Response:
+
 ```json
 {
   "plan_data": {
@@ -579,13 +728,15 @@ Superadmins must specify the organization ID since they can create projects for 
     "is_dpr_generated": false,
     "is_dpr_reviewed": false,
     "is_dpr_approved": false,
+    "latitude": 28.5494,
+    "longitude": 77.1960,
     "project": 10,
     "project_name": "Delhi Watershed Project",
     "organization": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6",
     "organization_name": "Delhi Development Authority",
-    "state": 69,
-    "district": 3110101,
-    "block": 311011,
+    "state_soi": 1,
+    "district_soi": 10,
+    "tehsil_soi": 100,
     "created_by": 1,
     "created_by_name": "John Doe",
     "updated_by": null
@@ -607,16 +758,17 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Method**: PUT/PATCH
 - **Description**: Update an existing watershed plan
 - **Authentication**: Required
-- **Permissions**: 
-  - Superadmins: Can update any plan in any project
-  - Org Admins: Can update plans in their organization's projects
-  - Project Users: Must have 'change_watershed' permission for the project
+- **Permissions**:
+    - Superadmins: Can update any plan in any project
+    - Org Admins: Can update plans in their organization's projects
+    - Project Users: Must have 'change_watershed' permission for the project
 
 #### Updatable Fields:
+
 - `plan` (string): Name of the watershed plan
-- `state` (integer): State ID from geoadmin
-- `district` (integer): District ID from geoadmin  
-- `block` (integer): Block ID from geoadmin
+- `state_soi` (integer): State SOI ID from geoadmin
+- `district_soi` (integer): District SOI ID from geoadmin
+- `tehsil_soi` (integer): Tehsil SOI ID from geoadmin
 - `village_name` (string): Name of the village
 - `gram_panchayat` (string): Name of the gram panchayat
 - `facilitator_name` (string): Name of the plan facilitator
@@ -625,8 +777,11 @@ Superadmins must specify the organization ID since they can create projects for 
 - `is_dpr_generated` (boolean): Whether DPR is generated
 - `is_dpr_reviewed` (boolean): Whether DPR is reviewed
 - `is_dpr_approved` (boolean): Whether DPR is approved
+- `latitude` (decimal): Latitude coordinate
+- `longitude` (decimal): Longitude coordinate
 
 #### Non-updatable Fields:
+
 - `project`: Cannot be changed after creation
 - `organization`: Cannot be changed after creation
 - `created_by`, `created_at`: Cannot be modified
@@ -635,6 +790,7 @@ Superadmins must specify the organization ID since they can create projects for 
 #### Update Methods:
 
 **PATCH (Partial Update)** - Update only specific fields:
+
 ```json
 {
   "is_completed": true,
@@ -644,12 +800,13 @@ Superadmins must specify the organization ID since they can create projects for 
 ```
 
 **PUT (Full Update)** - Provide all required fields:
+
 ```json
 {
   "plan": "Updated Watershed Management Plan 2025",
-  "state": 69,
-  "district": 3110101,
-  "block": 311011,
+  "state_soi": 1,
+  "district_soi": 10,
+  "tehsil_soi": 100,
   "village_name": "Updated Village Name",
   "gram_panchayat": "Updated GP Name",
   "facilitator_name": "Dr. Updated Facilitator",
@@ -662,6 +819,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ```
 
 #### Response:
+
 ```json
 {
   "plan_data": {
@@ -677,13 +835,15 @@ Superadmins must specify the organization ID since they can create projects for 
     "is_dpr_generated": true,
     "is_dpr_reviewed": false,
     "is_dpr_approved": false,
+    "latitude": null,
+    "longitude": null,
     "project": 10,
     "project_name": "Delhi Watershed Project",
     "organization": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6",
     "organization_name": "Delhi Development Authority",
-    "state": 69,
-    "district": 3110101,
-    "block": 311011,
+    "state_soi": 1,
+    "district_soi": 10,
+    "tehsil_soi": 100,
     "created_by": 1,
     "created_by_name": "John Doe",
     "updated_by": 2
@@ -762,7 +922,7 @@ These endpoints are maintained for backward compatibility:
 ### KML File Upload Process
 
 1. Create a project (if not already created):
-   
+
    **For Regular Users:**
    ```bash
    curl -X POST http://api.example.com/api/v1/projects/ \
@@ -771,9 +931,9 @@ These endpoints are maintained for backward compatibility:
      -d '{
        "name": "Plantation Project", 
        "description": "A new plantation project", 
-       "state": "state-id",
-       "district": "district-id",
-       "block": "block-id",
+       "state_soi": 1,
+       "district_soi": 10,
+       "tehsil_soi": 100,
        "app_type": "plantation"
      }'
    ```
@@ -787,9 +947,9 @@ These endpoints are maintained for backward compatibility:
        "name": "Plantation Project", 
        "description": "A new plantation project", 
        "organization": "organization-id",
-       "state": "state-id",
-       "district": "district-id", 
-       "block": "block-id",
+       "state_soi": 1,
+       "district_soi": 10,
+       "tehsil_soi": 100,
        "app_type": "plantation"
      }'
    ```
@@ -816,10 +976,30 @@ These endpoints are maintained for backward compatibility:
      -H "Authorization: Bearer {access_token}"
    ```
 
+### Managing Project Status
+
+1. Enable a project:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/{project_id}/enable/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+2. Disable a project:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/projects/{project_id}/disable/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
+3. List all disabled projects:
+   ```bash
+   curl -X GET http://api.example.com/api/v1/projects/disabled/ \
+     -H "Authorization: Bearer {access_token}"
+   ```
+
 ### Creating a Watershed Plan
 
 1. Create a project (if not already created):
-   
+
    **For Regular Users:**
    ```bash
    curl -X POST http://api.example.com/api/v1/projects/ \
@@ -828,7 +1008,7 @@ These endpoints are maintained for backward compatibility:
      -d '{
        "name": "Watershed Project", 
        "description": "A new watershed project", 
-       "state": "state-id",
+       "state_soi": 1,
        "app_type": "watershed"
      }'
    ```
@@ -842,7 +1022,7 @@ These endpoints are maintained for backward compatibility:
        "name": "Watershed Project", 
        "description": "A new watershed project", 
        "organization": "organization-id",
-       "state": "state-id",
+       "state_soi": 1,
        "app_type": "watershed"
      }'
    ```
@@ -856,40 +1036,43 @@ These endpoints are maintained for backward compatibility:
    ```
 
 3. Create a watershed plan:
-   3. Create a watershed plan for the project:
-      ```bash
-      # Minimal required fields
-      curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
-        -H "Authorization: Bearer {access_token}" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "plan": "Basic Watershed Plan 2025",
-          "state": 69,
-          "district": 3110101,
-          "block": 311011,
-          "village_name": "Example Village",
-          "gram_panchayat": "Example GP"
-        }'
-   
-      # Complete plan with all optional fields
-      curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
-        -H "Authorization: Bearer {access_token}" \
-        -H "Content-Type: application/json" \
-        -d '{
-          "plan": "Comprehensive Watershed Management Plan 2025",
-          "state": 69,
-          "district": 3110101,
-          "block": 311011,
-          "village_name": "Hauz Khas Village",
-          "gram_panchayat": "Hauz Khas Gram Panchayat",
-          "facilitator_name": "Dr. Rajesh Kumar",
-          "enabled": true,
-          "is_completed": false,
-          "is_dpr_generated": false,
-          "is_dpr_reviewed": false,
-          "is_dpr_approved": false
-        }'
-      ```
+    3. Create a watershed plan for the project:
+       ```bash
+       # Minimal required fields
+       curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
+         -H "Authorization: Bearer {access_token}" \
+         -H "Content-Type: application/json" \
+         -d '{
+           "plan": "Basic Watershed Plan 2025",
+           "state_soi": 1,
+           "district_soi": 10,
+           "tehsil_soi": 100,
+           "village_name": "Example Village",
+           "gram_panchayat": "Example GP",
+           "facilitator_name": "John Doe"
+         }'
+    
+       # Complete plan with all optional fields
+       curl -X POST http://api.example.com/api/v1/projects/{project_id}/watershed/plans/ \
+         -H "Authorization: Bearer {access_token}" \
+         -H "Content-Type: application/json" \
+         -d '{
+           "plan": "Comprehensive Watershed Management Plan 2025",
+           "state_soi": 1,
+           "district_soi": 10,
+           "tehsil_soi": 100,
+           "village_name": "Hauz Khas Village",
+           "gram_panchayat": "Hauz Khas Gram Panchayat",
+           "facilitator_name": "Dr. Rajesh Kumar",
+           "enabled": true,
+           "is_completed": false,
+           "is_dpr_generated": false,
+           "is_dpr_reviewed": false,
+           "is_dpr_approved": false,
+           "latitude": 28.5494,
+           "longitude": 77.1960
+         }'
+       ```
 
 4. View the created watershed plans:
    ```bash
@@ -905,8 +1088,8 @@ These endpoints are maintained for backward compatibility:
    curl -X GET http://api.example.com/api/v1/watershed/plans/ \
      -H "Authorization: Bearer {access_token}"
    
-   # View plans filtered by block (superadmin only)
-   curl -X GET http://api.example.com/api/v1/watershed/plans/?block=311011 \
+   # View plans filtered by tehsil (superadmin only)
+   curl -X GET http://api.example.com/api/v1/watershed/plans/?tehsil=100 \
      -H "Authorization: Bearer {access_token}"
    ```
 
@@ -928,9 +1111,9 @@ These endpoints are maintained for backward compatibility:
      -H "Content-Type: application/json" \
      -d '{
        "plan": "Updated Watershed Plan 2025",
-       "state": 69,
-       "district": 3110101,
-       "block": 311011,
+       "state_soi": 1,
+       "district_soi": 10,
+       "tehsil_soi": 100,
        "village_name": "Updated Village",
        "gram_panchayat": "Updated GP",
        "facilitator_name": "New Facilitator",
@@ -965,9 +1148,9 @@ Superadmins have multiple ways to access watershed plans depending on their cont
 
 4. **Geographical Filtering**: Filter plans by location (useful when working from partner locations)
    ```
-   GET /api/v1/watershed/plans/?block=311011
-   GET /api/v1/watershed/plans/?district=3110101
-   GET /api/v1/watershed/plans/?state=69
+   GET /api/v1/watershed/plans/?tehsil=100
+   GET /api/v1/watershed/plans/?district=10
+   GET /api/v1/watershed/plans/?state=1
    ```
 
 ### Superadmin vs Organization Admin Access
@@ -976,9 +1159,35 @@ Superadmins have multiple ways to access watershed plans depending on their cont
 - **Organization Admins**: Limited to their organization's plans through existing project-level endpoints
 - **Regular Users**: Limited to plans from projects they're assigned to
 
+### Password Reset Flow
+
+1. Request a password reset:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/auth/forgot-password/ \
+     -H "Content-Type: application/json" \
+     -d '{"username": "user123"}'
+   ```
+
+2. If the API responds with `"email_required": true`, re-submit with an email:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/auth/forgot-password/ \
+     -H "Content-Type: application/json" \
+     -d '{"username": "user123", "email": "user@example.com"}'
+   ```
+
+3. The user receives an email with a reset link and opens it in their browser to set a new password.
+
+3. For users without email, an admin can reset the password directly:
+   ```bash
+   curl -X POST http://api.example.com/api/v1/users/{user_id}/reset_password/ \
+     -H "Authorization: Bearer {access_token}" \
+     -H "Content-Type: application/json" \
+     -d '{"new_password": "new-secure-password"}'
+   ```
+
 ## API Security
 
-1. **Authentication**: All API endpoints (except registration and login) require JWT authentication.
+1. **Authentication**: All API endpoints (except registration, login, and forgot-password) require JWT authentication.
 2. **Authorization**: Permissions are checked at multiple levels:
    - Organization level
    - Project level
@@ -1028,22 +1237,23 @@ Below are ASCII diagrams showing the permission hierarchy and capabilities for d
 
 ### Permission Comparison Table
 
-| Capability                    | Superadmin | Org Admin | Project Manager | App User |
-|-------------------------------|------------|-----------|----------------|----------|
-| Access all organizations      | ✓          | ✗         | ✗              | ✗        |
-| Access organization projects  | ✓          | ✓         | ✗              | ✗        |
-| Access assigned projects      | ✓          | ✓         | ✓              | ✓        |
-| Create organizations          | ✓          | ✗         | ✗              | ✗        |
-| Create projects               | ✓          | ✓         | ✗              | ✗        |
-| Edit project details          | ✓          | ✓         | ✓              | ✗        |
-| Manage all users              | ✓          | ✗         | ✗              | ✗        |
-| Manage org users              | ✓          | ✓         | ✗              | ✗        |
-| Manage project users          | ✓          | ✓         | ✓              | ✗        |
-| Upload project data           | ✓          | ✓         | ✓              | ✓        |
-| Delete project data           | ✓          | ✓         | ✓              | ✗        |
-| Assign superadmin role        | ✓          | ✗         | ✗              | ✗        |
-| Assign org admin role         | ✓          | ✗         | ✗              | ✗        |
-| Assign project roles          | ✓          | ✓         | ✓              | ✗        |
-| View global watershed plans   | ✓          | ✗         | ✗              | ✗        |
-| View org watershed plans      | ✓          | ✗         | ✗              | ✗        |
-| Filter plans by geography     | ✓          | ✗         | ✗              | ✗        |
+| Capability                   | Superadmin | Org Admin | Project Manager | App User |
+|------------------------------|------------|-----------|-----------------|----------|
+| Access all organizations     | ✓          | ✗         | ✗               | ✗        |
+| Access organization projects | ✓          | ✓         | ✗               | ✗        |
+| Access assigned projects     | ✓          | ✓         | ✓               | ✓        |
+| Create organizations         | ✓          | ✗         | ✗               | ✗        |
+| Create projects              | ✓          | ✓         | ✗               | ✗        |
+| Edit project details         | ✓          | ✓         | ✓               | ✗        |
+| Manage all users             | ✓          | ✗         | ✗               | ✗        |
+| Manage org users             | ✓          | ✓         | ✗               | ✗        |
+| Manage project users         | ✓          | ✓         | ✓               | ✗        |
+| Upload project data          | ✓          | ✓         | ✓               | ✓        |
+| Delete project data          | ✓          | ✓         | ✓               | ✗        |
+| Assign superadmin role       | ✓          | ✗         | ✗               | ✗        |
+| Assign org admin role        | ✓          | ✗         | ✗               | ✗        |
+| Assign project roles         | ✓          | ✓         | ✓               | ✗        |
+| Reset other user's password  | ✓          | ✓ (org)   | ✗               | ✗        |
+| View global watershed plans  | ✓          | ✗         | ✗               | ✗        |
+| View org watershed plans     | ✓          | ✗         | ✗               | ✗        |
+| Filter plans by geography    | ✓          | ✗         | ✗               | ✗        |

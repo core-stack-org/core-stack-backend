@@ -27,9 +27,7 @@ def generate_fes_clart_layer(self, state, district, block, file_path, gee_accoun
     try:
         clart_filename = os.path.basename(file_path)
 
-        description = (
-            valid_gee_text(district) + "_" + valid_gee_text(block) + "_clart"
-        )
+        description = valid_gee_text(district) + "_" + valid_gee_text(block) + "_clart"
         asset_id = get_gee_asset_path(state, district, block) + description + "_fes"
 
         if not is_gee_asset_exists(asset_id):

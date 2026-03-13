@@ -6,11 +6,7 @@ from cryptography.fernet import Fernet
 from django.conf import settings
 import os
 import environ
-from nrm_app.settings import  FERNET_KEY
-
-
-
-
+from nrm_app.settings import FERNET_KEY
 
 
 @receiver(post_save, sender=GEEAccount)

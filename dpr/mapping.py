@@ -5,7 +5,7 @@ from dpr.models import (
     ODK_well,
     SWB_maintenance,
 )
-from dpr.utils import format_text
+from dpr.utils import ensure_str, format_text
 from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -191,7 +191,7 @@ def get_activity_type_from_waterbody(waterbody):
     print(f"Expected repair key: {expected_repair_key}")
 
     if expected_repair_key:
-        repair_value = data.get(expected_repair_key)
+        repair_value = ensure_str(data.get(expected_repair_key))
 
         if repair_value and repair_value.lower() == "other":
             other_value = data.get(f"{expected_repair_key}_other")
@@ -231,11 +231,11 @@ def get_activity_type_from_well(well):
     # Navigate to the Well_condition section
     well_condition = data.get("Well_condition", {})
 
-    repair_type = well_condition.get("select_one_repairs_well")
+    repair_type = ensure_str(well_condition.get("select_one_repairs_well"))
     print(f"Repair type well: {repair_type}")
 
     if repair_type:
-        if repair_type and repair_type.lower() == "other":
+        if repair_type.lower() == "other":
             other_value = well_condition.get("select_one_repairs_well_other")
             if other_value:
                 print(
@@ -255,9 +255,10 @@ def get_activity_type_from_well(well):
     return "Maintenance"
 
 
+# MARK: Water Structures Data and Well Data
 def populate_maintenance_from_waterbody(plan):
     """
-    Filter ODK_waterbody records by water structure type and populate the appropriate maintenance tables
+    Filter ODK_waterbody and ODK_well records by water structure type and populate the appropriate maintenance tables
     (GW_maintenance, Agri_maintenance, SWB_maintenance) based on the structure type.
 
     Does the same for wells maintenance -- populating the irrigation table
@@ -271,6 +272,7 @@ def populate_maintenance_from_waterbody(plan):
     )
     wells = ODK_well.objects.filter(plan_id=plan.id).exclude(status_re="rejected")
     print(f"Found {waterbodies.count()} waterbody records for plan {plan.id}")
+    print(f"Found {wells.count()} well records for plan {plan.id}")
 
     for waterbody in waterbodies:
         structure_type = waterbody.water_structure_type
@@ -283,8 +285,10 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_waterbody(waterbody)
 
         common_data = {
+            "demand_type": waterbody.data_waterbody.get("select_one_owns"),
             "beneficiary_settlement": waterbody.beneficiary_settlement,
             "Beneficiary_Name": waterbody.data_waterbody.get("Beneficiary_name"),
+            "ben_father": waterbody.data_waterbody.get("ben_father"),
             "select_one_activities": format_text(activity_type),
         }
 
@@ -400,8 +404,10 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_well(well)
 
         common_data = {
+            "demand_type": well.data_well.get("select_one_owns"),
             "beneficiary_settlement": well.beneficiary_settlement,
             "Beneficiary_Name": well.data_well.get("Beneficiary_name"),
+            "ben_father": well.data_well.get("ben_father"),
             "select_one_activities": format_text(activity_type),
         }
 

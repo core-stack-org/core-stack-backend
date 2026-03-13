@@ -22,35 +22,36 @@ from computing.utils import (
     sync_layer_to_geoserver,
     update_layer_sync_status,
 )
+from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
 def generate_hydrology(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    app_type="MWS",
-    start_year=None,
-    end_year=None,
-    is_annual=False,
-    gee_account_id=None,
+        self,
+        state=None,
+        district=None,
+        block=None,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        app_type="MWS",
+        start_year=None,
+        end_year=None,
+        is_annual=False,
+        gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
     sys.setrecursionlimit(6000)
 
-    end_year = end_year if is_annual else end_year + 1
+    end_year = end_year + 1
     task_list = []
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
 
     if state and district and block:
         asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -116,7 +117,7 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_precipitation_{layer_name_suffix}",
                 asset_id=ppt_asset_id,
                 dataset_name="Hydrology Precipitation",
-                layer_version=1.0,
+                algorithm_version="1.1",
                 misc={"start_date": start_date, "end_date": ppt_last_date},
             )
             print("save Precipitation info at the gee level...")
@@ -131,8 +132,7 @@ def generate_hydrology(
                 asset_id=et_asset_id,
                 dataset_name="Hydrology Evapotranspiration",
                 algorithm="fldas",
-                algorithm_version=1.1,
-                layer_version=1.0,
+                algorithm_version="1.1",
                 misc={"start_date": start_date, "end_date": et_last_date},
             )
             print("save Evapotranspiration info at the gee level...")
@@ -146,12 +146,12 @@ def generate_hydrology(
                 layer_name=f"{asset_suffix}_run_off_{layer_name_suffix}",
                 asset_id=ro_asset_id,
                 dataset_name="Hydrology Run Off",
-                layer_version=1.0,
+                algorithm_version="1.1",
                 misc={"start_date": start_date, "end_date": ro_last_date},
             )
             print("save Run Off info at the gee level...")
 
-    dg_task_id, delta_g_asset_id = delta_g(
+    dg_task_id, delta_g_asset_id, g_last_date = delta_g(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -160,14 +160,14 @@ def generate_hydrology(
         end_date=end_date,
         is_annual=is_annual,
     )
-
+    print("g_last_date", g_last_date)
     task_id_list = check_task_status([dg_task_id]) if dg_task_id else []
     print("dg task_id_list", task_id_list)
 
     layer_name = "deltaG_fortnight_" + asset_suffix
 
     if is_annual:
-        wd_task_id, wd_asset_id, w_last_date = well_depth(
+        wd_task_id, wd_asset_id = well_depth(
             asset_suffix=asset_suffix,
             asset_folder_list=asset_folder_list,
             app_type=app_type,
@@ -190,7 +190,7 @@ def generate_hydrology(
 
         layer_name = "deltaG_well_depth_" + asset_suffix
 
-    asset_id, g_last_date = calculate_g(
+    asset_id = calculate_g(
         delta_g_asset_id,
         asset_folder_list,
         asset_suffix,
@@ -210,7 +210,7 @@ def generate_hydrology(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Hydrology",
-            layer_version=1.0,
+            algorithm_version="1.1",
             misc={
                 "start_date": start_date,
                 "end_date": g_last_date,
@@ -225,5 +225,22 @@ def generate_hydrology(
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
+
+            if is_annual:
+                layer_STAC_generated = False
+                layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                    state=state,
+                    district=district,
+                    block=block,
+                    layer_name="change_in_well_depth_vector",
+                )
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+                )
+            else:
+                update_layer_sync_status(
+                    layer_id=layer_id, is_stac_specs_generated=False
+                )
+
             layer_at_geoserver = True
     return layer_at_geoserver

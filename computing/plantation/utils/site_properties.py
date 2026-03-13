@@ -75,7 +75,7 @@ def get_site_properties(roi, state, start_year, end_year):
 
 def get_dist_to_road(state):
     dataset_collection = ee.FeatureCollection(
-        f"projects/df-project-iit/assets/datasets/Road_DRRP/{valid_gee_text(state.lower())}"
+        f"projects/ext-datasets/assets/datasets/Road_DRRP/{valid_gee_text(state.lower())}"
     )
     dataset = dataset_collection.reduceToImage(
         properties=["STATE_ID"], reducer=ee.Reducer.first()

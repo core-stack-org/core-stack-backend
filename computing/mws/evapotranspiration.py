@@ -1,9 +1,8 @@
 import ee
 import datetime
 
-from dateutil.relativedelta import relativedelta
-
 from computing.mws.utils import get_last_date
+from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     check_task_status,
@@ -13,7 +12,6 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
 )
 import calendar
-from computing.models import Layer, Dataset
 
 
 def evapotranspiration(
@@ -40,10 +38,12 @@ def evapotranspiration(
         layer_obj = None
         try:
             layer_name_suffix = "annual" if is_annual else "fortnight"
-            dataset = Dataset.objects.get(name="Hydrology Evapotranspiration")
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                asset_folder_list[0],
+                asset_folder_list[1],
+                asset_folder_list[2],
                 layer_name=f"{asset_suffix}_evapotranspiration_{layer_name_suffix}",
+                dataset_name="Hydrology Evapotranspiration",
             )
         except Exception as e:
             print(
@@ -207,6 +207,8 @@ def et_fldas(
     while f_start_date < end_date:
         if is_annual:
             f_end_date = f_start_date + datetime.timedelta(days=363)
+            if f_end_date > end_date:
+                break
             image_path = (
                 "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_annual/ET_"
                 + str(s_year)
@@ -295,8 +297,6 @@ def et_global_fldas(
     print("In Global FLDAS")
     f_start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-    # fn_index = 0  # fortnight index
-    # s_year = f_start_date.date().year
 
     size = shape.size()
     size1 = ee.Number(size).subtract(ee.Number(1))
@@ -305,25 +305,42 @@ def et_global_fldas(
 
     while f_start_date < end_date:
         if is_annual:
-            f_end_date = f_start_date + relativedelta(years=1)
-            # s_year += 1
+            f_end_date = f_start_date + datetime.timedelta(days=363)
+            if f_end_date > end_date:
+                break
             img = ee.Image.constant(0).clip(shape)
             annual_start_date = f_start_date
-            # Loop over all months and individually calculate the ET for each month. Add them later to get ET for an entire year.
-            for n in range(12):
-                # s = annual_start_date
-                e = annual_start_date + relativedelta(months=1) - relativedelta(days=1)
-                number_of_days_in_month = ee.Date(str(e.date())).get("day")
-                image = filter_dataset(
-                    annual_start_date, number_of_days_in_month, fldas_dataset
-                )
+            while annual_start_date <= f_end_date:
+                annual_end_date = annual_start_date + datetime.timedelta(days=13)
+                if annual_start_date.month != annual_end_date.month:
+                    """If fortnight falls in two months, we have to do separate calculation as FLDAS will give different
+                    image for both months. So here we are getting number of days that falls in both months in that
+                    fortnight and passing that to 'filter_dataset' function to do further calculations.
+                    """
+                    res = calendar.monthrange(
+                        annual_start_date.year, annual_start_date.month
+                    )
+                    number_of_days = res[1] - annual_start_date.day
+                    img1 = filter_dataset(
+                        annual_start_date, number_of_days, fldas_dataset
+                    )
+
+                    number_of_days = annual_end_date.day
+                    img2 = filter_dataset(
+                        annual_end_date, number_of_days, fldas_dataset
+                    )
+                    image = img1.add(img2)
+                else:
+                    """If fortnight falls in single month"""
+                    number_of_days = annual_end_date.day - annual_start_date.day
+                    image = filter_dataset(
+                        annual_start_date, number_of_days, fldas_dataset
+                    )
 
                 img = img.add(ee.Image(image))
-                annual_start_date = annual_start_date + relativedelta(months=1)
-
-            sd = str(f_start_date.year) + "-07-01"
+                annual_start_date = annual_end_date + datetime.timedelta(days=1)
         else:
-            f_end_date = f_start_date + datetime.timedelta(days=14)
+            f_end_date = f_start_date + datetime.timedelta(days=13)
             if f_end_date > end_date:
                 break
 
@@ -345,8 +362,6 @@ def et_global_fldas(
                 number_of_days = f_end_date.day - f_start_date.day
                 img = filter_dataset(f_start_date, number_of_days, fldas_dataset)
 
-            # sd = str(f_start_date.date())
-
         mws = ee.List.sequence(0, size1)
 
         total = ee.Image(img)
@@ -366,9 +381,9 @@ def et_global_fldas(
             return feat.set(start_date, mean)
 
         shape = ee.FeatureCollection(mws.map(res))
-        f_start_date = f_end_date
+        f_start_date = f_end_date + datetime.timedelta(days=1)
         start_date = str(f_start_date.date())
-
+    print("start_date", start_date)
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(shape, description, asset_id)
     return task_id, start_date

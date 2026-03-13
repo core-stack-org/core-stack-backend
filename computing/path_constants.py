@@ -1,5 +1,3 @@
-
-
 MWS_FC_STATE_LEVEL = {
     "bihar": "projects/ee-anz208490/assets/bihar_blocks_NASA_chintan",
     "odisha": "",

@@ -118,13 +118,20 @@
         "SendLocationRequest": [
           "failure"
         ]
+      },{
+       "CommunityByLocation": [
+          "community_member"
+        ]
       }
     ]
   },
   {
     "name": "CommunityByLocation",
     "preAction": [
-      {
+     {
+        "data": {
+          "getDataFrom": { "field": "data", "state": "SendLocationRequest" }
+        },
         "function": "send_community_by_location"
       }
     ],
@@ -158,7 +165,7 @@
               "field": "misc"
             },
             {
-              "state": "SendDistrict", 
+              "state": "SendDistrict",
               "field": "misc"
             }
           ]
@@ -222,12 +229,16 @@
     ],
     "postAction": [],
     "transition": [
-        {
-            "COMPLETE": ["success"]
-        },
-        {
-            "JoinSuccess": ["failure"]
-        }
+      {
+        "COMPLETE": [
+          "success"
+        ]
+      },
+      {
+        "JoinSuccess": [
+          "failure"
+        ]
+      }
     ]
   }
 ]

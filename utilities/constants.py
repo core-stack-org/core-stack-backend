@@ -42,7 +42,6 @@ ODK_URL_waterbody = (
 
 ODK_URL_crop = ODK_BASE_URL + ODK_PROJECT_ID + "/forms/crop_form_V1.0.0.svc/Submissions"
 
-
 # Planning Forms
 ODK_URL_gw = (
     ODK_BASE_URL
@@ -154,7 +153,6 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
     + "/forms/nrm_agri_analysis_feedback_form_V1.0.0/submissions"
 )
 
-
 # MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
@@ -169,6 +167,12 @@ GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 
+GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
+
+GEE_FACILITIES_DATASET_PATH = (
+    "projects/corestack-datasets/assets/datasets/pan_india_facilities"
+)
+
 GEE_PATHS = {
     "MWS": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/mws/",
@@ -178,9 +182,10 @@ GEE_PATHS = {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/plantation/",
         "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/plantation/",
     },
-    "WATER_REJ": {
+    "WATERBODY": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/waterbody/",
-        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/waterbody/",
+        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "waterbody/",
+        "GEE_ASSET_FOLDER": "waterbody/",
     },
     "TEMPERATURE_HUMIDITY": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/temperature_humidity/",
@@ -189,3 +194,32 @@ GEE_PATHS = {
 }
 
 WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
+
+filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
+filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
+filter_query = (
+    "$filter=(day(__system/submissionDate) ge 14 "
+    "and month(__system/submissionDate) ge 12 "
+    "and year(__system/submissionDate) ge 2025) "
+    "or (day(__system/updatedAt) ge 14 "
+    "and month(__system/updatedAt) ge 12 "
+    "and year(__system/updatedAt) eq 2025)"
+)
+project_id = 2
+
+
+# demand vaidator constants
+
+DRAINAGE_LINES_ASSET = (
+    "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
+)
+GLOBAL_DRAINAGE_EPS_M = 10.0
+GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
+WORKS_WORKSPACE = "works"
+RESOURCES_WORKSPACE = "resources"
+LULC_ASSET = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2024_2025"
+SLOPE_ASSET = "USGS/SRTMGL1_003"
+CATCHMENT_ASSET = "projects/ext-datasets/assets/datasets/catchment_area_multiflow"
+STREAM_ORDER_ASSET = (
+    "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
+)

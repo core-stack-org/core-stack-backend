@@ -235,7 +235,7 @@ def get_osm_data(state, district, block, uid):
         )
         df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
 
-        total_area = df["area_in_ha"].sum()
+        total_area = int(df["area_in_ha"].sum())
 
         region_gdf = gpd.read_file(
             get_geojson(
@@ -874,7 +874,7 @@ def get_osm_data(state, district, block, uid):
         if parameter_block == "":
             parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
         else :
-            parameter_block = f"The Tehsil {block} having total area {total_area} hectares" + parameter_block + "."
+            parameter_block = f"The Tehsil {block} having total area {total_area:,} hectares" + parameter_block + "."
 
         if parameter_mws == "":
             parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
@@ -885,12 +885,11 @@ def get_osm_data(state, district, block, uid):
 
     except Exception as e:
         logger.info("The geojson is empty !", e)
-        return ""
+        return "", ""
 
 
 def get_terrain_data(state, district, block, uid):
     try:
-
         excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
 
         df = pd.read_excel(
@@ -1089,7 +1088,7 @@ def get_terrain_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block", district, block, e
+            "Not able to access excel for %s district, %s block", district, block
         )
         return "", [], [], "", "", [], [], [], []
 
@@ -1205,9 +1204,145 @@ def get_change_detection_data(state, district, block, uid):
             "Not able to access excel for %s district, %s block for degradation",
             district,
             block,
-            e,
         )
         return "", "", "", ""
+
+
+def get_land_conflict_industrial_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="lcw_conflict")
+
+        filtered_title = df.loc[df["UID"] == uid, "title_of_conflict"]
+        filtered_link = df.loc[df["UID"] == uid, "link_to_conflict"]
+
+        titles = filtered_title.tolist()
+        links = filtered_link.tolist()
+
+        conflicts = [
+            {"title": title, "link": link} 
+            for title, link in zip(titles, links)
+        ]
+
+        return conflicts
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Land Conflict",
+            district,
+            block,
+        )
+        return []
+
+
+def get_factory_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="factory_csr")
+
+        # Filter by UID
+        filtered_df = df[df["UID"] == uid]
+        
+        names = filtered_df["Company_Name"].tolist()
+        addresses = filtered_df["ADDRESS"].tolist()
+        types = filtered_df["LOCATION T"].tolist()
+
+        def clean_address(address):
+            if pd.isna(address):
+                return ""
+            
+            address = str(address)
+            
+            # Remove everything after "Fax :", "Email :", or "Internet :"
+            address = re.sub(r'\s*(?:Fax|Email|Internet)\s*:.*$', '', address, flags=re.IGNORECASE)
+            
+            return address.strip()
+
+        factories = [
+            {"name": name, "address": clean_address(address), "type": type_val} 
+            for name, address, type_val in zip(names, addresses, types)
+        ]
+
+        return factories
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Factory Data",
+            district,
+            block,
+        )
+        return []
+
+
+def get_mining_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="mining")
+
+        # Filter by UID first
+        filtered_df = df[df["UID"] == uid]
+        
+        # Remove rows where division is "unknown"
+        filtered_df = filtered_df[filtered_df["division"].str.lower() != "unknown"]
+        
+        # Remove duplicate entries based on "division" column
+        filtered_df = filtered_df.drop_duplicates(subset=["division"])
+        
+        # Extract the data
+        names = filtered_df["division"].tolist()
+        sectors = filtered_df["sector_moefcc"].tolist()
+        villages = filtered_df["village"].tolist()
+
+        mining_sites = [
+            {"division": division, "sector": sector, "village": village} 
+            for division, sector, village in zip(names, sectors, villages)
+        ]
+
+        return mining_sites
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Mining Data",
+            district,
+            block,
+        )
+        return []
+
+
+def get_green_credit_data(state, district, block, uid):
+    try:
+        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="green_credit")
+
+        # Filter by UID
+        filtered_df = df[df["UID"] == uid]
+
+        division = filtered_df["division"].tolist()
+        land_info = filtered_df["land_info"].tolist()
+
+        green_credits = []
+
+        for div, info in zip(division, land_info):
+            if pd.isna(info) or pd.isna(div):
+                continue
+            
+            # Split the land_info by "|"
+            parts = [part.strip() for part in str(info).split("|")]
+            
+            if len(parts) >= 4:
+                green_credits.append({
+                    "division": div,
+                    "registration_no": parts[0],
+                    "total_area": parts[1],
+                    "selected_area": parts[2],
+                    "available_area": parts[3]
+                })
+        
+        return green_credits
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Green Credit Data",
+            district,
+            block,
+        )
+        return []
 
 
 def get_cropping_intensity(state, district, block, uid):
@@ -1528,7 +1663,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             df_drought[selected_columns_moderate] = df_drought[selected_columns_moderate].apply(pd.to_numeric, errors="coerce")
             df_drought[selected_columns_severe] = df_drought[selected_columns_severe].apply(pd.to_numeric, errors="coerce")
 
-
             #? Trend Calculation
             filtered_df_kh = df.loc[df["UID"] == uid, selected_columns_kh].values[0]
 
@@ -1557,7 +1691,6 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                     else:
                         non_drought_year.append(match_exp.group(0))
             
-
             if len(drought_years):
                 
                 total_area_d = 0
@@ -1565,22 +1698,28 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                 for year in drought_years:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-                    total_area_d += yearly_area[0]
+                    if selected_column_temp:
+                        yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area) > 0 and len(yearly_area[0]) > 0:
+                            total_area_d += yearly_area[0][0]
 
 
                 for year in non_drought_year:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-                    total_area_nd += yearly_area[0]
+                    if selected_column_temp:
+                        yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area) > 0 and len(yearly_area[0]) > 0:
+                            total_area_nd += yearly_area[0][0]
                 
                 percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
+
 
                 if result.trend == "increasing":
                     parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
                     
                 else:
                     parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
+
 
             #? Non-Drought Years SWB
             if len(non_drought_year):
@@ -1590,23 +1729,28 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                 for year in non_drought_year:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-
                     selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
-                    yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values[0]
+                    
+                    if selected_column_temp:
+                        yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area_kh) > 0 and len(yearly_area_kh[0]) > 0:
+                            area_under_kh_nd += yearly_area_kh[0][0]
+                    
+                    if selected_column_temp_rb:
+                        yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values
+                        if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
+                            area_under_rb_nd += yearly_area_rb[0][0]
 
-                    area_under_rb_nd += yearly_area_rb[0]
-                    area_under_kh_nd += yearly_area_kh[0]
-
-                if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd ) * 100
+                # Handle division by zero for non-drought years
+                if area_under_kh_nd > 0:
+                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd) * 100
 
                     if result.trend == "increasing":
-                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh,2)}% from the Kharif to the Rabi season."
+                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh, 2)}% from the Kharif to the Rabi season."
                     elif result.trend == "decreasing":
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
                     else:
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
 
             if len(drought_years):
                 area_under_rb = 0
@@ -1615,24 +1759,29 @@ def get_surface_Water_bodies_data(state, district, block, uid):
 
                 for year in drought_years:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
-                    yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values[0]
-
                     selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
-                    yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values[0]
-
-                    area_under_rb += yearly_area_rb[0]
-                    area_under_kh += yearly_area_kh[0]
+                    
+                    if selected_column_temp:
+                        yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values
+                        if len(yearly_area_kh) > 0 and len(yearly_area_kh[0]) > 0:
+                            area_under_kh += yearly_area_kh[0][0]
+                    
+                    if selected_column_temp_rb:
+                        yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values
+                        if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
+                            area_under_rb += yearly_area_rb[0][0]
                 
-                if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh ) * 100
+                # Handle division by zero for drought years
+                if area_under_kh > 0:
+                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh) * 100
 
-                if result.trend == "increasing":
-                    parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh,2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                elif result.trend == "decreasing":
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                else:
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-
+                    if result.trend == "increasing":
+                        parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh, 2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    elif result.trend == "decreasing":
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    else:
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+ 
             # ? Data yearwise for waterbody
             selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
             selected_columns_rabi = [col for col in df.columns if col.startswith("rabi_area_in_ha_")]
@@ -1646,12 +1795,9 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             filtered_df_rabi = (df.loc[df["UID"] == uid, selected_columns_rabi].values[0].tolist())
             filtered_df_zaid = (df.loc[df["UID"] == uid, selected_columns_zaid].values[0].tolist())
 
-            #filtered_df_kharif = [abs(kharif - rabi) for kharif, rabi in zip(filtered_df_kharif, filtered_df_rabi)]
-            #filtered_df_rabi = [abs(rabi - zaid) for rabi, zaid in zip(filtered_df_rabi, filtered_df_zaid)]
-
         else:
             parameter_swb_1 += (
-                f"The MicrowaterShed doesn't have any surface water of its own."
+                f"No surface water bodies were detected through remote sensing in this micro-watershed."
             )
 
         return (
@@ -1665,7 +1811,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         )
 
     except Exception as e:
-        logger.info("Not able to access excel for %s district, %s block for Waterbodies",district,block)
+        print(e)
+        logger.info("Not able to access excel for %s state, %s district, %s block for Waterbodies",state.upper(),district.upper(),block.upper())
         return "", "", "", [], [], [], []
 
 
@@ -1766,6 +1913,7 @@ def get_water_balance_data(state, district, block, uid):
                     non_drought_years.append(match_exp.group(0))
 
 
+
         #? Good Rainfall Years
         if len(non_drought_years):
 
@@ -1778,30 +1926,58 @@ def get_water_balance_data(state, district, block, uid):
 
                 #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
-                rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
-                avg_rainfall += rainfall[0]
+                if selected_column_precp:
+                    rainfall_data = df.loc[df["UID"] == uid, selected_column_precp].values
+                    if len(rainfall_data) > 0 and len(rainfall_data[0]) > 0:
+                        rainfall = rainfall_data[0][0]
+                        avg_rainfall += rainfall
+                    else:
+                        continue  # Skip this year if no rainfall data
+                else:
+                    continue
 
                 #? Monsoon Onset
                 selected_column_onset = [col for col in df_drought.columns if col.startswith("monsoon_onset_" + year)]
-                onset = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values[0]
-                monsoon_onset.append(onset[0])
+                if selected_column_onset:
+                    onset_data = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values
+                    if len(onset_data) > 0 and len(onset_data[0]) > 0:
+                        onset = onset_data[0][0]
+                        monsoon_onset.append(onset)
 
                 #? Fortnight Delg Calc
                 selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
                 selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
                 selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
-                delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
-                delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
-                delg_zd = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values[0]
+                delg_kh_val = 0
+                delg_rb_val = 0
+                delg_zd_val = 0
 
-                avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
+                if selected_column_kh:
+                    delg_kh_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values
+                    if len(delg_kh_data) > 0 and len(delg_kh_data[0]) > 0:
+                        delg_kh_val = delg_kh_data[0][0]
+
+                if selected_column_rb:
+                    delg_rb_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values
+                    if len(delg_rb_data) > 0 and len(delg_rb_data[0]) > 0:
+                        delg_rb_val = delg_rb_data[0][0]
+
+                if selected_column_zd:
+                    delg_zd_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values
+                    if len(delg_zd_data) > 0 and len(delg_zd_data[0]) > 0:
+                        delg_zd_val = delg_zd_data[0][0]
+
+                avg_fortnight_delg += (delg_kh_val + delg_rb_val + delg_zd_val)
 
                 #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
-                runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
-
-                runoff_percent += ((runoff[0] / rainfall[0]) * 100)
+                if selected_column_runoff:
+                    runoff_data = df.loc[df["UID"] == uid, selected_column_runoff].values
+                    if len(runoff_data) > 0 and len(runoff_data[0]) > 0:
+                        runoff = runoff_data[0][0]
+                        if rainfall > 0:  # Avoid division by zero
+                            runoff_percent += ((runoff / rainfall) * 100)
             
             avg_rainfall = avg_rainfall / len(non_drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(non_drought_years)
@@ -1837,25 +2013,51 @@ def get_water_balance_data(state, district, block, uid):
 
                 #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
-                rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
-                avg_rainfall += rainfall[0]
+                rainfall = None
+                if selected_column_precp:
+                    rainfall_data = df.loc[df["UID"] == uid, selected_column_precp].values
+                    if len(rainfall_data) > 0 and len(rainfall_data[0]) > 0:
+                        rainfall = rainfall_data[0][0]
+                        avg_rainfall += rainfall
+                    else:
+                        continue  # Skip this year if no rainfall data
+                else:
+                    continue
 
                 #? Fortnight Delg Calc
                 selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
                 selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
                 selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
-                delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
-                delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
-                delg_zd = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values[0]
+                delg_kh_val = 0
+                delg_rb_val = 0
+                delg_zd_val = 0
 
-                avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
+                if selected_column_kh:
+                    delg_kh_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values
+                    if len(delg_kh_data) > 0 and len(delg_kh_data[0]) > 0:
+                        delg_kh_val = delg_kh_data[0][0]
+
+                if selected_column_rb:
+                    delg_rb_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values
+                    if len(delg_rb_data) > 0 and len(delg_rb_data[0]) > 0:
+                        delg_rb_val = delg_rb_data[0][0]
+
+                if selected_column_zd:
+                    delg_zd_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values
+                    if len(delg_zd_data) > 0 and len(delg_zd_data[0]) > 0:
+                        delg_zd_val = delg_zd_data[0][0]
+
+                avg_fortnight_delg += (delg_kh_val + delg_rb_val + delg_zd_val)
 
                 #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
-                runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
-
-                runoff_percent += ((runoff[0] / rainfall[0]) * 100)
+                if selected_column_runoff and rainfall is not None:
+                    runoff_data = df.loc[df["UID"] == uid, selected_column_runoff].values
+                    if len(runoff_data) > 0 and len(runoff_data[0]) > 0:
+                        runoff = runoff_data[0][0]
+                        if rainfall > 0:  # Avoid division by zero
+                            runoff_percent += ((runoff / rainfall) * 100)
 
             avg_rainfall = avg_rainfall / len(drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(drought_years)
@@ -2114,7 +2316,7 @@ def get_drought_data(state, district, block, uid):
 
 def get_village_data(state, district, block, uid):
     try:
-        df = pd.read_excel(
+        file_path = (
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -2123,45 +2325,47 @@ def get_village_data(state, district, block, uid):
             + district.lower()
             + "_"
             + block.lower()
-            + ".xlsx",
-            sheet_name="mws_intersect_villages",
+            + ".xlsx"
         )
-        df_village = pd.read_excel(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            sheet_name="nrega_assets_village",
-        )
-        df_socio = pd.read_excel(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            sheet_name="social_economic_indicator",
-        )
+        
+        # Check available sheets
+        excel_file = pd.ExcelFile(file_path)
+        available_sheets = excel_file.sheet_names
+        
+        # Check if mws_intersect_villages sheet is present (mandatory)
+        if "mws_intersect_villages" not in available_sheets:
+            logger.info(
+                "mws_intersect_villages sheet not found for %s district, %s block",
+                district,
+                block
+            )
+            return [], [], [], [], [], [], [], [], [], [], []
+        
+        # Load the main sheet
+        df = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
+        
+        # Check for optional sheets
+        has_nrega = "nrega_assets_village" in available_sheets
+        has_socio = "social_economic_indicator" in available_sheets
+        
+        # Load optional sheets if available
+        df_village = None
+        df_socio = None
+        
+        if has_nrega:
+            df_village = pd.read_excel(file_path, sheet_name="nrega_assets_village")
+        
+        if has_socio:
+            df_socio = pd.read_excel(file_path, sheet_name="social_economic_indicator")
 
         selected_columns_ids = [
             col for col in df.columns if col.startswith("Village IDs")
         ]
-        # select only the columns you care about
         matching = df.loc[df["MWS UID"] == uid, selected_columns_ids]
 
         if matching.empty:
-            # no rows found for this uid
             villages = []
         else:
-            # take the first (and presumably only) matching row
             villages = matching.iloc[0].tolist()
 
         villages_name = []
@@ -2180,166 +2384,217 @@ def get_village_data(state, district, block, uid):
         if len(villages) > 0:
             villages = eval(villages[0])
             for id in villages:
-                village_name_col = [
-                    col for col in df_village.columns if col.startswith("vill_name")
-                ]
-                name = (
-                    df_village.loc[df_village["vill_id"] == id, village_name_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_name.append(name[0])
+                village_name = None
+                
+                # Try to get village name from NREGA sheet first
+                if has_nrega and df_village is not None:
+                    village_name_col = [
+                        col for col in df_village.columns if col.startswith("vill_name")
+                    ]
+                    if len(village_name_col) > 0:
+                        village_match = df_village.loc[df_village["vill_id"] == id, village_name_col]
+                        if not village_match.empty:
+                            name = village_match.values[0].tolist()
+                            village_name = name[0] if name else None
+                
+                # Fallback to socio-economic sheet if name not found
+                if village_name is None and has_socio and df_socio is not None:
+                    village_name_col = [
+                        col for col in df_socio.columns if col.startswith("village_name")
+                    ]
+                    if len(village_name_col) > 0:
+                        village_match = df_socio.loc[df_socio["village_id"] == id, village_name_col]
+                        if not village_match.empty:
+                            name = village_match.values[0].tolist()
+                            village_name = name[0] if name else None
+                
+                villages_name.append(village_name)
 
-                swc_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Soil and water conservation")
-                ]
-                df_village[swc_cols] = df_village[swc_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                swc_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, swc_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                # Process NREGA data if available
+                if has_nrega and df_village is not None:
+                    # Process all NREGA work categories
+                    swc_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Soil and water conservation")
+                    ]
+                    if len(swc_cols) > 0:
+                        df_village[swc_cols] = df_village[swc_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, swc_cols]
+                        if not village_match.empty:
+                            swc_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            swc_works.append(0)
+                    else:
+                        swc_works.append(0)
 
-                lr_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Land restoration")
-                ]
-                df_village[lr_cols] = df_village[lr_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                lr_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, lr_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    lr_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Land restoration")
+                    ]
+                    if len(lr_cols) > 0:
+                        df_village[lr_cols] = df_village[lr_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, lr_cols]
+                        if not village_match.empty:
+                            lr_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            lr_works.append(0)
+                    else:
+                        lr_works.append(0)
 
-                plant_cols = [
-                    col for col in df_village.columns if col.startswith("Plantations")
-                ]
-                df_village[plant_cols] = df_village[plant_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                plantation_work.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, plant_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    plant_cols = [
+                        col for col in df_village.columns if col.startswith("Plantations")
+                    ]
+                    if len(plant_cols) > 0:
+                        df_village[plant_cols] = df_village[plant_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, plant_cols]
+                        if not village_match.empty:
+                            plantation_work.append(sum(village_match.values[0].tolist()))
+                        else:
+                            plantation_work.append(0)
+                    else:
+                        plantation_work.append(0)
 
-                iof_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Irrigation on farms")
-                ]
-                df_village[iof_cols] = df_village[iof_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                iof_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, iof_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    iof_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Irrigation on farms")
+                    ]
+                    if len(iof_cols) > 0:
+                        df_village[iof_cols] = df_village[iof_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, iof_cols]
+                        if not village_match.empty:
+                            iof_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            iof_works.append(0)
+                    else:
+                        iof_works.append(0)
 
-                ofl_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Off-farm livelihood assets")
-                ]
-                df_village[ofl_cols] = df_village[ofl_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                ofl_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, ofl_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    ofl_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Off-farm livelihood assets")
+                    ]
+                    if len(ofl_cols) > 0:
+                        df_village[ofl_cols] = df_village[ofl_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, ofl_cols]
+                        if not village_match.empty:
+                            ofl_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            ofl_works.append(0)
+                    else:
+                        ofl_works.append(0)
 
-                ca_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Community assets_count")
-                ]
-                df_village[ca_cols] = df_village[ca_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                ca_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, ca_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    ca_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Community assets_count")
+                    ]
+                    if len(ca_cols) > 0:
+                        df_village[ca_cols] = df_village[ca_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, ca_cols]
+                        if not village_match.empty:
+                            ca_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            ca_works.append(0)
+                    else:
+                        ca_works.append(0)
 
-                ofw_cols = [
-                    col
-                    for col in df_village.columns
-                    if col.startswith("Other farm works")
-                ]
-                df_village[ofw_cols] = df_village[ofw_cols].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                ofw_works.append(
-                    sum(
-                        df_village.loc[df_village["vill_id"] == id, ofw_cols]
-                        .values[0]
-                        .tolist()
-                    )
-                )
+                    ofw_cols = [
+                        col
+                        for col in df_village.columns
+                        if col.startswith("Other farm works")
+                    ]
+                    if len(ofw_cols) > 0:
+                        df_village[ofw_cols] = df_village[ofw_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_village.loc[df_village["vill_id"] == id, ofw_cols]
+                        if not village_match.empty:
+                            ofw_works.append(sum(village_match.values[0].tolist()))
+                        else:
+                            ofw_works.append(0)
+                    else:
+                        ofw_works.append(0)
+                else:
+                    # If NREGA sheet not available, append default values
+                    swc_works.append(0)
+                    lr_works.append(0)
+                    plantation_work.append(0)
+                    iof_works.append(0)
+                    ofl_works.append(0)
+                    ca_works.append(0)
+                    ofw_works.append(0)
 
-                sc_percent_col = [
-                    col for col in df_socio.columns if col.startswith("SC_percent")
-                ]
-                df_socio[sc_percent_col] = df_socio[sc_percent_col].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                sc_percent = (
-                    df_socio.loc[df_socio["village_id"] == id, sc_percent_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_sc.append(round(sc_percent[0], 2))
+                # Process socio-economic data if available
+                if has_socio and df_socio is not None:
+                    sc_percent_col = [
+                        col for col in df_socio.columns if col.startswith("SC_percent")
+                    ]
+                    if len(sc_percent_col) > 0:
+                        df_socio[sc_percent_col] = df_socio[sc_percent_col].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_socio.loc[df_socio["village_id"] == id, sc_percent_col]
+                        if not village_match.empty:
+                            sc_percent = village_match.values[0].tolist()
+                            villages_sc.append(round(sc_percent[0], 2))
+                        else:
+                            villages_sc.append(None)
+                    else:
+                        villages_sc.append(None)
 
-                st_percent_col = [
-                    col for col in df_socio.columns if col.startswith("ST_percent")
-                ]
-                df_socio[st_percent_col] = df_socio[st_percent_col].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                st_percent = (
-                    df_socio.loc[df_socio["village_id"] == id, st_percent_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_st.append(round(st_percent[0], 2))
+                    st_percent_col = [
+                        col for col in df_socio.columns if col.startswith("ST_percent")
+                    ]
+                    if len(st_percent_col) > 0:
+                        df_socio[st_percent_col] = df_socio[st_percent_col].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_socio.loc[df_socio["village_id"] == id, st_percent_col]
+                        if not village_match.empty:
+                            st_percent = village_match.values[0].tolist()
+                            villages_st.append(round(st_percent[0], 2))
+                        else:
+                            villages_st.append(None)
+                    else:
+                        villages_st.append(None)
 
-                pop_col = [
-                    col
-                    for col in df_socio.columns
-                    if col.startswith("total_population")
-                ]
-                df_socio[pop_col] = df_socio[pop_col].apply(
-                    pd.to_numeric, errors="coerce"
-                )
-                total_pop = (
-                    df_socio.loc[df_socio["village_id"] == id, pop_col]
-                    .values[0]
-                    .tolist()
-                )
-                villages_pop.append(total_pop[0])
+                    pop_col = [
+                        col
+                        for col in df_socio.columns
+                        if col.startswith("total_population")
+                    ]
+                    if len(pop_col) > 0:
+                        df_socio[pop_col] = df_socio[pop_col].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        village_match = df_socio.loc[df_socio["village_id"] == id, pop_col]
+                        if not village_match.empty:
+                            total_pop = village_match.values[0].tolist()
+                            villages_pop.append(total_pop[0])
+                        else:
+                            villages_pop.append(None)
+                    else:
+                        villages_pop.append(None)
+                else:
+                    # If socio-economic sheet not available, append default values
+                    villages_sc.append(None)
+                    villages_st.append(None)
+                    villages_pop.append(None)
 
         return (
             villages_name,
@@ -2357,8 +2612,8 @@ def get_village_data(state, district, block, uid):
 
     except Exception as e:
         logger.info(
-            "Not able to access excel for %s district, %s block for village data",
+            "Error accessing excel for %s district, %s block: %s",
             district,
-            block
+            block,
         )
-        return [],[],[],[],[],[],[],[],[],[],[]
+        return [], [], [], [], [], [], [], [], [], [], []

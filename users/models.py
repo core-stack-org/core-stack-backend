@@ -1,5 +1,3 @@
-import uuid
-
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -7,14 +5,38 @@ from django.utils.translation import gettext_lazy as _
 from organization.models import Organization
 
 
+class AccountType(models.TextChoices):
+    INDIVIDUAL = "individual", "Individual"
+    ORGANIZATION = "org", "Organization"
+
+
 class User(AbstractUser):
+    GENDER_CHOICES = [
+        ("M", "Male"),
+        ("F", "Female"),
+        ("O", "Other"),
+    ]
+
     id = models.AutoField(primary_key=True)
+    account_type = models.CharField(
+        max_length=20,
+        choices=AccountType.choices,
+        null=True,
+    )
     organization = models.ForeignKey(
         Organization, on_delete=models.SET_NULL, null=True, related_name="users"
     )
     contact_number = models.CharField(max_length=20, blank=True, null=True)
     odk_username = models.CharField(max_length=255, blank=True, null=True)
     is_superadmin = models.BooleanField(default=False)
+    age = models.PositiveIntegerField(blank=True, null=True)
+    education_qualification = models.CharField(max_length=255, blank=True, null=True)
+    gender = models.CharField(
+        max_length=1, choices=GENDER_CHOICES, blank=True, null=True
+    )
+    profile_picture = models.ImageField(
+        upload_to="profile_pictures/", blank=True, null=True
+    )
 
     groups = models.ManyToManyField(
         Group,

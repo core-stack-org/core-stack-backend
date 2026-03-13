@@ -15,10 +15,6 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
-    export_vector_asset_to_gee,
-    check_task_status,
-    is_gee_asset_exists,
-    build_gee_helper_paths,
 )
 from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 
@@ -389,7 +385,7 @@ def data_with_column(year, gdf, fin_df):
         for i in range(len(sorted_dates_strings)):
             s = sorted_dates_strings[i]
             col = f"{label}_{s}"
-            colnew = f"{label}_{year}_week_{i+1}"
+            colnew = f"{label}_{year}_week_{i + 1}"
             fin_df[colnew] = gdf[col]
             new_cols.append(colnew)
 
@@ -526,7 +522,6 @@ def drought_causality(
     combined_uid_data = {}
 
     for year in range(start_year, end_year + 1):
-        helper_account_path = build_gee_helper_paths("mws", gee_obj.helper_account.name)
         asset_path = ee.FeatureCollection(
             get_gee_asset_path(
                 state, district, block, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -537,6 +532,7 @@ def drought_causality(
             + valid_gee_text(block.lower())
             + "_"
             + str(year)
+            + "_v2"
         )
 
         feature_collection = ee.FeatureCollection(asset_path)

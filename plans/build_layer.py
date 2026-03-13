@@ -9,20 +9,10 @@ import os
 import sys
 from typing import Optional
 import tempfile
+from dpr.utils import transform_name
 from utilities.logger import logger
 import traceback
 from nrm_app.settings import GEOSERVER_URL, GEOSERVER_PASSWORD, GEOSERVER_USERNAME
-
-
-def format_name(block_name):
-    try:
-        formatted_name = block_name.lower()
-        formatted_name = formatted_name.replace(" ", "_")
-        logger.debug(f"Formatted name: {formatted_name}")
-        return formatted_name
-    except Exception as e:
-        logger.error(f"Error in format_name: {str(e)}")
-        raise
 
 
 class Geoserver_BB:
@@ -118,7 +108,7 @@ def build_layer(layer_type, item_type, plan_id, district, block, csv_path):
         gdf = gpd.GeoDataFrame(df_geom, geometry=geometry)
         gdf.crs = "EPSG:4326"
 
-        formatted_block = format_name(block_name=block)
+        formatted_block = transform_name(name=block)
         store_layer_name = f"{item_type}_{plan_id}_{district}_{formatted_block}"
         logger.debug(f"Store layer name: {store_layer_name}")
 

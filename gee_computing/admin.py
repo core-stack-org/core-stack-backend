@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models  import GEEAccount
+from .models import GEEAccount
 
 # Register your models here.
 

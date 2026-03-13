@@ -25,6 +25,12 @@ class IsOrganizationMember(permissions.BasePermission):
         if request.user.is_superadmin or request.user.is_superuser:
             return True
 
+        if (
+            request.method in permissions.SAFE_METHODS
+            and request.user.groups.filter(name="Test Plan Reviewer").exists()
+        ):
+            return True
+
         if hasattr(obj, "organization"):
             return obj.organization == request.user.organization
 
