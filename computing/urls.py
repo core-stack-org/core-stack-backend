@@ -20,7 +20,6 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
-    path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
     path("lulc_v3/", api.lulc_v3, name="lulc_v3"),
@@ -106,79 +105,19 @@ urlpatterns = [
         name="generate_layer_in_order",
     ),
     path(
-        "layer_status_dashboard/",
-        api.layer_status_dashboard,
+        "layer_staus_dashboard/",
+        api.layer_staus_dashboard,
         name="layer_staus_dashboard",
     ),
-    path("generate_lcw/", api.generate_lcw, name="generate_lcw_data"),
+    # Temperature & Humidity endpoints
     path(
-        "generate_agroecological/",
-        api.generate_agroecological,
-        name="generate_agroecological_data",
+        "generate-climate-layer/",
+        api.generate_climate_layer,
+        name="generate-climate-layer",
     ),
     path(
-        "generate_factory_csr/",
-        api.generate_factory_csr,
-        name="generate_factory_csr_data",
+        "climate-task-status/<str:task_id>/",
+        api.get_climate_task_status,
+        name="climate-task-status",
     ),
-    path(
-        "generate_green_credit/",
-        api.generate_green_credit,
-        name="generate_green_credit_data",
-    ),
-    path(
-        "generate_mining/",
-        api.generate_mining,
-        name="generate_mining_data",
-    ),
-    path(
-        "get_layers_in_workspace/",
-        api.get_layers_for_workspace,
-        name="get_layers_in_workspace",
-    ),
-    path(
-        "generate_natural_depression/",
-        api.generate_natural_depression,
-        name="generate_natural_depression_data",
-    ),
-    path(
-        "generate_distance_nearest_DL/",
-        api.generate_distance_nearest_upstream_DL,
-        name="generate_distance_nearest_DL_data",
-    ),
-    path(
-        "generate_catchment_area_singleflow/",
-        api.generate_catchment_area_SF,
-        name="generate_catchment_area_singleflow_data",
-    ),
-    path(
-        "generate_slope_percentage/",
-        api.generate_slope_percentage,
-        name="generate_slope_percentage",
-    ),
-    path(
-        "generate_ndvi_timeseries/",
-        api.generate_ndvi_timeseries,
-        name="generate_ndvi_timeseries",
-    ),
-    path(
-        "generate_zoi_data/",
-        api.generate_zoi_to_gee,
-        name="generate_zoi_data",
-    ),
-    path(
-        "generate_mws_connectivity_data/",
-        api.generate_mws_connectivity,
-        name="generate_mws_connectivity_data",
-    ),
-    path(
-        "generate_mws_centroid/",
-        api.generate_mws_centroid,
-        name="generate-mws-centroid",
-    ),
-    path(
-        "generate_facilities_proximity/",
-        api.generate_facilities_proximity,
-        name="generate_facilities_proximity",
-    ),    
 ]
