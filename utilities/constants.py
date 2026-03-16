@@ -156,14 +156,14 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 # MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
-GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
-GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
+GEE_ASSET_PATH = "projects/ee-saharshlaud/assets/apps/mws/"
+GEE_HELPER_PATH = "projects/ee-saharshlaud/assets/apps/mws/"
 
-GEE_PATH_PLANTATION = "projects/ee-corestackdev/assets/apps/plantation/"
-GEE_PATH_PLANTATION_HELPER = "projects/ee-corestack-helper/assets/apps/plantation/"
+GEE_PATH_PLANTATION = "projects/ee-saharshlaud/assets/apps/plantation/"
+GEE_PATH_PLANTATION_HELPER = "projects/ee-saharshlaud/assets/apps/plantation/"
 
-GEE_BASE_PATH = "projects/ee-corestackdev/assets/apps"
-GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
+GEE_BASE_PATH = "projects/ee-saharshlaud/assets/apps"
+GEE_HELPER_BASE_PATH = "projects/ee-saharshlaud/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 
