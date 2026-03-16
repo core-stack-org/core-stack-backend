@@ -44,6 +44,8 @@ from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
 from computing.change_detection.change_detection import get_change_detection
 from .lulc.lulc_v3 import clip_lulc_v3
+from .lulc.lulc_v3 import clip_lulc_v3_sync
+
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
@@ -278,7 +280,6 @@ def generate_annual_hydrology(request):
         print("Exception in generate_annual_hydrology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# LULC Raster Algo
 @api_view(["POST"])
 @schema(None)
 def lulc_for_tehsil(request):
@@ -367,28 +368,106 @@ def lulc_v3_river_basin(request):
         print("Exception in lulc_v3_river_basin api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# LULC Raster Algo
+# @api_view(["POST"])
+# @schema(None)
+# def lulc_v3(request):
+#     print("Inside lulc_v3 api.")
+#     try:
+#         state = request.data.get("state").lower()
+#         district = request.data.get("district").lower()
+#         block = request.data.get("block").lower()
+#         start_year = request.data.get("start_year")
+#         end_year = request.data.get("end_year")
+#         gee_account_id = request.data.get("gee_account_id")
+#         clip_lulc_v3.apply_async(
+#             args=[state, district, block, start_year, end_year, gee_account_id],
+#             queue="nrm",
+#         )
+#         return Response(
+#             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
+#         )
+#     except Exception as e:
+#         print("Exception in lulc_v3 api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+# LULC Raster Algo
 @api_view(["POST"])
 @schema(None)
 def lulc_v3(request):
     print("Inside lulc_v3 api.")
+    import time
+    from datetime import datetime as dt
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        clip_lulc_v3.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
+        execution_id = request.data.get("execution_id", "local")
+        MWS_Boundaries = request.data.get("MWS_Boundaries", None)
+
+        # SYNC — direct call, no Celery
+        asset_ids = clip_lulc_v3_sync(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            MWS_Boundaries=MWS_Boundaries,
         )
-        return Response(
-            {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
-        )
+
+        execution_time = time.time() - start_time
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        # that computes actual geometry and bbox from asset_id.
+        # Pattern: stac_spec = build_stac_spec(asset_ids, node_type, execution_id, ...)
+        return Response({
+            "status": "success",
+            "message": f"LULC v3 completed - {len(asset_ids)} assets created",
+            "execution_id": execution_id,
+            "node_type": "LULC_Algorithm",
+            "asset_ids": asset_ids,
+            "hosting_platform": "GEE",
+            "stac_spec": {
+                "stac_version": "1.0.0",
+                "type": "Feature",
+                "id": f"{state}_{district}_{block}_lulc_{execution_id[:8]}",
+                "properties": {
+                    "datetime": dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "title": f"LULC v3 for {block}, {district}, {state}",
+                    "stacd:algorithm": "LULC_Algorithm",
+                    "stacd:execution_id": execution_id,
+                    "stacd:state": state,
+                    "stacd:district": district,
+                    "stacd:block": block,
+                    "stacd:start_year": str(start_year),
+                    "stacd:end_year": str(end_year),
+                    "stacd:hosting_platform": "GEE",
+                },
+                "assets": {
+                    asset_id: {
+                        "href": f"https://code.earthengine.google.com/?asset={asset_id}",
+                        "type": "image/tiff",
+                        "roles": ["data"],
+                        "gee:asset_id": asset_id,
+                    }
+                    for asset_id in asset_ids
+                },
+            },
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in lulc_v3 api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "LULC_Algorithm",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # LULC Vectorization Algo
 @api_view(["POST"])
