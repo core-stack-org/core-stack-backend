@@ -21,6 +21,91 @@ from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
 from computing.STAC_specs import generate_STAC_layerwise
 
 
+
+def generate_terrain_raster_clip_sync(
+    state,
+    district,
+    block,
+    MWS_Boundaries=None,
+):
+    """
+    STACD-compatible synchronous version.
+    No Celery, no GCS, no GeoServer. Returns asset_id directly.
+    """
+    import ee
+    from utilities.gee_utils import ee_initialize
+    ee_initialize(2)
+
+    from utilities.gee_utils import (
+        valid_gee_text,
+        check_task_status,
+        export_raster_asset_to_gee,
+        is_gee_asset_exists,
+        get_gee_asset_path,
+    )
+    from utilities.constants import GEE_DATASET_PATH
+
+    # Use provided MWS_Boundaries or build default path
+    # if MWS_Boundaries is None:
+    #     roi_asset_id = (
+    #         get_gee_asset_path(state, district, block,asset_path="projects/ee-corestackdev/assets/apps/mws/")
+    #         + "filtered_mws_"
+    #         + valid_gee_text(district.lower())
+    #         + "_"
+    #         + valid_gee_text(block.lower())
+    #         + "_uid"
+    #     )
+    # else:
+    #     roi_asset_id = MWS_Boundaries
+
+    if MWS_Boundaries is None:
+        roi_asset_id = (
+            "projects/ee-corestackdev/assets/apps/mws/"
+            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
+        print(f"Using production MWS_Boundaries: {roi_asset_id}")
+    else:
+        roi_asset_id = MWS_Boundaries
+
+    asset_suffix = (
+        "terrain_raster_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + asset_suffix
+
+    if is_gee_asset_exists(asset_id):
+        print(f"Asset already exists, skipping: {asset_id}")
+        return asset_id
+
+    roi = ee.FeatureCollection(roi_asset_id)
+    pan_india_raster = ee.Image(
+        f"{GEE_DATASET_PATH}/terrain/pan_india_terrain_raster_fabdem"
+    )
+
+    task = export_raster_asset_to_gee(
+        image=pan_india_raster.clip(roi.union().geometry()),
+        description=asset_suffix,
+        asset_id=asset_id,
+        scale=30,
+        region=roi.geometry(),
+    )
+
+    task_id_list = check_task_status([task])
+    print(f"Terrain raster task completed: {task_id_list}")
+
+    if not is_gee_asset_exists(asset_id):
+        raise Exception(f"Asset not created after task completion: {asset_id}")
+
+    return asset_id
+
+
 @app.task(bind=True)
 def generate_terrain_raster_clip(
     self,

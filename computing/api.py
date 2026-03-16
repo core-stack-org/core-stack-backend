@@ -32,6 +32,8 @@ from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
+from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip_sync
+
 from computing.misc.drainage_lines import clip_drainage_lines
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
@@ -274,7 +276,7 @@ def generate_annual_hydrology(request):
         print("Exception in generate_annual_hydrology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# LULC Raster Algo
 @api_view(["POST"])
 @schema(None)
 def lulc_for_tehsil(request):
@@ -386,7 +388,7 @@ def lulc_v3(request):
         print("Exception in lulc_v3 api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# LULC Vectorization Algo
 @api_view(["POST"])
 @schema(None)
 def lulc_vector(request):
@@ -542,7 +544,7 @@ def generate_drought_layer(request):
         print("Exception in generate_drought_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Terrain vectorization algo
 @api_view(["POST"])
 @schema(None)
 def generate_terrain_descriptor(request):
@@ -563,35 +565,111 @@ def generate_terrain_descriptor(request):
         print("Exception in generate_terrain_descriptor api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# Terrain Raster Algo
+# @api_view(["POST"])
+# @schema(None)
+# def generate_terrain_raster(request):
+#     print("Inside generate_terrain_raster")
+#     try:
+#         state = request.data.get("state")
+#         district = request.data.get("district")
+#         block = request.data.get("block")
+#         gee_account_id = request.data.get("gee_account_id")
+#         generate_terrain_raster_clip.apply_async(
+#             kwargs={
+#                 "state": state,
+#                 "district": district,
+#                 "block": block,
+#                 "gee_account_id": gee_account_id,
+#             },
+#             queue="nrm",
+#         )
+
+#         return Response(
+#             {"Success": "generate_terrain_raster task initiated"},
+#             status=status.HTTP_200_OK,
+#         )
+#     except Exception as e:
+#         print("Exception in generate_terrain_raster api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 
 @api_view(["POST"])
 @schema(None)
 def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
+    import time
+    from datetime import datetime as dt
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_terrain_raster_clip.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+        MWS_Boundaries = request.data.get("MWS_Boundaries", None)
+
+        # SYNC — direct call, no Celery
+        asset_id = generate_terrain_raster_clip_sync(
+            state=state,
+            district=district,
+            block=block,
+            MWS_Boundaries=MWS_Boundaries,
         )
 
-        return Response(
-            {"Success": "generate_terrain_raster task initiated"},
-            status=status.HTTP_200_OK,
-        )
+        # TODO: Replace hardcoded stac_spec dict with a call to build_stac_spec()
+        # utility function that computes actual geometry and bbox from the asset_id.
+        # Pattern: stac_spec = build_stac_spec(asset_ids, node_type, execution_id, ...)
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Terrain raster completed",
+            "execution_id": execution_id,
+            "node_type": "Terrain_Algorithm",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {
+                "stac_version": "1.0.0",
+                "type": "Feature",
+                "id": f"{state}_{district}_{block}_terrain_{execution_id[:8]}",
+                "properties": {
+                    "datetime": dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "title": f"Terrain Raster for {block}, {district}, {state}",
+                    "stacd:algorithm": "Terrain_Algorithm",
+                    "stacd:execution_id": execution_id,
+                    "stacd:state": state,
+                    "stacd:district": district,
+                    "stacd:block": block,
+                    "stacd:hosting_platform": "GEE",
+                },
+                "assets": {
+                    asset_id: {
+                        "href": f"https://code.earthengine.google.com/?asset={asset_id}",
+                        "type": "image/tiff",
+                        "roles": ["data"],
+                        "gee:asset_id": asset_id,
+                    }
+                },
+            },
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_terrain_raster api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Terrain_Algorithm",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
+
+
+# TerrainXLulc slope vectorization
 @api_view(["POST"])
 @schema(None)
 def terrain_lulc_slope_cluster(request):
@@ -615,7 +693,7 @@ def terrain_lulc_slope_cluster(request):
         print("Exception in terrain_lulc_slope_cluster api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# TerrainXLulc plain vectorization
 @api_view(["POST"])
 @schema(None)
 def terrain_lulc_plain_cluster(request):
