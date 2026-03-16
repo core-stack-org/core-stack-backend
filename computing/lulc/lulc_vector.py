@@ -20,6 +20,74 @@ from computing.models import *
 # from computing.STAC_specs import generate_STAC_layerwise
 
 
+def vectorise_lulc_sync(
+    state,
+    district,
+    block,
+    start_year,
+    end_year,
+    LULC_Raster=None,  # input from LULC_Algorithm (not used yet, for future parameterization)
+):
+    """
+    STACD-compatible synchronous version.
+    No Celery, no GeoServer sync. Returns asset_id directly.
+    """
+    ee_initialize(2)
+
+    start_year = int(start_year)
+    end_year = int(end_year)
+
+    # MWS boundaries — read from production CoRE Stack (read-only)
+    fc = ee.FeatureCollection(
+        "projects/ee-corestackdev/assets/apps/mws/"
+        + f"{state.lower()}/{district.lower()}/{block.lower()}/"
+        + "filtered_mws_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_uid"
+    )
+
+    description = (
+        "lulc_vector_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
+
+    if not is_gee_asset_exists(asset_id):
+        generate_vector(
+            start_year=start_year,
+            end_year=end_year,
+            state=state,
+            district=district,
+            block=block,
+            description=description,
+            asset_id=asset_id,
+            fc=fc,
+        )
+
+    if not is_gee_asset_exists(asset_id):
+        raise Exception(f"Asset not created: {asset_id}")
+
+    # DB save
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state, district, block,
+            layer_name=description,
+            asset_id=asset_id,
+            dataset_name="LULC",
+            misc={"start_year": start_year, "end_year": end_year},
+        )
+
+    # GeoServer sync intentionally skipped for STACD
+    # TODO: Replace hardcoded GEE paths and account with parameters
+    # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+
+    return asset_id
+
+
 @app.task(bind=True)
 def vectorise_lulc(self, state, district, block, start_year, end_year, gee_account_id):
     ee_initialize(gee_account_id)

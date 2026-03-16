@@ -10,6 +10,8 @@ from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
+from .lulc.lulc_vector import vectorise_lulc_sync
+
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
@@ -39,6 +41,10 @@ from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_cl
 from computing.misc.drainage_lines import clip_drainage_lines
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
+
+from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster_sync
+from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster_sync
+
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
@@ -470,29 +476,103 @@ def lulc_v3(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # LULC Vectorization Algo
+# @api_view(["POST"])
+# @schema(None)
+# def lulc_vector(request):
+#     print("Inside lulc_vector")
+#     try:
+#         state = request.data.get("state").lower()
+#         district = request.data.get("district").lower()
+#         block = request.data.get("block").lower()
+#         start_year = request.data.get("start_year")
+#         end_year = request.data.get("end_year")
+#         gee_account_id = request.data.get("gee_account_id")
+#         vectorise_lulc.apply_async(
+#             args=[state, district, block, start_year, end_year, gee_account_id],
+#             queue="nrm",
+#         )
+#         return Response(
+#             {"Success": "lulc_vector task initiated"},
+#             status=status.HTTP_200_OK,
+#         )
+#     except Exception as e:
+#         print("Exception in lulc_vector api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(["POST"])
 @schema(None)
 def lulc_vector(request):
     print("Inside lulc_vector")
+    import time
+    from datetime import datetime as dt
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        vectorise_lulc.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
+        execution_id = request.data.get("execution_id", "local")
+        LULC_Raster = request.data.get("LULC_Raster", None)
+
+        # SYNC — direct call, no Celery
+        asset_id = vectorise_lulc_sync(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            LULC_Raster=LULC_Raster,
         )
-        return Response(
-            {"Success": "lulc_vector task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        # that computes actual geometry and bbox from asset_id.
+        # Pattern: stac_spec = build_stac_spec(asset_ids, node_type, execution_id, ...)
+        return Response({
+            "status": "success",
+            "message": "LULC vectorization completed",
+            "execution_id": execution_id,
+            "node_type": "LULC_Vectorization",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {
+                "stac_version": "1.0.0",
+                "type": "Feature",
+                "id": f"{state}_{district}_{block}_lulc_vector_{execution_id[:8]}",
+                "properties": {
+                    "datetime": dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "title": f"LULC Vector for {block}, {district}, {state}",
+                    "stacd:algorithm": "LULC_Vectorization",
+                    "stacd:execution_id": execution_id,
+                    "stacd:state": state,
+                    "stacd:district": district,
+                    "stacd:block": block,
+                    "stacd:start_year": str(start_year),
+                    "stacd:end_year": str(end_year),
+                    "stacd:hosting_platform": "GEE",
+                },
+                "assets": {
+                    asset_id: {
+                        "href": f"https://code.earthengine.google.com/?asset={asset_id}",
+                        "type": "application/geo+json",
+                        "roles": ["data"],
+                        "gee:asset_id": asset_id,
+                    }
+                },
+            },
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in lulc_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "LULC_Vectorization",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["POST"])
 @schema(None)
@@ -819,53 +899,200 @@ def generate_terrain_raster(request):
 
 
 # TerrainXLulc slope vectorization
+# @api_view(["POST"])
+# @schema(None)
+# def terrain_lulc_slope_cluster(request):
+#     print("Inside terrain_lulc_slope_cluster")
+#     try:
+#         state = request.data.get("state")
+#         district = request.data.get("district")
+#         block = request.data.get("block")
+#         start_year = request.data.get("start_year")
+#         end_year = request.data.get("end_year")
+#         gee_account_id = request.data.get("gee_account_id")
+#         lulc_on_slope_cluster.apply_async(
+#             args=[state, district, block, start_year, end_year, gee_account_id],
+#             queue="nrm",
+#         )
+#         return Response(
+#             {"Success": "terrain_lulc_slope_cluster task initiated"},
+#             status=status.HTTP_200_OK,
+#         )
+#     except Exception as e:
+#         print("Exception in terrain_lulc_slope_cluster api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# TerrainXLulc slope vectorization
 @api_view(["POST"])
 @schema(None)
 def terrain_lulc_slope_cluster(request):
     print("Inside terrain_lulc_slope_cluster")
+    import time
+    from datetime import datetime as dt
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        lulc_on_slope_cluster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
+        execution_id = request.data.get("execution_id", "local")
+        LULC_Raster = request.data.get("LULC_Raster", None)
+        Terrain_Raster = request.data.get("Terrain_Raster", None)
+
+        # SYNC — direct call, no Celery
+        asset_id = lulc_on_slope_cluster_sync(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            LULC_Raster=LULC_Raster, Terrain_Raster=Terrain_Raster,
         )
-        return Response(
-            {"Success": "terrain_lulc_slope_cluster task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        return Response({
+            "status": "success",
+            "message": "LULC x Terrain slope clustering completed",
+            "execution_id": execution_id,
+            "node_type": "Terrain_LULC_Slope",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {
+                "stac_version": "1.0.0",
+                "type": "Feature",
+                "id": f"{state}_{district}_{block}_lulc_slope_{execution_id[:8]}",
+                "properties": {
+                    "datetime": dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "title": f"LULC x Terrain Slope for {block}, {district}, {state}",
+                    "stacd:algorithm": "Terrain_LULC_Slope",
+                    "stacd:execution_id": execution_id,
+                    "stacd:state": state,
+                    "stacd:district": district,
+                    "stacd:block": block,
+                    "stacd:start_year": str(start_year),
+                    "stacd:end_year": str(end_year),
+                    "stacd:hosting_platform": "GEE",
+                },
+                "assets": {
+                    asset_id: {
+                        "href": f"https://code.earthengine.google.com/?asset={asset_id}",
+                        "type": "application/geo+json",
+                        "roles": ["data"],
+                        "gee:asset_id": asset_id,
+                    }
+                },
+            },
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in terrain_lulc_slope_cluster api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Terrain_LULC_Slope",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+# TerrainXLulc plain vectorization
+# @api_view(["POST"])
+# @schema(None)
+# def terrain_lulc_plain_cluster(request):
+#     print("Inside terrain_lulc_plain_cluster")
+#     try:
+#         state = request.data.get("state")
+#         district = request.data.get("district")
+#         block = request.data.get("block")
+#         start_year = request.data.get("start_year")
+#         end_year = request.data.get("end_year")
+#         gee_account_id = request.data.get("gee_account_id")
+#         lulc_on_plain_cluster.apply_async(
+#             args=[state, district, block, start_year, end_year, gee_account_id],
+#             queue="nrm",
+#         )
+#         return Response(
+#             {"Success": "terrain_lulc_plain_cluster task initiated"},
+#             status=status.HTTP_200_OK,
+#         )
+#     except Exception as e:
+#         print("Exception in terrain_lulc_plain_cluster api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 # TerrainXLulc plain vectorization
 @api_view(["POST"])
 @schema(None)
 def terrain_lulc_plain_cluster(request):
     print("Inside terrain_lulc_plain_cluster")
+    import time
+    from datetime import datetime as dt
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        lulc_on_plain_cluster.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
+        execution_id = request.data.get("execution_id", "local")
+        LULC_Raster = request.data.get("LULC_Raster", None)
+        Terrain_Raster = request.data.get("Terrain_Raster", None)
+
+        # SYNC — direct call, no Celery
+        asset_id = lulc_on_plain_cluster_sync(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            LULC_Raster=LULC_Raster, Terrain_Raster=Terrain_Raster,
         )
-        return Response(
-            {"Success": "terrain_lulc_plain_cluster task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        return Response({
+            "status": "success",
+            "message": "LULC x Terrain plain clustering completed",
+            "execution_id": execution_id,
+            "node_type": "Terrain_LULC_Plain",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {
+                "stac_version": "1.0.0",
+                "type": "Feature",
+                "id": f"{state}_{district}_{block}_lulc_plain_{execution_id[:8]}",
+                "properties": {
+                    "datetime": dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "title": f"LULC x Terrain Plain for {block}, {district}, {state}",
+                    "stacd:algorithm": "Terrain_LULC_Plain",
+                    "stacd:execution_id": execution_id,
+                    "stacd:state": state,
+                    "stacd:district": district,
+                    "stacd:block": block,
+                    "stacd:start_year": str(start_year),
+                    "stacd:end_year": str(end_year),
+                    "stacd:hosting_platform": "GEE",
+                },
+                "assets": {
+                    asset_id: {
+                        "href": f"https://code.earthengine.google.com/?asset={asset_id}",
+                        "type": "application/geo+json",
+                        "roles": ["data"],
+                        "gee:asset_id": asset_id,
+                    }
+                },
+            },
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in terrain_lulc_plain_cluster api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Terrain_LULC_Plain",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["POST"])
 @schema(None)

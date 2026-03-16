@@ -17,6 +17,104 @@ from utilities.gee_utils import (
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
 
 
+
+def lulc_on_plain_cluster_sync(
+    state, district, block, start_year, end_year,
+    LULC_Raster=None, Terrain_Raster=None,
+):
+    """
+    STACD-compatible synchronous version.
+    No Celery, no GeoServer sync. Returns asset_id directly.
+    """
+    ee_initialize(2)
+
+    start_year = int(start_year)
+    end_year = int(end_year)
+
+    asset_description = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_lulcXplains_clusters"
+    )
+    asset_id = get_gee_asset_path(state, district, block) + asset_description
+
+    if not is_gee_asset_exists(asset_id):
+        aez_india = ee.FeatureCollection("users/mtpictd/agro_eco_regions")
+
+        landforms = ee.Image(
+            get_gee_asset_path(state, district, block)
+            + "terrain_raster_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+        )
+
+        # MWS boundaries — read from production CoRE Stack (read-only)
+        mwsheds = ee.FeatureCollection(
+            "projects/ee-corestackdev/assets/apps/mws/"
+            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
+            + "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
+        )
+
+        filtered_aez = aez_india.filterBounds(mwsheds.geometry())
+        aez_no = filtered_aez.first().get("ae_regcode").getInfo()
+
+        lulc_imgs = []
+        for y in range(start_year, end_year + 1):
+            lulc_img = ee.Image(
+                get_gee_asset_path(state, district, block)
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
+                + "_"
+                + str(y)
+                + "-07-01_"
+                + str(y + 1)
+                + "-06-30_LULCmap_10m"
+            )
+            lulc_imgs.append(lulc_img)
+
+        lulc_img_collection = ee.ImageCollection.fromImages(lulc_imgs)
+        study_area_lulc = lulc_img_collection.mode().clip(mwsheds)
+        study_area_landforms = landforms.clip(mwsheds)
+
+        mwsheds_with_clusters = process_mws(mwsheds)
+        plain_mwsheds = mwsheds_with_clusters.filter(
+            ee.Filter.neq("terrain_cluster", 2)
+        )
+        plain_centroids = aez_lulcXterrain_cluster_centroids[f"aez{aez_no}"]["plains"]
+
+        result = process_feature_collection(
+            plain_mwsheds, study_area_landforms, study_area_lulc, plain_centroids
+        )
+        task = export_vector_asset_to_gee(result, asset_description, asset_id)
+        task_id_list = check_task_status([task])
+        print("lulc_on_plain_cluster_sync task completed:", task_id_list)
+
+    if not is_gee_asset_exists(asset_id):
+        raise Exception(f"Asset not created: {asset_id}")
+
+    save_layer_info_to_db(
+        state, district, block,
+        layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_plain",
+        asset_id=asset_id,
+        dataset_name="Terrain LULC",
+        misc={"start_year": start_year, "end_year": end_year},
+    )
+    make_asset_public(asset_id)
+
+    # GeoServer sync intentionally skipped for STACD
+    # TODO: Replace hardcoded GEE paths and account with parameters
+    # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+    return asset_id
+
+
+
 @app.task(bind=True)
 def lulc_on_plain_cluster(
     self, state, district, block, start_year, end_year, gee_account_id
