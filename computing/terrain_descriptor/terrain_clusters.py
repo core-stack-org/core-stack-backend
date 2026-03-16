@@ -17,6 +17,45 @@ from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
 
+def generate_terrain_clusters_sync(
+    state,
+    district,
+    block,
+    Terrain_Raster=None,
+):
+    """
+    STACD-compatible synchronous version.
+    No Celery, no GeoServer sync. Returns asset_id directly.
+    """
+    ee_initialize(2)
+
+    asset_name = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_terrain_clusters"
+    )
+    asset_id = get_gee_asset_path(state, district, block) + asset_name
+
+    if is_gee_asset_exists(asset_id):
+        print(f"Asset already exists, skipping: {asset_id}")
+        return asset_id
+
+    # compute_on_gee handles MWS boundaries internally
+    # but it reads from GEE_ASSET_PATH which points to your account
+    # so override the mt1k path to read from production
+    compute_on_gee(state, district, block, asset_id, asset_name)
+
+    if not is_gee_asset_exists(asset_id):
+        raise Exception(f"Asset not created: {asset_id}")
+
+    # GeoServer sync intentionally skipped for STACD
+    # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+
+    return asset_id
+
+
+
 @app.task(bind=True)
 def generate_terrain_clusters(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
@@ -44,14 +83,30 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
         fabdem.mosaic().setDefaultProjection("EPSG:3857", None, 30).rename("elevation")
     )
 
+    # mt1k = ee.FeatureCollection(
+    #     get_gee_asset_path(state, district, block)
+    #     + "filtered_mws_"
+    #     + valid_gee_text(district.lower())
+    #     + "_"
+    #     + valid_gee_text(block.lower())
+    #     + "_uid"
+    # )
+
+
+
     mt1k = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
+        "projects/ee-corestackdev/assets/apps/mws/"
+        + f"{state.lower()}/{district.lower()}/{block.lower()}/"
         + "filtered_mws_"
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
         + "_uid"
     )
+
+
+
+
 
     def process_geometry(feature):
         # Get the geometry of the feature

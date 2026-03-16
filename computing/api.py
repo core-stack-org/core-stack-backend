@@ -31,6 +31,8 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
+from .terrain_descriptor.terrain_clusters import generate_terrain_clusters_sync
+
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip_sync
 
@@ -545,25 +547,96 @@ def generate_drought_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Terrain vectorization algo
+# @api_view(["POST"])
+# @schema(None)
+# def generate_terrain_descriptor(request):
+#     print("Inside generate_terrain_descriptor")
+#     try:
+#         state = request.data.get("state")
+#         district = request.data.get("district")
+#         block = request.data.get("block")
+#         gee_account_id = request.data.get("gee_account_id")
+#         generate_terrain_clusters.apply_async(
+#             args=[state, district, block, gee_account_id], queue="nrm"
+#         )
+#         return Response(
+#             {"Success": "generate_terrain_descriptor task initiated"},
+#             status=status.HTTP_200_OK,
+#         )
+#     except Exception as e:
+#         print("Exception in generate_terrain_descriptor api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Terrain vectorization algo
 @api_view(["POST"])
 @schema(None)
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
+    import time
+    from datetime import datetime as dt
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_terrain_clusters.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+        Terrain_Raster = request.data.get("Terrain_Raster", None)
+
+        # SYNC — direct call, no Celery
+        asset_id = generate_terrain_clusters_sync(
+            state=state,
+            district=district,
+            block=block,
+            Terrain_Raster=Terrain_Raster,
         )
-        return Response(
-            {"Success": "generate_terrain_descriptor task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        # that computes actual geometry and bbox from asset_id.
+        # Pattern: stac_spec = build_stac_spec(asset_ids, node_type, execution_id, ...)
+        return Response({
+            "status": "success",
+            "message": "Terrain clusters completed",
+            "execution_id": execution_id,
+            "node_type": "Terrain_Vectorization",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {
+                "stac_version": "1.0.0",
+                "type": "Feature",
+                "id": f"{state}_{district}_{block}_terrain_clusters_{execution_id[:8]}",
+                "properties": {
+                    "datetime": dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "title": f"Terrain Clusters for {block}, {district}, {state}",
+                    "stacd:algorithm": "Terrain_Vectorization",
+                    "stacd:execution_id": execution_id,
+                    "stacd:state": state,
+                    "stacd:district": district,
+                    "stacd:block": block,
+                    "stacd:hosting_platform": "GEE",
+                },
+                "assets": {
+                    asset_id: {
+                        "href": f"https://code.earthengine.google.com/?asset={asset_id}",
+                        "type": "application/geo+json",
+                        "roles": ["data"],
+                        "gee:asset_id": asset_id,
+                    }
+                },
+            },
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_terrain_descriptor api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Terrain_Vectorization",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Terrain Raster Algo
 # @api_view(["POST"])
@@ -592,9 +665,6 @@ def generate_terrain_descriptor(request):
 #     except Exception as e:
 #         print("Exception in generate_terrain_raster api :: ", e)
 #         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
 
 @api_view(["POST"])
 @schema(None)
