@@ -1,0 +1,11 @@
+{
+  "runoff_field": "runoff_in_mm_2024-2025",
+  "precip_field": "precipitation_in_mm_2024-2025",
+  "et_field": "et_in_mm_2024-2025",
+  "surface_water_field": "total_area_in_ha_2024-2025",
+  "cropping_field": "cropping_intensity_unit_less_2024-2025",
+  "protection_field": "protection_area_in_ha",
+  "urbanization_field": "total_urbanization_area_in_ha",
+  "deforestation_field": "deforestation_area_in_ha",
+  "soge_field": "soge_dev_percent"
+}

@@ -1,0 +1,731 @@
+[
+  {
+    "layer_name": "LULC_24_25_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_24_25_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2024-07-01_2025-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "catchment_area_nalanda_hilsa_raster",
+    "dataset_name": "Catchment Area",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/catchment_area_singleflow/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=catchment_area_singleflow:catchment_area_nalanda_hilsa_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/catchment_area_nalanda_hilsa_raster"
+  },
+  {
+    "layer_name": "nalanda_hilsa_terrain_raster",
+    "dataset_name": "Terrain Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/terrain/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=terrain:nalanda_hilsa_terrain_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/terrain_raster_nalanda_hilsa"
+  },
+  {
+    "layer_name": "nalanda_hilsa",
+    "dataset_name": "NREGA Assets",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/nrega_assets/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=nrega_assets:nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nrega_nalanda_hilsa"
+  },
+  {
+    "layer_name": "aquifer_vector_nalanda_hilsa",
+    "dataset_name": "Aquifer",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/aquifer/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=aquifer:aquifer_vector_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/aquifer_vector_nalanda_hilsa"
+  },
+  {
+    "layer_name": "deltaG_fortnight_nalanda_hilsa",
+    "dataset_name": "Hydrology",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_fortnight_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/deltaG_fortnight_nalanda_hilsa"
+  },
+  {
+    "layer_name": "nalanda_hilsa_site_suitability_raster",
+    "dataset_name": "Site Suitability",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/plantation/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=plantation:nalanda_hilsa_site_suitability_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_site_suitability_raster"
+  },
+  {
+    "layer_name": "LULC_20_21_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_20_21_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2020-07-01_2021-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_19_20_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_19_20_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2019-07-01_2020-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_17_18_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_17_18_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2017-07-01_2018-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "nalanda_hilsa_intensity",
+    "dataset_name": "Cropping Intensity",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/crop_intensity/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=crop_intensity:nalanda_hilsa_intensity&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/cropping_intensity_nalanda_hilsa"
+  },
+  {
+    "layer_name": "drainage_density_nalanda_hilsa",
+    "dataset_name": "Drainage Density",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver//wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=:drainage_density_nalanda_hilsa&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/drainage_density_nalanda_hilsa"
+  },
+  {
+    "layer_name": "LULC_23_24_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_23_24_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2023-07-01_2024-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "distance_to_drainage_line_nalanda_hilsa_raster",
+    "dataset_name": "Distance to Drainage Line",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/distance_nearest_upstream_DL/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=distance_nearest_upstream_DL:distance_to_drainage_line_nalanda_hilsa_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/distance_to_drainage_line_nalanda_hilsa_raster"
+  },
+  {
+    "layer_name": "mws_nalanda_hilsa",
+    "dataset_name": "MWS",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/filtered_mws/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=filtered_mws:mws_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/filtered_mws_nalanda_hilsa_uid"
+  },
+  {
+    "layer_name": "waterbodies_zoi_nalanda_hilsa",
+    "dataset_name": "Surface Water Bodies",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:waterbodies_zoi_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/cropping_intensity_zoi_nalanda_hilsa"
+  },
+  {
+    "layer_name": "nalanda_hilsa_grid",
+    "dataset_name": "Crop GridXlulc",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/crop_grid_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=crop_grid_layers:nalanda_hilsa_grid&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/crop_gridXlulc_nalanda_hilsa_with_uid_16ha"
+  },
+  {
+    "layer_name": "surface_waterbodies_nalanda_hilsa",
+    "dataset_name": "Surface Water Bodies",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/swb2_nalanda_hilsa"
+  },
+  {
+    "layer_name": "nalanda_hilsa_drought",
+    "dataset_name": "Drought",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/cropping_drought/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=cropping_drought:nalanda_hilsa_drought&outputFormat=application/json",
+    "layer_version": "2.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/drought_nalanda_hilsa"
+  },
+  {
+    "layer_name": "nalanda_hilsa_drought_causality",
+    "dataset_name": "Drought Causality",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/drought_causality/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=drought_causality:nalanda_hilsa_drought_causality&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": ""
+  },
+  {
+    "layer_name": "nalanda_hilsa_cluster",
+    "dataset_name": "Terrain Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/terrain/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=terrain:nalanda_hilsa_cluster&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_terrain_clusters"
+  },
+  {
+    "layer_name": "LULC_24_25_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_24_25_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2024-07-01_2025-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_24_25_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_24_25_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2024-07-01_2025-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "nalanda_hilsa_clart",
+    "dataset_name": "CLART",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/clart/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=clart:nalanda_hilsa_clart&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/clart_nalanda_hilsa"
+  },
+  {
+    "layer_name": "deltaG_well_depth_nalanda_hilsa",
+    "dataset_name": "Hydrology",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/deltaG_well_depth_nalanda_hilsa"
+  },
+  {
+    "layer_name": "change_vector_nalanda_hilsa_Degradation",
+    "dataset_name": "Change Detection Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=change_detection:change_vector_nalanda_hilsa_Degradation&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_vector_nalanda_hilsa_Degradation_2017_2024"
+  },
+  {
+    "layer_name": "change_nalanda_hilsa_CropIntensity",
+    "dataset_name": "Change Detection Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_nalanda_hilsa_CropIntensity&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_nalanda_hilsa_CropIntensity_2017_2024"
+  },
+  {
+    "layer_name": "change_vector_nalanda_hilsa_Deforestation",
+    "dataset_name": "Change Detection Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=change_detection:change_vector_nalanda_hilsa_Deforestation&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_vector_nalanda_hilsa_Deforestation_2017_2024"
+  },
+  {
+    "layer_name": "restoration_nalanda_hilsa_raster",
+    "dataset_name": "Restoration Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/restoration/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=restoration:restoration_nalanda_hilsa_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/restoration_nalanda_hilsa_raster"
+  },
+  {
+    "layer_name": "soge_vector_nalanda_hilsa",
+    "dataset_name": "SOGE",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/soge_vector_nalanda_hilsa"
+  },
+  {
+    "layer_name": "nalanda_hilsa_slope_percentage_raster",
+    "dataset_name": "Slope Percentage",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/slope_percentage/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=slope_percentage:nalanda_hilsa_slope_percentage_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_slope_percentage_raster"
+  },
+  {
+    "layer_name": "LULC_18_19_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_18_19_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2018-07-01_2019-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_17_18_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_17_18_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2017-07-01_2018-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_23_24_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_23_24_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2023-07-01_2024-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_19_20_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_19_20_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2019-07-01_2020-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_17_18_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_17_18_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2017-07-01_2018-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_19_20_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_19_20_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2019-07-01_2020-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_23_24_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_23_24_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2023-07-01_2024-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_20_21_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_20_21_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2020-07-01_2021-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_21_22_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_21_22_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2021-07-01_2022-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_22_23_nalanda_hilsa_level_2",
+    "dataset_name": "LULC_level_2",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_2/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_2:LULC_22_23_nalanda_hilsa_level_2&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2022-07-01_2023-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_21_22_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_21_22_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2021-07-01_2022-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_22_23_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_22_23_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2022-07-01_2023-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_22_23_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_22_23_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2022-07-01_2023-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_21_22_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_21_22_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2021-07-01_2022-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "LULC_20_21_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_20_21_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2020-07-01_2021-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "change_nalanda_hilsa_Afforestation",
+    "dataset_name": "Change Detection Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_nalanda_hilsa_Afforestation&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_nalanda_hilsa_Afforestation_2017_2024"
+  },
+  {
+    "layer_name": "nalanda_hilsa_mws_connectivity",
+    "dataset_name": "Mws Connectivity",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/mws_connectivity/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_connectivity:nalanda_hilsa_mws_connectivity&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_mws_connectivity"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2017",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2017&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2017"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2018",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2018&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2018"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2019",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2019&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2019"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2020",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2020&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2020"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2021",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2021&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2021"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2022",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2022&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2022"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2017",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2017&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2017"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2018",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2018&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2018"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2019",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2019&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2019"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2020",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2020&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2020"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2021",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2021&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2021"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2022",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2022&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2022"
+  },
+  {
+    "layer_name": "ch_raster_nalanda_hilsa_2023",
+    "dataset_name": "Canopy Height Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=canopy_height:ch_raster_nalanda_hilsa_2023&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_raster_nalanda_hilsa_2023"
+  },
+  {
+    "layer_name": "overall_change_raster_nalanda_hilsa",
+    "dataset_name": "Tree Overall Change Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/tree_overall_ch/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=tree_overall_ch:overall_change_raster_nalanda_hilsa&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/overall_change_raster_nalanda_hilsa"
+  },
+  {
+    "layer_name": "change_vector_nalanda_hilsa_Urbanization",
+    "dataset_name": "Change Detection Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=change_detection:change_vector_nalanda_hilsa_Urbanization&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_vector_nalanda_hilsa_Urbanization_2017_2024"
+  },
+  {
+    "layer_name": "stream_order_nalanda_hilsa_raster",
+    "dataset_name": "Stream Order",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/stream_order/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=stream_order:stream_order_nalanda_hilsa_raster&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/stream_order_nalanda_hilsa_raster"
+  },
+  {
+    "layer_name": "lulc_vector_nalanda_hilsa",
+    "dataset_name": "LULC",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/lulc_vector/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=lulc_vector:lulc_vector_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/lulc_vector_nalanda_hilsa"
+  },
+  {
+    "layer_name": "restoration_nalanda_hilsa_vector",
+    "dataset_name": "Restoration Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/restoration/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=restoration:restoration_nalanda_hilsa_vector&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/restoration_nalanda_hilsa_vector"
+  },
+  {
+    "layer_name": "nalanda_hilsa_lulc_plain",
+    "dataset_name": "Terrain LULC",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/terrain_lulc/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=terrain_lulc:nalanda_hilsa_lulc_plain&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_lulcXplains_clusters"
+  },
+  {
+    "layer_name": "change_nalanda_hilsa_Degradation",
+    "dataset_name": "Change Detection Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_nalanda_hilsa_Degradation&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_nalanda_hilsa_Degradation_2017_2024"
+  },
+  {
+    "layer_name": "change_nalanda_hilsa_Urbanization",
+    "dataset_name": "Change Detection Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_nalanda_hilsa_Urbanization&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_nalanda_hilsa_Urbanization_2017_2024"
+  },
+  {
+    "layer_name": "change_nalanda_hilsa_Deforestation",
+    "dataset_name": "Change Detection Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=change_detection:change_nalanda_hilsa_Deforestation&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_nalanda_hilsa_Deforestation_2017_2024"
+  },
+  {
+    "layer_name": "change_vector_nalanda_hilsa_Afforestation",
+    "dataset_name": "Change Detection Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=change_detection:change_vector_nalanda_hilsa_Afforestation&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_vector_nalanda_hilsa_Afforestation_2017_2024"
+  },
+  {
+    "layer_name": "change_vector_nalanda_hilsa_CropIntensity",
+    "dataset_name": "Change Detection Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/change_detection/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=change_detection:change_vector_nalanda_hilsa_CropIntensity&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/change_vector_nalanda_hilsa_CropIntensity_2017_2024"
+  },
+  {
+    "layer_name": "stream_order_nalanda_hilsa_vector",
+    "dataset_name": "Stream Order",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/stream_order/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=stream_order:stream_order_nalanda_hilsa_vector&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/stream_order_nalanda_hilsa_vector"
+  },
+  {
+    "layer_name": "LULC_18_19_nalanda_hilsa_level_3",
+    "dataset_name": "LULC_level_3",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_3:LULC_18_19_nalanda_hilsa_level_3&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2018-07-01_2019-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "ccd_vector_nalanda_hilsa_2017_2023",
+    "dataset_name": "Ccd Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=ccd:ccd_vector_nalanda_hilsa_2017_2023&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_vector_nalanda_hilsa_2017_2023"
+  },
+  {
+    "layer_name": "ch_vector_nalanda_hilsa_2017_2023",
+    "dataset_name": "Canopy Height Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/canopy_height/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=canopy_height:ch_vector_nalanda_hilsa_2017_2023&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ch_vector_nalanda_hilsa_2017_2023"
+  },
+  {
+    "layer_name": "nalanda_hilsa_mws_centroid",
+    "dataset_name": "Mws Centroid",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/mws_centroid/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_centroid:nalanda_hilsa_mws_centroid&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_mws_centroid"
+  },
+  {
+    "layer_name": "overall_change_vector_nalanda_hilsa",
+    "dataset_name": "Tree Overall Change Vector",
+    "layer_type": "vector",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/tree_overall_ch/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=tree_overall_ch:overall_change_vector_nalanda_hilsa&outputFormat=application/json",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/overall_change_vector_nalanda_hilsa"
+  },
+  {
+    "layer_name": "LULC_18_19_nalanda_hilsa_level_1",
+    "dataset_name": "LULC_level_1",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=LULC_level_1:LULC_18_19_nalanda_hilsa_level_1&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/nalanda_hilsa_2018-07-01_2019-06-30_LULCmap_10m"
+  },
+  {
+    "layer_name": "ccd_raster_nalanda_hilsa_2023",
+    "dataset_name": "Ccd Raster",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/ccd/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=ccd:ccd_raster_nalanda_hilsa_2023&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/ccd_raster_nalanda_hilsa_2023"
+  },
+  {
+    "layer_name": "natural_depression_nalanda_hilsa_raster",
+    "dataset_name": "Natural Depression",
+    "layer_type": "raster",
+    "layer_url": "https://geoserver.core-stack.org:8443/geoserver/natural_depression/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=natural_depression:natural_depression_nalanda_hilsa_raster&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256",
+    "layer_version": "1.0",
+    "style_url": "",
+    "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/natural_depression_nalanda_hilsa_raster"
+  }
+]
