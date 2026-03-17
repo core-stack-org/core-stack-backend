@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import datetime
+import functools
 import os
 import re
 import subprocess
@@ -13,7 +14,6 @@ import requests
 from shapely.geometry import mapping, Polygon
 
 from computing.STAC_specs import constants
-from nrm_app.celery import app
 from nrm_app.settings import (
     BASE_DIR, S3_ACCESS_KEY, S3_SECRET_KEY,
     GEOSERVER_USERNAME, GEOSERVER_PASSWORD,
@@ -811,20 +811,26 @@ class STACCollectionGenerator:
 # Celery task entry point
 # ---------------------------------------------------------------------------
 
-@app.task(bind=True)
-def generate_stac_collection_task(self, layer_type, state, district, block,
-                                  layer_name, start_year="",
-                                  upload_to_s3=False, overwrite=False):
-    generator = STACCollectionGenerator()
-    if layer_type == "raster":
-        return generator.generate_raster(
-            state, district, block, layer_name,
-            start_year=start_year, upload_to_s3=upload_to_s3, overwrite=overwrite,
-        )
-    elif layer_type == "vector":
-        return generator.generate_vector(
-            state, district, block, layer_name,
-            upload_to_s3=upload_to_s3, overwrite=overwrite,
-        )
-    else:
-        raise ValueError(f"Unknown layer_type: {layer_type}")
+@functools.lru_cache(maxsize=1)
+def _make_celery_task():
+    from nrm_app.celery import app
+
+    @app.task(bind=True)
+    def generate_stac_collection_task(self, layer_type, state, district, block,
+                                      layer_name, start_year="",
+                                      upload_to_s3=False, overwrite=False):
+        generator = STACCollectionGenerator()
+        if layer_type == "raster":
+            return generator.generate_raster(
+                state, district, block, layer_name,
+                start_year=start_year, upload_to_s3=upload_to_s3, overwrite=overwrite,
+            )
+        elif layer_type == "vector":
+            return generator.generate_vector(
+                state, district, block, layer_name,
+                upload_to_s3=upload_to_s3, overwrite=overwrite,
+            )
+        else:
+            raise ValueError(f"Unknown layer_type: {layer_type}")
+
+    return generate_stac_collection_task
