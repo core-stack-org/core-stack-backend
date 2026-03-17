@@ -180,5 +180,10 @@ urlpatterns = [
         "generate_facilities_proximity/",
         api.generate_facilities_proximity,
         name="generate_facilities_proximity",
-    ),    
+    ),
+    path(
+        "generate_stac_collection/",
+        api.generate_stac_collection,
+        name="generate_stac_collection",
+    ),
 ]

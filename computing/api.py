@@ -69,6 +69,7 @@ from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
+from .STAC_specs.stac_collection import generate_stac_collection_task
 
 
 @api_security_check(allowed_methods="POST")
@@ -1558,3 +1559,50 @@ def generate_facilities_proximity(request):
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_stac_collection(request):
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        layer_name = request.data.get("layer_name")
+        layer_type = request.data.get("layer_type")
+        start_year = request.data.get("start_year", "")
+        upload_to_s3 = request.data.get("upload_to_s3", False)
+        overwrite = request.data.get("overwrite", False)
+
+        if not all([state, district, block, layer_name, layer_type]):
+            return Response(
+                {"error": "state, district, block, layer_name, and layer_type are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if layer_type not in ("raster", "vector"):
+            return Response(
+                {"error": "layer_type must be 'raster' or 'vector'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        generate_stac_collection_task.apply_async(
+            kwargs={
+                "layer_type": layer_type,
+                "state": state,
+                "district": district,
+                "block": block,
+                "layer_name": layer_name,
+                "start_year": start_year,
+                "upload_to_s3": upload_to_s3,
+                "overwrite": overwrite,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "STAC collection generation initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_stac_collection api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
