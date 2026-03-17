@@ -250,12 +250,6 @@ def create_excel_for_facilities(data, writer):
     other_cols = [c for c in df.columns if c not in first_cols]
     df = df[first_cols + other_cols]
 
-    # append (km) to distance columns
-    df.rename(
-        columns=lambda col: f"{col}_in_km" if col.endswith("_distance") else col,
-        inplace=True,
-    )
-
     df.to_excel(writer, sheet_name="facilities_proximity", index=False)
 
     print("Excel file created for facilities_proximity")
