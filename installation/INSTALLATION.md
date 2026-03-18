@@ -13,7 +13,6 @@ This document provides comprehensive installation instructions for the CoRE Stac
 - [Step 2: Automated Installation](#step-2-automated-installation)
 - [Step 3: Manual Post-Installation](#step-3-manual-post-installation)
 - [Running the Application](#running-the-application)
-- [Installation Summary](#installation-summary)
 
 ---
 
@@ -23,9 +22,72 @@ The installation follows a three-phase approach:
 
 | Phase | Description | Time |
 |-------|-------------|------|
-| **Phase 1** | Manual prerequisites (RabbitMQ, Git) | ~5 min |
+| **Phase 1** | Manual prerequisites and repo clone | ~5 min |
 | **Phase 2** | Automated installation script | ~15-20 min |
-| **Phase 3** | Manual post-installation (superuser, env vars) | ~10 min |
+| **Phase 3** | Optional credentials and manual runtime testing | ~10 min |
+
+### Current Workflow
+
+The current installer and API initialization flow use a single environment file:
+
+- Runtime env file: `nrm_app/.env`
+
+#### What `install.sh` does
+
+```mermaid
+flowchart TD
+    A[User runs installation/install.sh] --> B[Prepare directories and installer state]
+    B --> C[Ensure Miniconda and conda env exist]
+    C --> D[Ensure PostgreSQL and RabbitMQ are installed and running]
+    D --> E[Generate or update nrm_app/.env]
+    E --> F[Run collectstatic]
+    F --> G[Run Django migrations]
+    G --> H[Load seed data if needed]
+    H --> I[Create Django superuser if needed]
+    I --> J[Auto-detect existing GEE account ids]
+    J --> K[Optional: import GEE service-account JSON path]
+    K --> L[Run computing/misc/internal_api_initialisation_test.py]
+    L --> M{Admin boundary data already present?}
+    M -->|Yes| N[Normalize nested layout if needed and skip re-download]
+    M -->|No| O[Prompt to download admin-boundary dataset]
+    N --> P[Finish]
+    O --> P
+```
+
+#### What `internal_api_initialisation_test.py` does
+
+```mermaid
+flowchart TD
+    A[Test starts] --> B[Load Django using nrm_app/.env]
+    B --> C[Check DB connection and critical env vars]
+    C --> D[Generate JWT Bearer token automatically from an active Django user]
+    D --> E[Probe Earth Engine if configured]
+    E --> F[Probe Google Cloud Storage upload access for the same service account]
+    F --> G[Find a usable admin-boundary sample block]
+    G --> H[Run local admin-boundary compute helper]
+    H --> I{Auth, GEE, GCS, and sample all ready?}
+    I -->|No| J[Print the exact next missing setup step]
+    I -->|Yes| K[Call POST /api/v1/generate_block_layer/]
+    K --> L[Run the Celery task in eager mode inside the test process]
+    L --> M[Verify output artifacts under data/admin-boundary/output/...]
+    M --> N[Resolve URL tree and probe internal routes]
+    N --> O[Print pass/fail summary and next step]
+```
+
+#### What the human is supposed to do
+
+```mermaid
+flowchart TD
+    A[Clone repo and open terminal] --> B[Run installation/install.sh]
+    B --> C[Answer rerun prompts only for steps you want to redo]
+    C --> D[Provide GEE JSON path if you want full GEE-backed validation]
+    D --> E[Wait for internal_api_initialisation_test.py summary]
+    E --> F{Did the test pass?}
+    F -->|Yes| G[Use the verified sample/API or start the app]
+    F -->|No| H[Read the named failing step]
+    H --> I[Fix env, GEE, GCS bucket access, Django user, or admin-boundary data]
+    I --> J[Rerun install.sh or internal_api_initialisation_test.py]
+```
 
 ---
 
@@ -55,11 +117,8 @@ Before installing the CoRE Stack Backend, ensure you have:
 
 | Software | Version | Notes |
 |----------|---------|-------|
-| Python | 3.10 | Via Miniconda |
-| PostgreSQL | 15+ | With PostGIS support |
-| RabbitMQ | 3.12+ | For Celery task queue |
-| Apache | 2.4+ | With mod_wsgi |
-| Miniconda | Latest | Python environment manager |
+| Python | >=3.10 | Via Miniconda |
+
 
 ---
 
@@ -67,35 +126,7 @@ Before installing the CoRE Stack Backend, ensure you have:
 
 These steps must be completed manually before running the automated installation script.
 
-### 1.1 Update System and Install Essential Packages
-
-```bash
-# Update package list
-sudo apt update
-
-# Install essential packages
-sudo apt install -y git wget curl build-essential libpq-dev
-```
-
-### 1.2 Install RabbitMQ (Required for Celery)
-
-RabbitMQ is required for Celery task processing and is **not installed by the automated script**:
-
-```bash
-# Install RabbitMQ
-sudo apt install -y rabbitmq-server
-
-# Start and enable RabbitMQ service
-sudo systemctl start rabbitmq-server
-sudo systemctl enable rabbitmq-server
-
-# Verify RabbitMQ is running
-sudo systemctl status rabbitmq-server
-```
-
-### 1.3 Clone the Repository (Optional - for local development)
-
-If you want to review or modify the installation scripts before running:
+### 1.3 Clone the Repository
 
 ```bash
 # Navigate to your workspace
@@ -105,7 +136,7 @@ cd /path/to/your/workspace
 git clone https://github.com/core-stack-org/core-stack-backend.git
 
 # Navigate into the project directory
-cd core-stack-backend
+cd ./core-stack-backend
 ```
 
 ---
@@ -117,7 +148,7 @@ Once the prerequisites are ready, run the automated installation script.
 ### 2.1 Navigate to Installation Directory
 
 ```bash
-cd /path/to/core-stack-backend/installation
+cd ./installation
 ```
 
 ### 2.2 Configure Installation (Optional)
@@ -134,11 +165,11 @@ nano install.sh
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MINICONDA_DIR` | `$HOME/miniconda3` | Miniconda installation path |
-| `CONDA_ENV_NAME` | `corestack-backend` | Conda environment name |
-| `BACKEND_DIR` | `/var/www/data/corestack` | Backend deployment directory |
-| `POSTGRES_USER` | `nrm` | PostgreSQL username |
-| `POSTGRES_DB` | `nrm` | PostgreSQL database name |
-| `POSTGRES_PASSWORD` | `nrm@123` | PostgreSQL password |
+| `CONDA_ENV_NAME` | `corestackenv` | Conda environment name |
+| `BACKEND_DIR` | Derived from the repo root | Backend deployment directory |
+| `POSTGRES_USER` | `corestack_admin` | PostgreSQL username |
+| `POSTGRES_DB` | `corestack_db` | PostgreSQL database name |
+| `POSTGRES_PASSWORD` | `corestack@123` | PostgreSQL password |
 
 ### 2.3 Run the Installation Script
 
@@ -159,25 +190,23 @@ The installation script automatically performs the following:
 | Miniconda | Downloads and installs Miniconda |
 | Conda Environment | Creates environment from `environment.yml` |
 | PostgreSQL | Installs PostgreSQL, creates user and database |
-| Apache | Installs Apache with mod_wsgi |
-| Backend Clone | Clones repository to `/var/www/data/corestack` |
+| RabbitMQ | Installs and enables RabbitMQ |
 | Logs Directory | Creates and configures logs directory |
-| .env File | Generates `.env` file from `settings.py` |
+| `.env` File | Generates or updates `nrm_app/.env` from `settings.py` |
 | Static Files | Runs `collectstatic` |
 | Migrations | Runs database migrations |
-| Apache Config | Configures Apache virtual host |
+| GEE Import | Optionally stages GEE JSONs into `data/gee_confs/` and imports them |
+| Validation | Runs `computing/misc/internal_api_initialisation_test.py` |
 
 ### 2.5 Script Output
 
 After successful installation, you'll see:
 
 ```
-Deployment complete!
-Visit: http://localhost
-Activate env: conda activate corestack-backend
-Apache serves /, /static, and /media automatically.
+Core installation complete!
+Activate env: conda activate corestackenv
 
-⚠️  IMPORTANT: Review and update the .env file at /var/www/data/corestack/nrm_app/.env
+⚠️  IMPORTANT: Review and update the .env file at /path/to/core-stack-backend/nrm_app/.env
    with your actual credentials before running in production.
 ```
 
@@ -193,7 +222,7 @@ The installation script generates a `.env` file with blank values for most varia
 
 ```bash
 # Edit the .env file
-sudo nano /var/www/data/corestack/nrm_app/.env
+nano ./nrm_app/.env
 ```
 
 **Critical Variables to Configure:**
@@ -219,9 +248,9 @@ GEOSERVER_USERNAME=admin
 GEOSERVER_PASSWORD=your-geoserver-password
 
 # Google Earth Engine
-GEE_SERVICE_ACCOUNT_KEY_PATH=path/to/service-account-key.json
-GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH=path/to/helper-key.json
-GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH=path/to/datasets-key.json
+GEE_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-service-account-key.json
+GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-helper-key.json
+GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-datasets-key.json
 
 # S3 Settings (Not essential for local storage)
 S3_BUCKET=your-bucket-name
@@ -240,57 +269,81 @@ DPR_S3_REGION=ap-south-1
 AUTH_TOKEN_360=your-360dialog-token
 FERNET_KEY=your-fernet-key
 TMP_LOCATION=/tmp
-DEPLOYMENT_DIR=/var/www/data/corestack
+DEPLOYMENT_DIR=/path/to/core-stack-backend
 ```
 
-**Generate a Secret Key:**
+### 3.2 GEE Account Setup
+
+If you haven't already setup your GEE account during installation, you can now do so via admin panel.
+
+For GEE integration, you'll need to set up a Google Earth Engine service account and its credentials file, with permissions for Google Earth Engine, and Google Cloud Storage. 
+
+1. Go to your Google Cloud Console: `https://console.cloud.google.com/earth-engine/configuration`
+2. Create a new project (or select existing):
+   ![Add Project Example](./docs/assets/create-project.png)
+3. Configure/Register for Earth Engine project:
+   ![Register Project Example](./docs/assets/register-project.png)
+4. Set permissions and Access levels:
+   ![IAM Settings Example](./docs/assets/set-permissions.png)
+5. Create and Set service Account:
+   ![Service Account Example](./docs/assets/service-account.png)
+6. Create Service Account Keys:
+   ![Service Keys Example](./docs/assets/service-keys.png)
+   This will download a JSON file (e.g., `<project-name>-12345-356644b54.json`). Save this file securely - it contains the keys to access your cloud resources.
+
+### 3.3 Add GEE account to Django Admin Panel
+
+1.   Go to `http://127.0.0.1:8000/admin/gee_computing/geeaccount/add/`
+   Fill in:
+   - **Name:** A recognizable name (e.g., "production", "geo_org_gee")
+   - **Service Account Email:** The email from your GEE service account (looks like `name@project-id.iam.gserviceaccount.com`)
+   - **Helper Account:** Leave blank or set to another already added account
+   
+   ![Add GEE Account Example](./docs/assets/add-gee.png)
+
+2. After creating, note the account ID from the URL:
+   - URL looks like: `http://127.0.0.1:8000/admin/gee_computing/geeaccount/21/change/`
+   - Account ID is: 21 (the number in the URL)
+   - Note this down as `gee_account_id` for later use
+
+---
+
+## Running the Application
+
+### Running Both Services (Development)
+
+For development, you'll need two terminal sessions:
+
+**Terminal 1 - Django Server:**
 
 ```bash
-# Generate a random secret key
-python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+# Activate environment
+conda activate corestackenv
+
+# Run development server
+python manage.py runserver 0.0.0.0:8000
 ```
 
-**Generate a Fernet Key:**
+The server will be available at `http://127.0.0.1:8000/`
+
+**Terminal 2 - Celery Worker:**
+
+For asynchronous task processing:
 
 ```bash
-# Generate a Fernet key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Activate environment
+conda activate corestackenv
+
+# Start Celery worker
+celery -A nrm_app worker -l info -Q nrm
 ```
 
-### 3.2 Create Superuser
+### Optional Apache Deployment
 
-Create an admin user for the Django admin interface:
+**Restart Services**
 
-```bash
-# Activate conda environment
-conda activate corestack-backend
-
-# Navigate to project directory
-cd /var/www/data/corestack
-
-# Create superuser
-python manage.py createsuperuser
-```
-
-### 3.3 Configure GEE Service Account Keys
-
-Place your Google Earth Engine service account JSON keys:
-
-```bash
-# Create directory for GEE keys
-sudo mkdir -p /var/www/data/corestack/data/gee_confs
-
-# Copy your service account keys
-sudo cp ~/path/to/your-gee-key.json /var/www/data/corestack/data/gee_confs/
-
-# Set permissions
-sudo chown -R www-data:www-data /var/www/data/corestack/data/gee_confs
-sudo chmod 750 /var/www/data/corestack/data/gee_confs/*.json
-```
-
-### 3.4 Restart Services
-
-After configuring environment variables:
+Only use this section if you configure Apache separately. The current installer
+does not provision Apache or `mod_wsgi`.
 
 ```bash
 # Restart Apache to pick up new environment
@@ -300,22 +353,7 @@ sudo systemctl restart apache2
 sudo systemctl status apache2
 ```
 
-### 3.5 Database Restore (Optional)
-
-If you have a backup SQL file to restore:
-
-```bash
-# Restore database from SQL file
-psql -h localhost -U nrm -d nrm -f /path/to/backup.sql
-```
-
----
-
-## Running the Application
-
-### Production Mode (Apache)
-
-After installation, the application is served by Apache at `http://localhost/`.
+After manual Apache setup, the application can be served at `http://localhost/`.
 
 ```bash
 # Check Apache status
@@ -327,81 +365,6 @@ sudo tail -f /var/log/apache2/corestack_error.log
 # View access logs
 sudo tail -f /var/log/apache2/corestack_access.log
 ```
-
-### Development Mode
-
-For development, you can run the Django development server:
-
-```bash
-# Activate environment
-conda activate corestack-backend
-
-# Navigate to project
-cd /var/www/data/corestack
-
-# Run development server
-python manage.py runserver 0.0.0.0:8000
-```
-
-The server will be available at `http://127.0.0.1:8000/`
-
-### Running Celery Worker
-
-For asynchronous task processing:
-
-```bash
-# Activate environment
-conda activate corestack-backend
-
-# Navigate to project
-cd /var/www/data/corestack
-
-# Start Celery worker
-celery -A nrm_app worker -l info -Q nrm
-```
-
-### Running Both Services (Development)
-
-For development, you'll need two terminal sessions:
-
-**Terminal 1 - Django Server:**
-```bash
-conda activate corestack-backend
-cd /var/www/data/corestack
-python manage.py runserver
-```
-
-**Terminal 2 - Celery Worker:**
-```bash
-conda activate corestack-backend
-cd /var/www/data/corestack
-celery -A nrm_app worker -l info -Q nrm
-```
-
----
-
-## Installation Summary
-
-### Automated Steps (install.sh)
-
-- [x] Install Miniconda
-- [x] Create Conda environment
-- [x] Install PostgreSQL
-- [x] Install Apache with mod_wsgi
-- [x] Clone backend repository
-- [x] Setup logs directory
-- [x] Generate .env file template
-- [x] Collect static files
-- [x] Run database migrations
-- [x] Configure Apache virtual host
-
-### Manual Steps (Required)
-
-- [ ] Install RabbitMQ
-- [ ] Configure environment variables in `.env`
-- [ ] Create Django superuser
-- [ ] Configure GEE service account keys
-- [ ] Restart Apache after configuration
 
 ---
 
