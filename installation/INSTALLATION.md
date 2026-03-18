@@ -124,10 +124,6 @@ Before installing the CoRE Stack Backend, ensure you have:
 
 ## Step 1: Manual Prerequisites
 
-These steps must be completed manually before running the automated installation script.
-
-### 1.3 Clone the Repository
-
 ```bash
 # Navigate to your workspace
 cd /path/to/your/workspace
@@ -274,7 +270,7 @@ DEPLOYMENT_DIR=/path/to/core-stack-backend
 
 ### 3.2 GEE Account Setup
 
-If you haven't already setup your GEE account during installation, you can now do so via admin panel.
+If you haven't already setup your GEE account during installation, you can now do so via admin panel before running any tasks requiring GEE.
 
 For GEE integration, you'll need to set up a Google Earth Engine service account and its credentials file, with permissions for Google Earth Engine, and Google Cloud Storage. 
 
