@@ -1,9 +1,11 @@
 import os
 from celery import Celery
 from nrm_app.settings import INSTALLED_APPS
+from nrm_app.runtime import configure_runtime_environment
 
 # set the default Django settings module for the 'celery' program.
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
+configure_runtime_environment()
 
 app = Celery("nrm_app")
 

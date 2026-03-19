@@ -1,5 +1,6 @@
 import os
 import geopandas as gpd
+from pathlib import Path
 import re
 from nrm_app.celery import app
 from utilities.constants import LITHOLOGY_PATH
@@ -154,6 +155,4 @@ def generate_lithology_layer(self, state):
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
 
-        path = output_path.split("/")[:-1]
-        path = os.path.join(*path)
-        shutil.rmtree(path)
+        shutil.rmtree(Path(output_path))

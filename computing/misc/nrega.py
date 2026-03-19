@@ -6,7 +6,9 @@ from nrm_app.celery import app
 from shapely import wkt
 from shapely.geometry import Point
 from computing.utils import (
+    get_shapefile_upload_base,
     push_shape_to_geoserver,
+    remove_shapefile_artifacts,
     save_layer_info_to_db,
     get_directory_size,
     update_layer_sync_status,
@@ -45,8 +47,8 @@ def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
         + "_"
         + valid_gee_text(block.lower())
     )
-    layer_path = os.path.splitext(layer_path)[0] + "/" + layer_path.split("/")[-1]
-    upload_shp_to_gee(layer_path, layer_name, asset_id, gee_account_id)
+    upload_base = get_shapefile_upload_base(layer_path)
+    upload_shp_to_gee(upload_base, layer_name, asset_id, gee_account_id)
 
 
 @app.task(bind=True)
@@ -157,9 +159,7 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     )
 
     if os.path.exists(path):
-        path = path.split("/")[:-1]
-        path = os.path.join(*path)
-        shutil.rmtree(path)
+        remove_shapefile_artifacts(path)
 
     output_directory = os.path.dirname(path)
     os.makedirs(output_directory, exist_ok=True)

@@ -6,6 +6,7 @@ from geojson import Feature, FeatureCollection
 from shapely.geometry import mapping
 from computing.utils import (
     generate_shape_files,
+    get_shapefile_upload_base,
     push_shape_to_geoserver,
 )
 from utilities.gee_utils import (
@@ -48,7 +49,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
             + "_"
             + valid_gee_text(block.lower())
         )
-        layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
+        layer_path = get_shapefile_upload_base(shp_path)
         upload_shp_to_gee(layer_path, layer_name, asset_id)
 
     if is_gee_asset_exists(asset_id):

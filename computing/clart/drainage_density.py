@@ -2,6 +2,7 @@ import ee
 import json
 import geopandas as gpd
 import os
+from pathlib import Path
 from utilities.gee_utils import (
     check_task_status,
     valid_gee_text,
@@ -67,9 +68,7 @@ def drainage_density(self, state, district, block):
             print("saved drainage density info at the gee level...")
             make_asset_public(asset_id)
         if input_path:
-            path = input_path.split("/")[:-1]
-            path = os.path.join(*path)
-            shutil.rmtree(path)
+            shutil.rmtree(Path(input_path).parent)
 
 
 def generate_vector(state, district, block):

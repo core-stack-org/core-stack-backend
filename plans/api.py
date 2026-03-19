@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
@@ -31,6 +32,9 @@ from .build_layer import build_layer
 from .models import ODKSyncLog, Plan
 from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
+
+
+TMP_DIR = Path(TMP_LOCATION)
 
 
 # MARK: Get Plans API
@@ -89,9 +93,7 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = (
-        TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
-    )
+    CSV_PATH = str(TMP_DIR / f"{resource_type}_{plan_id}_{block}.csv")
 
     odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
 
@@ -142,7 +144,7 @@ def add_works(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = TMP_LOCATION + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = str(TMP_DIR / f"{work_type}_{plan_id}_{block}.csv")
 
     odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
 

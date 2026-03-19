@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Dict, Any
 from django.utils import timezone
 import bot_interface.interface.generic
@@ -204,7 +205,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         # Upload to S3
         file_extension = bot_interface.utils.get_filename_extension(filepath)[1]
         s3_folder = "docs/images/" if media_type == "image" else "docs/audios/"
-        file_name = s3_folder + filepath.split("/")[-1]
+        file_name = s3_folder + os.path.basename(filepath)
 
         status, url, error = bot_interface.utils.push_to_s3(
             filepath, CE_BUCKET_NAME, file_name, file_extension

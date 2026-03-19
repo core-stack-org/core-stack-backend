@@ -114,7 +114,10 @@ def build_layer(layer_type, item_type, plan_id, district, block, csv_path):
 
         # Use a temporary directory with explicit permissions
         with tempfile.TemporaryDirectory(prefix="geoserver_") as tmpdirname:
-            os.chmod(tmpdirname, 0o777)  # Ensure write permissions
+            try:
+                os.chmod(tmpdirname, 0o777)  # Ensure write permissions where supported
+            except OSError:
+                pass
             shapefile_path = os.path.join(tmpdirname, f"{store_layer_name}.shp")
             logger.debug(f"Temporary shapefile path: {shapefile_path}")
 

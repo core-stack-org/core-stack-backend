@@ -1,4 +1,6 @@
 import os
+import shutil
+from pathlib import Path
 
 import requests
 
@@ -39,7 +41,112 @@ def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
     )
     ee.Initialize(credentials)
 
-    return ee, credentials.service_account_email
+    try:
+        blob.upload_from_string(
+            "core-stack gcs upload probe\n",
+            content_type="text/plain",
+        )
+    except Exception as exc:
+        raise GEEInitializationError(
+            f"GCS upload probe failed for bucket '{GCS_BUCKET_NAME}' with "
+            f"account id={normalized_account_id} "
+            f"({account.service_account_email}): {exc}"
+        ) from exc
+
+    cleanup_detail = "Upload succeeded."
+    if cleanup:
+        try:
+            blob.delete()
+            cleanup_detail = "Upload and cleanup succeeded."
+        except Exception as exc:
+            cleanup_detail = (
+                "Upload succeeded, but probe cleanup could not delete the temporary "
+                f"object: {exc}"
+            )
+
+    return {
+        "account_id": normalized_account_id,
+        "service_account_email": account.service_account_email,
+        "bucket_name": GCS_BUCKET_NAME,
+        "blob_name": blob_name,
+        "detail": cleanup_detail,
+    }
+
+
+def copy_gee_credentials_into_repo(
+    credentials_path,
+    destination_dir="data/gee_confs",
+    destination_name=None,
+):
+    source_path = os.path.abspath(credentials_path)
+    if not os.path.isfile(source_path):
+        raise GEEInitializationError(
+            f"GEE credentials file was not found: {source_path}"
+        )
+
+    if os.path.isabs(destination_dir):
+        repo_directory = destination_dir
+    else:
+        repo_directory = os.path.join(BASE_DIR, destination_dir)
+
+    os.makedirs(repo_directory, exist_ok=True)
+
+    file_name = destination_name or os.path.basename(source_path)
+    destination_path = os.path.join(repo_directory, file_name)
+
+    if os.path.abspath(source_path) != os.path.abspath(destination_path):
+        shutil.copy2(source_path, destination_path)
+
+    try:
+        os.chmod(destination_path, 0o640)
+    except OSError:
+        pass
+
+    return {
+        "absolute_path": destination_path,
+        "relative_path": os.path.relpath(destination_path, BASE_DIR),
+    }
+
+
+def upsert_gee_account_from_json(credentials_path, account_name=None, helper_account_id=None):
+    credentials_path = os.path.abspath(credentials_path)
+    if not os.path.isfile(credentials_path):
+        raise GEEInitializationError(
+            f"GEE credentials file was not found: {credentials_path}"
+        )
+
+    with open(credentials_path, "rb") as credentials_file:
+        credentials_payload = credentials_file.read()
+
+    key_dict = json.loads(credentials_payload.decode("utf-8"))
+    service_account_email = key_dict.get("client_email")
+    if not service_account_email:
+        raise GEEInitializationError(
+            "The provided credentials JSON does not contain client_email."
+        )
+
+    account_name = account_name or os.path.splitext(os.path.basename(credentials_path))[0]
+    account = (
+        GEEAccount.objects.filter(service_account_email=service_account_email).first()
+        or GEEAccount.objects.filter(name=account_name).first()
+        or GEEAccount(name=account_name)
+    )
+
+    account.name = account_name
+    account.service_account_email = service_account_email
+    account.credentials_encrypted = Fernet(FERNET_KEY).encrypt(credentials_payload)
+    account.is_visible = True
+    account.save()
+
+    if helper_account_id:
+        helper_id = _normalize_gee_account_id(helper_account_id)
+        if helper_id != account.id:
+            account.helper_account = GEEAccount.objects.get(pk=helper_id)
+    elif account.helper_account_id is None:
+        account.helper_account = account
+
+    account.save()
+    return account
 
 
 # def ee_initialize(project=None):
@@ -434,17 +541,16 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
     bucket = gcs_config()
     blob_name = "nrm_raster/" + gcs_file_name
     blob = bucket.blob(blob_name)
-    out_path = (
-        "/".join(local_file_path.split("/")[:-1])
-        + "/"
-        + gcs_file_name.split(".")[0]
-        + "_comp.tif"
-    )
+    local_file = Path(local_file_path)
+    out_path = local_file.with_name(f"{Path(gcs_file_name).stem}_comp.tif")
     print(out_path)
-    cmd = f"gdal_translate {local_file_path} {out_path} -co TILED=YES -co COPY_SRC_OVERVIEWS=YES -co COMPRESS=LZW"
+    cmd = (
+        f"gdal_translate {local_file_path} {out_path} "
+        "-co TILED=YES -co COPY_SRC_OVERVIEWS=YES -co COMPRESS=LZW"
+    )
     os.system(command=cmd)
 
-    blob.upload_from_filename(out_path)
+    blob.upload_from_filename(str(out_path))
 
     print(f"File {out_path} uploaded to {blob_name} in bucket {GCS_BUCKET_NAME}")
     time.sleep(10)

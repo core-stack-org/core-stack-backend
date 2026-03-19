@@ -8,6 +8,9 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
+    from nrm_app.runtime import configure_runtime_environment
+
+    configure_runtime_environment()
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

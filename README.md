@@ -2,13 +2,12 @@
 
 ### Installation
 
-We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
+We now support both Linux/WSL and native Windows setup paths.
 - Installs **Miniconda** and sets up the Python environment
 - Installs & configures **PostgreSQL**
-- Installs & configures **Apache with mod_wsgi**
 - Clones the backend repo and applies Django **migrations**
 - Collects **static files**
-- Sets up **logs** and **Apache config**
+- Sets up **logs**
 
 #### Requirements
 
@@ -18,7 +17,7 @@ Before starting, make sure you have the following installed on your system:
 - **Git** (to clone the repository)
 - **Bash** (usually preinstalled on Linux)
 
-The installation script will handle the rest (Conda, PostgreSQL, Apache, etc.).
+For native Windows, use [`installation/install_windows.ps1`](./installation/install_windows.ps1) and the guide at [`installation/WINDOWS.md`](./installation/WINDOWS.md).
 
 #### 1. Clone the repository
 
@@ -34,8 +33,14 @@ chmod +x install.sh
 ./install.sh
 ```
 
-> The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run
-> migrations, and configure Apache.
+Windows PowerShell:
+
+```powershell
+cd .\installation
+.\install_windows.ps1
+```
+
+> The Linux installer covers the Linux dependency flow. The Windows installer prepares the Conda environment, `.env`, migrations, and validation for native Windows.
 
 > For any installation issues, check [Installation Documentation](./installation/INSTALLATION.md) and [Troubleshooting Guide](./installation/TROUBLESHOOTING.md).
 
@@ -51,6 +56,13 @@ If you are running some tasks, you need to run
 celery -A nrm_app worker -l info -Q nrm
 ```
 where 'nrm_app' is the app_name and 'nrm' is the rabbitmq queue.
+
+On Windows, use:
+
+```powershell
+conda run -n corestackenv python manage.py runserver
+conda run -n corestackenv celery -A nrm_app worker -l info -Q nrm --pool=solo
+```
 
 
 #### 4. Open in Browser

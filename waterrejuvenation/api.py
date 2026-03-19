@@ -49,7 +49,7 @@ def get_waterbodies_by_admin_and_uid(request):
         district_l = district.lower()
         block_l = block.lower()
 
-        base_dir = f"{MEDIA_ROOT}stats_excel_files"
+        base_dir = os.path.join(MEDIA_ROOT, "stats_excel_files")
         out_dir = os.path.join(base_dir, state_norm, district.upper())
         merged_fname = f"{district_l}_{block_l}_merged_data.json"
         merged_path = os.path.join(out_dir, merged_fname)

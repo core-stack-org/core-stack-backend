@@ -1,5 +1,6 @@
 import base64
 import os
+import shutil
 import tempfile
 import time
 
@@ -22,6 +23,36 @@ FIREFOX_BIN = os.environ.get("FIREFOX_BIN")  # optional explicit path
 GECKODRIVER_LOG = os.environ.get("GECKODRIVER_LOG", "geckodriver.log")
 
 
+def _find_firefox_binary() -> str:
+    firefox_bin = os.environ.get("FIREFOX_BIN")
+    if firefox_bin and os.path.exists(firefox_bin):
+        return firefox_bin
+
+    candidates = [
+        shutil.which("firefox"),
+        shutil.which("firefox.exe"),
+        shutil.which("firefox-esr"),
+        shutil.which("firefox-esr.exe"),
+        os.path.join(os.environ.get("PROGRAMFILES", ""), "Mozilla Firefox", "firefox.exe"),
+        os.path.join(
+            os.environ.get("PROGRAMFILES(X86)", ""),
+            "Mozilla Firefox",
+            "firefox.exe",
+        ),
+        "/usr/bin/firefox-esr",
+        "/usr/bin/firefox",
+        "/usr/local/bin/firefox",
+    ]
+
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+
+    raise RuntimeError(
+        "No Firefox binary found. Set FIREFOX_BIN or install Firefox on this machine."
+    )
+
+
 def render_pdf_with_firefox(
         url: str,
         *,
@@ -36,19 +67,7 @@ def render_pdf_with_firefox(
     opts.add_argument("--no-remote")  # isolate profiles on shared hosts
 
     # ---- choose binary (prefer explicit env, then ESR, then regular) ----
-    firefox_bin = os.environ.get("FIREFOX_BIN")
-    if firefox_bin and os.path.exists(firefox_bin):
-        chosen = firefox_bin
-    elif os.path.exists("/usr/bin/firefox-esr"):
-        chosen = "/usr/bin/firefox-esr"
-    elif os.path.exists("/usr/bin/firefox"):
-        chosen = "/usr/bin/firefox"
-    elif os.path.exists("/usr/local/bin/firefox"):
-        chosen = "/usr/local/bin/firefox"
-    else:
-        raise RuntimeError(
-            "No Firefox binary found. Set FIREFOX_BIN or install firefox/firefox-esr."
-        )
+    chosen = _find_firefox_binary()
     opts.binary_location = chosen
     logger.info("PDF: using Firefox binary at %s", chosen)
 
@@ -80,7 +99,8 @@ def render_pdf_with_firefox(
         if os.environ.get(var):
             logger.warning("PDF: unsetting %s to avoid binary/lib conflicts", var)
             os.environ.pop(var, None)
-    os.environ.setdefault("XDG_RUNTIME_DIR", TMP_LOCATION)
+    if os.name != "nt":
+        os.environ.setdefault("XDG_RUNTIME_DIR", TMP_LOCATION)
 
     # ---- optionally force a fresh, writable profile to /tmp ----
     profile_dir = tempfile.mkdtemp(prefix="ffprof_")

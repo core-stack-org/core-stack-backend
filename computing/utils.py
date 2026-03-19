@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import geopandas as gpd
 import fiona
@@ -40,13 +41,34 @@ import zipfile
 from datetime import datetime, timedelta
 
 
+SHAPEFILE_COMPONENT_SUFFIXES = (".shp", ".dbf", ".shx", ".prj", ".cpg", ".qix")
+
+
+def remove_shapefile_artifacts(path):
+    base_path = Path(os.path.splitext(path)[0])
+
+    if base_path.is_dir():
+        shutil.rmtree(base_path)
+        return
+
+    for suffix in SHAPEFILE_COMPONENT_SUFFIXES:
+        candidate = base_path.with_suffix(suffix)
+        if candidate.exists():
+            candidate.unlink()
+
+
+def get_shapefile_upload_base(path):
+    base_path = Path(os.path.splitext(path)[0])
+    if base_path.is_dir():
+        return str(base_path / base_path.name)
+    return str(base_path)
+
+
 def generate_shape_files(path):
 
     gdf = gpd.read_file(path + ".json")
     if os.path.exists(path):
-        path = path.split("/")[:-1]
-        path = os.path.join(*path)
-        shutil.rmtree(path)
+        remove_shapefile_artifacts(path)
 
     gdf.to_file(
         path,
@@ -61,7 +83,7 @@ def convert_to_zip(dir_name, file_type):
             zipf.write(dir_name + ".gpkg", arcname=os.path.basename(dir_name + ".gpkg"))
         return dir_name + ".zip"
     else:
-        return shutil.make_archive(dir_name, "zip", dir_name + "/")
+        return shutil.make_archive(dir_name, "zip", root_dir=dir_name)
 
 
 def push_shape_to_geoserver(

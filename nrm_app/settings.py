@@ -17,13 +17,24 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
+from .runtime import configure_runtime_environment, ensure_directory, project_root, resolve_path, running_on_windows
 
 env = environ.Env()
-
-environ.Env.read_env()
+ENV_FILE = Path(__file__).resolve().parent / ".env"
+environ.Env.read_env(str(ENV_FILE))
+configure_runtime_environment()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = project_root()
+DATA_DIR = ensure_directory(BASE_DIR / "data")
+LOG_DIR = ensure_directory(BASE_DIR / "logs")
+
+
+def env_or_default(name, default):
+    value = env(name, default=default)
+    if isinstance(value, str) and not value.strip():
+        return default
+    return value
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -36,13 +47,25 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = env("TMP_LOCATION")
+TMP_LOCATION = str(
+    ensure_directory(
+        resolve_path(
+            env_or_default("TMP_LOCATION", BASE_DIR / "tmp"),
+            base_dir=BASE_DIR,
+        )
+    )
+)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 AUTH_TOKEN_FB_META = env("AUTH_TOKEN_FB_META")
 ODK_PASSWORD = env("ODK_PASSWORD")
-DEPLOYMENT_DIR = env("DEPLOYMENT_DIR")
+DEPLOYMENT_DIR = str(
+    resolve_path(
+        env_or_default("DEPLOYMENT_DIR", BASE_DIR),
+        base_dir=BASE_DIR,
+    )
+)
 # MARK: ODK Sync Creds
 ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
 ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
@@ -51,11 +74,12 @@ ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
 DB_NAME = env("DB_NAME")
 DB_USER = env("DB_USER")
 DB_PASSWORD = env("DB_PASSWORD")
+DB_HOST = env_or_default("DB_HOST", "127.0.0.1")
+DB_PORT = str(env_or_default("DB_PORT", "5432"))
 
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 
-STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
 GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
 ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
@@ -208,7 +232,7 @@ ROOT_URLCONF = "nrm_app.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "DIRS": [str(BASE_DIR / "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -234,8 +258,8 @@ DATABASES = {
         "NAME": DB_NAME,
         "USER": DB_USER,
         "PASSWORD": DB_PASSWORD,
-        "HOST": "127.0.0.1",
-        "PORT": "",
+        "HOST": DB_HOST,
+        "PORT": DB_PORT,
     }
 }
 
@@ -271,20 +295,48 @@ USE_TZ = True
 # Celery
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_BROKER_URL = env_or_default(
+    "CELERY_BROKER_URL",
+    "amqp://guest:guest@127.0.0.1:5672//",
+)
+CELERY_RESULT_BACKEND = env_or_default("CELERY_RESULT_BACKEND", "rpc://")
+CELERY_WORKER_POOL = env_or_default(
+    "CELERY_WORKER_POOL",
+    "solo" if running_on_windows() else "prefork",
+)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
 
 STATIC_URL = "static/"
-STATIC_ROOT = "static/"
-ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
+STATIC_ROOT = str(BASE_DIR / "static")
+ASSET_DIR = str(
+    ensure_directory(
+        resolve_path(
+            env_or_default("ASSET_DIR", BASE_DIR / "assets"),
+            base_dir=BASE_DIR,
+        )
+    )
+)
 
 # Media files (User uploaded content)
-MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
+MEDIA_ROOT = str(
+    ensure_directory(
+        resolve_path(
+            env_or_default("MEDIA_ROOT", DATA_DIR),
+            base_dir=BASE_DIR,
+        )
+    )
+)
 MEDIA_URL = "/media/"
 
-EXCEL_PATH = env("EXCEL_PATH")
+EXCEL_PATH = str(
+    resolve_path(
+        env_or_default("EXCEL_PATH", BASE_DIR),
+        base_dir=BASE_DIR,
+    )
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -313,7 +365,7 @@ LOGGING = {
         "file": {
             "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": os.path.join(BASE_DIR, "logs", "app.log"),
+            "filename": str(LOG_DIR / "app.log"),
             "formatter": "verbose",
         },
         "mail_admins": {
@@ -362,7 +414,7 @@ GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH")
 
-LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
+LOCAL_COMPUTE_API_URL = env_or_default("LOCAL_COMPUTE_API_URL", "")
 
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
@@ -388,7 +440,17 @@ ES_AUTH = env("ES_AUTH")
 CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 
 # Community Engagement API Configuration
-WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+WHATSAPP_MEDIA_PATH = str(
+    ensure_directory(
+        resolve_path(
+            env_or_default(
+                "WHATSAPP_MEDIA_PATH",
+                BASE_DIR / "bot_interface" / "whatsapp_media",
+            ),
+            base_dir=BASE_DIR,
+        )
+    )
+)
 
 BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"

@@ -718,7 +718,7 @@ def get_merged_waterbodies_with_zoi(
     district_l = str(district).lower()
     block_l = str(block).lower()
 
-    base_dir = f"{MEDIA_ROOT}stats_excel_files"
+    base_dir = os.path.join(MEDIA_ROOT, "stats_excel_files")
     out_dir = os.path.join(base_dir, state, district.upper())
     os.makedirs(out_dir, exist_ok=True)
 

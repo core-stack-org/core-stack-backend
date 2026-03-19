@@ -2,6 +2,8 @@
 
 This document provides comprehensive installation instructions for the CoRE Stack Backend application using a hybrid approach: manual prerequisites, automated installation script, and manual post-installation configuration.
 
+For native Windows setup, use the dedicated guide at [`WINDOWS.md`](WINDOWS.md).
+
 > **Having issues?** Check the [Troubleshooting Guide](TROUBLESHOOTING.md) for solutions to common problems, or post an issue at [GitHub Issues](https://github.com/core-stack-org/core-stack-backend/issues)
 
 ## Table of Contents
