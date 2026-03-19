@@ -191,6 +191,24 @@ REST_FRAMEWORK = {
     ],
 }
 
+SWAGGER_SETTINGS = {
+    "USE_SESSION_AUTH": False,
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": 'JWT auth header. Example: "Bearer <access_token>"',
+        },
+        "X-API-Key": {
+            "type": "apiKey",
+            "name": "X-API-Key",
+            "in": "header",
+            "description": "API key header used by selected public endpoints.",
+        },
+    },
+}
+
 # MARK: JWT settings
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=90),

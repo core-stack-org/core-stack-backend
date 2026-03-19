@@ -9,6 +9,7 @@ venv/
 *.pyc
 .idea/
 .DS_Store
+__pycache__/
 
 # Django
 *.log
@@ -17,6 +18,7 @@ db.sqlite3
 db.sqlite3-journal
 media/
 static/
+
 
 # Virtual Environment
 venv/
@@ -47,3 +49,13 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
+
+
+.local/
+.kiloco*
+.kiloco*/
+*postman/
+.tldr*
+.tldr/
+.history/
+.codex/
