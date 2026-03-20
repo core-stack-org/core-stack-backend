@@ -1,6 +1,6 @@
 # plans/views.py
-from django.db.models import Count, Q, Value
-from django.db.models.functions import Concat
+from django.db.models import Avg, Case, CharField as CharFieldOutput, Count, F, Max, Min, Q, Value, When
+from django.db.models.functions import Concat, Length, Substr, Trim
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
@@ -58,6 +58,249 @@ STATE_CENTROIDS = {
     "Telangana": {"lat": 17.1232, "lon": 79.2088},
     "Dadra & Nagar Haveli and Daman & Diu": {"lat": 20.2376, "lon": 73.0167},
 }
+
+TEST_FACILITATOR_EXCLUSIONS = (
+    Q(facilitator_name__isnull=True)
+    | Q(facilitator_name="")
+    | Q(facilitator_name__icontains="test")
+    | Q(facilitator_name__icontains="demo")
+    | Q(facilitator_name__icontains="facilitator")
+)
+
+
+def _build_steward_meta_stats(queryset):
+    effective_village = Case(
+        When(
+            ~Q(village_name="") & Q(village_name__isnull=False),
+            then=Trim(F("village_name")),
+        ),
+        When(
+            plan__startswith="Plan ",
+            then=Trim(Substr("plan", 6, Length("plan") - Value(5))),
+        ),
+        default=Trim(F("plan")),
+        output_field=CharFieldOutput(max_length=255),
+    )
+    qs = queryset.annotate(effective_village=effective_village)
+
+    total_stewards = qs.values("facilitator_name").distinct().count()
+
+    per_steward = (
+        qs.values("facilitator_name")
+        .annotate(
+            plan_count=Count("id"),
+            completed_count=Count("id", filter=Q(is_completed=True)),
+            in_progress_count=Count("id", filter=Q(is_completed=False)),
+            dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+            dpr_reviewed=Count("id", filter=Q(is_dpr_reviewed=True)),
+        )
+    )
+
+    agg = per_steward.aggregate(
+        avg_plans=Avg("plan_count"),
+        min_plans=Min("plan_count"),
+        max_plans=Max("plan_count"),
+        avg_completion=Avg(
+            Case(
+                When(plan_count__gt=0, then=F("completed_count") * 100.0 / F("plan_count")),
+                default=Value(0.0),
+            )
+        ),
+    )
+
+    active_stewards = per_steward.filter(in_progress_count__gt=0).count()
+    inactive_stewards = total_stewards - active_stewards
+
+    dpr_agg = qs.aggregate(
+        total_dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+        total_dpr_reviewed=Count("id", filter=Q(is_dpr_reviewed=True)),
+        pending_dpr_generation=Count(
+            "id", filter=Q(is_completed=True, is_dpr_generated=False)
+        ),
+        pending_dpr_review=Count(
+            "id", filter=Q(is_dpr_generated=True, is_dpr_reviewed=False)
+        ),
+    )
+
+    top_stewards_qs = per_steward.order_by("-plan_count")[:10]
+    top_steward_names = [s["facilitator_name"] for s in top_stewards_qs]
+    village_map = {}
+    for entry in (
+        qs.filter(facilitator_name__in=top_steward_names)
+        .values("facilitator_name", "effective_village")
+        .distinct()
+    ):
+        village_map.setdefault(entry["facilitator_name"], []).append(
+            entry["effective_village"]
+        )
+    top_stewards = [
+        {
+            "facilitator_name": s["facilitator_name"],
+            "plan_count": s["plan_count"],
+            "completed_count": s["completed_count"],
+            "villages": village_map.get(s["facilitator_name"], []),
+        }
+        for s in top_stewards_qs
+    ]
+
+    by_organization = [
+        {
+            "organization_id": s["organization"],
+            "organization_name": s["organization__name"],
+            "steward_count": s["steward_count"],
+        }
+        for s in (
+            qs.values("organization", "organization__name")
+            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .order_by("-steward_count")
+        )
+    ]
+
+    state_level = [
+        {
+            "state_id": s["state_soi"],
+            "state_name": s["state_soi__state_name"],
+            "steward_count": s["steward_count"],
+        }
+        for s in (
+            qs.filter(state_soi__isnull=False)
+            .values("state_soi", "state_soi__state_name")
+            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .order_by("-steward_count")
+        )
+    ]
+
+    district_level = [
+        {
+            "district_id": s["district_soi"],
+            "district_name": s["district_soi__district_name"],
+            "state_name": s["state_soi__state_name"],
+            "steward_count": s["steward_count"],
+        }
+        for s in (
+            qs.filter(district_soi__isnull=False)
+            .values("district_soi", "district_soi__district_name", "state_soi__state_name")
+            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .order_by("-steward_count")
+        )
+    ]
+
+    tehsil_level = [
+        {
+            "tehsil_id": s["tehsil_soi"],
+            "tehsil_name": s["tehsil_soi__tehsil_name"],
+            "district_name": s["district_soi__district_name"],
+            "steward_count": s["steward_count"],
+        }
+        for s in (
+            qs.filter(tehsil_soi__isnull=False)
+            .values(
+                "tehsil_soi",
+                "tehsil_soi__tehsil_name",
+                "district_soi__district_name",
+            )
+            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .order_by("-steward_count")
+        )
+    ]
+
+    village_level = [
+        {
+            "village_name": s["effective_village"],
+            "tehsil_name": s["tehsil_soi__tehsil_name"],
+            "district_name": s["district_soi__district_name"],
+            "state_name": s["state_soi__state_name"],
+            "steward_count": s["steward_count"],
+        }
+        for s in (
+            qs.values(
+                "effective_village",
+                "tehsil_soi__tehsil_name",
+                "district_soi__district_name",
+                "state_soi__state_name",
+            )
+            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .order_by("-steward_count")
+        )
+    ]
+
+    return {
+        "total_stewards": total_stewards,
+        "plans_per_steward": {
+            "avg": round(agg["avg_plans"] or 0, 2),
+            "min": agg["min_plans"] or 0,
+            "max": agg["max_plans"] or 0,
+        },
+        "avg_completion_rate": round(agg["avg_completion"] or 0, 2),
+        "dpr_stats": dpr_agg,
+        "active_stewards": active_stewards,
+        "inactive_stewards": inactive_stewards,
+        "top_stewards": top_stewards,
+        "by_organization": by_organization,
+        "state_level": state_level,
+        "district_level": district_level,
+        "tehsil_level": tehsil_level,
+        "village_level": village_level,
+    }
+
+
+def _build_steward_listing(queryset):
+    effective_village = Case(
+        When(
+            ~Q(village_name="") & Q(village_name__isnull=False),
+            then=Trim(F("village_name")),
+        ),
+        When(
+            plan__startswith="Plan ",
+            then=Trim(Substr("plan", 6, Length("plan") - Value(5))),
+        ),
+        default=Trim(F("plan")),
+        output_field=CharFieldOutput(max_length=255),
+    )
+    qs = queryset.annotate(effective_village=effective_village)
+
+    per_steward = (
+        qs.values("facilitator_name")
+        .annotate(
+            plan_count=Count("id"),
+            completed_count=Count("id", filter=Q(is_completed=True)),
+        )
+        .order_by("facilitator_name")
+    )
+
+    steward_names = [s["facilitator_name"] for s in per_steward]
+
+    plans_by_steward = {}
+    villages_by_steward = {}
+    for row in qs.filter(facilitator_name__in=steward_names).values(
+        "facilitator_name", "id", "plan", "is_completed", "effective_village"
+    ):
+        name = row["facilitator_name"]
+        plans_by_steward.setdefault(name, []).append(
+            {
+                "id": row["id"],
+                "plan": row["plan"],
+                "is_completed": row["is_completed"],
+                "village_name": row["effective_village"],
+            }
+        )
+        villages_by_steward.setdefault(name, set()).add(row["effective_village"])
+
+    stewards = [
+        {
+            "facilitator_name": s["facilitator_name"],
+            "plan_count": s["plan_count"],
+            "completed_count": s["completed_count"],
+            "villages": sorted(villages_by_steward.get(s["facilitator_name"], [])),
+            "plans": plans_by_steward.get(s["facilitator_name"], []),
+        }
+        for s in per_steward
+    ]
+
+    return {
+        "total_stewards": len(steward_names),
+        "stewards": stewards,
+    }
 
 
 class PlanPermission(permissions.BasePermission):
@@ -483,6 +726,74 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             "tehsil_id": tehsil_id,
         }
 
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="steward-meta-stats")
+    def steward_meta_stats(self, request, *args, **kwargs):
+        base_queryset = PlanApp.objects.filter(enabled=True).exclude(
+            Q(plan__icontains="test") | Q(plan__icontains="demo")
+        )
+
+        organization_id = request.query_params.get("organization")
+        project_id = request.query_params.get("project")
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if organization_id:
+            base_queryset = base_queryset.filter(organization_id=organization_id)
+        if project_id:
+            base_queryset = base_queryset.filter(project_id=project_id)
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_meta_stats(steward_qs)
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "project_id": project_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="steward-listing")
+    def steward_listing(self, request, *args, **kwargs):
+        base_queryset = PlanApp.objects.filter(enabled=True).exclude(
+            Q(plan__icontains="test") | Q(plan__icontains="demo")
+        )
+
+        organization_id = request.query_params.get("organization")
+        project_id = request.query_params.get("project")
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if organization_id:
+            base_queryset = base_queryset.filter(organization_id=organization_id)
+        if project_id:
+            base_queryset = base_queryset.filter(project_id=project_id)
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_listing(steward_qs)
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "project_id": project_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
         return Response(response_data, status=status.HTTP_200_OK)
 
 
@@ -1130,6 +1441,178 @@ class PlanViewSet(viewsets.ModelViewSet):
             "tehsil_id": tehsil_id,
         }
 
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="steward-meta-stats")
+    def steward_meta_stats(self, request, *args, **kwargs):
+        user = request.user
+        project_id = self.kwargs.get("project_pk") or request.query_params.get(
+            "project"
+        )
+
+        is_test_plan_reviewer = user.groups.filter(name="Test Plan Reviewer").exists()
+
+        base_queryset = PlanApp.objects.filter(enabled=True)
+
+        if is_test_plan_reviewer:
+            base_queryset = base_queryset.filter(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+            if project_id:
+                base_queryset = base_queryset.filter(project_id=project_id)
+        else:
+            base_queryset = base_queryset.exclude(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
+
+                    if not (user.is_superadmin or user.is_superuser):
+                        if user.groups.filter(
+                            name__in=["Organization Admin", "Org Admin", "Administrator"]
+                        ).exists():
+                            if project.organization != user.organization:
+                                return Response(
+                                    {"message": "You do not have access to this project."},
+                                    status=status.HTTP_403_FORBIDDEN,
+                                )
+                        else:
+                            user_project_exists = UserProjectGroup.objects.filter(
+                                user=user, project=project
+                            ).exists()
+                            if not user_project_exists:
+                                return Response(
+                                    {"message": "You do not have access to this project."},
+                                    status=status.HTTP_403_FORBIDDEN,
+                                )
+
+                    base_queryset = base_queryset.filter(project=project)
+                except Project.DoesNotExist:
+                    return Response(
+                        {"message": "Project not found."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            else:
+                if not (user.is_superadmin or user.is_superuser):
+                    if user.groups.filter(
+                        name__in=["Organization Admin", "Org Admin", "Administrator"]
+                    ).exists():
+                        base_queryset = base_queryset.filter(organization=user.organization)
+                    else:
+                        user_projects = UserProjectGroup.objects.filter(
+                            user=user
+                        ).values_list("project_id", flat=True)
+                        base_queryset = base_queryset.filter(project_id__in=user_projects)
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_meta_stats(steward_qs)
+        response_data["filters_applied"] = {
+            "project_id": project_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="steward-listing")
+    def steward_listing(self, request, *args, **kwargs):
+        user = request.user
+        project_id = self.kwargs.get("project_pk") or request.query_params.get(
+            "project"
+        )
+
+        is_test_plan_reviewer = user.groups.filter(name="Test Plan Reviewer").exists()
+
+        base_queryset = PlanApp.objects.filter(enabled=True)
+
+        if is_test_plan_reviewer:
+            base_queryset = base_queryset.filter(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+            if project_id:
+                base_queryset = base_queryset.filter(project_id=project_id)
+        else:
+            base_queryset = base_queryset.exclude(
+                Q(plan__icontains="test") | Q(plan__icontains="demo")
+            )
+
+            if project_id:
+                try:
+                    project = Project.objects.get(
+                        id=project_id, app_type=AppType.WATERSHED, enabled=True
+                    )
+
+                    if not (user.is_superadmin or user.is_superuser):
+                        if user.groups.filter(
+                            name__in=["Organization Admin", "Org Admin", "Administrator"]
+                        ).exists():
+                            if project.organization != user.organization:
+                                return Response(
+                                    {"message": "You do not have access to this project."},
+                                    status=status.HTTP_403_FORBIDDEN,
+                                )
+                        else:
+                            user_project_exists = UserProjectGroup.objects.filter(
+                                user=user, project=project
+                            ).exists()
+                            if not user_project_exists:
+                                return Response(
+                                    {"message": "You do not have access to this project."},
+                                    status=status.HTTP_403_FORBIDDEN,
+                                )
+
+                    base_queryset = base_queryset.filter(project=project)
+                except Project.DoesNotExist:
+                    return Response(
+                        {"message": "Project not found."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            else:
+                if not (user.is_superadmin or user.is_superuser):
+                    if user.groups.filter(
+                        name__in=["Organization Admin", "Org Admin", "Administrator"]
+                    ).exists():
+                        base_queryset = base_queryset.filter(organization=user.organization)
+                    else:
+                        user_projects = UserProjectGroup.objects.filter(
+                            user=user
+                        ).values_list("project_id", flat=True)
+                        base_queryset = base_queryset.filter(project_id__in=user_projects)
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_listing(steward_qs)
+        response_data["filters_applied"] = {
+            "project_id": project_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
         return Response(response_data, status=status.HTTP_200_OK)
 
     @action(
