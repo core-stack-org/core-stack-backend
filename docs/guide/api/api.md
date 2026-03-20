@@ -859,6 +859,145 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Authentication**: Required
 - **Permissions**: User must have delete permission for the project
 
+### Steward Meta Stats (Global Level)
+- **URL**: `/api/v1/watershed/plans/steward-meta-stats/`
+- **Method**: GET
+- **Description**: Get comprehensive statistics about landscape stewards (facilitators) across all watershed plans. Excludes test/demo plans and test facilitator names.
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins and API key users only
+- **Query Parameters**:
+    - `organization` (optional): Filter by organization ID
+    - `project` (optional): Filter by project ID
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**:
+  ```json
+  {
+      "total_stewards": 150,
+      "plans_per_steward": {
+          "avg": 4.2,
+          "min": 1,
+          "max": 18
+      },
+      "avg_completion_rate": 62.5,
+      "dpr_stats": {
+          "total_dpr_generated": 80,
+          "total_dpr_reviewed": 45,
+          "pending_dpr_generation": 35,
+          "pending_dpr_review": 20
+      },
+      "active_stewards": 95,
+      "inactive_stewards": 55,
+      "top_stewards": [
+          {
+              "facilitator_name": "John Doe",
+              "plan_count": 18,
+              "completed_count": 12,
+              "villages": ["Village A", "Village B"]
+          }
+      ],
+      "by_organization": [
+          {"organization_id": 1, "organization_name": "Org X", "steward_count": 40}
+      ],
+      "state_level": [
+          {"state_id": 1, "state_name": "Bihar", "steward_count": 50}
+      ],
+      "district_level": [
+          {"district_id": 1, "district_name": "Nalanda", "state_name": "Bihar", "steward_count": 30}
+      ],
+      "tehsil_level": [
+          {"tehsil_id": 1, "tehsil_name": "Hilsa", "district_name": "Nalanda", "steward_count": 15}
+      ],
+      "village_level": [
+          {
+              "village_name": "XYZ",
+              "tehsil_name": "Hilsa",
+              "district_name": "Nalanda",
+              "state_name": "Bihar",
+              "steward_count": 5
+          }
+      ],
+      "filters_applied": {
+          "organization_id": null,
+          "project_id": null,
+          "state_id": null,
+          "district_id": null,
+          "tehsil_id": null
+      }
+  }
+  ```
+- **Notes**:
+    - Steward counts are distinct facilitator names at each geographic level
+    - `active_stewards`: stewards with at least one in-progress plan
+    - `inactive_stewards`: stewards whose all plans are completed
+    - `avg_completion_rate`: average percentage of completed plans per steward
+    - `top_stewards`: top 10 stewards ranked by plan count, with their villages
+    - Village name is resolved from `village_name` field; if blank, extracted from plan name (e.g., "Plan Villagename" yields "Villagename")
+
+### Steward Meta Stats (Project Level)
+- **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-meta-stats/`
+- **Method**: GET
+- **Description**: Get steward statistics scoped to a specific project (or the user's accessible plans)
+- **Authentication**: Required
+- **Permissions**:
+    - Superadmins: Full access
+    - Org Admins: Access to their organization's projects
+    - Project Users: Access to assigned projects only
+- **Query Parameters**:
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**: Same structure as Global Level (see above), with `filters_applied` containing `project_id` instead of `organization_id`
+
+### Steward Listing (Global Level)
+- **URL**: `/api/v1/watershed/plans/steward-listing/`
+- **Method**: GET
+- **Description**: List all stewards with their individual plans and villages. Unlike `steward-meta-stats` which returns aggregates, this returns the full per-steward breakdown.
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins and API key users only
+- **Query Parameters**:
+    - `organization` (optional): Filter by organization ID
+    - `project` (optional): Filter by project ID
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**:
+  ```json
+  {
+      "total_stewards": 150,
+      "stewards": [
+          {
+              "facilitator_name": "John Doe",
+              "plan_count": 3,
+              "completed_count": 2,
+              "villages": ["Village A", "Village B"],
+              "plans": [
+                  {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A"},
+                  {"id": 2, "plan": "Plan Village B", "is_completed": true, "village_name": "Village B"},
+                  {"id": 5, "plan": "Plan Village A Phase 2", "is_completed": false, "village_name": "Village A"}
+              ]
+          }
+      ],
+      "filters_applied": {}
+  }
+  ```
+
+### Steward Listing (Project Level)
+- **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-listing/`
+- **Method**: GET
+- **Description**: List all stewards and their plans scoped to a specific project (or the user's accessible plans)
+- **Authentication**: Required
+- **Permissions**:
+    - Superadmins: Full access
+    - Org Admins: Access to their organization's projects
+    - Project Users: Access to assigned projects only
+- **Query Parameters**:
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**: Same structure as Global Level (see above), with `filters_applied` containing `project_id` instead of `organization_id`
+
 ## Legacy Plan Endpoints
 
 These endpoints are maintained for backward compatibility:

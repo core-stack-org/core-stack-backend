@@ -229,12 +229,30 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_mws_connectivity(geojson_data, writer)
             elif workspace == "mws":
                 create_excel_for_mws(geojson_data, writer)
+            elif workspace == "facilities_proximity":
+                create_excel_for_facilities(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_facilities(data, writer):
+    features = data["features"]
+    df_data = [feature["properties"] for feature in features]
+
+    df = pd.DataFrame(df_data)
+
+    # keep first columns
+    first_cols = ["lgd_village", "lgd_village_name"]
+    other_cols = [c for c in df.columns if c not in first_cols]
+    df = df[first_cols + other_cols]
+
+    df.to_excel(writer, sheet_name="facilities_proximity", index=False)
+
+    print("Excel file created for facilities_proximity")
 
 
 def create_excel_for_mws(data, writer):
