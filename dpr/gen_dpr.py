@@ -20,6 +20,7 @@ from dpr.mapping import (
     RECHARGE_STRUCTURE_REVERSE_MAPPING,
     RS_WATER_STRUCTIRE_REVERSE_MAPPING,
     WATER_STRUCTURE_REVERSE_MAPPING,
+    classify_demand_type,
     populate_maintenance_from_waterbody,
 )
 from dpr.utils import ensure_str, get_waterbody_repair_activities, transform_name
@@ -995,7 +996,7 @@ def add_section_e(doc, plan):
 
     doc.add_heading("Maintenance Works by Asset Type", level=2)
 
-    table = doc.add_table(rows=len(asset_types), cols=1)
+    table = doc.add_table(rows=1 + len(asset_types), cols=1)
     table.style = "Table Grid"
 
     header_cells = table.rows[0].cells
@@ -1003,9 +1004,9 @@ def add_section_e(doc, plan):
     header_cells[0].paragraphs[0].runs[0].bold = True
 
     for i, asset_type in enumerate(asset_types):
-        row_cells = table.rows[i].cells
-        row_cells[0].text = asset_type
+        table.rows[i + 1].cells[0].text = asset_type
 
+    for asset_type in asset_types:
         doc.add_heading(f"Maintenance Works for {asset_type}", level=3)
 
         if asset_type == "Water Recharge Structures":
@@ -1042,7 +1043,7 @@ def maintenance_gw_table(doc, plan):
     for maintenance in GW_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
+            classify_demand_type(maintenance.data_gw_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_gw_maintenance.get("beneficiary_settlement") or "NA"
@@ -1086,6 +1087,8 @@ def maintenance_gw_table(doc, plan):
         row_cells[7].text = str(maintenance.longitude)
 
 
+
+
 def maintenance_agri_table(doc, plan):
     headers = [
         "Type of demand",
@@ -1108,7 +1111,7 @@ def maintenance_agri_table(doc, plan):
     for maintenance in Agri_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
+            classify_demand_type(maintenance.data_agri_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_agri_maintenance.get("beneficiary_settlement") or "NA"
@@ -1175,7 +1178,7 @@ def maintenance_waterstructures_table(doc, plan):
     for maintenance in SWB_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
+            classify_demand_type(maintenance.data_swb_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_swb_maintenance.get("beneficiary_settlement") or "NA"
@@ -1234,7 +1237,7 @@ def maintenance_rs_waterstructures_table(doc, plan):
     for maintenance in SWB_RS_maintenance.objects.filter(plan_id=plan.id).exclude(is_deleted=True):
         row_cells = table.add_row().cells
         row_cells[0].text = to_utf8(
-            format_text(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
+            classify_demand_type(maintenance.data_swb_rs_maintenance.get("demand_type")) or "NA"
         )
         row_cells[1].text = to_utf8(
             maintenance.data_swb_rs_maintenance.get("beneficiary_settlement") or "NA"
@@ -1313,7 +1316,7 @@ def create_nrm_works_table(doc, plan, mws):
         row_cells[0].text = str(i)  # S.No
         row_cells[1].text = "Recharge Structure"  # Work Category
         row_cells[2].text = to_utf8(
-            structure.data_groundwater.get("demand_type") or "NA"
+            classify_demand_type(structure.data_groundwater.get("demand_type")) or "NA"
         )
         row_cells[3].text = to_utf8(structure.work_type)
         row_cells[4].text = to_utf8(structure.beneficiary_settlement)
@@ -1335,7 +1338,7 @@ def create_nrm_works_table(doc, plan, mws):
         row_cells = table.rows[i].cells
         row_cells[0].text = str(i)  # S.No
         row_cells[1].text = "Irrigation Work"
-        row_cells[2].text = to_utf8(irr_work.data_agri.get("demand_type") or "NA")
+        row_cells[2].text = to_utf8(classify_demand_type(irr_work.data_agri.get("demand_type_irrigation")) or "NA")
         if (
             (irr_work.work_type or "").lower() == "other"
             and irr_work.data_agri
