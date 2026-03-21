@@ -173,6 +173,24 @@ surface_waterbodies = [
     "Community pond",
 ]
 
+_COMMUNITY_DEMAND_VALUES = {
+    "community", "community well", "community demand",
+    "public", "public well",
+    "shared among families",
+}
+_INDIVIDUAL_DEMAND_VALUES = {"private", "privately owned", "individual demand"}
+
+
+def classify_demand_type(raw_value):
+    if not raw_value:
+        return raw_value
+    normalized = raw_value.strip().lower().replace("_", " ")
+    if normalized in _COMMUNITY_DEMAND_VALUES:
+        return "Community Demand"
+    if normalized in _INDIVIDUAL_DEMAND_VALUES:
+        return "Individual Demand"
+    return raw_value
+
 
 def get_activity_type_from_waterbody(waterbody):
     """
@@ -285,7 +303,7 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_waterbody(waterbody)
 
         common_data = {
-            "demand_type": waterbody.data_waterbody.get("select_one_owns"),
+            "demand_type": classify_demand_type(waterbody.data_waterbody.get("select_one_owns")),
             "beneficiary_settlement": waterbody.beneficiary_settlement,
             "Beneficiary_Name": waterbody.data_waterbody.get("Beneficiary_name"),
             "ben_father": waterbody.data_waterbody.get("ben_father"),
@@ -404,7 +422,7 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_well(well)
 
         common_data = {
-            "demand_type": well.data_well.get("select_one_owns"),
+            "demand_type": classify_demand_type(well.data_well.get("select_one_owns")),
             "beneficiary_settlement": well.beneficiary_settlement,
             "Beneficiary_Name": well.data_well.get("Beneficiary_name"),
             "ben_father": well.data_well.get("ben_father"),
