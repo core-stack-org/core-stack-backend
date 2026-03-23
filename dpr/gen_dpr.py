@@ -42,6 +42,7 @@ from .models import (
     Agri_maintenance,
     GW_maintenance,
     ODK_agri,
+    ODK_agrohorticulture,
     ODK_crop,
     ODK_groundwater,
     ODK_livelihood,
@@ -1537,7 +1538,7 @@ def add_section_g(doc, plan, mws):
             row_cells = plantation_table.add_row().cells
             row_cells[0].text = "Plantations"
             row_cells[1].text = to_utf8(
-                plantation_group.get("demand_type_plantations") or "NA"
+                classify_demand_type(plantation_group.get("demand_type_plantations")) or "NA"
             )
             row_cells[2].text = to_utf8(record.beneficiary_settlement or "NA")
             row_cells[3].text = to_utf8(
@@ -1547,20 +1548,18 @@ def add_section_g(doc, plan, mws):
             )
             row_cells[4].text = to_utf8(plantation_group.get("gender") or "NA")
             row_cells[5].text = to_utf8(plantation_group.get("ben_father") or "NA")
-            plantation_crop_type = (
+            row_cells[6].text = to_utf8(
                 record.data_livelihood.get("Plantation")
                 or plantation_group.get("crop_name")
                 or "NA"
             )
-            row_cells[6].text = to_utf8(plantation_crop_type)
-            plantation_crop_area = (
+            row_cells[7].text = to_utf8(
                 record.data_livelihood.get("Plantation_crop")
                 or plantation_group.get("crop_area")
                 or "NA"
             )
-            row_cells[7].text = to_utf8(plantation_crop_area)
             row_cells[8].text = (
-                "{:.6}".format(record.latitude) if record.latitude else "NA"
+                "{:.6f}".format(record.latitude) if record.latitude else "NA"
             )
             row_cells[9].text = (
                 "{:.6f}".format(record.longitude) if record.longitude else "NA"
@@ -1599,8 +1598,34 @@ def add_section_g(doc, plan, mws):
             )
             row_cells[7].text = to_utf8(kg_area)
             row_cells[8].text = (
-                "{:.6}".format(record.latitude) if record.latitude else "NA"
+                "{:.6f}".format(record.latitude) if record.latitude else "NA"
             )
             row_cells[9].text = (
                 "{:.6f}".format(record.longitude) if record.longitude else "NA"
             )
+
+    for agrohorti in ODK_agrohorticulture.objects.filter(plan_id=plan.id).exclude(
+        status_re="rejected"
+    ).exclude(is_deleted=True):
+        data = agrohorti.data_agohorticulture or {}
+        row_cells = plantation_table.add_row().cells
+        row_cells[0].text = "Plantations"
+        row_cells[1].text = to_utf8(
+            classify_demand_type(data.get("demand_type_plantations")) or "NA"
+        )
+        row_cells[2].text = to_utf8(data.get("beneficiary_settlement") or "NA")
+        row_cells[3].text = to_utf8(data.get("beneficiary_name") or "NA")
+        row_cells[4].text = to_utf8(data.get("gender") or "NA")
+        row_cells[5].text = to_utf8(data.get("ben_father") or "NA")
+        species = " ".join(filter(None, [
+            data.get("select_multiple_species"),
+            data.get("select_multiple_species_other"),
+        ])) or "NA"
+        row_cells[6].text = to_utf8(species)
+        row_cells[7].text = to_utf8(data.get("crop_area") or "NA")
+        row_cells[8].text = (
+            "{:.6f}".format(agrohorti.latitude) if agrohorti.latitude else "NA"
+        )
+        row_cells[9].text = (
+            "{:.6f}".format(agrohorti.longitude) if agrohorti.longitude else "NA"
+        )

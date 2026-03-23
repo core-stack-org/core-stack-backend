@@ -626,7 +626,7 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "is_deleted",
     ]
     search_fields = ["beneficiary_settlement", "block_name", "beneficiary_contact", "plan_name"]
-    readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
+    readonly_fields = ["livelihood_id", "uuid", "system", "gps_point", "data_before_moderation"]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -925,7 +925,7 @@ class ODKAgrohorticultureAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["agrohorticulture_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid", "data_before_moderation"]
+    readonly_fields = ["agrohorticulture_id", "uuid", "data_before_moderation"]
     ordering = ["-agrohorticulture_id"]
 
     fieldsets = (
