@@ -170,7 +170,55 @@ sudo chmod -R 755 /var/www/data/corestack
 sudo chmod 640 /var/www/data/corestack/nrm_app/.env
 ```
 
+
+### Migration failed
+
+> **IMPORTANT:** If the install.sh script fails at automated migrations. Here are some proven manual steps:
+
+**Fresh Migrations**
+
+If starting completely fresh:
+
+```bash
+# Clear any existing migration files (not __init__.py)
+find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
+find . -path "*/migrations/*.pyc" -delete
+
+# Create migrations folders for each app
+find . -maxdepth 2 -name 'apps.py' -type f | while IFS= read -r f; do
+  d=$(dirname "$f")
+  mkdir -p "$d/migrations"
+  touch "$d/migrations/__init__.py"
+done
+```
+
+**Run Migrations**
+
+```bash
+# Make migrations first
+python manage.py makemigrations
+
+# Check what will be applied (optional but recommended)
+python manage.py migrate --plan
+
+# Apply with fake-initial for first time
+python manage.py migrate --fake-initial
+```
+
+> **NOTE:** If migrations fail at `users` app specifically, try:
+> ```bash
+> python manage.py makemigrations users
+> python manage.py migrate users
+> python manage.py migrate
+> ```
+
+**Collect Static Files**
+
+```bash
+python manage.py collectstatic
+```
 ---
+
 
 ## Phase 3: Post-Installation Issues
 

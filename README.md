@@ -42,7 +42,8 @@ chmod +x install.sh
 #### 3. Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:
 ```bash
-conda activate corestack-backend (or whatever is the name of your virtual environment)
+# activate your virtual environment (default name: corestack-backend, through `install.sh`)
+conda activate corestack-backend
 python manage.py runserver
 ```
 - **Running celery:**

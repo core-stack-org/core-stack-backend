@@ -93,7 +93,8 @@ sudo systemctl enable rabbitmq-server
 sudo systemctl status rabbitmq-server
 ```
 
-### 1.3 Clone the Repository (Optional - for local development)
+### 1.3 Clone the Repository 
+> Optional for local development and for data-only users
 
 If you want to review or modify the installation scripts before running:
 
@@ -185,7 +186,7 @@ Apache serves /, /static, and /media automatically.
 
 ## Step 3: Manual Post-Installation
 
-These steps must be completed manually after the automated installation.
+***These steps must be completed manually after the automated installation.***
 
 ### 3.1 Configure Environment Variables
 
@@ -272,23 +273,7 @@ cd /var/www/data/corestack
 python manage.py createsuperuser
 ```
 
-### 3.3 Configure GEE Service Account Keys
-
-Place your Google Earth Engine service account JSON keys:
-
-```bash
-# Create directory for GEE keys
-sudo mkdir -p /var/www/data/corestack/data/gee_confs
-
-# Copy your service account keys
-sudo cp ~/path/to/your-gee-key.json /var/www/data/corestack/data/gee_confs/
-
-# Set permissions
-sudo chown -R www-data:www-data /var/www/data/corestack/data/gee_confs
-sudo chmod 750 /var/www/data/corestack/data/gee_confs/*.json
-```
-
-### 3.4 Restart Services
+### 3.3 Restart Services
 
 After configuring environment variables:
 
@@ -300,33 +285,79 @@ sudo systemctl restart apache2
 sudo systemctl status apache2
 ```
 
-### 3.5 Database Restore (Optional)
+---
 
-If you have a backup SQL file to restore:
+## Step 4: Pipeline Integrations
 
-```bash
-# Restore database from SQL file
-psql -h localhost -U nrm -d nrm -f /path/to/backup.sql
+
+### 4.1 GEE Account Setup
+
+1. Go to your Google Cloud Console: `https://console.cloud.google.com/earth-engine/configuration`
+2. Create a new project (or select existing):
+   ![Add Project Example](./assets/create-project.png)
+3. Configure/Register for Earth Engine project:
+   ![Register Project Example](./assets/register-project.png)
+4. Set permissions and Access levels:
+   ![IAM Settings Example](./assets/set-permissions.png)
+5. Create and Set service Account:
+   ![Service Account Example](./assets/service-account.png)
+6. Create Service Account Keys:
+   ![Service Keys Example](./assets/service-keys.png)
+   This will download a JSON file (e.g., `<project-name>-12345-356644b54.json`). Save this file securely - it contains the keys to access your cloud resources.
+
+#### Add to your Django setup, through Admin Panel: 
+
+1. Now, add the account to Django admin:
+   Go to `http://127.0.0.1:8000/admin/gee_computing/geeaccount/add/`
+   Fill in:
+   - **Name:** A recognizable name (e.g., "production", "geo_org_gee")
+   - **Service Account Email:** The email from your GEE service account (looks like `name@project-id.iam.gserviceaccount.com`)
+   - **Helper Account:** Leave blank or set to another already added account
+   
+   ![Add GEE Account Example](./assets/add-gee.png)
+
+2. After creating, note the account ID from the URL:
+   - URL looks like: `http://127.0.0.1:8000/admin/gee_computing/geeaccount/21/change/`
+   - Account ID is: 21 (the number in the URL)
+   - Note this down as `gee_account_id` for later use
+
+
+### 4.2 Testing and Running API pipelines through Postman
+
+For testing local APIs, you'll most likely use Postman. Create a [free account](https://www.postman.com/) if you don't have one.
+
+#### Get Authentication Token
+
+1. Make a POST request to obtain JWT token:
+   ![Postman Authentication Example](./assets/postman-auth.png)
+
+   ```
+   POST http://127.0.0.1:8000/api/token/
+   Content-Type: application/json
+   
+   {
+       "username": "your_username",
+       "password": "your_password"
+   }
+   ```
+
+2. The response will contain an `access` key - this is your Bearer Token:
+   ![Bearer Token Example](./assets/bearer-token.png)
+
+#### Use Bearer Token in Requests
+
+Add the token to the Authorization header:
+   ![Postman API Request Example](./assets/post-api.png)
+
 ```
+Authorization: Bearer <your_access_token>
+```
+
+Now you can call any compute APIs with their API requests.
 
 ---
 
-## Running the Application
-
-### Production Mode (Apache)
-
-After installation, the application is served by Apache at `http://localhost/`.
-
-```bash
-# Check Apache status
-sudo systemctl status apache2
-
-# View error logs
-sudo tail -f /var/log/apache2/corestack_error.log
-
-# View access logs
-sudo tail -f /var/log/apache2/corestack_access.log
-```
+## Step 5: Running the Application
 
 ### Development Mode
 
@@ -340,7 +371,9 @@ conda activate corestack-backend
 cd /var/www/data/corestack
 
 # Run development server
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver
+# Or Choose specific port
+python manage.py runserver 127.0.0.1:8010
 ```
 
 The server will be available at `http://127.0.0.1:8000/`
@@ -376,6 +409,21 @@ python manage.py runserver
 conda activate corestack-backend
 cd /var/www/data/corestack
 celery -A nrm_app worker -l info -Q nrm
+```
+
+### Production Mode (Apache)
+
+After installation, the application is served by Apache at `http://localhost/`.
+
+```bash
+# Check Apache status
+sudo systemctl status apache2
+
+# View error logs
+sudo tail -f /var/log/apache2/corestack_error.log
+
+# View access logs
+sudo tail -f /var/log/apache2/corestack_access.log
 ```
 
 ---
