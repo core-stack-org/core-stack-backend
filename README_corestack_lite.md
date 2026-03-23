@@ -142,7 +142,7 @@ GEE_DEFAULT_ACCOUNT_ID=2
 GOOGLE_APPLICATION_CREDENTIALS=/home/yourusername/.config/gcloud/application_default_credentials.json
 
 # Fernet Key (required for credential encryption)
-FERNET_KEY=Lnnka_UIGsBxg8K494VN5QNJJh6als-ZRq2VTCy0nURQ=
+FERNET_KEY= your-fernet-key
 ```
 
 > Replace `yourusername` with your actual Linux username.
@@ -296,46 +296,36 @@ Open: `http://localhost:8080/geoserver/web`
 
 ### 6h. Create required workspaces
 
-The CoRE Stack algorithms publish layers to specific GeoServer workspaces. **These must be created manually before running any algo API for the first time.**
+The CoRE Stack algorithms publish layers to specific GeoServer workspaces. **All 8 workspaces must be created manually before running any algo API for the first time.** GeoServer does not create these automatically.
 
 ```bash
-# Terrain raster (raster layers — reads from GCS)
-curl -X POST http://localhost:8080/geoserver/rest/workspaces \
-  -H "Content-Type: application/json" -u admin:geoserver \
-  -d '{"workspace": {"name": "terrain"}}'
-
-# LULC raster — 3 levels (raster layers — reads from GCS)
-for ws in LULC_level_1 LULC_level_2 LULC_level_3; do
+# Create all 8 required workspaces in one shot
+for ws in panchayat_boundaries mws terrain LULC_level_1 LULC_level_2 LULC_level_3 lulc_vector terrain_lulc; do
   curl -X POST http://localhost:8080/geoserver/rest/workspaces \
     -H "Content-Type: application/json" -u admin:geoserver \
     -d "{\"workspace\": {\"name\": \"$ws\"}}"
 done
 
-# LULC vector (vector layers — shapefile upload)
-curl -X POST http://localhost:8080/geoserver/rest/workspaces \
-  -H "Content-Type: application/json" -u admin:geoserver \
-  -d '{"workspace": {"name": "lulc_vector"}}'
-
-# Terrain clusters vector + Terrain LULC slope/plain vectors
-curl -X POST http://localhost:8080/geoserver/rest/workspaces \
-  -H "Content-Type: application/json" -u admin:geoserver \
-  -d '{"workspace": {"name": "terrain_lulc"}}'
-
 # Verify all workspaces created
 curl -s http://localhost:8080/geoserver/rest/workspaces.json \
-  -u admin:geoserver | python3 -m json.tool
+  -u admin:geoserver | python3 -m json.tool | grep '"name"'
 ```
 
-**Expected workspaces after setup:** `terrain`, `LULC_level_1`, `LULC_level_2`, `LULC_level_3`, `lulc_vector`, `terrain_lulc`
+**Expected workspaces after setup:** `panchayat_boundaries`, `mws`, `terrain`, `LULC_level_1`, `LULC_level_2`, `LULC_level_3`, `lulc_vector`, `terrain_lulc`
 
 | Workspace | Used by | Layer type |
 |---|---|---|
+| `panchayat_boundaries` | AdminBoundary | Vector |
+| `mws` | MWSLayer | Vector |
 | `terrain` | TerrainAlgorithm, TerrainVectorization | Raster + Vector |
 | `LULC_level_1` | LULCAlgorithm | Raster |
 | `LULC_level_2` | LULCAlgorithm | Raster |
 | `LULC_level_3` | LULCAlgorithm | Raster |
 | `lulc_vector` | LULCVectorization | Vector |
 | `terrain_lulc` | TerrainLULCSlope, TerrainLULCPlain | Vector |
+
+> If a workspace already exists, GeoServer returns a `500` error for that entry but continues — safe to re-run this loop on an existing setup.
+
 
 ---
 
