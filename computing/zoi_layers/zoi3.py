@@ -8,9 +8,24 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
+    check_task_status,
+    export_vector_asset_to_gee,
 )
 from waterrejuvenation.utils import wait_for_task_completion
 import ee
+
+
+def _build_fc_chunks(fc, chunk_size):
+    size = fc.size().getInfo()
+    parts = size // chunk_size
+    chunks = []
+    for part in range(parts + 1):
+        start = part * chunk_size
+        end = start + chunk_size
+        chunk = ee.FeatureCollection(fc.toList(fc.size()).slice(start, end))
+        if chunk.size().getInfo() > 0:
+            chunks.append((part, chunk))
+    return chunks
 
 
 def get_ndvi_for_zoi(
@@ -56,12 +71,59 @@ def get_ndvi_for_zoi(
     )
 
     zoi_collections = ee.FeatureCollection(asset_id_zoi)
-    fc = get_ndvi_data(zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path)
-    task = ee.batch.Export.table.toAsset(
-        collection=fc, description=description_ndvi, assetId=ndvi_asset_path
-    )
-    task.start()
-    wait_for_task_completion(task)
+    total_features = zoi_collections.size().getInfo()
+    print(f"Total ZOI features for NDVI: {total_features}")
+
+    # For larger feature collections, split into chunks and merge chunk assets.
+    # This avoids export failures for heavy NDVI computations.
+    chunk_size = 40
+    if total_features > chunk_size:
+        print(f"Running chunked NDVI generation with chunk size {chunk_size}")
+        chunk_assets = []
+        chunk_merge_task_ids = []
+        chunks = _build_fc_chunks(zoi_collections, chunk_size)
+
+        for part, chunk_fc in chunks:
+            chunk_suffix = f"{description_ndvi}_chunk_{part}"
+            chunk_asset_path = f"{ndvi_asset_path}_chunk_{part}"
+
+            if is_gee_asset_exists(chunk_asset_path):
+                ee.data.deleteAsset(chunk_asset_path)
+
+            chunk_result_fc = get_ndvi_data(
+                chunk_fc, 2017, 2024, chunk_suffix, chunk_asset_path
+            )
+            task_id = export_vector_asset_to_gee(
+                chunk_result_fc, chunk_suffix, chunk_asset_path
+            )
+            if task_id:
+                chunk_merge_task_ids.append(task_id)
+                chunk_assets.append(chunk_asset_path)
+
+        if chunk_merge_task_ids:
+            check_task_status(chunk_merge_task_ids)
+
+        if not chunk_assets:
+            raise Exception("No NDVI chunk assets were generated for merge.")
+
+        merged_fc = ee.FeatureCollection(chunk_assets).flatten()
+        if is_gee_asset_exists(ndvi_asset_path):
+            ee.data.deleteAsset(ndvi_asset_path)
+        final_task = ee.batch.Export.table.toAsset(
+            collection=merged_fc, description=description_ndvi, assetId=ndvi_asset_path
+        )
+        final_task.start()
+        wait_for_task_completion(final_task)
+        fc = ee.FeatureCollection(ndvi_asset_path)
+    else:
+        fc = get_ndvi_data(zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path)
+        task = ee.batch.Export.table.toAsset(
+            collection=fc, description=description_ndvi, assetId=ndvi_asset_path
+        )
+        task.start()
+        wait_for_task_completion(task)
+        fc = ee.FeatureCollection(ndvi_asset_path)
+
     start_date = "30-06-2017"
     end_date = "01-07-2024"
     if state and district and block:

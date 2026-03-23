@@ -124,7 +124,7 @@ def clip_lulc_v3(
             pan_india = ee.Image(
                 f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{curr_start_year}_{curr_end_year}"
             )
-            clipped_lulc = pan_india.clip(roi.geometry())
+            clipped_lulc = pan_india.clipToCollection(roi.geometry())
             l1_asset_new.append(clipped_lulc)
 
     task_list = []

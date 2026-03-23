@@ -37,6 +37,8 @@ import ee
 import logging
 from datetime import datetime
 import geemap
+
+
 from waterrejuvenation.utils import (
     wait_for_task_completion,
     delete_asset_on_GEE,
@@ -72,6 +74,7 @@ def Upload_Desilting_Points(
     is_lulc_required=True,
     gee_account_id=None,
     is_processing_required=True,
+    is_force_regeneration=True,
 ):
     import pandas as pd
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
@@ -87,6 +90,9 @@ def Upload_Desilting_Points(
 
     wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
+    if is_force_regeneration:
+        wdsl_log = WaterbodiesDesiltingLog.objects.filter(project_id=wb_obj.project_id)
+        wdsl_log.delete()
 
     if wb_obj.process:
         logger.warning("File already processed. Skipping.")
@@ -435,90 +441,125 @@ def Genereate_zoi_and_zoi_indicator(
 def BuildDesiltingLayer(
     project_id, asset_suffix=None, asset_folder=None, gee_account_id=None
 ):
-    # ee_initialize(gee_account_id)
-    from .models import WaterbodiesDesiltingLog
+    from waterrejuvenation.models import WaterbodiesDesiltingLog
+
+    # ee_initialize(gee_account_id)  # Uncomment if needed
 
     instance = Project.objects.get(pk=project_id)
     data = WaterbodiesDesiltingLog.objects.filter(
         project_id=project_id, closest_wb_lat__isnull=False, process=True
     )
+
+    # Asset paths
     asset_folder = [instance.name]
-    assst_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
+    asset_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
-        + assst_suffix_desilt
+        + asset_suffix_desilt
     )
 
     delete_asset_on_GEE(asset_id_desilt)
+
+    # File paths
     project_id = instance.id
     org_name = instance.organization.name
     app_type = instance.app_type
     project_name = instance.name
-    filename = (
-        f"{org_name}_{app_type}_{project_id}_{project_name}_{int(datetime.now().timestamp())}"
-        + ".csv"
-    )
+    filename = f"{org_name}_{app_type}_{project_id}_{project_name}_{int(datetime.now().timestamp())}.csv"
     directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
     full_path = os.path.join(SITE_DATA_PATH, directory)
-    file_path = full_path + filename
+    file_path = os.path.join(full_path, filename)
     os.makedirs(full_path, exist_ok=True)
+
+    # Write CSV
+    csv_columns = [
+        "desilt_id",
+        "latitude",
+        "longitude",
+        "desiltingpoint_lat",
+        "desiltingpoint_lon",
+        "Village",
+        "distance_from_desilting_point",
+        "name_of_ngo",
+        "State",
+        "District",
+        "Taluka",
+        "waterbody_name",
+        "slit_excavated",
+        "intervention_year",
+    ]
+
     with open(file_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(
-            [
-                "desilt_id",
-                "latitude",
-                "longitude",
-                "desiltingpoint_lat",
-                "desiltingpoint_lon",
-                "Village",
-                "distance_from_desilting_point",
-                "name_of_ngo",
-                "State",
-                "District",
-                "Taluka",
-                "waterbody_name",
-                "slit_excavated",
-                "intervention_year",
-            ]
-        )
+        writer.writerow(csv_columns)
         for loc in data:
             writer.writerow(
                 [
-                    val if val is not None and str(val).strip() != "" else "N/A"
-                    for val in [
-                        loc.id,
-                        loc.closest_wb_lat,
-                        loc.closest_wb_long,
-                        loc.lat,
-                        loc.lon,
-                        loc.Village,
-                        loc.distance_closest_wb_pixel,
-                        loc.name_of_ngo,
-                        loc.State,
-                        loc.District,
-                        loc.Taluka,
-                        loc.waterbody_name,
-                        loc.slit_excavated,
-                        loc.intervention_year,
-                    ]
+                    loc.id,
+                    loc.closest_wb_lat,
+                    loc.closest_wb_long,
+                    loc.lat,
+                    loc.lon,
+                    loc.Village,
+                    loc.distance_closest_wb_pixel,
+                    loc.name_of_ngo,
+                    loc.State,
+                    loc.District,
+                    loc.Taluka,
+                    loc.waterbody_name,
+                    loc.slit_excavated,
+                    loc.intervention_year,
                 ]
             )
+
+    # Read CSV into DataFrame
     df = pd.read_csv(file_path)
-    df = df.fillna("N/A").replace(r"^\s*$", "N/A", regex=True)
+
+    # --- FIX: handle numeric vs string columns ---
+    numeric_cols = [
+        "latitude",
+        "longitude",
+        "desiltingpoint_lat",
+        "desiltingpoint_lon",
+        "distance_from_desilting_point",
+        "slit_excavated",
+    ]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(
+            df[col], errors="coerce"
+        )  # keeps numbers, NaN if invalid
+
+    # Drop rows without geometry
+    df = df.dropna(subset=["latitude", "longitude"])
+
+    # Fill missing numeric values with 0 (optional)
+    df[numeric_cols] = df[numeric_cols].fillna(0)
+
+    # Fill missing string columns with "N/A"
+    string_cols = [c for c in df.columns if c not in numeric_cols]
+    df[string_cols] = df[string_cols].fillna("N/A").replace(r"^\s*$", "N/A", regex=True)
+
+    # Create GeoDataFrame
     geometry = [Point(xy) for xy in zip(df["longitude"], df["latitude"])]
     gdf = gpd.GeoDataFrame(df, geometry=geometry)
-    gdf.set_crs("EPSG:4326", allow_override=True, inplace=True)
-    gdf = gdf.dropna(subset=["geometry"])
+    gdf.set_crs("EPSG:4326", inplace=True)
+
+    # Convert to GEE FeatureCollection
     fc = gdf_to_ee_fc(gdf)
+
+    # Delete previous asset if exists
     delete_asset_on_GEE(asset_id_desilt)
-    point_tasks = ee.batch.Export.table.toAsset(
-        collection=fc, description=assst_suffix_desilt, assetId=asset_id_desilt
+
+    # Export to GEE
+    task = ee.batch.Export.table.toAsset(
+        collection=fc, description=asset_suffix_desilt, assetId=asset_id_desilt
     )
-    point_tasks.start()
-    wait_for_task_completion(point_tasks)
+    task.start()
+    wait_for_task_completion(task)
+
+    return {"status": "success", "asset_id": asset_id_desilt}
 
 
 def BuildMWSLayer(
