@@ -16,7 +16,6 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
-
 def generate_terrain_clusters_sync(
     state,
     district,
@@ -37,23 +36,25 @@ def generate_terrain_clusters_sync(
     )
     asset_id = get_gee_asset_path(state, district, block) + asset_name
 
-    if is_gee_asset_exists(asset_id):
-        print(f"Asset already exists, skipping: {asset_id}")
-        return asset_id
-
-    # compute_on_gee handles MWS boundaries internally
-    # but it reads from GEE_ASSET_PATH which points to your account
-    # so override the mt1k path to read from production
-    compute_on_gee(state, district, block, asset_id, asset_name)
+    if not is_gee_asset_exists(asset_id):
+        compute_on_gee(state, district, block, asset_id, asset_name)
 
     if not is_gee_asset_exists(asset_id):
         raise Exception(f"Asset not created: {asset_id}")
 
-    # GeoServer sync intentionally skipped for STACD
-    # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+    # Save to DB first to always get a valid layer_id (even on reruns)
+    layer_id = save_layer_info_to_db(
+        state, district, block,
+        layer_name=asset_name,
+        asset_id=asset_id,
+        dataset_name="Terrain Vector",
+        misc={},
+    )
+
+    # GeoServer sync — identical to async
+    layer_at_geoserver = sync_to_geoserver(state, district, block, asset_id, layer_id)
 
     return asset_id
-
 
 
 @app.task(bind=True)

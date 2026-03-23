@@ -26,21 +26,15 @@ def vectorise_lulc_sync(
     block,
     start_year,
     end_year,
-    LULC_Raster=None,  # input from LULC_Algorithm (not used yet, for future parameterization)
+    LULC_Raster=None,
 ):
-    """
-    STACD-compatible synchronous version.
-    No Celery, no GeoServer sync. Returns asset_id directly.
-    """
     ee_initialize(2)
 
     start_year = int(start_year)
     end_year = int(end_year)
 
-    # MWS boundaries — read from production CoRE Stack (read-only)
     fc = ee.FeatureCollection(
-        "projects/ee-corestackdev/assets/apps/mws/"
-        + f"{state.lower()}/{district.lower()}/{block.lower()}/"
+        get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
         + "_"
@@ -56,7 +50,44 @@ def vectorise_lulc_sync(
     )
     asset_id = get_gee_asset_path(state, district, block) + description
 
-    if not is_gee_asset_exists(asset_id):
+    if is_gee_asset_exists(asset_id):
+        layer_obj = None
+        try:
+            dataset = Dataset.objects.get(name="LULC")
+            layer_obj = Layer.objects.get(
+                dataset=dataset,
+                layer_name=description,
+            )
+        except Exception as e:
+            print("layer not found for lulc vector. So, reading the column name from asset_id.")
+        if layer_obj:
+            existing_end_date = int(layer_obj.misc["end_year"])
+        else:
+            roi = ee.FeatureCollection(asset_id)
+            col_names = roi.first().propertyNames().getInfo()
+            filtered_col = [col for col in col_names if col.startswith("tree")]
+            filtered_col.sort()
+            existing_end_date = int(filtered_col[-1].split("_")[-1])
+        print("existing_end_date", existing_end_date)
+        print("end_year", end_year)
+        if existing_end_date < end_year:
+            new_start_year = existing_end_date
+            new_asset_id = f"{asset_id}_{new_start_year}_{end_year}"
+            new_description = f"{description}_{new_start_year}_{end_year}"
+            if not is_gee_asset_exists(new_asset_id):
+                generate_vector(
+                    start_year=new_start_year,
+                    end_year=end_year,
+                    state=state,
+                    district=district,
+                    block=block,
+                    description=new_description,
+                    asset_id=new_asset_id,
+                    fc=fc,
+                )
+                if is_gee_asset_exists(new_asset_id):
+                    merge_fc_into_existing_fc(asset_id, description, new_asset_id)
+    else:
         generate_vector(
             start_year=start_year,
             end_year=end_year,
@@ -68,24 +99,18 @@ def vectorise_lulc_sync(
             fc=fc,
         )
 
-    if not is_gee_asset_exists(asset_id):
-        raise Exception(f"Asset not created: {asset_id}")
+    # DB save + GeoServer sync — identical to async
+    layer_at_geoserver = sync_to_db_and_geoserver(
+        asset_id=asset_id,
+        state=state,
+        district=district,
+        block=block,
+        description=description,
+        start_year=start_year,
+        end_year=end_year,
+    )
 
-    # DB save
-    if is_gee_asset_exists(asset_id):
-        save_layer_info_to_db(
-            state, district, block,
-            layer_name=description,
-            asset_id=asset_id,
-            dataset_name="LULC",
-            misc={"start_year": start_year, "end_year": end_year},
-        )
-
-    # GeoServer sync intentionally skipped for STACD
-    # TODO: Replace hardcoded GEE paths and account with parameters
-    # TODO: Replace hardcoded stac_spec with build_stac_spec() call
-
-    return asset_id
+    return asset_id  # return asset_id for STACD, not layer_at_geoserver
 
 
 @app.task(bind=True)

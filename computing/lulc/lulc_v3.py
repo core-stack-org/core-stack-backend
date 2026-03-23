@@ -140,8 +140,27 @@ def clip_lulc_v3_sync(
             misc={"start_year": start_year, "end_year": end_year},
         )
 
-    # GCS and GeoServer sync intentionally skipped for STACD
-    # TODO: Replace hardcoded GEE paths and account with parameters
+
+    # Make assets public before GCS sync
+    for asset_id in final_output_assetid_array_new:
+        make_asset_public(asset_id)
+
+    # GCS sync — same as async version
+    sync_lulc_to_gcs(
+        final_output_filename_array_new,
+        final_output_assetid_array_new,
+        scale,
+    )
+
+    # GeoServer sync — same as async version
+    sync_lulc_to_geoserver(
+        final_output_filename_array_new,
+        state,
+        district,
+        block,
+        [],   # layer_ids — passing empty list, DB save already done above
+        None, # asset_suffix — not needed for block-level calls
+    )
 
     return final_output_assetid_array_new
 

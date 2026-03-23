@@ -24,7 +24,7 @@ def lulc_on_plain_cluster_sync(
 ):
     """
     STACD-compatible synchronous version.
-    No Celery, no GeoServer sync. Returns asset_id directly.
+    Returns asset_id directly.
     """
     ee_initialize(2)
 
@@ -48,12 +48,11 @@ def lulc_on_plain_cluster_sync(
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-        )
+        )  # The eleven landforms raster
 
-        # MWS boundaries — read from production CoRE Stack (read-only)
+        # MWS boundaries — read from your own account (same as async)
         mwsheds = ee.FeatureCollection(
-            "projects/ee-corestackdev/assets/apps/mws/"
-            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
+            get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
@@ -92,25 +91,45 @@ def lulc_on_plain_cluster_sync(
         result = process_feature_collection(
             plain_mwsheds, study_area_landforms, study_area_lulc, plain_centroids
         )
+        print("Processing completed successfully")
         task = export_vector_asset_to_gee(result, asset_description, asset_id)
         task_id_list = check_task_status([task])
-        print("lulc_on_plain_cluster_sync task completed:", task_id_list)
+        print("lulc_on_plain_cluster_sync task completed - task_id_list:", task_id_list)
 
-    if not is_gee_asset_exists(asset_id):
-        raise Exception(f"Asset not created: {asset_id}")
+    layer_at_geoserver = False
+    if is_gee_asset_exists(asset_id):
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_plain",
+            asset_id=asset_id,
+            dataset_name="Terrain LULC",
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+            },
+        )
+        make_asset_public(asset_id)
 
-    save_layer_info_to_db(
-        state, district, block,
-        layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_plain",
-        asset_id=asset_id,
-        dataset_name="Terrain LULC",
-        misc={"start_year": start_year, "end_year": end_year},
-    )
-    make_asset_public(asset_id)
+        fc = ee.FeatureCollection(asset_id).getInfo()
+        fc = {"features": fc["features"], "type": fc["type"]}
+        res = sync_layer_to_geoserver(
+            state,
+            fc,
+            valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_lulc_plain",
+            "terrain_lulc",
+        )
+        print(res)
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")
+            layer_at_geoserver = True
 
-    # GeoServer sync intentionally skipped for STACD
-    # TODO: Replace hardcoded GEE paths and account with parameters
-    # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+    # return asset_id for STACD instead of layer_at_geoserver flag
     return asset_id
 
 

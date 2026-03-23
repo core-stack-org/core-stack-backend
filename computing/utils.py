@@ -168,7 +168,9 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
             print(e)
 
     path = generate_shape_files(path)
-    return push_shape_to_geoserver(path, workspace=workspace, layer_name=layer_name)
+    # return push_shape_to_geoserver(path, workspace=workspace, layer_name=layer_name)
+    return push_shape_to_geoserver(path, store_name=layer_name, workspace=workspace, layer_name=layer_name)
+
 
 
 def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None):

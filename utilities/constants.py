@@ -154,7 +154,7 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 )
 
 # MARK: GEE Paths
-GCS_BUCKET_NAME = "core_stack"
+GCS_BUCKET_NAME = "corestack-lite"
 
 GEE_ASSET_PATH = "projects/ee-saharshlaud/assets/apps/mws/"
 GEE_HELPER_PATH = "projects/ee-saharshlaud/assets/apps/mws/"
