@@ -29,6 +29,7 @@ from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
+from .mws.mws import mws_layer_sync
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
@@ -241,26 +242,65 @@ def upload_kml(request):
         print("Exception in upload_kml api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# MWS Layer
+# @api_security_check(allowed_methods="POST")
+# @schema(None)
+# def generate_mws_layer(request):
+#     print("Inside generate_mws_layer")
+#     try:
+#         state = request.data.get("state")
+#         district = request.data.get("district")
+#         block = request.data.get("block")
+#         gee_account_id = request.data.get("gee_account_id")
+#         mws_layer.apply_async(
+#             args=[state, district, block, gee_account_id], queue="nrm"
+#         )
+#         return Response(
+#             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+#         )
+#     except Exception as e:
+#         print("Exception in generate_mws_layer api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_security_check(allowed_methods="POST")
+@api_view(["POST"])
 @schema(None)
 def generate_mws_layer(request):
     print("Inside generate_mws_layer")
+    import time
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        gee_account_id = request.data.get("gee_account_id")
-        mws_layer.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+        Pan_India_MWS = request.data.get("Pan_India_MWS", None)
+
+        # SYNC — direct call, no Celery
+        asset_id = mws_layer_sync(
+            state=state,
+            district=district,
+            block=block,
+            Pan_India_MWS=Pan_India_MWS,
         )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "MWS layer completed",
+            "execution_id": execution_id,
+            "node_type": "MWS_Layer",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        })
     except Exception as e:
         print("Exception in generate_mws_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response(
+            {"status": "failed", "message": str(e), "node_type": "MWS_Layer"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 @api_security_check(allowed_methods="POST")
 @schema(None)

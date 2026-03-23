@@ -30,6 +30,76 @@ from utilities.gee_utils import (
 from computing.utils import save_layer_info_to_db
 
 
+
+def mws_layer_sync(state, district, block, Pan_India_MWS=None):
+    """
+    STACD corestack-lite sync version of mws_layer.
+    No Celery. Accepts Pan_India_MWS as parameter instead of hardcoding.
+    Returns asset_id (filtered_mws_uid) directly.
+    GeoServer sync kept — MWS is a vector, no GCS needed.
+    """
+    ee_initialize()
+    description = (
+        "filtered_mws_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_uid"
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
+    layer_name = (
+        f"mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+    )
+
+    if not is_gee_asset_exists(asset_id):
+        # Use passed Pan_India_MWS param or fall back to hardcoded path
+        pan_india_mws_path = (
+            Pan_India_MWS
+            if Pan_India_MWS is not None
+            else GEE_DATASET_PATH + "/hydrological_boundaries/microwatershed"
+        )
+        mwses_uid_fc = ee.FeatureCollection(pan_india_mws_path)
+
+        admin_boundary = ee.FeatureCollection(
+            get_gee_asset_path(state, district, block)
+            + "admin_boundary_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+        )
+        filtered_mws_block_uid = mwses_uid_fc.filterBounds(admin_boundary.geometry())
+
+        task_id = export_vector_asset_to_gee(
+            filtered_mws_block_uid, description, asset_id
+        )
+        mws_task_id_list = check_task_status([task_id])
+        print("mws_task_id_list", mws_task_id_list)
+
+    if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="MWS",
+            algorithm_version="1.2",
+        )
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(
+            fc,
+            state,
+            layer_name,
+            "mws",
+        )
+
+        if res and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag is updated")
+
+    return asset_id  # only change from original — was: return layer_generated
+
 @app.task(bind=True)
 def mws_layer(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
