@@ -65,32 +65,53 @@ def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
 #     except Exception as e:
 #         print("Exception in gee connection", e)
 
+# CoreStack-lite GCS Config Function
+def gcs_config():
+    """
+    STACD/corestack-lite version of gcs_config.
+    Uses Application Default Credentials (ADC) instead of DB-stored service account.
+    Run 'gcloud auth application-default login --no-launch-browser' to set up ADC.
+    Anyone setting up corestack-lite locally needs to run this once.
+    """
+    from google.auth import default as google_auth_default
 
-def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
-    from google.oauth2 import service_account
-
-    # # Authenticate Earth Engine
-    # ee_initialize()
-
-    # Authenticate Google Cloud Storage
-    account = GEEAccount.objects.get(pk=gee_account_id)
-    key_dict = json.loads(account.get_credentials().decode("utf-8"))
-    credentials = service_account.Credentials.from_service_account_info(
-        key_dict,
+    credentials, project = google_auth_default(
         scopes=[
-            "https://www.googleapis.com/auth/earthengine",
             "https://www.googleapis.com/auth/devstorage.full_control",
-        ],
+        ]
     )
-
-    # Create Storage Client
-    storage_client = storage.Client(credentials=credentials)
-
-    # Verify access
+    storage_client = storage.Client(credentials=credentials, project=project)
     bucket = storage_client.bucket(GCS_BUCKET_NAME)
     return bucket
 
-    # print(list(bucket.list_blobs()))
+
+
+# CoreStack GCS Config Function
+# def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
+#     from google.oauth2 import service_account
+
+#     # # Authenticate Earth Engine
+#     # ee_initialize()
+
+#     # Authenticate Google Cloud Storage
+#     account = GEEAccount.objects.get(pk=gee_account_id)
+#     key_dict = json.loads(account.get_credentials().decode("utf-8"))
+#     credentials = service_account.Credentials.from_service_account_info(
+#         key_dict,
+#         scopes=[
+#             "https://www.googleapis.com/auth/earthengine",
+#             "https://www.googleapis.com/auth/devstorage.full_control",
+#         ],
+#     )
+
+#     # Create Storage Client
+#     storage_client = storage.Client(credentials=credentials)
+
+#     # Verify access
+#     bucket = storage_client.bucket(GCS_BUCKET_NAME)
+#     return bucket
+
+#     # print(list(bucket.list_blobs()))
 
 
 def download_gee_layer(state, district, block):
@@ -671,7 +692,8 @@ def upload_shp_to_gee(
             upload_file_to_gcs(component_path, dest_blob)
 
     # GCS URI to the shapefile
-    gcs_uri = f"gs://core_stack/{gcs_blob_name}"
+    # gcs_uri = f"gs://core_stack/{gcs_blob_name}"
+    gcs_uri = f"gs://{GCS_BUCKET_NAME}/{gcs_blob_name}"
 
     # Upload from GCS to GEE
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id)

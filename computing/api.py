@@ -47,6 +47,7 @@ from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster_sync
 
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
+from .misc.admin_boundary import generate_tehsil_shape_file_data_sync
 from .misc.nrega import clip_nrega_district_block
 from computing.change_detection.change_detection import get_change_detection
 from .lulc.lulc_v3 import clip_lulc_v3
@@ -82,26 +83,62 @@ from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 
-
-@api_security_check(allowed_methods="POST")
+# Admin Boundary
+# @api_security_check(allowed_methods="POST")
+# @schema(None)
+# def generate_admin_boundary(request):
+#     print("Inside generate_block_layer API.")
+#     try:
+#         state = request.data.get("state").lower()
+#         district = request.data.get("district").lower()
+#         block = request.data.get("block").lower()
+#         gee_account_id = request.data.get("gee_account_id")
+#         generate_tehsil_shape_file_data.apply_async(
+#             args=[state, district, block, gee_account_id], queue="nrm"
+#         )
+#         return Response(
+#             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+#         )
+#     except Exception as e:
+#         print("Exception in generate_block_layer api :: ", e)
+#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+@api_view(["POST"])
 @schema(None)
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
+    import time
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
-        generate_tehsil_shape_file_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        # SYNC — direct call, no Celery
+        asset_id = generate_tehsil_shape_file_data_sync(
+            state=state,
+            district=district,
+            block=block,
         )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+
+        # TODO: Replace hardcoded stac_spec with build_stac_spec() call
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Admin boundary completed",
+            "execution_id": execution_id,
+            "node_type": "Admin_Boundary",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        })
     except Exception as e:
         print("Exception in generate_block_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response(
+            {"status": "failed", "message": str(e), "node_type": "Admin_Boundary"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 @api_security_check(allowed_methods="POST")
 @schema(None)

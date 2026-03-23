@@ -40,19 +40,35 @@ import zipfile
 from datetime import datetime, timedelta
 
 
+# def generate_shape_files(path):
+
+#     gdf = gpd.read_file(path + ".json")
+#     if os.path.exists(path):
+#         path = path.split("/")[:-1]
+#         path = os.path.join(*path)
+#         shutil.rmtree(path)
+
+#     gdf.to_file(
+#         path,
+#         driver="ESRI Shapefile",
+#     )
+#     return path
+
 def generate_shape_files(path):
 
     gdf = gpd.read_file(path + ".json")
+    # Remove only the target directory, not the parent
     if os.path.exists(path):
-        path = path.split("/")[:-1]
-        path = os.path.join(*path)
-        shutil.rmtree(path)
+        shutil.rmtree(path)          # was: path = path.split("/")[:-1] then rmtree parent
 
     gdf.to_file(
         path,
         driver="ESRI Shapefile",
     )
     return path
+
+
+
 
 
 def convert_to_zip(dir_name, file_type):
