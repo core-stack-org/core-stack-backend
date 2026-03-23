@@ -9,11 +9,13 @@ https://docs.djangoproject.com/en/4.2/howto/deployment/wsgi/
 
 import os
 import site
+from pathlib import Path
 import environ
 from django.core.wsgi import get_wsgi_application
 
 env = environ.Env()
-environ.Env.read_env()
+ENV_FILE = Path(__file__).resolve().parent / ".env"
+environ.Env.read_env(str(ENV_FILE))
 
 DEBUG = env("DEBUG")
 
