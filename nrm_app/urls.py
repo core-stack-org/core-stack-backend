@@ -30,7 +30,7 @@ schema_view = get_schema_view(
         description="CoRE Stack API",
         terms_of_service="",
         contact=openapi.Contact(email="support@core-stack.org"),
-        license=openapi.License(name=""),
+        license=openapi.License(name="CC BY 4.0"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
