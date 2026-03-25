@@ -192,3 +192,43 @@ class InstallScriptTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "yes")
+
+    def test_installer_managed_paths_are_rewritten_to_backend_dir_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            env_file = Path(tmp_dir) / ".env"
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "BACKEND_DIR=/tmp/backend",
+                        "DEPLOYMENT_DIR=/tmp/backend",
+                        "TMP_LOCATION=/tmp/backend/tmp",
+                        "WHATSAPP_MEDIA_PATH=/tmp/backend/bot_interface/whatsapp_media",
+                        "EXCEL_DIR=/tmp/backend/data/excel_files",
+                        "EXCEL_PATH=/tmp/backend",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_bash(
+                textwrap.dedent(
+                    f"""
+                    source "{INSTALL_SCRIPT}"
+                    maybe_set_installer_managed_path_value "{env_file}" "BACKEND_DIR" "/tmp/backend" "." "."
+                    maybe_set_installer_managed_path_value "{env_file}" "DEPLOYMENT_DIR" "/tmp/backend" "." '$BACKEND_DIR'
+                    maybe_set_installer_managed_path_value "{env_file}" "TMP_LOCATION" "/tmp/backend/tmp" "tmp" '$BACKEND_DIR/tmp'
+                    maybe_set_installer_managed_path_value "{env_file}" "WHATSAPP_MEDIA_PATH" "/tmp/backend/bot_interface/whatsapp_media" "bot_interface/whatsapp_media" '$BACKEND_DIR/bot_interface/whatsapp_media'
+                    maybe_set_installer_managed_path_value "{env_file}" "EXCEL_DIR" "/tmp/backend/data/excel_files" "data/excel_files" '$BACKEND_DIR/data/excel_files'
+                    maybe_set_installer_managed_path_value "{env_file}" "EXCEL_PATH" "/tmp/backend" "." '$BACKEND_DIR'
+                    cat "{env_file}"
+                    """
+                )
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('BACKEND_DIR="."', result.stdout)
+            self.assertIn('DEPLOYMENT_DIR="$BACKEND_DIR"', result.stdout)
+            self.assertIn('TMP_LOCATION="$BACKEND_DIR/tmp"', result.stdout)
+            self.assertIn('WHATSAPP_MEDIA_PATH="$BACKEND_DIR/bot_interface/whatsapp_media"', result.stdout)
+            self.assertIn('EXCEL_DIR="$BACKEND_DIR/data/excel_files"', result.stdout)
+            self.assertIn('EXCEL_PATH="$BACKEND_DIR"', result.stdout)
