@@ -192,6 +192,7 @@ The installation script automatically performs the following:
 | Static Files | Runs `collectstatic` |
 | Migrations | Runs database migrations |
 | GEE Import | Optionally stages GEE JSONs into `data/gee_confs/` and imports them |
+| Admin Boundary | Downloads and normalizes the admin-boundary dataset into `data/admin-boundary/` |
 | Validation | Runs `computing/misc/internal_api_initialisation_test.py` |
 
 ### 2.5 Script Output
@@ -204,6 +205,111 @@ Activate env: conda activate corestackenv
 
 ⚠️  IMPORTANT: Review and update the .env file at /path/to/core-stack-backend/nrm_app/.env
    with your actual credentials before running in production.
+```
+
+### 2.6 Run Specific Installer Steps
+
+The installer now supports direct step selection without the old 30-second confirmation pauses:
+
+```bash
+# Show available steps
+bash installation/install.sh --list-steps
+
+# Start from a later step
+bash installation/install.sh --from gee_configuration
+
+# Run only the validation step
+bash installation/install.sh --only initialisation_check
+
+# Run the remote/public API smoke test only
+bash installation/install.sh --only public_api_check
+
+# Skip the large admin-boundary download on a partial rerun
+bash installation/install.sh --from env_file --skip admin_boundary_data
+
+# Run non-interactively with a known GEE JSON path
+bash installation/install.sh --gee-json /full/path/to/service-account.json
+
+# Use the generic optional-input mechanism
+bash installation/install.sh --input gee_json=/full/path/to/service-account.json
+
+# Queue public API credentials and the public host in the same run
+bash installation/install.sh \
+  --input public_api_key=your-public-api-key \
+  --input public_api_base_url=https://geoserver.core-stack.org/api/v1
+
+# Queue GeoServer publish settings for the internal initialization check too
+bash installation/install.sh \
+  --input geoserver_url=https://maps.example.com/geoserver \
+  --input geoserver_username=admin \
+  --input geoserver_password=your-password
+```
+
+When you run the installer interactively, it now prints the supported optional inputs up front and lets you enter either `KEY=VALUE` pairs or CLI-style values such as `--gee-json /path/to/file.json` before the step pipeline starts. This is meant to make post-install reruns easy too: future optional inputs can be added to the installer without changing the overall flow.
+
+The installer currently understands these optional inputs:
+
+- `gee_json`
+- `public_api_key`
+- `public_api_base_url`
+- `geoserver_url`
+- `geoserver_username`
+- `geoserver_password`
+
+If `PUBLIC_API_X_API_KEY` and `PUBLIC_API_BASE_URL` are configured in `nrm_app/.env`, the installer can also run the `public_api_check` step, which exercises two real public APIs against the Assam sample `assam / cachar / lakhipur`.
+If `GEOSERVER_URL`, `GEOSERVER_USERNAME`, and `GEOSERVER_PASSWORD` are present, the internal initialization check can also verify the GeoServer-backed publish path instead of stopping with a configuration warning.
+
+### 2.7 Public API Download Helper
+
+Use [`installation/public_api_client.py`](/mnt/y/core-stack-org/backend-test-2/installation/public_api_client.py) directly to fetch public API metadata, layer download URLs, tehsil payloads, village geometries, MWS geometries, and per-MWS payloads for one location. The client is standard-library only, so it does not depend on `install.sh`, `corestackenv`, or any third-party pip package.
+
+```bash
+# Download everything for a known tehsil
+python installation/public_api_client.py download \
+  --state assam \
+  --district cachar \
+  --tehsil lakhipur
+
+# Resolve the tehsil from a point first, then download the data
+python installation/public_api_client.py download \
+  --latitude 24.79 \
+  --longitude 92.79
+
+# Metadata-only run for a quick inspection
+python installation/public_api_client.py download \
+  --state assam \
+  --district cachar \
+  --tehsil lakhipur \
+  --metadata-only
+```
+
+The client reads `PUBLIC_API_X_API_KEY` and `PUBLIC_API_BASE_URL` from `nrm_app/.env` by default, but you can also run it with `--api-key` and `--base-url` directly if you have not run the installer.
+
+Examples:
+
+```bash
+# Minimal installer-friendly smoke test
+python installation/public_api_client.py smoke-test
+
+# Validate names against active locations and show closest matches
+python installation/public_api_client.py resolve \
+  --state bihar \
+  --district jamu \
+  --tehsil jami
+
+# Download selected raster layers for one tehsil
+python installation/public_api_client.py download \
+  --state assam \
+  --district cachar \
+  --tehsil lakhipur \
+  --streams layer_catalog,layers \
+  --layer-types raster
+
+# Run fully standalone without any local .env file
+python installation/public_api_client.py \
+  --api-key your-public-api-key \
+  --base-url https://geoserver.core-stack.org/api/v1 \
+  smoke-test
 ```
 
 ---
@@ -242,6 +348,10 @@ EMAIL_HOST_PASSWORD=your-email-password
 GEOSERVER_URL=https://geoserver.example.com/geoserver
 GEOSERVER_USERNAME=admin
 GEOSERVER_PASSWORD=your-geoserver-password
+
+# Public API helper scripts
+PUBLIC_API_X_API_KEY=your-public-api-key
+PUBLIC_API_BASE_URL=https://geoserver.core-stack.org/api/v1
 
 # Google Earth Engine
 GEE_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-service-account-key.json
