@@ -13,11 +13,23 @@ import traceback
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+for env_name in (
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "BLIS_NUM_THREADS",
+    "GOTO_NUM_THREADS",
+):
+    os.environ.setdefault(env_name, "1")
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
 
@@ -63,9 +75,8 @@ def format_sample_location(sample: SampleLocation) -> str:
 
 def normalize_path(path: str) -> str:
     path = path.replace("\\.", ".").replace("\\", "")
-    path = path.replace("^", "").replace("$", "").replace("?", "")
+    path = path.replace("^", "").replace("$", "")
     path = re.sub(r"\(\?P<format>[^)]+\)", "json", path)
-    path = re.sub(r"<(?P<name>[^:>]+)>", lambda match: sample_value(match.group("name")), path)
     path = re.sub(
         r"\(\?P<(?P<name>[^>]+)>[^)]+\)",
         lambda match: sample_value(match.group("name")),
@@ -76,6 +87,8 @@ def normalize_path(path: str) -> str:
         lambda match: sample_value(match.group("name"), match.group("kind")),
         path,
     )
+    path = re.sub(r"<(?P<name>[^:>]+)>", lambda match: sample_value(match.group("name")), path)
+    path = path.replace("?", "")
     path = re.sub(r"/+", "/", path)
     if not path.startswith("/"):
         path = f"/{path}"
@@ -178,6 +191,18 @@ def run_configuration_checks(require_gee: bool) -> list[CheckResult]:
                 )
             )
 
+    geoserver_url = str(getattr(settings, "GEOSERVER_URL", "")).strip()
+    if geoserver_url:
+        results.append(CheckResult("PASS", "GEOSERVER_URL", geoserver_url))
+    else:
+        results.append(
+            CheckResult(
+                "WARN",
+                "GEOSERVER_URL",
+                "Value is blank. GeoServer-backed publish and download flows will fail.",
+            )
+        )
+
     return results
 
 
@@ -249,6 +274,67 @@ def run_gcs_upload_probe(require_gee: bool) -> CheckResult:
         "Uploaded a temporary object to "
         f"gs://{probe_result['bucket_name']}/{probe_result['blob_name']} using "
         f"{probe_result['service_account_email']}. {probe_result['detail']}",
+    )
+
+
+def run_geoserver_probe() -> CheckResult:
+    import requests
+    from django.conf import settings
+
+    geoserver_url = str(getattr(settings, "GEOSERVER_URL", "")).strip()
+    geoserver_username = str(getattr(settings, "GEOSERVER_USERNAME", "")).strip()
+    geoserver_password = str(getattr(settings, "GEOSERVER_PASSWORD", "")).strip()
+
+    if not geoserver_url:
+        return CheckResult(
+            "WARN",
+            "geoserver-probe",
+            "Skipped because GEOSERVER_URL is blank. The first computing API publishes "
+            "artifacts to GeoServer after local shapefile generation.",
+        )
+
+    parsed = urlparse(geoserver_url)
+    if not parsed.scheme or not parsed.netloc:
+        return CheckResult(
+            "FAIL",
+            "geoserver-probe",
+            f"GEOSERVER_URL is invalid: {geoserver_url!r}. Use a full URL such as "
+            "'https://host/geoserver'.",
+        )
+
+    if not geoserver_username or not geoserver_password:
+        return CheckResult(
+            "WARN",
+            "geoserver-probe",
+            "GEOSERVER_USERNAME or GEOSERVER_PASSWORD is blank. GeoServer publish flows "
+            "will fail until REST credentials are configured.",
+        )
+
+    probe_url = f"{geoserver_url.rstrip('/')}/rest/about/version.json"
+    try:
+        response = requests.get(
+            probe_url,
+            auth=(geoserver_username, geoserver_password),
+            timeout=10,
+        )
+    except Exception as exc:
+        return CheckResult(
+            "WARN",
+            "geoserver-probe",
+            f"GeoServer REST probe failed for {probe_url}: {exc}",
+        )
+
+    if response.status_code == 200:
+        return CheckResult(
+            "PASS",
+            "geoserver-probe",
+            f"GeoServer REST is reachable at {probe_url}.",
+        )
+
+    return CheckResult(
+        "WARN",
+        "geoserver-probe",
+        f"GeoServer REST returned HTTP {response.status_code} for {probe_url}.",
     )
 
 
@@ -441,7 +527,10 @@ def discover_admin_boundary_sample() -> SampleLocation | None:
 
 
 def run_admin_boundary_compute_check() -> tuple[CheckResult, SampleLocation | None]:
-    from computing.misc.admin_boundary import clip_block_from_admin_boundary
+    import shutil
+
+    from computing.misc.admin_boundary import clip_block_from_admin_boundary, create_shp_files
+    from utilities.gee_utils import valid_gee_text
 
     sample = discover_admin_boundary_sample()
     if sample is None:
@@ -486,12 +575,74 @@ def run_admin_boundary_compute_check() -> tuple[CheckResult, SampleLocation | No
             sample,
         )
 
+    state_dir_path = Path(state_dir)
+    if not state_dir_path.is_absolute():
+        state_dir_path = ROOT_DIR / state_dir_path
+
+    output_prefix = (
+        f"{valid_gee_text(sample.district.lower())}_"
+        f"{valid_gee_text(sample.block.lower())}"
+    )
+    output_json = state_dir_path / f"{output_prefix}.json"
+    output_shape_dir = state_dir_path / output_prefix
+    expected_shape_parts = [
+        output_shape_dir / f"{output_prefix}.shp",
+        output_shape_dir / f"{output_prefix}.shx",
+        output_shape_dir / f"{output_prefix}.dbf",
+    ]
+
+    if output_json.exists():
+        output_json.unlink()
+    if output_shape_dir.is_dir():
+        shutil.rmtree(output_shape_dir)
+
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            create_shp_files(collection, state_dir, sample.district, sample.block, None)
+    except Exception as exc:
+        return (
+            CheckResult(
+                "FAIL",
+                "admin-boundary-compute",
+                "Local admin-boundary compute built features, but artifact generation "
+                f"failed for {format_sample_location(sample)}: {exc}",
+            ),
+            sample,
+        )
+
+    output_json_ready = output_json.exists()
+    output_shape_dir_ready = output_shape_dir.is_dir()
+    shape_parts_ready = all(path.exists() for path in expected_shape_parts)
+    if not (output_json_ready and output_shape_dir_ready and shape_parts_ready):
+        missing_artifacts = []
+        if not output_json_ready:
+            missing_artifacts.append(str(output_json.relative_to(ROOT_DIR)))
+        if not output_shape_dir_ready:
+            missing_artifacts.append(str(output_shape_dir.relative_to(ROOT_DIR)))
+        if not shape_parts_ready:
+            missing_artifacts.extend(
+                str(path.relative_to(ROOT_DIR))
+                for path in expected_shape_parts
+                if not path.exists()
+            )
+        return (
+            CheckResult(
+                "FAIL",
+                "admin-boundary-compute",
+                "Local admin-boundary compute returned features, but did not leave the "
+                "expected output artifacts. Missing: "
+                + ", ".join(dict.fromkeys(missing_artifacts)),
+            ),
+            sample,
+        )
+
     return (
         CheckResult(
             "PASS",
             "admin-boundary-compute",
             f"Built {len(features)} features for {format_sample_location(sample)} using "
-            f"{sample.source_file.relative_to(ROOT_DIR)}. Output directory: {state_dir}",
+            f"{sample.source_file.relative_to(ROOT_DIR)}. Artifacts verified under "
+            f"{state_dir_path.relative_to(ROOT_DIR)}",
         ),
         sample,
     )
@@ -501,7 +652,10 @@ def run_first_computing_api_check(
     require_gee: bool,
     sample: SampleLocation | None,
     gcs_upload_result: CheckResult,
+    geoserver_result: CheckResult,
 ) -> CheckResult:
+    import shutil
+
     from django.conf import settings
     from django.test import Client
     from nrm_app.celery import app
@@ -538,6 +692,16 @@ def run_first_computing_api_check(
             "`gcs-upload-probe` first, then rerun this initialisation test.",
         )
 
+    if geoserver_result.level != "PASS":
+        level = "FAIL" if require_gee else "WARN"
+        return CheckResult(
+            level,
+            "first-computing-api",
+            "Skipped full POST /api/v1/generate_block_layer/ execution because the "
+            "GeoServer publish path is not ready yet. Fix `geoserver-probe` first, "
+            "then rerun this initialisation test.",
+        )
+
     jwt_headers, _api_key_headers, api_key_obj = build_auth_headers()
     if not jwt_headers:
         if api_key_obj is not None:
@@ -563,6 +727,11 @@ def run_first_computing_api_check(
         output_shape_dir / f"{output_prefix}.shx",
         output_shape_dir / f"{output_prefix}.dbf",
     ]
+
+    if output_json.exists():
+        output_json.unlink()
+    if output_shape_dir.is_dir():
+        shutil.rmtree(output_shape_dir)
 
     payload = {
         "state": sample.state,
@@ -650,6 +819,7 @@ def build_next_step_guidance(
     auth_result: CheckResult,
     gee_probe_result: CheckResult,
     gcs_upload_result: CheckResult,
+    geoserver_result: CheckResult,
     admin_boundary_result: CheckResult,
     first_api_result: CheckResult,
 ) -> CheckResult:
@@ -700,6 +870,15 @@ def build_next_step_guidance(
             "by `/api/v1/generate_block_layer/`. Grant bucket write access "
             "(`storage.objects.create`, and ideally `storage.objects.delete` for probe cleanup) "
             "to the same service account, then rerun the initialisation test.",
+        )
+
+    if geoserver_result.level != "PASS":
+        return CheckResult(
+            "FAIL",
+            "setup-next-step",
+            "Earth Engine and GCS are ready, but GeoServer publish settings are not. "
+            "Set `GEOSERVER_URL`, `GEOSERVER_USERNAME`, and `GEOSERVER_PASSWORD` to a "
+            "reachable GeoServer REST endpoint, then rerun the initialisation test.",
         )
 
     if first_api_result.level != "PASS":
@@ -761,6 +940,9 @@ def main() -> int:
     gcs_upload_result = run_gcs_upload_probe(require_gee=args.require_gee)
     print_result(gcs_upload_result)
 
+    geoserver_result = run_geoserver_probe()
+    print_result(geoserver_result)
+
     auth_result = run_auth_probe()
     print_result(auth_result)
 
@@ -771,6 +953,7 @@ def main() -> int:
         require_gee=args.require_gee,
         sample=sample,
         gcs_upload_result=gcs_upload_result,
+        geoserver_result=geoserver_result,
     )
     print_result(first_api_result)
 
@@ -804,6 +987,7 @@ def main() -> int:
         auth_result=auth_result,
         gee_probe_result=gee_probe_result,
         gcs_upload_result=gcs_upload_result,
+        geoserver_result=geoserver_result,
         admin_boundary_result=admin_boundary_result,
         first_api_result=first_api_result,
     )
