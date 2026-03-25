@@ -48,8 +48,8 @@ declare -A OPTIONAL_INPUT_VALUES=()
 ENV_DB_NAME="$POSTGRES_DB"
 ENV_DB_USER="$POSTGRES_USER"
 ENV_DB_PASSWORD="$POSTGRES_PASSWORD"
-ENV_DEPLOYMENT_DIR="$BACKEND_DIR"
-ENV_TMP_LOCATION="$BACKEND_DIR/tmp"
+ENV_DEPLOYMENT_DIR='$BACKEND_DIR'
+ENV_TMP_LOCATION='$BACKEND_DIR/tmp'
 
 STEP_ORDER=(
     "unzip_install"
@@ -797,6 +797,21 @@ function current_env_value() {
     strip_wrapping_quotes "$value"
 }
 
+function maybe_set_installer_managed_path_value() {
+    local env_file="$1"
+    local key="$2"
+    local legacy_absolute="$3"
+    local legacy_relative="$4"
+    local managed_value="$5"
+    local current_value=""
+
+    current_value="$(current_env_value "$env_file" "$key")"
+
+    if [ -z "$current_value" ] || [ "$current_value" = "$legacy_absolute" ] || [ "$current_value" = "$legacy_relative" ] || [ "$current_value" = "$managed_value" ]; then
+        set_env_value "$env_file" "$key" "$managed_value"
+    fi
+}
+
 function generate_fernet_key() {
     activate_conda_env
     python - <<'PY'
@@ -883,12 +898,15 @@ function generate_env_file() {
 
         case "$var_name" in
             WHATSAPP_MEDIA_PATH)
-                echo "WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media" >> "$env_file"
+                echo 'WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media' >> "$env_file"
                 mkdir -p "$BACKEND_DIR/bot_interface/whatsapp_media"
                 ;;
             EXCEL_DIR)
-                echo "EXCEL_DIR=$BACKEND_DIR/data/excel_files" >> "$env_file"
+                echo 'EXCEL_DIR=$BACKEND_DIR/data/excel_files' >> "$env_file"
                 mkdir -p "$BACKEND_DIR/data/excel_files"
+                ;;
+            EXCEL_PATH)
+                echo 'EXCEL_PATH=$BACKEND_DIR' >> "$env_file"
                 ;;
             *)
                 echo "${var_name}=\"\"" >> "$env_file"
@@ -896,17 +914,31 @@ function generate_env_file() {
         esac
     done <<< "$all_vars"
 
+    if ! grep -q '^BACKEND_DIR=' "$env_file"; then
+        echo 'BACKEND_DIR=.' >> "$env_file"
+    fi
+
     if ! grep -q '^EXCEL_DIR=' "$env_file"; then
-        echo "EXCEL_DIR=$BACKEND_DIR/data/excel_files" >> "$env_file"
+        echo 'EXCEL_DIR=$BACKEND_DIR/data/excel_files' >> "$env_file"
         mkdir -p "$BACKEND_DIR/data/excel_files"
     fi
 
     if ! grep -q '^WHATSAPP_MEDIA_PATH=' "$env_file"; then
-        echo "WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media" >> "$env_file"
+        echo 'WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media' >> "$env_file"
         mkdir -p "$BACKEND_DIR/bot_interface/whatsapp_media"
     fi
 
+    if ! grep -q '^EXCEL_PATH=' "$env_file"; then
+        echo 'EXCEL_PATH=$BACKEND_DIR' >> "$env_file"
+    fi
+
     apply_env_overrides "$env_file"
+    maybe_set_installer_managed_path_value "$env_file" "BACKEND_DIR" "$BACKEND_DIR" "." "."
+    maybe_set_installer_managed_path_value "$env_file" "DEPLOYMENT_DIR" "$BACKEND_DIR" "." '$BACKEND_DIR'
+    maybe_set_installer_managed_path_value "$env_file" "TMP_LOCATION" "$BACKEND_DIR/tmp" "tmp" '$BACKEND_DIR/tmp'
+    maybe_set_installer_managed_path_value "$env_file" "WHATSAPP_MEDIA_PATH" "$BACKEND_DIR/bot_interface/whatsapp_media" "bot_interface/whatsapp_media" '$BACKEND_DIR/bot_interface/whatsapp_media'
+    maybe_set_installer_managed_path_value "$env_file" "EXCEL_DIR" "$BACKEND_DIR/data/excel_files" "data/excel_files" '$BACKEND_DIR/data/excel_files'
+    maybe_set_installer_managed_path_value "$env_file" "EXCEL_PATH" "$BACKEND_DIR" "." '$BACKEND_DIR'
     set_env_value "$env_file" "PUBLIC_API_BASE_URL" "$(normalize_public_api_base_url "${PUBLIC_API_BASE_URL_ARG:-$(current_env_value "$env_file" "PUBLIC_API_BASE_URL")}")"
     if [ -z "$(current_env_value "$env_file" "PUBLIC_API_BASE_URL")" ]; then
         set_env_value "$env_file" "PUBLIC_API_BASE_URL" "$DEFAULT_PUBLIC_API_BASE_URL"

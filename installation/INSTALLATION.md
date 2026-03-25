@@ -358,6 +358,12 @@ GEE_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-service-account-key.json
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-helper-key.json
 GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH=data/gee_confs/your-datasets-key.json
 
+# Local project paths anchored to BACKEND_DIR
+BACKEND_DIR=.
+EXCEL_DIR=$BACKEND_DIR/data/excel_files
+EXCEL_PATH=$BACKEND_DIR
+WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media
+
 # S3 Settings (Not essential for local storage)
 S3_BUCKET=your-bucket-name
 S3_REGION=ap-south-1
@@ -374,8 +380,8 @@ DPR_S3_REGION=ap-south-1
 # Other Services (As per need)
 AUTH_TOKEN_360=your-360dialog-token
 FERNET_KEY=your-fernet-key
-TMP_LOCATION=/tmp
-DEPLOYMENT_DIR=/path/to/core-stack-backend
+TMP_LOCATION=$BACKEND_DIR/tmp
+DEPLOYMENT_DIR=$BACKEND_DIR
 ```
 
 ### 3.2 GEE Account Setup
