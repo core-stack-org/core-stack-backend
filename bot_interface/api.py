@@ -719,7 +719,7 @@ def download_image(app_instance_config_id, mime_type, media_id):
     BSP_URL, HEADERS, namespace = bot_interface.auth.get_bsp_url_headers(
         bot_instance_id=app_instance_config_id
     )
-    filepath = WHATSAPP_MEDIA_PATH + media_id + ".jpg"
+    filepath = os.path.join(WHATSAPP_MEDIA_PATH, f"{media_id}.jpg")
     url = BSP_URL.split("v24.0")[0] + "v24.0" + "/" + media_id
     print("url :: ", url)
     r = requests.get(url, headers=HEADERS)
@@ -932,7 +932,7 @@ def download_media_from_url(app_instance_config_id, media_response):
         print("extension :: ", extension)
         print("WHATSAPP_MEDIA_PATH :: ", WHATSAPP_MEDIA_PATH)
         # assert False
-        filepath = f"{WHATSAPP_MEDIA_PATH}{media_id}.{extension}"
+        filepath = os.path.join(WHATSAPP_MEDIA_PATH, f"{media_id}.{extension}")
         print("filepath in download_media_from_url function :: ", filepath)
 
         # Download file

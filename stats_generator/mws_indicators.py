@@ -53,16 +53,12 @@ def generate_mws_data_for_kyl_filters(
 ):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = (
-        EXCEL_PATH
-        + "data/stats_excel_files/"
-        + state_folder
-        + "/"
-        + district_folder
-        + "/"
-        + district
-        + "_"
-        + block
+    file_xl_path = os.path.join(
+        EXCEL_PATH,
+        "data/stats_excel_files",
+        state_folder,
+        district_folder,
+        f"{district}_{block}",
     )
     if regenerate:
         file_path = None
@@ -885,16 +881,12 @@ def generate_mws_data_for_kyl_filters(
 def get_mws_KYL_filter_data(state, district, block, file_type):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = (
-        EXCEL_PATH
-        + "data/stats_excel_files/"
-        + state_folder
-        + "/"
-        + district_folder
-        + "/"
-        + district
-        + "_"
-        + block
+    file_xl_path = os.path.join(
+        EXCEL_PATH,
+        "data/stats_excel_files",
+        state_folder,
+        district_folder,
+        f"{district}_{block}",
     )
 
     file_path = None
