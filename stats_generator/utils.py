@@ -477,10 +477,14 @@ def create_excel_for_aquifer(data, writer):
 
     for feature in features:
         properties = feature["properties"]
+        if properties.get("aquifer_class", "") == "Hard-Rock":
+            aquifer_class = "Hard Rock"
+        else:
+            aquifer_class = "Alluvium"
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "aquifer_class": properties.get("aquifer_class", ""),
+            "aquifer_class": aquifer_class,
             "principle_aq_Alluvium_percent": properties.get(
                 "principle_aq_Alluvium_percent", "0"
             ),
