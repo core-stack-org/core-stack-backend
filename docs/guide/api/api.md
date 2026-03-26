@@ -1396,3 +1396,339 @@ Below are ASCII diagrams showing the permission hierarchy and capabilities for d
 | View global watershed plans  | ✓          | ✗         | ✗               | ✗        |
 | View org watershed plans     | ✓          | ✗         | ✗               | ✗        |
 | Filter plans by geography    | ✓          | ✗         | ✗               | ✗        |
+
+## DPR (Detailed Project Report) Data API
+
+These endpoints expose the data that powers each section of the DPR document for a given watershed plan. All endpoints are read-only (`GET`).
+
+**Base URL pattern**: `/api/v1/dpr_data/{plan_id}/`
+
+**Authentication**: Every endpoint accepts **either** of the following:
+
+| Method | Header | Example |
+|--------|--------|---------|
+| JWT Bearer token | `Authorization: Bearer <token>` | Obtained from `/api/v1/auth/token/` |
+| API Key | `X-API-Key: <key>` | Issued from the admin panel (`UserAPIKey`) |
+
+If neither credential is provided, or if the credential is invalid, the endpoint returns `401 Unauthorized`.
+
+**Pagination**: Endpoints that return lists support `PageNumberPagination`.
+- Default page size: `50`
+- Override with `?page_size=<n>` (max `200`)
+- Response shape for paginated endpoints:
+  ```json
+  {
+    "count": 87,
+    "next": "...?page=2",
+    "previous": null,
+    "results": [...]
+  }
+  ```
+
+---
+
+### Summary
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/summary/`
+- **Method**: GET
+- **Description**: Returns record counts for every section in one lightweight call. Use this to render skeleton UIs or know what data to expect before fetching sections.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Response**:
+  ```json
+  {
+    "plan_id": 42,
+    "plan_name": "Watershed Plan Jaunpur",
+    "village_name": "Rampur",
+    "sections": {
+      "settlements": 12,
+      "crops": 34,
+      "wells": 87,
+      "waterbodies": 45,
+      "maintenance": { "gw": 23, "agri": 15, "swb": 8, "swb_rs": 4 },
+      "nrm_works": { "recharge": 30, "irrigation": 22 },
+      "livelihood": 18,
+      "agrohorticulture": 7
+    }
+  }
+  ```
+
+---
+
+### Section A – Team Details
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/team-details/`
+- **Method**: GET
+- **Description**: Returns plan team metadata (organization, project, facilitator).
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Response**:
+  ```json
+  {
+    "organization": "CoRE Stack Foundation",
+    "project": "Jaunpur Watershed",
+    "plan": "Rampur Watershed Plan 2024",
+    "facilitator": "Dr. Rajesh Kumar",
+    "process": "PRA, Gram Sabha, Transect Walk, GIS Mapping"
+  }
+  ```
+
+---
+
+### Section B – Village Brief
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/village-brief/`
+- **Method**: GET
+- **Description**: Returns village-level geography and settlement count.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Response**:
+  ```json
+  {
+    "village_name": "Rampur",
+    "gram_panchayat": "Rampur GP",
+    "tehsil": "Badlapur",
+    "district": "Jaunpur",
+    "state": "Uttar Pradesh",
+    "total_settlements": 12,
+    "latitude": 25.12345678,
+    "longitude": 82.56789012
+  }
+  ```
+
+---
+
+### Section C – Settlements (Socio-Economic + MGNREGA)
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/settlements/`
+- **Method**: GET
+- **Description**: Returns one record per settlement with household demographics, caste profile, and MGNREGA data.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "settlement_id": "s_abc123",
+    "settlement_name": "Rampur Tola",
+    "number_of_households": 120,
+    "settlement_type": "Mixed Caste Group",
+    "caste_group_detail": "SC, ST, OBC",
+    "caste_counts": { "sc": "30", "st": "20", "obc": "50", "general": "20" },
+    "marginal_farmers": "45",
+    "nrega_job_applied": 80,
+    "nrega_job_card": 75,
+    "nrega_work_days": 1200,
+    "nrega_past_work": "Road construction\n\nWell digging",
+    "nrega_demand": "Pond desilting",
+    "nrega_issues": "Delayed payments",
+    "latitude": 25.1234,
+    "longitude": 82.5678
+  }
+  ```
+
+---
+
+### Section C – Crops
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/crops/`
+- **Method**: GET
+- **Description**: Returns cropping pattern data per settlement. Acreage values are converted from hectares (form input) to acres.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "crop_grid_id": "cg_xyz456",
+    "beneficiary_settlement": "Rampur Tola",
+    "irrigation_source": "Rainfed",
+    "land_classification": "Upland",
+    "kharif_crops": "Paddy Maize",
+    "kharif_acres": 12.3553,
+    "rabi_crops": "Wheat",
+    "rabi_acres": 8.6487,
+    "zaid_crops": null,
+    "zaid_acres": null,
+    "cropping_intensity": "Single crop"
+  }
+  ```
+
+---
+
+### Section C – Livestock
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/livestock/`
+- **Method**: GET
+- **Description**: Returns livestock census per settlement (from `ODK_settlement.livestock_census`).
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "settlement_id": "s_abc123",
+    "settlement_name": "Rampur Tola",
+    "goats": "45",
+    "sheep": null,
+    "cattle": "30",
+    "piggery": null,
+    "poultry": "120"
+  }
+  ```
+
+---
+
+### Section D – Wells
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/wells/`
+- **Method**: GET
+- **Description**: Returns individual well records with ownership, usage, and maintenance demand details extracted from `data_well` JSON.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "well_id": "well_abc123",
+    "beneficiary_settlement": "Rampur Tola",
+    "well_type": "Open Well",
+    "owner": "Community",
+    "beneficiary_name": "Ravi Kumar",
+    "beneficiary_father_name": "Shyam Kumar",
+    "water_availability": "Year Round",
+    "households_benefitted": 15,
+    "caste_uses": "SC",
+    "well_usage": "Irrigation",
+    "need_maintenance": "Yes",
+    "repair_activities": "Desilting",
+    "latitude": 25.1234,
+    "longitude": 82.5678
+  }
+  ```
+
+---
+
+### Section D – Waterbodies
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/waterbodies/`
+- **Method**: GET
+- **Description**: Returns individual water structure records with ownership, usage, and repair activity details extracted from `data_waterbody` JSON.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "waterbody_id": "wb_def789",
+    "beneficiary_settlement": "Rampur Tola",
+    "owner": "Community",
+    "beneficiary_name": "Sita Devi",
+    "beneficiary_father_name": "Ram Prasad",
+    "who_manages": "Gram Panchayat",
+    "caste_who_uses": "All castes",
+    "households_benefitted": 80,
+    "water_structure_type": "Check dam",
+    "usage": "Irrigation",
+    "need_maintenance": "Yes",
+    "repair_activities": "Desilting",
+    "latitude": 25.1111,
+    "longitude": 82.5555
+  }
+  ```
+
+---
+
+### Section E – Maintenance
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/maintenance/`
+- **Method**: GET
+- **Description**: Returns proposed maintenance work records. Filter by asset type using the `?type=` query parameter.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Query Parameters**:
+  - `type` (required): One of `gw` (groundwater/recharge structures), `agri` (irrigation structures), `swb` (surface water bodies), `swb_rs` (remote-sensed surface water bodies). Defaults to `gw`.
+- **Response** (`results` item):
+  ```json
+  {
+    "id": 1,
+    "demand_type": "Community Demand",
+    "beneficiary_settlement": "Rampur Tola",
+    "beneficiary_name": "Mohan Lal",
+    "beneficiary_father_name": "Hari Lal",
+    "structure_type": "Check dam",
+    "repair_activities": "Desilting",
+    "latitude": 25.1234,
+    "longitude": 82.5678
+  }
+  ```
+- **Examples**:
+  ```
+  GET /api/v1/dpr_data/42/maintenance/?type=gw      # Recharge structures
+  GET /api/v1/dpr_data/42/maintenance/?type=agri     # Irrigation structures
+  GET /api/v1/dpr_data/42/maintenance/?type=swb      # Surface water bodies
+  GET /api/v1/dpr_data/42/maintenance/?type=swb_rs   # Remote-sensed SWBs
+  ```
+
+---
+
+### Section F – NRM Works
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/nrm-works/`
+- **Method**: GET
+- **Description**: Returns proposed new NRM works combining both recharge structures (`ODK_groundwater`) and irrigation works (`ODK_agri`) in a single list. Each record includes a `work_category` discriminator.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "work_category": "Recharge Structure",
+    "demand_type": "Community Demand",
+    "work_demand": "Check dam",
+    "beneficiary_settlement": "Rampur Tola",
+    "beneficiary_name": "Geeta Devi",
+    "gender": "Female",
+    "beneficiary_father_name": "Ram Babu",
+    "latitude": 25.1234,
+    "longitude": 82.5678
+  }
+  ```
+- `work_category` values: `"Recharge Structure"` or `"Irrigation Work"`
+
+---
+
+### Section G – Livelihood
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/livelihood/`
+- **Method**: GET
+- **Description**: Returns proposed livelihood works spanning livestock, fisheries, plantations, kitchen gardens, and agrohorticulture. Each record includes a `livelihood_work` discriminator.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Response** (`results` item):
+  ```json
+  {
+    "livelihood_work": "Plantations",
+    "demand_type": "Individual Demand",
+    "work_demand": "Mango",
+    "beneficiary_settlement": "Rampur Tola",
+    "beneficiary_name": "Sunita Devi",
+    "gender": "Female",
+    "beneficiary_father_name": "Babu Lal",
+    "total_acres": "2.5",
+    "latitude": 25.1234,
+    "longitude": 82.5678
+  }
+  ```
+- `livelihood_work` values: `"Livestock"`, `"Fisheries"`, `"Plantations"`, `"Kitchen Garden"`
+
+---
+
+### DPR Data API – Quick Reference
+
+All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
+
+| Endpoint | Paginated | Data Source |
+|---|---|---|
+| `GET dpr_data/{id}/summary/` | No | All ODK models (counts only) |
+| `GET dpr_data/{id}/team-details/` | No | `PlanApp` |
+| `GET dpr_data/{id}/village-brief/` | No | `PlanApp` + `ODK_settlement` |
+| `GET dpr_data/{id}/settlements/` | Yes | `ODK_settlement` |
+| `GET dpr_data/{id}/crops/` | Yes | `ODK_crop` |
+| `GET dpr_data/{id}/livestock/` | Yes | `ODK_settlement.livestock_census` |
+| `GET dpr_data/{id}/wells/` | Yes | `ODK_well` |
+| `GET dpr_data/{id}/waterbodies/` | Yes | `ODK_waterbody` |
+| `GET dpr_data/{id}/maintenance/?type=gw\|agri\|swb\|swb_rs` | Yes | `GW_maintenance`, `Agri_maintenance`, `SWB_maintenance`, `SWB_RS_maintenance` |
+| `GET dpr_data/{id}/nrm-works/` | Yes | `ODK_groundwater` + `ODK_agri` |
+| `GET dpr_data/{id}/livelihood/` | Yes | `ODK_livelihood` + `ODK_agrohorticulture` |
