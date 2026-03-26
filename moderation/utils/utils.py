@@ -348,6 +348,8 @@ def sync_edited_updated_cropping_pattern(cp_submission):
 
     def get_crop_pattern(field_name, other_field_name):
         crops = cp_submission.get(field_name, "")
+        if isinstance(crops, list):
+            crops = " ".join(str(v) for v in crops)
         if crops and "other" in crops.lower():
             other = cp_submission.get(other_field_name, "")
             if other:
@@ -641,6 +643,8 @@ def _extract_livelihood_fields(data):
 def _extract_crop_fields(data):
     def _crop_pattern(field, other_field):
         crops = data.get(field, "")
+        if isinstance(crops, list):
+            crops = " ".join(str(v) for v in crops)
         if crops and "other" in crops.lower():
             other = data.get(other_field, "")
             if other:
