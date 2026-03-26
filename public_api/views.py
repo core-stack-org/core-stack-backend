@@ -359,16 +359,12 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
 def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = (
-        EXCEL_PATH
-        + "data/stats_excel_files/"
-        + state_folder
-        + "/"
-        + district_folder
-        + "/"
-        + district
-        + "_"
-        + tehsil
+    file_xl_path = os.path.join(
+        EXCEL_PATH,
+        "data/stats_excel_files",
+        state_folder,
+        district_folder,
+        f"{district}_{tehsil}",
     )
     json_file = file_xl_path + "_KYL_filter_data.json"
 

@@ -89,8 +89,9 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = (
-        TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = os.path.join(
+        TMP_LOCATION,
+        f"{resource_type}_{plan_id}_{block}.csv",
     )
 
     odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
@@ -142,7 +143,10 @@ def add_works(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = TMP_LOCATION + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = os.path.join(
+        TMP_LOCATION,
+        f"{work_type}_{plan_id}_{block}.csv",
+    )
 
     odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
 
