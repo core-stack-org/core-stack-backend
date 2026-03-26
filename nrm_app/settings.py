@@ -19,11 +19,28 @@ from corsheaders.defaults import default_headers
 
 
 env = environ.Env()
-
-environ.Env.read_env()
+ENV_FILE = Path(__file__).resolve().parent / ".env"
+environ.Env.read_env(str(ENV_FILE))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+os.environ.setdefault("BACKEND_DIR", str(BASE_DIR))
+
+
+def resolve_env_path(name, default="", *, trailing_sep=False):
+    raw_value = str(os.environ.get(name, default) or "").strip()
+    if not raw_value:
+        return ""
+
+    raw_value = os.path.expandvars(raw_value)
+    candidate = Path(raw_value).expanduser()
+    if not candidate.is_absolute():
+        candidate = BASE_DIR / candidate
+
+    resolved = os.path.normpath(str(candidate))
+    if trailing_sep:
+        resolved = resolved.rstrip("/\\") + os.sep
+    return resolved
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -36,13 +53,13 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = env("TMP_LOCATION")
+TMP_LOCATION = resolve_env_path("TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 AUTH_TOKEN_FB_META = env("AUTH_TOKEN_FB_META")
 ODK_PASSWORD = env("ODK_PASSWORD")
-DEPLOYMENT_DIR = env("DEPLOYMENT_DIR")
+DEPLOYMENT_DIR = resolve_env_path("DEPLOYMENT_DIR", default="$BACKEND_DIR")
 # MARK: ODK Sync Creds
 ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
 ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
@@ -284,7 +301,12 @@ ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
 MEDIA_URL = "/media/"
 
-EXCEL_PATH = env("EXCEL_PATH")
+EXCEL_PATH = resolve_env_path("EXCEL_PATH", default="$BACKEND_DIR", trailing_sep=True)
+EXCEL_DIR = resolve_env_path(
+    "EXCEL_DIR",
+    default="$BACKEND_DIR/data/excel_files",
+    trailing_sep=True,
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -388,7 +410,11 @@ ES_AUTH = env("ES_AUTH")
 CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 
 # Community Engagement API Configuration
-WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+WHATSAPP_MEDIA_PATH = resolve_env_path(
+    "WHATSAPP_MEDIA_PATH",
+    default="$BACKEND_DIR/bot_interface/whatsapp_media",
+    trailing_sep=True,
+)
 
 BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"

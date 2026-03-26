@@ -41,13 +41,13 @@ from datetime import datetime, timedelta
 
 
 def generate_shape_files(path):
-
     gdf = gpd.read_file(path + ".json")
     if os.path.exists(path):
-        path = path.split("/")[:-1]
-        path = os.path.join(*path)
+        # Only replace the target shapefile directory. Removing the parent
+        # state/workspace directory here corrupts sibling outputs on reruns.
         shutil.rmtree(path)
 
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     gdf.to_file(
         path,
         driver="ESRI Shapefile",

@@ -14,19 +14,12 @@ from scipy.spatial.distance import jensenshannon
 
 from .models import Overpass_Block_Details
 
-from nrm_app.settings import GEOSERVER_URL
-from nrm_app.settings import OVERPASS_URL
+from nrm_app.settings import EXCEL_DIR, GEOSERVER_URL, OVERPASS_URL
 from utilities.logger import setup_logger
-import environ
-
-env = environ.Env()
-# reading .env file
-environ.Env.read_env()
 
 logger = setup_logger(__name__)
 
-# TODO: fix the path issue <> shiv and ksheetiz
-DATA_DIR_TEMP = env("EXCEL_DIR")
+DATA_DIR_TEMP = EXCEL_DIR
 
 
 # ? MARK: HELPER FUNCTIONS

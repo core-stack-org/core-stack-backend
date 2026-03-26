@@ -104,8 +104,8 @@ logger = setup_logger(__name__)
 
 # MARK: Generate DPR
 @api_view(["POST"])
-@auth_free
 @schema(None)
+@auth_free
 def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
@@ -371,8 +371,8 @@ def generate_mws_report(request):
 
 
 @api_view(["GET"])
-@auth_free
 @schema(None)
+@auth_free
 def generate_resource_report(request):
     try:
         # ? district, block, plan_id
@@ -396,8 +396,8 @@ def generate_resource_report(request):
 
 
 @api_view(["GET"])
-@auth_free
 @schema(None)
+@auth_free
 def download_mws_report(request):
     # Require the usual params, but render from your external domain
     required = ("state", "district", "block", "uid")
@@ -417,10 +417,9 @@ def download_mws_report(request):
     return resp
 
 
-@api_view(["GET"])
-@auth_free
-@schema(None)
 @api_security_check(auth_type="Auth_free")
+@schema(None)
+@auth_free
 def generate_tehsil_report(request):
     try:
         # ? district, block, mwsId

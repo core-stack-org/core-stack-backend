@@ -1204,6 +1204,8 @@ def detect_url(text):
 
 
 def convert_image_hdpi(filepath):
+    import os
+
     from bot_interface.api import WHATSAPP_MEDIA_PATH
 
     image_name = filepath.split("/")[-1]
@@ -1215,7 +1217,8 @@ def convert_image_hdpi(filepath):
     img_format = img.format.lower()
     hdpi_im_key = file_identifier + "_hdpi." + img_format
     print(str(hdpi_im_key))
-    im_hdpi_file = WHATSAPP_MEDIA_PATH + "hdpi/" + hdpi_im_key
+    im_hdpi_file = os.path.join(WHATSAPP_MEDIA_PATH, "hdpi", hdpi_im_key)
+    os.makedirs(os.path.dirname(im_hdpi_file), exist_ok=True)
     print(str(im_hdpi_file))
     width_0, height_0 = img.size
     hdpi_fixed_width_in_pixel = 480
