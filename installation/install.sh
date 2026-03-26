@@ -26,12 +26,14 @@ ENV_DB_PASSWORD="$POSTGRES_PASSWORD"
 
 function install_miniconda() {
     if command -v conda &> /dev/null; then
-        echo "Conda already available ($(conda --version)). Skipping Miniconda install."
+        MINICONDA_DIR="$(conda info --base)"
+        echo "Conda already available ($(conda --version)) at $MINICONDA_DIR. Skipping Miniconda install."
         return
     fi
     if [ -d "$MINICONDA_DIR" ]; then
         echo "Miniconda found at $MINICONDA_DIR but not on PATH. Sourcing it..."
         source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+        MINICONDA_DIR="$(conda info --base)"
         return
     fi
     echo "Installing Miniconda..."
@@ -50,12 +52,13 @@ function install_miniconda() {
 
 function ensure_conda() {
     if ! command -v conda &> /dev/null; then
-        source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+        source "$MINICONDA_DIR/etc/profile.d/conda.sh" 2>/dev/null || true
     fi
     if ! command -v conda &> /dev/null; then
         echo "Conda still not found. Exiting."
         exit 1
     fi
+    MINICONDA_DIR="$(conda info --base)"
 }
 
 function setup_conda_env() {
