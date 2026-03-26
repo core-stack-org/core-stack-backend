@@ -1351,6 +1351,7 @@ function download_admin_boundary_data() {
     install_gdown_if_missing
     sudo apt-get install -y p7zip-full
 
+    activate_conda_env
     cd "$BACKEND_DIR"
     gdown "$fileid" -O "$archive_path"
     7z x "$archive_path" -o"$extraction_root"
