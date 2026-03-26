@@ -498,6 +498,7 @@ function mark_step_complete() {
 
 function ensure_conda() {
     if command -v conda >/dev/null 2>&1; then
+        MINICONDA_DIR="$(conda info --base)"
         return 0
     fi
 
@@ -510,6 +511,7 @@ function ensure_conda() {
         echo "Conda was not found. Expected it at $MINICONDA_DIR."
         exit 1
     fi
+    MINICONDA_DIR="$(conda info --base)"
 }
 
 function activate_conda_env() {
@@ -641,7 +643,8 @@ function finalize_admin_boundary_extraction() {
 
 function install_miniconda() {
     if command -v conda >/dev/null 2>&1; then
-        echo "Conda already available ($(conda --version))."
+        MINICONDA_DIR="$(conda info --base)"
+        echo "Conda already available ($(conda --version)) at $MINICONDA_DIR."
         mark_step_complete "miniconda"
         return
     fi
@@ -650,6 +653,7 @@ function install_miniconda() {
         echo "Miniconda found at $MINICONDA_DIR. Sourcing it..."
         # shellcheck disable=SC1091
         source "$MINICONDA_DIR/etc/profile.d/conda.sh"
+        MINICONDA_DIR="$(conda info --base)"
         mark_step_complete "miniconda"
         return
     fi
