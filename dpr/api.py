@@ -8,6 +8,7 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, schema
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from utilities.auth_check_decorator import api_security_check
@@ -16,6 +17,32 @@ from utilities.logger import setup_logger
 
 from .gen_dpr import (
     get_plan_details,
+)
+from .serializers import (
+    CropSerializer,
+    DPRSummarySerializer,
+    LivelihoodSerializer,
+    LivestockSerializer,
+    MaintenanceSerializer,
+    NRMWorkSerializer,
+    SettlementSerializer,
+    TeamDetailsSerializer,
+    VillageBriefSerializer,
+    WaterbodySerializer,
+    WellSerializer,
+)
+from .services import (
+    get_crops_data,
+    get_dpr_summary,
+    get_livestock_data,
+    get_livelihood_data,
+    get_maintenance_data,
+    get_nrm_works_data,
+    get_settlements_data,
+    get_team_details,
+    get_village_brief,
+    get_waterbodies_data,
+    get_wells_data,
 )
 from .gen_multi_mws_report import (
     get_cropping_mws_data,
@@ -580,3 +607,135 @@ def generate_tehsil_report(request):
     except Exception as e:
         logger.exception("Exception in generate_tehsil_report api :: ", e)
         return render(request, "error-page.html", {})
+
+
+# ---------------------------------------------------------------------------
+# DPR Data API
+# ---------------------------------------------------------------------------
+
+VALID_MAINTENANCE_TYPES = {"gw", "agri", "swb", "swb_rs"}
+
+
+class DPRPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+
+def _get_plan_or_404(plan_id):
+    plan = get_plan_details(plan_id)
+    if plan is None:
+        return None, Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+    return plan, None
+
+
+def _paginated_response(request, data, serializer_class):
+    paginator = DPRPagination()
+    page = paginator.paginate_queryset(data, request)
+    serializer = serializer_class(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+# MARK: DPR Summary
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_summary(request, plan_id):
+    plan, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    data = get_dpr_summary(plan_id)
+    data["plan_name"] = plan.plan
+    data["village_name"] = plan.village_name
+    return Response(DPRSummarySerializer(data).data)
+
+
+# MARK: Section A
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_team_details(request, plan_id):
+    plan, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(TeamDetailsSerializer(get_team_details(plan)).data)
+
+
+# MARK: Section B
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_village_brief(request, plan_id):
+    plan, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(VillageBriefSerializer(get_village_brief(plan)).data)
+
+
+# MARK: Section C
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_settlements(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_settlements_data(plan_id), SettlementSerializer)
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_crops(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_crops_data(plan_id), CropSerializer)
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_livestock(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_livestock_data(plan_id), LivestockSerializer)
+
+
+# MARK: Section D
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_wells(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_wells_data(plan_id), WellSerializer)
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_waterbodies(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_waterbodies_data(plan_id), WaterbodySerializer)
+
+
+# MARK: Section E
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_maintenance(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    maintenance_type = request.query_params.get("type", "gw")
+    if maintenance_type not in VALID_MAINTENANCE_TYPES:
+        return Response(
+            {"error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return _paginated_response(request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer)
+
+
+# MARK: Section F
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_nrm_works(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_nrm_works_data(plan_id), NRMWorkSerializer)
+
+
+# MARK: Section G
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+def dpr_livelihood(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)

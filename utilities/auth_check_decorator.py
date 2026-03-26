@@ -172,6 +172,27 @@ def check_authentication(request, auth_type):
         else:
             return {"valid": False, "message": "Invalid or expired JWT token"}
 
+    elif auth_type == "JWT_or_API_key":
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split("Bearer ")[1]
+            is_valid, user_info = validate_jwt(token)
+            if is_valid:
+                return {"valid": True, "user_info": user_info}
+            return {"valid": False, "message": "Invalid or expired JWT token"}
+
+        api_key = request.headers.get("X-API-Key")
+        if api_key:
+            is_valid, user_info = validate_api_key(api_key)
+            if is_valid:
+                return {"valid": True, "user_info": user_info}
+            return {"valid": False, "message": "Invalid API key"}
+
+        return {
+            "valid": False,
+            "message": "Authentication required. Provide 'Authorization: Bearer <token>' or 'X-API-Key: <key>'",
+        }
+
     else:
         return {"valid": False, "message": f"Unknown auth type: {auth_type}"}
 
