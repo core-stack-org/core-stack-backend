@@ -751,16 +751,35 @@
             <h2>Socio-ecological patterns across Tehsil</h2>
             <p>
                 The following map shows the variation of different socio-ecological stress patterns across
-                microwatersheds in the Tehsil. As the number of stress patterns in a microwatershed increases, its
-                gradient moves from green to red color.
+                microwatersheds and villages in the tehsil. As the number of stress patterns in a microwatershed
+                increases, its gradient moves from green to red color.
             </p>
-            <div class="pattern-conditions">
-                <h4>Current stresses patterns in the tehsil include:</h4>
-                <ul>
-                    {% for pattern in active_pattern %}
-                    <li><strong>{{ pattern }}</strong></li>
-                    {% endfor %}
-                </ul>
+
+            <!-- Side by side pattern sections -->
+            <div class="pattern-info-container">
+                <!-- MWS-level patterns — yellow -->
+                {% if active_pattern %}
+                <div class="pattern-conditions">
+                    <h4>Current MWS stress patterns in the tehsil include:</h4>
+                    <ul>
+                        {% for pattern in active_pattern %}
+                        <li><strong>{{ pattern }}</strong></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- Village-level patterns — blue -->
+                {% if village_active_pattern %}
+                <div class="pattern-recommendations">
+                    <h4>Current village-level stress patterns in the tehsil include:</h4>
+                    <ul>
+                        {% for pattern in village_active_pattern %}
+                        <li><strong>{{ pattern }}</strong></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
             </div>
 
             <div id="mainMap" class="map"></div>
@@ -1194,6 +1213,7 @@
         // const HIRiskyearRange = highIrrigationRisk.year_range || "";
         const mwsActivePatternsSafe = mwsActivePatterns || {};
         const patternDisplayMappingSafe = patternDisplayMapping || {};
+        const villageActivePattern = {{ village_active_pattern| safe }};
 
         //const agroforestryTransition = {{agroforestry_transition_json|safe}};
         //const agroforestrySankey = {{agroforestry_sankey_json|safe}};
@@ -2877,6 +2897,10 @@
                 if (feature) {
                     const uid = feature.get('uid') || feature.get('UID') || feature.getId() || 'Unknown';
 
+                    console.log('Clicked UID:', uid);
+                    console.log('Available UIDs in mwsActivePatterns:', Object.keys(mwsActivePatterns).slice(0, 5));
+                    console.log('Pattern for this UID:', mwsActivePatterns[uid]);
+
                     // ============ GET AREA FROM FEATURE ============
                     const areaHa = feature.get('area_in_ha') || feature.get('area_ha') || feature.get('area') || 'N/A';
                     const formattedArea = typeof areaHa === 'number' ? areaHa.toFixed(2) : areaHa;
@@ -2885,7 +2909,8 @@
                     const intensity = (mwsPatternIntensity && mwsPatternIntensity[uid]) ? mwsPatternIntensity[uid] : 0;
 
                     // Get pattern keys and convert to display names
-                    const patternKeys = (mwsActivePatternsSafe && mwsActivePatternsSafe[uid]) || [];
+                    // const patternKeys = (mwsActivePatternsSafe && mwsActivePatternsSafe[uid]) || [];
+                    const patternKeys = mwsActivePatterns[uid] || [];
                     const patternDisplayNames = patternKeys.map(key =>
                         (patternDisplayMappingSafe && patternDisplayMappingSafe[key]) ||
                         key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
