@@ -328,14 +328,8 @@ LOGGING = {
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",  # or INFO in production
+            "level": "DEBUG",
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": os.path.join(BASE_DIR, "logs", "app.log"),
             "formatter": "verbose",
         },
         "mail_admins": {
@@ -345,12 +339,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": True,
         },
-        "geoadmin": {  # replace with your Django app name
-            "handlers": ["console", "file"],
+        "geoadmin": {
+            "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,
         },
