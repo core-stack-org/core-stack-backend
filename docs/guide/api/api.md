@@ -1732,3 +1732,172 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 | `GET dpr_data/{id}/maintenance/?type=gw\|agri\|swb\|swb_rs` | Yes | `GW_maintenance`, `Agri_maintenance`, `SWB_maintenance`, `SWB_RS_maintenance` |
 | `GET dpr_data/{id}/nrm-works/` | Yes | `ODK_groundwater` + `ODK_agri` |
 | `GET dpr_data/{id}/livelihood/` | Yes | `ODK_livelihood` + `ODK_agrohorticulture` |
+
+---
+
+## STAC Endpoints
+
+### Get STAC Catalog (Query Param Style)
+
+- **URL**: `/api/v1/get_stac_catalog/`
+- **Method**: GET
+- **Description**: Returns the STAC catalog or collection JSON at any level of the hierarchy via query parameters. With no params returns the root catalog; each additional param narrows the scope one level deeper.
+- **Authentication**: Required
+- **Query Parameters** (all optional, progressively narrow scope):
+  - `state` (string): State name — returns the state collection
+  - `district` (string): Requires `state` — returns the district collection
+  - `block` (string): Requires `state` + `district` — returns the block collection
+- **Content-Type**: `application/geo+json`
+
+| Params supplied | File returned |
+|---|---|
+| _(none)_ | `catalog.json` (root) |
+| `state` | `tehsil_wise/{state}/collection.json` |
+| `state` + `district` | `tehsil_wise/{state}/{district}/collection.json` |
+| `state` + `district` + `block` | `tehsil_wise/{state}/{district}/{block}/collection.json` |
+
+- **Examples**:
+  ```
+  GET /api/v1/get_stac_catalog/
+  GET /api/v1/get_stac_catalog/?state=bihar
+  GET /api/v1/get_stac_catalog/?state=bihar&district=nalanda
+  GET /api/v1/get_stac_catalog/?state=bihar&district=nalanda&block=hilsa
+  ```
+- **Error**: `404` if the catalog at the requested scope has not been generated yet
+- **Notes**: Input names are case-insensitive and normalised using `sanitize_text` to match how paths were written during generation.
+
+---
+
+### Get Root Catalog
+
+- **URL**: `/api/v1/stac/`
+- **Method**: GET
+- **Description**: Returns the root STAC catalog JSON. Entry point for navigating the full catalog hierarchy.
+- **Authentication**: Required
+- **Response** (`200 OK`): Root `catalog.json` as JSON
+- **Error**: `404` if no catalog has been generated yet
+
+---
+
+### Get State Collection
+
+- **URL**: `/api/v1/stac/{state}/`
+- **Method**: GET
+- **Description**: Returns the STAC collection for a given state.
+- **Authentication**: Required
+- **URL Parameters**:
+  - `state` (string): State name (case-insensitive, e.g. `bihar`)
+- **Response** (`200 OK`): State-level `collection.json` as JSON
+- **Error**: `404` if the state collection does not exist
+
+---
+
+### Get District Collection
+
+- **URL**: `/api/v1/stac/{state}/{district}/`
+- **Method**: GET
+- **Description**: Returns the STAC collection for a given district within a state.
+- **Authentication**: Required
+- **URL Parameters**:
+  - `state` (string): State name
+  - `district` (string): District name (case-insensitive)
+- **Response** (`200 OK`): District-level `collection.json` as JSON
+- **Error**: `404` if the district collection does not exist
+
+---
+
+### Get Block Collection
+
+- **URL**: `/api/v1/stac/{state}/{district}/{block}/`
+- **Method**: GET
+- **Description**: Returns the STAC collection for a given block, including links to all items generated for that block.
+- **Authentication**: Required
+- **URL Parameters**:
+  - `state` (string): State name
+  - `district` (string): District name
+  - `block` (string): Block name (case-insensitive)
+- **Response** (`200 OK`): Block-level `collection.json` as JSON
+- **Error**: `404` if the block collection does not exist
+
+---
+
+### Get Item
+
+- **URL**: `/api/v1/stac/{state}/{district}/{block}/items/{item_id}/`
+- **Method**: GET
+- **Description**: Returns a single STAC item (layer) within a block collection. The `item_id` follows the pattern `{state}_{district}_{block}_{layer_name}` (with optional `_{start_year}` suffix for time-series layers).
+- **Authentication**: Required
+- **URL Parameters**:
+  - `state`, `district`, `block` (string): Geographic hierarchy (case-insensitive)
+  - `item_id` (string): Item identifier, e.g. `bihar_nalanda_hilsa_ndvi_2023`
+- **Response** (`200 OK`): STAC item JSON with assets (data, thumbnail, style)
+- **Error**: `404` if the item does not exist
+
+---
+
+### Catalog Hierarchy
+
+```
+GET /api/v1/stac/                                          root catalog
+GET /api/v1/stac/{state}/                                  state collection
+GET /api/v1/stac/{state}/{district}/                       district collection
+GET /api/v1/stac/{state}/{district}/{block}/               block collection (lists items)
+GET /api/v1/stac/{state}/{district}/{block}/items/{id}/    single item
+```
+
+All names are case-insensitive. Collections are only available after `generate_stac_collection` has been run for at least one layer in that geography.
+
+---
+
+### Generate STAC Collection
+
+- **URL**: `/api/v1/generate_stac_collection/`
+- **Method**: POST
+- **Description**: Asynchronously generates a STAC (SpatioTemporal Asset Catalog) collection for a given geographic boundary and layer. The task is dispatched to the `nrm` Celery queue and returns immediately.
+- **Authentication**: Required
+- **Request Body**:
+  ```json
+  {
+    "state": "Bihar",
+    "district": "Nalanda",
+    "block": "Hilsa",
+    "layer_name": "ndvi",
+    "layer_type": "raster",
+    "start_year": "2023",
+    "upload_to_s3": false,
+    "overwrite": false
+  }
+  ```
+- **Required Fields**:
+  - `state` (string): State name
+  - `district` (string): District name
+  - `block` (string): Block name
+  - `layer_name` (string): Name of the layer for which the STAC collection is generated
+  - `layer_type` (string): Type of layer — must be `"raster"` or `"vector"`
+- **Optional Fields**:
+  - `start_year` (string, default: `""`): Starting year for the collection
+  - `upload_to_s3` (boolean, default: `false`): Whether to upload the generated collection to S3
+  - `overwrite` (boolean, default: `false`): Whether to overwrite an existing collection
+- **Success Response** (`200 OK`):
+  ```json
+  {
+    "Success": "STAC collection generation initiated"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request` — missing required fields:
+    ```json
+    { "error": "state, district, block, layer_name, and layer_type are required" }
+    ```
+  - `400 Bad Request` — invalid `layer_type`:
+    ```json
+    { "error": "layer_type must be 'raster' or 'vector'" }
+    ```
+  - `500 Internal Server Error`:
+    ```json
+    { "Exception": "<error message>" }
+    ```
+- **Notes**:
+  - The generation runs asynchronously; a `200` response only confirms the task was enqueued.
+  - Use `upload_to_s3: true` to persist the output to S3 after generation.
+  - Use `overwrite: true` to regenerate and replace an existing collection.
