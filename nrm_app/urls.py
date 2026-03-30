@@ -53,6 +53,8 @@ urlpatterns = [
     path("api/v1/", include("bot_interface.urls"), name="whatsapp_webhook"),
     path("api/v1/", include("waterrejuvenation.urls")),
     path("api/v1/", include("moderation.urls")),
+    # Status page
+    path("status/", include("status_monitor.urls")),
     # Swagger Doc
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"

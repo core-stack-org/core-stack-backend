@@ -123,6 +123,7 @@ INSTALLED_APPS = [
     "apiadmin",
     "moderation",
     "users.apps.UsersConfig",
+    "status_monitor",
 ]
 
 # MARK: CORS Settings
