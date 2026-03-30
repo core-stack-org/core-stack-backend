@@ -186,4 +186,34 @@ urlpatterns = [
         api.generate_stac_collection,
         name="generate_stac_collection",
     ),
+    path(
+        "get_stac_catalog/",
+        api.get_stac_catalog,
+        name="get_stac_catalog",
+    ),
+    path(
+        "stac/",
+        api.stac_root_catalog,
+        name="stac_root_catalog",
+    ),
+    path(
+        "stac/<str:state>/",
+        api.stac_state_collection,
+        name="stac_state_collection",
+    ),
+    path(
+        "stac/<str:state>/<str:district>/",
+        api.stac_district_collection,
+        name="stac_district_collection",
+    ),
+    path(
+        "stac/<str:state>/<str:district>/<str:block>/",
+        api.stac_block_collection,
+        name="stac_block_collection",
+    ),
+    path(
+        "stac/<str:state>/<str:district>/<str:block>/items/<str:item_id>/",
+        api.stac_item,
+        name="stac_item",
+    ),
 ]

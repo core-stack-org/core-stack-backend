@@ -8,6 +8,7 @@ import subprocess
 import urllib
 import xml.etree.ElementTree as ET
 
+from nrm_app.celery import app
 import pandas as pd
 import pystac
 import requests
@@ -18,6 +19,7 @@ from nrm_app.settings import (
     BASE_DIR, S3_ACCESS_KEY, S3_SECRET_KEY,
     GEOSERVER_USERNAME, GEOSERVER_PASSWORD,
 )
+
 
 
 def sanitize_text(text):
@@ -813,8 +815,7 @@ class STACCollectionGenerator:
 
 @functools.lru_cache(maxsize=1)
 def _make_celery_task():
-    from nrm_app.celery import app
-
+    
     @app.task(bind=True)
     def generate_stac_collection_task(self, layer_type, state, district, block,
                                       layer_name, start_year="",

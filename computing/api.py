@@ -1,3 +1,4 @@
+import json
 import os
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
@@ -9,6 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
+from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
 from .lulc.lulc_vector import vectorise_lulc
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
@@ -1606,3 +1608,107 @@ def generate_stac_collection(request):
     except Exception as e:
         print("Exception in generate_stac_collection api :: ", e)
         return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ---------------------------------------------------------------------------
+# STAC catalog read helpers
+# ---------------------------------------------------------------------------
+
+_STAC_ROOT = os.path.join(
+    BASE_DIR, "data", "STAC_specs",
+    "CorestackCatalogs_merged_collection",
+)
+_TEHSIL = "tehsil_wise"
+
+
+def _read_json(path):
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+@api_view(["GET"])
+@schema(None)
+def get_stac_catalog(request):
+    state    = request.query_params.get("state", "").strip()
+    district = request.query_params.get("district", "").strip()
+    block    = request.query_params.get("block", "").strip()
+
+    base = STACConfig().stac_files_dir
+
+    if state:
+        state = sanitize_text(state.lower())
+    if district:
+        district = sanitize_text(district.lower())
+    if block:
+        block = sanitize_text(block.lower())
+
+    if not state:
+        path = os.path.join(base, "catalog.json")
+    elif not district:
+        path = os.path.join(base, _TEHSIL, state, "collection.json")
+    elif not block:
+        path = os.path.join(base, _TEHSIL, state, district, "collection.json")
+    else:
+        path = os.path.join(base, _TEHSIL, state, district, block, "collection.json")
+
+    data = _read_json(path)
+    if data is None:
+        return Response({"error": f"Catalog not found at requested scope"}, status=status.HTTP_404_NOT_FOUND)
+
+    from django.http import JsonResponse
+    return JsonResponse(data, content_type="application/geo+json")
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_root_catalog(request):
+    data = _read_json(os.path.join(_STAC_ROOT, "catalog.json"))
+    if data is None:
+        return Response({"error": "Root catalog not found"}, status=status.HTTP_404_NOT_FOUND)
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_state_collection(request, state):
+    path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), "collection.json")
+    data = _read_json(path)
+    if data is None:
+        return Response({"error": f"State collection not found: {state}"}, status=status.HTTP_404_NOT_FOUND)
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_district_collection(request, state, district):
+    path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), district.lower(), "collection.json")
+    data = _read_json(path)
+    if data is None:
+        return Response({"error": f"District collection not found: {district}"}, status=status.HTTP_404_NOT_FOUND)
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_block_collection(request, state, district, block):
+    path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), district.lower(), block.lower(), "collection.json")
+    data = _read_json(path)
+    if data is None:
+        return Response({"error": f"Block collection not found: {block}"}, status=status.HTTP_404_NOT_FOUND)
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_item(request, state, district, block, item_id):
+    path = os.path.join(
+        _STAC_ROOT, _TEHSIL,
+        state.lower(), district.lower(), block.lower(),
+        item_id, f"{item_id}.json",
+    )
+    data = _read_json(path)
+    if data is None:
+        return Response({"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND)
+    return Response(data)
