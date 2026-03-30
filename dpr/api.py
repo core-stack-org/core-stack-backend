@@ -638,6 +638,7 @@ def _paginated_response(request, data, serializer_class):
 
 # MARK: DPR Summary
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_summary(request, plan_id):
     plan, err = _get_plan_or_404(plan_id)
     if err:
@@ -650,6 +651,7 @@ def dpr_summary(request, plan_id):
 
 # MARK: Section A
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_team_details(request, plan_id):
     plan, err = _get_plan_or_404(plan_id)
     if err:
@@ -659,6 +661,7 @@ def dpr_team_details(request, plan_id):
 
 # MARK: Section B
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_village_brief(request, plan_id):
     plan, err = _get_plan_or_404(plan_id)
     if err:
@@ -668,6 +671,7 @@ def dpr_village_brief(request, plan_id):
 
 # MARK: Section C
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_settlements(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -676,6 +680,7 @@ def dpr_settlements(request, plan_id):
 
 
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_crops(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -684,6 +689,7 @@ def dpr_crops(request, plan_id):
 
 
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_livestock(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -693,6 +699,7 @@ def dpr_livestock(request, plan_id):
 
 # MARK: Section D
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_wells(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -701,6 +708,7 @@ def dpr_wells(request, plan_id):
 
 
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_waterbodies(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -710,6 +718,7 @@ def dpr_waterbodies(request, plan_id):
 
 # MARK: Section E
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_maintenance(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -725,6 +734,7 @@ def dpr_maintenance(request, plan_id):
 
 # MARK: Section F
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_nrm_works(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
@@ -734,6 +744,7 @@ def dpr_nrm_works(request, plan_id):
 
 # MARK: Section G
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
 def dpr_livelihood(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
