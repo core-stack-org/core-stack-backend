@@ -1986,6 +1986,14 @@ def get_agri_low_yield_data(state, district, block):
         )
         df_degrade = pd.read_excel(file_path, sheet_name="change_detection_degradation")
 
+        ci_columns = [
+            col for col in df_area.columns if col.startswith("cropping_intensity_")
+        ]
+
+        start_year = 2017
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
         mws_pattern = {}
         mws_intensity = {}
 
@@ -2100,6 +2108,7 @@ def get_agri_low_yield_data(state, district, block):
             "mws_intensity": mws_intensity,
             "total_area": round(total_to_barren + total_to_scrub, 2),
             "total_all_area": total_all_area,
+            "year_range": year_range,
         }
 
         return result, sankey_data
@@ -2117,6 +2126,7 @@ def get_agri_low_yield_data(state, district, block):
             "mws_intensity": {},
             "total_area": 0.0,
             "total_all_area": 0.0,
+            "year_range": "",
         }, {"nodes": [], "links": []}
 
 
@@ -2671,6 +2681,14 @@ def get_fishery_water_potential_data(state, district, block):
         df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
         df_water = pd.read_excel(file_path, sheet_name="surfaceWaterBodies_annual")
 
+        ci_columns = [
+            col for col in df_area.columns if col.startswith("cropping_intensity_")
+        ]
+
+        start_year = 2017
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
         mws_pattern = {}
         mws_intensity = {}
 
@@ -2899,7 +2917,7 @@ def get_fishery_water_potential_data(state, district, block):
             "total_area": area_percentage,
             "total_zaid_area": round(total_zaid_area, 2),
             "total_swb_area": round(total_swb_area, 2),
-            "year_range": years_sorted[0] + "-" + years_sorted[-1],
+            "year_range": year_range,
         }
 
         return result, seasonal_timeline

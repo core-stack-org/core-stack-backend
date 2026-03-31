@@ -850,7 +850,8 @@
                 <p class="pattern-summary">
                     <span id="groundwater-area" class="number-class"></span> hectares out of
                     <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in the
-                    tehsil appears to be groundwater stressed.
+                    tehsil appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater
+                    recharge structures, and groundwater collectives should be considered.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
@@ -894,7 +895,8 @@
                 <p class="pattern-summary">
                     <span id="drought-area" class="number-class"></span> hectares out of
                     <span id="drought-area-1" class="number-class"></span> hectares of cropping area in the tehsil
-                    appears to have a high drought incidence.
+                    appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater
+                    harvesting structures, and water user associations should be considered.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
@@ -943,7 +945,8 @@
                 <p class="pattern-summary">
                     <span id="irrigation-area" class="number-class"></span> hectares out of
                     <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in the tehsil
-                    appears to have a high irrigation risk.
+                    appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water
+                    user associations, and construction of new waterbodies should be considered.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
@@ -979,10 +982,21 @@
 
             <div id="yield-section">
                 <h3>Likely stress in cropping yield</h3>
+                <p>Likely stress in cropping yield is assessed based on degradation of farmland into barren or shrub
+                    areas and areas with reduced cropping intensity. The reasons should be investigated and changes in
+                    cropping patterns and methods to improve soil health or water availability could be considered.
+                    Micro-watersheds where the extent of either of these conditions over the years <span
+                        id="CRPYieldyearRange"></span> exceed
+                    30 hectares have been highlighted in yellow. Similarly, micro-watersheds where farmland areas that
+                    have undergone degradation and reduction in the number of crop cycles both exceeding 30 hectares are
+                    marked in red.</p>
                 <p class="pattern-summary">
-                    <span id="yield-area" class="number-class"></span> hectares out of
-                    <span id="yield-area-1" class="number-class"></span> hectares of cropping area in the tehsil appears
-                    to have had a reduction in cropping area.
+                    <span id="yield-area" class="number-class"></span> hectares in the tehsil appears to have had a
+                    reduction in cropping area.
+                </p>
+                <p class="pattern-summary">
+                    <span id="yield-area-1" class="number-class"></span> hectares in the tehsil appears to have had a
+                    reduction in cropping intensity.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
@@ -1007,6 +1021,17 @@
                         <canvas id="yieldSankeyChart"></canvas>
                     </div>
                 </div>
+                <p class="legend-note">
+                    Note: Cropping degradation is calculated based on farmland transitions to barren or scrubs and shrub
+                    land or reduction in cropping intensity (change in area earlier sown thrice to now sown twice,
+                    earlier sown twice to now sown once, earlier sown thrice to now sown once). The degradation in
+                    cropping is computed using the IndiaSAT Land Use Land Cover outputs. Transitions from farmland to
+                    barren land, shrubs, or human settlements (built-up) are computed. Similarly, we use annual land use
+                    land cover (LULC), to identify areas under single cropping, double cropping and triple cropping
+                    using pixels
+                    which are classified as single kharif, single non-kharif, double and triple classes of LULC
+                    classifier to determine cropping intensity.
+                </p>
             </div>
         </section>
 
@@ -1039,6 +1064,12 @@
                     <canvas id="forestSankeyChart"></canvas>
                 </div>
             </div>
+            <p class="legend-note">
+                Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover outputs.
+                Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland are
+                computed.
+
+            </p>
         </section>
 
         <section class="section" id="health-section">
@@ -1046,7 +1077,8 @@
             <h3>Mining Presence</h3>
             <p class="pattern-summary">
                 <span id="mining-area" class="number-class"></span> hectares could be at risk of air, water, or soil
-                pollution from industries.
+                pollution from industries. Water safety and soil, air pollution tests should be considered as a safety
+                measure.
             </p>
             <div class="pattern-info-container">
                 <div class="pattern-conditions">
@@ -1079,9 +1111,8 @@
             <div id="caste-section">
                 <h3>High density of marginalized caste communities</h3>
                 <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages"
-                        class="number-class"></span> villages are from marginalized groups defined as SC or ST
-                    population is high
-                    Positive discrimination in access to social entitlements should be considered.</p>
+                        class="number-class"></span> villages are from marginalized groups. Any incidence of
+                    discrimination in access to social entitlements should be examined.</p>
 
                 <div class="map-chart-container">
                     <div id="casteMap" class="map"></div>
@@ -1114,18 +1145,17 @@
         <section class="section" id="fishery-section">
             <h2>Intervention opportunities</h2>
             <h3>Fishery</h3>
-            <p>Up to <span id="fishery-area" class="number-class"></span>% area in the tehsil appears to have good
+            <p>Up to <span id="fishery-area-1" class="number-class"></span> <span id="fishery-area"
+                    style="display:none;"></span> <span id="fishery-area-2" style="display:none;"></span>hectares of
+                area in the tehsil appears to have good
                 potential for fishery due to a reasonable amount of surface water retained throughout the year.
-                Currently <span id="fishery-area-1" class="number-class"></span> hectares of land is under Perennial
-                surface water in these areas, out of <span id="fishery-area-2" class="number-class"></span> hectare
-                Perennial surface water area in hectares in the tehsil. Good water potential in a microwatershed is
-                assessed based on three conditions including the surface water availability during Rabi season being
-                more than a threshold value of 30%, surface water availability during Zaid season similarly being more
-                than 30%, and a non declining trend in annual surface water availability observed over the years <span
-                    id="FishryyearRange"></span>. In the map below, the micro-watersheds are mapped to a gradient of
-                green, depending on the number of conditions satisfied for a particular micro-watershed (light green
-                corresponds to one of the conditions being met, and dark green corresponds to all the conditions being
-                true).</p>
+                Good water potential in a microwatershed is assessed based on three conditions including the surface
+                water availability during Rabi season being more than a threshold value of 30%, surface water
+                availability during Zaid season similarly being more than 30%, and a non declining trend in annual
+                surface water availability observed over the years <span id="FishryyearRange"></span>. In the map below,
+                the micro-watersheds are mapped to a gradient of green, depending on the number of conditions satisfied
+                for a particular micro-watershed (light green corresponds to one of the conditions being met, and dark
+                green corresponds to all the conditions being true).</p>
 
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
@@ -1262,6 +1292,7 @@
         }
         document.getElementById("HIrriRiskyearRange").innerText = highIrrigationRisk.year_range;
         document.getElementById("FishryyearRange").innerText = fisheryPotential.year_range;
+        document.getElementById("CRPYieldyearRange").innerText = lowYield.year_range;
 
         function getColorForIntensity(intensity) {
 
@@ -2854,30 +2885,179 @@
         });
 
 
-        function initClickPopup() {
-            console.log('Initializing simple click popup...');
+        // ============ SHARED POPUP BUILDER ============
+        function buildPopupHTML(uid, evt) {
+            const areaHa = evt ? (evt.feature ? evt.feature.get('area_in_ha') || evt.feature.get('area_ha') || evt.feature.get('area') || 'N/A' : 'N/A') : 'N/A';
+            const formattedArea = typeof areaHa === 'number' ? areaHa.toFixed(2) : areaHa;
 
-            // Check if mainMap exists
-            if (typeof mainMap === 'undefined' || !mainMap) {
-                console.log('mainMap not ready, retrying...');
-                setTimeout(initClickPopup, 500);
-                return;
+            const intensity = (mwsPatternIntensity && mwsPatternIntensity[uid]) ? mwsPatternIntensity[uid] : 0;
+            const patternKeys = mwsActivePatterns[uid] || [];
+            const patternDisplayNames = patternKeys.map(key =>
+                (patternDisplayMappingSafe && patternDisplayMappingSafe[key]) ||
+                key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+            );
+
+            const currentState = "{{ state }}";
+            const currentDistrict = "{{ district }}";
+            const currentBlock = "{{ block }}";
+            const MWSReportUrl = `https://geoserver.core-stack.org/api/v1/generate_mws_report/?state=${currentState}&district=${currentDistrict}&block=${currentBlock}&uid=${uid}`;
+
+            let intensityColor = intensity === 0 ? '#27ae60' : '#c0392b';
+            let intensityText = intensity === 0 ? 'No Stress Pattern' : `(${intensity}) Stress Patterns`;
+
+            let html = `
+        <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-weight: bold; color: #2c3e50;">MWS: ${uid}</span>
+                <span style="
+                    background-color: ${intensityColor};
+                    color: white;
+                    padding: 2px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: bold;
+                ">${intensityText}</span>
+            </div>
+            <div style="font-size: 11px; color: #666; margin-top: 5px;">
+                <span style="font-weight: bold;">Area:</span> ${formattedArea} ha
+            </div>
+        </div>
+    `;
+
+            if (patternDisplayNames.length > 0) {
+                patternDisplayNames.forEach(pattern => {
+                    html += `
+                <div style="
+                    padding: 4px 0 4px 8px;
+                    border-left: 3px solid #e74c3c;
+                    margin-bottom: 3px;
+                    font-size: 12px;
+                    color: #555;
+                ">• ${pattern}</div>
+            `;
+                });
+            } else {
+                html += `<div style="color: #27ae60; font-size: 12px; padding: 4px 0;">✓ No active patterns</div>`;
             }
 
-            // Create popup element - SIMPLE AND SMALL
+            html += `
+        <div style="margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
+            <a href="${MWSReportUrl}" target="_blank" style="
+                display: inline-block;
+                background-color: #3498db;
+                color: white;
+                padding: 6px 16px;
+                border-radius: 20px;
+                text-decoration: none;
+                font-size: 12px;
+                font-weight: bold;
+                border: none;
+                cursor: pointer;
+            "
+            onmouseover="this.style.backgroundColor='#2980b9'"
+            onmouseout="this.style.backgroundColor='#3498db'"
+            >View Micro-Watershed Profile</a>
+        </div>
+    `;
+            return html;
+        }
+
+        // ============ SIMPLE POPUP FOR SECTION MAPS ============
+        function buildSimplePopupHTML(uid, feature) {
+            const areaHa = feature.get('area_in_ha') || feature.get('area_ha') || feature.get('area') || 'N/A';
+            const formattedArea = typeof areaHa === 'number' ? areaHa.toFixed(2) : areaHa;
+            const currentState = "{{ state }}";
+            const currentDistrict = "{{ district }}";
+            const currentBlock = "{{ block }}";
+            const MWSReportUrl = `https://geoserver.core-stack.org/api/v1/generate_mws_report/?state=${currentState}&district=${currentDistrict}&block=${currentBlock}&uid=${uid}`;
+            return `
+        <div style="display: flex; justify-content: space-between; align-items: center;
+                    border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+            <span style="font-weight: bold; color: #2c3e50;">MWS: ${uid}</span>
+            <span class="popup-close-btn" style="cursor: pointer; font-size: 16px; color: #999;
+                line-height: 1; padding: 0 4px;" title="Close">✕</span>
+        </div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 10px;">
+            <span style="font-weight: bold;">Area:</span> ${formattedArea} ha
+        </div>
+        <div style="text-align: center;">
+            <a href="${MWSReportUrl}" target="_blank" style="
+                display: inline-block; background-color: #3498db; color: white;
+                padding: 6px 16px; border-radius: 20px; text-decoration: none;
+                font-size: 12px; font-weight: bold; cursor: pointer;"
+            onmouseover="this.style.backgroundColor='#2980b9'"
+            onmouseout="this.style.backgroundColor='#3498db'"
+            >View Micro-Watershed Profile</a>
+        </div>
+    `;
+        }
+
+        // ============ FULL POPUP FOR MAIN MAP ============
+        function buildFullPopupHTML(uid, feature) {
+            const areaHa = feature.get('area_in_ha') || feature.get('area_ha') || feature.get('area') || 'N/A';
+            const formattedArea = typeof areaHa === 'number' ? areaHa.toFixed(2) : areaHa;
+            const intensity = (mwsPatternIntensity && mwsPatternIntensity[uid]) ? mwsPatternIntensity[uid] : 0;
+            const patternKeys = mwsActivePatterns[uid] || [];
+            const patternDisplayNames = patternKeys.map(key =>
+                (patternDisplayMappingSafe && patternDisplayMappingSafe[key]) ||
+                key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+            );
+            const currentState = "{{ state }}";
+            const currentDistrict = "{{ district }}";
+            const currentBlock = "{{ block }}";
+            const MWSReportUrl = `https://geoserver.core-stack.org/api/v1/generate_mws_report/?state=${currentState}&district=${currentDistrict}&block=${currentBlock}&uid=${uid}`;
+            let intensityColor = intensity === 0 ? '#27ae60' : '#c0392b';
+            let intensityText = intensity === 0 ? 'No Stress Pattern' : `(${intensity}) Stress Patterns`;
+
+            let html = `
+        <div style="display: flex; justify-content: space-between; align-items: center;
+                    border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: bold; color: #2c3e50;">MWS: ${uid}</span>
+                <span style="background-color: ${intensityColor}; color: white;
+                    padding: 2px 8px; border-radius: 12px;
+                    font-size: 11px; font-weight: bold;">${intensityText}</span>
+            </div>
+            <span class="popup-close-btn" style="cursor: pointer; font-size: 16px; color: #999;
+                line-height: 1; padding: 0 4px;" title="Close">✕</span>
+        </div>
+        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">
+            <span style="font-weight: bold;">Area:</span> ${formattedArea} ha
+        </div>
+    `;
+            if (patternDisplayNames.length > 0) {
+                patternDisplayNames.forEach(pattern => {
+                    html += `<div style="padding: 4px 0 4px 8px; border-left: 3px solid #e74c3c;
+                margin-bottom: 3px; font-size: 12px; color: #555;">• ${pattern}</div>`;
+                });
+            } else {
+                html += `<div style="color: #27ae60; font-size: 12px; padding: 4px 0;">✓ No active patterns</div>`;
+            }
+            html += `
+        <div style="margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
+            <a href="${MWSReportUrl}" target="_blank" style="
+                display: inline-block; background-color: #3498db; color: white;
+                padding: 6px 16px; border-radius: 20px; text-decoration: none;
+                font-size: 12px; font-weight: bold; cursor: pointer;"
+            onmouseover="this.style.backgroundColor='#2980b9'"
+            onmouseout="this.style.backgroundColor='#3498db'"
+            >View Micro-Watershed Profile</a>
+        </div>
+    `;
+            return html;
+        }
+
+        // ============ ATTACH POPUP TO A MAP ============
+        function initPopupForMap(map, isMainMap) {
+            if (!map) return;
+
             const popupElement = document.createElement('div');
             popupElement.style.cssText = `
-                background: white;
-                border-radius: 6px;
-                padding: 12px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                border: 1px solid #ddd;
-                min-width: 250px;
-                max-width: 300px;
-                font-size: 12px;
-                pointer-events: auto;
-                line-height: 1.5;
-            `;
+        background: white; border-radius: 6px; padding: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2); border: 1px solid #ddd;
+        min-width: 250px; max-width: 300px; font-size: 12px;
+        pointer-events: auto; line-height: 1.5;
+    `;
 
             const popup = new ol.Overlay({
                 element: popupElement,
@@ -2887,228 +3067,45 @@
                 autoPanAnimation: { duration: 250 }
             });
 
-            mainMap.addOverlay(popup);
+            map.addOverlay(popup);
 
-            // Click handler
-            // Click handler
-            mainMap.on('click', function (evt) {
-                const feature = mainMap.forEachFeatureAtPixel(evt.pixel, f => f);
-
+            map.on('click', function (evt) {
+                const feature = map.forEachFeatureAtPixel(evt.pixel, f => f);
                 if (feature) {
                     const uid = feature.get('uid') || feature.get('UID') || feature.getId() || 'Unknown';
-
-                    console.log('Clicked UID:', uid);
-                    console.log('Available UIDs in mwsActivePatterns:', Object.keys(mwsActivePatterns).slice(0, 5));
-                    console.log('Pattern for this UID:', mwsActivePatterns[uid]);
-
-                    // ============ GET AREA FROM FEATURE ============
-                    const areaHa = feature.get('area_in_ha') || feature.get('area_ha') || feature.get('area') || 'N/A';
-                    const formattedArea = typeof areaHa === 'number' ? areaHa.toFixed(2) : areaHa;
-                    // ==============================================
-
-                    const intensity = (mwsPatternIntensity && mwsPatternIntensity[uid]) ? mwsPatternIntensity[uid] : 0;
-
-                    // Get pattern keys and convert to display names
-                    // const patternKeys = (mwsActivePatternsSafe && mwsActivePatternsSafe[uid]) || [];
-                    const patternKeys = mwsActivePatterns[uid] || [];
-                    const patternDisplayNames = patternKeys.map(key =>
-                        (patternDisplayMappingSafe && patternDisplayMappingSafe[key]) ||
-                        key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                    );
-                    const currentState = "{{ state }}";
-                    const currentDistrict = "{{ district }}";
-                    const currentBlock = "{{ block }}";
-                    const MWSReportUrl = `https://geoserver.core-stack.org/api/v1/generate_mws_report/?state=${currentState}&district=${currentDistrict}&block=${currentBlock}&uid=${uid}`;
-                    console.log("MWS report Url", MWSReportUrl)
-                    // Determine stress color
-                    let intensityColor, intensityText;
-                    if (intensity === 0) {
-                        intensityColor = '#27ae60';
-                        intensityText = 'No Stress Pattern';
-                    } else {
-                        intensityColor = '#c0392b';
-                        intensityText = `(${intensity}) Stress Patterns`;
-                    }
-
-                    // ============ SIMPLE POPUP CONTENT WITH AREA ============
-                    let html = `
-                        <div style="border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span style="font-weight: bold; color: #2c3e50;"> MWS: ${uid}</span>
-                                <span style="
-                                    background-color: ${intensityColor};
-                                    color: white;
-                                    padding: 2px 8px;
-                                    border-radius: 12px;
-                                    font-size: 11px;
-                                    font-weight: bold;
-                                ">${intensityText}</span>
-                            </div>
-                            <div style="font-size: 11px; color: #666; margin-top: 5px;">
-                                <span style="font-weight: bold;">Area:</span> ${formattedArea} ha
-                            </div>
-                        </div>
-                    `;
-
-                    // Add patterns
-                    if (patternDisplayNames.length > 0) {
-                        patternDisplayNames.forEach(pattern => {
-                            html += `
-                                <div style="
-                                    padding: 4px 0 4px 8px;
-                                    border-left: 3px solid #e74c3c;
-                                    margin-bottom: 3px;
-                                    font-size: 12px;
-                                    color: #555;
-                                ">• ${pattern}</div>
-                            `;
-                        });
-                    } else {
-                        html += `<div style="color: #27ae60; font-size: 12px; padding: 4px 0;">✓ No active patterns</div>`;
-                    }
-
-                    // ============ ADD BUTTON WITH CORRECT URL ============
-                    html += `
-                        <div style="margin-top: 12px; border-top: 1px solid #eee; padding-top: 10px; text-align: center;">
-                            <a href="${MWSReportUrl}" 
-                            target="_blank" 
-                            style="
-                                display: inline-block;
-                                background-color: #3498db;
-                                color: white;
-                                padding: 6px 16px;
-                                border-radius: 20px;
-                                text-decoration: none;
-                                font-size: 12px;
-                                font-weight: bold;
-                                transition: background-color 0.2s;
-                                border: none;
-                                cursor: pointer;
-                            "
-                            onmouseover="this.style.backgroundColor='#2980b9'"
-                            onmouseout="this.style.backgroundColor='#3498db'"
-                            >
-                                View Micro-Watershed Profile
-                            </a>
-                        </div>
-                    `;
-
-                    popupElement.innerHTML = html;
+                    popupElement.innerHTML = isMainMap
+                        ? buildFullPopupHTML(uid, feature)
+                        : buildSimplePopupHTML(uid, feature);
                     popup.setPosition(evt.coordinate);
 
+                    const closeBtn = popupElement.querySelector('.popup-close-btn');
+                    if (closeBtn) {
+                        closeBtn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            popup.setPosition(undefined);
+                            popupElement.innerHTML = '';
+                        });
+                    }
                 } else {
                     popup.setPosition(undefined);
                 }
             });
-            // Change cursor on hover
-            mainMap.on('pointermove', function (evt) {
-                const hit = mainMap.hasFeatureAtPixel(evt.pixel);
-                mainMap.getTargetElement().style.cursor = hit ? 'pointer' : 'default';
-            });
 
-            console.log('✅ Simple popup initialized');
+            map.on('pointermove', function (evt) {
+                const hit = map.hasFeatureAtPixel(evt.pixel);
+                map.getTargetElement().style.cursor = hit ? 'pointer' : 'default';
+            });
         }
 
-        // ============ TEST POPUP WITH FIRST FEATURE ============
-        setTimeout(() => {
-            // Get first feature for testing
-            let testFeature = null;
-            mainMap.getLayers().forEach(layer => {
-                if (layer instanceof ol.layer.Vector) {
-                    const source = layer.getSource();
-                    if (source) {
-                        source.forEachFeature(f => {
-                            if (!testFeature) testFeature = f;
-                        });
-                    }
-                }
-            });
-
-            if (testFeature) {
-                console.log('Test feature available:', testFeature.get('uid') || testFeature.get('UID'));
-            } else {
-                console.log('No features found on map yet');
-            }
-        }, 2000);
-
-
-        // ============ MINIMAL DEBUG VERSION ============
-        // Use this if the above doesn't work - this is guaranteed to work
-
-        function initMinimalClickPopup() {
-            if (!mainMap) {
-                setTimeout(initMinimalClickPopup, 200);
-                return;
-            }
-
-            console.log('Initializing minimal click popup...');
-
-            // Simple popup
-            const popupDiv = document.createElement('div');
-            popupDiv.style.cssText = `
-            background: white;
-            border-radius: 6px;
-            padding: 12px 16px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            border: 1px solid #ddd;
-            font-size: 13px;
-            pointer-events: auto;
-            max-width: 300px;
-            word-wrap: break-word;
-        `;
-
-            const popup = new ol.Overlay({
-                element: popupDiv,
-                positioning: 'bottom-center',
-                offset: [0, -10]
-            });
-            mainMap.addOverlay(popup);
-
-            // Click handler
-            mainMap.on('click', function (e) {
-                const feature = mainMap.forEachFeatureAtPixel(e.pixel, f => f);
-
-                if (feature) {
-                    const uid = feature.get('uid') || feature.get('UID') || 'Unknown';
-                    const intensity = mwsPatternIntensity?.[uid] || 0;
-                    const patterns = mwsActivePatterns?.[uid] || [];
-
-                    let html = `
-                    <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                        📍 ${uid}
-                    </div>
-                    <div style="margin-bottom: 5px;">
-                        <span style="font-weight: bold;">Stress Level:</span> 
-                        <span style="color: ${intensity > 3 ? '#c0392b' : intensity > 1 ? '#e67e22' : '#27ae60'};">
-                            ${intensity}
-                        </span>
-                    </div>
-                `;
-
-                    if (patterns.length > 0) {
-                        html += `<div style="font-weight: bold; margin-top: 8px; margin-bottom: 3px;">Patterns:</div>`;
-                        html += `<div style="max-height: 150px; overflow-y: auto;">`;
-                        patterns.forEach(p => {
-                            const display = patternDisplayMapping?.[p] || p.replace(/_/g, ' ');
-                            html += `<div style="padding: 3px 0; font-size: 12px;">• ${display}</div>`;
-                        });
-                        html += `</div>`;
-                    }
-
-                    popupDiv.innerHTML = html;
-                    popup.setPosition(e.coordinate);
-                } else {
-                    popup.setPosition(undefined);
-                }
-            });
-
-            // Cursor change
-            mainMap.on('pointermove', function (e) {
-                const hit = mainMap.hasFeatureAtPixel(e.pixel);
-                mainMap.getTargetElement().style.cursor = hit ? 'pointer' : 'default';
-            });
-
-            console.log('Minimal click popup ready');
+        // ============ INIT ALL MAPS ============
+        function initClickPopup() {
+            initPopupForMap(mainMap, true);
+            const sectionMaps = [
+                AgricultureMap, AgriDroughtMap, AgriIrrigationMap,
+                AgriYieldMap, ForestDegradMap, MiningMap, FisheryMap
+            ];
+            sectionMaps.forEach(map => initPopupForMap(map, false));
+            console.log('Popups initialized for all maps');
         }
 
         // Start initialization
