@@ -3,6 +3,7 @@ from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
+    get_layer_object,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -15,9 +16,6 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
 )
 from nrm_app.celery import app
-from computing.models import *
-
-# from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -41,10 +39,12 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
     if is_gee_asset_exists(asset_id):
         layer_obj = None
         try:
-            dataset = Dataset.objects.get(name="LULC")
-            layer_obj = Layer.objects.get(
-                dataset=dataset,
+            layer_obj = get_layer_object(
+                state=state,
+                district=district,
+                block=block,
                 layer_name=description,
+                dataset_name="LULC",
             )
         except Exception as e:
             print(
@@ -181,6 +181,10 @@ def generate_vector(
 def sync_to_db_and_geoserver(
     asset_id, state, district, block, description, start_year, end_year
 ):
+    """
+    This function will save layer information to db if asset exist and
+    update whether the layer sync to geoserver or not.
+    """
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
