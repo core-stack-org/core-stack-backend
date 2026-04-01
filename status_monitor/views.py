@@ -4,6 +4,8 @@ from datetime import timedelta
 from django.utils import timezone
 from django.views.generic import TemplateView
 
+from django_celery_beat.models import PeriodicTask
+
 from .models import Endpoint, StatusCheck
 
 
@@ -71,9 +73,19 @@ class StatusPageView(TemplateView):
                 "days": days,
             })
 
+        check_interval = ""
+        try:
+            pt = PeriodicTask.objects.get(task="status_monitor.check_all_endpoints")
+            if pt.interval:
+                every, period = pt.interval.every, pt.interval.period
+                check_interval = f"every {every} {period}" if every > 1 else f"every {period.rstrip('s')}"
+        except PeriodicTask.DoesNotExist:
+            pass
+
         ctx["endpoints"] = endpoint_data
         ctx["all_operational"] = all_operational
         ctx["last_checked"] = now
+        ctx["check_interval"] = check_interval
         ctx["date_range_start"] = date_range[0].strftime("%b %d")
         ctx["date_range_end"] = date_range[-1].strftime("%b %d")
         return ctx
