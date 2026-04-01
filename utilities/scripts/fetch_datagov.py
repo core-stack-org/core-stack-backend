@@ -5,7 +5,7 @@ A robust, modular, and resumable downloader for data.gov.in resources.
 
 FEATURES:
 ---------
-- Resource Dictionary: Use short names (e.g., 'VillageSHG') instead of UUIDs.
+- Resource Dictionary: Use short names (e.g., 'lgd_villages') instead of UUIDs.
 - Parallel Fetching: Multi-threaded downloads for speed.
 - Storage Backends: CSV, JSON, and JSONL (JSON Lines).
 - In-Memory Buffering: Option to keep data in RAM and flush periodically (safer for crashes).
