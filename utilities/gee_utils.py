@@ -396,13 +396,22 @@ def is_asset_public(asset_id):
 
 def sync_raster_to_gcs(image, scale, layer_name):
     print("inside sync_raster_to_gcs")
+    # Optimize large/sparse exports:
+    # - region limits export to image footprint
+    # - skipEmptyTiles avoids writing empty tiles for disjoint ROI
+    # - cloudOptimized produces GeoTIFFs better suited for serving/upload
     export_task = ee.batch.Export.image.toCloudStorage(
         image=image,
         description="gcs_" + layer_name,
         bucket=GCS_BUCKET_NAME,
         fileNamePrefix="nrm_raster/" + layer_name,
         scale=scale,
+        region=image.geometry(),
         fileFormat="GeoTIFF",
+        formatOptions={"cloudOptimized": True},
+        skipEmptyTiles=True,
+        fileDimensions=4096,
+        shardSize=256,
         crs="EPSG:4326",
         maxPixels=1e13,
     )
@@ -578,6 +587,25 @@ def gcs_file_exists(layer_name):
     for _ in bucket.list_blobs(prefix=prefix):
         return True
     return False
+
+
+def delete_gcs_raster_files(layer_name):
+    """
+    Delete existing raster objects for a layer from GCS.
+    Handles both:
+    - nrm_raster/<layer_name>.tif
+    - multipart outputs with prefix nrm_raster/<layer_name>
+    """
+    bucket = gcs_config()
+    prefix = f"nrm_raster/{layer_name}"
+    deleted = 0
+    for blob in bucket.list_blobs(prefix=prefix):
+        try:
+            blob.delete()
+            deleted += 1
+        except Exception as e:
+            print(f"Failed deleting GCS blob {blob.name}: {e}")
+    print(f"Deleted {deleted} GCS blob(s) for layer {layer_name}")
 
 
 def upload_tif_from_gcs_to_gee(gcs_path, asset_id, scale):
