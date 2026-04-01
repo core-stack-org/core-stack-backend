@@ -418,6 +418,8 @@ PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 
 FERNET_KEY = env("FERNET_KEY")
 
+API_KEY = env("API_KEY", default="")
+
 
 lulc_years = [
     "2017_2018",
