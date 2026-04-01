@@ -57,7 +57,7 @@
 
         .section {
             margin-bottom: 40px;
-            page-break-inside: avoid;
+            page-break-inside: auto;
         }
 
         .map {
@@ -123,13 +123,17 @@
             height: 20px;
             width: 100%;
             border-radius: 4px;
-            background: linear-gradient(to right,
-                    rgba(100, 200, 100, 0.7) 0%,
-                    rgba(200, 200, 100, 0.7) 25%,
-                    rgba(255, 200, 100, 0.7) 50%,
-                    rgba(255, 100, 50, 0.7) 75%,
-                    rgba(255, 0, 0, 0.7) 100%);
             border: 1px solid rgba(0, 0, 0, 0.2);
+
+            background: linear-gradient(to right,
+                    rgba(100, 200, 100, 1) 0%,
+                    rgba(200, 200, 100, 1) 25%,
+                    rgba(255, 200, 100, 1) 50%,
+                    rgba(255, 100, 50, 1) 75%,
+                    rgba(255, 0, 0, 1) 100%);
+
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
 
         .legend-gradient-labels {
