@@ -2,6 +2,7 @@ from rest_framework.decorators import schema
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import JsonResponse
+from django.db.models import Q
 from utilities.gee_utils import (
     valid_gee_text,
 )
@@ -19,6 +20,10 @@ from .views import (
     get_mws_geometries_data,
     get_village_geometries_data,
 )
+from computing.models import Layer, Dataset, LayerType
+from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
+from stats_generator.utils import get_url
+from nrm_app.settings import GEOSERVER_URL
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
 from .swagger_schemas import (
@@ -485,5 +490,268 @@ def get_village_geometries(request):
     except Exception as e:
         return Response(
             {"error": f"Internal server error: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+#############  Get Layer Manifest for GeoNode/QGIS  ##################
+@api_security_check(auth_type="API_key")
+def get_layer_manifest(request):
+    """
+    Return a GeoNode/QGIS-ready manifest of all layers.
+    
+    Query parameters:
+    - state: Filter by state (optional)
+    - district: Filter by district (optional)
+    - tehsil: Filter by tehsil/block (optional)
+    - all_active: Return all active locations (optional, boolean)
+    - format: Output format - 'json' or 'csv' (default: json)
+    """
+    from datetime import datetime, timezone
+    from urllib.parse import parse_qs, urlparse
+    from django.http import HttpResponse
+    import csv
+    from io import StringIO
+
+    def raster_tiff_download_url(workspace, layer_name):
+        return (
+            f"{GEOSERVER_URL}/{workspace}/wcs?service=WCS&version=2.0.1"
+            f"&request=GetCoverage&CoverageId={workspace}:{layer_name}"
+            f"&format=geotiff&compression=LZW&tiling=true&tileheight=256&tilewidth=256"
+        )
+
+    def infer_service_details(layer_url):
+        if not layer_url:
+            return {
+                "service": "", "workspace": "", "resource_name": "",
+                "resource_identifier": "", "geoserver_root": "", "ows_url": "", "wms_url": "",
+            }
+        parsed = urlparse(layer_url)
+        query_params = parse_qs(parsed.query)
+        
+        path = parsed.path or ""
+        marker_index = path.find("/geoserver")
+        if marker_index == -1:
+            geoserver_root = f"{parsed.scheme}://{parsed.netloc}"
+        else:
+            prefix = path[: marker_index + len("/geoserver")]
+            geoserver_root = f"{parsed.scheme}://{parsed.netloc}{prefix}"
+
+        service = query_params.get("service", [""])[0].upper()
+        workspace = ""
+        resource_name = ""
+        resource_identifier = ""
+
+        if "typeName" in query_params and query_params["typeName"]:
+            resource_identifier = query_params["typeName"][0]
+            if ":" in resource_identifier:
+                workspace, resource_name = resource_identifier.split(":", 1)
+        elif "CoverageId" in query_params and query_params["CoverageId"]:
+            resource_identifier = query_params["CoverageId"][0]
+            if ":" in resource_identifier:
+                workspace, resource_name = resource_identifier.split(":", 1)
+
+        ows_url = f"{geoserver_root}/{workspace}/ows" if workspace else ""
+        wms_url = f"{geoserver_root}/wms" if geoserver_root else ""
+
+        return {
+            "service": service, "workspace": workspace,
+            "resource_name": resource_name, "resource_identifier": resource_identifier,
+            "geoserver_root": geoserver_root, "ows_url": ows_url, "wms_url": wms_url,
+        }
+
+    def infer_qgis_provider(layer_type, service):
+        lt = str(layer_type).strip().lower()
+        sv = str(service).strip().lower()
+        if lt in {"vector", "point"} or sv == "wfs":
+            return "WFS"
+        if lt == "raster" or sv == "wcs":
+            return "WCS"
+        if sv == "wms":
+            return "WMS"
+        return ""
+
+    def infer_download_format(provider):
+        p = str(provider).strip().lower()
+        if p == "wfs":
+            return "GeoJSON"
+        if p == "wcs":
+            return "GeoTIFF"
+        if p == "wms":
+            return "Rendered map image"
+        return ""
+
+    def infer_style_format(style_url):
+        lowered = str(style_url).lower()
+        if lowered.endswith(".qml"):
+            return "QML"
+        if lowered.endswith(".sld"):
+            return "SLD"
+        if lowered.endswith(".json"):
+            return "JSON"
+        return ""
+
+    try:
+        state = request.query_params.get("state", "").lower()
+        district = request.query_params.get("district", "").lower()
+        tehsil = request.query_params.get("tehsil", "").lower()
+        all_active = request.query_params.get("all_active", "").lower() == "true"
+        output_format = request.query_params.get("format", "json").lower()
+
+        # Build base queryset
+        layers_qs = Layer.objects.select_related(
+            "dataset", "state", "district", "block"
+        ).filter(is_sync_to_geoserver=True)
+
+        # Filter by location
+        locations = []
+        if all_active:
+            locations = (
+                layers_qs.values("state__state_name", "district__district_name", "block__tehsil_name")
+                .distinct()
+            )
+            locations = [
+                {
+                    "state": loc["state__state_name"],
+                    "district": loc["district__district_name"],
+                    "tehsil": loc["block__tehsil_name"],
+                }
+                for loc in locations
+            ]
+        elif state and district and tehsil:
+            locations = [{"state": state, "district": district, "tehsil": tehsil}]
+        else:
+            locations = [{"state": state, "district": district, "tehsil": tehsil}]
+
+        # Collect layer records
+        all_records = []
+        EXCLUDE_KEYWORDS = ["run_off", "evapotranspiration", "precipitation"]
+
+        for loc in locations:
+            filters = Q(is_sync_to_geoserver=True)
+            if loc.get("state"):
+                filters &= Q(state__state_name__iexact=loc["state"])
+            if loc.get("district"):
+                filters &= Q(district__district_name__iexact=loc["district"])
+            if loc.get("tehsil"):
+                filters &= Q(block__tehsil_name__iexact=loc["tehsil"])
+
+            for kw in EXCLUDE_KEYWORDS:
+                filters &= ~Q(layer_name__icontains=kw)
+
+            location_layers = layers_qs.filter(filters).order_by("layer_name", "-layer_version")
+
+            # Deduplicate
+            seen = {}
+            for layer in location_layers:
+                name = layer.layer_name.lower()
+                if name not in seen:
+                    seen[name] = layer
+                else:
+                    cv = float(seen[name].layer_version or 0)
+                    nv = float(layer.layer_version or 0)
+                    if nv > cv:
+                        seen[name] = layer
+
+            for layer in seen.values():
+                dataset = layer.dataset
+                workspace = dataset.workspace or ""
+                layer_type = dataset.layer_type or ""
+                layer_name = layer.layer_name or ""
+
+                # Get style URLs
+                style_url = ""
+                sld_url = ""
+                if dataset.misc:
+                    style_url = dataset.misc.get("style_url", "")
+                    sld_url = dataset.misc.get("sld_url", "")
+
+                # Generate layer URL
+                if layer_type in [LayerType.VECTOR, LayerType.POINT]:
+                    layer_url = get_url(workspace, layer_name)
+                elif layer_type == LayerType.RASTER:
+                    layer_url = raster_tiff_download_url(workspace, layer_name)
+                else:
+                    layer_url = ""
+
+                service_details = infer_service_details(layer_url)
+                qgis_provider = infer_qgis_provider(layer_type, service_details["service"])
+
+                all_records.append({
+                    "state": layer.state.state_name.lower() if layer.state else "",
+                    "district": layer.district.district_name.lower() if layer.district else "",
+                    "tehsil": layer.block.tehsil_name.lower() if layer.block else "",
+                    "dataset_name": dataset.name or "",
+                    "layer_name": layer_name,
+                    "layer_type": layer_type,
+                    "layer_version": layer.layer_version or "",
+                    "layer_url": layer_url,
+                    "style_url": style_url,
+                    "sld_url": sld_url,
+                    "style_format": infer_style_format(style_url),
+                    "sld_format": "SLD" if sld_url else "",
+                    "gee_asset_path": layer.gee_asset_path or "",
+                    "service_type": service_details["service"],
+                    "workspace": service_details["workspace"],
+                    "resource_identifier": service_details["resource_identifier"],
+                    "resource_name": service_details["resource_name"] or layer_name,
+                    "geoserver_root": service_details["geoserver_root"],
+                    "ows_url": service_details["ows_url"],
+                    "wms_url": service_details["wms_url"],
+                    "qgis_provider": qgis_provider,
+                    "download_format": infer_download_format(qgis_provider),
+                    "geonode_publish_strategy": "remote-service-from-geoserver",
+                })
+
+        # Build summary
+        unique_wms = sorted(set(r["wms_url"] for r in all_records if r.get("wms_url")))
+        unique_ws = sorted(set(r["workspace"] for r in all_records if r.get("workspace")))
+        type_counts = {}
+        for r in all_records:
+            lt = r.get("layer_type", "unknown") or "unknown"
+            type_counts[lt] = type_counts.get(lt, 0) + 1
+
+        manifest = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "source": "django_database",
+            "scope": {
+                "all_active_locations": all_active,
+                "requested_state": state,
+                "requested_district": district,
+                "requested_tehsil": tehsil,
+                "location_count": len(locations),
+            },
+            "summary": {
+                "layer_count": len(all_records),
+                "layer_type_counts": type_counts,
+                "unique_workspaces": unique_ws,
+                "unique_wms_urls": unique_wms,
+            },
+            "locations": locations,
+            "layers": all_records,
+        }
+
+        if output_format == "csv":
+            if not all_records:
+                return Response(
+                    {"error": "No layers found for the specified location(s)"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            fieldnames = list(all_records[0].keys())
+            output = StringIO()
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_records)
+
+            response = HttpResponse(output.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = "attachment; filename=core_stack_manifest.csv"
+            return response
+
+        return Response(manifest, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print(f"Error in get_layer_manifest: {str(e)}")
+        return Response(
+            {"status": "error", "message": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

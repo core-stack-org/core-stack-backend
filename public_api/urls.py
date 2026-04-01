@@ -32,4 +32,9 @@ urlpatterns = [
         api.get_village_geometries,
         name="get-village-geometries",
     ),
+    path(
+        "get_layer_manifest/",
+        api.get_layer_manifest,
+        name="get-layer-manifest",
+    ),
 ]
