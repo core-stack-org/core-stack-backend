@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoRE Stack Status</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f9fafb; }
+        .bar { width: 8px; height: 34px; border-radius: 3px; cursor: pointer; transition: transform 0.15s; }
+        .bar:hover { transform: scaleY(1.25); }
+        .bar.operational { background-color: #22c55e; }
+        .bar.degraded { background-color: #eab308; }
+        .bar.outage { background-color: #ef4444; }
+        .bar.nodata { background-color: #d1d5db; }
+        .tooltip {
+            position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+            background: #1f2937; color: #fff; font-size: 12px; padding: 6px 10px;
+            border-radius: 6px; white-space: nowrap; pointer-events: none;
+            opacity: 0; transition: opacity 0.15s; margin-bottom: 6px; z-index: 10;
+        }
+        .tooltip::after {
+            content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            border: 5px solid transparent; border-top-color: #1f2937;
+        }
+        .bar-wrapper:hover .tooltip { opacity: 1; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-dot.up { background-color: #22c55e; }
+        .status-dot.down { background-color: #ef4444; }
+        .status-dot.unknown { background-color: #d1d5db; }
+    </style>
+</head>
+<body class="min-h-screen py-8 px-4">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-2xl font-bold text-gray-900 mb-1">CoRE Stack Status</h1>
+            <p class="text-sm text-gray-500">
+                Last checked: {{ last_checked|date:"M d, Y H:i" }} IST
+            </p>
+        </div>
+
+        <!-- Overall Status Banner -->
+        <div class="rounded-lg p-5 mb-8 shadow-sm border
+            {% if all_operational %}bg-green-50 border-green-200{% else %}bg-yellow-50 border-yellow-200{% endif %}">
+            <div class="flex items-center">
+                {% if all_operational %}
+                    <svg class="w-6 h-6 text-green-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-green-800 font-semibold text-lg">All Systems Operational</span>
+                {% else %}
+                    <svg class="w-6 h-6 text-yellow-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-yellow-800 font-semibold text-lg">Some Systems Experiencing Issues</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Uptime Legend -->
+        <div class="flex items-center justify-between text-xs text-gray-400 mb-6 px-1">
+            <span>{{ date_range_start }}</span>
+            <div class="flex items-center space-x-4">
+                <span class="flex items-center"><span class="bar operational mr-1" style="width:8px;height:12px;"></span> 100%</span>
+                <span class="flex items-center"><span class="bar degraded mr-1" style="width:8px;height:12px;"></span> Degraded</span>
+                <span class="flex items-center"><span class="bar outage mr-1" style="width:8px;height:12px;"></span> Outage</span>
+                <span class="flex items-center"><span class="bar nodata mr-1" style="width:8px;height:12px;"></span> No data</span>
+            </div>
+            <span>{{ date_range_end }}</span>
+        </div>
+
+        <!-- Endpoints -->
+        {% for ep in endpoints %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center">
+                    <span class="status-dot {% if ep.current_up %}up{% elif ep.current_up == None %}unknown{% else %}down{% endif %} mr-3"></span>
+                    <div>
+                        <span class="font-medium text-gray-900">{{ ep.name }}</span>
+                        {% if ep.current_up %}
+                            <span class="text-green-600 text-sm ml-2">Operational</span>
+                        {% elif ep.current_up == None %}
+                            <span class="text-gray-400 text-sm ml-2">No data</span>
+                        {% else %}
+                            <span class="text-red-600 text-sm ml-2">Down</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="text-right text-sm text-gray-500">
+                    {% if ep.uptime_pct != None %}
+                        <span class="font-medium {% if ep.uptime_pct == 100 %}text-green-600{% elif ep.uptime_pct >= 99 %}text-green-600{% elif ep.uptime_pct >= 95 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                            {{ ep.uptime_pct|floatformat:2 }}%
+                        </span>
+                        <span class="text-gray-400 ml-1">uptime</span>
+                    {% endif %}
+                    {% if ep.response_time_ms != None %}
+                        <span class="text-gray-400 ml-3">{{ ep.response_time_ms }}ms</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex items-end space-x-0.5" style="gap: 2px;">
+                {% for day in ep.days %}
+                <div class="bar-wrapper relative flex-1 flex justify-center">
+                    <div class="bar {{ day.color }}"></div>
+                    <div class="tooltip">
+                        {{ day.date }}<br>
+                        {% if day.pct != None %}{{ day.pct|floatformat:1 }}% uptime{% else %}No data{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
+            No endpoints configured. Run <code class="bg-gray-100 px-2 py-1 rounded text-sm">python manage.py setup_status_monitor</code> to seed endpoints.
+        </div>
+        {% endfor %}
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-xs text-gray-400">
+            <p>Uptime over the past 30 days{% if check_interval %} &middot; Checks run {{ check_interval }}{% endif %}</p>
+            <p class="mt-1">Powered by CoRE Stack</p>
+        </div>
+    </div>
+</body>
+</html>

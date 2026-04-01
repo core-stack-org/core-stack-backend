@@ -123,6 +123,7 @@ INSTALLED_APPS = [
     "apiadmin",
     "moderation",
     "users.apps.UsersConfig",
+    "status_monitor",
 ]
 
 # MARK: CORS Settings
@@ -416,6 +417,8 @@ DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
 PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 
 FERNET_KEY = env("FERNET_KEY")
+
+API_KEY = env("API_KEY", default="")
 
 
 lulc_years = [
