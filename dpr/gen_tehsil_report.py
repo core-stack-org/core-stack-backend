@@ -2149,6 +2149,14 @@ def get_forest_degrad_data(state, district, block):
             file_path, sheet_name="change_detection_deforestation"
         )
 
+        ci_columns = [
+            col for col in df_area.columns if col.startswith("cropping_intensity_")
+        ]
+
+        start_year = 2017
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
         mws_pattern = {}
         mws_intensity = {}
 
@@ -2258,6 +2266,7 @@ def get_forest_degrad_data(state, district, block):
             "mws_intensity": mws_intensity,
             "total_area": total_matched_area,
             "total_all_area": total_all_area,
+            "year_range": year_range,
         }
 
         return result, forest_sankey
@@ -2511,6 +2520,16 @@ def get_socio_economic_nrega_data(state, district, block):
         df_mws_villages = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
         df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
 
+        ci_columns = [
+            col for col in df_nrega.columns if col.startswith("Community assets_count")
+        ]
+
+        start_year = 2005
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
+        print("nrega ---year", year_range)
+
         village_pattern = {}
         village_intensity = {}
 
@@ -2644,6 +2663,7 @@ def get_socio_economic_nrega_data(state, district, block):
             "village_intensity": village_intensity,
             "total_villages": len(matched_villages),
             "total_all_villages": total_all_villages,
+            "year_range": year_range,
         }
 
         return result, nrega_pie_chart
@@ -2661,6 +2681,7 @@ def get_socio_economic_nrega_data(state, district, block):
             "village_intensity": {},
             "total_villages": 0,
             "total_all_villages": 0,
+            "year_range": "",
         }, {"labels": [], "values": []}
 
 

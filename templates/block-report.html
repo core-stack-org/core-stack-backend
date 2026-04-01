@@ -1041,7 +1041,8 @@
             <p class="pattern-summary">
                 <span id="forest-area" class="number-class"></span> hectares out of
                 <span id="forest-area-1" class="number-class"></span> hectares of area under tree cover in the tehsil
-                appears to have reduced.
+                appears to have been lost. Forest protection committees and strengthening of collective norms should be
+                considered. The data is computed over the years <span id="CRPyearRange"></span> .
             </p>
             <div class="pattern-info-container">
                 <div class="pattern-conditions">
@@ -1128,7 +1129,7 @@
                 <h3>Poor uptake of MGNREGA works</h3>
                 <p><span id="nrega-villages" class="number-class"></span> villages out of <span id="nrega-villages-1"
                         class="number-class"></span> have had a low (less than 100 NREGA work) number of NREGA works
-                    during 2005-2025.
+                    during <span id="NREGAyearRange"></span>.
                     Positive discrimination in access to NREGA assets should be considered.</p>
 
                 <div class="map-chart-container">
@@ -1293,6 +1294,8 @@
         document.getElementById("HIrriRiskyearRange").innerText = highIrrigationRisk.year_range;
         document.getElementById("FishryyearRange").innerText = fisheryPotential.year_range;
         document.getElementById("CRPYieldyearRange").innerText = lowYield.year_range;
+        document.getElementById("CRPyearRange").innerText = forestDegradation.year_range;
+        document.getElementById("NREGAyearRange").innerText = socioNrega.year_range;
 
         function getColorForIntensity(intensity) {
 
