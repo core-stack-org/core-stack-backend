@@ -4,6 +4,7 @@ from django.db import models
 class Endpoint(models.Model):
     name = models.CharField(max_length=255)
     url = models.URLField(max_length=1024, unique=True)
+    headers = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
