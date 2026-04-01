@@ -119,7 +119,7 @@
 
         <!-- Footer -->
         <div class="mt-8 text-center text-xs text-gray-400">
-            <p>Uptime over the past 30 days &middot; Checks run every 5 minutes</p>
+            <p>Uptime over the past 30 days{% if check_interval %} &middot; Checks run {{ check_interval }}{% endif %}</p>
             <p class="mt-1">Powered by CoRE Stack</p>
         </div>
     </div>
