@@ -42,6 +42,9 @@ def generate_cropping_intensity(
     gee_account_id=None,
     zoi_ci_asset=None,
 ):
+    """
+    It will generate croppingintensity layer for given location(tehsil level) or region of intrest.
+    """
     ee_initialize(gee_account_id)
     if state and district and block:
         asset_suffix = (

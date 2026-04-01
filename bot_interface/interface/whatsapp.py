@@ -88,7 +88,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         # Preserve session context (smj_id, state, user_id)
         WhatsAppInterface._preserve_user_context(event_packet, bot_id)
 
-        # 🔥 CRITICAL FIX: normalize interactive events
+        # CRITICAL FIX: normalize interactive events
         WhatsAppInterface._normalize_interactive_event(event_packet, bot_id)
 
         return event_packet
@@ -114,7 +114,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         except Exception:
             return
 
-        # 🔑 COMMUNITY SELECTION CONTRACT
+        # COMMUNITY SELECTION CONTRACT
         if user_session.expected_response_type == "community":
             event_packet["event"] = "success"
             # misc already has community_id
@@ -184,7 +184,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
         # Always keep raw id available
         event_packet["misc"] = reply_id
 
-        # 🔑 IMPORTANT: set semantic event
+        #  IMPORTANT: set semantic event
         event_packet["event"] = reply_id
 
         if message.get("context"):
@@ -363,7 +363,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                 button_value = event_data.get("misc") or event_data.get("data")
                 print(f"DEBUG: Button event detected - button_value: {button_value}")
 
-                # ✅ Always preserve semantic event
+                #  Always preserve semantic event
                 event_to_process = event_data.get("event") or "success"
 
                 # -------- Payload handling ONLY --------
@@ -1417,7 +1417,9 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
                         break
 
                 # Create contextual service menu message
-                service_text = f"📋 {community_name} के लिए सेवाएं\n\nआप क्या करना चाहते हैं:"
+                service_text = (
+                    f"📋 {community_name} के लिए सेवाएं\n\nआप क्या करना चाहते हैं:"
+                )
             else:
                 # Fallback message if no active community
                 service_text = "📋 समुदाय सेवाएं\n\nआप क्या करना चाहते हैं:"
@@ -1958,7 +1960,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
             try:
                 user_log = UserLogs.objects.get(id=user_log_id)
             except UserLogs.DoesNotExist:
-                print ("user log not found") 
+                print("user log not found")
                 return {
                     "success": False,
                     "message": f"UserLogs record with id {user_log_id} not found",
@@ -2087,7 +2089,7 @@ class WhatsAppInterface(bot_interface.interface.generic.GenericInterface):
 
             # Prepare API payload
             payload = {
-                "item_type": 'Asset_Demand',
+                "item_type": "Asset_Demand",
                 "coordinates": json.dumps(coordinates) if coordinates else "",
                 "number": contact_number,
                 "community_id": community_id,

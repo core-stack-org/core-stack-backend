@@ -3,6 +3,7 @@ from rasterio.features import rasterize
 from rasterio.transform import from_origin
 import fiona
 import os
+from utilities.constants import CRS
 
 
 def rasterize_vector(vector_path, output_raster_path, attribute_column):
@@ -44,7 +45,7 @@ def rasterize_vector(vector_path, output_raster_path, attribute_column):
         width=raster.shape[1],
         count=1,
         dtype=raster.dtype,
-        crs="EPSG:4326",
+        crs=CRS,
         transform=transform,
     ) as dst:
         dst.write(raster, 1)

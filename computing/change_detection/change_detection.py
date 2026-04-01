@@ -20,6 +20,10 @@ from computing.STAC_specs import generate_STAC_layerwise
 def get_change_detection(
     self, state, district, block, start_year, end_year, gee_account_id
 ):
+    """
+    This function will generate change detection raster for urbanization, Degradation,
+    Deforestation, Afforestation and cropintensity for given location(tehsil level)
+    """
     # Initialize the Earth Engine
     ee_initialize(gee_account_id)
     param_dict = {
@@ -488,6 +492,7 @@ def sync_to_gcs_geoserver(
             change.lower(),
         )
         if res and layer_ids[change]:
+            # update flag in db whether layer sync to geoserver or not
             sync_status = update_layer_sync_status(
                 layer_id=layer_ids[change], sync_to_geoserver=True
             )

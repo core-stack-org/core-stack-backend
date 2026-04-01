@@ -214,8 +214,15 @@ GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
 LULC_ASSET = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2024_2025"
-SLOPE_ASSET = "USGS/SRTMGL1_003"
+SRTM_DIGITAL_ELEVATION = "USGS/SRTMGL1_003"
 CATCHMENT_ASSET = "projects/ext-datasets/assets/datasets/catchment_area_multiflow"
 STREAM_ORDER_ASSET = (
     "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
 )
+
+INDIA_LINEAMENTS = "projects/ee-harshita-om/assets/india_lineaments"
+CRS = "EPSG:4326"
+DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
+CHIRPS_PPT = "UCSB-CHG/CHIRPS/DAILY"
+MODIS_ET = "MODIS/061/MOD16A2GF"
+SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
