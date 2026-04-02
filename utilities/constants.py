@@ -226,3 +226,12 @@ DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 CHIRPS_PPT = "UCSB-CHG/CHIRPS/DAILY"
 MODIS_ET = "MODIS/061/MOD16A2GF"
 SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
+LITHOLOGY_BASE_ASSET_ID_PATH = "projects/ee-corestackdev/assets/apps/mws/"
+RIVER_BASIN_EE_ACCOUNT = "datasets"
+CGWB_BASIN = "projects/corestack-datasets/assets/datasets/CGWB_basin"
+LULC_V2_RIVER_BASIN_OUTPUT = (
+    "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
+)
+LULC_V2_RIVER_BASIN_MAX_PIXEL = 1e13
+LULC_V3_RIVER_BASIN_EE_ACCOUNT = 7
+LULC_V3_OUTPUT_ASSET = "projects/corestack-datasets/assets/datasets/lulc_v3/"
