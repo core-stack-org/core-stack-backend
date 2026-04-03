@@ -230,6 +230,8 @@ CGWB_BASIN = "projects/corestack-datasets/assets/datasets/CGWB_basin"
 LULC_V2_RIVER_BASIN_OUTPUT = (
     "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
 )
+LULC_V2_RIVER_BASIN_MAX_PIXEL = 1e13
+LULC_V3_RIVER_BASIN_EE_ACCOUNT = 7
 LULC_V3_OUTPUT_ASSET = "projects/corestack-datasets/assets/datasets/lulc_v3/"
 LEVEL_1C_TOA = "COPERNICUS/S2_HARMONIZED"
 LAND_COVER_CLASSIFICATION_10_METER = "GOOGLE/DYNAMICWORLD/V1"
