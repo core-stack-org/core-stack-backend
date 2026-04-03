@@ -1,6 +1,13 @@
 import ee
 from datetime import datetime, timedelta
 import pandas as pd
+from utilities.constants import (
+    L1_TOA,
+    LC_O8_T1_TOA,
+    LEVEL_1C_TOA,
+    VEGETATION_INDEX_OF_16_DAY,
+    PAN_INDIA_LULC_V3,
+)
 
 chastainBandNames = ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "SWIR2"]
 
@@ -87,7 +94,7 @@ Get Landsat and Sentinel image collections
 def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
     # ------ Landsat 7 TOA
     L7 = (
-        ee.ImageCollection("LANDSAT/LE07/C02/T1_TOA")
+        ee.ImageCollection(L1_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL7cloud)
@@ -97,7 +104,7 @@ def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
 
     # ------ Landsat 8 TOA
     L8 = (
-        ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
+        ee.ImageCollection(LC_O8_T1_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL8cloud)
@@ -107,7 +114,7 @@ def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
 
     # ------ Sentinel-2 TOA
     S2 = (
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+        ee.ImageCollection(LEVEL_1C_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskS2cloudTOA)
@@ -212,7 +219,7 @@ def Get_NDVI_image_datewise(harmonized_LS_ic, roi_boundary):
 
 
 def Get_LS_16Day_NDVI_TimeSeries(
-        inputStartDate, inputEndDate, harmonized_LS_ic, roi_boundary
+    inputStartDate, inputEndDate, harmonized_LS_ic, roi_boundary
 ):
     startDate = datetime.strptime(inputStartDate, "%Y-%m-%d")
     endDate = datetime.strptime(inputEndDate, "%Y-%m-%d")
@@ -242,7 +249,7 @@ def pairLSModis(lsRenameBands, roi_boundary):
 
         # ------ MODIS VI ( We can add EVI to the band list later )
         modis = (
-            ee.ImageCollection("MODIS/061/MOD13Q1")
+            ee.ImageCollection(VEGETATION_INDEX_OF_16_DAY)
             .filterDate(startDateT, endDateT)
             .select(["NDVI", "SummaryQA"])
             .filterBounds(roi_boundary)
@@ -490,7 +497,7 @@ studyarea ---> geometry of region of interest
 
 # Function to get distances as required from each pixel to each cluster centroid
 def Get_Euclidean_Distance(
-        cluster_centroids, roi_timeseries_img, input_bands, roi_boundary
+    cluster_centroids, roi_timeseries_img, input_bands, roi_boundary
 ):
     def wrapper(curr_centroid):
         temp_img = ee.Image()
@@ -559,9 +566,7 @@ def Get_final_prediction_image(distance_imgs_list):
 
 
 def get_cropping_frequency(roi_boundary, startDate, endDate):
-    cluster_centroids = ee.FeatureCollection(
-        "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
-    )
+    cluster_centroids = ee.FeatureCollection(PAN_INDIA_LULC_V3)
     ignore_clusters = [12]  # remove invalid clusters
     cluster_centroids = cluster_centroids.filter(
         ee.Filter.Not(ee.Filter.inList("class", ignore_clusters))

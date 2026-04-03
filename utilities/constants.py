@@ -235,3 +235,16 @@ LULC_V2_RIVER_BASIN_OUTPUT = (
 LULC_V2_RIVER_BASIN_MAX_PIXEL = 1e13
 LULC_V3_RIVER_BASIN_EE_ACCOUNT = 7
 LULC_V3_OUTPUT_ASSET = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+LEVEL_1C_TOA = "COPERNICUS/S2_HARMONIZED"
+LAND_COVER_CLASSIFICATION_10_METER = "GOOGLE/DYNAMICWORLD/V1"
+LEVEL_1_GRD = "COPERNICUS/S1_GRD"
+DEM_OF_90_M_RESOLUTION = "CGIAR/SRTM90_V4"
+CROPLAND_DATASET_PATH = "projects/ee-indiasat/assets/Rasterized_Groundtruth/L2_TrainingData_SAR_TimeSeries_1Year"
+ANKIT_CGWB_BASIN = "projects/ee-ankit-mcs/assets/CGWB_basin"
+L1_TOA = "LANDSAT/LE07/C02/T1_TOA"
+LC_O8_T1_TOA = "LANDSAT/LC08/C02/T1_TOA"
+VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
+PAN_INDIA_LULC_V3 = (
+    "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
+)
+PAN_INDIA_LULC_V3_BASE = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"

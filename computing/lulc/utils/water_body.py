@@ -1,5 +1,10 @@
 import ee
 from computing.lulc.misc import mask_s2cloud
+from utilities.constants import (
+    LEVEL_1_GRD,
+    LAND_COVER_CLASSIFICATION_10_METER,
+    LEVEL_1C_TOA,
+)
 
 """
 Function to get the first date of the month of input start date and the last date of this month.
@@ -24,7 +29,7 @@ Function to get water body predictions in kharif using Sentinel-1 SAR data.
 
 def get_kharif_bodies(roi_boundary, start_date, end_date):
     SAR_ic = (
-        ee.ImageCollection("COPERNICUS/S1_GRD")
+        ee.ImageCollection(LEVEL_1_GRD)
         .filterBounds(roi_boundary)
         .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VV"))
     )
@@ -181,7 +186,7 @@ Function to get water body predictions in Zaid using Dynamic World.
 
 def get_zaid_bodies(roi_boundary, start_date, end_date):
     DW_ic = (
-        ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+        ee.ImageCollection(LAND_COVER_CLASSIFICATION_10_METER)
         .filterBounds(roi_boundary)
         .select(["label", "water"])
     )
@@ -271,7 +276,7 @@ def ndwi_based_water_cleaning(
     roi_boundary, prediction_image, startDate, endDate, NDWI_threshold
 ):
     S2_ic = (
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+        ee.ImageCollection(LEVEL_1C_TOA)
         .filterBounds(roi_boundary)
         .filterDate(startDate, endDate)
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 10))

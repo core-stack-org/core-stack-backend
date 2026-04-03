@@ -15,6 +15,7 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
 from computing.lulc.misc import clip_lulc_from_river_basin
+from utilities.constants import ANKIT_CGWB_BASIN, LULC_V2_RIVER_BASIN_MAX_PIXEL, CRS
 
 
 @app.task(bind=True)
@@ -66,7 +67,7 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         crop_freq_array.append(cropping_frequency_img)
-        river_basin = ee.FeatureCollection("projects/ee-ankit-mcs/assets/CGWB_basin")
+        river_basin = ee.FeatureCollection(ANKIT_CGWB_BASIN)
         l1_asset_new.append(
             clip_lulc_from_river_basin(
                 river_basin,
@@ -450,8 +451,8 @@ def lulc_river_basin(self, state_name, district_name, block_name, start_year, en
             assetId=final_output_assetid_array_new[i],
             pyramidingPolicy={"predicted_label": "mode"},
             scale=scale,
-            maxPixels=1e13,
-            crs="EPSG:4326",
+            maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
+            crs=CRS,
         )
         image_export_task.start()
         print("Successfully started the LULC v3", image_export_task.status())
