@@ -2,7 +2,7 @@ from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from computing.utils import sync_project_fc_to_geoserver
 
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, PAN_INDIA_LULC_V3_RIVER_BASIN, PAN_INDIA_LULC_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long,
@@ -33,7 +33,6 @@ import math
 import os
 import requests
 import json
-
 
 years = [
     "2017_2018",
@@ -141,10 +140,7 @@ def get_waterbody_id_for_lat_long(excel_hash, water_body_asset_id):
 def get_water_mask(year):
     # Define your water classes
     water_classes = [2, 3, 4]
-    image = ee.Image(
-        "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
-        + year
-    )
+    image = ee.Image(PAN_INDIA_LULC_V3_RIVER_BASIN + year)
     water_mask = (
         image.select("predicted_label")
         .remap(water_classes, [1] * len(water_classes), 0)
@@ -186,7 +182,7 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
     water_masks = []
     for year in lulc_years:
         image = ee.Image(
-            f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}"
+            f"{PAN_INDIA_LULC_DATASET}{year}"
         )
         water_mask = (
             image.select("predicted_label")
@@ -795,7 +791,7 @@ def get_merged_waterbodies_with_zoi(
 
     # If both failed, return None
     if standard_map is None and zoi_map is None:
-        print("❌ Both standard and ZOI fetch failed.")
+        print(" Both standard and ZOI fetch failed.")
         return None
 
     # Merge: union of UIDs from both maps

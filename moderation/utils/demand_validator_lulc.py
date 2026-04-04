@@ -1,6 +1,6 @@
 import re
 import ee
-from utilities.constants import LULC_ASSET
+from utilities.constants import LULC_ASSET, FDIR
 from utilities.gee_utils import ee_initialize
 from moderation.utils.utils import LULC_MODE_BY_STRUCTURE
 
@@ -100,7 +100,7 @@ def compute_lulc_downstream(lat: float, lon: float, n_steps: int = 3) -> str | N
     # -----------------------------
     # Load datasets
     # -----------------------------
-    fdir = ee.Image("WWF/HydroSHEDS/03DIR").select("b1")
+    fdir = ee.Image(FDIR).select("b1")
     lulc = _lulc_image()
 
     pt = ee.Geometry.Point([lon, lat])

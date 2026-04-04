@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 import os
+from utilities.constants import STAT_CSV_PATH, OUTPUT_JSON_PATH
 
 
 def gen_json_data(state_csv_path, output_json_path=None):
@@ -60,7 +61,7 @@ def gen_json_data(state_csv_path, output_json_path=None):
 
 
 json_string = gen_json_data(
-    "/home/ankit/gramvaani/nrm/checkin/backend/fromgitlab/nrm-app/data/admin-boundaries/odisha.csv",
-    "/home/ankit/gramvaani/nrm/checkin/backend/fromgitlab/nrm-app/data/output/all_states.json",
+    STAT_CSV_PATH,
+    OUTPUT_JSON_PATH,
 )
 print(json_string)

@@ -871,12 +871,12 @@ def BuildWaterBodyLayer(
         return ee.Feature(
             ee.Algorithms.If(
                 has_match,
-                # ✅ MATCH FOUND → duplicate polygon geometry
+                #  MATCH FOUND → duplicate polygon geometry
                 ee.Feature(matched_polygon)
                 .copyProperties(point)
                 .set("matched", True)
                 .set("match_type", match_type),
-                # ❌ NO MATCH → keep original POINT geometry
+                #  NO MATCH → keep original POINT geometry
                 ee.Feature(pt_geom)
                 .copyProperties(point)
                 .set("matched", False)
