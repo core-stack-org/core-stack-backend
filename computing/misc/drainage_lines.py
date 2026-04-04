@@ -17,7 +17,7 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     get_gee_dir_path,
 )
-from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
+from utilities.constants import GEE_DATASET_PATH, GEE_PATHS, PAN_INDIA_DRAINAGE_LINES
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
@@ -35,10 +35,14 @@ def clip_drainage_lines(
     app_type="MWS",
     proj_id=None,
 ):
+    """
+    It will generate drainage line layer for given location at tehsil level
+
+    """
     print("started drainage line")
     ee_initialize(gee_account_id)
     pan_india_drainage = ee.FeatureCollection(
-        GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
+        GEE_DATASET_PATH + PAN_INDIA_DRAINAGE_LINES
     )
     description = ""
     if state and district and block:

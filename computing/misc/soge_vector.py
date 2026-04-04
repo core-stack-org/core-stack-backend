@@ -17,12 +17,15 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from computing.utils import sync_fc_to_geoserver
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH, SOGE
 from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
 def generate_soge_vector(self, state, district, block, gee_account_id):
+    """
+    It will generate soge layer for given location at tehsil level
+    """
     """Generate vector layer for the SOGE - Stage of Ground Water Extraction"""
     ee_initialize(gee_account_id)
 
@@ -30,7 +33,7 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
     asset_path = get_gee_asset_path(state, district, block)
     asset_id = asset_path + description
 
-    soge_fc = ee.FeatureCollection(GEE_DATASET_PATH + "/SOGE_vector_2020")
+    soge_fc = ee.FeatureCollection(GEE_DATASET_PATH + SOGE)
 
     if not is_gee_asset_exists(asset_id):
         mws_asset_id = (

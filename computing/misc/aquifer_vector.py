@@ -9,7 +9,7 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     make_asset_public,
 )
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH, AQUIFER
 from computing.utils import (
     sync_fc_to_geoserver,
     save_layer_info_to_db,
@@ -41,7 +41,7 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
     )
     roi = ee.FeatureCollection(roi_asset_id)
 
-    aquifers_fc = ee.FeatureCollection(GEE_DATASET_PATH + "/Aquifer_vector")
+    aquifers_fc = ee.FeatureCollection(GEE_DATASET_PATH + AQUIFER)
 
     yield_dict = ee.Dictionary(
         {
