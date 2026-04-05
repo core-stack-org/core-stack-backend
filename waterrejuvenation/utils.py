@@ -2,7 +2,11 @@ from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from computing.utils import sync_project_fc_to_geoserver
 
 from projects.models import Project
-from utilities.constants import GEE_PATHS, PAN_INDIA_LULC_V3_RIVER_BASIN, PAN_INDIA_LULC_DATASET
+from utilities.constants import (
+    GEE_PATHS,
+    PAN_INDIA_LULC_V3_RIVER_BASIN,
+    PAN_INDIA_LULC_DATASET,
+)
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long,
@@ -181,9 +185,7 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
     # Create water masks from each LULC year
     water_masks = []
     for year in lulc_years:
-        image = ee.Image(
-            f"{PAN_INDIA_LULC_DATASET}{year}"
-        )
+        image = ee.Image(f"{PAN_INDIA_LULC_DATASET}{year}")
         water_mask = (
             image.select("predicted_label")
             .remap(water_classes, [1] * len(water_classes), 0)

@@ -314,4 +314,6 @@ WATER_REJ_GEE_ASSET = "projects/ee-kapil-test/assets/apps/waterbody/"
 PAN_INDIA_LULC_V3_RIVER_BASIN = (
     "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
 )
-PAN_INDIA_LULC_DATASET = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+PAN_INDIA_LULC_DATASET = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+)
