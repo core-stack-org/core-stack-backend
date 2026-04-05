@@ -37,6 +37,9 @@ def generate_swb_layer(
     end_year=None,
     gee_account_id=None,
     is_all_classes=False,
+    river_asset_id=None,
+    canal_asset_id=None,
+    waterbody_type_buffer_m=500,
 ):
     ee_initialize(gee_account_id)
     if state and district and block:
@@ -105,13 +108,21 @@ def generate_swb_layer(
         if swb3:
             task_id_list = check_task_status([swb3])
             print("SWB task completed - swb3_task_id_list:", task_id_list)
-    swb4, asset_id = waterbody_catchment_streamorder_properties(
-        roi=roi,
-        asset_suffix=asset_suffix,
-        asset_folder_list=asset_folder_list,
-        app_type=app_type,
-        gee_account_id=gee_account_id,
-    )
+    swb4_kwargs = {
+        "roi": roi,
+        "asset_suffix": asset_suffix,
+        "asset_folder_list": asset_folder_list,
+        "app_type": app_type,
+        "gee_account_id": gee_account_id,
+        "waterbody_type_buffer_m": waterbody_type_buffer_m,
+    }
+    # Only pass explicit overrides. If None, let swb4.py defaults apply.
+    if river_asset_id:
+        swb4_kwargs["river_asset_id"] = river_asset_id
+    if canal_asset_id:
+        swb4_kwargs["canal_asset_id"] = canal_asset_id
+
+    swb4, asset_id = waterbody_catchment_streamorder_properties(**swb4_kwargs)
     if swb4:
         task_id_list = check_task_status([swb4])
         print("SWB task completed - swb4_task_id_list:", task_id_list)
