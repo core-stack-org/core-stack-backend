@@ -54,7 +54,7 @@ def compute_max_stream_order_and_catchment_for_swb(swb_layer_asset, proj_id):
     task = ee.batch.Export.table.toAsset(
         collection=swb_with_max,
         description="Export_SWB_Max_catchment_area",
-        assetId=asset_name,  # 🔁 Your desired asset path
+        assetId=asset_name,  # Your desired asset path
     )
     task.start()
     wait_for_task_completion(task)
