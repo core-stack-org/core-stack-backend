@@ -221,12 +221,11 @@ STREAM_ORDER_ASSET = (
 )
 
 INDIA_LINEAMENTS = "projects/ee-harshita-om/assets/india_lineaments"
-CRS = "EPSG:4326"
+CRS_4326 = "EPSG:4326"
 DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 CHIRPS_PPT = "UCSB-CHG/CHIRPS/DAILY"
-MODIS_ET = "MODIS/061/MOD16A2GF"
-SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
-LITHOLOGY_BASE_ASSET_ID_PATH = "projects/ee-corestackdev/assets/apps/mws/"
+MODIS_TERRA_NET_ET_GAP_FILLED_8_DAY = "MODIS/061/MOD16A2GF"
+MODIS_TERRA_SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
 RIVER_BASIN_EE_ACCOUNT = "datasets"
 CGWB_BASIN = "projects/corestack-datasets/assets/datasets/CGWB_basin"
 LULC_V2_RIVER_BASIN_OUTPUT = (
@@ -247,4 +246,6 @@ VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
 PAN_INDIA_LULC_V3 = (
     "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
 )
-PAN_INDIA_LULC_V3_BASE = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+PAN_INDIA_LULC_V3_BASE = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
