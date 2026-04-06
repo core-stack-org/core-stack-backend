@@ -20,6 +20,9 @@ from constants.pan_india_urls import NATURAL_DEPRESSION
 
 @app.task(bind=True)
 def generate_natural_depression_data(self, state, district, block, gee_account_id):
+    """
+    It will generate natural depression layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     description = (
         "natural_depression_" + valid_gee_text(district) + "_" + valid_gee_text(block)
