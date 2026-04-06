@@ -15,6 +15,8 @@ from utilities.constants import (
     ADMIN_BOUNDARY_INPUT_DIR,
     NREGA_ASSETS_INPUT_DIR,
     NREGA_ASSETS_OUTPUT_DIR,
+    CRS,
+    SOI_TEHSIL,
 )
 from unidecode import unidecode
 import boto3
@@ -51,6 +53,9 @@ def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
 
 @app.task(bind=True)
 def clip_nrega_district_block(self, state, district, block, gee_account_id):
+    """
+    It will generate nrega layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     print("inside clip")
     s3 = boto3.resource(
@@ -74,7 +79,7 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         district_gdf = gpd.GeoDataFrame(
             columns=["Work Name", "Panchayat", "lon", "lat", "geometry"],
             geometry="geometry",
-            crs="EPSG:4326",
+            crs=CRS,
         )
 
     # If geometry is missing but lat/lon present, build Point geometry
@@ -87,9 +92,7 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         district_gdf["geometry"] = [
             Point(xy) for xy in zip(district_gdf["lon"], district_gdf["lat"])
         ]
-        district_gdf = gpd.GeoDataFrame(
-            district_gdf, geometry="geometry", crs="EPSG:4326"
-        )
+        district_gdf = gpd.GeoDataFrame(district_gdf, geometry="geometry", crs=CRS)
 
     # If GeoJSON was loaded but has no geometry, create Point geometries from lat/lon
     if (
@@ -100,12 +103,10 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         district_gdf["geometry"] = [
             Point(xy) for xy in zip(district_gdf["lon"], district_gdf["lat"])
         ]
-        district_gdf = gpd.GeoDataFrame(
-            district_gdf, geometry="geometry", crs="EPSG:4326"
-        )
+        district_gdf = gpd.GeoDataFrame(district_gdf, geometry="geometry", crs=CRS)
 
     # Load SOI tehsil boundary
-    soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
+    soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + SOI_TEHSIL)
 
     # Filter by state, district, block
     soi = soi[(soi["STATE"].str.lower() == state.lower())]
@@ -148,7 +149,7 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
             )
 
     # Ensure CRS is set
-    block_metadata_df.crs = "EPSG:4326"
+    block_metadata_df.crs = CRS
 
     path = os.path.join(
         NREGA_ASSETS_OUTPUT_DIR,
