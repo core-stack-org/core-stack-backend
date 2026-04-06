@@ -5,6 +5,9 @@ from utilities.constants import (
     GEE_PATH_PLANTATION,
     GEE_ASSET_PATH,
     GEE_DATASET_PATH,
+    INDIA_SAT_LULC,
+    ROAD_DRRP,
+    CRS,
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -26,16 +29,16 @@ logger = setup_logger(__name__)
 
 
 def get_pss(
-        roi,
-        start_year,
-        end_year,
-        asset_name,
-        org=None,
-        project=None,
-        have_new_sites=False,
-        state=None,
-        district=None,
-        block=None,
+    roi,
+    start_year,
+    end_year,
+    asset_name,
+    org=None,
+    project=None,
+    have_new_sites=False,
+    state=None,
+    district=None,
+    block=None,
 ):
     """
     Generate Plantation Site Suitability (PSS) raster.
@@ -91,13 +94,13 @@ def get_pss(
 
         # Prepare asset description and path
         asset_id = (
-                get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
-                + description
+            get_gee_dir_path([org, project_name], asset_path=GEE_PATH_PLANTATION)
+            + description
         )
     else:
         asset_id = (
-                get_gee_dir_path([state, district, block], asset_path=GEE_ASSET_PATH)
-                + description
+            get_gee_dir_path([state, district, block], asset_path=GEE_ASSET_PATH)
+            + description
         )
 
     # Remove existing asset if it exists to prevent conflicts
@@ -471,7 +474,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
         s_year = start_year
         lulc_years = []
         while s_year <= end_year:
-            asset_id = f"{GEE_DATASET_PATH}/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year + 1)}"
+            asset_id = f"{GEE_DATASET_PATH}{INDIA_SAT_LULC}{s_year}_{str(s_year + 1)}"
             lulc_img = (
                 ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
             )
@@ -487,9 +490,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
         return ndvi
     # Distance to Roads
     if variable == "distToRoad":
-        dataset_collection = ee.FeatureCollection(
-            f"projects/ext-datasets/assets/datasets/Road_DRRP/{valid_gee_text(state)}"
-        )
+        dataset_collection = ee.FeatureCollection(f"{ROAD_DRRP}{valid_gee_text(state)}")
         dataset = dataset_collection.reduceToImage(
             properties=["STATE_ID"], reducer=ee.Reducer.first()
         )
@@ -513,7 +514,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
         s_year = start_year
         lulc_years = []
         while s_year <= end_year:
-            asset_id = f"{GEE_DATASET_PATH}/LULC_v3_river_basin/pan_india_lulc_v3_{s_year}_{str(s_year + 1)}"
+            asset_id = f"{GEE_DATASET_PATH}{INDIA_SAT_LULC}{s_year}_{str(s_year + 1)}"
             lulc_img = (
                 ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
             )
@@ -525,13 +526,13 @@ def get_dataset(variable, state, roi, start_year, end_year):
             .fastDistanceTransform()
             .sqrt()
             .multiply(ee.Image.pixelArea().sqrt())
-            .reproject(crs="EPSG:4326", scale=10)
+            .reproject(crs=CRS, scale=10)
         )
     return None
 
 
 def create_classification(
-        project_intervals, variable_list, roi, state, start_year, end_year
+    project_intervals, variable_list, roi, state, start_year, end_year
 ):
     """
     Create classification layers for multiple variables.
