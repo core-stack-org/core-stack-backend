@@ -444,9 +444,10 @@ def download_mws_report(request):
     return resp
 
 
-@api_security_check(auth_type="Auth_free")
-@schema(None)
+@api_view(["GET"])
 @auth_free
+@schema(None)
+@api_security_check(auth_type="Auth_free")
 def generate_tehsil_report(request):
     try:
         # ? district, block, mwsId
@@ -510,66 +511,15 @@ def generate_tehsil_report(request):
             result["state"], result["district"], result["block"]
         )
 
-        # ============ MATCHING hasSectionData LOGIC FROM HTML ============
-        def has_section_data(data_obj):
-            if not data_obj:
-                return False
+        # print("Active Patterns", active_pattern)
+        active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "active_patterns", []
+        )
 
-            # Check for total_area > 0 (EXACTLY like HTML)
-            if isinstance(data_obj, dict) and "total_area" in data_obj:
-                return data_obj["total_area"] > 0
+        village_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "village_active_patterns", []
+        )
 
-            # Check for total_population > 0 (EXACTLY like HTML)
-            if isinstance(data_obj, dict) and "total_population" in data_obj:
-                return data_obj["total_population"] > 0
-
-            # Check for total_villages > 0 (EXACTLY like HTML)
-            if isinstance(data_obj, dict) and "total_villages" in data_obj:
-                return data_obj["total_villages"] > 0
-
-            return False
-
-        # ==============================================================
-
-        # ============ BUILD ACTIVE PATTERN LIST ============
-        active_pattern = []
-
-        # Pattern display names mapping (from your HTML)
-        PATTERN_DISPLAY_NAMES = {
-            "groundwater_stress": "Groundwater Stress",
-            "high_drought_incidence": "High drought incidence",
-            "high_irrigation_risk": "High irrigation risk",
-            "low_yield": "Likely stress in cropping yield",
-            "forest_degradation": "Tree Health Degradation",
-            "mining_presence": "Mining Presence",
-            "caste": "High density of marginalized caste communities",
-            "nrega": "Poor uptake of MGNREGA works",
-        }
-
-        # Check each pattern and ONLY add if has_section_data returns True
-        if has_section_data(groundwater_stress):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["groundwater_stress"])
-
-        if has_section_data(high_drought_incidence):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["high_drought_incidence"])
-
-        if has_section_data(high_irrigation_risk):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["high_irrigation_risk"])
-
-        if has_section_data(low_yield):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["low_yield"])
-
-        if has_section_data(forest_degradation):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["forest_degradation"])
-
-        if has_section_data(mining_presence):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["mining_presence"])
-
-        if has_section_data(socio_caste):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["caste"])
-
-        if has_section_data(socio_nrega):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["nrega"])
         # =====================================================
 
         context = {
@@ -578,7 +528,8 @@ def generate_tehsil_report(request):
             "block": result["block"],
             "block_osm": parameter_block,
             "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
-            "active_pattern": active_pattern,  # Now matches HTML hide logic
+            "active_pattern": active_pattern,
+            "village_active_pattern": village_active_pattern,
             "pattern_display_mapping_json": pattern_display_mapping,
             "mws_active_patterns_json": json.dumps(mws_active_pattern),
             "groundwater_stress_json": json.dumps(groundwater_stress),
@@ -625,7 +576,9 @@ class DPRPagination(PageNumberPagination):
 def _get_plan_or_404(plan_id):
     plan = get_plan_details(plan_id)
     if plan is None:
-        return None, Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+        return None, Response(
+            {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
+        )
     return plan, None
 
 
@@ -676,7 +629,9 @@ def dpr_settlements(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_settlements_data(plan_id), SettlementSerializer)
+    return _paginated_response(
+        request, get_settlements_data(plan_id), SettlementSerializer
+    )
 
 
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
@@ -694,7 +649,9 @@ def dpr_livestock(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_livestock_data(plan_id), LivestockSerializer)
+    return _paginated_response(
+        request, get_livestock_data(plan_id), LivestockSerializer
+    )
 
 
 # MARK: Section D
@@ -713,7 +670,9 @@ def dpr_waterbodies(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_waterbodies_data(plan_id), WaterbodySerializer)
+    return _paginated_response(
+        request, get_waterbodies_data(plan_id), WaterbodySerializer
+    )
 
 
 # MARK: Section E
@@ -726,10 +685,14 @@ def dpr_maintenance(request, plan_id):
     maintenance_type = request.query_params.get("type", "gw")
     if maintenance_type not in VALID_MAINTENANCE_TYPES:
         return Response(
-            {"error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"},
+            {
+                "error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
-    return _paginated_response(request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer)
+    return _paginated_response(
+        request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer
+    )
 
 
 # MARK: Section F
@@ -749,4 +712,6 @@ def dpr_livelihood(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)
+    return _paginated_response(
+        request, get_livelihood_data(plan_id), LivelihoodSerializer
+    )
