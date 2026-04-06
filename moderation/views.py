@@ -22,7 +22,7 @@ from utilities.constants import (
     GEOSERVER_BASE,
     WORKS_WORKSPACE,
     RESOURCES_WORKSPACE,
-    SLOPE_ASSET,
+    SRTM_DIGITAL_ELEVATION,
     CATCHMENT_ASSET,
     STREAM_ORDER_ASSET,
 )
@@ -201,7 +201,7 @@ def compute_slope_mean_30m(lat: float, lon: float, buffer_m: int = 30) -> float:
     if not EE_AVAILABLE:
         return 0.0
 
-    dem = ee.Image(SLOPE_ASSET)
+    dem = ee.Image(SRTM_DIGITAL_ELEVATION)
     slope_deg = ee.Terrain.slope(dem)
 
     slope_pct = (
@@ -293,7 +293,11 @@ def compute_drainage_distance_m(lat: float, lon: float, scale: int = 30) -> floa
 
 from django.conf import settings as django_settings
 
-with open(os.path.join(django_settings.BASE_DIR, "moderation", "utils", "rules.json"), "r", encoding="utf-8") as f:
+with open(
+    os.path.join(django_settings.BASE_DIR, "moderation", "utils", "rules.json"),
+    "r",
+    encoding="utf-8",
+) as f:
     RULES = json.load(f)
 
 ALLOWED_PARAMS = {

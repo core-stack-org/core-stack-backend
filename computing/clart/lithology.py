@@ -19,6 +19,9 @@ import shutil
 
 @app.task(bind=True)
 def generate_lithology_layer(self, state):
+    """
+    It will generate lithology layer for given location(state level).
+    """
     asset_id = get_gee_asset_path(state) + valid_gee_text(state.lower()) + "_lithology"
 
     if not is_gee_asset_exists(asset_id):
@@ -85,11 +88,11 @@ def generate_lithology_layer(self, state):
                 )
 
                 if (
-                        score_5 > 0
-                        and score_1 == 0
-                        and score_2 == 0
-                        and score_3 == 0
-                        and score_4 == 0
+                    score_5 > 0
+                    and score_1 == 0
+                    and score_2 == 0
+                    and score_3 == 0
+                    and score_4 == 0
                 ):
                     continue
 
