@@ -17,7 +17,7 @@ from utilities.gee_utils import (
 )
 from .crop_gridXlulc import crop_grids_lulc
 from nrm_app.celery import app
-from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, CROP_GRID_PATH, CRS_4326
+from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, CROP_GRID_PATH, CRS
 
 
 @app.task(bind=True)
@@ -206,7 +206,7 @@ def convert_geojson_to_fc(state, district, block, path, geom_len):
         for i in range(gdf.shape[0]):
             unique_ids.append(block + "_" + str(i))
         gdf["uid"] = unique_ids
-        gdf = gdf.to_crs(CRS_4326)
+        gdf = gdf.to_crs(CRS)
 
         ee_fc = gdf_to_ee_fc(gdf)
         features.extend(ee_fc)
