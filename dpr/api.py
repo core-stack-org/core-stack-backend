@@ -33,6 +33,7 @@ from .serializers import (
 )
 from .services import (
     get_crops_data,
+    get_dpr_report_status,
     get_dpr_summary,
     get_dpr_status_tracking,
     get_livestock_data,
@@ -44,6 +45,7 @@ from .services import (
     get_village_brief,
     get_waterbodies_data,
     get_wells_data,
+    patch_dpr_report_status,
     update_demand_status,
 )
 from .gen_multi_mws_report import (
@@ -727,6 +729,29 @@ def dpr_status_tracking(request, plan_id):
     if err:
         return err
     return Response(get_dpr_status_tracking(plan_id))
+
+
+# MARK: DPR Report Workflow Status
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET", "PATCH"])
+@schema(None)
+def dpr_report_status(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+
+    if request.method == "GET":
+        data = get_dpr_report_status(plan_id)
+        if data is None:
+            return Response(
+                {"error": "DPR report not found for this plan"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(data)
+
+    result, error = patch_dpr_report_status(plan_id, request.data, request.user)
+    if error:
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(result)
 
 
 # MARK: Update Demand Status

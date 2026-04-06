@@ -1744,6 +1744,8 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 | `GET dpr_data/{id}/livelihood/` | Yes | `ODK_livelihood` + `ODK_agrohorticulture` |
 | `GET dpr_data/{id}/status-tracking/` | No | All resource + demand models (counts by status) |
 | `PATCH dpr_data/{id}/demand-status/` | No | Any resource/demand model (single record update) |
+| `GET dpr_data/{id}/report-status/` | No | `DPR_Report` (current workflow status) |
+| `PATCH dpr_data/{id}/report-status/` | No | `DPR_Report` (update workflow status) |
 
 ---
 
@@ -1807,6 +1809,95 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 - **Error Responses**:
   - `400 Bad Request` — missing fields, invalid `resource_type`, invalid `status`, or resource not found
   - `404 Not Found` — plan does not exist
+
+---
+
+### DPR Report Workflow Status
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/report-status/`
+- **Methods**: GET, PATCH
+- **Description**: Read or update the workflow status of the `DPR_Report` for a plan. The frontend uses this to render a status toggle (e.g. Submitted → Approved / Rejected).
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+
+#### GET — Read current status
+
+**Response** (`200 OK`):
+```json
+{
+  "dpr_report_id": 12,
+  "plan_id": 42,
+  "status": "SUBMITTED",
+  "submitted_breakdown": {
+    "resources_submitted": 25,
+    "demands_submitted": 10
+  },
+  "dpr_report_s3_url": "https://...",
+  "dpr_generated_at": "2026-04-01T10:00:00Z",
+  "last_updated_at": "2026-04-05T14:30:00Z",
+  "last_updated_by": 7
+}
+```
+
+- `submitted_breakdown` is always present regardless of current status — it shows how many resource and demand records are in `SUBMITTED` state across all ODK models for this plan.
+
+**Error**: `404 Not Found` — DPR report has not been generated for this plan yet.
+
+#### PATCH — Update status
+
+All fields are optional but at least one must be provided.
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string | Updates `DPR_Report.status`. Allowed: `SUBMITTED`, `APPROVED`, `REJECTED` |
+| `resources_submitted` | string | Bulk-sets the demand status on **all resource records** (settlements, wells, waterbodies, crops) for this plan |
+| `demands_submitted` | string | Bulk-sets the demand status on **all demand records** (groundwater, agri, livelihood, agrohorticulture, all maintenance) for this plan |
+
+`resources_submitted` and `demands_submitted` accept any value from `DEMAND_STATUS_CHOICES`: `PENDING`, `SUBMITTED`, `APPROVED`, `REVERTED`, `REJECTED`.
+
+**Examples**:
+
+Toggle all resources to Submitted:
+```json
+{ "resources_submitted": "SUBMITTED" }
+```
+
+Toggle all demands to Submitted:
+```json
+{ "demands_submitted": "SUBMITTED" }
+```
+
+Mark both groups and set DPR status in one call:
+```json
+{
+  "status": "SUBMITTED",
+  "resources_submitted": "SUBMITTED",
+  "demands_submitted": "SUBMITTED"
+}
+```
+
+Approve the DPR without touching individual records:
+```json
+{ "status": "APPROVED" }
+```
+
+**Response** (`200 OK`) — always includes the updated `submitted_breakdown` counts:
+```json
+{
+  "dpr_report_id": 12,
+  "plan_id": 42,
+  "status": "SUBMITTED",
+  "submitted_breakdown": {
+    "resources_submitted": 25,
+    "demands_submitted": 10
+  },
+  "last_updated_at": "2026-04-06T09:15:00Z",
+  "last_updated_by": 7
+}
+```
+
+**Error Responses**:
+- `400 Bad Request` — no fields provided, or invalid value for any field
+- `404 Not Found` — plan or DPR report not found
 
 ---
 
