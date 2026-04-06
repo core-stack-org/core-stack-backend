@@ -23,4 +23,5 @@ urlpatterns = [
     path("dpr_data/<int:plan_id>/livelihood/", api.dpr_livelihood, name="dpr_livelihood"),
     path("dpr_data/<int:plan_id>/status-tracking/", api.dpr_status_tracking, name="dpr_status_tracking"),
     path("dpr_data/<int:plan_id>/demand-status/", api.dpr_update_demand_status, name="dpr_update_demand_status"),
+    path("dpr_data/<int:plan_id>/report-status/", api.dpr_report_status, name="dpr_report_status"),
 ]

@@ -9,6 +9,8 @@ from .mapping import (
 )
 from .models import (
     DEMAND_STATUS_CHOICES,
+    DPR_STATUS_CHOICES,
+    DPR_Report,
     Agri_maintenance,
     GW_maintenance,
     ODK_agri,
@@ -638,4 +640,93 @@ def update_demand_status(plan_id, resource_type, resource_id, new_status):
         "resource_type": resource_type,
         "resource_id": str(resource_id),
         "status": new_status,
+    }, None
+
+
+# ---------------------------------------------------------------------------
+# DPR Report Workflow Status
+# ---------------------------------------------------------------------------
+
+# Statuses the frontend toggle is allowed to set (PENDING is system-only,
+# REVERTED is excluded per product decision).
+ALLOWED_DPR_WORKFLOW_STATUSES = {"SUBMITTED", "APPROVED", "REJECTED"}
+
+
+def get_dpr_report_status(plan_id):
+    try:
+        report = DPR_Report.objects.get(plan_id=plan_id)
+    except DPR_Report.DoesNotExist:
+        return None
+    return {
+        "dpr_report_id": report.dpr_report_id,
+        "plan_id": plan_id,
+        "status": report.status,
+        "submitted_breakdown": {
+            "resources_submitted": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+            "demands_submitted": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+        },
+        "dpr_report_s3_url": report.dpr_report_s3_url,
+        "dpr_generated_at": report.dpr_generated_at,
+        "last_updated_at": report.last_updated_at,
+        "last_updated_by": report.last_updated_by_id,
+    }
+
+
+def _bulk_update_group(type_map, plan_id, new_status):
+    pid = str(plan_id)
+    for model, _pk, demand_field in type_map.values():
+        model.objects.filter(plan_id=pid).exclude(is_deleted=True).update(
+            **{demand_field: new_status}
+        )
+
+
+def patch_dpr_report_status(plan_id, payload, user):
+    """
+    payload keys (all optional, at least one required):
+      status               – updates DPR_Report.status (SUBMITTED / APPROVED / REJECTED)
+      resources_submitted  – bulk-sets demand_status on all resource models
+      demands_submitted    – bulk-sets demand_status on all demand models
+    """
+    new_status = payload.get("status")
+    resources_status = payload.get("resources_submitted")
+    demands_status = payload.get("demands_submitted")
+
+    if not any([new_status, resources_status, demands_status]):
+        return None, "At least one of status, resources_submitted, or demands_submitted is required"
+
+    if new_status and new_status not in ALLOWED_DPR_WORKFLOW_STATUSES:
+        return None, f"Invalid status. Choose from: {', '.join(sorted(ALLOWED_DPR_WORKFLOW_STATUSES))}"
+
+    for label, value in [("resources_submitted", resources_status), ("demands_submitted", demands_status)]:
+        if value and value not in VALID_DEMAND_STATUSES:
+            return None, f"Invalid {label} status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+
+    try:
+        report = DPR_Report.objects.get(plan_id=plan_id)
+    except DPR_Report.DoesNotExist:
+        return None, "DPR report not found for this plan"
+
+    if resources_status:
+        _bulk_update_group(RESOURCE_TYPE_MAP, plan_id, resources_status)
+
+    if demands_status:
+        _bulk_update_group(DEMAND_TYPE_MAP, plan_id, demands_status)
+
+    from django.utils import timezone
+    if new_status:
+        report.status = new_status
+    report.last_updated_at = timezone.now()
+    report.last_updated_by = user
+    report.save(update_fields=["status", "last_updated_at", "last_updated_by"])
+
+    return {
+        "dpr_report_id": report.dpr_report_id,
+        "plan_id": plan_id,
+        "status": report.status,
+        "submitted_breakdown": {
+            "resources_submitted": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+            "demands_submitted": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+        },
+        "last_updated_at": report.last_updated_at,
+        "last_updated_by": report.last_updated_by_id,
     }, None
