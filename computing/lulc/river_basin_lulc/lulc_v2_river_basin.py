@@ -12,6 +12,13 @@ from computing.lulc.cropping_frequency import *
 from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from nrm_app.celery import app
+from utilities.constants import (
+    RIVER_BASIN_EE_ACCOUNT,
+    CGWB_BASIN,
+    LULC_V2_RIVER_BASIN_OUTPUT,
+    CRS,
+    LULC_V2_RIVER_BASIN_MAX_PIXEL,
+)
 
 
 @app.task(bind=True)
@@ -23,17 +30,17 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize("datasets")
+    ee_initialize(RIVER_BASIN_EE_ACCOUNT)
     print("Inside generate lulc")
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
-    roi_boundary_geom = ee.FeatureCollection(
-        "projects/corestack-datasets/assets/datasets/CGWB_basin"
-    ).filter(ee.Filter.eq("objectid", basin_object_id))
+    roi_boundary_geom = ee.FeatureCollection(CGWB_BASIN).filter(
+        ee.Filter.eq("objectid", basin_object_id)
+    )
 
     filename_prefix = (
-            str(basin_object_id) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
+        str(basin_object_id) + "_" + roi_boundary_geom.first().get("ba_name").getInfo()
     )
 
     loop_start = start_date
@@ -138,10 +145,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
 
         scale = 10
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m_v2"
-        final_output_assetid = (
-                "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
-                + final_output_filename
-        )
+        final_output_assetid = LULC_V2_RIVER_BASIN_OUTPUT + final_output_filename
 
         # Setup the task
         image_export_task = ee.batch.Export.image.toAsset(
@@ -150,9 +154,9 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
             assetId=final_output_assetid,
             pyramidingPolicy={"predicted_label": "mode"},
             scale=scale,
-            maxPixels=1e13,
+            maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
             region=roi_boundary_geom.geometry(),
-            crs="EPSG:4326",
+            crs=CRS,
         )
 
         image_export_task.start()

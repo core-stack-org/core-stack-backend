@@ -2,6 +2,12 @@ import ee
 from computing.lulc.misc import mask_s2cloud
 from datetime import datetime
 import pandas as pd
+from utilities.constants import (
+    LEVEL_1_GRD,
+    DEM_OF_90_M_RESOLUTION,
+    LEVEL_1C_TOA,
+    CROPLAND_DATASET_PATH,
+)
 
 
 def fill_empty_bands(image):
@@ -23,7 +29,7 @@ def fill_empty_bands(image):
 
 def Get_S1_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
     S1 = (
-        ee.ImageCollection("COPERNICUS/S1_GRD")
+        ee.ImageCollection(LEVEL_1_GRD)
         .filter(ee.Filter.eq("instrumentMode", "IW"))
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
@@ -230,7 +236,7 @@ def get_trained_model(training_data_assetpath):
 
 
 def Get_slope(roi_boundary):
-    dem = ee.Image("CGIAR/SRTM90_V4")
+    dem = ee.Image(DEM_OF_90_M_RESOLUTION)
     slope = ee.Terrain.slope(dem)
     slope_image = slope.clip(roi_boundary.geometry())
     return slope_image
@@ -245,7 +251,7 @@ def ndvi_based_cropland_cleaning(
     roi_boundary, prediction_image, startDate, endDate, NDVI_threshold
 ):
     S2_ic = (
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+        ee.ImageCollection(LEVEL_1C_TOA)
         .filterBounds(roi_boundary)
         .filterDate(startDate, endDate)
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 10))
@@ -286,7 +292,7 @@ def ndvi_based_forest_cleaning(
     roi_boundary, prediction_image, startDate, endDate, NDVI_threshold
 ):
     S2_ic = (
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+        ee.ImageCollection(LEVEL_1C_TOA)
         .filterBounds(roi_boundary)
         .filterDate(startDate, endDate)
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 10))
@@ -320,7 +326,7 @@ def ndvi_based_forest_cleaning(
 
 def get_cropland_prediction(startDate, endDate, roi_boundary):
     print("inside cropland")
-    training_data_assetpath = "projects/ee-indiasat/assets/Rasterized_Groundtruth/L2_TrainingData_SAR_TimeSeries_1Year"
+    training_data_assetpath = CROPLAND_DATASET_PATH
     trained_model = get_trained_model(training_data_assetpath)
     print("trained model done")
     S1_ic = Get_S1_ImageCollections(startDate, endDate, roi_boundary)
