@@ -8,6 +8,7 @@ from .mapping import (
     classify_demand_type,
 )
 from .models import (
+    DEMAND_STATUS_CHOICES,
     Agri_maintenance,
     GW_maintenance,
     ODK_agri,
@@ -548,3 +549,93 @@ def get_livelihood_data(plan_id):
         })
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# DPR Status Tracking & Demand Status Updates
+# ---------------------------------------------------------------------------
+
+RESOURCE_TYPE_MAP = {
+    "settlement": (ODK_settlement, "settlement_id", "settlement_demand_status"),
+    "well": (ODK_well, "well_id", "well_demand_status"),
+    "waterbody": (ODK_waterbody, "waterbody_id", "waterbody_demand_status"),
+    "crop": (ODK_crop, "crop_grid_id", "crop_pattern_demand_status"),
+}
+
+DEMAND_TYPE_MAP = {
+    "groundwater": (ODK_groundwater, "recharge_structure_id", "recharge_structure_demand_status"),
+    "agri": (ODK_agri, "irrigation_work_id", "irrigation_work_demand_status"),
+    "livelihood": (ODK_livelihood, "livelihood_id", "livelihood_demand_status"),
+    "agrohorticulture": (ODK_agrohorticulture, "agrohorticulture_id", "agrohorticulture_demand_status"),
+    "gw_maintenance": (GW_maintenance, "gw_maintenance_id", "recharge_structure_maintenance_status"),
+    "swb_rs_maintenance": (SWB_RS_maintenance, "swb_rs_maintenance_id", "swb_rs_maintenance_status"),
+    "swb_maintenance": (SWB_maintenance, "swb_maintenance_id", "swb_maintenance_status"),
+    "agri_maintenance": (Agri_maintenance, "agri_maintenance_id", "irrigation_structure_maintenance_status"),
+}
+
+ALL_TYPE_MAP = {**RESOURCE_TYPE_MAP, **DEMAND_TYPE_MAP}
+
+VALID_DEMAND_STATUSES = {c[0] for c in DEMAND_STATUS_CHOICES}
+
+
+def _count_by_status(type_map, plan_id, target_status):
+    pid = str(plan_id)
+    total = 0
+    for _model, _pk, demand_field in type_map.values():
+        total += _model.objects.filter(plan_id=pid, **{demand_field: target_status}).exclude(is_deleted=True).count()
+    return total
+
+
+def get_dpr_status_tracking(plan_id):
+    return {
+        "statuses": [
+            {
+                "key": "SUBMITTED",
+                "label": "Submitted",
+                "sub_sections": [
+                    {
+                        "key": "RESOURCES_SUBMITTED",
+                        "label": "Resources Submitted",
+                        "count": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+                    },
+                    {
+                        "key": "DEMANDS_SUBMITTED",
+                        "label": "Demands Submitted",
+                        "count": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+                    },
+                ],
+            },
+            {
+                "key": "APPROVED",
+                "label": "Approved",
+                "count": _count_by_status(ALL_TYPE_MAP, plan_id, "APPROVED"),
+            },
+            {
+                "key": "REJECTED",
+                "label": "Rejected",
+                "count": _count_by_status(ALL_TYPE_MAP, plan_id, "REJECTED"),
+            },
+        ]
+    }
+
+
+def update_demand_status(plan_id, resource_type, resource_id, new_status):
+    if resource_type not in ALL_TYPE_MAP:
+        return None, f"Invalid resource_type. Choose from: {', '.join(sorted(ALL_TYPE_MAP))}"
+
+    if new_status not in VALID_DEMAND_STATUSES:
+        return None, f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+
+    model, pk_field, demand_field = ALL_TYPE_MAP[resource_type]
+    try:
+        obj = model.objects.get(**{pk_field: resource_id, "plan_id": str(plan_id)})
+    except model.DoesNotExist:
+        return None, "Resource not found"
+
+    setattr(obj, demand_field, new_status)
+    obj.save(update_fields=[demand_field])
+    return {
+        "resource_type": resource_type,
+        "resource_id": str(resource_id),
+        "status": new_status,
+    }, None

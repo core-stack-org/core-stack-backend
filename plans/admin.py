@@ -82,9 +82,6 @@ class PlanAppAdmin(admin.ModelAdmin):
         "state_soi",
         "district_soi",
         "tehsil_soi",
-        "state",
-        "district",
-        "block",
         "project",
         "organization",
     )
@@ -95,9 +92,6 @@ class PlanAppAdmin(admin.ModelAdmin):
             "Location Information",
             {
                 "fields": (
-                    "state",
-                    "district",
-                    "block",
                     "state_soi",
                     "district_soi",
                     "tehsil_soi",
@@ -135,19 +129,3 @@ class PlanAppAdmin(admin.ModelAdmin):
             obj.created_by = request.user
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
-
-
-@admin.register(Plan)
-class PlanAdmin(admin.ModelAdmin):
-    list_display = (
-        "plan",
-        "plan_id",
-        "facilitator_name",
-        "village_name",
-        "gram_panchayat",
-        "state",
-        "district",
-        "block",
-    )
-    list_filter = ("facilitator_name", "village_name", "state", "district", "block")
-    search_fields = ("facilitator_name", "plan", "village_name")

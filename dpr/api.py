@@ -34,6 +34,7 @@ from .serializers import (
 from .services import (
     get_crops_data,
     get_dpr_summary,
+    get_dpr_status_tracking,
     get_livestock_data,
     get_livelihood_data,
     get_maintenance_data,
@@ -43,6 +44,7 @@ from .services import (
     get_village_brief,
     get_waterbodies_data,
     get_wells_data,
+    update_demand_status,
 )
 from .gen_multi_mws_report import (
     get_cropping_mws_data,
@@ -715,3 +717,37 @@ def dpr_livelihood(request, plan_id):
     return _paginated_response(
         request, get_livelihood_data(plan_id), LivelihoodSerializer
     )
+
+
+# MARK: DPR Status Tracking
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_status_tracking(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(get_dpr_status_tracking(plan_id))
+
+
+# MARK: Update Demand Status
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["PATCH"])
+@schema(None)
+def dpr_update_demand_status(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+
+    resource_type = request.data.get("resource_type")
+    resource_id = request.data.get("resource_id")
+    new_status = request.data.get("status")
+
+    if not all([resource_type, resource_id, new_status]):
+        return Response(
+            {"error": "resource_type, resource_id, and status are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    result, error = update_demand_status(plan_id, resource_type, resource_id, new_status)
+    if error:
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(result)

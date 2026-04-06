@@ -616,6 +616,11 @@ Superadmins must specify the organization ID since they can create projects for 
     - Superadmins: Can access any project
     - Org Admins: Can access projects in their organization
     - App Users: Can access assigned projects only
+- **Query Parameters**:
+    - `filter_test_plan=true` (optional): Exclude plans whose name contains "test" or "demo"
+- **Notes**:
+    - Test/demo plans are included by default. Pass `?filter_test_plan=true` to exclude them.
+    - Users in the **Test Plan Reviewer** group see only test/demo plans, regardless of this parameter.
 
 ### List Watershed Plans (Organization Level)
 
@@ -624,6 +629,9 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Description**: List all watershed plans for a specific organization
 - **Authentication**: Required
 - **Permissions**: Superadmins only
+- **Query Parameters**:
+    - `filter_test_plan=true` (optional): Exclude plans whose name contains "test" or "demo"
+- **Notes**: Test/demo plans are included by default. Pass `?filter_test_plan=true` to exclude them.
 
 ### List Watershed Plans (Global Level)
 
@@ -636,6 +644,8 @@ Superadmins must specify the organization ID since they can create projects for 
     - `tehsil`: Filter plans by tehsil ID (e.g., `?tehsil=123`)
     - `district`: Filter plans by district ID (e.g., `?district=456`)
     - `state`: Filter plans by state ID (e.g., `?state=789`)
+    - `filter_test_plan=true` (optional): Exclude plans whose name contains "test" or "demo"
+- **Notes**: Test/demo plans are included by default. Pass `?filter_test_plan=true` to exclude them.
 
 ### Create Watershed Plan
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/`
@@ -1399,7 +1409,7 @@ Below are ASCII diagrams showing the permission hierarchy and capabilities for d
 
 ## DPR (Detailed Project Report) Data API
 
-These endpoints expose the data that powers each section of the DPR document for a given watershed plan. All endpoints are read-only (`GET`).
+These endpoints expose the data that powers each section of the DPR document for a given watershed plan. Most endpoints are read-only (`GET`), with the exception of the demand status update endpoint (`PATCH`).
 
 **Base URL pattern**: `/api/v1/dpr_data/{plan_id}/`
 
@@ -1732,6 +1742,71 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 | `GET dpr_data/{id}/maintenance/?type=gw\|agri\|swb\|swb_rs` | Yes | `GW_maintenance`, `Agri_maintenance`, `SWB_maintenance`, `SWB_RS_maintenance` |
 | `GET dpr_data/{id}/nrm-works/` | Yes | `ODK_groundwater` + `ODK_agri` |
 | `GET dpr_data/{id}/livelihood/` | Yes | `ODK_livelihood` + `ODK_agrohorticulture` |
+| `GET dpr_data/{id}/status-tracking/` | No | All resource + demand models (counts by status) |
+| `PATCH dpr_data/{id}/demand-status/` | No | Any resource/demand model (single record update) |
+
+---
+
+### Status Tracking
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/status-tracking/`
+- **Method**: GET
+- **Description**: Returns aggregate counts of resources and demands grouped by `DEMAND_STATUS_CHOICES`. The "Submitted" status is split into two sub-sections: **Resources Submitted** (settlements, wells, waterbodies, crops) and **Demands Submitted** (groundwater, agri, livelihood, agrohorticulture, maintenance records).
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Response**:
+  ```json
+  {
+    "statuses": [
+      {
+        "key": "SUBMITTED",
+        "label": "Submitted",
+        "sub_sections": [
+          { "key": "RESOURCES_SUBMITTED", "label": "Resources Submitted", "count": 25 },
+          { "key": "DEMANDS_SUBMITTED", "label": "Demands Submitted", "count": 10 }
+        ]
+      },
+      { "key": "APPROVED", "label": "Approved", "count": 15 },
+      { "key": "REJECTED", "label": "Rejected", "count": 3 }
+    ]
+  }
+  ```
+- **Notes**:
+  - PENDING and REVERTED statuses are excluded from the response.
+  - **Resources**: `ODK_settlement`, `ODK_well`, `ODK_waterbody`, `ODK_crop`
+  - **Demands**: `ODK_groundwater`, `ODK_agri`, `ODK_livelihood`, `ODK_agrohorticulture`, `GW_maintenance`, `SWB_RS_maintenance`, `SWB_maintenance`, `Agri_maintenance`
+  - Approved and Rejected counts span both groups.
+
+---
+
+### Update Demand Status
+
+- **URL**: `/api/v1/dpr_data/{plan_id}/demand-status/`
+- **Method**: PATCH
+- **Description**: Updates the demand status on a single resource or demand record. The frontend renders a dropdown per record populated with `DEMAND_STATUS_CHOICES`; on selection change, this endpoint is called.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Request Body**:
+  ```json
+  {
+    "resource_type": "settlement",
+    "resource_id": "SET_001",
+    "status": "APPROVED"
+  }
+  ```
+- **Required Fields**:
+  - `resource_type` (string): One of `settlement`, `well`, `waterbody`, `groundwater`, `agri`, `crop`, `livelihood`, `agrohorticulture`, `gw_maintenance`, `swb_rs_maintenance`, `swb_maintenance`, `agri_maintenance`
+  - `resource_id` (string): Primary key of the record
+  - `status` (string): One of `PENDING`, `SUBMITTED`, `APPROVED`, `REVERTED`, `REJECTED`
+- **Response** (`200 OK`):
+  ```json
+  {
+    "resource_type": "settlement",
+    "resource_id": "SET_001",
+    "status": "APPROVED"
+  }
+  ```
+- **Error Responses**:
+  - `400 Bad Request` — missing fields, invalid `resource_type`, invalid `status`, or resource not found
+  - `404 Not Found` — plan does not exist
 
 ---
 
