@@ -1,233 +1,25 @@
-from computing.utils import generate_swb_layer_with_max_so_catchment
+import ee
+
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
-    valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
 )
-import ee
-
-from waterrejuvenation.utils import add_on_drainage_flag
-
-# Update these to your exact pan-India assets.
-DEFAULT_PAN_INDIA_RIVER_ASSET = (
-    "projects/ext-datasets/assets/datasets/River_pan_india"
-)
-DEFAULT_PAN_INDIA_CANAL_ASSET = (
-    "projects/ext-datasets/assets/datasets/Canal_pan_india"
-)
-DEFAULT_WATERBODY_TYPE_BUFFER_M = 500
-DEFAULT_PAN_INDIA_VILLAGE_ASSET = (
-    "projects/ext-datasets/assets/datasets/Village_pan_india"
-)
-# Common field names across village datasets are often `villname` or `village`.
-# If your export shows blank, we can switch this field.
-DEFAULT_PAN_INDIA_VILLAGE_NAME_FIELD = "Village Na"
 
 
-def _safe_feature_collection(asset_id):
-    if not asset_id:
-        return None
-    try:
-        # For public datasets, metadata fetch can fail in some environments
-        # even when the collection is readable in computations.
-        return ee.FeatureCollection(asset_id)
-    except Exception:
-        print(f"[SWB4] Asset not found or inaccessible: {asset_id}")
-        return None
-
-
-def add_waterbody_type_flag(
-    swb_fc,
-    river_asset_id=DEFAULT_PAN_INDIA_RIVER_ASSET,
-    canal_asset_id=DEFAULT_PAN_INDIA_CANAL_ASSET,
-    buffer_m=DEFAULT_WATERBODY_TYPE_BUFFER_M,
-):
-    river_fc = _safe_feature_collection(river_asset_id)
-    canal_fc = _safe_feature_collection(canal_asset_id)
-
-    # If both datasets are unavailable, mark everything as unknown.
-    if river_fc is None and canal_fc is None:
-        return swb_fc.map(lambda f: ee.Feature(f).set("waterbody_type", "unknown"))
-
-    # Keep only required fields on reference layers
-    if river_fc is not None:
-        river_fc = river_fc.select(["rivname", "objectid", "ripcode"])
-    if canal_fc is not None:
-        canal_fc = canal_fc.select(["canname", "cancode", "prjname"])
-
-    # Critical optimization: clip massive pan-India layers to SWB extent first.
-    # This dramatically reduces join graph size and avoids EE memory overflow.
-    swb_extent = swb_fc.geometry().bounds().buffer(max(buffer_m * 5, 5000))
-    if river_fc is not None:
-        river_fc = river_fc.filterBounds(swb_extent)
-    if canal_fc is not None:
-        canal_fc = canal_fc.filterBounds(swb_extent)
-
-    # Match on either direct intersect OR within configurable distance.
-    spatial_filter = ee.Filter.Or(
-        ee.Filter.intersects(leftField=".geo", rightField=".geo", maxError=1),
-        ee.Filter.withinDistance(
-            distance=buffer_m, leftField=".geo", rightField=".geo", maxError=1
-        ),
-    )
-
-    if river_fc is not None:
-        river_join = ee.Join.saveFirst("river_match", outer=True)
-        with_river = ee.FeatureCollection(
-            river_join.apply(primary=swb_fc, secondary=river_fc, condition=spatial_filter)
-        )
-    else:
-        with_river = swb_fc.map(lambda f: ee.Feature(f).set("river_match", None))
-
-    if canal_fc is not None:
-        canal_join = ee.Join.saveFirst("canal_match", outer=True)
-        with_both = ee.FeatureCollection(
-            canal_join.apply(primary=with_river, secondary=canal_fc, condition=spatial_filter)
-        )
-    else:
-        with_both = with_river.map(lambda f: ee.Feature(f).set("canal_match", None))
-
-    def classify(feature):
-        feature = ee.Feature(feature)
-        river_match = feature.get("river_match")
-        canal_match = feature.get("canal_match")
-
-        river_is_null = ee.Algorithms.IsEqual(river_match, None)
-        canal_is_null = ee.Algorithms.IsEqual(canal_match, None)
-
-        waterbody_type = ee.Algorithms.If(
-            river_is_null,
-            ee.Algorithms.If(canal_is_null, "individual", "canal"),
-            "river",
-        )
-        waterbody_type_name = ee.Algorithms.If(
-            river_is_null,
-            ee.Algorithms.If(
-                canal_is_null, None, ee.Feature(canal_match).get("canname")
-            ),
-            ee.Feature(river_match).get("rivname"),
-        )
-
-        river_objectid = ee.Algorithms.If(
-            river_is_null, None, ee.Feature(river_match).get("objectid")
-        )
-        rip_code = ee.Algorithms.If(
-            river_is_null, None, ee.Feature(river_match).get("ripcode")
-        )
-        # Canal info should be populated only when:
-        # - river is null (so no river match)
-        # - canal is NOT null
-        canal_condition_fail = ee.Algorithms.If(river_is_null, canal_is_null, True)
-        canal_code = ee.Algorithms.If(
-            canal_condition_fail, None, ee.Feature(canal_match).get("cancode")
-        )
-        project_name = ee.Algorithms.If(
-            canal_condition_fail, None, ee.Feature(canal_match).get("prjname")
-        )
-
-        # Drop temporary join payload fields to keep export graph light.
-        return (
-            feature.set(
-                {
-                    "waterbody_type": waterbody_type,
-                    "waterbody_type_name": waterbody_type_name,
-                    "river_objectid": river_objectid,
-                    "rip_code": rip_code,
-                    "canal_code": canal_code,
-                    "project_name": project_name,
-                    "river_asset_loaded": river_fc is not None,
-                    "canal_asset_loaded": canal_fc is not None,
-                }
-            )
-            .set("river_match", None)
-            .set("canal_match", None)
-        )
-
-    return with_both.map(classify)
-
-
-def add_village_name_flag(
-    swb_fc,
-    village_asset_id=DEFAULT_PAN_INDIA_VILLAGE_ASSET,
-    village_name_field=DEFAULT_PAN_INDIA_VILLAGE_NAME_FIELD,
-    clip_buffer_m=500,
-):
-    village_fc = _safe_feature_collection(village_asset_id)
-
-    if village_fc is None:
-        return swb_fc.map(
-            lambda f: ee.Feature(f).set(
-                {
-                    "covering_village_names": None,
-                    "village_name": None,
-                    "village_asset_loaded": False,
-                }
-            )
-        )
-
-    # Clip to relevant area.
-    # Avoid `.select(...)` here because field names may vary (and using a wrong
-    # field during select can drop properties or fail the whole map).
-    village_fc = village_fc.filterBounds(
-        swb_fc.geometry().bounds().buffer(clip_buffer_m)
-    )
-
-    condition = ee.Filter.intersects(
-        leftField=".geo", rightField=".geo", maxError=1
-    )
-    join = ee.Join.saveAll("village_matches", outer=True)
-    with_village = ee.FeatureCollection(
-        join.apply(primary=swb_fc, secondary=village_fc, condition=condition)
-    )
-
-    def classify(feature):
-        feature = ee.Feature(feature)
-        matches = ee.List(ee.Algorithms.If(feature.get("village_matches"), feature.get("village_matches"), ee.List([])))
-        has_matches = matches.size().gt(0)
-
-        names = ee.List(
-            matches.map(lambda m: ee.Feature(m).get(village_name_field))
-        ).removeAll([None]).distinct().sort()
-
-        covering_village_names = ee.Algorithms.If(
-            has_matches, ee.String(names.join(", ")), None
-        )
-
-        return (
-            feature.set(
-                {
-                    "covering_village_names": covering_village_names,
-                    # Backward compatibility for existing consumers.
-                    "village_name": covering_village_names,
-                    "village_asset_loaded": True,
-                }
-            )
-            .set("village_matches", None)
-        )
-
-    return with_village.map(classify)
-
-
-def waterbody_catchment_streamorder_properties(
+def waterbody_wbc_intersection(
     roi=None,
     state=None,
-    district=None,
-    block=None,
-    project_id=None,
     asset_suffix=None,
     asset_folder_list=None,
     app_type=None,
-    gee_account_id=None,
-    river_asset_id=DEFAULT_PAN_INDIA_RIVER_ASSET,
-    canal_asset_id=DEFAULT_PAN_INDIA_CANAL_ASSET,
-    waterbody_type_buffer_m=DEFAULT_WATERBODY_TYPE_BUFFER_M,
 ):
-    print(f"asset suffix swb4: {asset_suffix}")
-    print(f"[SWB4] river_asset_id: {river_asset_id}")
-    print(f"[SWB4] canal_asset_id: {canal_asset_id}")
-    print(f"[SWB4] waterbody_type_buffer_m: {waterbody_type_buffer_m}")
+    if not state:
+        print("State name must be provided to run this script")
+        return None
+
+    # Swapped naming: WBC intersection now exports as SWB4.
     description = "swb4_" + asset_suffix
     asset_id = (
         get_gee_dir_path(
@@ -235,8 +27,16 @@ def waterbody_catchment_streamorder_properties(
         )
         + description
     )
-    asset_suffix_swb4 = "swb4_" + asset_suffix
-    swb3_asset = (
+
+    # Check if the asset already exists to avoid redundant processing
+    if is_gee_asset_exists(asset_id):
+        return None, asset_id
+
+    # Load census state and water bodies feature collections
+    census_state = ee.FeatureCollection(
+        "projects/ee-vatsal/assets/WBC_" + state.upper().replace(" ", "") + "_UPD"
+    )
+    water_bodies = ee.FeatureCollection(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
@@ -244,59 +44,145 @@ def waterbody_catchment_streamorder_properties(
         + asset_suffix
     )
 
-    swb2_asset = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    # Filter points and polygons within the area of interest (aoi)
+    points = census_state.filterBounds(roi)
+    polygons = water_bodies.filterBounds(roi)
+
+    feature_collection = points
+
+    # Function to handle null or missing area values
+    def replace_null_area(feature):
+        # Extract water body attributes, handling potential null values
+        area = ee.Number(feature.get("water_spread_area_of_water_body"))
+        capacity = ee.Number(feature.get("storage_capacity_water_body_original"))
+        depth = ee.Number(feature.get("max_depth_water_body_fully_filled"))
+
+        # Ensure non-null values or default to 0
+        area = ee.Algorithms.If(area, area, 0)
+        capacity = ee.Algorithms.If(capacity, capacity, 0)
+        depth = ee.Algorithms.If(depth, depth, 0)
+        area = ee.Number(area)
+        capacity = ee.Number(capacity)
+        depth = ee.Number(depth)
+        # Calculate area if not provided, using capacity and depth
+        new_area = ee.Algorithms.If(
+            area.neq(0),
+            area,
+            ee.Algorithms.If(
+                capacity and depth, capacity.divide(depth).divide(10000), 0
+            ),
         )
-        + "swb2_"
-        + asset_suffix
-    )
-    try:
-        ee.data.getAsset(swb3_asset)
-        water_bodies = ee.FeatureCollection(swb3_asset)
-    except Exception as e:
-        print("SWB3 does not exist")
-        water_bodies = ee.FeatureCollection(swb2_asset)
+        return feature.set("water_spread_area_of_water_body", new_area)
 
-    print(f"asset_i{water_bodies}")
-    swb4_fs = generate_swb_layer_with_max_so_catchment(
-        roi=water_bodies,
-        asset_suffix=asset_suffix,
-        asset_folder=asset_folder_list,
-        app_type=app_type,
-        gee_account_id=gee_account_id,
+    # Apply area replacement to all features
+    points = feature_collection.map(replace_null_area)
+
+    # Buffer points to create search areas
+    buffered_points = points.map(lambda feature: feature.buffer(90))
+
+    # Create a spatial filter to find intersecting features
+    spatial_filter = ee.Filter.intersects(
+        leftField=".geo", rightField=".geo", maxError=10
     )
-    asset_id_dl = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+
+    # Perform a spatial join to find intersecting polygons for each point
+    intersect_joined = ee.Join.saveAll("intersections").apply(
+        primary=buffered_points, secondary=polygons, condition=spatial_filter
+    )
+
+    # Function to select the closest polygon to each point
+    def select_closest_polygon(feature):
+        # Calculate the spread area of the water body
+        spread = ee.Number(feature.get("water_spread_area_of_water_body"))
+        spread = spread.multiply(10000)
+        intersections = ee.List(feature.get("intersections"))
+
+        # Calculate the difference between intersection areas
+        def compute_difference(fc2_feature):
+            area_ored = ee.Number(fc2_feature.get("area_ored"))
+            difference = area_ored.subtract(spread).abs()
+            return ee.Feature(
+                None, {"difference": difference, "uid": fc2_feature.get("UID")}
+            )
+
+        # Find the polygon with the closest area match
+        fc2_intersecting = ee.FeatureCollection(intersections)
+        fc2_with_difference = fc2_intersecting.map(compute_difference)
+        sorted_fc2 = fc2_with_difference.sort("difference", True)
+        closest_feature = sorted_fc2.first()
+        return feature.set("closest_polygon_id", closest_feature.get("uid"))
+
+    # Apply closest polygon selection
+    fc1_with_closest_polygon = intersect_joined.map(select_closest_polygon)
+    fc1 = fc1_with_closest_polygon
+    fc2 = water_bodies
+
+    # Join water bodies with points based on closest polygon
+    join_filter = ee.Filter.equals(leftField="UID", rightField="closest_polygon_id")
+    joined_fc = ee.Join.saveAll(matchesKey="matches").apply(
+        primary=fc2, secondary=fc1, condition=join_filter
+    )
+
+    # Add census IDs to features
+    def add_census_id(feature):
+        matches = ee.List(feature.get("matches"))
+        census_ids = matches.map(lambda m: ee.Feature(m).get("unique_id"))
+        return feature.set("census_id", census_ids.get(0))
+
+    fc2_with_census_id = joined_fc.map(add_census_id)
+    fc2 = fc2_with_census_id
+    fc1 = water_bodies
+
+    # Remove unnecessary match properties
+    def remove_property(feat, prop):
+        properties = feat.propertyNames()
+        select_properties = properties.filter(ee.Filter.neq("item", prop))
+        return feat.select(select_properties)
+
+    new_fc = fc2.map(lambda feat: remove_property(feat, "matches"))
+    fc2_without_matrices = new_fc
+
+    # Add census ID to features without matches
+    fc1_with_census_id = fc1.map(lambda feat: feat.set("census_id", "NA"))
+
+    # Filter and merge feature collections
+    uid_list = fc2_without_matrices.aggregate_array("UID").distinct()
+    filtered_fc1 = fc1_with_census_id.filter(ee.Filter.inList("UID", uid_list).Not())
+
+    first_fc = ee.FeatureCollection(filtered_fc1.merge(fc2_without_matrices))
+
+    # Perform a join with census state data
+    second_fc = census_state
+    field_filter = ee.Filter.equals(leftField="census_id", rightField="unique_id")
+    join = ee.Join.saveAll(matchesKey="matches", ordering="unique_id", ascending=True)
+    joined = join.apply(primary=first_fc, secondary=second_fc, condition=field_filter)
+
+    # Merge properties from matched features
+    def merge_props(feature):
+        matches = ee.List(feature.get("matches"))
+        census_feature = ee.Feature(matches.get(0))
+        return feature.copyProperties(census_feature)
+
+    merged = joined.map(merge_props)
+    merged = merged.map(lambda feat: remove_property(feat, "matches"))
+
+    # Identify and set columns unique to the merged dataset
+    columns1 = ee.List(merged.first().propertyNames())
+    columns2 = ee.List(filtered_fc1.first().propertyNames())
+    unique_to_list1 = columns1.removeAll(columns2)
+
+    # Set unique columns to "NA" for features without matches
+    def set_columns_to_na(feature):
+        return ee.Feature(
+            unique_to_list1.iterate(
+                lambda column_name, feat: ee.Feature(feature).set(column_name, "NA"),
+                feature,
+            )
         )
-        + "drainage_lines_"
-        + asset_suffix
-    )
-    swb4_fs_on_drainage = add_on_drainage_flag(swb4_fs, asset_id_dl)
-    swb4_fc_with_waterbody_type = add_waterbody_type_flag(
-        swb4_fs_on_drainage,
-        river_asset_id=river_asset_id,
-        canal_asset_id=canal_asset_id,
-        buffer_m=waterbody_type_buffer_m,
-    )
-    swb4_fc_with_village = add_village_name_flag(
-        swb4_fc_with_waterbody_type,
-        village_asset_id=DEFAULT_PAN_INDIA_VILLAGE_ASSET,
-        village_name_field=DEFAULT_PAN_INDIA_VILLAGE_NAME_FIELD,
-        clip_buffer_m=waterbody_type_buffer_m,
-    )
 
-    # Lightweight debug logs only (avoid heavy getInfo on full collections).
-    try:
-        swb_count = swb4_fs_on_drainage.size().getInfo()
-        typed_count = swb4_fc_with_waterbody_type.size().getInfo()
-        print(f"[SWB4] swb_count_before_type: {swb_count}")
-        print(f"[SWB4] swb_count_after_type: {typed_count}")
-    except Exception as debug_err:
-        print(f"[SWB4] debug logging failed: {debug_err}")
+    filtered_fc1 = filtered_fc1.map(set_columns_to_na)
+    final_upd = filtered_fc1.merge(merged)
 
-    task_id = export_vector_asset_to_gee(
-        swb4_fc_with_village, description, asset_id
-    )
+    # Export the final feature collection to Google Earth Engine asset
+    task_id = export_vector_asset_to_gee(final_upd, description, asset_id)
     return task_id, asset_id

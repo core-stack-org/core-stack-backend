@@ -17,10 +17,10 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from .swb1 import vectorize_water_pixels
 from .swb2 import waterbody_mws_intersection
-from .swb3 import waterbody_wbc_intersection
+from .swb4 import waterbody_wbc_intersection
 
 from computing.STAC_specs import generate_STAC_layerwise
-from .swb4 import waterbody_catchment_streamorder_properties
+from .swb3 import waterbody_catchment_streamorder_properties
 
 
 @app.task(bind=True)
@@ -96,19 +96,7 @@ def generate_swb_layer(
         asset_id, layer_name, asset_suffix, start_date, end_date, state, district, block
     )
 
-    # SWB3: Intersect water bodies with WBC (Water Body Census) to get more data on intersecting water bodies
-    if state and district and block:
-        swb3, asset_id = waterbody_wbc_intersection(
-            roi=roi,
-            state=state,  # Mandatory
-            asset_suffix=asset_suffix,
-            asset_folder_list=asset_folder_list,
-            app_type=app_type,
-        )
-        if swb3:
-            task_id_list = check_task_status([swb3])
-            print("SWB task completed - swb3_task_id_list:", task_id_list)
-    swb4_kwargs = {
+    swb3_kwargs = {
         "roi": roi,
         "asset_suffix": asset_suffix,
         "asset_folder_list": asset_folder_list,
@@ -118,14 +106,31 @@ def generate_swb_layer(
     }
     # Only pass explicit overrides. If None, let swb4.py defaults apply.
     if river_asset_id:
-        swb4_kwargs["river_asset_id"] = river_asset_id
+        swb3_kwargs["river_asset_id"] = river_asset_id
     if canal_asset_id:
-        swb4_kwargs["canal_asset_id"] = canal_asset_id
+        swb3_kwargs["canal_asset_id"] = canal_asset_id
 
-    swb4, asset_id = waterbody_catchment_streamorder_properties(**swb4_kwargs)
-    if swb4:
-        task_id_list = check_task_status([swb4])
-        print("SWB task completed - swb4_task_id_list:", task_id_list)
+    # SWB3 (swapped): enriched final layer. Run this first.
+    swb3, swb3_asset_id = waterbody_catchment_streamorder_properties(**swb3_kwargs)
+    if swb3:
+        task_id_list = check_task_status([swb3])
+        print("SWB task completed - swb3_task_id_list:", task_id_list)
+
+    # SWB4 (swapped): Intersect water bodies with WBC.
+    if state and district and block:
+        swb4, swb4_asset_id = waterbody_wbc_intersection(
+            roi=roi,
+            state=state,  # Mandatory
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+        )
+        if swb4:
+            task_id_list = check_task_status([swb4])
+            print("SWB task completed - swb4_task_id_list:", task_id_list)
+
+    # Keep downstream sync pointing to final enriched output.
+    asset_id = swb3_asset_id
     layer_at_geoserver = sync_asset_to_db_and_geoserver(
         asset_id,
         layer_name,
