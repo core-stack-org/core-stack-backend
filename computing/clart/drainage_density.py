@@ -13,7 +13,7 @@ from utilities.gee_utils import (
     get_geojson_from_gcs,
     make_asset_public,
 )
-from utilities.constants import DRAINAGE_DENSITY_OUTPUT, CRS
+from utilities.constants import DRAINAGE_DENSITY_OUTPUT, CRS_4326
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
 from computing.utils import save_layer_info_to_db
@@ -89,7 +89,7 @@ def generate_vector(state, district, block):
         mws = json.loads(mws)
 
     watersheds = gpd.GeoDataFrame.from_features(mws)
-    watersheds.set_crs(CRS, inplace=True)
+    watersheds.set_crs(CRS_4326, inplace=True)
 
     drainage_lines = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
