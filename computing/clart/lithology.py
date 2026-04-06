@@ -15,6 +15,7 @@ from utilities.gee_utils import (
 )
 from .rasterize_vector import rasterize_vector
 import shutil
+from utilities.constants import GEE_ASSET_PATH
 
 
 @app.task(bind=True)
@@ -22,7 +23,13 @@ def generate_lithology_layer(self, state):
     """
     It will generate lithology layer for given location(state level).
     """
-    asset_id = get_gee_asset_path(state) + valid_gee_text(state.lower()) + "_lithology"
+    asset_id = (
+        GEE_ASSET_PATH
+        + valid_gee_text(state.lower())
+        + "/"
+        + valid_gee_text(state.lower())
+        + "_lithology"
+    )
 
     if not is_gee_asset_exists(asset_id):
         state_lith = gpd.read_file(
