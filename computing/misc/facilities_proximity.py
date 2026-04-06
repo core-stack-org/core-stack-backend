@@ -42,16 +42,13 @@ from computing.utils import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Constants
-FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
-FACILITIES_DATASET_NAME = "Facilities Proximity"
+from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE, FACILITIES_DATASET_NAME
 
 
 def generate_facilities_proximity(state, district, block, gee_account_id):
     """
     Generate facilities proximity layer for a tehsil/block.
-    
+
     Steps:
         1. Initialize GEE
         2. Create Output Asset ID
@@ -59,54 +56,63 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
         4. Export as GEE asset
         5. Make asset public and Register in database
         6. Sync to GeoServer
-    
+
     Args:
         state: State name (e.g., "Odisha")
         district: District name (e.g., "Koraput")
         block: Block/Tehsil name (e.g., "Jaypur")
         gee_account_id: GEE account ID
-    
+
     Returns:
         bool: True if layer synced to GeoServer successfully
     """
     start_time = datetime.now()
-    print(f"[{start_time}] Starting facilities proximity for {state}/{district}/{block}")
-    
+    print(
+        f"[{start_time}] Starting facilities proximity for {state}/{district}/{block}"
+    )
+
     try:
         # Step 1: Initialize GEE
         ee_initialize(gee_account_id)
-        
+
         # Verify facilities asset exists
         if not is_gee_asset_exists(GEE_FACILITIES_DATASET_PATH):
             print(f"ERROR: GEE asset not found: {GEE_FACILITIES_DATASET_PATH}")
             return False
-        
+
         # Step 2: Build output asset ID
         asset_suffix = f"facilities_proximity_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        asset_id = get_gee_dir_path([state, district, block], GEE_PATHS["MWS"]["GEE_ASSET_PATH"]) + asset_suffix
-        
+        asset_id = (
+            get_gee_dir_path(
+                [state, district, block], GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix
+        )
+
         print(f"[{datetime.now()}] Asset ID: {asset_id}")
-        
+
         # Step 3: Load admin boundary and filter facilities
         admin_boundary_path = (
-            get_gee_asset_path(state, district, block, GEE_PATHS["MWS"]["GEE_ASSET_PATH"])
+            get_gee_asset_path(
+                state, district, block, GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
+            )
             + "admin_boundary_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
         )
-        
+
         if not is_gee_asset_exists(admin_boundary_path):
             print(f"ERROR: Admin boundary not found: {admin_boundary_path}")
             return False
-        
+
         # Load and filter
         facilities_fc = ee.FeatureCollection(GEE_FACILITIES_DATASET_PATH)
         admin_boundary = ee.FeatureCollection(admin_boundary_path)
         filtered_fc = facilities_fc.filterBounds(admin_boundary.geometry())
-        
+
         # Step 4: Export as GEE asset
-        
+
         if not is_gee_asset_exists(asset_id):
             print(f"[{datetime.now()}] Exporting to GEE asset...")
             task_id = export_vector_asset_to_gee(filtered_fc, asset_suffix, asset_id)
@@ -117,24 +123,28 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
                 return False
         else:
             print(f"[{datetime.now()}] Asset already exists")
-        
+
         # Step 5: Make public and save to database
         if is_gee_asset_exists(asset_id):
             make_asset_public(asset_id)
             layer_name = f"facilities_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
             layer_id = save_layer_info_to_db(
-                state, district, block,
+                state,
+                district,
+                block,
                 layer_name=layer_name,
                 asset_id=asset_id,
                 dataset_name=FACILITIES_DATASET_NAME,
             )
             print(f"[{datetime.now()}] Layer saved (ID: {layer_id})")
-        
+
             # Step 6: Sync to GeoServer
             print(f"[{datetime.now()}] Syncing to GeoServer...")
             fc = ee.FeatureCollection(asset_id)
-            res = sync_fc_to_geoserver(fc, state, f"{layer_name}", FACILITIES_GEOSERVER_WORKSPACE)
-        
+            res = sync_fc_to_geoserver(
+                fc, state, f"{layer_name}", FACILITIES_GEOSERVER_WORKSPACE
+            )
+
             if res and res.get("status_code") == 201 and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 elapsed = (datetime.now() - start_time).total_seconds()
@@ -143,7 +153,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
             else:
                 print(f"ERROR: GeoServer sync failed")
                 return False
-    
+
     except Exception as e:
         print(f"ERROR: {e}")
         return False

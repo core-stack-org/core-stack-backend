@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-from utilities.constants import GEE_EXT_DATASET_PATH
+from utilities.constants import GEE_EXT_DATASET_PATH, FACTORY_PAN_INDIA
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -20,6 +20,9 @@ from nrm_app.celery import app
 
 @app.task(bind=True)
 def generate_factory_csr_data(self, state, district, block, gee_account_id):
+    """
+    It will generate factory csr data if available for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
 
     roi_asset_id = (
@@ -31,7 +34,7 @@ def generate_factory_csr_data(self, state, district, block, gee_account_id):
         + "_uid"
     )
 
-    pan_india_asset_id = f"{GEE_EXT_DATASET_PATH}/Factory_CSR_pan_india"
+    pan_india_asset_id = f"{GEE_EXT_DATASET_PATH}/{FACTORY_PAN_INDIA}"
 
     description = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_factory_csr"
     asset_id = get_gee_asset_path(state, district, block) + description

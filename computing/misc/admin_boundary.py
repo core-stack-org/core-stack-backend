@@ -25,6 +25,9 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
+    """
+    It will generate Admin boundary of given location as tehsil levels
+    """
     ee_initialize()
     description = (
         "admin_boundary_"
