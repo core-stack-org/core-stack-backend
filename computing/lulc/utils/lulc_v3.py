@@ -10,7 +10,7 @@ from computing.lulc.utils.cropland import *
 from computing.lulc.cropping_frequency import *
 from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
-from utilities.constants import CRS, RIVER_BASIN_MAX_PIXEL
+from utilities.constants import CRS_4326
 
 
 @app.task(bind=True)
@@ -486,8 +486,8 @@ def generate_lulc_layers(
             assetId=final_output_assetid_array_new[i],
             pyramidingPolicy={"predicted_label": "mode"},
             scale=scale,
-            maxPixels=RIVER_BASIN_MAX_PIXEL,
-            crs=CRS,
+            maxPixels=1e13,
+            crs=CRS_4326,
         )
         image_export_task.start()
 
@@ -550,8 +550,8 @@ def generate_lulc_layers(
                 assetId=final_output_assetid,
                 pyramidingPolicy={"predicted_label": "mode"},
                 scale=scale,
-                maxPixels=RIVER_BASIN_MAX_PIXEL,
-                crs=CRS,
+                maxPixels=1e13,
+                crs=CRS_4326,
             )
 
             image_export_task.start()

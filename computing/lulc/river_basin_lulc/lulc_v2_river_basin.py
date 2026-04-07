@@ -16,7 +16,6 @@ from utilities.constants import (
     CGWB_BASIN,
     LULC_V2_RIVER_BASIN_OUTPUT,
     CRS_4326,
-    RIVER_BASIN_MAX_PIXEL,
 )
 
 
@@ -153,7 +152,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
             assetId=final_output_assetid,
             pyramidingPolicy={"predicted_label": "mode"},
             scale=scale,
-            maxPixels=RIVER_BASIN_MAX_PIXEL,
+            maxPixels=1e13,
             region=roi_boundary_geom.geometry(),
             crs=CRS_4326,
         )
