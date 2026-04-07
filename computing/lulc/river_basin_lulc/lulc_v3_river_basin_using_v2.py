@@ -11,16 +11,15 @@ from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
 from utilities.constants import (
     CGWB_BASIN,
-    LULC_V3_RIVER_BASIN_EE_ACCOUNT,
     LULC_V3_OUTPUT_ASSET,
     LULC_V2_RIVER_BASIN_OUTPUT,
-    CRS,
+    CRS_4326,
     LULC_V2_RIVER_BASIN_MAX_PIXEL,
 )
 
 
 @app.task(bind=True)
-def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
+def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_accouint_id):
     """
     Args:
         self:
@@ -28,7 +27,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize(LULC_V3_RIVER_BASIN_EE_ACCOUNT)
+    ee_initialize(account_id=gee_accouint_id)
     print("Inside lulc_river_basin")
 
     roi_boundary = ee.FeatureCollection(CGWB_BASIN).filter(
@@ -454,6 +453,6 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
                 pyramidingPolicy={"predicted_label": "mode"},
                 scale=scale,
                 maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
-                crs=CRS,
+                crs=CRS_4326,
             )
             image_export_task.start()

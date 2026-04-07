@@ -13,10 +13,9 @@ from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from nrm_app.celery import app
 from utilities.constants import (
-    RIVER_BASIN_EE_ACCOUNT,
     CGWB_BASIN,
     LULC_V2_RIVER_BASIN_OUTPUT,
-    CRS,
+    CRS_4326,
     LULC_V2_RIVER_BASIN_MAX_PIXEL,
 )
 
@@ -30,7 +29,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize(RIVER_BASIN_EE_ACCOUNT)
+    ee_initialize()
     print("Inside generate lulc")
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
@@ -156,7 +155,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
             scale=scale,
             maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
             region=roi_boundary_geom.geometry(),
-            crs=CRS,
+            crs=CRS_4326,
         )
 
         image_export_task.start()
