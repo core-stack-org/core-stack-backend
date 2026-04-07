@@ -1,10 +1,7 @@
 import os
-import requests
 import json
 from rest_framework.response import Response
 import pandas as pd
-import numpy as np
-from .utils import get_url
 from nrm_app.settings import EXCEL_PATH
 from django.http import HttpResponse
 from rest_framework import status
@@ -25,7 +22,6 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
 
     xlsx_file = file_xl_path + ".xlsx"
     json_path = file_xl_path + "_KYL_village_data.json"
-    excel_output = file_xl_path + "_KYL_village_data.xlsx"
 
     if not regenerate and os.path.exists(json_path):
         with open(json_path, "rb") as file:
@@ -236,39 +232,10 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
                 )
 
     results_df = pd.DataFrame(results)
-    results_df.to_excel(excel_output, index=False)
-
     results_list = results_df.to_dict(orient="records")
 
     with open(json_path, "w") as f:
         json.dump(results_list, f, indent=4)
-
-    if results_list:
-        layer_name = f"{district}_{block}"
-        url = get_url("panchayat_boundaries", layer_name)
-
-        try:
-            r = requests.get(url)
-            r.raise_for_status()
-            geojson_data = r.json()
-
-            for feature in geojson_data["features"]:
-                vill_id = feature["properties"].get("vill_ID")
-
-                match = next(
-                    (item for item in results_list if item["village_id"] == vill_id),
-                    None,
-                )
-
-                if match:
-                    feature["properties"].update(match)
-
-            out_geojson = file_xl_path + "_panchayat_boundaries_nw.geojson"
-            with open(out_geojson, "w") as f:
-                json.dump(geojson_data, f)
-
-        except Exception as e:
-            print("Failed updating GeoJSON:", e)
 
     if os.path.exists(json_path):
         with open(json_path, "rb") as file:
