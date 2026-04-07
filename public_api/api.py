@@ -1,7 +1,5 @@
-from rest_framework.decorators import schema
 from rest_framework.response import Response
 from rest_framework import status
-from django.http import JsonResponse
 from utilities.gee_utils import (
     valid_gee_text,
 )
@@ -36,6 +34,43 @@ from geoadmin.utils import (
 )
 
 
+def _success_response(data, http_status=status.HTTP_200_OK):
+    return Response(
+        {
+            "status": "success",
+            "error_message": None,
+            "data": data,
+        },
+        status=http_status,
+    )
+
+
+def _error_response(message, http_status, details=None):
+    payload = {
+        "status": "error",
+        "error_message": message,
+        "error": message,
+    }
+    if details is not None:
+        payload["details"] = details
+    return Response(payload, status=http_status)
+
+
+def _normalize_external_result(result, default_error="Unable to process request"):
+    if isinstance(result, Response):
+        data = result.data if hasattr(result, "data") else {}
+        if 200 <= result.status_code < 300:
+            return _success_response(data, http_status=result.status_code)
+        message = (
+            data.get("error")
+            or data.get("message")
+            or data.get("Message")
+            or default_error
+        )
+        return _error_response(message, result.status_code, details=data)
+    return _success_response(result)
+
+
 @swagger_auto_schema(**admin_by_latlon_schema)
 @api_security_check(auth_type="API_key")
 def get_admin_details_by_lat_lon(request):
@@ -47,40 +82,39 @@ def get_admin_details_by_lat_lon(request):
         lon_param = request.query_params.get("longitude")
 
         if lat_param is None or lon_param is None:
-            return Response(
-                {"error": "Both 'latitude' and 'longitude' parameters are required."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "Both 'latitude' and 'longitude' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             lat = float(lat_param)
             lon = float(lon_param)
         except (ValueError, TypeError):
-            return Response(
-                {"error": "Latitude and longitude must be valid numbers(float)."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "Latitude and longitude must be valid numbers(float).",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         # To Validate the coordinate
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            return Response(
-                {
-                    "error": "Latitude must be between -90 and 90, longitude must be between -180 and 180."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "Latitude must be between -90 and 90, longitude must be between -180 and 180.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         properties_list = get_location_info_by_lat_lon(lat, lon)
-        return properties_list
+        return _normalize_external_result(
+            properties_list,
+            default_error="Unable to retrieve location data for the given coordinates",
+        )
 
     except Exception as e:
         print(f"Error occurred: {e}")
-        return Response(
-            {
-                "status": "error",
-                "message": "Unable to retrieve location data for the given coordinates",
-            },
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return _error_response(
+            "Unable to retrieve location data for the given coordinates",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
         )
 
 
@@ -97,33 +131,35 @@ def get_mws_by_lat_lon(request):
         lon_param = request.query_params.get("longitude")
 
         if lat_param is None or lon_param is None:
-            return Response(
-                {"error": "Both 'latitude' and 'longitude' parameters are required."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "Both 'latitude' and 'longitude' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             lat = float(lat_param)
             lon = float(lon_param)
         except (ValueError, TypeError):
-            return Response(
-                {"error": "Latitude and longitude must be valid numbers(float)."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "Latitude and longitude must be valid numbers(float).",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            return Response(
-                {
-                    "error": "Latitude must be between -90 and 90, longitude must be between -180 and 180."
-                },
-                status=400,
+            return _error_response(
+                "Latitude must be between -90 and 90, longitude must be between -180 and 180.",
+                status.HTTP_400_BAD_REQUEST,
             )
         data = get_mws_id_by_lat_lon(lon, lat)
-        return data
+        return _normalize_external_result(
+            data, default_error="Unable to retrieve MWS id for the given coordinates"
+        )
     except Exception as e:
         print("Exception while getting the mws_id by lat long", str(e))
-        return Response(
-            {"State": "", "District": "", "Tehsil": "", "uid": ""}, status=404
+        return _error_response(
+            "Unable to retrieve MWS id for the given coordinates",
+            status.HTTP_404_NOT_FOUND,
+            details=str(e),
         )
 
 
@@ -142,11 +178,9 @@ def get_mws_data(request):
         mws_id = request.query_params.get("mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
-            return Response(
-                {
-                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "'state', 'district', 'tehsil', and 'mws_id' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if (
@@ -154,29 +188,31 @@ def get_mws_data(request):
             or not is_valid_string(district)
             or not is_valid_string(tehsil)
         ):
-            return Response(
-                {
-                    "error": "State/District/Tehsil must contain only letters, spaces, and underscores"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if not is_valid_mws_id(mws_id):
-            return Response(
-                {"error": "MWS id can only contain numbers and underscores"},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "MWS id can only contain numbers and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         data = get_mws_time_series_data(state, district, tehsil, mws_id)
         if not data:
-            return Response(
-                {"error": "Data not found for the given mws_id"},
-                status=status.HTTP_404_NOT_FOUND,
+            return _error_response(
+                "Data not found for the given mws_id",
+                status.HTTP_404_NOT_FOUND,
             )
-        return Response(data, status=200)
+        return _success_response(data, http_status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return _error_response(
+            "Internal server error while fetching MWS data",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
+        )
 
 
 ######### Get MWS DATA by Admin Details  ##########
@@ -195,9 +231,9 @@ def generate_tehsil_data(request):
         regenerate = request.query_params.get("regenerate", "").lower()
 
         if state is None or district is None or tehsil is None:
-            return Response(
-                {"error": "'state', 'district', and 'tehsil' parameters are required."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "'state', 'district', and 'tehsil' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if (
@@ -205,29 +241,28 @@ def generate_tehsil_data(request):
             or not is_valid_string(district)
             or not is_valid_string(tehsil)
         ):
-            return Response(
-                {
-                    "error": "State/District/Tehsil must contain only letters, spaces, and underscores"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         file_path, file_exists = excel_file_exists(state, district, tehsil)
         if not file_exists:
-            return Response(
-                {"Message": "Data not found for this state, district, tehsil"},
-                status=status.HTTP_404_NOT_FOUND,
+            return _error_response(
+                "Data not found for this state, district, tehsil",
+                status.HTTP_404_NOT_FOUND,
             )
 
         # Get JSON (from cache or generate)
         json_data = get_tehsil_json(state, district, tehsil, regenerate)
-        return JsonResponse(json_data, status=200)
+        return _success_response(json_data, http_status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        return Response(
-            {"status": "error", "message": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return _error_response(
+            "Internal server error while generating tehsil data",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
         )
 
 
@@ -246,11 +281,9 @@ def get_mws_json_by_kyl_indicator(request):
         mws_id = request.query_params.get("mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
-            return Response(
-                {
-                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "'state', 'district', 'tehsil', and 'mws_id' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if (
@@ -258,35 +291,37 @@ def get_mws_json_by_kyl_indicator(request):
             or not is_valid_string(district)
             or not is_valid_string(tehsil)
         ):
-            return Response(
-                {
-                    "error": "State/District/Tehsil must contain only letters, spaces, and underscores"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if not is_valid_mws_id(mws_id):
-            return Response(
-                {"error": "MWS id can only contain numbers and underscores"},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "MWS id can only contain numbers and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if not excel_file_exists(state, district, tehsil):
-            return Response(
-                {"Message": "Data not found for this state, district, tehsil."},
-                status=status.HTTP_404_NOT_FOUND,
+            return _error_response(
+                "Data not found for this state, district, tehsil.",
+                status.HTTP_404_NOT_FOUND,
             )
 
         data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
         if not data:
-            return Response(
-                {"error": "Data not found for the given mws_id."},
-                status=status.HTTP_404_NOT_FOUND,
+            return _error_response(
+                "Data not found for the given mws_id.",
+                status.HTTP_404_NOT_FOUND,
             )
-        return Response(data, status=200)
+        return _success_response(data, http_status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return _error_response(
+            "Internal server error while fetching KYL indicator data",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
+        )
 
 
 #############  Get Generated Layers Urls  ##################
@@ -300,9 +335,9 @@ def get_generated_layer_urls(request):
         tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
 
         if state is None or district is None or tehsil is None:
-            return Response(
-                {"error": "'state', 'district', and 'tehsil' parameters are required."},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "'state', 'district', and 'tehsil' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if (
@@ -310,26 +345,25 @@ def get_generated_layer_urls(request):
             or not is_valid_string(district)
             or not is_valid_string(tehsil)
         ):
-            return Response(
-                {
-                    "error": "State/District/Tehsil must contain only letters, spaces, and underscores"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         layers_details_json = fetch_generated_layer_urls(state, district, tehsil)
         if not layers_details_json:
-            return Response(
-                {"error": "Data not found for this state, district, tehsil."},
-                status=status.HTTP_404_NOT_FOUND,
+            return _error_response(
+                "Data not found for this state, district, tehsil.",
+                status.HTTP_404_NOT_FOUND,
             )
-        return Response(layers_details_json, status=200)
+        return _success_response(layers_details_json, http_status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error in get_generated_layer_urls: {str(e)}")
-        return Response(
-            {"status": "error", "message": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return _error_response(
+            "Internal server error while fetching generated layer urls",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
         )
 
 
@@ -351,11 +385,9 @@ def get_mws_report_urls(request):
         mws_id = request.query_params.get("mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
-            return Response(
-                {
-                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "'state', 'district', 'tehsil', and 'mws_id' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if (
@@ -363,17 +395,15 @@ def get_mws_report_urls(request):
             or not is_valid_string(district)
             or not is_valid_string(tehsil)
         ):
-            return Response(
-                {
-                    "error": "State/District/Tehsil must contain only letters, spaces, and underscores"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         if not is_valid_mws_id(mws_id):
-            return Response(
-                {"error": "MWS id can only contain numbers and underscores"},
-                status=status.HTTP_400_BAD_REQUEST,
+            return _error_response(
+                "MWS id can only contain numbers and underscores",
+                status.HTTP_400_BAD_REQUEST,
             )
 
         # Call business logic function
@@ -383,15 +413,29 @@ def get_mws_report_urls(request):
         )
 
         if error_response:
-            return error_response
+            err_payload = (
+                error_response.data if hasattr(error_response, "data") else {}
+            )
+            err_message = (
+                err_payload.get("error")
+                or err_payload.get("message")
+                or err_payload.get("Message")
+                or "Failed to generate MWS report URL"
+            )
+            return _error_response(
+                err_message,
+                error_response.status_code,
+                details=err_payload,
+            )
 
-        return Response(result, status=status.HTTP_200_OK)
+        return _success_response(result, http_status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error in get_generated_layer_urls: {str(e)}")
-        return Response(
-            {"status": "error", "message": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return _error_response(
+            "Internal server error while fetching MWS report urls",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
         )
 
 
@@ -406,14 +450,18 @@ def generate_active_locations(request):
         activated_locations_data = get_activated_location_json()
 
         if activated_locations_data is not None:
-            return Response(activated_locations_data, status=status.HTTP_200_OK)
+            return _success_response(
+                activated_locations_data, http_status=status.HTTP_200_OK
+            )
 
         response_data = activated_entities()
         transformed_data = transform_data(data=response_data)
-        return Response(transformed_data, status=status.HTTP_200_OK)
+        return _success_response(transformed_data, http_status=status.HTTP_200_OK)
 
     except Exception as e:
         print("Exception in proposed_blocks api :: ", e)
-        return Response(
-            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        return _error_response(
+            "Internal server error while generating active locations",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
         )

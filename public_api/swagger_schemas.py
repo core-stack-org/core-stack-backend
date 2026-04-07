@@ -84,6 +84,17 @@ not_found_response = openapi.Response(description="Not Found - Data not found")
 
 internal_error_response = openapi.Response(description="Internal Server Error")
 
+# ============= COMMON EXAMPLES =============
+def success_example(data):
+    return {"status": "success", "error_message": None, "data": data}
+
+
+def error_example(message, details=None):
+    payload = {"status": "error", "error_message": message, "error": message}
+    if details is not None:
+        payload["details"] = details
+    return payload
+
 # ============= API SCHEMAS =============
 
 # Admin Details by Lat Lon Schema
@@ -108,19 +119,31 @@ admin_by_latlon_schema = {
         200: openapi.Response(
             description="Success - It will return JSON data having admin details.",
             examples={
-                "application/json": {
-                    "State": "UTTAR PRADESH",
-                    "District": "JAUNPUR",
-                    "Tehsil": "BADLAPUR",
-                }
+                "application/json": success_example(
+                    {
+                        "State": "UTTAR PRADESH",
+                        "District": "JAUNPUR",
+                        "Tehsil": "BADLAPUR",
+                    }
+                )
             },
         ),
         400: openapi.Response(
-            description="Bad Request - Both 'latitude' and 'longitude' parameters are required. OR Latitude and longitude must be valid numbers(float)."
+            description="Bad Request - Invalid latitude/longitude input.",
+            examples={
+                "application/json": error_example(
+                    "Both 'latitude' and 'longitude' parameters are required."
+                )
+            },
         ),
         401: unauthorized_response,
         404: openapi.Response(
-            description="Not Found - Latitude and longitude is not in SOI boundary."
+            description="Not Found - Latitude and longitude is not in SOI boundary.",
+            examples={
+                "application/json": error_example(
+                    "Latitude and longitude is not in SOI boundary."
+                )
+            },
         ),
         500: internal_error_response,
     },
@@ -150,12 +173,14 @@ mws_by_latlon_schema = {
         200: openapi.Response(
             description="Success - It will return JSON data having admin detail with mws_id.",
             examples={
-                "application/json": {
-                    "uid": "12_234647",
-                    "state": "UTTAR PRADESH",
-                    "district": "JAUNPUR",
-                    "tehsil": "BADLAPUR",
-                }
+                "application/json": success_example(
+                    {
+                        "uid": "12_234647",
+                        "State": "UTTAR PRADESH",
+                        "District": "JAUNPUR",
+                        "Tehsil": "BADLAPUR",
+                    }
+                )
             },
         ),
         400: bad_request_response,
@@ -206,43 +231,50 @@ get_mws_data_schema = {
         200: openapi.Response(
             description="Success - Returns MWS time series data",
             examples={
-                "application/json": {
-                    "mws_id": "12_208104",
-                    "time_series": [
-                        {
-                            "date": "2024-01-01",
-                            "et": 2.5,
-                            "runoff": 1.3,
-                            "precipitation": 10.2,
-                        },
-                        {
-                            "date": "2024-01-15",
-                            "et": 3.1,
-                            "runoff": 0.8,
-                            "precipitation": 5.4,
-                        },
-                    ],
-                }
+                "application/json": success_example(
+                    {
+                        "mws_id": "12_208104",
+                        "time_series": [
+                            {
+                                "date": "2024-01-01",
+                                "et": 2.5,
+                                "runoff": 1.3,
+                                "precipitation": 10.2,
+                            },
+                            {
+                                "date": "2024-01-15",
+                                "et": 3.1,
+                                "runoff": 0.8,
+                                "precipitation": 5.4,
+                            },
+                        ],
+                    }
+                )
             },
         ),
         400: openapi.Response(
             description="Bad Request - Missing required parameters or invalid format",
             examples={
-                "application/json": {
-                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
-                }
+                "application/json": error_example(
+                    "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                )
             },
         ),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
         404: openapi.Response(
             description="Not Found - MWS ID not found",
             examples={
-                "application/json": {"error": "Data not found for the given mws_id"}
+                "application/json": error_example("Data not found for the given mws_id")
             },
         ),
         500: openapi.Response(
             description="Internal Server Error",
-            examples={"application/json": {"Exception": "Error message details"}},
+            examples={
+                "application/json": error_example(
+                    "Internal server error while fetching MWS data",
+                    details="Error message details",
+                )
+            },
         ),
     },
     "tags": ["Dataset APIs"],
@@ -282,25 +314,18 @@ tehsil_data_schema = {
         200: openapi.Response(
             description="Success - It will return JSON data for the tehsil.",
             examples={
-                "application/json": {
-                    "aquifer_vector": [
-                        {
-                            "uid": "12_207597",
-                            "area_in_ha": 2336.11,
-                            "aquifer_class": "Alluvium",
-                            "principle_aq_alluvium_percent": 100,
-                            "principle_aq_banded gneissic complex_percent": 0,
-                        },
-                        {
-                            "uid": "12_208413",
-                            "area_in_ha": 864.04,
-                            "aquifer_class": "Alluvium",
-                            "principle_aq_alluvium_percent": 100,
-                            "principle_aq_banded gneissic complex_percent": 0,
-                        },
-                    ],
-                    "Soge_vector": ["..............."],
-                }
+                "application/json": success_example(
+                    {
+                        "aquifer_vector": [
+                            {
+                                "uid": "12_207597",
+                                "area_in_ha": 2336.11,
+                                "aquifer_class": "Alluvium",
+                            }
+                        ],
+                        "Soge_vector": ["..............."],
+                    }
+                )
             },
         ),
         400: openapi.Response(
@@ -355,22 +380,16 @@ kyl_indicators_schema = {
         200: openapi.Response(
             description="Success - It will return JSON data of the KYL Indicator for the mws_id.",
             examples={
-                "application/json": [
-                    {
-                        "mws_id": "12_234647",
-                        "terraincluster_id": 1,
-                        "avg_precipitation": 764.4457,
-                        "cropping_intensity_trend": 0,
-                        "cropping_intensity_avg": 1.7417,
-                        "avg_single_cropped": 8.2647,
-                        "avg_double_cropped": 80.1709,
-                        "avg_triple_cropped": 1.8198,
-                        "..................": ".......",
-                        "avg_number_dry_spell": 2.1667,
-                        "avg_runoff": 167.7886,
-                        "total_nrega_assets": 550,
-                    }
-                ]
+                "application/json": success_example(
+                    [
+                        {
+                            "mws_id": "12_234647",
+                            "terraincluster_id": 1,
+                            "avg_precipitation": 764.4457,
+                            "total_nrega_assets": 550,
+                        }
+                    ]
+                )
             },
         ),
         400: openapi.Response(
@@ -415,24 +434,15 @@ generated_layer_urls_schema = {
         200: openapi.Response(
             description="Success - It will return JSON data for the generated layers.",
             examples={
-                "application/json": [
-                    {
-                        "layer_name": "SOGE",
-                        "layer_type": "vector",
-                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_nalanda_hilsa&outputFormat=application/json",
-                        "layer_version": "1.0",
-                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/SOGE_style.qml",
-                        "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/soge_vector_nalanda_hilsa",
-                    },
-                    {
-                        "layer_name": "Drainage",
-                        "layer_type": "vector",
-                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/drainage/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=drainage:nalanda_hilsa&outputFormat=application/json",
-                        "layer_version": "1.0",
-                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/Drainage-Layer-Style.qml",
-                        "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/drainage_lines_nalanda_hilsa",
-                    },
-                ]
+                "application/json": success_example(
+                    [
+                        {
+                            "layer_name": "SOGE",
+                            "layer_type": "vector",
+                            "layer_version": "1.0",
+                        }
+                    ]
+                )
             },
         ),
         400: openapi.Response(
@@ -474,9 +484,11 @@ mws_report_urls_schema = {
         200: openapi.Response(
             description="Success - It will return JSON having mws report url.",
             examples={
-                "application/json": {
-                    "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104",
-                }
+                "application/json": success_example(
+                    {
+                        "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104"
+                    }
+                )
             },
         ),
         400: openapi.Response(
@@ -520,23 +532,26 @@ generate_active_locations_schema = {
         200: openapi.Response(
             description="Success - Returns activated locations data",
             examples={
-                "application/json": {
-                    "uttar_pradesh": {
-                        "districts": {
-                            "bara_banki": {"tehsils": ["fatehpur", "nawabganj"]},
-                            "lucknow": {"tehsils": ["mohanlalganj", "malihabad"]},
+                "application/json": success_example(
+                    {
+                        "uttar_pradesh": {
+                            "districts": {
+                                "bara_banki": {"tehsils": ["fatehpur", "nawabganj"]}
+                            }
                         }
-                    },
-                    "jharkhand": {
-                        "districts": {"deoghar": {"tehsils": ["devipur", "sarwan"]}}
-                    },
-                }
+                    }
+                )
             },
         ),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
         500: openapi.Response(
             description="Internal Server Error",
-            examples={"application/json": {"Exception": "Error message details"}},
+            examples={
+                "application/json": error_example(
+                    "Internal server error while generating active locations",
+                    details="Error message details",
+                )
+            },
         ),
     },
     "tags": ["Dataset APIs"],
