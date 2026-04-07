@@ -19,7 +19,7 @@ from utilities.constants import (
 
 
 @app.task(bind=True)
-def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_accouint_id):
+def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_account_id):
     """
     Args:
         self:
@@ -27,7 +27,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_accouin
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize(account_id=gee_accouint_id)
+    ee_initialize(account_id=gee_account_id)
     print("Inside lulc_river_basin")
 
     roi_boundary = ee.FeatureCollection(CGWB_BASIN).filter(
