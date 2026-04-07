@@ -8,6 +8,9 @@ from .mapping import (
     classify_demand_type,
 )
 from .models import (
+    DEMAND_STATUS_CHOICES,
+    DPR_STATUS_CHOICES,
+    DPR_Report,
     Agri_maintenance,
     GW_maintenance,
     ODK_agri,
@@ -548,3 +551,182 @@ def get_livelihood_data(plan_id):
         })
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# DPR Status Tracking & Demand Status Updates
+# ---------------------------------------------------------------------------
+
+RESOURCE_TYPE_MAP = {
+    "settlement": (ODK_settlement, "settlement_id", "settlement_demand_status"),
+    "well": (ODK_well, "well_id", "well_demand_status"),
+    "waterbody": (ODK_waterbody, "waterbody_id", "waterbody_demand_status"),
+    "crop": (ODK_crop, "crop_grid_id", "crop_pattern_demand_status"),
+}
+
+DEMAND_TYPE_MAP = {
+    "groundwater": (ODK_groundwater, "recharge_structure_id", "recharge_structure_demand_status"),
+    "agri": (ODK_agri, "irrigation_work_id", "irrigation_work_demand_status"),
+    "livelihood": (ODK_livelihood, "livelihood_id", "livelihood_demand_status"),
+    "agrohorticulture": (ODK_agrohorticulture, "agrohorticulture_id", "agrohorticulture_demand_status"),
+    "gw_maintenance": (GW_maintenance, "gw_maintenance_id", "recharge_structure_maintenance_status"),
+    "swb_rs_maintenance": (SWB_RS_maintenance, "swb_rs_maintenance_id", "swb_rs_maintenance_status"),
+    "swb_maintenance": (SWB_maintenance, "swb_maintenance_id", "swb_maintenance_status"),
+    "agri_maintenance": (Agri_maintenance, "agri_maintenance_id", "irrigation_structure_maintenance_status"),
+}
+
+ALL_TYPE_MAP = {**RESOURCE_TYPE_MAP, **DEMAND_TYPE_MAP}
+
+VALID_DEMAND_STATUSES = {c[0] for c in DEMAND_STATUS_CHOICES}
+
+
+def _count_by_status(type_map, plan_id, target_status):
+    pid = str(plan_id)
+    total = 0
+    for _model, _pk, demand_field in type_map.values():
+        total += _model.objects.filter(plan_id=pid, **{demand_field: target_status}).exclude(is_deleted=True).count()
+    return total
+
+
+def get_dpr_status_tracking(plan_id):
+    return {
+        "statuses": [
+            {
+                "key": "SUBMITTED",
+                "label": "Submitted",
+                "sub_sections": [
+                    {
+                        "key": "RESOURCES_SUBMITTED",
+                        "label": "Resources Submitted",
+                        "count": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+                    },
+                    {
+                        "key": "DEMANDS_SUBMITTED",
+                        "label": "Demands Submitted",
+                        "count": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+                    },
+                ],
+            },
+            {
+                "key": "APPROVED",
+                "label": "Approved",
+                "count": _count_by_status(ALL_TYPE_MAP, plan_id, "APPROVED"),
+            },
+            {
+                "key": "REJECTED",
+                "label": "Rejected",
+                "count": _count_by_status(ALL_TYPE_MAP, plan_id, "REJECTED"),
+            },
+        ]
+    }
+
+
+def update_demand_status(plan_id, resource_type, resource_id, new_status):
+    if resource_type not in ALL_TYPE_MAP:
+        return None, f"Invalid resource_type. Choose from: {', '.join(sorted(ALL_TYPE_MAP))}"
+
+    if new_status not in VALID_DEMAND_STATUSES:
+        return None, f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+
+    model, pk_field, demand_field = ALL_TYPE_MAP[resource_type]
+    try:
+        obj = model.objects.get(**{pk_field: resource_id, "plan_id": str(plan_id)})
+    except model.DoesNotExist:
+        return None, "Resource not found"
+
+    setattr(obj, demand_field, new_status)
+    obj.save(update_fields=[demand_field])
+    return {
+        "resource_type": resource_type,
+        "resource_id": str(resource_id),
+        "status": new_status,
+    }, None
+
+
+# ---------------------------------------------------------------------------
+# DPR Report Workflow Status
+# ---------------------------------------------------------------------------
+
+# Statuses the frontend toggle is allowed to set (PENDING is system-only,
+# REVERTED is excluded per product decision).
+ALLOWED_DPR_WORKFLOW_STATUSES = {"SUBMITTED", "APPROVED", "REJECTED"}
+
+
+def get_dpr_report_status(plan_id):
+    try:
+        report = DPR_Report.objects.get(plan_id=plan_id)
+    except DPR_Report.DoesNotExist:
+        return None
+    return {
+        "dpr_report_id": report.dpr_report_id,
+        "plan_id": plan_id,
+        "status": report.status,
+        "submitted_breakdown": {
+            "resources_submitted": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+            "demands_submitted": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+        },
+        "dpr_report_s3_url": report.dpr_report_s3_url,
+        "dpr_generated_at": report.dpr_generated_at,
+        "last_updated_at": report.last_updated_at,
+        "last_updated_by": report.last_updated_by_id,
+    }
+
+
+def _bulk_update_group(type_map, plan_id, new_status):
+    pid = str(plan_id)
+    for model, _pk, demand_field in type_map.values():
+        model.objects.filter(plan_id=pid).exclude(is_deleted=True).update(
+            **{demand_field: new_status}
+        )
+
+
+def patch_dpr_report_status(plan_id, payload, user):
+    """
+    payload keys (all optional, at least one required):
+      status               – updates DPR_Report.status (SUBMITTED / APPROVED / REJECTED)
+      resources_submitted  – bulk-sets demand_status on all resource models
+      demands_submitted    – bulk-sets demand_status on all demand models
+    """
+    new_status = payload.get("status")
+    resources_status = payload.get("resources_submitted")
+    demands_status = payload.get("demands_submitted")
+
+    if not any([new_status, resources_status, demands_status]):
+        return None, "At least one of status, resources_submitted, or demands_submitted is required"
+
+    if new_status and new_status not in ALLOWED_DPR_WORKFLOW_STATUSES:
+        return None, f"Invalid status. Choose from: {', '.join(sorted(ALLOWED_DPR_WORKFLOW_STATUSES))}"
+
+    for label, value in [("resources_submitted", resources_status), ("demands_submitted", demands_status)]:
+        if value and value not in VALID_DEMAND_STATUSES:
+            return None, f"Invalid {label} status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+
+    try:
+        report = DPR_Report.objects.get(plan_id=plan_id)
+    except DPR_Report.DoesNotExist:
+        return None, "DPR report not found for this plan"
+
+    if resources_status:
+        _bulk_update_group(RESOURCE_TYPE_MAP, plan_id, resources_status)
+
+    if demands_status:
+        _bulk_update_group(DEMAND_TYPE_MAP, plan_id, demands_status)
+
+    from django.utils import timezone
+    if new_status:
+        report.status = new_status
+    report.last_updated_at = timezone.now()
+    report.last_updated_by = user
+    report.save(update_fields=["status", "last_updated_at", "last_updated_by"])
+
+    return {
+        "dpr_report_id": report.dpr_report_id,
+        "plan_id": plan_id,
+        "status": report.status,
+        "submitted_breakdown": {
+            "resources_submitted": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+            "demands_submitted": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+        },
+        "last_updated_at": report.last_updated_at,
+        "last_updated_by": report.last_updated_by_id,
+    }, None
