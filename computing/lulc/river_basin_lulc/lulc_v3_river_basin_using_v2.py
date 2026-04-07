@@ -14,7 +14,7 @@ from utilities.constants import (
     LULC_V3_OUTPUT_ASSET,
     LULC_V2_RIVER_BASIN_OUTPUT,
     CRS_4326,
-    LULC_V2_RIVER_BASIN_MAX_PIXEL,
+    RIVER_BASIN_MAX_PIXEL,
 )
 
 
@@ -452,7 +452,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_account
                 assetId=asset_id,
                 pyramidingPolicy={"predicted_label": "mode"},
                 scale=scale,
-                maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
+                maxPixels=RIVER_BASIN_MAX_PIXEL,
                 crs=CRS_4326,
             )
             image_export_task.start()
