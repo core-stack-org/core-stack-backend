@@ -358,8 +358,9 @@ def lulc_v3_river_basin(request):
         basin_object_id = request.data.get("basin_object_id")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
         lulc_river_basin_v3.apply_async(
-            args=[basin_object_id, start_year, end_year], queue="nrm"
+            args=[basin_object_id, start_year, end_year, gee_account_id], queue="nrm"
         )
         return Response({"Success": "lulc_v3_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -1578,7 +1579,9 @@ def generate_stac_collection(request):
 
         if not all([state, district, block, layer_name, layer_type]):
             return Response(
-                {"error": "state, district, block, layer_name, and layer_type are required"},
+                {
+                    "error": "state, district, block, layer_name, and layer_type are required"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1607,7 +1610,9 @@ def generate_stac_collection(request):
         )
     except Exception as e:
         print("Exception in generate_stac_collection api :: ", e)
-        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1615,7 +1620,9 @@ def generate_stac_collection(request):
 # ---------------------------------------------------------------------------
 
 _STAC_ROOT = os.path.join(
-    BASE_DIR, "data", "STAC_specs",
+    BASE_DIR,
+    "data",
+    "STAC_specs",
     "CorestackCatalogs_merged_collection",
 )
 _TEHSIL = "tehsil_wise"
@@ -1631,9 +1638,9 @@ def _read_json(path):
 @api_view(["GET"])
 @schema(None)
 def get_stac_catalog(request):
-    state    = request.query_params.get("state", "").strip()
+    state = request.query_params.get("state", "").strip()
     district = request.query_params.get("district", "").strip()
-    block    = request.query_params.get("block", "").strip()
+    block = request.query_params.get("block", "").strip()
 
     base = STACConfig().stac_files_dir
 
@@ -1655,9 +1662,13 @@ def get_stac_catalog(request):
 
     data = _read_json(path)
     if data is None:
-        return Response({"error": f"Catalog not found at requested scope"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": f"Catalog not found at requested scope"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
     from django.http import JsonResponse
+
     return JsonResponse(data, content_type="application/geo+json")
 
 
@@ -1666,7 +1677,9 @@ def get_stac_catalog(request):
 def stac_root_catalog(request):
     data = _read_json(os.path.join(_STAC_ROOT, "catalog.json"))
     if data is None:
-        return Response({"error": "Root catalog not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": "Root catalog not found"}, status=status.HTTP_404_NOT_FOUND
+        )
     return Response(data)
 
 
@@ -1676,27 +1689,45 @@ def stac_state_collection(request, state):
     path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), "collection.json")
     data = _read_json(path)
     if data is None:
-        return Response({"error": f"State collection not found: {state}"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": f"State collection not found: {state}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     return Response(data)
 
 
 @api_view(["GET"])
 @schema(None)
 def stac_district_collection(request, state, district):
-    path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), district.lower(), "collection.json")
+    path = os.path.join(
+        _STAC_ROOT, _TEHSIL, state.lower(), district.lower(), "collection.json"
+    )
     data = _read_json(path)
     if data is None:
-        return Response({"error": f"District collection not found: {district}"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": f"District collection not found: {district}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     return Response(data)
 
 
 @api_view(["GET"])
 @schema(None)
 def stac_block_collection(request, state, district, block):
-    path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), district.lower(), block.lower(), "collection.json")
+    path = os.path.join(
+        _STAC_ROOT,
+        _TEHSIL,
+        state.lower(),
+        district.lower(),
+        block.lower(),
+        "collection.json",
+    )
     data = _read_json(path)
     if data is None:
-        return Response({"error": f"Block collection not found: {block}"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": f"Block collection not found: {block}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     return Response(data)
 
 
@@ -1704,11 +1735,17 @@ def stac_block_collection(request, state, district, block):
 @schema(None)
 def stac_item(request, state, district, block, item_id):
     path = os.path.join(
-        _STAC_ROOT, _TEHSIL,
-        state.lower(), district.lower(), block.lower(),
-        item_id, f"{item_id}.json",
+        _STAC_ROOT,
+        _TEHSIL,
+        state.lower(),
+        district.lower(),
+        block.lower(),
+        item_id,
+        f"{item_id}.json",
     )
     data = _read_json(path)
     if data is None:
-        return Response({"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND
+        )
     return Response(data)
