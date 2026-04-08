@@ -55,9 +55,14 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     )
 
     key = f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+    layer_at_geoserver = False
 
-    file_obj = s3.Object(NREGA_BUCKET, key).get()
-    gdf = gpd.read_file(BytesIO(file_obj["Body"].read()))
+    try:
+        file_obj = s3.Object(NREGA_BUCKET, key).get()
+        gdf = gpd.read_file(BytesIO(file_obj["Body"].read()))
+    except Exception as e:
+        print("Error while reading file from S3:", e)
+        return layer_at_geoserver
 
     # Ensure CRS
     if gdf.crs is None:
@@ -159,7 +164,6 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
             if task_id:
                 check_task_status([task_id])
 
-    layer_at_geoserver = False
     if is_gee_asset_exists(nrega_asset_id):
 
         layer_id = save_layer_info_to_db(
