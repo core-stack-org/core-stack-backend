@@ -27,14 +27,14 @@ def extract_facilities(df_facilities, v_id):
         "bank_branch_distance": "bank_branch_distance",
         "bank_atm_distance": "bank_atm_distance",
         "apmc_distance": "apmc_distance",
-        "agri_market_distance": "agri_industry_markets_trading_distance",
-        "storage_warehousing_distance": "agri_industry_storage_warehousing_distance",
-        "distribution_utilities_distance": "agri_industry_distribution_utilities_distance",
-        "agri_processing_distance": "agri_industry_agri_processing_distance",
-        "industrial_manufacturing_distance": "agri_industry_industrial_manufacturing_distance",
-        "cooperative_distance": "agri_industry_co_operatives_societies_distance",
-        "livestock_distance": "agri_industry_dairy_animal_husbandry_distance",
-        "agri_support_distance": "agri_industry_agri_support_infrastructure_distance",
+        "agri_industry_markets_trading_distance": "agri_industry_markets_trading_distance",
+        "agri_industry_storage_warehousing_distance": "agri_industry_storage_warehousing_distance",
+        "agri_industry_distri_utilities_distance": "agri_industry_distribution_utilities_distance",
+        "agri_industry_agri_processing_distance": "agri_industry_agri_processing_distance",
+        "agri_industry_industrial_manu_distance": "agri_industry_industrial_manufacturing_distance",
+        "agri_industry_co_operatives_soci_distance": "agri_industry_co_operatives_societies_distance",
+        "agri_industry_dairy_animal_hus_distance": "agri_industry_dairy_animal_husbandry_distance",
+        "agri_industry_agri_support_infra_distance": "agri_industry_agri_support_infrastructure_distance",
     }
 
     fac_data = {key: -1 for key in FACILITIES_COLUMN_MAP}
