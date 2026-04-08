@@ -81,7 +81,7 @@ def ndvi_timeseries(
         + description
     )
 
-    if is_gee_asset_exists(f"{asset_id}_tree"):  # TODO check for all 3
+    if is_gee_asset_exists(f"{asset_id}_shrub"):  # TODO check for all 3
         layer_obj = None
         try:
             layer_obj = get_layer_object(
@@ -255,10 +255,8 @@ def _generate_data(
 ):
     print("f_start_date>>>", start_date)
     print("end_date>>>", end_date)
-    task_ids = []
     asset_ids = []
     f_start_date = start_date
-    year_count = end_date.year - start_date.year
     last_date = None
 
     # if year_count > 1:
@@ -341,7 +339,7 @@ def _generate_data(
                 else:
                     print(f"Merge failed to start for {ndvi_description}")
             else:
-                task, last_date = _generate_ndvi(
+                _, last_date = _generate_ndvi(
                     ndvi_asset_id,
                     asset_folder_list,
                     app_type,
