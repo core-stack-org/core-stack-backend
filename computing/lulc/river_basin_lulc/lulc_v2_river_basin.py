@@ -14,7 +14,7 @@ from computing.lulc.misc import *
 from nrm_app.celery import app
 from utilities.constants import (
     CGWB_BASIN,
-    LULC_V2_RIVER_BASIN_OUTPUT,
+    LULC_V2_RIVER_BASIN_OUTPUT_PATH,
     CRS_4326,
 )
 
@@ -143,7 +143,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
 
         scale = 10
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m_v2"
-        final_output_assetid = LULC_V2_RIVER_BASIN_OUTPUT + final_output_filename
+        final_output_assetid = LULC_V2_RIVER_BASIN_OUTPUT_PATH + final_output_filename
 
         # Setup the task
         image_export_task = ee.batch.Export.image.toAsset(
