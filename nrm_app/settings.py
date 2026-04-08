@@ -157,7 +157,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": [
-        "rest_framework.renderers.JSONRenderer",
+        "utilities.renderers.RoundedJSONRenderer",
     ],
 }
 
@@ -358,6 +358,9 @@ MONGODB_URI = env("MONGODB_URI", default="")
 MONGODB_DB_NAME = env("MONGODB_DB_NAME", default="core_stack")
 MONGODB_WATERBODIES_COLLECTION = env(
     "MONGODB_WATERBODIES_COLLECTION", default="waterbodies_cache"
+)
+MONGODB_PUBLIC_API_V2_COLLECTION = env(
+    "MONGODB_PUBLIC_API_V2_COLLECTION", default="public_api_mws_v2_cache"
 )
 
 # NREGA settings

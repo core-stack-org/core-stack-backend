@@ -13,6 +13,12 @@ from nrm_app.settings import (
     MONGODB_URI,
     MONGODB_WATERBODIES_COLLECTION,
 )
+from utilities.openmeteo_format import (
+    annual_structure_from_dict,
+    error_envelope,
+    success_envelope,
+)
+from utilities.renderers import round_floats
 from .swagger_schemas import waterbodies_by_admin_schema, waterbodies_by_uuid
 from .utils import get_merged_waterbodies_with_zoi
 
@@ -25,48 +31,38 @@ _MONGO_CACHE_STATUS_LOGGED = False
 
 
 def _error_response(message, http_status, details=None):
-    payload = {
-        "status": "error",
-        "error_message": message,
-        "error": message,  # Backward compatibility for existing clients.
-    }
-    if details is not None:
-        payload["details"] = details
-    return Response(payload, status=http_status)
+    return Response(error_envelope(message, details), status=http_status)
 
 
 def _success_response_for_admin(merged_data, state_norm, district_l, block_l):
     data = list(merged_data.values()) if isinstance(merged_data, dict) else []
-    return Response(
-        {
-            "status": "success",
-            "error_message": None,
-            "location": {
-                "state": state_norm,
-                "district": district_l,
-                "block": block_l,
-            },
-            "data": data,
-        },
-        status=status.HTTP_200_OK,
-    )
+    timeseries_data = [annual_structure_from_dict(item) for item in data]
+    body = success_envelope(timeseries_data)
+    body["location"] = {
+        "state": state_norm,
+        "district": district_l,
+        "block": block_l,
+    }
+    return Response(round_floats(body, precision=2), status=status.HTTP_200_OK)
 
 
 def _success_response_for_uid(item, uid, state_norm, district_l, block_l):
-    return Response(
-        {
-            "status": "success",
-            "error_message": None,
-            "uid": str(uid),
-            "location": {
-                "state": state_norm,
-                "district": district_l,
-                "block": block_l,
-            },
-            "data": item,
-        },
-        status=status.HTTP_200_OK,
-    )
+    body = success_envelope(annual_structure_from_dict(item))
+    body["uid"] = str(uid)
+    body["location"] = {
+        "state": state_norm,
+        "district": district_l,
+        "block": block_l,
+    }
+    return Response(round_floats(body, precision=2), status=status.HTTP_200_OK)
+
+
+def _success_response_for_admin_v2(merged_data, state_norm, district_l, block_l):
+    return _success_response_for_admin(merged_data, state_norm, district_l, block_l)
+
+
+def _success_response_for_uid_v2(item, uid, state_norm, district_l, block_l):
+    return _success_response_for_uid(item, uid, state_norm, district_l, block_l)
 
 
 def _extract_admin_params(request):
@@ -258,6 +254,10 @@ def _handle_waterbodies_request(request, require_uid=False):
     )
 
 
+def _handle_waterbodies_request_v2(request, require_uid=False):
+    return _handle_waterbodies_request(request, require_uid=require_uid)
+
+
 @swagger_auto_schema(**waterbodies_by_admin_schema)
 @api_view(["GET"])
 def get_waterbodies_by_admin_and_uid(request):
@@ -279,6 +279,34 @@ def get_waterbodies_by_uid(request):
         return _handle_waterbodies_request(request, require_uid=True)
     except Exception as exc:
         print(f"Unexpected error in get_waterbodies_by_uid: {exc}")
+        return _error_response(
+            "Internal server error while retrieving waterbody data.",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(exc),
+        )
+
+
+@swagger_auto_schema(**waterbodies_by_admin_schema)
+@api_view(["GET"])
+def get_waterbodies_by_admin_and_uid_v2(request):
+    try:
+        return _handle_waterbodies_request_v2(request)
+    except Exception as exc:
+        print(f"Unexpected error in get_waterbodies_by_admin_and_uid_v2: {exc}")
+        return _error_response(
+            "Internal server error while retrieving waterbody data.",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(exc),
+        )
+
+
+@swagger_auto_schema(**waterbodies_by_uuid)
+@api_view(["GET"])
+def get_waterbodies_by_uid_v2(request):
+    try:
+        return _handle_waterbodies_request_v2(request, require_uid=True)
+    except Exception as exc:
+        print(f"Unexpected error in get_waterbodies_by_uid_v2: {exc}")
         return _error_response(
             "Internal server error while retrieving waterbody data.",
             status.HTTP_500_INTERNAL_SERVER_ERROR,

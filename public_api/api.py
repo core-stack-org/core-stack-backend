@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+
+from django.conf import settings
 from rest_framework.response import Response
 from rest_framework import status
 from utilities.gee_utils import (
@@ -32,42 +35,130 @@ from geoadmin.utils import (
     activated_entities,
     get_activated_location_json,
 )
+from utilities.openmeteo_format import (
+    error_envelope,
+    hourly_structure_from_mws,
+    normalize_payload,
+    success_envelope,
+)
+
+try:
+    from pymongo import MongoClient
+except Exception:
+    MongoClient = None
+
+_PUBLIC_API_V2_MONGO_LOGGED = False
+
+
+def _get_mongo_collection_public_api_v2():
+    global _PUBLIC_API_V2_MONGO_LOGGED
+    uri = getattr(settings, "MONGODB_URI", "") or ""
+    db_name = getattr(settings, "MONGODB_DB_NAME", "core_stack")
+    coll_name = getattr(
+        settings, "MONGODB_PUBLIC_API_V2_COLLECTION", "public_api_mws_v2_cache"
+    )
+    if not uri or MongoClient is None:
+        if not _PUBLIC_API_V2_MONGO_LOGGED:
+            print(
+                "Public API v2 Mongo cache disabled: set MONGODB_URI and install pymongo."
+            )
+            _PUBLIC_API_V2_MONGO_LOGGED = True
+        return None, None
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=3000)
+        collection = client[db_name][coll_name]
+        if not _PUBLIC_API_V2_MONGO_LOGGED:
+            print(f"Public API v2 Mongo cache enabled: db={db_name}, collection={coll_name}")
+            _PUBLIC_API_V2_MONGO_LOGGED = True
+        return client, collection
+    except Exception as exc:
+        if not _PUBLIC_API_V2_MONGO_LOGGED:
+            print(f"Public API v2 Mongo unavailable: {exc}")
+            _PUBLIC_API_V2_MONGO_LOGGED = True
+        return None, None
+
+
+def _mongo_mws_v2_key(state_norm, district_l, tehsil_l, mws_id):
+    return {
+        "state": state_norm,
+        "district": district_l,
+        "tehsil": tehsil_l,
+        "mws_id": str(mws_id),
+    }
+
+
+def _load_mws_v2_from_mongo(state_norm, district_l, tehsil_l, mws_id):
+    client, collection = _get_mongo_collection_public_api_v2()
+    if collection is None:
+        return None
+    try:
+        doc = collection.find_one(
+            _mongo_mws_v2_key(state_norm, district_l, tehsil_l, mws_id),
+            {"_id": 0, "payload": 1},
+        )
+        return doc.get("payload") if doc else None
+    except Exception as exc:
+        print(f"Public API v2 Mongo read failed: {exc}")
+        return None
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _save_mws_v2_to_mongo(state_norm, district_l, tehsil_l, mws_id, payload):
+    client, collection = _get_mongo_collection_public_api_v2()
+    if collection is None:
+        return
+    try:
+        collection.update_one(
+            _mongo_mws_v2_key(state_norm, district_l, tehsil_l, mws_id),
+            {
+                "$set": {
+                    **_mongo_mws_v2_key(state_norm, district_l, tehsil_l, mws_id),
+                    "payload": payload,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+            upsert=True,
+        )
+    except Exception as exc:
+        print(f"Public API v2 Mongo write failed: {exc}")
+    finally:
+        if client is not None:
+            client.close()
 
 
 def _success_response(data, http_status=status.HTTP_200_OK):
-    return Response(
-        {
-            "status": "success",
-            "error_message": None,
-            "data": data,
-        },
-        status=http_status,
-    )
+    inner = normalize_payload(data)
+    return Response(success_envelope(inner), status=http_status)
+
+
+def _success_response_v2(data, http_status=status.HTTP_200_OK):
+    """data is already an Open-Meteo inner block (e.g. cached hourly bundle)."""
+    return Response(success_envelope(data), status=http_status)
 
 
 def _error_response(message, http_status, details=None):
-    payload = {
-        "status": "error",
-        "error_message": message,
-        "error": message,
-    }
-    if details is not None:
-        payload["details"] = details
-    return Response(payload, status=http_status)
+    return Response(error_envelope(message, details), status=http_status)
+
+
+def _error_response_v2(message, http_status, details=None):
+    return _error_response(message, http_status, details)
 
 
 def _normalize_external_result(result, default_error="Unable to process request"):
     if isinstance(result, Response):
         data = result.data if hasattr(result, "data") else {}
         if 200 <= result.status_code < 300:
-            return _success_response(data, http_status=result.status_code)
+            inner = normalize_payload(data)
+            return Response(success_envelope(inner), http_status=result.status_code)
         message = (
             data.get("error")
             or data.get("message")
             or data.get("Message")
             or default_error
         )
-        return _error_response(message, result.status_code, details=data)
+        return Response(error_envelope(message, data), status=result.status_code)
     return _success_response(result)
 
 
@@ -205,10 +296,99 @@ def get_mws_data(request):
                 "Data not found for the given mws_id",
                 status.HTTP_404_NOT_FOUND,
             )
+        if isinstance(data, dict) and data.get("error"):
+            return _error_response(
+                str(data["error"]),
+                status.HTTP_404_NOT_FOUND,
+            )
+        if isinstance(data, dict) and "Error in get mws data" in data:
+            return _error_response(
+                "Failed to fetch MWS data from GeoServer.",
+                status.HTTP_502_BAD_GATEWAY,
+                details=data.get("Error in get mws data"),
+            )
         return _success_response(data, http_status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
         return _error_response(
+            "Internal server error while fetching MWS data",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
+        )
+
+
+@swagger_auto_schema(**get_mws_data_schema)
+@api_security_check(auth_type="API_key")
+def get_mws_data_v2(request):
+    """
+    Retrieve MWS data in Open-Meteo-style time-series structure.
+    Cached in MongoDB (same pattern as waterbodies); use regenerate=true to refresh from GeoServer.
+    """
+    print("Inside mws data by excel api v2")
+    try:
+        state = valid_gee_text(request.query_params.get("state").lower())
+        district = valid_gee_text(request.query_params.get("district").lower())
+        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        mws_id = request.query_params.get("mws_id")
+        regenerate = str(request.query_params.get("regenerate", "")).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+
+        if state is None or district is None or tehsil is None or mws_id is None:
+            return _error_response_v2(
+                "'state', 'district', 'tehsil', and 'mws_id' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (
+            not is_valid_string(state)
+            or not is_valid_string(district)
+            or not is_valid_string(tehsil)
+        ):
+            return _error_response_v2(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not is_valid_mws_id(mws_id):
+            return _error_response_v2(
+                "MWS id can only contain numbers and underscores",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        state_norm = state.upper()
+        if not regenerate:
+            cached = _load_mws_v2_from_mongo(state_norm, district, tehsil, mws_id)
+            if cached is not None:
+                return _success_response_v2(cached, http_status=status.HTTP_200_OK)
+
+        data = get_mws_time_series_data(state, district, tehsil, mws_id)
+        if not data:
+            return _error_response_v2(
+                "Data not found for the given mws_id",
+                status.HTTP_404_NOT_FOUND,
+            )
+        if isinstance(data, dict) and data.get("error"):
+            return _error_response_v2(
+                str(data["error"]),
+                status.HTTP_404_NOT_FOUND,
+            )
+        if isinstance(data, dict) and "Error in get mws data" in data:
+            return _error_response_v2(
+                "Failed to fetch MWS data from GeoServer.",
+                status.HTTP_502_BAD_GATEWAY,
+                details=data.get("Error in get mws data"),
+            )
+
+        v2_payload = hourly_structure_from_mws(data)
+        _save_mws_v2_to_mongo(state_norm, district, tehsil, mws_id, v2_payload)
+
+        return _success_response_v2(v2_payload, http_status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in stats mws json v2 :: ", e)
+        return _error_response_v2(
             "Internal server error while fetching MWS data",
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             details=str(e),
