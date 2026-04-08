@@ -1,4 +1,4 @@
-# contains the URLs of various resources
+# Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 
@@ -20,6 +20,8 @@ DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
 
 LITHOLOGY_PATH = "data/lithology/"
 SITE_DATA_PATH = "data/site_data"
+
+WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
 
 
 # MARK: ODK URLs
@@ -189,8 +191,18 @@ GEE_PATHS = {
     },
 }
 
-WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
+PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
 
+LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
+    "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
+)
+
+LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+
+
+# Moderation Constants
 filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
 filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
 filter_query = (
@@ -205,7 +217,6 @@ project_id = 2
 
 
 # demand vaidator constants
-
 DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
@@ -220,29 +231,26 @@ STREAM_ORDER_ASSET = (
     "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
 )
 
+# Datasets
 INDIA_LINEAMENTS = "projects/ee-harshita-om/assets/india_lineaments"
-CRS_4326 = "EPSG:4326"
-DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 CHIRPS_PPT = "UCSB-CHG/CHIRPS/DAILY"
 MODIS_TERRA_NET_ET_GAP_FILLED_8_DAY = "MODIS/061/MOD16A2GF"
 MODIS_TERRA_SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
 CGWB_BASIN = "projects/corestack-datasets/assets/datasets/CGWB_basin"
-LULC_V2_RIVER_BASIN_OUTPUT = (
-    "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
-)
-LULC_V3_OUTPUT_ASSET = "projects/corestack-datasets/assets/datasets/lulc_v3/"
-LEVEL_1C_TOA = "COPERNICUS/S2_HARMONIZED"
+SENTINEL2_LEVEL_1C_TOA = "COPERNICUS/S2_HARMONIZED"
 LAND_COVER_CLASSIFICATION_10_METER = "GOOGLE/DYNAMICWORLD/V1"
-LEVEL_1_GRD = "COPERNICUS/S1_GRD"
+SENTINEL1_GRD = "COPERNICUS/S1_GRD"
 DEM_OF_90_M_RESOLUTION = "CGIAR/SRTM90_V4"
 CROPLAND_DATASET_PATH = "projects/ee-indiasat/assets/Rasterized_Groundtruth/L2_TrainingData_SAR_TimeSeries_1Year"
-ANKIT_CGWB_BASIN = "projects/ee-ankit-mcs/assets/CGWB_basin"
-L1_TOA = "LANDSAT/LE07/C02/T1_TOA"
-LC_O8_T1_TOA = "LANDSAT/LC08/C02/T1_TOA"
+LANDSAT7_T1_CALIBERATED_TOA = "LANDSAT/LE07/C02/T1_TOA"
+LANDSAT8_T1_CALIBERATED_TOA = "LANDSAT/LC08/C02/T1_TOA"
 VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
-PAN_INDIA_LULC_V3 = (
+PAN_INDIA_L3_LULC_CLUSTERS = (
     "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
 )
-PAN_INDIA_LULC_V3_BASE = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
-)
+
+# CRS
+CRS_4326 = "EPSG:4326"
+
+# Algorithm
+DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
