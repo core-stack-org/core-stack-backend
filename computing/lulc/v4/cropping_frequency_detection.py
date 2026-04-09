@@ -2,11 +2,11 @@ import ee
 from datetime import datetime, timedelta
 import pandas as pd
 from utilities.constants import (
-    L1_TOA,
-    LC_O8_T1_TOA,
-    LEVEL_1C_TOA,
+    LANDSAT7_T1_CALIBERATED_TOA,
+    LANDSAT8_T1_CALIBERATED_TOA,
+    SENTINEL2_LEVEL_1C_TOA,
     VEGETATION_INDEX_OF_16_DAY,
-    PAN_INDIA_LULC_V3,
+    PAN_INDIA_L3_LULC_CLUSTERS,
 )
 
 chastainBandNames = ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "SWIR2"]
@@ -94,7 +94,7 @@ Get Landsat and Sentinel image collections
 def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
     # ------ Landsat 7 TOA
     L7 = (
-        ee.ImageCollection(L1_TOA)
+        ee.ImageCollection(LANDSAT7_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL7cloud)
@@ -104,7 +104,7 @@ def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
 
     # ------ Landsat 8 TOA
     L8 = (
-        ee.ImageCollection(LC_O8_T1_TOA)
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL8cloud)
@@ -114,7 +114,7 @@ def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
 
     # ------ Sentinel-2 TOA
     S2 = (
-        ee.ImageCollection(LEVEL_1C_TOA)
+        ee.ImageCollection(SENTINEL2_LEVEL_1C_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskS2cloudTOA)
@@ -566,7 +566,7 @@ def Get_final_prediction_image(distance_imgs_list):
 
 
 def get_cropping_frequency(roi_boundary, startDate, endDate):
-    cluster_centroids = ee.FeatureCollection(PAN_INDIA_LULC_V3)
+    cluster_centroids = ee.FeatureCollection(PAN_INDIA_L3_LULC_CLUSTERS)
     ignore_clusters = [12]  # remove invalid clusters
     cluster_centroids = cluster_centroids.filter(
         ee.Filter.Not(ee.Filter.inList("class", ignore_clusters))
