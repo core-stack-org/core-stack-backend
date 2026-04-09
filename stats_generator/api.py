@@ -57,9 +57,9 @@ def add_sheets_in_stats_excel(request):
         state = valid_gee_text(request.query_params.get("state", "").lower())
         district = valid_gee_text(request.query_params.get("district", "").lower())
         block = valid_gee_text(request.query_params.get("block", "").lower())
-        sheets = request.query_params.get("sheets", "")
+        workspace = request.query_params.get("workspace", "")
 
-        response_data = add_sheets_to_excel(state, district, block, sheets)
+        response_data = add_sheets_to_excel(state, district, block, workspace)
         return Response({"status": "success"}, status=status.HTTP_200_OK)
 
     except Exception as e:
