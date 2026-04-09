@@ -1,22 +1,9 @@
 import rasterio
-import sys
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from dataclasses import dataclass
 
 from rasterio.warp import reproject, Resampling
-
-# if len(sys.argv) > 2:
-#     state_name = sys.argv[2]
-#     start_year = int(sys.argv[3])
-#     mid_pt = int(sys.argv[4])
-#     end_year = int(sys.argv[5])
-# else:
-#     state_name = "Dhenkanal"
-#     start_year = 2010
-#     mid_pt = 2015
-#     end_year = 2020
 
 
 def get_area_estimation(state_name, start_year, mid_pt, end_year, DATA_DIR):
@@ -41,7 +28,7 @@ def get_area_estimation(state_name, start_year, mid_pt, end_year, DATA_DIR):
     ]
 
     def evaluate_area(cfg: RunConfig) -> dict:
-        predict_year = "2010_15"
+        predict_year = "2010_15"  # TODO
 
         if cfg.ex_ante:
             suffix = "ex_ante"
@@ -60,7 +47,7 @@ def get_area_estimation(state_name, start_year, mid_pt, end_year, DATA_DIR):
             )
 
         gt_tif = (
-            DATA_DIR + f"/deforestation_map_{start_year}_{mid_pt}_gd.tif"
+            DATA_DIR + f"/deforestation_map_{start_year}_{mid_pt}_gd.tif"  # TODO
         )  # f"training_data_x_{predict_year[:4]}_y_{predict_year}.tif"
 
         with rasterio.open(gt_tif) as gt_src, rasterio.open(pred_tif) as pred_src:

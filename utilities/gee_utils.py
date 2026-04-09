@@ -195,7 +195,9 @@ def copy_gee_credentials_into_repo(
     }
 
 
-def upsert_gee_account_from_json(credentials_path, account_name=None, helper_account_id=None):
+def upsert_gee_account_from_json(
+    credentials_path, account_name=None, helper_account_id=None
+):
     credentials_path = os.path.abspath(credentials_path)
     if not os.path.isfile(credentials_path):
         raise GEEInitializationError(
@@ -212,7 +214,9 @@ def upsert_gee_account_from_json(credentials_path, account_name=None, helper_acc
             "The provided credentials JSON does not contain client_email."
         )
 
-    account_name = account_name or os.path.splitext(os.path.basename(credentials_path))[0]
+    account_name = (
+        account_name or os.path.splitext(os.path.basename(credentials_path))[0]
+    )
     account = (
         GEEAccount.objects.filter(service_account_email=service_account_email).first()
         or GEEAccount.objects.filter(name=account_name).first()
@@ -603,6 +607,18 @@ def sync_raster_to_gcs(image, scale, layer_name):
     export_task.start()
     print("Successfully started the sync_raster_to_gcs", export_task.status())
     return export_task.status()["id"]
+
+
+def download_tif_from_gcs(source_blob_name, destination_file_name):
+    bucket = gcs_config()
+
+    # Get the blob (file)
+    blob = bucket.blob(source_blob_name)
+
+    # Download the file
+    blob.download_to_filename(destination_file_name)
+
+    print(f"Downloaded {source_blob_name} to {destination_file_name}")
 
 
 def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
