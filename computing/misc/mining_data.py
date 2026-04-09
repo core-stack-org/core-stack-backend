@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-from utilities.constants import GEE_EXT_DATASET_PATH
+from utilities.constants import MINING_PAN_INDIA_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -20,6 +20,9 @@ from nrm_app.celery import app
 
 @app.task(bind=True)
 def generate_mining_data(self, state, district, block, gee_account_id):
+    """
+    It will generate mining layer for given layer at tehsil level
+    """
     ee_initialize(gee_account_id)
 
     roi_asset_id = (
@@ -31,7 +34,7 @@ def generate_mining_data(self, state, district, block, gee_account_id):
         + "_uid"
     )
 
-    pan_india_asset_id = f"{GEE_EXT_DATASET_PATH}/Mining_data_pan_india"
+    pan_india_asset_id = MINING_PAN_INDIA_DATASET
 
     description = (
         f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mining"

@@ -34,6 +34,9 @@ def generate_catchment_area_singleflow(
     asset_folder=None,
     app_type="MWS",
 ):
+    """
+    It will generate catchment layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     if state and district and block:
         description = (
@@ -55,7 +58,7 @@ def generate_catchment_area_singleflow(
 
     else:
         roi_boundary = ee.FeatureCollection(roi_path)
-        description = "catchment_area_" + asset_suffix +'_raster'
+        description = "catchment_area_" + asset_suffix + "_raster"
 
         asset_id = (
             get_gee_dir_path(

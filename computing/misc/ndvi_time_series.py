@@ -44,6 +44,9 @@ def ndvi_timeseries(
     app_type="MWS",
     gee_account_id=None,
 ):
+    """
+    It will generate ndvi timeseries layer for given location at tehsil level or region of intrest
+    """
     print(f"{gee_account_id=}")
     ee_initialize(gee_account_id)
 
