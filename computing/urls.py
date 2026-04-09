@@ -41,6 +41,11 @@ urlpatterns = [
         name="generate_terrain_descriptor",
     ),
     path(
+        "generate_terrain_compute_all/",
+        api.generate_terrain_compute_all,
+        name="generate_terrain_compute_all",
+    ),
+    path(
         "generate_terrain_raster/",
         api.generate_terrain_raster,
         name="generate_terrain_raster",

@@ -1,4 +1,5 @@
 import os
+import logging
 
 import requests
 
@@ -26,20 +27,56 @@ from google.oauth2 import service_account
 import numpy as np
 import tempfile
 
+logger = logging.getLogger(__name__)
+
 
 def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
-    account = GEEAccount.objects.get(pk=account_id)
-    key_dict = json.loads(account.get_credentials().decode("utf-8"))
-    credentials = service_account.Credentials.from_service_account_info(
-        key_dict,
-        scopes=[
-            "https://www.googleapis.com/auth/earthengine",
-            "https://www.googleapis.com/auth/devstorage.full_control",
-        ],
-    )
-    ee.Initialize(credentials)
+    try:
+        if account_id in (None, ""):
+            logger.warning("Skipping Earth Engine initialization: no GEE account id configured.")
+            return False
 
-    return ee, credentials.service_account_email
+        if isinstance(account_id, str):
+            account_id = account_id.strip()
+            if not account_id.isdigit():
+                logger.warning(
+                    "Skipping Earth Engine initialization: invalid GEE account id %r.",
+                    account_id,
+                )
+                return False
+            account_id = int(account_id)
+
+        account = GEEAccount.objects.get(pk=account_id)
+        credentials_payload = account.get_credentials()
+        if not credentials_payload:
+            logger.warning(
+                "Skipping Earth Engine initialization: GEE account %s has no stored credentials.",
+                account_id,
+            )
+            return False
+
+        key_dict = json.loads(credentials_payload.decode("utf-8"))
+        credentials = service_account.Credentials.from_service_account_info(
+            key_dict,
+            scopes=[
+                "https://www.googleapis.com/auth/earthengine",
+                "https://www.googleapis.com/auth/devstorage.full_control",
+            ],
+        )
+        ee.Initialize(credentials)
+
+        return ee, credentials.service_account_email
+    except GEEAccount.DoesNotExist:
+        logger.warning(
+            "Skipping Earth Engine initialization: GEEAccount with id %s does not exist.",
+            account_id,
+        )
+    except Exception:
+        logger.exception(
+            "Earth Engine initialization failed for GEE account id %s.", account_id
+        )
+
+    return False
 
 
 # def ee_initialize(project=None):
