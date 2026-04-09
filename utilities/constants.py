@@ -169,9 +169,13 @@ GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 AQUIFER_DATASET_PATH = "projects/corestack-datasets/assets/datasets/Aquifer_vector"
-PAN_INDIA_DRAINAGE_LINES = "/drainage-line/pan_india_drainage_lines"
+PAN_INDIA_DRAINAGE_LINES_DATASET = (
+    "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
+)
 GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
-AGROECOLOGICAL_PAN_INDIA = "Agroecological_space_pan_india"
+AGROECOLOGICAL_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Agroecological_space_pan_india"
+)
 
 GEE_FACILITIES_DATASET_PATH = (
     "projects/corestack-datasets/assets/datasets/pan_india_facilities"
