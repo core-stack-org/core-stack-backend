@@ -168,7 +168,7 @@ GEE_BASE_PATH = "projects/ee-corestackdev/assets/apps"
 GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
-AQUIFER = "/Aquifer_vector"
+AQUIFER_DATASET_PATH = "projects/corestack-datasets/assets/datasets/Aquifer_vector"
 PAN_INDIA_DRAINAGE_LINES = "/drainage-line/pan_india_drainage_lines"
 GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
 AGROECOLOGICAL_PAN_INDIA = "Agroecological_space_pan_india"
@@ -252,13 +252,14 @@ PAN_INDIA_L3_LULC_CLUSTERS = (
 )
 AEZ = "users/mtpictd/agro_eco_regions"
 FACILITIES_DATASET_NAME = "Facilities Proximity"
-LCW_PAN_INDIA = "lcw_conflict_pan_india"
-MINING_PAN_INDIA = "Mining_data_pan_india"
-SOI_TEHSIL = "/soi_tehsil.geojson"
-WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
-SOGE = "/SOGE_vector_2020"
-FACTORY_PAN_INDIA = "Factory_CSR_pan_india"
-GREEN_CREDIT_PAN_INDIA = "Green_credit_pan_india"
+LCW_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/lcw_conflict_pan_india"
+MINING_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/Mining_data_pan_india"
+FACTORY_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Factory_CSR_pan_india"
+)
+GREEN_CREDIT_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Green_credit_pan_india"
+)
 HARMONIZED_LANDSAT_SENTINEL = "NASA/HLS/HLSL30/v002"
 NBAR_MSI = "NASA/HLS/HLSS30/v002"
 
@@ -267,12 +268,15 @@ CRS_4326 = "EPSG:4326"
 
 # Algorithm
 DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
-PAN_INDIA_LULC_V3_BASE = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
-)
+
 # workspace
 FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
 
 # other
-ADMIN_BOUNDARY_INPUT_DIR = "data" / "admin-boundary" / "input"
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
+PAN_INDIA_LULC_V3_BASE = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
+SOGE = "/SOGE_vector_2020"
+WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
+SOI_TEHSIL = "/soi_tehsil.geojson"
