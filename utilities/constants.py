@@ -250,6 +250,17 @@ VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
 PAN_INDIA_L3_LULC_CLUSTERS = (
     "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
 )
+AEZ = "users/mtpictd/agro_eco_regions"
+FACILITIES_DATASET_NAME = "Facilities Proximity"
+LCW_PAN_INDIA = "lcw_conflict_pan_india"
+MINING_PAN_INDIA = "Mining_data_pan_india"
+SOI_TEHSIL = "/soi_tehsil.geojson"
+WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
+SOGE = "/SOGE_vector_2020"
+FACTORY_PAN_INDIA = "Factory_CSR_pan_india"
+GREEN_CREDIT_PAN_INDIA = "Green_credit_pan_india"
+HARMONIZED_LANDSAT_SENTINEL = "NASA/HLS/HLSL30/v002"
+NBAR_MSI = "NASA/HLS/HLSS30/v002"
 
 # CRS
 CRS_4326 = "EPSG:4326"
@@ -259,17 +270,9 @@ DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 PAN_INDIA_LULC_V3_BASE = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
 )
-AEZ = "users/mtpictd/agro_eco_regions"
+# workspace
 FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
-FACILITIES_DATASET_NAME = "Facilities Proximity"
-FACTORY_PAN_INDIA = "Factory_CSR_pan_india"
-GREEN_CREDIT_PAN_INDIA = "Green_credit_pan_india"
-HARMONIZED_LANDSAT_SENTINEL = "NASA/HLS/HLSL30/v002"
-NBAR_MSI = "NASA/HLS/HLSS30/v002"
+
+# other
 ADMIN_BOUNDARY_INPUT_DIR = "data" / "admin-boundary" / "input"
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
-LCW_PAN_INDIA = "lcw_conflict_pan_india"
-MINING_PAN_INDIA = "Mining_data_pan_india"
-SOI_TEHSIL = "/soi_tehsil.geojson"
-WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
-SOGE = "/SOGE_vector_2020"
