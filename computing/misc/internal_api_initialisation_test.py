@@ -33,7 +33,7 @@ for env_name in (
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
 
-ADMIN_BOUNDARY_INPUT_DIR = ROOT_DIR / ADMIN_BOUNDARY_INPUT_DIR
+ADMIN_BOUNDARY_INPUT_DIR = ROOT_DIR / "data" / "admin-boundary" / "input"
 
 SUCCESS_STATUSES = {200, 201, 202, 204, 301, 302, 400, 401, 403, 404, 405}
 

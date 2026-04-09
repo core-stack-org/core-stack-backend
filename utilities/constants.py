@@ -1,4 +1,4 @@
-# contains the URLs of various resources
+# Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 
@@ -20,6 +20,8 @@ DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
 
 LITHOLOGY_PATH = "data/lithology/"
 SITE_DATA_PATH = "data/site_data"
+
+WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
 
 
 # MARK: ODK URLs
@@ -166,10 +168,14 @@ GEE_BASE_PATH = "projects/ee-corestackdev/assets/apps"
 GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
-AQUIFER = "/Aquifer_vector"
-PAN_INDIA_DRAINAGE_LINES = "/drainage-line/pan_india_drainage_lines"
+AQUIFER_DATASET_PATH = "projects/corestack-datasets/assets/datasets/Aquifer_vector"
+PAN_INDIA_DRAINAGE_LINES_DATASET = (
+    "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
+)
 GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
-AGROECOLOGICAL_PAN_INDIA = "Agroecological_space_pan_india"
+AGROECOLOGICAL_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Agroecological_space_pan_india"
+)
 
 GEE_FACILITIES_DATASET_PATH = (
     "projects/corestack-datasets/assets/datasets/pan_india_facilities"
@@ -191,8 +197,18 @@ GEE_PATHS = {
     },
 }
 
-WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
+PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
 
+LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
+    "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
+)
+
+LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+
+
+# Moderation Constants
 filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
 filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
 filter_query = (
@@ -207,7 +223,6 @@ project_id = 2
 
 
 # demand vaidator constants
-
 DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
@@ -222,47 +237,50 @@ STREAM_ORDER_ASSET = (
     "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
 )
 
+# Datasets
 INDIA_LINEAMENTS = "projects/ee-harshita-om/assets/india_lineaments"
-CRS = "EPSG:4326"
-DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 CHIRPS_PPT = "UCSB-CHG/CHIRPS/DAILY"
-MODIS_ET = "MODIS/061/MOD16A2GF"
-SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
-LITHOLOGY_BASE_ASSET_ID_PATH = "projects/ee-corestackdev/assets/apps/mws/"
-RIVER_BASIN_EE_ACCOUNT = "datasets"
+MODIS_TERRA_NET_ET_GAP_FILLED_8_DAY = "MODIS/061/MOD16A2GF"
+MODIS_TERRA_SURFACE_REFLECTANCE = "MODIS/061/MOD09A1"
 CGWB_BASIN = "projects/corestack-datasets/assets/datasets/CGWB_basin"
-LULC_V2_RIVER_BASIN_OUTPUT = (
-    "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
-)
-LULC_V2_RIVER_BASIN_MAX_PIXEL = 1e13
-LULC_V3_RIVER_BASIN_EE_ACCOUNT = 7
-LULC_V3_OUTPUT_ASSET = "projects/corestack-datasets/assets/datasets/lulc_v3/"
-LEVEL_1C_TOA = "COPERNICUS/S2_HARMONIZED"
+SENTINEL2_LEVEL_1C_TOA = "COPERNICUS/S2_HARMONIZED"
 LAND_COVER_CLASSIFICATION_10_METER = "GOOGLE/DYNAMICWORLD/V1"
-LEVEL_1_GRD = "COPERNICUS/S1_GRD"
+SENTINEL1_GRD = "COPERNICUS/S1_GRD"
 DEM_OF_90_M_RESOLUTION = "CGIAR/SRTM90_V4"
 CROPLAND_DATASET_PATH = "projects/ee-indiasat/assets/Rasterized_Groundtruth/L2_TrainingData_SAR_TimeSeries_1Year"
-ANKIT_CGWB_BASIN = "projects/ee-ankit-mcs/assets/CGWB_basin"
-L1_TOA = "LANDSAT/LE07/C02/T1_TOA"
-LC_O8_T1_TOA = "LANDSAT/LC08/C02/T1_TOA"
+LANDSAT7_T1_CALIBERATED_TOA = "LANDSAT/LE07/C02/T1_TOA"
+LANDSAT8_T1_CALIBERATED_TOA = "LANDSAT/LC08/C02/T1_TOA"
 VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
-PAN_INDIA_LULC_V3 = (
+PAN_INDIA_L3_LULC_CLUSTERS = (
     "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
 )
+AEZ = "users/mtpictd/agro_eco_regions"
+FACILITIES_DATASET_NAME = "Facilities Proximity"
+LCW_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/lcw_conflict_pan_india"
+MINING_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/Mining_data_pan_india"
+FACTORY_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Factory_CSR_pan_india"
+)
+GREEN_CREDIT_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Green_credit_pan_india"
+)
+HARMONIZED_LANDSAT_SENTINEL = "NASA/HLS/HLSL30/v002"
+NBAR_MSI = "NASA/HLS/HLSS30/v002"
+
+# CRS
+CRS_4326 = "EPSG:4326"
+
+# Algorithm
+DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
+
+# workspace
+FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
+
+# other
+FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
 PAN_INDIA_LULC_V3_BASE = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
 )
-AEZ = "users/mtpictd/agro_eco_regions"
-FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
-FACILITIES_DATASET_NAME = "Facilities Proximity"
-FACTORY_PAN_INDIA = "Factory_CSR_pan_india"
-GREEN_CREDIT_PAN_INDIA = "Green_credit_pan_india"
-HARMONIZED_LANDSAT_SENTINEL = "NASA/HLS/HLSL30/v002"
-NBAR_MSI = "NASA/HLS/HLSS30/v002"
-ADMIN_BOUNDARY_INPUT_DIR = "data" / "admin-boundary" / "input"
-FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
-LCW_PAN_INDIA = "lcw_conflict_pan_india"
-MINING_PAN_INDIA = "Mining_data_pan_india"
-SOI_TEHSIL = "/soi_tehsil.geojson"
-WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
 SOGE = "/SOGE_vector_2020"
+WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
+SOI_TEHSIL = "/soi_tehsil.geojson"

@@ -1,13 +1,16 @@
 import ee
 from computing.lulc.misc import mask_s2cloud
-from utilities.constants import LEVEL_1C_TOA, LAND_COVER_CLASSIFICATION_10_METER
+from utilities.constants import (
+    SENTINEL2_LEVEL_1C_TOA,
+    LAND_COVER_CLASSIFICATION_10_METER,
+)
 
 
 def ndwi_based_builtup_cleaning(
     roi_boundary, prediction_image, start_date, end_date, NDWI_threshold
 ):
     S2_ic = (
-        ee.ImageCollection(LEVEL_1C_TOA)
+        ee.ImageCollection(SENTINEL2_LEVEL_1C_TOA)
         .filterBounds(roi_boundary)
         .filterDate(start_date, end_date)
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 10))
@@ -45,7 +48,7 @@ def ndvi_based_builtup_cleaning(
     roi_boundary, prediction_image, startDate, endDate, NDVI_threshold
 ):
     S2_ic = (
-        ee.ImageCollection(LEVEL_1C_TOA)
+        ee.ImageCollection(SENTINEL2_LEVEL_1C_TOA)
         .filterBounds(roi_boundary)
         .filterDate(startDate, endDate)
         .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 10))

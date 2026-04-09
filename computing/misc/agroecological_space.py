@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-from utilities.constants import GEE_EXT_DATASET_PATH, AGROECOLOGICAL_PAN_INDIA
+from utilities.constants import AGROECOLOGICAL_PAN_INDIA_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -34,7 +34,7 @@ def generate_agroecological_data(self, state, district, block, gee_account_id):
         + "_uid"
     )
 
-    pan_india_asset_id = f"{GEE_EXT_DATASET_PATH}/{AGROECOLOGICAL_PAN_INDIA}"
+    pan_india_asset_id = AGROECOLOGICAL_PAN_INDIA_DATASET
 
     description = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_agroecological"
     asset_id = get_gee_asset_path(state, district, block) + description
