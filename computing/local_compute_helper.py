@@ -10,22 +10,19 @@ from rasterio.mask import mask
 from shapely.geometry import mapping
 from utilities.gee_utils import valid_gee_text
 
-from computing.utils import convert_to_zip
-import logging
 
-
-from computing.config_loader import (
-    AEZ_VECTOR_PATH,
-    LULC_BASE_DIR,
-    PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
-    TERRAIN_RASTER_PATH,
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PRECOMPUTED_TEHSIL_WATERSHED_DIR = (
+    PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
 )
-from utilities.download_gpkg_from_geoserver import generate_gpkg
-
-PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
-
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
+AEZ_VECTOR_PATH = (
+    PROJECT_ROOT / "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
+)
+LULC_BASE_DIR = PROJECT_ROOT / "data/base_layers/lulc"
+TERRAIN_RASTER_PATH = (
+    PROJECT_ROOT / "data/base_layers/terrain_raster_fabdam_pan_india.tif"
+)
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
 LULC_CLASSES = np.arange(1, 13, dtype=np.int16)
@@ -102,60 +99,19 @@ def resolve_precomputed_vector_file(
     )
 
 
-def resolve_precomputed_panchayat_vector_file(
-    state,
-    district,
-    block,
-    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
-    extensions=PRECOMPUTED_ROI_EXTENSIONS,
-    missing_file_label="Precomputed vector file",
-):
-    roi_dir = Path(precomputed_roi_dir or PRECOMPUTED_PANCHAYAT_DIR)
-    state_slug = _slug(state, "unknown_state")
-    district_slug = _slug(district, "unknown_district")
-    block_slug = _slug(block, "unknown_tehsil")
-
-    expected_paths = [
-        roi_dir / state_slug / district_slug / f"{block_slug}{ext}"
-        for ext in extensions
-    ]
-    for path in expected_paths:
-        if path.exists():
-            return path
-
-    raise FileNotFoundError(
-        f"{missing_file_label} not found. "
-        f"state={state}, district={district}, block={block}. "
-        f"Expected one of: {[str(path) for path in expected_paths]}"
-    )
-
-
 def load_precomputed_watersheds(
     state,
     district,
     block,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
 ):
-    try:
-        watershed_path = resolve_precomputed_vector_file(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-            missing_file_label="Precomputed watershed boundary file",
-        )
-
-    except FileNotFoundError:
-        print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
-        generate_gpkg(state=state, district=district, block=block, workspace="mws")
-        watershed_path = resolve_precomputed_vector_file(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-            missing_file_label="Generated watershed boundary file not found",
-        )
-
+    watershed_path = resolve_precomputed_vector_file(
+        state=state,
+        district=district,
+        block=block,
+        precomputed_roi_dir=precomputed_roi_dir,
+        missing_file_label="Precomputed watershed boundary file",
+    )
     watersheds_gdf = read_validated_vector_file(
         watershed_path,
         f"Precomputed watershed file has no valid geometries: {watershed_path}",
@@ -164,72 +120,19 @@ def load_precomputed_watersheds(
     return watersheds_gdf, str(watershed_path)
 
 
-def load_precomputed_panchayat(
-    state,
-    district,
-    block,
-    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
-):
-    try:
-        panchayat_path = resolve_precomputed_panchayat_vector_file(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-            missing_file_label="Precomputed panchayat boundary file",
-        )
-
-    except FileNotFoundError:
-        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
-        generate_gpkg(
-            state=state,
-            district=district,
-            block=block,
-            workspace="panchayat_boundaries",
-        )
-
-        panchayat_path = resolve_precomputed_panchayat_vector_file(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-            missing_file_label="Generated panchayat boundary file not found",
-        )
-
-    panchayat_gdf = read_validated_vector_file(
-        panchayat_path,
-        f"Precomputed panchayat file has no valid geometries: {panchayat_path}",
-    )
-
-    print(f"Loaded panchayat boundaries: {panchayat_path}")
-    return panchayat_gdf, str(panchayat_path)
-
-
 def load_precomputed_roi(
     state,
     district,
     block,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
 ):
-    try:
-        roi_path = resolve_precomputed_vector_file(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-            missing_file_label="Precomputed tehsil watershed file",
-        )
-    except FileNotFoundError:
-        print(f"Precomputed ROI not found for {state}/{district}/{block}. Downloading...")
-        generate_gpkg(state=state, district=district, block=block, workspace="mws")
-        roi_path = resolve_precomputed_vector_file(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-            missing_file_label="Generated tehsil watershed file",
-        )
-
+    roi_path = resolve_precomputed_vector_file(
+        state=state,
+        district=district,
+        block=block,
+        precomputed_roi_dir=precomputed_roi_dir,
+        missing_file_label="Precomputed tehsil watershed file",
+    )
     roi_gdf = read_validated_vector_file(
         roi_path,
         f"Precomputed ROI file has no valid geometries: {roi_path}",
@@ -266,7 +169,6 @@ def build_output_vector_path(
     district,
     block,
     output_base_dir,
-    custom_subdir="custom",
     block_fallback="unknown_block",
 ):
     output_dir = _build_output_dir(
@@ -274,7 +176,6 @@ def build_output_vector_path(
         state=state,
         district=district,
         block=block,
-        custom_subdir=custom_subdir,
         block_fallback=block_fallback,
     )
     return output_dir / f"{layer_name}.gpkg"
@@ -340,37 +241,16 @@ def clip_raster_with_roi(roi_gdf, raster_path, output_path, raster_label="Raster
     return str(output_path)
 
 
-RASTER_DECLARED_SRS = "EPSG:4326"
-VECTOR_DECLARED_SRS = "EPSG:4326"
+def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
+    from utilities.geoserver_utils import Geoserver
 
-
-def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
-
-    _log = logging.getLogger(__name__)
-
-    geo.ensure_workspace(workspace)
+    geo = Geoserver()
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     upload_response = geo.create_coveragestore(
         path=file_path,
         workspace=workspace,
         layer_name=layer_name,
     )
-    try:
-        geo.configure_coverage(
-            workspace=workspace,
-            store=layer_name,
-            coverage=layer_name,
-            srs=RASTER_DECLARED_SRS,
-            projection_policy="REPROJECT_TO_DECLARED",
-            enabled=True,
-        )
-    except Exception as e:
-        _log.warning(
-            "Failed to force SRS on coverage %s:%s: %s",
-            workspace,
-            layer_name,
-            e,
-        )
     style_response = None
     if style_name:
         style_response = geo.publish_style(
@@ -378,166 +258,6 @@ def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, st
             style_name=style_name,
             workspace=workspace,
         )
-    return upload_response, style_response
-
-
-def _verify_raster_layer(geo, workspace, layer_name):
-    """Return True iff a layer (not just the store) is registered on the server."""
-    from utilities.geoserver_utils import GeoserverException
-
-    try:
-        geo.get_layer(layer_name=layer_name, workspace=workspace)
-        return True
-    except GeoserverException:
-        return False
-    except Exception:
-        return False
-
-
-def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_type="gpkg"):
-    _log = logging.getLogger(__name__)
-
-    geo.ensure_workspace(workspace)
-    try:
-        geo.delete_vector_store(workspace=workspace, store=layer_name)
-    except Exception:
-        pass
-
-    zip_path = convert_to_zip(path, file_type)
-    response = geo.create_shp_datastore(
-        path=zip_path,
-        store_name=layer_name,
-        workspace=workspace,
-        file_extension=file_type,
-    )
-    try:
-        geo.configure_featuretype(
-            workspace=workspace,
-            store=layer_name,
-            featuretype=layer_name,
-            srs=VECTOR_DECLARED_SRS,
-            projection_policy="FORCE_DECLARED",
-        )
-    except Exception as e:
-        _log.warning(
-            "Failed to force SRS on featuretype %s:%s: %s",
-            workspace,
-            layer_name,
-            e,
-        )
-    return response
-
-
-def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"):
-    import logging
-    from django.conf import settings
-    from utilities.geoserver_utils import Geoserver
-
-    _log = logging.getLogger(__name__)
-
-    local_geo = Geoserver()
-    local_response = _push_vector_to_geoserver_instance(
-        local_geo, path, layer_name, workspace, file_type
-    )
-    local_ok = isinstance(local_response, dict) and local_response.get("status_code") in (
-        200,
-        201,
-    )
-    _log.info(
-        "Pushed vector %s to local GeoServer (ok=%s).", layer_name, local_ok
-    )
-
-    prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
-    prod_response = None
-    prod_ok = None
-    if prod_url:
-        try:
-            prod_geo = Geoserver(
-                service_url=prod_url,
-                username=settings.PROD_GEOSERVER_USERNAME,
-                password=settings.PROD_GEOSERVER_PASSWORD,
-            )
-            prod_response = _push_vector_to_geoserver_instance(
-                prod_geo, path, layer_name, workspace, file_type
-            )
-            prod_ok = isinstance(prod_response, dict) and prod_response.get(
-                "status_code"
-            ) in (200, 201)
-            _log.info(
-                "Pushed vector %s to prod GeoServer (%s) (ok=%s).",
-                layer_name,
-                prod_url,
-                prod_ok,
-            )
-        except Exception as e:
-            prod_ok = False
-            prod_response = {"error": str(e)}
-            _log.error("Failed to push vector %s to prod GeoServer: %s", layer_name, e)
-
-    overall_ok = local_ok and (prod_ok if prod_ok is not None else True)
-    failure_status = None
-    if isinstance(prod_response, dict):
-        failure_status = prod_response.get("status_code")
-    if failure_status is None and isinstance(local_response, dict):
-        failure_status = local_response.get("status_code")
-
-    return {
-        "status_code": 201 if overall_ok else (failure_status or 500),
-        "local_ok": local_ok,
-        "prod_ok": prod_ok,
-        "local_response": local_response,
-        "prod_response": prod_response,
-    }
-
-
-def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
-    import logging
-    from django.conf import settings
-    from utilities.geoserver_utils import Geoserver
-
-    _log = logging.getLogger(__name__)
-
-    local_geo = Geoserver()
-    upload_response, style_response = _push_raster_to_geoserver_instance(
-        local_geo, file_path, layer_name, workspace, style_name
-    )
-    local_layer_ok = _verify_raster_layer(local_geo, workspace, layer_name)
-    _log.info(
-        "Pushed raster %s to local GeoServer (layer_exists=%s).",
-        layer_name,
-        local_layer_ok,
-    )
-
-    prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
-    if prod_url:
-        try:
-            prod_geo = Geoserver(
-                service_url=prod_url,
-                username=settings.PROD_GEOSERVER_USERNAME,
-                password=settings.PROD_GEOSERVER_PASSWORD,
-            )
-            prod_upload, prod_style = _push_raster_to_geoserver_instance(
-                prod_geo, file_path, layer_name, workspace, style_name
-            )
-            prod_layer_ok = _verify_raster_layer(prod_geo, workspace, layer_name)
-            _log.info(
-                "Pushed raster %s to prod GeoServer (%s) "
-                "(layer_exists=%s, upload=%s, style=%s).",
-                layer_name,
-                prod_url,
-                prod_layer_ok,
-                prod_upload,
-                prod_style,
-            )
-            if not prod_layer_ok:
-                _log.error(
-                    "Prod raster push for %s created store but NO layer. "
-                    "Coverage auto-config likely failed on prod GeoServer.",
-                    layer_name,
-                )
-        except Exception as e:
-            _log.error("Failed to push raster %s to prod GeoServer: %s", layer_name, e)
-
     return upload_response, style_response
 
 
@@ -993,11 +713,7 @@ def compute_mode_lulc_array(reprojected_arrays, lulc_classes=LULC_CLASSES):
     return mode_values
 
 
-def get_compute_mode(request, default=None):
-    from django.conf import settings
-
-    if default is None:
-        default = "local" if getattr(settings, "SYNC_LAYER", False) else "gee"
+def get_compute_mode(request, default="gee"):
     compute = str(request.data.get("compute") or default).strip().lower()
     if compute not in VALID_COMPUTE_TYPES:
         raise ValueError("compute must be either 'gee' or 'local'")
@@ -1006,50 +722,3 @@ def get_compute_mode(request, default=None):
 
 def select_compute_task(compute, gee_task, local_task):
     return gee_task if compute == "gee" else local_task
-
-
-def read_geojson_with_string_coords(path, mask_gdf):
-    """
-    Safely reads a GeoJSON file with malformed string coordinates that cause fiona to crash.
-    Pre-filters using the bounding box of mask_gdf to prevent high memory usage.
-    """
-    import json
-    with open(path, 'r') as f:
-        data = json.load(f)
-        
-    def _convert_coords(coords):
-        if not coords:
-            return coords
-        if isinstance(coords[0], (list, tuple)):
-            return [_convert_coords(c) for c in coords]
-        return [float(c) for c in coords]
-        
-    minx, miny, maxx, maxy = mask_gdf.total_bounds
-    buffer_deg = 0.05
-    
-    def _is_roughly_in_bounds(coords):
-        if not coords: return False
-        if isinstance(coords[0], (list, tuple)):
-            for c in coords:
-                if _is_roughly_in_bounds(c): return True
-            return False
-        else:
-            try:
-                x, y = float(coords[0]), float(coords[1])
-                return (minx - buffer_deg <= x <= maxx + buffer_deg) and (miny - buffer_deg <= y <= maxy + buffer_deg)
-            except Exception:
-                return True
-
-    filtered_features = []
-    for feature in data.get("features", []):
-        geom = feature.get("geometry")
-        if geom and "coordinates" in geom:
-            if _is_roughly_in_bounds(geom["coordinates"]):
-                try:
-                    geom["coordinates"] = _convert_coords(geom["coordinates"])
-                    filtered_features.append(feature)
-                except Exception:
-                    pass
-                
-    return gpd.GeoDataFrame.from_features(filtered_features, crs="EPSG:4326")
-

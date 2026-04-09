@@ -1,10 +1,7 @@
 import json
 import os
-import inspect
-from datetime import datetime
 import requests
-from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
-from nrm_app.settings import DATA_DIR, LOCAL_COMPUTE_API_URL
+from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -17,26 +14,20 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
-from computing.change_detection.change_detection import (
-    get_change_detection as get_change_detection_gee_task,
-)
-from computing.change_detection.change_detection_local import (
-    get_change_detection as get_change_detection_local_task,
-)
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection as vectorise_change_detection_gee_task,
 )
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
-from .et_downscale.et_downscale import generate_et_downscale
 from .utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
 from django.conf import settings
 from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
-from .lulc.lulc_vector import vectorise_lulc
+from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
+from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
@@ -55,21 +46,50 @@ from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
-from .local_compute_helper import get_compute_mode, select_compute_task
-from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
-from .surface_water_bodies.swb_local import (
-    generate_swb_layer as generate_swb_local_task,
+from .cropping_intensity.cropping_intesity_local import (
+    generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
+from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
-from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
+from .terrain_descriptor.terrain_clusters import (
+    generate_terrain_clusters as generate_terrain_clusters_gee_task,
+)
+from .terrain_descriptor.terrain_clusters_local import (
+    generate_terrain_clusters as generate_terrain_clusters_local_task,
+)
+from .terrain_descriptor.terrain_compute_all_local import (
+    generate_terrain_compute_all as generate_terrain_compute_all_task,
+)
+from .terrain_descriptor.terrain_raster_fabdem import (
+    generate_terrain_raster_clip as generate_terrain_raster_clip_gee_task,
+)
+from .terrain_descriptor.terrain_raster_fabdem_local import (
+    generate_terrain_raster_clip as generate_terrain_raster_clip_local_task,
+)
 from computing.misc.drainage_lines import clip_drainage_lines
-from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
-from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
+from .lulc_X_terrain.lulc_on_slope_cluster import (
+    lulc_on_slope_cluster as lulc_on_slope_cluster_gee_task,
+)
+from .lulc_X_terrain.lulc_on_slope_cluster_local import (
+    lulc_on_slope_cluster_local as lulc_on_slope_cluster_local_task,
+)
+from .lulc_X_terrain.lulc_on_plain_cluster import (
+    lulc_on_plain_cluster as lulc_on_plain_cluster_gee_task,
+)
+from .lulc_X_terrain.lulc_on_plain_cluster_local import (
+    lulc_on_plain_cluster_local as lulc_on_plain_cluster_local_task,
+)
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
-from .lulc.lulc_v3 import clip_lulc_v3
+from computing.change_detection.change_detection import (
+    get_change_detection as get_change_detection_gee_task,
+)
+from computing.change_detection.change_detection_local import (
+    get_change_detection as get_change_detection_local_task,
+)
+from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
+from .lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local_task
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
@@ -79,7 +99,12 @@ from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
 from .plantation.site_suitability import site_suitability
-from .misc.aquifer_vector import generate_aquifer_vector
+from .misc.aquifer_vector import (
+    generate_aquifer_vector as generate_aquifer_vector_gee_task,
+)
+from .misc.aquifer_vector_local import (
+    generate_aquifer_vector as generate_aquifer_vector_local_task,
+)
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
@@ -90,7 +115,6 @@ from .views import (
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
     clear_layer_cache,
-    check_missing_excel_files,
 )
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
@@ -104,169 +128,11 @@ from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities import generate_facilities_proximity_task
-from utilities.pipelines import api_request_payload
+from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
-from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
-from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
-from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
-from utilities.layer_generation_mode import (
-    format_stac_for_api_response,
-    sync_layer_generation_if_enabled,
-    is_sync_layer_generation_request,
-)
-from utilities.stac_spec_collector import collect_generated_stac_specs
-from utilities.layer_generation_logging import (
-    layer_api_error_response,
-    layer_generation_api_logging,
-)
-from computing import layer_asset_ids as layer_assets
-from utilities.constants import GEE_PATHS
-from utilities.gee_utils import get_gee_dir_path, valid_gee_text
-from gee_computing.models import GEEAccount
-
-
-def _build_mws_asset_id(state, district, block, description):
-    return (
-        get_gee_dir_path([state, district, block], asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"])
-        + description
-    )
-
-
-def _build_lulc_v3_asset_id(state, district, block, year):
-    description = (
-        f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        f"_{year}-07-01_{year + 1}-06-30_LULCmap_10m"
-    )
-    return _build_mws_asset_id(state, district, block, description)
-
-
-def _tehsil_suffix(district, block):
-    return layer_assets.tehsil_suffix(district, block)
-
-
-def _get_request_value(data, *keys):
-    """Read first non-empty value from request body (supports aliases and form lists)."""
-    for key in keys:
-        val = data.get(key)
-        if val is None:
-            continue
-        if isinstance(val, (list, tuple)):
-            val = val[0] if val else None
-        if val is not None and str(val).strip() != "":
-            return str(val).strip()
-    return None
-
-
-def _parse_zoi_request_dates(request):
-    """
-    Resolve ZOI date window from API body.
-    Accepts start_date/end_date (YYYY-MM-DD) or start_year/end_year (hydrological years).
-    """
-    data = request.data
-    start_date = _get_request_value(
-        data, "start_date", "startDate", "Start_Date", "START_DATE"
-    )
-    end_date = _get_request_value(data, "end_date", "endDate", "End_Date", "END_DATE")
-
-    start_year = _get_request_value(data, "start_year", "startYear", "Start_Year")
-    end_year = _get_request_value(data, "end_year", "endYear", "End_Year")
-
-    if not start_date and start_year is not None:
-        start_date = f"{int(start_year)}-07-01"
-    if not end_date and end_year is not None:
-        end_date = f"{int(end_year) + 1}-06-30"
-
-    return start_date, end_date
-
-
-def _task_started_response(
-    message,
-    task=None,
-    asset_id=None,
-    asset_ids=None,
-    *,
-    stac_spec=None,
-    completed=False,
-):
-    payload = {
-        "status": "completed" if completed else "initiated",
-        "Success": message,
-        "message": message,
-    }
-    if task is not None and getattr(task, "id", None):
-        payload["task_id"] = task.id
-    resolved = layer_assets.resolve_asset_id_field(asset_id=asset_id, asset_ids=asset_ids)
-    if resolved is not None:
-        payload["asset_id"] = resolved
-    if asset_ids is not None:
-        payload["asset_ids"] = asset_ids
-    elif isinstance(asset_id, list):
-        payload["asset_ids"] = asset_id
-    if stac_spec is not None:
-        payload["stac"] = format_stac_for_api_response(stac_spec)
-    return Response(payload, status=status.HTTP_200_OK)
-
-
-def _ensure_layer_stac_spec(
-    *,
-    state,
-    district,
-    block,
-    layer_name,
-    layer_type,
-    start_year="",
-    end_year="",
-):
-    """Read STAC JSON for a layer; generate inline when missing (sync API path)."""
-    stac_spec = collect_generated_stac_specs(
-        state=state,
-        district=district,
-        block=block,
-        layer_name=layer_name,
-        layer_type=layer_type,
-        start_year=start_year,
-        end_year=end_year,
-    )
-    if stac_spec.get("items"):
-        stac_spec["stac_status"] = "available"
-        return stac_spec
-
-    task_kwargs = {
-        "layer_type": layer_type,
-        "state": state,
-        "district": district,
-        "block": block,
-        "layer_name": layer_name,
-        "start_year": str(start_year or ""),
-        "end_year": str(end_year or ""),
-        "upload_to_s3": bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
-        "overwrite_metadata": bool(getattr(settings, "STAC_OVERWRITE_METADATA", True)),
-    }
-    task_result = generate_stac_collection_task.apply(kwargs=task_kwargs)
-    if task_result.failed():
-        stac_spec["stac_status"] = "generation_failed"
-        stac_spec["stac_error"] = str(task_result.result)
-        return stac_spec
-    if not task_result.result:
-        stac_spec["stac_status"] = "generation_failed"
-        stac_spec["stac_error"] = "STAC collection generation returned False"
-        return stac_spec
-
-    stac_spec = collect_generated_stac_specs(
-        state=state,
-        district=district,
-        block=block,
-        layer_name=layer_name,
-        layer_type=layer_type,
-        start_year=start_year,
-        end_year=end_year,
-    )
-    stac_spec["stac_status"] = "available" if stac_spec.get("items") else "not_generated_yet"
-    return stac_spec
 
 
 @api_security_check(allowed_methods="POST")
@@ -278,46 +144,15 @@ def generate_admin_boundary(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        if gee_account_id in (None, ""):
-            return Response(
-                {"error": "gee_account_id is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            gee_account_id = int(gee_account_id)
-        except (TypeError, ValueError):
-            return Response(
-                {"error": "gee_account_id must be an integer."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if not GEEAccount.objects.filter(pk=gee_account_id).exists():
-            return Response(
-                {"error": f"GEEAccount with id={gee_account_id} was not found."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        task = generate_tehsil_shape_file_data.apply_async(
+        generate_tehsil_shape_file_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.admin_boundary_asset_id(state, district, block)
-        sync_mode = is_sync_layer_generation_request(request)
-        stac_spec = None
-        if sync_mode and all([state, district, block]):
-            stac_spec = _ensure_layer_stac_spec(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="admin_boundaries_vector",
-                layer_type="vector",
-            )
-        return _task_started_response(
-            "Successfully completed" if sync_mode else "Successfully initiated",
-            task=task,
-            asset_id=asset_id,
-            stac_spec=stac_spec,
-            completed=sync_mode,
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        return layer_api_error_response("generate_admin_boundary", e, request=request)
+        print("Exception in generate_block_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_security_check(allowed_methods="POST")
@@ -329,13 +164,15 @@ def generate_nrega_layer(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = clip_nrega_district_block.apply_async(
+        clip_nrega_district_block.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.nrega_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_nrega_layer", e, request=request)
+        print("Exception in generate_nrega_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -347,7 +184,7 @@ def generate_drainage_layer(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = clip_drainage_lines.apply_async(
+        clip_drainage_lines.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -356,10 +193,12 @@ def generate_drainage_layer(request):
             },
             queue="nrm",
         )
-        asset_id = layer_assets.drainage_lines_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_drainage_layer", e, request=request)
+        print("Exception in generate_drainage_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -374,7 +213,8 @@ def create_workspace(request):
         print(response)
         return Response({"Success": response}, status=status.HTTP_201_CREATED)
     except Exception as e:
-        return layer_api_error_response("create_workspace", e, request=request)
+        print("Exception in create_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -389,7 +229,8 @@ def delete_layer(request):
         print(response)
         return Response({"Success": response}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("delete_layer", e, request=request)
+        print("Exception in delete_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -412,7 +253,8 @@ def upload_kml(request):
             {"Success": "Successfully uploaded"}, status=status.HTTP_201_CREATED
         )
     except Exception as e:
-        return layer_api_error_response("upload_kml", e, request=request)
+        print("Exception in upload_kml api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_security_check(allowed_methods="POST")
@@ -424,22 +266,15 @@ def generate_mws_layer(request):
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        task = mws_layer.apply_async(
+        mws_layer.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = _build_mws_asset_id(
-            state,
-            district,
-            block,
-            "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_uid",
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
-        return layer_api_error_response("generate_mws_layer", e, request=request)
+        print("Exception in generate_mws_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_security_check(allowed_methods="POST")
@@ -453,7 +288,7 @@ def generate_fortnightly_hydrology(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_hydrology.apply_async(
+        generate_hydrology.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -465,16 +300,12 @@ def generate_fortnightly_hydrology(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.hydrology_asset_ids(
-            state, district, block, is_annual=False
-        )
-        return _task_started_response(
-            "Successfully initiated",
-            task=task,
-            asset_ids=asset_ids,
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        return layer_api_error_response("generate_fortnightly_hydrology", e, request=request)
+        print("Exception in generate_fortnightly_hydrology api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -488,7 +319,7 @@ def generate_annual_hydrology(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_hydrology.apply_async(
+        generate_hydrology.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -500,16 +331,12 @@ def generate_annual_hydrology(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.hydrology_asset_ids(
-            state, district, block, is_annual=True
-        )
-        return _task_started_response(
-            "Successfully initiated",
-            task=task,
-            asset_ids=asset_ids,
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        return layer_api_error_response("generate_annual_hydrology", e, request=request)
+        print("Exception in generate_annual_hydrology api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -524,31 +351,27 @@ def lulc_for_tehsil(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
         version = request.data.get("version")
-        start_year = int(start_year)
-        end_year = int(end_year)
         if version == "v2":
-            task = generate_lulc_v2_tehsil.apply_async(
+            generate_lulc_v2_tehsil.apply_async(
                 args=[state, district, block, start_year, end_year, gee_account_id],
                 queue="nrm",
             )
-            asset_ids = layer_assets.lulc_tehsil_asset_ids(
-                state, district, block, start_year, end_year, version="v2"
+            return Response(
+                {"Success": "generate_lulc_v2_tehsil task initiated"},
+                status=status.HTTP_200_OK,
             )
-            return _task_started_response(
-                "generate_lulc_v2_tehsil task initiated", task=task, asset_ids=asset_ids
+        else:
+            generate_lulc_v3_tehsil.apply_async(
+                args=[state, district, block, start_year, end_year, gee_account_id],
+                queue="nrm",
             )
-        task = generate_lulc_v3_tehsil.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
-        )
-        asset_ids = layer_assets.lulc_tehsil_asset_ids(
-            state, district, block, start_year, end_year, version="v3"
-        )
-        return _task_started_response(
-            "generate_lulc_v3_tehsil task initiated", task=task, asset_ids=asset_ids
-        )
+            return Response(
+                {"Success": "generate_lulc_v3_tehsil task initiated"},
+                status=status.HTTP_200_OK,
+            )
     except Exception as e:
-        return layer_api_error_response("lulc_for_tehsil", e, request=request)
+        print("Exception in lulc_for_tehsil api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -574,7 +397,8 @@ def lulc_v2_river_basin(request):
         )
         return Response({"Success": "lulc_v2_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("lulc_v2_river_basin", e, request=request)
+        print("Exception in lulc_v2_river_basin api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -601,7 +425,8 @@ def lulc_v3_river_basin(request):
         )
         return Response({"Success": "lulc_v3_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("lulc_v3_river_basin", e, request=request)
+        print("Exception in lulc_v3_river_basin api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -612,21 +437,28 @@ def lulc_v3(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = int(request.data.get("start_year"))
-        end_year = int(request.data.get("end_year"))
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        asset_ids = layer_assets.lulc_v3_clip_asset_ids(
-            state, district, block, start_year, end_year
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            clip_lulc_v3_gee_task,
+            clip_lulc_v3_local_task,
         )
-        task = clip_lulc_v3.apply_async(
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        return _task_started_response(
-            "Successfully initiated", task=task, asset_ids=asset_ids
+        return Response(
+            {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        print("Invalid request in lulc_v3 api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("lulc_v3", e, request=request)
+        print("Exception in lulc_v3 api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -640,16 +472,26 @@ def lulc_vector(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        task = vectorise_lulc.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            vectorise_lulc_gee_task,
+            vectorise_lulc_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_id = layer_assets.lulc_vector_asset_id(state, district, block)
-        return _task_started_response(
-            "lulc_vector task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "lulc_vector task initiated"},
+            status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in lulc_vector api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("lulc_vector", e, request=request)
+        print("Exception in lulc_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -663,16 +505,17 @@ def lulc_v4(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_lulc_v4.apply_async(
+        generate_lulc_v4.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_id = layer_assets.lulc_v4_asset_id(state, district, block)
-        return _task_started_response(
-            "lulc_time_series task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "lulc_time_series task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("lulc_v4", e, request=request)
+        print("Exception in lulc_time_series api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -687,7 +530,8 @@ def get_gee_layer(request):
 
         return Response({"Success": response}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("get_gee_layer", e, request=request)
+        print("Exception in get_gee_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -701,7 +545,13 @@ def generate_ci_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_cropping_intensity.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_cropping_intensity,
+            generate_cropping_intensity_local_task,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -712,113 +562,46 @@ def generate_ci_layer(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.cropping_intensity_asset_ids(
-            state, district, block, int(start_year), int(end_year)
+        return Response(
+            {"Success": "Cropping Intensity task initiated"},
+            status=status.HTTP_200_OK,
         )
-        return _task_started_response(
-            "Cropping Intensity task initiated", task=task, asset_ids=asset_ids
-        )
+    except ValueError as e:
+        print("Invalid request in generate_cropping_intensity_layer api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("generate_ci_layer", e, request=request)
+        print("Exception in generate_cropping_intensity_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def generate_swb(request):
-    print("Inside generate swb api")
-    print(request.data)
-
+    print("Inside generate_swf")
     try:
-        state = request.data.get("state") or request.data.get("State")
-        district = request.data.get("district") or request.data.get("District")
-        block = request.data.get("block") or request.data.get("Block")
-        roi = request.data.get("roi")
-        roi_path = request.data.get("roi_path")
-        asset_suffix = request.data.get("asset_suffix")
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id") or request.data.get(
-            "gee_account_d"
+        gee_account_id = request.data.get("gee_account_id")
+        generate_swb_layer.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
-        compute = get_compute_mode(request)
-
-        missing = []
-        if not state:
-            missing.append("state")
-        if not district:
-            missing.append("district")
-        if not block:
-            missing.append("block")
-        if not gee_account_id:
-            missing.append("gee_account_id")
-        if missing:
-            return Response(
-                {
-                    "error": f"Missing required fields: {', '.join(missing)}",
-                    "hint": "Use keys state, district, block, gee_account_id in request body.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        state = state.lower()
-        district = district.lower()
-        block = block.lower()
-        asset_ids = layer_assets.swb_pipeline_asset_ids(state, district, block)
-        task = select_compute_task(
-            compute,
-            generate_swb_gee_task,
-            generate_swb_local_task,
-        )
-        task_kwargs = {
-            "state": state,
-            "district": district,
-            "block": block,
-            "start_year": start_year,
-            "end_year": end_year,
-            "gee_account_id": gee_account_id,
-        }
-        if compute == "local":
-            task_kwargs.update(
-                {
-                    "roi": roi,
-                    "roi_path": roi_path,
-                    "asset_suffix": asset_suffix,
-                }
-            )
-        sync_mode = is_sync_layer_generation_request(request)
-        task_result = task.apply_async(kwargs=task_kwargs, queue="nrm")
-        if task_result.failed():
-            return Response(
-                {
-                    "error": str(task_result.result),
-                    "asset_id": layer_assets.resolve_asset_id_field(
-                        asset_ids=asset_ids
-                    ),
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        if not task_result.result:
-            return Response(
-                {
-                    "error": "SWB generation failed",
-                    "asset_id": layer_assets.resolve_asset_id_field(
-                        asset_ids=asset_ids
-                    ),
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        return _task_started_response(
-            "Generate swb completed" if sync_mode else "Generate swb task initiated",
-            asset_ids=asset_ids,
-            completed=sync_mode,
-        )
-    except ValueError as e:
         return Response(
-            {"error": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
+            {"Success": "Generate swb task initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        return layer_api_error_response("generate_swb", e, request=request)
+        print("Exception in generate_swf api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -832,7 +615,7 @@ def generate_drought_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        task = calculate_drought.apply_async(
+        calculate_drought.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -843,14 +626,13 @@ def generate_drought_layer(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.drought_layer_asset_ids(
-            state, district, block, int(start_year), int(end_year)
-        )
-        return _task_started_response(
-            "generate_drought_layer task initiated", task=task, asset_ids=asset_ids
+        return Response(
+            {"Success": "generate_drought_layer task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("generate_drought_layer", e, request=request)
+        print("Exception in generate_drought_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -858,50 +640,51 @@ def generate_drought_layer(request):
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
     try:
-        state = _get_request_value(request.data, "state", "State", "STATE")
-        district = _get_request_value(
-            request.data, "district", "District", "DISTRICT"
-        )
-        block = _get_request_value(
-            request.data,
-            "block",
-            "Block",
-            "BLOCK",
-            "tehsil",
-            "Tehsil",
-            "TEHSIL",
-        )
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_terrain_clusters.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_terrain_clusters_gee_task,
+            generate_terrain_clusters_local_task,
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_terrain_clusters",
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": "generate_terrain_descriptor task initiated"},
+            status=status.HTTP_200_OK,
         )
-        sync_mode = is_sync_layer_generation_request(request)
-        stac_spec = None
-        if sync_mode and all([state, district, block]):
-            stac_spec = _ensure_layer_stac_spec(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="terrain_vector",
-                layer_type="vector",
-            )
-        return _task_started_response(
-            "generate_terrain_descriptor completed"
-            if sync_mode
-            else "generate_terrain_descriptor task initiated",
-            task=task,
-            asset_id=asset_id,
-            stac_spec=stac_spec,
-            completed=sync_mode,
+    except ValueError as e:
+        print("Invalid request in generate_terrain_descriptor api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_terrain_descriptor api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_terrain_compute_all(request):
+    print("Inside generate_terrain_compute_all")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_terrain_compute_all_task.apply_async(
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "generate_terrain_compute_all task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("generate_terrain_descriptor", e, request=request)
+        print("Exception in generate_terrain_compute_all api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -913,7 +696,13 @@ def generate_terrain_raster(request):
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_terrain_raster_clip.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_terrain_raster_clip_gee_task,
+            generate_terrain_raster_clip_local_task,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -922,16 +711,17 @@ def generate_terrain_raster(request):
             },
             queue="nrm",
         )
-        asset_id = layer_assets.mws_asset_id(
-            state, district, block, _tehsil_suffix(district, block)
+
+        return Response(
+            {"Success": "generate_terrain_raster task initiated"},
+            status=status.HTTP_200_OK,
         )
-        return _task_started_response(
-            "generate_terrain_raster task initiated",
-            task=task,
-            asset_id=asset_id,
-        )
+    except ValueError as e:
+        print("Invalid request in generate_terrain_raster api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("generate_terrain_raster", e, request=request)
+        print("Exception in generate_terrain_raster api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -942,24 +732,29 @@ def terrain_lulc_slope_cluster(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        task = lulc_on_slope_cluster.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            lulc_on_slope_cluster_gee_task,
+            lulc_on_slope_cluster_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_lulcXslopes_clusters",
+        return Response(
+            {"Success": "terrain_lulc_slope_cluster task initiated"},
+            status=status.HTTP_200_OK,
         )
-        return _task_started_response(
-            "terrain_lulc_slope_cluster task initiated", task=task, asset_id=asset_id
-        )
+    except ValueError as e:
+        print("Invalid request in terrain_lulc_slope_cluster api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("terrain_lulc_slope_cluster", e, request=request)
+        print("Exception in terrain_lulc_slope_cluster api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -970,24 +765,29 @@ def terrain_lulc_plain_cluster(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        task = lulc_on_plain_cluster.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            lulc_on_plain_cluster_gee_task,
+            lulc_on_plain_cluster_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_lulcXplains_clusters",
+        return Response(
+            {"Success": "terrain_lulc_plain_cluster task initiated"},
+            status=status.HTTP_200_OK,
         )
-        return _task_started_response(
-            "terrain_lulc_plain_cluster task initiated", task=task, asset_id=asset_id
-        )
+    except ValueError as e:
+        print("Invalid request in terrain_lulc_plain_cluster api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("terrain_lulc_plain_cluster", e, request=request)
+        print("Exception in terrain_lulc_plain_cluster api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -999,17 +799,16 @@ def generate_clart(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_clart_layer.apply_async(
+        generate_clart_layer.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state, district, block, "clart_" + _tehsil_suffix(district, block)
-        )
-        return _task_started_response(
-            "generate_clart task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "generate_clart task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("generate_clart", e, request=request)
+        print("Exception in generate_clart api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1023,33 +822,26 @@ def change_detection(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        compute = get_compute_mode(request)
-        task = select_compute_task(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
             compute,
             get_change_detection_gee_task,
             get_change_detection_local_task,
         )
-        task_result = task.apply_async(
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_ids = layer_assets.change_detection_asset_ids(
-            state, district, block, start_year, end_year
-        )
-        sync_mode = is_sync_layer_generation_request(request)
-        return _task_started_response(
-            "change_detection completed" if sync_mode else "change_detection task initiated",
-            task=task_result,
-            asset_ids=asset_ids,
-            completed=sync_mode,
+        return Response(
+            {"Success": "change_detection task initiated"},
+            status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        print("Invalid request in change_detection api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("change_detection", e, request=request)
+        print("Exception in change_detection api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1063,35 +855,26 @@ def change_detection_vector(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        compute = get_compute_mode(request)
-        task = select_compute_task(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
             compute,
             vectorise_change_detection_gee_task,
             vectorise_change_detection_local_task,
         )
-        task_result = task.apply_async(
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_ids = layer_assets.change_detection_vector_asset_ids(
-            state, district, block, start_year, end_year
-        )
-        sync_mode = is_sync_layer_generation_request(request)
-        return _task_started_response(
-            "change_detection_vector completed"
-            if sync_mode
-            else "change_detection_vector task initiated",
-            task=task_result,
-            asset_ids=asset_ids,
-            completed=sync_mode,
+        return Response(
+            {"Success": "change_detection_vector task initiated"},
+            status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        print("Invalid request in change_detection_vector api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("change_detection_vector", e, request=request)
+        print("Exception in change_detection_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1103,23 +886,16 @@ def crop_grid(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = create_crop_grids.apply_async(
+        create_crop_grids.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            "crop_grid_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower() + "_with_uid_16ha"),
-        )
-        return _task_started_response(
-            "crop_grid task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "crop_grid task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("crop_grid", e, request=request)
+        print("Exception in crop_grid api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1133,18 +909,17 @@ def mws_drought_causality(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        task = drought_causality.apply_async(
+        drought_causality.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        asset_id = layer_assets.drought_causality_asset_id(
-            state, district, block, int(end_year)
-        )
-        return _task_started_response(
-            "Drought Causality task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "Drought Causality task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("mws_drought_causality", e, request=request)
+        print("Exception in Drought Causality api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1191,14 +966,14 @@ def tree_health_raster(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.tree_health_raster_asset_ids(
-            state, district, block, start_year, end_year
-        )
-        return _task_started_response(
-            "tree_health task initiated", asset_ids=asset_ids
+
+        return Response(
+            {"Success": "tree_health task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("tree_health_raster", e, request=request)
+        print("Exception in change_detection api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_security_check(allowed_methods="POST")
@@ -1246,14 +1021,13 @@ def tree_health_vector(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.tree_health_vector_asset_ids(
-            state, district, block, int(start_year), int(end_year)
-        )
-        return _task_started_response(
-            "Overall_change_vector task initiated", asset_ids=asset_ids
+        return Response(
+            {"Success": "Overall_change_vector task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("tree_health_vector", e, request=request)
+        print("Exception in Overall_change_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1265,7 +1039,8 @@ def gee_task_status(request):
         response = check_gee_task_status(task_id)
         return Response({"Response": response}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("gee_task_status", e, request=request)
+        print("Exception in gee_task_status api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1277,16 +1052,16 @@ def stream_order(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_stream_order.apply_async(
+        generate_stream_order.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        description = "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
-        asset_id = _build_mws_asset_id(state, district, block, description + "_vector")
-        return _task_started_response(
-            "stream_order_vector task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "stream_order_vector task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("stream_order", e, request=request)
+        print("Exception in stream_order_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1298,16 +1073,16 @@ def restoration_opportunity(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_restoration_opportunity.apply_async(
+        generate_restoration_opportunity.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        description = "restoration_" + valid_gee_text(district) + "_" + valid_gee_text(block)
-        asset_id = _build_mws_asset_id(state, district, block, description + "_vector")
-        return _task_started_response(
-            "restoration_opportunity task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "restoration_opportunity task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("restoration_opportunity", e, request=request)
+        print("Exception in restoration_opportunity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1330,7 +1105,7 @@ def plantation_site_suitability(request):
             if request.data.get("gee_account_id")
             else None
         )
-        task_result = site_suitability.apply(
+        site_suitability.apply_async(
             args=[
                 project_id,
                 start_year,
@@ -1339,21 +1114,16 @@ def plantation_site_suitability(request):
                 district,
                 block,
                 gee_account_id,
-            ]
+            ],
+            queue="nrm",
         )
-
-        if task_result.failed():
-            return Response(
-                {"error": str(task_result.result)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
         return Response(
-            {"Success": "Plantation_site_suitability completed"},
+            {"Success": "Plantation_site_suitability task initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("plantation_site_suitability", e, request=request)
+        print("Exception in Plantation_site_suitability api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1365,18 +1135,23 @@ def aquifer_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_aquifer_vector.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_aquifer_vector_gee_task,
+            generate_aquifer_vector_local_task,
         )
-        description = (
-            "aquifer_vector_" + valid_gee_text(district) + "_" + valid_gee_text(block)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": "aquifer vector task initiated"},
+            status=status.HTTP_200_OK,
         )
-        asset_id = _build_mws_asset_id(state, district, block, description)
-        return _task_started_response(
-            "aquifer vector task initiated", task=task, asset_id=asset_id
-        )
+    except ValueError as e:
+        print("Invalid request in aquifer vector api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("aquifer_vector", e, request=request)
+        print("Exception in aquifer vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1388,16 +1163,16 @@ def soge_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_soge_vector.apply_async(
+        generate_soge_vector.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        description = "soge_vector_" + valid_gee_text(district) + "_" + valid_gee_text(block)
-        asset_id = _build_mws_asset_id(state, district, block, description)
-        return _task_started_response(
-            "SOGE vector task initiated", task=task, asset_id=asset_id
+        return Response(
+            {"Success": "SOGE vector task initiated"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("soge_vector", e, request=request)
+        print("Exception in SOGE vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1422,7 +1197,8 @@ def fes_clart_upload_layer(request):
         filename = f'{district.strip().replace(" ", "_")}_{block.strip().replace(" ", "_")}_clart_fes{file_extension}'
 
         temp_upload_dir = os.path.join(
-            DATA_DIR,
+            BASE_DIR,
+            "data",
             "fes_clart_file",
             state.strip().replace(" ", "_"),
             district.strip().replace(" ", "_"),
@@ -1435,17 +1211,18 @@ def fes_clart_upload_layer(request):
                 destination.write(chunk)
 
         # Pass file path to the task
-        task = generate_fes_clart_layer.apply_async(
+        generate_fes_clart_layer.apply_async(
             args=[state, district, block, file_path, gee_account_id],
             queue="nrm",
         )
-        asset_id = layer_assets.fes_clart_asset_id(state, district, block)
-        return _task_started_response(
-            "Fes clart task Initiated", task=task, asset_id=asset_id
+
+        return Response(
+            {"success": "Fes clart task Initiated"}, status=status.HTTP_200_OK
         )
 
     except Exception as e:
-        return layer_api_error_response("fes_clart_upload_layer", e, request=request)
+        print("Exception in clart upload_geoserver_layer API:", e)
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1457,13 +1234,15 @@ def swb_pond_merging(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = merge_swb_ponds.apply_async(
+        merge_swb_ponds.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.merge_swb_ponds_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("swb_pond_merging", e, request=request)
+        print("Exception in merge_swb_ponds api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1606,7 +1385,7 @@ def generate_layer_in_order(request):
         end_year = request.data.get("end_year")
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
-        task = layer_generate_map.apply_async(
+        layer_generate_map.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1618,28 +1397,12 @@ def generate_layer_in_order(request):
             },
             queue="nrm",
         )
-        asset_ids = [
-            layer_assets.mws_filtered_asset_id(state, district, block),
-            layer_assets.admin_boundary_asset_id(state, district, block),
-        ]
-        if start_year is not None and end_year is not None:
-            asset_ids.extend(
-                layer_assets.lulc_v3_clip_asset_ids(
-                    state, district, block, int(start_year), int(end_year)
-                )
-            )
-        elif end_year is not None:
-            asset_ids.append(
-                layer_assets.lulc_v3_asset_id(state, district, block, int(end_year))
-            )
-        asset_ids = list(dict.fromkeys(asset_ids))
-        return _task_started_response(
-            "Successfully initiated",
-            task=task,
-            asset_ids=asset_ids,
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        return layer_api_error_response("generate_layer_in_order", e, request=request)
+        print("Exception in generate_layer_order_first api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1656,7 +1419,8 @@ def layer_status_dashboard(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("layer_status_dashboard", e, request=request)
+        print("Exception in layer_staus_dashboard api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1668,18 +1432,15 @@ def generate_lcw(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_lcw_conflict_data.apply_async(
+        generate_lcw_conflict_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_lcw_conflict",
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
-        return layer_api_error_response("generate_lcw", e, request=request)
+        print("Exception in generate_lcw_conflict_data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1691,18 +1452,15 @@ def generate_agroecological(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_agroecological_data.apply_async(
+        generate_agroecological_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_agroecological",
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
-        return layer_api_error_response("generate_agroecological", e, request=request)
+        print("Exception in generate_agroecological_data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1714,18 +1472,15 @@ def generate_factory_csr(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_factory_csr_data.apply_async(
+        generate_factory_csr_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_factory_csr",
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
-        return layer_api_error_response("generate_factory_csr", e, request=request)
+        print("Exception in generate_factory_csr_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1737,18 +1492,15 @@ def generate_green_credit(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_green_credit_data.apply_async(
+        generate_green_credit_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_green_credit",
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
-        return layer_api_error_response("generate_green_credit", e, request=request)
+        print("Exception in generate_green_credit_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1760,18 +1512,15 @@ def generate_mining(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_mining_data.apply_async(
+        generate_mining_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_asset_id(
-            state,
-            district,
-            block,
-            _tehsil_suffix(district, block) + "_mining",
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
-        return layer_api_error_response("generate_mining", e, request=request)
+        print("Exception in generate_mining_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -1783,7 +1532,8 @@ def get_layers_for_workspace(request):
         result = get_layers_of_workspace(workspace)
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("get_layers_for_workspace", e, request=request)
+        print("Exception in get_layers_for_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1795,13 +1545,15 @@ def generate_natural_depression(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_natural_depression_data.apply_async(
+        generate_natural_depression_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.natural_depression_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_natural_depression", e, request=request)
+        print("Exception in generate_natural_depression_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1813,13 +1565,15 @@ def generate_distance_nearest_upstream_DL(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_distance_to_nearest_drainage_line.apply_async(
+        generate_distance_to_nearest_drainage_line.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.distance_to_drainage_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_distance_nearest_upstream_DL", e, request=request)
+        print("Exception in generate_distance_nearest_upstream_DL_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1831,13 +1585,15 @@ def generate_catchment_area_SF(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_catchment_area_singleflow.apply_async(
+        generate_catchment_area_singleflow.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.catchment_area_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_catchment_area_SF", e, request=request)
+        print("Exception in generate_catchment_area_SF_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1849,13 +1605,15 @@ def generate_slope_percentage(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_slope_percentage_data.apply_async(
+        generate_slope_percentage_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.slope_percentage_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_slope_percentage", e, request=request)
+        print("Exception in generate_slope_percentage_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1866,13 +1624,13 @@ def generate_ndvi_timeseries(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = int(request.data.get("start_year") or 2017)
-        end_year = int(request.data.get("end_year") or 2024)
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
         mws_count = request.data.get("mws_count") or 150
         chunk_size = request.data.get("chunk_size") or 100
 
-        task = ndvi_timeseries.apply_async(
+        ndvi_timeseries.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1885,16 +1643,13 @@ def generate_ndvi_timeseries(request):
             },
             queue="nrm",
         )
-        asset_ids = layer_assets.ndvi_timeseries_asset_ids(
-            state, district, block, int(start_year), int(end_year)
-        )
-        return _task_started_response(
-            "Successfully initiated generate_ndvi_timeseries",
-            task=task,
-            asset_ids=asset_ids,
+        return Response(
+            {"Success": "Successfully initiated generate_ndvi_timeseries"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("generate_ndvi_timeseries", e, request=request)
+        print("Exception in generate_ndvi_timeseries api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1902,64 +1657,26 @@ def generate_ndvi_timeseries(request):
 def generate_zoi_to_gee(request):
     print("Inside generate zoi layers")
     try:
-        state = request.data.get("state")
-        district = request.data.get("district")
-        block = request.data.get("block")
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        start_date, end_date = _parse_zoi_request_dates(request)
-
-        if not state or not district or not block:
-            return Response(
-                {"error": "state, district, and block are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if bool(start_date) ^ bool(end_date):
-            return Response(
-                {
-                    "error": "Pass both start_date and end_date together (YYYY-MM-DD), "
-                    "or both start_year and end_year."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if start_date and end_date:
-            try:
-                datetime.strptime(start_date, "%Y-%m-%d")
-                datetime.strptime(end_date, "%Y-%m-%d")
-            except ValueError:
-                return Response(
-                    {"error": "start_date and end_date must be in YYYY-MM-DD format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        state = state.lower()
-        district = district.lower()
-        block = block.lower()
-
-        print(f"generate_zoi_to_gee dates: start_date={start_date}, end_date={end_date}")
-
-        task = generate_zoi.apply_async(
+        generate_zoi.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
                 "gee_account_id": gee_account_id,
-                "start_date": start_date,
-                "end_date": end_date,
             },
             queue="waterbody",
         )
-        zoi_start_year, zoi_end_year = layer_assets.hydrological_years_from_date_window(
-            start_date, end_date
-        )
-        asset_ids = layer_assets.zoi_pipeline_asset_ids(
-            state, district, block, zoi_start_year, zoi_end_year
-        )
-        return _task_started_response(
-            "Successfully initiated", task=task, asset_ids=asset_ids
+
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        return layer_api_error_response("generate_zoi_to_gee", e, request=request)
+        print("Exception in generate_mining_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1971,13 +1688,15 @@ def generate_mws_connectivity(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_mws_connectivity_data.apply_async(
+        generate_mws_connectivity_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_connectivity_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_mws_connectivity", e, request=request)
+        print("Exception in generate_mws_connectivity_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1989,13 +1708,15 @@ def generate_mws_centroid(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        task = generate_mws_centroid_data.apply_async(
+        generate_mws_centroid_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
-        asset_id = layer_assets.mws_centroid_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
     except Exception as e:
-        return layer_api_error_response("generate_mws_centroid", e, request=request)
+        print("Exception in generate_mws_centroid api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -2003,21 +1724,19 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
-        payload = api_request_payload(
-            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
-            overwrite=True,
-        )
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
         generate_facilities_proximity_task.apply_async(
-            kwargs={"payload": payload},
-            queue="nrm",
+            args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
-            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
-    except ValueError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return layer_api_error_response("generate_facilities_proximity", e, request=request)
+        print("Exception in generate_facilities_proximity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -2025,77 +1744,20 @@ def generate_facilities_proximity(request):
 def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
-        payload = api_request_payload(
-            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
-            overwrite=False,
-        )
-        generate_antyodaya_layer_task.apply_async(
-            kwargs={"payload": payload},
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
-        )
-    except ValueError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        print("Exception in generate_antyodaya api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_livestocks(request):
-    print("Inside generate_livestocks API.")
-    try:
-        payload = api_request_payload(
-            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
-            overwrite=False,
-        )
-        generate_livestocks_layer_task.apply_async(
-            kwargs={"payload": payload},
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
-        )
-    except ValueError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        print("Exception in generate_livestocks api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def et_downscale(request):
-    print("Inside generate_et_downscale API.")
-    try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
-        tehsil = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        application = request.data.get("application") or "all"
-
-        generate_et_downscale.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "tehsil": tehsil,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-                "application": application,
-            },
+        block = request.data.get("block").lower()
+        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
+        overwrite = request.data.get("overwrite", False)
+        generate_antyodaya_layer_task.apply_async(
+            args=[state, district, block, sync_to_geoserver, overwrite],
             queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_mws_centroid api :: ", e)
+        print("Exception in generate_antyodaya api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2128,57 +1790,30 @@ def generate_stac_collection(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        task_kwargs = {
-            "layer_type": layer_type,
-            "state": state,
-            "district": district,
-            "block": block,
-            "layer_name": layer_name,
-            "start_year": start_year,
-            "end_year": end_year,
-            "upload_to_s3": upload_to_s3,
-            "overwrite": overwrite,
-            "overwrite_metadata": overwrite_metadata,
-        }
-
-        if is_sync_layer_generation_request(request):
-            task_result = generate_stac_collection_task.apply(kwargs=task_kwargs)
-            if task_result.failed():
-                return Response(
-                    {"error": str(task_result.result)},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-            if not task_result.result:
-                return Response(
-                    {"error": "STAC collection generation failed"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-
-            stac_spec = collect_generated_stac_specs(
-                state=state,
-                district=district,
-                block=block,
-                layer_name=layer_name,
-                layer_type=layer_type,
-                start_year=start_year,
-                end_year=end_year,
-            )
-            stac = format_stac_for_api_response(stac_spec)
-            return Response(
-                {
-                    "Success": "STAC collection generation completed",
-                    "stac": stac,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        generate_stac_collection_task.apply_async(kwargs=task_kwargs, queue="nrm")
+        generate_stac_collection_task.apply_async(
+            kwargs={
+                "layer_type": layer_type,
+                "state": state,
+                "district": district,
+                "block": block,
+                "layer_name": layer_name,
+                "start_year": start_year,
+                "end_year": end_year,
+                "upload_to_s3": upload_to_s3,
+                "overwrite": overwrite,
+                "overwrite_metadata": overwrite_metadata,
+            },
+            queue="nrm",
+        )
         return Response(
             {"Success": "STAC collection generation initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        return layer_api_error_response("generate_stac_collection", e, request=request)
+        print("Exception in generate_stac_collection api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2186,7 +1821,8 @@ def generate_stac_collection(request):
 # ---------------------------------------------------------------------------
 
 _STAC_ROOT = os.path.join(
-    DATA_DIR,
+    BASE_DIR,
+    "data",
     "STAC_specs",
     "CorestackCatalogs_merged_collection",
 )
@@ -2400,7 +2036,8 @@ def missing_layers(request):
         result = missing_layer_for_all_workspace()
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        return layer_api_error_response("missing_layers", e, request=request)
+        print("Exception in get_layers_for_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -2453,141 +2090,3 @@ def generate_canal_vector(request):
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_tree_in_grassland(request):
-    print("Inside generate_tree_in_grassland API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_tree_in_grassland_layer.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Tree in Grassland task initiated"},
-            status=status.HTTP_200_OK,
-        )
-    except Exception as e:
-        print("Exception in generate_tree_in_grassland api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def forest_fringe_degradation(request):
-    print("Inside forest_fringe_degradation API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fringe_degradation.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Forest Fringe task initiated"},
-            status=status.HTTP_200_OK,
-        )
-    except Exception as e:
-        print("Exception in generate_forest_fringe api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_forest_fire(request):
-    print("Inside generate_forest_fire API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fire_layer_updated.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Forest Fire task initiated"},
-            status=status.HTTP_200_OK,
-        )
-    except Exception as e:
-        print("Exception in generate_forest_fire api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["GET"])
-@schema(None)
-def missing_excel(request):
-    try:
-        result = check_missing_excel_files()
-        return Response({"result": result}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in missing_excel api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-def _auto_discover_computing_api_views(namespace):
-    """
-    Auto-discover request handlers in this module and wrap them once.
-    This is intentionally broad so new APIs are automatically covered.
-    """
-    discovered = []
-    for name, fn in namespace.items():
-        if name.startswith("_") or not callable(fn):
-            continue
-        if getattr(fn, "__module__", None) != __name__:
-            continue
-        if getattr(fn, "__layer_generation_sync_wrapped__", False):
-            continue
-        try:
-            target = inspect.unwrap(fn)
-            sig = inspect.signature(target)
-        except (OSError, TypeError, ValueError):
-            continue
-
-        params = list(sig.parameters.values())
-        if len(params) == 0:
-            continue
-        first_param = params[0]
-        if first_param.kind in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        ) and first_param.name == "request":
-            discovered.append(name)
-    return discovered
-
-
-for _view_name in _auto_discover_computing_api_views(globals()):
-    wrapped = sync_layer_generation_if_enabled(
-        layer_generation_api_logging(globals()[_view_name])
-    )
-    wrapped.__layer_generation_sync_wrapped__ = True
-    globals()[_view_name] = wrapped

@@ -3,24 +3,25 @@ import os
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
-from computing.config_loader import (
-    CHANGE_DETECTION_RASTER_OUTPUT_DIR as CHANGE_RASTER_OUTPUT_BASE_DIR,
-    CHANGE_DETECTION_VECTOR_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
-)
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    PROJECT_ROOT,
     build_output_raster_path,
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     ensure_file_exists,
     load_precomputed_watersheds,
-    push_local_vector_to_geoserver,
     write_vector_output,
 )
 from computing.utils import (
+    push_shape_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+
+
+CHANGE_RASTER_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/change_detection/change_detection_local"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/change_detection/change_detection_vector_local"
 GEOSERVER_WORKSPACE = "change_detection"
 
 CHANGE_VECTOR_CLASS_DEFINITIONS = {
@@ -143,7 +144,6 @@ def run_change_detection_vector_local(
             class_definitions=class_definitions,
         )
 
-        published_layer_name = _published_layer_name(district, block, param_name)
         output_stub = _output_stub(district, block, param_name, start_year, end_year)
         output_path = build_output_vector_path(
             layer_name=output_stub,
@@ -156,14 +156,16 @@ def run_change_detection_vector_local(
         asset_id = write_vector_output(
             gdf=result_gdf,
             output_path=output_path,
-            layer_name=published_layer_name,
+            layer_name=output_stub,
         )
         print(f"Saved local change detection vector: {asset_id}")
+
+        published_layer_name = _published_layer_name(district, block, param_name)
         if push_to_geoserver:
-            geoserver_response = push_local_vector_to_geoserver(
-                path=os.path.splitext(asset_id)[0],
-                layer_name=published_layer_name,
+            geoserver_response = push_shape_to_geoserver(
+                os.path.splitext(asset_id)[0],
                 workspace=GEOSERVER_WORKSPACE,
+                layer_name=published_layer_name,
                 file_type="gpkg",
             )
             print(f"GeoServer response for {param_name}: {geoserver_response}")
@@ -181,7 +183,6 @@ def run_change_detection_vector_local(
                 layer_name=published_layer_name,
                 asset_id=asset_id,
                 dataset_name="Change Detection Vector",
-                misc={"is_generated_locally": True},
             )
             if layer_id and push_to_geoserver:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)

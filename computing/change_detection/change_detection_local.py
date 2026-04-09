@@ -10,9 +10,9 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
-from computing.config_loader import CHANGE_DETECTION_RASTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    PROJECT_ROOT,
     build_output_raster_path,
     get_union_geometry,
     load_precomputed_roi,
@@ -21,6 +21,9 @@ from computing.local_compute_helper import (
     validate_geometry,
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
+
+
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/change_detection/change_detection_local"
 GEOSERVER_WORKSPACE = "change_detection"
 
 CHANGE_STAC_LAYER_NAMES = {
@@ -537,7 +540,6 @@ def run_change_detection_local(
                 misc={
                     "start_year": start_year,
                     "end_year": end_year,
-                    "is_generated_locally": True,
                 },
             )
             if layer_id and push_to_geoserver:
