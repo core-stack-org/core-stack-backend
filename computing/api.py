@@ -8,10 +8,14 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from computing.change_detection.change_detection_vector import (
-    vectorise_change_detection,
+    vectorise_change_detection as vectorise_change_detection_gee_task,
+)
+from computing.change_detection.change_detection_vector_local import (
+    vectorise_change_detection as vectorise_change_detection_local_task,
 )
 from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
-from .lulc.lulc_vector import vectorise_lulc
+from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
+from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
@@ -30,18 +34,50 @@ from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
+from .cropping_intensity.cropping_intesity_local import (
+    generate_cropping_intensity as generate_cropping_intensity_local_task,
+)
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
-from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
+from .terrain_descriptor.terrain_clusters import (
+    generate_terrain_clusters as generate_terrain_clusters_gee_task,
+)
+from .terrain_descriptor.terrain_clusters_local import (
+    generate_terrain_clusters as generate_terrain_clusters_local_task,
+)
+from .terrain_descriptor.terrain_compute_all_local import (
+    generate_terrain_compute_all as generate_terrain_compute_all_task,
+)
+from .terrain_descriptor.terrain_raster_fabdem import (
+    generate_terrain_raster_clip as generate_terrain_raster_clip_gee_task,
+)
+from .terrain_descriptor.terrain_raster_fabdem_local import (
+    generate_terrain_raster_clip as generate_terrain_raster_clip_local_task,
+)
 from computing.misc.drainage_lines import clip_drainage_lines
-from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
-from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
+from .lulc_X_terrain.lulc_on_slope_cluster import (
+    lulc_on_slope_cluster as lulc_on_slope_cluster_gee_task,
+)
+from .lulc_X_terrain.lulc_on_slope_cluster_local import (
+    lulc_on_slope_cluster_local as lulc_on_slope_cluster_local_task,
+)
+from .lulc_X_terrain.lulc_on_plain_cluster import (
+    lulc_on_plain_cluster as lulc_on_plain_cluster_gee_task,
+)
+from .lulc_X_terrain.lulc_on_plain_cluster_local import (
+    lulc_on_plain_cluster_local as lulc_on_plain_cluster_local_task,
+)
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
-from computing.change_detection.change_detection import get_change_detection
-from .lulc.lulc_v3 import clip_lulc_v3
+from computing.change_detection.change_detection import (
+    get_change_detection as get_change_detection_gee_task,
+)
+from computing.change_detection.change_detection_local import (
+    get_change_detection as get_change_detection_local_task,
+)
+from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
+from .lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local_task
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
@@ -51,7 +87,12 @@ from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
 from .plantation.site_suitability import site_suitability
-from .misc.aquifer_vector import generate_aquifer_vector
+from .misc.aquifer_vector import (
+    generate_aquifer_vector as generate_aquifer_vector_gee_task,
+)
+from .misc.aquifer_vector_local import (
+    generate_aquifer_vector as generate_aquifer_vector_local_task,
+)
 from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
@@ -379,13 +420,22 @@ def lulc_v3(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        clip_lulc_v3.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            clip_lulc_v3_gee_task,
+            clip_lulc_v3_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
         return Response(
             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        print("Invalid request in lulc_v3 api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in lulc_v3 api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -402,7 +452,13 @@ def lulc_vector(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        vectorise_lulc.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            vectorise_lulc_gee_task,
+            vectorise_lulc_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
@@ -410,6 +466,9 @@ def lulc_vector(request):
             {"Success": "lulc_vector task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in lulc_vector api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in lulc_vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -466,7 +525,13 @@ def generate_ci_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_cropping_intensity.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_cropping_intensity,
+            generate_cropping_intensity_local_task,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -481,6 +546,9 @@ def generate_ci_layer(request):
             {"Success": "Cropping Intensity task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in generate_cropping_intensity_layer api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_cropping_intensity_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -556,15 +624,46 @@ def generate_terrain_descriptor(request):
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        generate_terrain_clusters.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_terrain_clusters_gee_task,
+            generate_terrain_clusters_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "generate_terrain_descriptor task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in generate_terrain_descriptor api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_terrain_descriptor api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_terrain_compute_all(request):
+    print("Inside generate_terrain_compute_all")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_terrain_compute_all_task.apply_async(
+            args=[state, district, block, start_year, end_year, gee_account_id],
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "generate_terrain_compute_all task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_terrain_compute_all api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -577,7 +676,13 @@ def generate_terrain_raster(request):
         district = request.data.get("district")
         block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
-        generate_terrain_raster_clip.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_terrain_raster_clip_gee_task,
+            generate_terrain_raster_clip_local_task,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -591,6 +696,9 @@ def generate_terrain_raster(request):
             {"Success": "generate_terrain_raster task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in generate_terrain_raster api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_terrain_raster api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -604,10 +712,16 @@ def terrain_lulc_slope_cluster(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        lulc_on_slope_cluster.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            lulc_on_slope_cluster_gee_task,
+            lulc_on_slope_cluster_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
@@ -615,6 +729,9 @@ def terrain_lulc_slope_cluster(request):
             {"Success": "terrain_lulc_slope_cluster task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in terrain_lulc_slope_cluster api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in terrain_lulc_slope_cluster api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -628,10 +745,16 @@ def terrain_lulc_plain_cluster(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        lulc_on_plain_cluster.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            lulc_on_plain_cluster_gee_task,
+            lulc_on_plain_cluster_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
@@ -639,6 +762,9 @@ def terrain_lulc_plain_cluster(request):
             {"Success": "terrain_lulc_plain_cluster task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in terrain_lulc_plain_cluster api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in terrain_lulc_plain_cluster api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -673,10 +799,16 @@ def change_detection(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        get_change_detection.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            get_change_detection_gee_task,
+            get_change_detection_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
@@ -684,6 +816,9 @@ def change_detection(request):
             {"Success": "change_detection task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in change_detection api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in change_detection api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -697,10 +832,16 @@ def change_detection_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        vectorise_change_detection.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            vectorise_change_detection_gee_task,
+            vectorise_change_detection_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
@@ -708,6 +849,9 @@ def change_detection_vector(request):
             {"Success": "change_detection_vector task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in change_detection_vector api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in change_detection_vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -971,13 +1115,20 @@ def aquifer_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_aquifer_vector.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_aquifer_vector_gee_task,
+            generate_aquifer_vector_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "aquifer vector task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in aquifer vector api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in aquifer vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
