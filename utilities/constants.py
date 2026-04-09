@@ -281,6 +281,8 @@ FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
 PAN_INDIA_LULC_V3_BASE = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
 )
-SOGE = "/SOGE_vector_2020"
-WRI_LAND_RESTORATION = "/WRI/LandscapeRestorationOpportunities"
+SOGE_DATASET = "projects/corestack-datasets/assets/datasets/SOGE_vector_2020"
+WRI_LAND_RESTORATION_DATASET = (
+    "projects/corestack-datasets/assets/datasets/WRI/LandscapeRestorationOpportunities"
+)
 SOI_TEHSIL = "/soi_tehsil.geojson"

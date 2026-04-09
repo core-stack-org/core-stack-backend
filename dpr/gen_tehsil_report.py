@@ -15,8 +15,14 @@ from scipy.spatial.distance import jensenshannon
 
 from .models import Overpass_Block_Details
 
-from nrm_app.settings import EXCEL_DIR, GEOSERVER_URL, OVERPASS_URL
+from nrm_app.settings import GEOSERVER_URL
+from nrm_app.settings import OVERPASS_URL
 from utilities.logger import setup_logger
+import environ
+
+env = environ.Env()
+# reading .env file
+environ.Env.read_env()
 
 logger = setup_logger(__name__)
 
@@ -25,7 +31,8 @@ JSON_FILE_PATH = os.path.join(
     os.path.dirname(CURRENT_DIR), "dpr/utils", "block_patterns.json"
 )
 
-DATA_DIR_TEMP = EXCEL_DIR
+# TODO: fix the path issue <> shiv and ksheetiz
+DATA_DIR_TEMP = env("EXCEL_DIR")
 
 
 # ? MARK: HELPER FUNCTIONS
@@ -730,7 +737,8 @@ def get_pattern_intensity(state, district, block):
         # Initialize dictionaries to track intensity and pattern details
         mws_pattern_intensity = {}
         mws_active_patterns = {}
-        active_patterns = set()  # NEW: Track distinct active patterns
+        active_patterns = set()
+        village_active_patterns = set()
 
         for uid in df_temp["UID"]:
             mws_pattern_intensity[uid] = 0
@@ -811,9 +819,8 @@ def get_pattern_intensity(state, district, block):
                                         continue
 
                                     # Get metric values for each village ID
-                                    metric_values = []
+                                    any_village_passes = False
                                     for village_id in village_ids:
-                                        # Find the row in df2 with this village_id
                                         matching_rows = df2[
                                             df2[village_id_col] == village_id
                                         ]
@@ -822,32 +829,40 @@ def get_pattern_intensity(state, district, block):
                                                 metric_col
                                             ]
                                             if pd.notna(metric_val):
-                                                metric_values.append(float(metric_val))
+                                                passed = False
+                                                if comp_type == 1:
+                                                    passed = (
+                                                        float(metric_val) == comparison
+                                                    )
+                                                elif comp_type == 2:
+                                                    passed = (
+                                                        float(metric_val) != comparison
+                                                    )
+                                                elif (
+                                                    comp_type == 3
+                                                ):  # SC_percent > 17 / ST_percent > 33
+                                                    passed = (
+                                                        float(metric_val) > comparison
+                                                    )
+                                                elif comp_type == 4:
+                                                    passed = (
+                                                        float(metric_val) < comparison
+                                                    )
+                                                elif comp_type == 5:
+                                                    passed = (
+                                                        float(metric_val) >= comparison
+                                                    )
+                                                elif comp_type == 6:
+                                                    passed = (
+                                                        float(metric_val) <= comparison
+                                                    )
 
-                                    # Calculate average metric across all villages
-                                    if len(metric_values) > 0:
-                                        avg_metric = sum(metric_values) / len(
-                                            metric_values
-                                        )
+                                                if passed:
+                                                    any_village_passes = True
+                                                    break  # no need to check further villages
 
-                                        # Compare using comp_type
-                                        passed = False
-
-                                        if comp_type == 1:
-                                            passed = avg_metric == comparison
-                                        elif comp_type == 2:
-                                            passed = avg_metric != comparison
-                                        elif comp_type == 3:
-                                            passed = avg_metric > comparison
-                                        elif comp_type == 4:
-                                            passed = avg_metric < comparison
-                                        elif comp_type == 5:
-                                            passed = avg_metric >= comparison
-                                        elif comp_type == 6:
-                                            passed = avg_metric <= comparison
-
-                                        if passed:
-                                            uids_per_indicator[idx].add(mws_uid)
+                                    if any_village_passes:
+                                        uids_per_indicator[idx].add(mws_uid)
 
                         except Exception as e:
                             print(f"    ✗ Error loading sheets: {e}")
@@ -1071,51 +1086,86 @@ def get_pattern_intensity(state, district, block):
 
                                 years = sorted(list(years))
 
+                                if not years:
+                                    for index, row in df.iterrows():
+                                        uid = row["UID"]
+                                        values = []
+                                        all_valid = True
+
+                                        for col_name in column:
+                                            val = row.get(col_name)
+                                            if pd.notna(val):
+                                                values.append(float(val))
+                                            else:
+                                                all_valid = False
+                                                break
+
+                                        if all_valid and len(values) == len(column):
+                                            total_sum = sum(values)
+                                            passed = False
+
+                                            if comp_type == 1:
+                                                passed = total_sum == comparison
+                                            elif comp_type == 2:
+                                                passed = total_sum != comparison
+                                            elif comp_type == 3:
+                                                passed = total_sum > comparison
+                                            elif comp_type == 4:
+                                                passed = total_sum < comparison
+                                            elif comp_type == 5:
+                                                passed = total_sum >= comparison
+                                            elif comp_type == 6:
+                                                passed = total_sum <= comparison
+
+                                            if passed:
+                                                uids_per_indicator[idx].add(uid)
+
                                 # For each UID, check how many drought years exist
-                                for index, row in df.iterrows():
-                                    uid = row["UID"]
-                                    drought_year_count = 0
+                                else:
+                                    for index, row in df.iterrows():
+                                        uid = row["UID"]
+                                        drought_year_count = 0
 
-                                    # For each year, sum values from all base columns
-                                    for year in years:
-                                        year_sum = 0
-                                        valid_year = True
+                                        # For each year, sum values from all base columns
+                                        for year in years:
+                                            year_sum = 0
+                                            valid_year = True
 
-                                        for base_col in column:
-                                            col_name = base_col + year
-                                            if col_name in df.columns:
-                                                val = row[col_name]
-                                                if pd.notna(val):
-                                                    year_sum += float(val)
+                                            for base_col in column:
+                                                col_name = base_col + year
+                                                if col_name in df.columns:
+                                                    val = row[col_name]
+                                                    if pd.notna(val):
+                                                        year_sum += float(val)
+                                                    else:
+                                                        valid_year = False
+                                                        break
                                                 else:
                                                     valid_year = False
                                                     break
-                                            else:
-                                                valid_year = False
-                                                break
 
-                                        # Check if this year qualifies as a drought year (sum > 5)
-                                        if valid_year and year_sum > 5:
-                                            drought_year_count += 1
+                                            # Check if this year qualifies as a drought year (sum > 5)
+                                            if valid_year and year_sum >= 5:
+                                                drought_year_count += 1
 
-                                    # Now check if drought_year_count meets the comparison criteria
-                                    passed = False
+                                        # Now check if drought_year_count meets the comparison criteria
+                                        passed = False
 
-                                    if comp_type == 1:  # Equals to
-                                        passed = drought_year_count == comparison
-                                    elif comp_type == 2:  # Not Equals to
-                                        passed = drought_year_count != comparison
-                                    elif comp_type == 3:  # Greater than
-                                        passed = drought_year_count > comparison
-                                    elif comp_type == 4:  # Less than
-                                        passed = drought_year_count < comparison
-                                    elif comp_type == 5:  # Greater than equal to
-                                        passed = drought_year_count >= comparison
-                                    elif comp_type == 6:  # Less than equal to
-                                        passed = drought_year_count <= comparison
+                                        if comp_type == 1:  # Equals to
+                                            passed = drought_year_count == comparison
+                                        elif comp_type == 2:  # Not Equals to
+                                            passed = drought_year_count != comparison
+                                        elif comp_type == 3:  # Greater than
+                                            passed = drought_year_count > comparison
+                                        elif comp_type == 4:  # Less than
+                                            passed = drought_year_count < comparison
+                                        elif comp_type == 5:  # Greater than equal to
+                                            passed = drought_year_count >= comparison
+                                        elif comp_type == 6:  # Less than equal to
+                                            passed = drought_year_count <= comparison
 
-                                    if passed:
-                                        uids_per_indicator[idx].add(uid)
+                                        if passed:
+                                            uids_per_indicator[idx].add(uid)
 
                             # Type 6: Presence check
                             elif indicator_type == 6:
@@ -1176,27 +1226,130 @@ def get_pattern_intensity(state, district, block):
 
                 # Find UIDs that passed ALL indicators (intersection of all sets)
                 if uids_per_indicator:
-                    # Start with UIDs from first indicator
                     common_uids = uids_per_indicator[0]
 
                     # Intersect with UIDs from remaining indicators
                     for idx in range(1, len(uids_per_indicator)):
                         common_uids = common_uids.intersection(uids_per_indicator[idx])
 
-                    # Increment intensity for UIDs that satisfied this pattern
-                    # NEW: Also track this as an active pattern
-                    if common_uids:  # If any UID satisfied this pattern
-                        active_patterns.add(pattern_name)
+                    VILLAGE_LEVEL_PATTERNS = {
+                        "caste",
+                        "nrega",
+                    }  # these are village-level, not MWS-level
 
-                        for uid in common_uids:
-                            if uid in mws_pattern_intensity:
-                                mws_pattern_intensity[uid] += 1
+                    if common_uids:
+                        if pattern_name in VILLAGE_LEVEL_PATTERNS:
 
-                            if uid in mws_active_patterns:
-                                if (
-                                    pattern_name not in mws_active_patterns[uid]
-                                ):  # Avoid duplicates
-                                    mws_active_patterns[uid].append(pattern_name)
+                            if pattern_name == "caste":
+                                try:
+                                    df_social = pd.read_excel(
+                                        file_path,
+                                        sheet_name="social_economic_indicator",
+                                    )
+                                    df_mws = pd.read_excel(
+                                        file_path, sheet_name="mws_intersect_villages"
+                                    )
+                                    total_population = 0
+
+                                    for uid in common_uids:
+                                        mws_row = df_mws[df_mws["MWS UID"] == uid]
+                                        if not mws_row.empty:
+                                            village_ids = mws_row.iloc[0]["Village IDs"]
+                                            if isinstance(village_ids, str):
+                                                try:
+                                                    import ast
+
+                                                    village_ids = ast.literal_eval(
+                                                        village_ids
+                                                    )
+                                                except:
+                                                    try:
+                                                        village_ids = json.loads(
+                                                            village_ids
+                                                        )
+                                                    except:
+                                                        continue
+                                            if isinstance(village_ids, list):
+                                                for village_id in village_ids:
+                                                    v_row = df_social[
+                                                        df_social["village_id"]
+                                                        == village_id
+                                                    ]
+                                                    if not v_row.empty:
+                                                        pop = v_row.iloc[0].get(
+                                                            "total_population", 0
+                                                        )
+                                                        if pd.notna(pop):
+                                                            total_population += float(
+                                                                pop
+                                                            )
+
+                                    if total_population > 0:
+                                        village_active_patterns.add(pattern_name)
+                                    else:
+                                        logger.warning(
+                                            "Caste pattern skipped — total_population is 0"
+                                        )
+
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Caste population check failed: {e}"
+                                    )
+
+                            elif pattern_name == "nrega":
+                                # Only add if actual matched villages exist
+                                try:
+                                    df_nrega = pd.read_excel(
+                                        file_path, sheet_name="nrega_annual"
+                                    )
+                                    df_mws = pd.read_excel(
+                                        file_path, sheet_name="mws_intersect_villages"
+                                    )
+                                    matched_villages = set()
+
+                                    for uid in common_uids:
+                                        mws_row = df_mws[df_mws["MWS UID"] == uid]
+                                        if not mws_row.empty:
+                                            village_ids = mws_row.iloc[0]["Village IDs"]
+                                            if isinstance(village_ids, str):
+                                                try:
+                                                    import ast
+
+                                                    village_ids = ast.literal_eval(
+                                                        village_ids
+                                                    )
+                                                except:
+                                                    try:
+                                                        village_ids = json.loads(
+                                                            village_ids
+                                                        )
+                                                    except:
+                                                        continue
+                                            if isinstance(village_ids, list):
+                                                for village_id in village_ids:
+                                                    matched_villages.add(village_id)
+
+                                    if len(matched_villages) > 0:
+                                        village_active_patterns.add(pattern_name)
+                                    else:
+                                        logger.warning(
+                                            "NREGA pattern skipped — total_villages is 0"
+                                        )
+
+                                except Exception as e:
+                                    logger.warning(f"NREGA villages check failed: {e}")
+                        else:
+                            active_patterns.add(
+                                pattern_name
+                            )  # ✅ MWS-level patterns go here
+
+                            for uid in common_uids:
+                                if uid in mws_pattern_intensity:
+                                    mws_pattern_intensity[uid] += 1
+
+                                if uid in mws_active_patterns:
+                                    if pattern_name not in mws_active_patterns[uid]:
+                                        mws_active_patterns[uid].append(pattern_name)
 
         PATTERN_DISPLAY_MAPPING = {
             # Agriculture patterns
@@ -1217,18 +1370,38 @@ def get_pattern_intensity(state, district, block):
 
         active_stre_pattern = []
         for str_pattern in active_patterns:
-            active_stre_pattern.append(PATTERN_DISPLAY_MAPPING.get(str_pattern))
-        # NEW: Return intensity and list of distinct active patterns
+            display_name = PATTERN_DISPLAY_MAPPING.get(str_pattern)
+            if display_name:
+                active_stre_pattern.append(display_name)
+            else:
+                logger.warning(
+                    f"Pattern '{str_pattern}' not found in PATTERN_DISPLAY_MAPPING"
+                )
+
+        village_stre_pattern = []  # ✅ NEW
+        for str_pattern in village_active_patterns:
+            display_name = PATTERN_DISPLAY_MAPPING.get(str_pattern)
+            if display_name:
+                village_stre_pattern.append(display_name)
+            else:
+                logger.warning(
+                    f"Village pattern '{str_pattern}' not found in PATTERN_DISPLAY_MAPPING"
+                )
+
+        # Build pattern_display_mapping for both
         pattern_display_mapping = {}
-        for pattern_key in active_patterns:
-            pattern_display_mapping[pattern_key] = PATTERN_DISPLAY_MAPPING.get(
-                pattern_key, pattern_key
-            )
+        for pattern_key in (
+            active_patterns | village_active_patterns
+        ):  # union of both sets
+            display = PATTERN_DISPLAY_MAPPING.get(pattern_key)
+            if display:
+                pattern_display_mapping[pattern_key] = display
 
         return {
             "intensity": mws_pattern_intensity,
             "mws_active_patterns": mws_active_patterns,
             "active_patterns": sorted(list(active_stre_pattern)),
+            "village_active_patterns": sorted(village_stre_pattern),
             "pattern_display_mapping": pattern_display_mapping,
         }
 
@@ -1813,6 +1986,14 @@ def get_agri_low_yield_data(state, district, block):
         )
         df_degrade = pd.read_excel(file_path, sheet_name="change_detection_degradation")
 
+        ci_columns = [
+            col for col in df_area.columns if col.startswith("cropping_intensity_")
+        ]
+
+        start_year = 2017
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
         mws_pattern = {}
         mws_intensity = {}
 
@@ -1927,6 +2108,7 @@ def get_agri_low_yield_data(state, district, block):
             "mws_intensity": mws_intensity,
             "total_area": round(total_to_barren + total_to_scrub, 2),
             "total_all_area": total_all_area,
+            "year_range": year_range,
         }
 
         return result, sankey_data
@@ -1944,6 +2126,7 @@ def get_agri_low_yield_data(state, district, block):
             "mws_intensity": {},
             "total_area": 0.0,
             "total_all_area": 0.0,
+            "year_range": "",
         }, {"nodes": [], "links": []}
 
 
@@ -1965,6 +2148,14 @@ def get_forest_degrad_data(state, district, block):
         df_degrade = pd.read_excel(
             file_path, sheet_name="change_detection_deforestation"
         )
+
+        ci_columns = [
+            col for col in df_area.columns if col.startswith("cropping_intensity_")
+        ]
+
+        start_year = 2017
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
 
         mws_pattern = {}
         mws_intensity = {}
@@ -2075,6 +2266,7 @@ def get_forest_degrad_data(state, district, block):
             "mws_intensity": mws_intensity,
             "total_area": total_matched_area,
             "total_all_area": total_all_area,
+            "year_range": year_range,
         }
 
         return result, forest_sankey
@@ -2328,6 +2520,16 @@ def get_socio_economic_nrega_data(state, district, block):
         df_mws_villages = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
         df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
 
+        ci_columns = [
+            col for col in df_nrega.columns if col.startswith("Community assets_count")
+        ]
+
+        start_year = 2005
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
+        print("nrega ---year", year_range)
+
         village_pattern = {}
         village_intensity = {}
 
@@ -2461,6 +2663,7 @@ def get_socio_economic_nrega_data(state, district, block):
             "village_intensity": village_intensity,
             "total_villages": len(matched_villages),
             "total_all_villages": total_all_villages,
+            "year_range": year_range,
         }
 
         return result, nrega_pie_chart
@@ -2478,6 +2681,7 @@ def get_socio_economic_nrega_data(state, district, block):
             "village_intensity": {},
             "total_villages": 0,
             "total_all_villages": 0,
+            "year_range": "",
         }, {"labels": [], "values": []}
 
 
@@ -2497,6 +2701,14 @@ def get_fishery_water_potential_data(state, district, block):
 
         df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
         df_water = pd.read_excel(file_path, sheet_name="surfaceWaterBodies_annual")
+
+        ci_columns = [
+            col for col in df_area.columns if col.startswith("cropping_intensity_")
+        ]
+
+        start_year = 2017
+        end_year = start_year + len(ci_columns) - 1
+        year_range = f"{start_year}-{end_year}"
 
         mws_pattern = {}
         mws_intensity = {}
@@ -2726,7 +2938,7 @@ def get_fishery_water_potential_data(state, district, block):
             "total_area": area_percentage,
             "total_zaid_area": round(total_zaid_area, 2),
             "total_swb_area": round(total_swb_area, 2),
-            "year_range": years_sorted[0] + "-" + years_sorted[-1],
+            "year_range": year_range,
         }
 
         return result, seasonal_timeline
