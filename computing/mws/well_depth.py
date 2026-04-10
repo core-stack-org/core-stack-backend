@@ -4,7 +4,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 from computing.utils import get_layer_object
-from utilities.constants import GEE_PATHS, AQUIFER_PRINCIPAL
+from utilities.constants import GEE_PATHS, PRINCIPAL_AQUIFER
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -62,7 +62,7 @@ def well_depth(
 def _generate_data(
     asset_id, asset_path, description, asset_suffix, start_date, end_date
 ):
-    principal_aquifers = ee.FeatureCollection(AQUIFER_PRINCIPAL)
+    principal_aquifers = ee.FeatureCollection(PRINCIPAL_AQUIFER)
     delta_g = ee.FeatureCollection(
         asset_path + "filtered_delta_g_annual_" + asset_suffix + "_uid"
     )

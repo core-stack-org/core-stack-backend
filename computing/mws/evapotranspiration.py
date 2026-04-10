@@ -12,7 +12,12 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
 )
 import calendar
-from utilities.constants import ET, ET_FLDS, ET_FLDS_HYDRO, FEWS_NET
+from utilities.constants import (
+    ET_FLDAS_FORTNIGHT,
+    ET_FLDAS_ANNUAL,
+    ET_FLDAS_HYDRO,
+    FLDAS_NOAH_LAND_SURFACE_MODEL,
+)
 
 
 def evapotranspiration(
@@ -167,7 +172,7 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
 
 
 def calculate_et(roi, asset_id, description, start_date, end_date, is_annual):
-    bounding_box = ee.Image(ET)
+    bounding_box = ee.Image(ET_FLDAS_FORTNIGHT)
     bbox_geometry = bounding_box.geometry()
     is_within = bbox_geometry.contains(roi.geometry(), ee.ErrorMargin(1))
     if is_within.getInfo():
@@ -210,7 +215,9 @@ def et_fldas(
             f_end_date = f_start_date + datetime.timedelta(days=363)
             if f_end_date > end_date:
                 break
-            image_path = ET_FLDS + str(s_year) + "_" + str(s_year + 1) + "_Hydroyear"
+            image_path = (
+                ET_FLDAS_ANNUAL + str(s_year) + "_" + str(s_year + 1) + "_Hydroyear"
+            )
             s_year += 1
         else:
             f_end_date = f_start_date + datetime.timedelta(days=13)
@@ -218,7 +225,7 @@ def et_fldas(
                 break
 
             image_path = (
-                ET_FLDS_HYDRO
+                ET_FLDAS_HYDRO
                 + str(f_start_date.date()).replace("-", "")
                 + "_"
                 + str(f_end_date.date()).replace("-", "")
@@ -296,7 +303,7 @@ def et_global_fldas(
     size = shape.size()
     size1 = ee.Number(size).subtract(ee.Number(1))
 
-    fldas_dataset = ee.ImageCollection(FEWS_NET)
+    fldas_dataset = ee.ImageCollection(FLDAS_NOAH_LAND_SURFACE_MODEL)
 
     while f_start_date < end_date:
         if is_annual:

@@ -11,7 +11,7 @@ import geemap
 import re
 
 from computing.utils import sync_vector_to_gcs, get_geojson_from_gcs
-from utilities.constants import GEE_HELPER_PATH, SWB_ASSET_PREFIX, CRS_4326
+from utilities.constants import GEE_HELPER_PATH, GEE_ASSET_PATH, CRS_4326
 
 from nrm_app.celery import app
 from utilities.gee_utils import (
@@ -125,7 +125,7 @@ def merge_swb_ponds(
     state,
     district,
     block,
-    ee_assets_prefix=SWB_ASSET_PREFIX,
+    ee_assets_prefix=GEE_ASSET_PATH,
     output_suffix="_merged_swb_ponds",
     target_crs=CRS_4326,
 ):

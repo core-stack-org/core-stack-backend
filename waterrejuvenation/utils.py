@@ -4,8 +4,9 @@ from computing.utils import sync_project_fc_to_geoserver
 from projects.models import Project
 from utilities.constants import (
     GEE_PATHS,
-    PAN_INDIA_LULC_V3_RIVER_BASIN,
-    PAN_INDIA_LULC_DATASET,
+    PAN_INDIA_LULC_V3_DATASET,
+    WATER_REJ_GEE_ASSET,
+    WATER_REJ_TEST_GEE_ASSET,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -22,8 +23,7 @@ from utilities.gee_utils import (
 import numpy as np
 from nrm_app.settings import MEDIA_ROOT
 
-WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-WATER_REJ_TEST_GEE_ASSET = "projects/ee-kapil-test/assets/apps/waterbody/"
+
 import time
 import ee
 import logging
@@ -144,7 +144,7 @@ def get_waterbody_id_for_lat_long(excel_hash, water_body_asset_id):
 def get_water_mask(year):
     # Define your water classes
     water_classes = [2, 3, 4]
-    image = ee.Image(PAN_INDIA_LULC_V3_RIVER_BASIN + year)
+    image = ee.Image(PAN_INDIA_LULC_V3_DATASET + year)
     water_mask = (
         image.select("predicted_label")
         .remap(water_classes, [1] * len(water_classes), 0)
@@ -185,7 +185,7 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
     # Create water masks from each LULC year
     water_masks = []
     for year in lulc_years:
-        image = ee.Image(f"{PAN_INDIA_LULC_DATASET}{year}")
+        image = ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}")
         water_mask = (
             image.select("predicted_label")
             .remap(water_classes, [1] * len(water_classes), 0)
