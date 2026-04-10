@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import MWS_CONNECTIVITY_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -31,7 +31,7 @@ def generate_mws_connectivity_data(self, state, district, block, gee_account_id)
         + "_uid"
     )
 
-    pan_india_asset_id = f"{GEE_DATASET_PATH}/India_mws_connectivity"
+    pan_india_asset_id = MWS_CONNECTIVITY_DATASET
 
     description = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_connectivity"
     asset_id = get_gee_asset_path(state, district, block) + description

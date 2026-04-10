@@ -4,31 +4,50 @@ from shapely.geometry import Polygon, Point, MultiPolygon, MultiPoint
 import geopandas as gpd
 import pandas as pd
 import fiona
-
+from utilities.constants import (
+    ANNUAL_PPT,
+    MEAN_ANNUAL_TEMP,
+    ARDITY_INDEX,
+    REFERENCE_ET,
+    AWC,
+    TOPOSOILPH,
+    TOPOSOILBD,
+    TOPOSOILEC,
+    TOPOSOILOC,
+    TOPOSOILTEXTURE,
+    SUBSOILBD,
+    SUBSOILEC,
+    SUBSOILOC,
+    SUBSOILPH,
+    SUBSOILTEXTURE,
+    SRTM_DIGITAL_ELEVATION,
+    RASTER_DRAINAGE,
+    PLANTATION_SITE_SCORE,
+)
 from dpr import mapping
 
 dataset_info = {
     # World Clim v2.1 (https://www.worldclim.org/data/worldclim21.html)
     "annualPrecipitation": {
-        "path": "projects/ee-plantationsitescores/assets/AnnualPrecipitation",
+        "path": ANNUAL_PPT,
         "label": "Annual Precipitation (mm/yr)",
     },
     "meanAnnualTemperature": {
-        "path": "projects/ee-plantationsitescores/assets/MeanAnnualTemp",
+        "path": MEAN_ANNUAL_TEMP,
         "label": "Mean Annual Temperature (°C)",
     },
     # Global AI and PET v2 (https://doi.org/10.6084/m9.figshare.7504448.v3)
     "aridityIndex": {
-        "path": "projects/ee-plantationsitescores/assets/India-AridityIndex",
+        "path": ARDITY_INDEX,
         "label": "Aridity Index",
     },
     "referenceEvapoTranspiration": {
-        "path": "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration",
+        "path": REFERENCE_ET,
         "label": "Reference Evapotranspiration (mm/yr)",
     },
     # HWSD v1.2 (https://www.fao.org/soils-portal/data-hub/soil-maps-and-databases/harmonized-world-soil-database-v12/en/)
     "AWC": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS",
+        "path": AWC,
         "label": "Available Water Capacity (mm/m)",
         "mapping": {
             1: 150,
@@ -41,44 +60,44 @@ dataset_info = {
         },
     },
     "topsoilPH": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O",
+        "path": TOPOSOILPH,
         "label": "Topsoil pH",
     },
     "topsoilBD": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN",
+        "path": TOPOSOILBD,
         "label": "Topsoil Bulk Density (kg/dm3)",
     },
     "topsoilOC": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-T_OC",
+        "path": TOPOSOILOC,
         "label": "Topsoil Organic Carbon (% weight)",
     },
     "topsoilCEC": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL",
+        "path": TOPOSOILEC,
         "label": "Topsoil Cation Exchange Capacity (cmol/kg)",
     },
     "topsoilTexture": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE",
+        "path": TOPOSOILTEXTURE,
         "label": "Topsoil Texture",
         "mapping": {0: "none", 1: "Coarse", 2: "Medium", 3: "Fine"},
     },
     "subsoilPH": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O",
+        "path": SUBSOILPH,
         "label": "Subsoil pH",
     },
     "subsoilBD": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN",
+        "path": SUBSOILBD,
         "label": "Subsoil Bulk Density (kg/dm3)",
     },
     "subsoilOC": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-S_OC",
+        "path": SUBSOILOC,
         "label": "Subsoil Organic Carbon (% weight)",
     },
     "subsoilCEC": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL",
+        "path": SUBSOILEC,
         "label": "Subsoil Cation Exchange Capacity (cmol/kg)",
     },
     "subsoilTexture": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS",
+        "path": SUBSOILTEXTURE,
         "label": "Subsoil Texture",
         "mapping": {
             0: "none",
@@ -98,7 +117,7 @@ dataset_info = {
         },
     },
     "drainage": {
-        "path": "projects/ee-plantationsitescores/assets/Raster-Drainage",
+        "path": RASTER_DRAINAGE,
         "label": "Soil Drainage",
         "mapping": {
             0: "Excessively drained",
@@ -111,18 +130,18 @@ dataset_info = {
         },
     },
     # SRTM DEM v3 (https://lpdaac.usgs.gov/documents/13/SRTM_Quick_Guide.pdf)
-    "elevation": {"path": "USGS/SRTMGL1_003", "label": "Elevation (m)"},
+    "elevation": {"path": SRTM_DIGITAL_ELEVATION, "label": "Elevation (m)"},
     "slope": {
-        "path": "USGS/SRTMGL1_003",
+        "path": SRTM_DIGITAL_ELEVATION,
         "label": "Slope (°)",
     },
     "aspect": {
-        "path": "USGS/SRTMGL1_003",
+        "path": SRTM_DIGITAL_ELEVATION,
         "label": "Aspect (°)",
     },
     # In-lab Drainage Network
     "distToDrainage": {
-        "path": "projects/ee-plantationsitescores/assets/so_thinned2",
+        "path": PLANTATION_SITE_SCORE,
         "label": "Distance to Drainage Lines (m)",
     },
 }

@@ -4,7 +4,14 @@ import datetime
 from computing.mws.utils import get_last_date
 from computing.utils import create_chunk, merge_chunks, get_layer_object
 from gee_computing.models import GEEAccount
-from utilities.constants import GEE_PATHS
+from utilities.constants import (
+    GEE_PATHS,
+    RUNOFF_ASSET,
+    SRTM_DIGITAL_ELEVATION,
+    LAND_COVER_CLASSIFICATION_10_METER,
+    JAXA_PPT,
+    CRS_4326,
+)
 from utilities.gee_utils import (
     is_gee_asset_exists,
     check_task_status,
@@ -19,18 +26,18 @@ from utilities.gee_utils import (
 
 
 def run_off(
-        gee_account_id,
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        app_type=None,
-        start_date=None,
-        end_date=None,
-        is_annual=False,
+    gee_account_id,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    app_type=None,
+    start_date=None,
+    end_date=None,
+    is_annual=False,
 ):
     description = (
-                      "Runoff_annual_" if is_annual else "Runoff_fortnight_"
-                  ) + asset_suffix
+        "Runoff_annual_" if is_annual else "Runoff_fortnight_"
+    ) + asset_suffix
     asset_id = get_gee_dir_path(asset_folder_list) + description
     if is_gee_asset_exists(asset_id):
         print("inside run off ")
@@ -95,15 +102,15 @@ def run_off(
 
 
 def _generate_layer(
-        roi,
-        app_type,
-        asset_folder_list,
-        asset_id,
-        description,
-        start_date,
-        end_date,
-        is_annual,
-        gee_account_id,
+    roi,
+    app_type,
+    asset_folder_list,
+    asset_id,
+    description,
+    start_date,
+    end_date,
+    is_annual,
+    gee_account_id,
 ):
     gee_obj = GEEAccount.objects.get(pk=gee_account_id)
     helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
@@ -118,8 +125,8 @@ def _generate_layer(
         last_date = None
         for i in range(len(rois)):
             chunk_asset_id = (
-                    get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
-                    + descs[i]
+                get_gee_dir_path(asset_folder_list, asset_path=helper_account_path)
+                + descs[i]
             )
 
             if not is_gee_asset_exists(chunk_asset_id):
@@ -173,9 +180,9 @@ def _generate_layer(
 
 
 def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual):
-    soil = ee.Image("projects/ee-dharmisha-siddharth/assets/HYSOGs250m")
-    srtm2 = ee.Image("USGS/SRTMGL1_003")
-    lulc_img = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+    soil = ee.Image(RUNOFF_ASSET)
+    srtm2 = ee.Image(SRTM_DIGITAL_ELEVATION)
+    lulc_img = ee.ImageCollection(LAND_COVER_CLASSIFICATION_10_METER)
 
     geometry = roi.geometry()
     DEM = srtm2.clip(geometry)
@@ -195,7 +202,7 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
         + ": b('b1')"
     ).rename("soil")
 
-    soil = soil.clip(roi).rename("soil").reproject(crs="EPSG:4326", scale=30)
+    soil = soil.clip(roi).rename("soil").reproject(crs=CRS_4326, scale=30)
 
     mws = ee.List.sequence(0, size1)
 
@@ -215,7 +222,7 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
         dwComposite = classification.reduce(ee.Reducer.mode())
 
         dwComposite = (
-            dwComposite.clip(roi).rename("label").reproject(crs="EPSG:4326", scale=30)
+            dwComposite.clip(roi).rename("label").reproject(crs=CRS_4326, scale=30)
         )
 
         lulc = dwComposite.rename(["lulc"])
@@ -268,23 +275,23 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             + ": 0"
         ).rename("CN2")
 
-        CN2 = CN2.clip(roi).rename("CN2").reproject(crs="EPSG:4326", scale=30)
+        CN2 = CN2.clip(roi).rename("CN2").reproject(crs=CRS_4326, scale=30)
 
         # CN1 = CN2.expression("-75*CN2/(CN2-175)", {"CN2": CN2.select("CN2")}).rename(
         #     "CN1"
         # )
 
-        # CN1 = CN1.clip(shape).rename("CN1").reproject(crs="EPSG:4326", scale=30)
+        # CN1 = CN1.clip(shape).rename("CN1").reproject(crs=CRS, scale=30)
 
         CN3 = CN2.expression(
             "CN2*((2.718)**(0.00673*(100-CN2)))", {"CN2": CN2.select("CN2")}
         ).rename("CN3")
 
-        CN3 = CN3.clip(roi).rename("CN3").reproject(crs="EPSG:4326", scale=30)
+        CN3 = CN3.clip(roi).rename("CN3").reproject(crs=CRS_4326, scale=30)
 
         slope = slope.rename("slope")
 
-        slope = slope.clip(roi).rename("slope").reproject(crs="EPSG:4326", scale=30)
+        slope = slope.clip(roi).rename("slope").reproject(crs=CRS_4326, scale=30)
 
         part1 = (
             CN3.select("CN3")
@@ -293,13 +300,13 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             .rename("p1")
         )
 
-        part1 = part1.clip(roi).rename("p1").reproject(crs="EPSG:4326", scale=30)
+        part1 = part1.clip(roi).rename("p1").reproject(crs=CRS_4326, scale=30)
 
         part2 = slope.expression(
             "1-(2*(2.718)**(-13.86*slope))", {"slope": slope.select("slope")}
         ).rename("p2")
 
-        part2 = part2.clip(roi).rename("p2").reproject(crs="EPSG:4326", scale=30)
+        part2 = part2.clip(roi).rename("p2").reproject(crs=CRS_4326, scale=30)
 
         CN2a = slope.expression(
             "p1*p2+CN2",
@@ -310,37 +317,37 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             },
         ).rename("CN2a")
 
-        CN2a = CN2a.clip(roi).rename("CN2a").reproject(crs="EPSG:4326", scale=30)
+        CN2a = CN2a.clip(roi).rename("CN2a").reproject(crs=CRS_4326, scale=30)
 
         CN1a = CN2a.expression(
             "4.2*CN2a/(10-0.058*CN2a)", {"CN2a": CN2a.select("CN2a")}
         ).rename("CN1a")
 
-        CN1a = CN1a.clip(roi).rename("CN1a").reproject(crs="EPSG:4326", scale=30)
+        CN1a = CN1a.clip(roi).rename("CN1a").reproject(crs=CRS_4326, scale=30)
 
         CN3a = CN2a.expression(
             "23*CN2a/(10+0.13*CN2a)", {"CN2a": CN2a.select("CN2a")}
         ).rename("CN3a")
 
-        CN3a = CN3a.clip(roi).rename("CN3a").reproject(crs="EPSG:4326", scale=30)
+        CN3a = CN3a.clip(roi).rename("CN3a").reproject(crs=CRS_4326, scale=30)
 
         sr1 = CN1a.expression("(25400/CN1a)-254", {"CN1a": CN1a.select("CN1a")}).rename(
             "sr1"
         )
 
-        sr1 = sr1.clip(roi).rename("sr1").reproject(crs="EPSG:4326", scale=30)
+        sr1 = sr1.clip(roi).rename("sr1").reproject(crs=CRS_4326, scale=30)
 
         sr2 = CN2a.expression("(25400/CN2a)-254", {"CN2a": CN2a.select("CN2a")}).rename(
             "sr2"
         )
 
-        sr2 = sr2.clip(roi).rename("sr2").reproject(crs="EPSG:4326", scale=30)
+        sr2 = sr2.clip(roi).rename("sr2").reproject(crs=CRS_4326, scale=30)
 
         sr3 = CN3a.expression("(25400/CN3a)-254", {"CN3a": CN3a.select("CN3a")}).rename(
             "sr3"
         )
 
-        sr3 = sr3.clip(roi).rename("sr3").reproject(crs="EPSG:4326", scale=30)
+        sr3 = sr3.clip(roi).rename("sr3").reproject(crs=CRS_4326, scale=30)
 
         base = ee.Date(f_end_date)
 
@@ -352,15 +359,13 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
             dtMid = base.advance(b, "day").format("YYYY-MM-dd")
             dtFrom = base.advance(c, "day").format("YYYY-MM-dd")
 
-            dataset = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(
-                ee.Filter.date(dtFrom, dtTo)
-            )
+            dataset = ee.ImageCollection(JAXA_PPT).filter(ee.Filter.date(dtFrom, dtTo))
 
             antecedent = dataset.reduce(ee.Reducer.sum())
             antecedent = (
                 antecedent.clip(roi)
                 .select("hourlyPrecipRate_sum")
-                .reproject(crs="EPSG:4326", scale=30)
+                .reproject(crs=CRS_4326, scale=30)
             )
 
             M2 = CN2a.expression(
@@ -371,7 +376,7 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
                 },
             ).rename("m2")
 
-            M2 = M2.clip(roi).rename("m2").reproject(crs="EPSG:4326", scale=30)
+            M2 = M2.clip(roi).rename("m2").reproject(crs=CRS_4326, scale=30)
 
             M1 = CN2a.expression(
                 "0.5*(-sr+sqrt(sr**2+4*p*sr))",
@@ -381,7 +386,7 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
                 },
             ).rename("m1")
 
-            M1 = M1.clip(roi).rename("m1").reproject(crs="EPSG:4326", scale=30)
+            M1 = M1.clip(roi).rename("m1").reproject(crs=CRS_4326, scale=30)
 
             M3 = CN2a.expression(
                 "0.5*(-sr+sqrt(sr**2+4*p*sr))",
@@ -391,17 +396,15 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
                 },
             ).rename("m3")
 
-            M3 = M3.clip(roi).rename("m3").reproject(crs="EPSG:4326", scale=30)
+            M3 = M3.clip(roi).rename("m3").reproject(crs=CRS_4326, scale=30)
 
-            dataset = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(
-                ee.Filter.date(dtMid, dtTo)
-            )
+            dataset = ee.ImageCollection(JAXA_PPT).filter(ee.Filter.date(dtMid, dtTo))
             total = dataset.reduce(ee.Reducer.sum())
 
             total = (
                 total.clip(roi)
                 .select("hourlyPrecipRate_sum")
-                .reproject(crs="EPSG:4326", scale=30)
+                .reproject(crs=CRS_4326, scale=30)
             )
 
             runoff = total.expression(
@@ -430,9 +433,7 @@ def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual
         runoffTotal = runoffs.reduce(ee.Reducer.sum())
 
         runoffTotal = (
-            runoffTotal.clip(roi)
-            .select("runoff_sum")
-            .reproject(crs="EPSG:4326", scale=30)
+            runoffTotal.clip(roi).select("runoff_sum").reproject(crs=CRS_4326, scale=30)
         )
         total = runoffTotal
         total = total.clip(roi)
