@@ -17,7 +17,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
 )
 from nrm_app.celery import app
-from utilities.constants import GEE_DATASET_PATH, GEE_PATHS, PAN_INDIA_RASTER_FABDEM
+from utilities.constants import GEE_PATHS, PAN_INDIA_RASTER_FABDEM
 from computing.STAC_specs import generate_STAC_layerwise
 
 
@@ -71,7 +71,7 @@ def generate_terrain_raster_clip(
     roi = ee.FeatureCollection(roi_asset_id)
 
     # Load the raster image and clip to ROI
-    pan_india_raster = ee.Image(f"{GEE_DATASET_PATH}{PAN_INDIA_RASTER_FABDEM}")
+    pan_india_raster = ee.Image(PAN_INDIA_RASTER_FABDEM)
 
     task = export_raster_asset_to_gee(
         image=pan_india_raster.clip(roi.union().geometry()),

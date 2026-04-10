@@ -10,7 +10,7 @@ from utilities.constants import (
     WATERREJUVENATION,
     WATERREJ_LULCFORM,
     SRTM_DIGITAL_ELEVATION,
-    LC_O8_T1_TOA,
+    LANDSAT8_T1_CALIBERATED_TOA,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -377,7 +377,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
         lulc_year, proj_obj.id, app_type="WATER_REJ"
     )
     landsat_collection = (
-        ee.ImageCollection(LC_O8_T1_TOA)
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(start_date, end_date)
         .map(mask_landsat_clouds)
     )
@@ -542,7 +542,7 @@ def generate_ndmi_layer(swb_asset_id, proj_id):
         lulc_year, proj_obj.id, app_type="WATER_REJ"
     )
     landsat = (
-        ee.ImageCollection(LC_O8_T1_TOA)
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(start_date, end_date)
         .map(mask_landsat_clouds)
     )

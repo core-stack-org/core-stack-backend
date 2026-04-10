@@ -220,7 +220,7 @@ filter_query = (
     "and year(__system/updatedAt) eq 2025)"
 )
 project_id = 2
-FDIR = "WWF/HydroSHEDS/03DIR"
+WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 
 # demand vaidator constants
 DRAINAGE_LINES_ASSET = (
@@ -330,7 +330,7 @@ PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
 
 # Prefixes
 SWB_ASSET_PREFIX = "projects/ee-corestackdev/assets/apps/mws/"
-PAN_INDIA_RASTER_FABDEM = "/terrain/pan_india_terrain_raster_fabdem"
+PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
 STAT_CSV_PATH = "/home/ankit/gramvaani/nrm/checkin/backend/fromgitlab/nrm-app/data/admin-boundaries/odisha.csv"
