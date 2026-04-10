@@ -101,6 +101,9 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_swb(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
+                create_excel_for_mws_intersect_swb(
+                    geojson_data, writer, district, block
+                )
             elif workspace == "nrega_assets":
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                 mws_file_url = get_url("mws_layers", mws_lay_name)
@@ -239,6 +242,63 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     return results
 
 
+def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
+    print("Inside create_excel_for_mws_intersect_swb")
+
+    # --- Fetch MWS layer ---
+    mws_layer_name = f"mws_{district}_{block}"
+    mws_data_url = get_url("mws", mws_layer_name)
+
+    mws_response = requests.get(mws_data_url)
+    if mws_response.status_code != 200:
+        print(f"Error fetching MWS data: {mws_response.status_code}")
+        return
+
+    mws_geojson = mws_response.json()
+
+    def calculate_intersection_area(geom1, geom2):
+        if geom1.intersects(geom2):
+            return geom1.intersection(geom2).area
+        return 0
+
+    rows = []
+
+    for mws_feature in mws_geojson["features"]:
+        mws_props = mws_feature["properties"]
+        mws_uid = mws_props.get("uid")
+        mws_geom = shape(mws_feature["geometry"])
+
+        for swb_feature in swb_geojson["features"]:
+            swb_props = swb_feature["properties"]
+            swb_geom = shape(swb_feature["geometry"])
+
+            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
+
+            if intersection_area > 0:
+                # waterbodies centroid calculation
+                centroid = swb_geom.centroid
+                lon, lat = centroid.x, centroid.y
+
+                rows.append(
+                    {
+                        "UID": mws_uid,
+                        "SWB_UID": swb_props.get("UID"),
+                        "Waterbodies_name": swb_props.get("water_body_name"),
+                        "Latitude": lat,
+                        "Longitude": lon,
+                    }
+                )
+
+    df = pd.DataFrame(rows)
+
+    if not df.empty:
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(6)
+
+    df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
+    print("Excel sheet 'mws_intersect_swb' created successfully")
+
+
 def create_excel_for_facilities(data, writer):
     features = data["features"]
     df_data = [feature["properties"] for feature in features]
@@ -251,7 +311,6 @@ def create_excel_for_facilities(data, writer):
     df = df[first_cols + other_cols]
 
     df.to_excel(writer, sheet_name="facilities_proximity", index=False)
-
     print("Excel file created for facilities_proximity")
 
 
