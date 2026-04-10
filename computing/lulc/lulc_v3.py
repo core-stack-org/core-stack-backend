@@ -27,7 +27,8 @@ from computing.utils import (
 )
 
 from computing.STAC_specs import generate_STAC_layerwise
-from utilities.constants import PAN_INDIA_LULC_V3_BASE
+from utilities.constants import PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
+
 
 @app.task(bind=True)
 def clip_lulc_v3(
@@ -125,7 +126,7 @@ def clip_lulc_v3(
         final_output_assetid_array_new.append(final_output_assetid)
         if not new_loop_start or loop_start >= new_loop_start:
             pan_india = ee.Image(
-                f"{PAN_INDIA_LULC_V3_BASE}_{curr_start_year}_{curr_end_year}"
+                f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{curr_start_year}_{curr_end_year}"
             )
             clipped_lulc = pan_india.clip(roi.geometry())
             l1_asset_new.append(clipped_lulc)

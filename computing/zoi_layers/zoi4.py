@@ -45,7 +45,7 @@ def generate_ndmi_layer(
     else:
         workspace = "zoi_layers"
 
-    description_swb = "swb4_" + asset_suffix
+    description_swb = "swb3_" + asset_suffix
     asset_id_swb = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]

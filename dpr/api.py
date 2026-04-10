@@ -33,7 +33,9 @@ from .serializers import (
 )
 from .services import (
     get_crops_data,
+    get_dpr_report_status,
     get_dpr_summary,
+    get_dpr_status_tracking,
     get_livestock_data,
     get_livelihood_data,
     get_maintenance_data,
@@ -43,6 +45,8 @@ from .services import (
     get_village_brief,
     get_waterbodies_data,
     get_wells_data,
+    patch_dpr_report_status,
+    update_demand_status,
 )
 from .gen_multi_mws_report import (
     get_cropping_mws_data,
@@ -444,9 +448,10 @@ def download_mws_report(request):
     return resp
 
 
-@api_security_check(auth_type="Auth_free")
-@schema(None)
+@api_view(["GET"])
 @auth_free
+@schema(None)
+@api_security_check(auth_type="Auth_free")
 def generate_tehsil_report(request):
     try:
         # ? district, block, mwsId
@@ -510,66 +515,15 @@ def generate_tehsil_report(request):
             result["state"], result["district"], result["block"]
         )
 
-        # ============ MATCHING hasSectionData LOGIC FROM HTML ============
-        def has_section_data(data_obj):
-            if not data_obj:
-                return False
+        # print("Active Patterns", active_pattern)
+        active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "active_patterns", []
+        )
 
-            # Check for total_area > 0 (EXACTLY like HTML)
-            if isinstance(data_obj, dict) and "total_area" in data_obj:
-                return data_obj["total_area"] > 0
+        village_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "village_active_patterns", []
+        )
 
-            # Check for total_population > 0 (EXACTLY like HTML)
-            if isinstance(data_obj, dict) and "total_population" in data_obj:
-                return data_obj["total_population"] > 0
-
-            # Check for total_villages > 0 (EXACTLY like HTML)
-            if isinstance(data_obj, dict) and "total_villages" in data_obj:
-                return data_obj["total_villages"] > 0
-
-            return False
-
-        # ==============================================================
-
-        # ============ BUILD ACTIVE PATTERN LIST ============
-        active_pattern = []
-
-        # Pattern display names mapping (from your HTML)
-        PATTERN_DISPLAY_NAMES = {
-            "groundwater_stress": "Groundwater Stress",
-            "high_drought_incidence": "High drought incidence",
-            "high_irrigation_risk": "High irrigation risk",
-            "low_yield": "Likely stress in cropping yield",
-            "forest_degradation": "Tree Health Degradation",
-            "mining_presence": "Mining Presence",
-            "caste": "High density of marginalized caste communities",
-            "nrega": "Poor uptake of MGNREGA works",
-        }
-
-        # Check each pattern and ONLY add if has_section_data returns True
-        if has_section_data(groundwater_stress):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["groundwater_stress"])
-
-        if has_section_data(high_drought_incidence):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["high_drought_incidence"])
-
-        if has_section_data(high_irrigation_risk):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["high_irrigation_risk"])
-
-        if has_section_data(low_yield):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["low_yield"])
-
-        if has_section_data(forest_degradation):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["forest_degradation"])
-
-        if has_section_data(mining_presence):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["mining_presence"])
-
-        if has_section_data(socio_caste):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["caste"])
-
-        if has_section_data(socio_nrega):
-            active_pattern.append(PATTERN_DISPLAY_NAMES["nrega"])
         # =====================================================
 
         context = {
@@ -578,7 +532,8 @@ def generate_tehsil_report(request):
             "block": result["block"],
             "block_osm": parameter_block,
             "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
-            "active_pattern": active_pattern,  # Now matches HTML hide logic
+            "active_pattern": active_pattern,
+            "village_active_pattern": village_active_pattern,
             "pattern_display_mapping_json": pattern_display_mapping,
             "mws_active_patterns_json": json.dumps(mws_active_pattern),
             "groundwater_stress_json": json.dumps(groundwater_stress),
@@ -750,3 +705,60 @@ def dpr_livelihood(request, plan_id):
     if err:
         return err
     return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)
+
+
+# MARK: DPR Status Tracking
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_status_tracking(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(get_dpr_status_tracking(plan_id))
+
+
+# MARK: DPR Report Workflow Status
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET", "PATCH"])
+@schema(None)
+def dpr_report_status(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+
+    if request.method == "GET":
+        data = get_dpr_report_status(plan_id)
+        if data is None:
+            return Response(
+                {"error": "DPR report not found for this plan"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(data)
+
+    result, error = patch_dpr_report_status(plan_id, request.data, request.user)
+    if error:
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(result)
+
+
+# MARK: Update Demand Status
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["PATCH"])
+@schema(None)
+def dpr_update_demand_status(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+
+    resource_type = request.data.get("resource_type")
+    resource_id = request.data.get("resource_id")
+    new_status = request.data.get("status")
+
+    if not all([resource_type, resource_id, new_status]):
+        return Response(
+            {"error": "resource_type, resource_id, and status are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    result, error = update_demand_status(plan_id, resource_type, resource_id, new_status)
+    if error:
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(result)

@@ -17,7 +17,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from computing.utils import sync_fc_to_geoserver
-from utilities.constants import GEE_DATASET_PATH, SOGE
+from utilities.constants import SOGE_DATASET
 from computing.STAC_specs import generate_STAC_layerwise
 
 
@@ -33,7 +33,7 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
     asset_path = get_gee_asset_path(state, district, block)
     asset_id = asset_path + description
 
-    soge_fc = ee.FeatureCollection(GEE_DATASET_PATH + SOGE)
+    soge_fc = ee.FeatureCollection(SOGE_DATASET)
 
     if not is_gee_asset_exists(asset_id):
         mws_asset_id = (

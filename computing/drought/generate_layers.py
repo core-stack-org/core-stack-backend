@@ -2,7 +2,12 @@ import ee
 
 from gee_computing.models import GEEAccount
 from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
-from utilities.constants import GEE_PATHS, CHIRPS_PPT, MODIS_ET, SURFACE_REFLECTANCE
+from utilities.constants import (
+    GEE_PATHS,
+    CHIRPS_PPT,
+    MODIS_TERRA_NET_ET_GAP_FILLED_8_DAY,
+    MODIS_TERRA_SURFACE_REFLECTANCE,
+)
 from utilities.gee_utils import (
     is_gee_asset_exists,
     ee_initialize,
@@ -166,7 +171,9 @@ def drought_chunk(
     modis_ndvi = ndvi_ndwi.select("NDVI")
     modis_ndwi = ndvi_ndwi.select("NDWI")
 
-    modis = ee.ImageCollection(MODIS_ET).select(["ET", "PET"])
+    modis = ee.ImageCollection(MODIS_TERRA_NET_ET_GAP_FILLED_8_DAY).select(
+        ["ET", "PET"]
+    )
 
     modis_scale = 500
     modis_available_from_year = 2000
@@ -1511,7 +1518,7 @@ def drought_chunk(
 
 
 def modis_ndvi_ndwi():
-    mod09a1 = ee.ImageCollection(SURFACE_REFLECTANCE).select(
+    mod09a1 = ee.ImageCollection(MODIS_TERRA_SURFACE_REFLECTANCE).select(
         ["sur_refl_b01", "sur_refl_b02", "sur_refl_b04"]  # Red  # NIR  # Green
     )
 
