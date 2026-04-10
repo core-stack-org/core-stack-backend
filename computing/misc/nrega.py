@@ -46,6 +46,9 @@ def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
 @app.task(bind=True)
 def clip_nrega_district_block(self, state, district, block, gee_account_id):
     print("Start nrega asset clipping")
+    """
+    It will generate nrega layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     s3 = boto3.resource(
         "s3",

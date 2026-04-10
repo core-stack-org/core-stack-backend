@@ -580,9 +580,7 @@ class DPRPagination(PageNumberPagination):
 def _get_plan_or_404(plan_id):
     plan = get_plan_details(plan_id)
     if plan is None:
-        return None, Response(
-            {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
-        )
+        return None, Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
     return plan, None
 
 
@@ -633,9 +631,7 @@ def dpr_settlements(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(
-        request, get_settlements_data(plan_id), SettlementSerializer
-    )
+    return _paginated_response(request, get_settlements_data(plan_id), SettlementSerializer)
 
 
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
@@ -653,9 +649,7 @@ def dpr_livestock(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(
-        request, get_livestock_data(plan_id), LivestockSerializer
-    )
+    return _paginated_response(request, get_livestock_data(plan_id), LivestockSerializer)
 
 
 # MARK: Section D
@@ -674,9 +668,7 @@ def dpr_waterbodies(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(
-        request, get_waterbodies_data(plan_id), WaterbodySerializer
-    )
+    return _paginated_response(request, get_waterbodies_data(plan_id), WaterbodySerializer)
 
 
 # MARK: Section E
@@ -689,14 +681,10 @@ def dpr_maintenance(request, plan_id):
     maintenance_type = request.query_params.get("type", "gw")
     if maintenance_type not in VALID_MAINTENANCE_TYPES:
         return Response(
-            {
-                "error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"
-            },
+            {"error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    return _paginated_response(
-        request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer
-    )
+    return _paginated_response(request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer)
 
 
 # MARK: Section F
@@ -716,9 +704,7 @@ def dpr_livelihood(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(
-        request, get_livelihood_data(plan_id), LivelihoodSerializer
-    )
+    return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)
 
 
 # MARK: DPR Status Tracking

@@ -37,6 +37,9 @@ def generate_stream_order(
     asset_folder=None,
     app_type="MWS",
 ):
+    """
+    It will generate stream order layer for given location at tehsil level or region of intrest
+    """
 
     ee_initialize(gee_account_id)
     if state and district and block:
@@ -192,7 +195,7 @@ def stream_order_vector_generation(
     asset_suffix=None,
     asset_folder=None,
 ):
-    layer_id = None  # ✅ ensure defined
+    layer_id = None  #  ensure defined
 
     # -------------------------------
     # Build asset path
