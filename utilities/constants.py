@@ -21,6 +21,9 @@ DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
 LITHOLOGY_PATH = "data/lithology/"
 SITE_DATA_PATH = "data/site_data"
 
+LITHOLOGY_PATH_BASE="projects/ee-corestackdev/assets/apps/mws/"
+SRTM_DIGITAL_ELEVATION = "USGS/SRTMGL1_003"
+INDIA_LINEAMENTS = "projects/ee-harshita-om/assets/india_lineaments"
 
 # MARK: ODK URLs
 ODK_BASE_URL = "https://odk.core-stack.org/v1/projects/"

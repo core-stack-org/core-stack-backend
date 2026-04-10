@@ -243,4 +243,4 @@ def generate_hydrology(
                 )
 
             layer_at_geoserver = True
-    return layer_at_geoserver
+    return asset_id

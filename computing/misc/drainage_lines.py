@@ -116,4 +116,4 @@ def clip_drainage_lines(
 
         except Exception as e:
             print("Exception in syncing Drainage line to geoserver", e)
-    return layer_at_geoserver
+    return asset_id

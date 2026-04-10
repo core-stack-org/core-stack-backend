@@ -16,46 +16,6 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
-def generate_terrain_clusters_sync(
-    state,
-    district,
-    block,
-    Terrain_Raster=None,
-):
-    """
-    STACD-compatible synchronous version.
-    No Celery, no GeoServer sync. Returns asset_id directly.
-    """
-    ee_initialize(2)
-
-    asset_name = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_terrain_clusters"
-    )
-    asset_id = get_gee_asset_path(state, district, block) + asset_name
-
-    if not is_gee_asset_exists(asset_id):
-        compute_on_gee(state, district, block, asset_id, asset_name)
-
-    if not is_gee_asset_exists(asset_id):
-        raise Exception(f"Asset not created: {asset_id}")
-
-    # Save to DB first to always get a valid layer_id (even on reruns)
-    layer_id = save_layer_info_to_db(
-        state, district, block,
-        layer_name=asset_name,
-        asset_id=asset_id,
-        dataset_name="Terrain Vector",
-        misc={},
-    )
-
-    # GeoServer sync — identical to async
-    layer_at_geoserver = sync_to_geoserver(state, district, block, asset_id, layer_id)
-
-    return asset_id
-
 
 @app.task(bind=True)
 def generate_terrain_clusters(self, state, district, block, gee_account_id):
@@ -74,7 +34,7 @@ def generate_terrain_clusters(self, state, district, block, gee_account_id):
         layer_id = compute_on_gee(state, district, block, asset_id, asset_name)
 
     layer_at_geoserver = sync_to_geoserver(state, district, block, asset_id, layer_id)
-    return layer_at_geoserver
+    return asset_id
 
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
@@ -84,30 +44,14 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
         fabdem.mosaic().setDefaultProjection("EPSG:3857", None, 30).rename("elevation")
     )
 
-    # mt1k = ee.FeatureCollection(
-    #     get_gee_asset_path(state, district, block)
-    #     + "filtered_mws_"
-    #     + valid_gee_text(district.lower())
-    #     + "_"
-    #     + valid_gee_text(block.lower())
-    #     + "_uid"
-    # )
-
-
-
     mt1k = ee.FeatureCollection(
-        "projects/ee-corestackdev/assets/apps/mws/"
-        + f"{state.lower()}/{district.lower()}/{block.lower()}/"
+        get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
         + "_uid"
     )
-
-
-
-
 
     def process_geometry(feature):
         # Get the geometry of the feature

@@ -159,4 +159,4 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
                 layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
             )
             layer_at_geoserver = True
-    return layer_at_geoserver
+    return asset_id

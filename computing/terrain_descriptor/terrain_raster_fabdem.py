@@ -21,82 +21,6 @@ from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
 from computing.STAC_specs import generate_STAC_layerwise
 
 
-def generate_terrain_raster_clip_sync(
-    state,
-    district,
-    block,
-    MWS_Boundaries=None,
-):
-    """
-    STACD-compatible synchronous version.
-    Calls same logic as generate_terrain_raster_clip but without Celery.
-    """
-    ee_initialize(2)
-
-    if MWS_Boundaries is None:
-        roi_asset_id = (
-            "projects/ee-corestackdev/assets/apps/mws/"
-            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
-            + "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_uid"
-        )
-    else:
-        roi_asset_id = MWS_Boundaries
-
-    asset_suffix = (
-        "terrain_raster_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    layer_name = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_terrain_raster"
-    )
-    asset_id = get_gee_asset_path(state, district, block) + asset_suffix
-
-    roi = ee.FeatureCollection(roi_asset_id)
-    pan_india_raster = ee.Image(
-        f"{GEE_DATASET_PATH}/terrain/pan_india_terrain_raster_fabdem"
-    )
-
-    if not is_gee_asset_exists(asset_id):
-        task = export_raster_asset_to_gee(
-            image=pan_india_raster.clip(roi.union().geometry()),
-            description=asset_suffix,
-            asset_id=asset_id,
-            scale=30,
-            region=roi.geometry(),
-        )
-        check_task_status([task])
-        if not is_gee_asset_exists(asset_id):
-            raise Exception(f"Asset not created: {asset_id}")
-
-    # From here — exact same as async function
-    make_asset_public(asset_id)
-
-    task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
-    check_task_status([task_id])
-
-    layer_id = save_layer_info_to_db(
-        state, district, block,
-        layer_name, asset_id, "Terrain Raster",
-        algorithm="FABDEM", algorithm_version="2.0",
-    )
-
-    res = sync_raster_gcs_to_geoserver(
-        "terrain", layer_name, layer_name, "terrain_raster"
-    )
-    if res and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-
-    return asset_id
-
 @app.task(bind=True)
 def generate_terrain_raster_clip(
     self,
@@ -205,4 +129,4 @@ def generate_terrain_raster_clip(
                     layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
                 )
         layer_at_geoserver = True
-    return layer_at_geoserver
+    return asset_id

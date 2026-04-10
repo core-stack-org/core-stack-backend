@@ -79,7 +79,7 @@ def generate_catchment_area_singleflow(
         proj_id=proj_id,
     )
 
-    return layer_status
+    return asset_id
 
 
 def catchment_area_raster_generation(

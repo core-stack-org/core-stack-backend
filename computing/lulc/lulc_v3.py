@@ -26,143 +26,10 @@ from computing.utils import (
     get_layer_object,
 )
 
+
 from computing.STAC_specs import generate_STAC_layerwise
 
 
-
-def clip_lulc_v3_sync(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
-    MWS_Boundaries=None,
-):
-    """
-    STACD-compatible synchronous version.
-    No Celery, no GCS sync, no GeoServer sync. Returns asset_ids list directly.
-    """
-    ee_initialize(2)
-    print("Inside clip_lulc_v3_sync")
-
-    start_year = int(start_year)
-    end_year = int(end_year)
-    start_date = str(start_year) + "-07-01"
-    end_date = str(end_year + 1) + "-06-30"
-
-    # MWS boundaries — read from production CoRE Stack (read-only)
-    if MWS_Boundaries is None:
-        roi = ee.FeatureCollection(
-            "projects/ee-corestackdev/assets/apps/mws/"
-            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
-            + "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_uid"
-        ).union()
-    else:
-        roi = ee.FeatureCollection(MWS_Boundaries).union()
-
-    filename_prefix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    gee_asset_path = get_gee_asset_path(state, district, block)
-
-    loop_start = datetime.strptime(start_date, "%Y-%m-%d")
-    loop_end = datetime.strptime(end_date, "%Y-%m-%d")
-
-    l1_asset_new = []
-    final_output_filename_array_new = []
-    final_output_assetid_array_new = []
-    scale = 10
-
-    while loop_start <= loop_end:
-        curr_start_date = loop_start
-        curr_end_date = curr_start_date + relativedelta(years=1) - timedelta(days=1)
-        loop_start = curr_start_date + relativedelta(years=1)
-
-        curr_start_year = curr_start_date.year
-        curr_end_year = curr_end_date.year
-
-        curr_filename = (
-            filename_prefix
-            + "_"
-            + curr_start_date.strftime("%Y-%m-%d")
-            + "_"
-            + curr_end_date.strftime("%Y-%m-%d")
-        )
-        final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
-        final_output_assetid = gee_asset_path + final_output_filename
-        final_output_filename_array_new.append(final_output_filename)
-        final_output_assetid_array_new.append(final_output_assetid)
-
-        if not is_gee_asset_exists(final_output_assetid):
-            pan_india = ee.Image(
-                f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{curr_start_year}_{curr_end_year}"
-            )
-            clipped_lulc = pan_india.clip(roi.geometry())
-            l1_asset_new.append((clipped_lulc, final_output_filename, final_output_assetid))
-
-    # Export only assets that don't exist yet
-    task_list = []
-    geometry = roi.geometry()
-    for image, filename, asset_id in l1_asset_new:
-        task_id = export_raster_asset_to_gee(
-            image=image.clip(geometry),
-            description=filename,
-            asset_id=asset_id,
-            scale=scale,
-            region=geometry,
-            pyramiding_policy={"predicted_label": "mode"},
-        )
-        task_list.append(task_id)
-
-    if task_list:
-        task_id_list = check_task_status(task_list)
-        print("LULC task_id_list", task_id_list)
-
-    # Verify all assets exist
-    for asset_id in final_output_assetid_array_new:
-        if not is_gee_asset_exists(asset_id):
-            raise Exception(f"Asset not created: {asset_id}")
-
-    # DB save
-    for i, asset_id in enumerate(final_output_assetid_array_new):
-        name_arr = final_output_filename_array_new[i].split("_20")
-        s_year = name_arr[1][:2]
-        e_year = name_arr[2][:2]
-        save_layer_info_to_db(
-            state, district, block,
-            layer_name=f"LULC_{s_year}_{e_year}_{filename_prefix}_level_3",
-            asset_id=asset_id,
-            dataset_name="LULC_level_3",
-            misc={"start_year": start_year, "end_year": end_year},
-        )
-
-
-    # Make assets public before GCS sync
-    for asset_id in final_output_assetid_array_new:
-        make_asset_public(asset_id)
-
-    # GCS sync — same as async version
-    sync_lulc_to_gcs(
-        final_output_filename_array_new,
-        final_output_assetid_array_new,
-        scale,
-    )
-
-    # GeoServer sync — same as async version
-    sync_lulc_to_geoserver(
-        final_output_filename_array_new,
-        state,
-        district,
-        block,
-        [],   # layer_ids — passing empty list, DB save already done above
-        None, # asset_suffix — not needed for block-level calls
-    )
-
-    return final_output_assetid_array_new
 
 
 
@@ -339,7 +206,7 @@ def clip_lulc_v3(
         asset_suffix,
     )
 
-    return layer_at_geoserver
+    return final_output_assetid_array_new
 
 
 def sync_lulc_to_gcs(

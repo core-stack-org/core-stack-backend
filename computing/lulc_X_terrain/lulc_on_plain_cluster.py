@@ -17,123 +17,6 @@ from utilities.gee_utils import (
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
 
 
-
-def lulc_on_plain_cluster_sync(
-    state, district, block, start_year, end_year,
-    LULC_Raster=None, Terrain_Raster=None,
-):
-    """
-    STACD-compatible synchronous version.
-    Returns asset_id directly.
-    """
-    ee_initialize(2)
-
-    start_year = int(start_year)
-    end_year = int(end_year)
-
-    asset_description = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_lulcXplains_clusters"
-    )
-    asset_id = get_gee_asset_path(state, district, block) + asset_description
-
-    if not is_gee_asset_exists(asset_id):
-        aez_india = ee.FeatureCollection("users/mtpictd/agro_eco_regions")
-
-        landforms = ee.Image(
-            get_gee_asset_path(state, district, block)
-            + "terrain_raster_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-        )  # The eleven landforms raster
-
-        # MWS boundaries — read from your own account (same as async)
-        mwsheds = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
-            + "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_uid"
-        )
-
-        filtered_aez = aez_india.filterBounds(mwsheds.geometry())
-        aez_no = filtered_aez.first().get("ae_regcode").getInfo()
-
-        lulc_imgs = []
-        for y in range(start_year, end_year + 1):
-            lulc_img = ee.Image(
-                get_gee_asset_path(state, district, block)
-                + valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
-                + "_"
-                + str(y)
-                + "-07-01_"
-                + str(y + 1)
-                + "-06-30_LULCmap_10m"
-            )
-            lulc_imgs.append(lulc_img)
-
-        lulc_img_collection = ee.ImageCollection.fromImages(lulc_imgs)
-        study_area_lulc = lulc_img_collection.mode().clip(mwsheds)
-        study_area_landforms = landforms.clip(mwsheds)
-
-        mwsheds_with_clusters = process_mws(mwsheds)
-        plain_mwsheds = mwsheds_with_clusters.filter(
-            ee.Filter.neq("terrain_cluster", 2)
-        )
-        plain_centroids = aez_lulcXterrain_cluster_centroids[f"aez{aez_no}"]["plains"]
-
-        result = process_feature_collection(
-            plain_mwsheds, study_area_landforms, study_area_lulc, plain_centroids
-        )
-        print("Processing completed successfully")
-        task = export_vector_asset_to_gee(result, asset_description, asset_id)
-        task_id_list = check_task_status([task])
-        print("lulc_on_plain_cluster_sync task completed - task_id_list:", task_id_list)
-
-    layer_at_geoserver = False
-    if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_plain",
-            asset_id=asset_id,
-            dataset_name="Terrain LULC",
-            misc={
-                "start_year": start_year,
-                "end_year": end_year,
-            },
-        )
-        make_asset_public(asset_id)
-
-        fc = ee.FeatureCollection(asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = sync_layer_to_geoserver(
-            state,
-            fc,
-            valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_lulc_plain",
-            "terrain_lulc",
-        )
-        print(res)
-        if res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag updated")
-            layer_at_geoserver = True
-
-    # return asset_id for STACD instead of layer_at_geoserver flag
-    return asset_id
-
-
-
 @app.task(bind=True)
 def lulc_on_plain_cluster(
     self, state, district, block, start_year, end_year, gee_account_id
@@ -237,7 +120,7 @@ def lulc_on_plain_cluster(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
-    return layer_at_geoserver
+    return asset_id
 
 
 def process_feature_collection(fc, landforms, area_lulc, plain_centroids):

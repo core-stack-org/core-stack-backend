@@ -49,7 +49,7 @@ def generate_restoration_opportunity(self, state, district, block, gee_account_i
     layer_at_geoserver = generate_vector(
         roi, raster_asset_id, args, state, district, block, description + "_vector"
     )
-    return layer_at_geoserver
+    return raster_asset_id
 
 
 def clip_raster(roi, state, district, block, description):

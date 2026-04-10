@@ -23,72 +23,6 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from computing.STAC_specs import generate_STAC_layerwise
 
 
-
-def generate_tehsil_shape_file_data_sync(state, district, block):
-    """
-    STACD corestack-lite sync version of generate_tehsil_shape_file_data.
-    No Celery. Returns asset_id directly.
-    GeoServer push kept — admin boundary is a vector, no GCS needed.
-    """
-    ee_initialize()
-    description = (
-        "admin_boundary_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
-
-    collection, state_dir = clip_block_from_admin_boundary(state, district, block)
-
-    layer_id = None
-
-    shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
-    print("shp_path returned:", shp_path)
-    print("layer_path being uploaded:", os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1])
-
-    create_gee_directory(state, district, block)
-
-    if not is_gee_asset_exists(asset_id):
-        layer_name = (
-            "admin_boundary_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-        )
-        layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
-        upload_shp_to_gee(layer_path, layer_name, asset_id)
-
-    if is_gee_asset_exists(asset_id):
-        make_asset_public(asset_id)
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
-            asset_id=asset_id,
-            dataset_name="Admin Boundary",
-        )
-
-    res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag updated")
-
-        # TODO: Replace with build_stac_spec() call
-        layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-            state=state,
-            district=district,
-            block=block,
-            layer_name="admin_boundaries_vector",
-        )
-        update_layer_sync_status(
-            layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-        )
-
-    return asset_id  # only change from original — was: return layer_at_geoserver
-
-
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
     ee_initialize()
@@ -146,7 +80,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
         )
 
         layer_at_geoserver = True
-    return layer_at_geoserver
+    return asset_id
 
 
 def create_shp_files(collection, state_dir, district, block, layer_id):

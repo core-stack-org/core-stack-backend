@@ -5,13 +5,11 @@ from rest_framework.decorators import api_view, parser_classes, schema
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
-
+import time
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
 from .lulc.lulc_vector import vectorise_lulc
-from .lulc.lulc_vector import vectorise_lulc_sync
-
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
@@ -29,31 +27,19 @@ from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
-from .mws.mws import mws_layer_sync
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
-from .terrain_descriptor.terrain_clusters import generate_terrain_clusters_sync
-
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
-from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip_sync
-
 from computing.misc.drainage_lines import clip_drainage_lines
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
-
-from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster_sync
-from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster_sync
-
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
-from .misc.admin_boundary import generate_tehsil_shape_file_data_sync
 from .misc.nrega import clip_nrega_district_block
 from computing.change_detection.change_detection import get_change_detection
 from .lulc.lulc_v3 import clip_lulc_v3
-from .lulc.lulc_v3 import clip_lulc_v3_sync
-
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
@@ -85,41 +71,24 @@ from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 
 # Admin Boundary
-# @api_security_check(allowed_methods="POST")
-# @schema(None)
-# def generate_admin_boundary(request):
-#     print("Inside generate_block_layer API.")
-#     try:
-#         state = request.data.get("state").lower()
-#         district = request.data.get("district").lower()
-#         block = request.data.get("block").lower()
-#         gee_account_id = request.data.get("gee_account_id")
-#         generate_tehsil_shape_file_data.apply_async(
-#             args=[state, district, block, gee_account_id], queue="nrm"
-#         )
-#         return Response(
-#             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-#         )
-#     except Exception as e:
-#         print("Exception in generate_block_layer api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
-    import time
     start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
         execution_id = request.data.get("execution_id", "local")
 
         # SYNC — direct call, no Celery
-        asset_id = generate_tehsil_shape_file_data_sync(
+        asset_id = generate_tehsil_shape_file_data(
             state=state,
             district=district,
             block=block,
+            gee_account_id = gee_account_id
         )
 
         # TODO: Replace hardcoded stac_spec with build_stac_spec() call
@@ -140,51 +109,80 @@ def generate_admin_boundary(request):
             {"status": "failed", "message": str(e), "node_type": "Admin_Boundary"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
+    
+# NREGA
 @api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_nrega_layer(request):
     print("Inside generate_nrega_layer API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        clip_nrega_district_block.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
+        execution_id = request.data.get("execution_id")
+
+
+        asset_id = clip_nrega_district_block(state, district, block, gee_account_id)
+        execution_time = time.time() - start_time
+
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "status": "success",
+                "message": "NREGA Clip Completed",
+                "execution_id": execution_id,
+                "node_type": "NREGA_Clip",
+                "asset_ids": [asset_id],
+                "hosting_platform": "GEE",
+                "stac_spec": {},
+                "execution_time": execution_time,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in generate_nrega_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Drainage Lines
 @api_view(["POST"])
 @schema(None)
 def generate_drainage_layer(request):
     print("Inside generate_drainage_layer API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        clip_drainage_lines.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id  = clip_drainage_lines(
+                state = state,
+                district = district,
+                block = block,
+                gee_account_id = gee_account_id,
         )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Drainage Lines completed",
+            "execution_id": execution_id,
+            "node_type": "Drainage_Lines",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_drainage_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Drainage_Lines",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -243,44 +241,24 @@ def upload_kml(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # MWS Layer
-# @api_security_check(allowed_methods="POST")
-# @schema(None)
-# def generate_mws_layer(request):
-#     print("Inside generate_mws_layer")
-#     try:
-#         state = request.data.get("state")
-#         district = request.data.get("district")
-#         block = request.data.get("block")
-#         gee_account_id = request.data.get("gee_account_id")
-#         mws_layer.apply_async(
-#             args=[state, district, block, gee_account_id], queue="nrm"
-#         )
-#         return Response(
-#             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-#         )
-#     except Exception as e:
-#         print("Exception in generate_mws_layer api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-@api_view(["POST"])
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_mws_layer(request):
     print("Inside generate_mws_layer")
-    import time
     start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
+        gee_account_id = request.data.get("gee_account_id")
         execution_id = request.data.get("execution_id", "local")
-        Pan_India_MWS = request.data.get("Pan_India_MWS", None)
 
         # SYNC — direct call, no Celery
-        asset_id = mws_layer_sync(
+        asset_id = mws_layer(
             state=state,
             district=district,
             block=block,
-            Pan_India_MWS=Pan_India_MWS,
+            gee_account_id = gee_account_id
         )
 
         # TODO: Replace hardcoded stac_spec with build_stac_spec() call
@@ -301,11 +279,12 @@ def generate_mws_layer(request):
             {"status": "failed", "message": str(e), "node_type": "MWS_Layer"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
-
+# Fortnightly Hydrology
 @api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_fortnightly_hydrology(request):
     print("Inside generate_fortnightly_hydrology")
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -313,30 +292,46 @@ def generate_fortnightly_hydrology(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        generate_hydrology.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-                "is_annual": False,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_hydrology(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            gee_account_id=gee_account_id,
+            is_annual=False,
         )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Fortnightly Hydrology completed",
+            "execution_id": execution_id,
+            "node_type": "Hydrology",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_fortnightly_hydrology api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Hydrology",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Annual Hydrology
 @api_view(["POST"])
 @schema(None)
 def generate_annual_hydrology(request):
     print("Inside generate_annual_hydrology")
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -344,25 +339,39 @@ def generate_annual_hydrology(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        generate_hydrology.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "is_annual": True,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_hydrology(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            gee_account_id=gee_account_id,
+            is_annual=True,
         )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Annual Hydrology completed",
+            "execution_id": execution_id,
+            "node_type": "Hydrology_Annual",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_annual_hydrology api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Hydrology_Annual",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(["POST"])
 @schema(None)
 def lulc_for_tehsil(request):
@@ -451,36 +460,12 @@ def lulc_v3_river_basin(request):
         print("Exception in lulc_v3_river_basin api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# LULC Raster Algo
-# @api_view(["POST"])
-# @schema(None)
-# def lulc_v3(request):
-#     print("Inside lulc_v3 api.")
-#     try:
-#         state = request.data.get("state").lower()
-#         district = request.data.get("district").lower()
-#         block = request.data.get("block").lower()
-#         start_year = request.data.get("start_year")
-#         end_year = request.data.get("end_year")
-#         gee_account_id = request.data.get("gee_account_id")
-#         clip_lulc_v3.apply_async(
-#             args=[state, district, block, start_year, end_year, gee_account_id],
-#             queue="nrm",
-#         )
-#         return Response(
-#             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
-#         )
-#     except Exception as e:
-#         print("Exception in lulc_v3 api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # LULC Raster Algo
 @api_view(["POST"])
 @schema(None)
 def lulc_v3(request):
     print("Inside lulc_v3 api.")
-    import time
     from datetime import datetime as dt
     start_time = time.time()
     try:
@@ -490,16 +475,15 @@ def lulc_v3(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         execution_id = request.data.get("execution_id", "local")
-        MWS_Boundaries = request.data.get("MWS_Boundaries", None)
+        
 
         # SYNC — direct call, no Celery
-        asset_ids = clip_lulc_v3_sync(
+        asset_ids = clip_lulc_v3(
             state=state,
             district=district,
             block=block,
             start_year=start_year,
             end_year=end_year,
-            MWS_Boundaries=MWS_Boundaries,
         )
 
         execution_time = time.time() - start_time
@@ -553,34 +537,10 @@ def lulc_v3(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # LULC Vectorization Algo
-# @api_view(["POST"])
-# @schema(None)
-# def lulc_vector(request):
-#     print("Inside lulc_vector")
-#     try:
-#         state = request.data.get("state").lower()
-#         district = request.data.get("district").lower()
-#         block = request.data.get("block").lower()
-#         start_year = request.data.get("start_year")
-#         end_year = request.data.get("end_year")
-#         gee_account_id = request.data.get("gee_account_id")
-#         vectorise_lulc.apply_async(
-#             args=[state, district, block, start_year, end_year, gee_account_id],
-#             queue="nrm",
-#         )
-#         return Response(
-#             {"Success": "lulc_vector task initiated"},
-#             status=status.HTTP_200_OK,
-#         )
-#     except Exception as e:
-#         print("Exception in lulc_vector api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 @api_view(["POST"])
 @schema(None)
 def lulc_vector(request):
     print("Inside lulc_vector")
-    import time
     from datetime import datetime as dt
     start_time = time.time()
     try:
@@ -590,16 +550,16 @@ def lulc_vector(request):
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
         execution_id = request.data.get("execution_id", "local")
-        LULC_Raster = request.data.get("LULC_Raster", None)
+        gee_account_id = request.data.get("gee_account_id")
 
         # SYNC — direct call, no Celery
-        asset_id = vectorise_lulc_sync(
+        asset_id = vectorise_lulc(
             state=state,
             district=district,
             block=block,
             start_year=start_year,
             end_year=end_year,
-            LULC_Raster=LULC_Raster,
+            gee_account_id=gee_account_id
         )
 
         execution_time = time.time() - start_time
@@ -783,48 +743,25 @@ def generate_drought_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Terrain vectorization algo
-# @api_view(["POST"])
-# @schema(None)
-# def generate_terrain_descriptor(request):
-#     print("Inside generate_terrain_descriptor")
-#     try:
-#         state = request.data.get("state")
-#         district = request.data.get("district")
-#         block = request.data.get("block")
-#         gee_account_id = request.data.get("gee_account_id")
-#         generate_terrain_clusters.apply_async(
-#             args=[state, district, block, gee_account_id], queue="nrm"
-#         )
-#         return Response(
-#             {"Success": "generate_terrain_descriptor task initiated"},
-#             status=status.HTTP_200_OK,
-#         )
-#     except Exception as e:
-#         print("Exception in generate_terrain_descriptor api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-# Terrain vectorization algo
 @api_view(["POST"])
 @schema(None)
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
-    import time
     from datetime import datetime as dt
     start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
+        gee_account_id = request.data.get("gee_account_id")
         execution_id = request.data.get("execution_id", "local")
-        Terrain_Raster = request.data.get("Terrain_Raster", None)
 
         # SYNC — direct call, no Celery
-        asset_id = generate_terrain_clusters_sync(
+        asset_id = generate_terrain_clusters(
             state=state,
             district=district,
             block=block,
-            Terrain_Raster=Terrain_Raster,
+            gee_account_id = gee_account_id
         )
 
         execution_time = time.time() - start_time
@@ -875,53 +812,27 @@ def generate_terrain_descriptor(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Terrain Raster Algo
-# @api_view(["POST"])
-# @schema(None)
-# def generate_terrain_raster(request):
-#     print("Inside generate_terrain_raster")
-#     try:
-#         state = request.data.get("state")
-#         district = request.data.get("district")
-#         block = request.data.get("block")
-#         gee_account_id = request.data.get("gee_account_id")
-#         generate_terrain_raster_clip.apply_async(
-#             kwargs={
-#                 "state": state,
-#                 "district": district,
-#                 "block": block,
-#                 "gee_account_id": gee_account_id,
-#             },
-#             queue="nrm",
-#         )
-
-#         return Response(
-#             {"Success": "generate_terrain_raster task initiated"},
-#             status=status.HTTP_200_OK,
-#         )
-#     except Exception as e:
-#         print("Exception in generate_terrain_raster api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 @api_view(["POST"])
 @schema(None)
 def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
-    import time
     from datetime import datetime as dt
     start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
+        gee_account_id = request.data.get("gee_account_id")
+
         execution_id = request.data.get("execution_id", "local")
-        MWS_Boundaries = request.data.get("MWS_Boundaries", None)
 
         # SYNC — direct call, no Celery
-        asset_id = generate_terrain_raster_clip_sync(
+        asset_id = generate_terrain_raster_clip(
             state=state,
             district=district,
             block=block,
-            MWS_Boundaries=MWS_Boundaries,
+            gee_account_id = gee_account_id
+
         )
 
         # TODO: Replace hardcoded stac_spec dict with a call to build_stac_spec()
@@ -971,41 +882,11 @@ def generate_terrain_raster(request):
             "node_type": "Terrain_Algorithm",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-
-
-
-# TerrainXLulc slope vectorization
-# @api_view(["POST"])
-# @schema(None)
-# def terrain_lulc_slope_cluster(request):
-#     print("Inside terrain_lulc_slope_cluster")
-#     try:
-#         state = request.data.get("state")
-#         district = request.data.get("district")
-#         block = request.data.get("block")
-#         start_year = request.data.get("start_year")
-#         end_year = request.data.get("end_year")
-#         gee_account_id = request.data.get("gee_account_id")
-#         lulc_on_slope_cluster.apply_async(
-#             args=[state, district, block, start_year, end_year, gee_account_id],
-#             queue="nrm",
-#         )
-#         return Response(
-#             {"Success": "terrain_lulc_slope_cluster task initiated"},
-#             status=status.HTTP_200_OK,
-#         )
-#     except Exception as e:
-#         print("Exception in terrain_lulc_slope_cluster api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 # TerrainXLulc slope vectorization
 @api_view(["POST"])
 @schema(None)
 def terrain_lulc_slope_cluster(request):
     print("Inside terrain_lulc_slope_cluster")
-    import time
     from datetime import datetime as dt
     start_time = time.time()
     try:
@@ -1014,15 +895,15 @@ def terrain_lulc_slope_cluster(request):
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
+        gee_account_id = request.data.get("gee_account_id")
         execution_id = request.data.get("execution_id", "local")
-        LULC_Raster = request.data.get("LULC_Raster", None)
-        Terrain_Raster = request.data.get("Terrain_Raster", None)
+    
 
         # SYNC — direct call, no Celery
-        asset_id = lulc_on_slope_cluster_sync(
+        asset_id = lulc_on_slope_cluster(
             state=state, district=district, block=block,
             start_year=start_year, end_year=end_year,
-            LULC_Raster=LULC_Raster, Terrain_Raster=Terrain_Raster,
+            gee_account_id = gee_account_id
         )
 
         execution_time = time.time() - start_time
@@ -1072,39 +953,11 @@ def terrain_lulc_slope_cluster(request):
             "node_type": "Terrain_LULC_Slope",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-
-# TerrainXLulc plain vectorization
-# @api_view(["POST"])
-# @schema(None)
-# def terrain_lulc_plain_cluster(request):
-#     print("Inside terrain_lulc_plain_cluster")
-#     try:
-#         state = request.data.get("state")
-#         district = request.data.get("district")
-#         block = request.data.get("block")
-#         start_year = request.data.get("start_year")
-#         end_year = request.data.get("end_year")
-#         gee_account_id = request.data.get("gee_account_id")
-#         lulc_on_plain_cluster.apply_async(
-#             args=[state, district, block, start_year, end_year, gee_account_id],
-#             queue="nrm",
-#         )
-#         return Response(
-#             {"Success": "terrain_lulc_plain_cluster task initiated"},
-#             status=status.HTTP_200_OK,
-#         )
-#     except Exception as e:
-#         print("Exception in terrain_lulc_plain_cluster api :: ", e)
-#         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 # TerrainXLulc plain vectorization
 @api_view(["POST"])
 @schema(None)
 def terrain_lulc_plain_cluster(request):
     print("Inside terrain_lulc_plain_cluster")
-    import time
     from datetime import datetime as dt
     start_time = time.time()
     try:
@@ -1113,15 +966,15 @@ def terrain_lulc_plain_cluster(request):
         block = request.data.get("block")
         start_year = int(request.data.get("start_year"))
         end_year = int(request.data.get("end_year"))
+        gee_account_id = request.data.get("gee_account_id")
         execution_id = request.data.get("execution_id", "local")
-        LULC_Raster = request.data.get("LULC_Raster", None)
-        Terrain_Raster = request.data.get("Terrain_Raster", None)
+
 
         # SYNC — direct call, no Celery
-        asset_id = lulc_on_plain_cluster_sync(
+        asset_id = lulc_on_plain_cluster(
             state=state, district=district, block=block,
             start_year=start_year, end_year=end_year,
-            LULC_Raster=LULC_Raster, Terrain_Raster=Terrain_Raster,
+            gee_account_id = gee_account_id
         )
 
         execution_time = time.time() - start_time
@@ -1175,21 +1028,41 @@ def terrain_lulc_plain_cluster(request):
 @schema(None)
 def generate_clart(request):
     print("Inside generate_clart")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_clart_layer.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_clart_layer(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
         )
-        return Response(
-            {"Success": "generate_clart task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "CLART Layer completed",
+            "execution_id": execution_id,
+            "node_type": "CLART_Layer",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_clart api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "CLART_Layer",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1405,47 +1278,87 @@ def gee_task_status(request):
         print("Exception in gee_task_status api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-@api_view(["POST"])
+# Stream Order
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def stream_order(request):
     print("Inside stream_order_vector api")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_stream_order.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_stream_order(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
         )
-        return Response(
-            {"Success": "stream_order_vector task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Stream Order completed",
+            "execution_id": execution_id,
+            "node_type": "Stream_Order",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
-        print("Exception in stream_order_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print("Exception in stream_order api :: ", e)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Stream_Order",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Restoration Opportunity
 @api_view(["POST"])
 @schema(None)
 def restoration_opportunity(request):
     print("Inside restoration_opportunity api")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_restoration_opportunity.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_restoration_opportunity(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
         )
-        return Response(
-            {"Success": "restoration_opportunity task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Restoration Opportunity completed",
+            "execution_id": execution_id,
+            "node_type": "Restoration_Opportunity",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in restoration_opportunity api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Restoration_Opportunity",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1509,28 +1422,47 @@ def aquifer_vector(request):
         print("Exception in aquifer vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# SOGE Vector
 @api_view(["POST"])
 @schema(None)
 def soge_vector(request):
     print("Inside soge vector layer api")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_soge_vector.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_soge_vector(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
         )
-        return Response(
-            {"Success": "SOGE vector task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "SOGE Vector completed",
+            "execution_id": execution_id,
+            "node_type": "SOGE_Vector",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in SOGE vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "SOGE_Vector",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(["POST"])
 @schema(None)
 @parser_classes([MultiPartParser, FormParser])
@@ -1931,26 +1863,46 @@ def generate_distance_nearest_upstream_DL(request):
         print("Exception in generate_distance_nearest_upstream_DL_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-@api_view(["POST"])
+# Catchment Area
+@api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_catchment_area_SF(request):
-    print("Inside generate_catchment_area_SF_to_gee API.")
+    print("Inside generate_catchment_area_SF API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_catchment_area_singleflow.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        print("Exception in generate_catchment_area_SF_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        execution_id = request.data.get("execution_id", "local")
 
+        asset_id = generate_catchment_area_singleflow(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
+        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Catchment Area completed",
+            "execution_id": execution_id,
+            "node_type": "Catchment_Area",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("Exception in generate_catchment_area_SF api :: ", e)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Catchment_Area",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["POST"])
 @schema(None)

@@ -15,7 +15,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
-
+from nrm_app.settings import GEE_DEFAULT_ACCOUNT_ID
 
 def lulc_on_slope_cluster_sync(
     state, district, block, start_year, end_year,
@@ -134,12 +134,14 @@ def lulc_on_slope_cluster_sync(
     # return asset_id for STACD instead of layer_at_geoserver flag
     return asset_id
 
-
 @app.task(bind=True)
 def lulc_on_slope_cluster(
-    self, state, district, block, start_year, end_year, gee_account_id
+    self, state, district, block, start_year, end_year, gee_account_id=None, LULC_Raster=None, Terrain_Raster=None
 ):
-    ee_initialize(gee_account_id)
+    ee_initialize(gee_account_id or GEE_DEFAULT_ACCOUNT_ID)
+
+    start_year = int(start_year)
+    end_year = int(end_year)
 
     asset_description = (
         valid_gee_text(district.lower())
@@ -158,10 +160,11 @@ def lulc_on_slope_cluster(
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-        )  # The eleven landforms raster
+        )
 
         mwsheds = ee.FeatureCollection(
-            get_gee_asset_path(state, district, block)
+            "projects/ee-corestackdev/assets/apps/mws/"
+            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
             + "filtered_mws_"
             + valid_gee_text(district.lower())
             + "_"
@@ -170,7 +173,6 @@ def lulc_on_slope_cluster(
         )
 
         filtered_aez = aez_india.filterBounds(mwsheds.geometry())
-
         aez_no = filtered_aez.first().get("ae_regcode").getInfo()
         print("aez_no=", aez_no)
 
@@ -241,8 +243,8 @@ def lulc_on_slope_cluster(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
-    return layer_at_geoserver
 
+    return asset_id
 
 def process_feature_collection(fc, landforms, area_lulc, slope_centroids):
     """

@@ -241,4 +241,4 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
             )
             layer_at_geoserver = True
             print("sync to geoserver flag is updated")
-    return layer_at_geoserver
+    return asset_id

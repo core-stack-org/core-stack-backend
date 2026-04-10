@@ -106,11 +106,11 @@ def generate_stream_order(
     fc = calculate_pixel_area_percentage(args, roi, raster)
     # Generate vector Layer
     if state and district and block:
-        layer_at_geoserver = stream_order_vector_generation(
+        asset_id = stream_order_vector_generation(
             state, district, block, description, fc
         )
     else:
-        layer_at_geoserver = stream_order_vector_generation(
+        asset_id = stream_order_vector_generation(
             asset_folder=asset_folder,
             description=description,
             fc=fc,
@@ -118,7 +118,7 @@ def generate_stream_order(
             asset_suffix=asset_suffix,
         )
 
-    return layer_at_geoserver
+    return asset_id
 
 
 def stream_order_raster_generation(
@@ -277,7 +277,7 @@ def stream_order_vector_generation(
         )
         layer_at_geoserver = True
 
-    return layer_at_geoserver
+    return vector_asset_id
 
 
 def calculate_pixel_area_percentage(class_labels, fc, raster):
