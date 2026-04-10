@@ -251,12 +251,12 @@ def Generate_lulc_mws(
     Generate_water_balance_indicator(
         mws_asset_id, proj_id=proj_obj.id, gee_account_id=gee_account_id
     )
-    asset_suffix_swb4 = f"swb4_{proj_obj.name}+{proj_obj.id}"
+    asset_suffix_swb3 = f"swb3_{proj_obj.name}+{proj_obj.id}"
     asset_id_swb = (
         get_gee_dir_path(
             [proj_obj.name], asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
-        + asset_suffix_swb4
+        + asset_suffix_swb3
     )
     BuildMWSLayer(
         gee_account_id=gee_account_id, proj_id=proj_obj.id, app_type="WATERBODY"
@@ -817,7 +817,7 @@ def BuildWaterBodyLayer(
     # ------------------------------------------------------------------
     # Waterbody polygons
     # ------------------------------------------------------------------
-    wb_description = "swb4_" + asset_suffix
+    wb_description = "swb3_" + asset_suffix
     waterbody_asset_id = (
         get_gee_dir_path(
             asset_folder,

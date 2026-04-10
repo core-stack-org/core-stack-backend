@@ -17,7 +17,7 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from utilities.constants import GEE_DATASET_PATH, WRI_LAND_RESTORATION
+from utilities.constants import WRI_LAND_RESTORATION_DATASET
 from computing.STAC_specs import generate_STAC_layerwise
 
 
@@ -58,7 +58,7 @@ def generate_restoration_opportunity(self, state, district, block, gee_account_i
 def clip_raster(roi, state, district, block, description):
     asset_id = get_gee_asset_path(state, district, block) + description + "_raster"
 
-    restoration_raster = ee.Image(GEE_DATASET_PATH + WRI_LAND_RESTORATION)
+    restoration_raster = ee.Image(WRI_LAND_RESTORATION_DATASET)
 
     if not is_gee_asset_exists(asset_id):
         clipped_raster = restoration_raster.clip(roi.geometry())

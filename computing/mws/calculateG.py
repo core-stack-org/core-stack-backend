@@ -12,7 +12,7 @@ from utilities.gee_utils import (
     check_task_status,
 )
 import geopandas as gpd
-from utilities.constants import CRS
+from utilities.constants import CRS_4326
 
 
 def calculate_g(
@@ -113,7 +113,7 @@ def calculate_g(
 
             fc["features"] = features
             gdf = gpd.GeoDataFrame.from_features(fc)
-            gdf.crs = CRS
+            gdf.crs = CRS_4326
 
             path = os.path.join(MERGE_MWS_PATH, asset_folder_list[0])
             if not os.path.exists(path):

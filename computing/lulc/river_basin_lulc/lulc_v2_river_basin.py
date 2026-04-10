@@ -13,11 +13,9 @@ from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from nrm_app.celery import app
 from utilities.constants import (
-    RIVER_BASIN_EE_ACCOUNT,
     CGWB_BASIN,
-    LULC_V2_RIVER_BASIN_OUTPUT,
-    CRS,
-    LULC_V2_RIVER_BASIN_MAX_PIXEL,
+    LULC_V2_RIVER_BASIN_OUTPUT_PATH,
+    CRS_4326,
 )
 
 
@@ -30,7 +28,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize(RIVER_BASIN_EE_ACCOUNT)
+    ee_initialize()
     print("Inside generate lulc")
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
@@ -145,7 +143,7 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
 
         scale = 10
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m_v2"
-        final_output_assetid = LULC_V2_RIVER_BASIN_OUTPUT + final_output_filename
+        final_output_assetid = LULC_V2_RIVER_BASIN_OUTPUT_PATH + final_output_filename
 
         # Setup the task
         image_export_task = ee.batch.Export.image.toAsset(
@@ -154,9 +152,9 @@ def lulc_river_basin_v2(self, basin_object_id, start_year, end_year):
             assetId=final_output_assetid,
             pyramidingPolicy={"predicted_label": "mode"},
             scale=scale,
-            maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
+            maxPixels=1e13,
             region=roi_boundary_geom.geometry(),
-            crs=CRS,
+            crs=CRS_4326,
         )
 
         image_export_task.start()

@@ -732,7 +732,7 @@ def get_merged_waterbodies_with_zoi(
             f"&maxFeatures={maxf}&outputFormat=application/json"
         )
 
-    standard_layer = f"swb4_{district_l}_{block_l}"
+    standard_layer = f"swb3_{district_l}_{block_l}"
     zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
 
     standard_wfs = build_wfs("swb", standard_layer, max_features)

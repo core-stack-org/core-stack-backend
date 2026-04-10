@@ -11,16 +11,14 @@ from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
 from utilities.constants import (
     CGWB_BASIN,
-    LULC_V3_RIVER_BASIN_EE_ACCOUNT,
-    LULC_V3_OUTPUT_ASSET,
-    LULC_V2_RIVER_BASIN_OUTPUT,
-    CRS,
-    LULC_V2_RIVER_BASIN_MAX_PIXEL,
+    LULC_V3_OUTPUT_ASSET_PATH,
+    LULC_V2_RIVER_BASIN_OUTPUT_PATH,
+    CRS_4326,
 )
 
 
 @app.task(bind=True)
-def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
+def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_account_id):
     """
     Args:
         self:
@@ -28,7 +26,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize(LULC_V3_RIVER_BASIN_EE_ACCOUNT)
+    ee_initialize(account_id=gee_account_id)
     print("Inside lulc_river_basin")
 
     roi_boundary = ee.FeatureCollection(CGWB_BASIN).filter(
@@ -64,12 +62,12 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
             roi_boundary, curr_start_date, curr_end_date
         )
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
-        final_output_assetid = LULC_V3_OUTPUT_ASSET + final_output_filename
+        final_output_assetid = LULC_V3_OUTPUT_ASSET_PATH + final_output_filename
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         crop_freq_array.append(cropping_frequency_img)
         lulc_v2 = ee.Image(
-            LULC_V2_RIVER_BASIN_OUTPUT
+            LULC_V2_RIVER_BASIN_OUTPUT_PATH
             + filename_prefix
             + "_"
             + str(curr_start_date)
@@ -453,7 +451,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
                 assetId=asset_id,
                 pyramidingPolicy={"predicted_label": "mode"},
                 scale=scale,
-                maxPixels=LULC_V2_RIVER_BASIN_MAX_PIXEL,
-                crs=CRS,
+                maxPixels=1e13,
+                crs=CRS_4326,
             )
             image_export_task.start()

@@ -54,7 +54,7 @@ def generate_zoi1(
 ):
     print("insdie zoi")
     ee_initialize(gee_account_id)
-    description = "swb4_" + asset_suffix
+    description = "swb3_" + asset_suffix
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
