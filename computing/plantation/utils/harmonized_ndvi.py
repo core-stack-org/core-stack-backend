@@ -1,8 +1,8 @@
 import ee
 from utilities.constants import (
-    L1_TOA,
-    LC_O8_T1_TOA,
-    LEVEL_1C_TOA,
+    LANDSAT7_T1_CALIBERATED_TOA,
+    LANDSAT8_T1_CALIBERATED_TOA,
+    SENTINEL2_LEVEL_1C_TOA,
     VEGETATION_INDEX_OF_16_DAY,
 )
 
@@ -68,21 +68,21 @@ def maskS2cloudTOA(image):
 # Function to get Landsat-7, Landsat-8, and Sentinel-2 image collections
 def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
     L7 = (
-        ee.ImageCollection(L1_TOA)
+        ee.ImageCollection(LANDSAT7_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL7cloud)
     )
 
     L8 = (
-        ee.ImageCollection(LC_O8_T1_TOA)
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL8cloud)
     )
 
     S2 = (
-        ee.ImageCollection(LEVEL_1C_TOA)
+        ee.ImageCollection(SENTINEL2_LEVEL_1C_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskS2cloudTOA)

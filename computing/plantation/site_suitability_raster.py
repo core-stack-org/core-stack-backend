@@ -7,7 +7,7 @@ from utilities.constants import (
     GEE_DATASET_PATH,
     INDIA_SAT_LULC,
     ROAD_DRRP,
-    CRS,
+    CRS_4326,
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -526,7 +526,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
             .fastDistanceTransform()
             .sqrt()
             .multiply(ee.Image.pixelArea().sqrt())
-            .reproject(crs=CRS, scale=10)
+            .reproject(crs=CRS_4326, scale=10)
         )
     return None
 
