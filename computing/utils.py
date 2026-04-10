@@ -262,6 +262,7 @@ def merge_chunks(
     chunk_size,
     chunk_asset_path=GEE_HELPER_PATH,
     merge_asset_path=GEE_ASSET_PATH,
+    merge_asset_id=None,
 ):
     print("Merge Chunk task initiated")
     ee_initialize()
@@ -280,7 +281,9 @@ def merge_chunks(
 
     asset = ee.FeatureCollection(assets).flatten()
 
-    asset_id = get_gee_dir_path(folder_list, merge_asset_path) + description
+    asset_id = merge_asset_id or (
+        get_gee_dir_path(folder_list, merge_asset_path) + description
+    )
     try:
         # Export an ee.FeatureCollection as an Earth Engine asset.
         task = ee.batch.Export.table.toAsset(
@@ -296,6 +299,7 @@ def merge_chunks(
         return task.status()["id"]
     except Exception as e:
         print(f"Error occurred in running merge task: {e}")
+        return None
 
 
 def fix_invalid_geometry_in_gdf(gdf):
