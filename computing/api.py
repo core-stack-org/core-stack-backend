@@ -32,6 +32,7 @@ from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
 from .drought.drought import calculate_drought
+from .temperature_humidity.temp_humid import calculate_temperature_humidity
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from computing.misc.drainage_lines import clip_drainage_lines
@@ -543,6 +544,34 @@ def generate_drought_layer(request):
         )
     except Exception as e:
         print("Exception in generate_drought_layer api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["POST"])
+@schema(None)
+def generate_temperature_humidity_layer(request):
+    print("Inside generate_temperature_humidity_layer")
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        year = request.data.get("year", 2023)
+        gee_account_id = request.data.get("gee_account_id")
+        calculate_temperature_humidity.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "year": year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "generate_temperature_humidity_layer task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_temperature_humidity_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
