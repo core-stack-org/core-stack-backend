@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
+from plans.models import PlanApp
 
 from .gen_dpr import (
     get_plan_details,
@@ -412,12 +413,28 @@ def generate_resource_report(request):
 
         for key, value in params.items():
             result[key] = value
+            
+        plan_id = result.get("plan_id")
+        plan_details = None
+        if plan_id:
+            try:
+                plan = PlanApp.objects.get(id=plan_id)
+                plan_details = {
+                    "organization_name": plan.organization.name if plan.organization else "NA",
+                    "project_name": plan.project.name if plan.project else "NA",
+                    "plan_name": plan.plan,
+                    "facilitator_name": plan.facilitator_name,
+                    "village_name": plan.village_name,
+                }
+            except PlanApp.DoesNotExist:
+                pass
 
         context = {
-            "district": result["district"],
-            "block": result["block"],
-            "plan_id": result["plan_id"],
-            "plan_name": result["plan_name"],
+            "district": result.get("district"),
+            "block": result.get("block"),
+            "plan_id": plan_id,
+            "plan_name": result.get("plan_name", ""),
+            "plan_details": plan_details,
         }
 
         return render(request, "resource-report.html", context)
@@ -448,10 +465,8 @@ def download_mws_report(request):
     return resp
 
 
-@api_view(["GET"])
-@auth_free
-@schema(None)
 @api_security_check(auth_type="Auth_free")
+@schema(None)
 def generate_tehsil_report(request):
     try:
         # ? district, block, mwsId
