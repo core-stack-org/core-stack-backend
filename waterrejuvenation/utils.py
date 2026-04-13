@@ -6,7 +6,6 @@ from utilities.constants import (
     GEE_PATHS,
     PAN_INDIA_LULC_V3_DATASET,
     WATER_REJ_GEE_ASSET,
-    WATER_REJ_TEST_GEE_ASSET,
 )
 from utilities.gee_utils import (
     ee_initialize,

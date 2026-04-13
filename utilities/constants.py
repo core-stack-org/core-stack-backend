@@ -285,8 +285,8 @@ ET_FLDAS_FORTNIGHT = (
 )
 GLDAS = "NASA/FLDAS/NOAH01/C/GL/M/V001"
 JAXA_PPT = "JAXA/GPM_L3/GSMaP/v6/operational"
-RUNOFF_ASSET = "projects/ee-dharmisha-siddharth/assets/HYSOGs250m"
-PRINCIPAL_AQUIFER = "projects/ee-anz208490/assets/principalAquifer"
+RUNOFF_ASSET = "projects/ext-datasets/assets/datasets/HYSOGs250m"
+PRINCIPAL_AQUIFER = "projects/ext-datasets/assets/datasets/principalAquifer"
 INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
 ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
 WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
@@ -296,7 +296,6 @@ FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
 WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-WATER_REJ_TEST_GEE_ASSET = "projects/ee-kapil-test/assets/apps/waterbody/"
 PAN_INDIA_LULC_V3_DATASET = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
 )
