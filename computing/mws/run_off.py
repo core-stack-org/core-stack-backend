@@ -6,7 +6,7 @@ from computing.utils import create_chunk, merge_chunks, get_layer_object
 from gee_computing.models import GEEAccount
 from utilities.constants import (
     GEE_PATHS,
-    RUNOFF_ASSET,
+    GLOBAL_HYDROLOGIC_SOIL_GROUPS,
     SRTM_DIGITAL_ELEVATION,
     LAND_COVER_CLASSIFICATION_10_METER,
     JAXA_PPT,
@@ -180,7 +180,7 @@ def _generate_layer(
 
 
 def generate_run_off(roi, description, asset_id, start_date, end_date, is_annual):
-    soil = ee.Image(RUNOFF_ASSET)
+    soil = ee.Image(GLOBAL_HYDROLOGIC_SOIL_GROUPS)
     srtm2 = ee.Image(SRTM_DIGITAL_ELEVATION)
     lulc_img = ee.ImageCollection(LAND_COVER_CLASSIFICATION_10_METER)
 
