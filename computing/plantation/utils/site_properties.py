@@ -1,6 +1,6 @@
 import ee
 
-from utilities.constants import GEE_DATASET_PATH, ROAD_DRRP, INDIA_SAT_LULC
+from utilities.constants import GEE_DATASET_PATH, ROAD_DRRP, INDIA_SAT_LULC_V3_PAN_INDIA
 from utilities.gee_utils import (
     valid_gee_text,
 )
@@ -98,9 +98,7 @@ def get_distance_to_drainage():
 def get_distance_to_settlement(start_year, end_year):
     lulc_years = []
     while start_year <= end_year:
-        asset_id = (
-            f"{GEE_DATASET_PATH}{INDIA_SAT_LULC}{start_year}_{str(start_year + 1)}"
-        )
+        asset_id = f"{GEE_DATASET_PATH}{INDIA_SAT_LULC_V3_PAN_INDIA}{start_year}_{str(start_year + 1)}"
         lulc_img = ee.Image(asset_id).select(["predicted_label"])
         lulc_years.append(lulc_img)
         start_year += 1

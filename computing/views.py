@@ -9,6 +9,7 @@ import json
 import os
 from django.conf import settings
 from pathlib import Path
+from utilities.constants import GEOSERVER_BASE
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -98,8 +99,7 @@ def layer_status(self, state, district, block):
                     status_code = 400
         else:
             capabilities_url = (
-                f"https://geoserver.core-stack.org:8443/geoserver/{workspace}/wms"
-                "?service=WMS&request=GetCapabilities"
+                f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
             )
             response = requests.get(capabilities_url)
             if response.status_code == 200:
@@ -199,8 +199,7 @@ def valid_raster_layers_for_workspace(workspace):
         all valid (have data)layers for particular workspace
     """
     capabilities_url = (
-        f"https://geoserver.core-stack.org:8443/geoserver/{workspace}/wms"
-        "?service=WMS&request=GetCapabilities"
+        f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
     )
     response = requests.get(capabilities_url)
     if response.status_code != 200:

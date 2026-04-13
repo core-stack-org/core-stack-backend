@@ -1,7 +1,7 @@
 import ee
 from utilities.constants import (
     GEE_DATASET_PATH,
-    INDIA_SAT_LULC,
+    INDIA_SAT_LULC_V3_PAN_INDIA,
     LAND_COVER_CLASSIFICATION_10_METER,
 )
 
@@ -27,7 +27,13 @@ def india_sat_lulc(suitability_vector, start_year, end_year):
     lulc_years = {}
     # for (year = start year <= end year++) {
     for year in range(start_year, end_year + 1):
-        asset_id = GEE_DATASET_PATH + INDIA_SAT_LULC + str(year) + "_" + str(year + 1)
+        asset_id = (
+            GEE_DATASET_PATH
+            + INDIA_SAT_LULC_V3_PAN_INDIA
+            + str(year)
+            + "_"
+            + str(year + 1)
+        )
 
         lulc_years[year] = (
             ee.Image(asset_id)
