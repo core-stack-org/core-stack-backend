@@ -1,6 +1,6 @@
 import ee
 
-from utilities.constants import GEE_PATHS, VATSAL_WBC
+from utilities.constants import GEE_PATHS, WBC
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
@@ -33,9 +33,7 @@ def waterbody_wbc_intersection(
         return None, asset_id
 
     # Load census state and water bodies feature collections
-    census_state = ee.FeatureCollection(
-        VATSAL_WBC + state.upper().replace(" ", "") + "_UPD"
-    )
+    census_state = ee.FeatureCollection(WBC + state.upper().replace(" ", "") + "_UPD")
     water_bodies = ee.FeatureCollection(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]

@@ -311,7 +311,7 @@ FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
-VATSAL_WBC = "projects/ee-vatsal/assets/WBC_"
+WBC = "projects/ext-datasets/assets/datasets/WBC_"
 
 # Plantation
 ANNUAL_PPT = "projects/ee-plantationsitescores/assets/AnnualPrecipitation"
@@ -331,11 +331,3 @@ SUBSOILEC = "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL"
 SUBSOILTEXTURE = "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS"
 RASTER_DRAINAGE = "projects/ee-plantationsitescores/assets/Raster-Drainage"
 PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
-
-# CSV Paths
-STAT_CSV_PATH = "/home/ankit/gramvaani/nrm/checkin/backend/fromgitlab/nrm-app/data/admin-boundaries/odisha.csv"
-OUTPUT_JSON_PATH = "/home/ankit/gramvaani/nrm/checkin/backend/fromgitlab/nrm-app/data/output/all_states.json"
-folder_path = (
-    "/home/ankit/gramvaani/nrm/checkin/backend/nrm-app/data/lulc/LULC_devdurga_3oct2024"
-)
-zip_to_geoserver_folder_path = "/home/ankit/gramvaani/nrm/checkin/backend/fromgitlab/nrm-app/data/zip-shapefiles/drainage"
