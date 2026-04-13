@@ -22,6 +22,9 @@ from constants.pan_india_urls import DISTANCE_TO_UPSTREAM_DL
 def generate_distance_to_nearest_drainage_line(
     self, state, district, block, gee_account_id
 ):
+    """
+    It will generate distance to nearest drainage line layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     description = (
         "distance_to_drainage_line_"

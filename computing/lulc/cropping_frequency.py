@@ -2,6 +2,13 @@ from datetime import datetime
 
 import ee
 import pandas as pd
+from utilities.constants import (
+    LANDSAT7_T1_CALIBERATED_TOA,
+    LANDSAT8_T1_CALIBERATED_TOA,
+    SENTINEL2_LEVEL_1C_TOA,
+    VEGETATION_INDEX_OF_16_DAY,
+    PAN_INDIA_L3_LULC_CLUSTERS,
+)
 
 # from .lulc import roi_boundary
 
@@ -91,7 +98,7 @@ Get Landsat and Sentinel image collections
 def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
     # ------ Landsat 7 TOA
     L7 = (
-        ee.ImageCollection("LANDSAT/LE07/C02/T1_TOA")
+        ee.ImageCollection(LANDSAT7_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL7cloud)
@@ -101,7 +108,7 @@ def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
 
     # ------ Landsat 8 TOA
     L8 = (
-        ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL8cloud)
@@ -111,7 +118,7 @@ def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
 
     # ------ Sentinel-2 TOA
     S2 = (
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+        ee.ImageCollection(SENTINEL2_LEVEL_1C_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskS2cloudTOA)
@@ -258,7 +265,7 @@ def pairLSModis(lsRenameBands, roi_boundary):
 
         # ------ MODIS VI ( We can add EVI to the band list later )
         modis = (
-            ee.ImageCollection("MODIS/061/MOD13Q1")
+            ee.ImageCollection(VEGETATION_INDEX_OF_16_DAY)
             .filterDate(startDateT, endDateT)
             .select(["NDVI", "SummaryQA"])
             .filterBounds(roi_boundary)
@@ -576,9 +583,7 @@ def Get_final_prediction_image(distance_imgs_list):
 
 
 def get_cropping_frequency(roi_boundary, startDate, endDate):
-    cluster_centroids = ee.FeatureCollection(
-        "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
-    )
+    cluster_centroids = ee.FeatureCollection(PAN_INDIA_L3_LULC_CLUSTERS)
     ignore_clusters = [12]  # remove invalid clusters
     cluster_centroids = cluster_centroids.filter(
         ee.Filter.Not(ee.Filter.inList("class", ignore_clusters))

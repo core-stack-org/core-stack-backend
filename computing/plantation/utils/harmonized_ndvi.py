@@ -1,4 +1,10 @@
 import ee
+from utilities.constants import (
+    LANDSAT7_T1_CALIBERATED_TOA,
+    LANDSAT8_T1_CALIBERATED_TOA,
+    SENTINEL2_LEVEL_1C_TOA,
+    VEGETATION_INDEX_OF_16_DAY,
+)
 
 # Chastain band names
 chastainBandNames = ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "SWIR2"]
@@ -62,21 +68,21 @@ def maskS2cloudTOA(image):
 # Function to get Landsat-7, Landsat-8, and Sentinel-2 image collections
 def Get_L7_L8_S2_ImageCollections(inputStartDate, inputEndDate, roi_boundary):
     L7 = (
-        ee.ImageCollection("LANDSAT/LE07/C02/T1_TOA")
+        ee.ImageCollection(LANDSAT7_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL7cloud)
     )
 
     L8 = (
-        ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskL8cloud)
     )
 
     S2 = (
-        ee.ImageCollection("COPERNICUS/S2_HARMONIZED")
+        ee.ImageCollection(SENTINEL2_LEVEL_1C_TOA)
         .filterDate(inputStartDate, inputEndDate)
         .filterBounds(roi_boundary)
         .map(maskS2cloudTOA)
@@ -174,7 +180,7 @@ def pairLSModis(lsRenameBands, roi_boundary):
 
         # ------ MODIS VI ( We can add EVI to the band list later )
         modis = (
-            ee.ImageCollection("MODIS/061/MOD13Q1")
+            ee.ImageCollection(VEGETATION_INDEX_OF_16_DAY)
             .filterDate(startDateT, endDateT)
             .select(["NDVI", "SummaryQA"])
             .filterBounds(roi_boundary)

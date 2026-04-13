@@ -101,6 +101,9 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_swb(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
+                create_excel_for_mws_intersect_swb(
+                    geojson_data, writer, district, block
+                )
             elif workspace == "nrega_assets":
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                 mws_file_url = get_url("mws_layers", mws_lay_name)
@@ -239,6 +242,63 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     return results
 
 
+def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
+    print("Inside create_excel_for_mws_intersect_swb")
+
+    # --- Fetch MWS layer ---
+    mws_layer_name = f"mws_{district}_{block}"
+    mws_data_url = get_url("mws", mws_layer_name)
+
+    mws_response = requests.get(mws_data_url)
+    if mws_response.status_code != 200:
+        print(f"Error fetching MWS data: {mws_response.status_code}")
+        return
+
+    mws_geojson = mws_response.json()
+
+    def calculate_intersection_area(geom1, geom2):
+        if geom1.intersects(geom2):
+            return geom1.intersection(geom2).area
+        return 0
+
+    rows = []
+
+    for mws_feature in mws_geojson["features"]:
+        mws_props = mws_feature["properties"]
+        mws_uid = mws_props.get("uid")
+        mws_geom = shape(mws_feature["geometry"])
+
+        for swb_feature in swb_geojson["features"]:
+            swb_props = swb_feature["properties"]
+            swb_geom = shape(swb_feature["geometry"])
+
+            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
+
+            if intersection_area > 0:
+                # waterbodies centroid calculation
+                centroid = swb_geom.centroid
+                lon, lat = centroid.x, centroid.y
+
+                rows.append(
+                    {
+                        "UID": mws_uid,
+                        "SWB_UID": swb_props.get("UID"),
+                        "Waterbodies_name": swb_props.get("water_body_name"),
+                        "Latitude": lat,
+                        "Longitude": lon,
+                    }
+                )
+
+    df = pd.DataFrame(rows)
+
+    if not df.empty:
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(6)
+
+    df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
+    print("Excel sheet 'mws_intersect_swb' created successfully")
+
+
 def create_excel_for_facilities(data, writer):
     features = data["features"]
     df_data = [feature["properties"] for feature in features]
@@ -251,7 +311,6 @@ def create_excel_for_facilities(data, writer):
     df = df[first_cols + other_cols]
 
     df.to_excel(writer, sheet_name="facilities_proximity", index=False)
-
     print("Excel file created for facilities_proximity")
 
 
@@ -876,18 +935,24 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
 
     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom, mws_geom):
+    def calculate_intersection_area_ha(village_geom, mws_geom, mws_area_ha):
         if village_geom.intersects(mws_geom):
             intersection = village_geom.intersection(mws_geom)
-            return intersection.area
+            if mws_geom.area == 0:
+                return 0
+            # ratio of intersection to full MWS geometry area (both in degrees²)
+            ratio = intersection.area / mws_geom.area
+            return ratio * mws_area_ha
         return 0
 
     mws_villages_dict = {}
 
     for mws_feature in mws_geojson["features"]:
         mws_uid = mws_feature["properties"]["uid"]
+        mws_area = mws_feature["properties"]["area_in_ha"]
         mws_geom = shape(mws_feature["geometry"])
         village_ids = set()
+        village_details = {}
 
         for village_feature in village_geojson["features"]:
             village_id = village_feature["properties"]["vill_ID"]
@@ -895,22 +960,41 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
                 continue
 
             village_geom = shape(village_feature["geometry"])
-            area_intersected = calculate_intersection_area(village_geom, mws_geom)
-            if area_intersected > 0:
+            area_intersected_ha = calculate_intersection_area_ha(
+                village_geom, mws_geom, mws_area
+            )
+            if area_intersected_ha > 0:
                 village_ids.add(village_id)
+                percentage_of_area = (
+                    (area_intersected_ha / mws_area) * 100 if mws_area > 0 else 0
+                )
+                village_details[village_id] = {
+                    "area_intersect": round(area_intersected_ha, 2),
+                    "percentage_of_area": round(percentage_of_area, 2),
+                }
+
         if village_ids:
-            mws_villages_dict[mws_uid] = list(village_ids)
+            mws_villages_dict[mws_uid] = {
+                "area_in_ha": mws_area,
+                "village_ids": list(village_ids),
+                "village_details": village_details,
+            }
 
     data = [
-        {"MWS UID": mws_uid, "Village IDs": village_ids}
-        for mws_uid, village_ids in mws_villages_dict.items()
+        {
+            "MWS UID": mws_uid,
+            "area_in_ha": values["area_in_ha"],
+            "Village IDs": values["village_ids"],
+            "Village Details": values["village_details"],
+        }
+        for mws_uid, values in mws_villages_dict.items()
     ]
 
     df = pd.DataFrame(data)
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
     df.to_excel(writer, sheet_name="mws_intersect_villages", index=False)
-    print("The data has been saved to mws_intersect_villages.xlsx")
+    print("The data has been saved to mws_intersect_villages")
 
 
 # def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, block):

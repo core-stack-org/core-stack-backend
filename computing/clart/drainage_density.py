@@ -110,7 +110,7 @@ def generate_vector(state, district, block):
         drainage_lines = json.loads(drainage_lines)
 
     drainage_lines = gpd.GeoDataFrame.from_features(drainage_lines)
-    drainage_lines.set_crs("EPSG:4326", inplace=True)
+    drainage_lines.set_crs(CRS_4326, inplace=True)
 
     # drainage_line_path = os.path.join(
     #     DRAINAGE_LINES_OUTPUT,

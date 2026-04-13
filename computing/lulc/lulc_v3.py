@@ -27,6 +27,7 @@ from computing.utils import (
 )
 
 from computing.STAC_specs import generate_STAC_layerwise
+from utilities.constants import PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
 
 
 @app.task(bind=True)
@@ -43,6 +44,9 @@ def clip_lulc_v3(
     asset_suffix=None,
     app_type="MWS",
 ):
+    """
+    it will generate raster lulc for all three level for given year at tehsil level.
+    """
     ee_initialize(gee_account_id)
     print("Inside lulc_river_basin")
     start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
@@ -122,7 +126,7 @@ def clip_lulc_v3(
         final_output_assetid_array_new.append(final_output_assetid)
         if not new_loop_start or loop_start >= new_loop_start:
             pan_india = ee.Image(
-                f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{curr_start_year}_{curr_end_year}"
+                f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{curr_start_year}_{curr_end_year}"
             )
             clipped_lulc = pan_india.clip(roi.geometry())
             l1_asset_new.append(clipped_lulc)
