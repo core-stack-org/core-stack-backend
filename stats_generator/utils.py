@@ -876,18 +876,24 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
 
     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom, mws_geom):
+    def calculate_intersection_area_ha(village_geom, mws_geom, mws_area_ha):
         if village_geom.intersects(mws_geom):
             intersection = village_geom.intersection(mws_geom)
-            return intersection.area
+            if mws_geom.area == 0:
+                return 0
+            # ratio of intersection to full MWS geometry area (both in degrees²)
+            ratio = intersection.area / mws_geom.area
+            return ratio * mws_area_ha
         return 0
 
     mws_villages_dict = {}
 
     for mws_feature in mws_geojson["features"]:
         mws_uid = mws_feature["properties"]["uid"]
+        mws_area = mws_feature["properties"]["area_in_ha"]
         mws_geom = shape(mws_feature["geometry"])
         village_ids = set()
+        village_details = {}
 
         for village_feature in village_geojson["features"]:
             village_id = village_feature["properties"]["vill_ID"]
@@ -895,22 +901,41 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
                 continue
 
             village_geom = shape(village_feature["geometry"])
-            area_intersected = calculate_intersection_area(village_geom, mws_geom)
-            if area_intersected > 0:
+            area_intersected_ha = calculate_intersection_area_ha(
+                village_geom, mws_geom, mws_area
+            )
+            if area_intersected_ha > 0:
                 village_ids.add(village_id)
+                percentage_of_area = (
+                    (area_intersected_ha / mws_area) * 100 if mws_area > 0 else 0
+                )
+                village_details[village_id] = {
+                    "area_intersect": round(area_intersected_ha, 2),
+                    "percentage_of_area": round(percentage_of_area, 2),
+                }
+
         if village_ids:
-            mws_villages_dict[mws_uid] = list(village_ids)
+            mws_villages_dict[mws_uid] = {
+                "area_in_ha": mws_area,
+                "village_ids": list(village_ids),
+                "village_details": village_details,
+            }
 
     data = [
-        {"MWS UID": mws_uid, "Village IDs": village_ids}
-        for mws_uid, village_ids in mws_villages_dict.items()
+        {
+            "MWS UID": mws_uid,
+            "area_in_ha": values["area_in_ha"],
+            "Village IDs": values["village_ids"],
+            "Village Details": values["village_details"],
+        }
+        for mws_uid, values in mws_villages_dict.items()
     ]
 
     df = pd.DataFrame(data)
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
     df.to_excel(writer, sheet_name="mws_intersect_villages", index=False)
-    print("The data has been saved to mws_intersect_villages.xlsx")
+    print("The data has been saved to mws_intersect_villages")
 
 
 # def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, block):

@@ -2449,7 +2449,7 @@ def get_socio_economic_caste_data(state, district, block):
             village_id = row["village_id"]
 
             if village_id in matched_villages:
-                pop = row.get("total_population", 0)
+                pop = row.get("total_population_count", 0)
 
                 if pd.notna(pop):
                     pop_value = float(pop)
