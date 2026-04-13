@@ -9,7 +9,7 @@ import json
 import os
 from django.conf import settings
 from pathlib import Path
-from utilities.constants import GEOSERVER_BASE, WORKSPACE_URL_END
+from utilities.constants import GEOSERVER_BASE
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -98,7 +98,9 @@ def layer_status(self, state, district, block):
                     print(f"Invalid XML for layer: {layer_name}")
                     status_code = 400
         else:
-            capabilities_url = f"{GEOSERVER_BASE}{workspace}/{WORKSPACE_URL_END}"
+            capabilities_url = (
+                f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
+            )
             response = requests.get(capabilities_url)
             if response.status_code == 200:
                 root = ET.fromstring(response.content)
@@ -196,7 +198,9 @@ def valid_raster_layers_for_workspace(workspace):
     Returns:
         all valid (have data)layers for particular workspace
     """
-    capabilities_url = f"{GEOSERVER_BASE}{workspace}/{WORKSPACE_URL_END}"
+    capabilities_url = (
+        f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
+    )
     response = requests.get(capabilities_url)
     if response.status_code != 200:
         print(f"Failed to retrieve capabilities from {workspace}.")

@@ -16,7 +16,7 @@ from utilities.constants import (
     ET_FLDAS_FORTNIGHT,
     ET_FLDAS_ANNUAL,
     ET_FLDAS_HYDRO,
-    FLDAS_NOAH_LAND_SURFACE_MODEL,
+    GLDAS,
 )
 
 
@@ -303,7 +303,7 @@ def et_global_fldas(
     size = shape.size()
     size1 = ee.Number(size).subtract(ee.Number(1))
 
-    fldas_dataset = ee.ImageCollection(FLDAS_NOAH_LAND_SURFACE_MODEL)
+    fldas_dataset = ee.ImageCollection(GLDAS)
 
     while f_start_date < end_date:
         if is_annual:

@@ -283,7 +283,7 @@ ET_FLDAS_ANNUAL = (
 ET_FLDAS_HYDRO = (
     "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
 )
-FLDAS_NOAH_LAND_SURFACE_MODEL = "NASA/FLDAS/NOAH01/C/GL/M/V001"
+GLDAS = "NASA/FLDAS/NOAH01/C/GL/M/V001"
 JAXA_PPT = "JAXA/GPM_L3/GSMaP/v6/operational"
 RUNOFF_ASSET = "projects/ee-dharmisha-siddharth/assets/HYSOGs250m"
 PRINCIPAL_AQUIFER = "projects/ee-anz208490/assets/principalAquifer"
