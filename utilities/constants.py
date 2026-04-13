@@ -276,11 +276,11 @@ MWS_DATASET = (
 MWS_CONNECTIVITY_DATASET = (
     "projects/corestack-datasets/assets/datasets/India_mws_connectivity"
 )
-ET_FLDAS_FORTNIGHT = "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_20200111_20200124"
+ET_FLDAS_BOUNDING_BOX = "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_20200111_20200124"
 ET_FLDAS_ANNUAL = (
     "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_annual/ET_"
 )
-ET_FLDAS_HYDRO = (
+ET_FLDAS_FORTNIGHT = (
     "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
 )
 GLDAS = "NASA/FLDAS/NOAH01/C/GL/M/V001"

@@ -13,9 +13,9 @@ from utilities.gee_utils import (
 )
 import calendar
 from utilities.constants import (
-    ET_FLDAS_FORTNIGHT,
+    ET_FLDAS_BOUNDING_BOX,
     ET_FLDAS_ANNUAL,
-    ET_FLDAS_HYDRO,
+    ET_FLDAS_FORTNIGHT,
     GLDAS,
 )
 
@@ -172,7 +172,7 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
 
 
 def calculate_et(roi, asset_id, description, start_date, end_date, is_annual):
-    bounding_box = ee.Image(ET_FLDAS_FORTNIGHT)
+    bounding_box = ee.Image(ET_FLDAS_BOUNDING_BOX)
     bbox_geometry = bounding_box.geometry()
     is_within = bbox_geometry.contains(roi.geometry(), ee.ErrorMargin(1))
     if is_within.getInfo():
@@ -225,7 +225,7 @@ def et_fldas(
                 break
 
             image_path = (
-                ET_FLDAS_HYDRO
+                ET_FLDAS_FORTNIGHT
                 + str(f_start_date.date()).replace("-", "")
                 + "_"
                 + str(f_end_date.date()).replace("-", "")
