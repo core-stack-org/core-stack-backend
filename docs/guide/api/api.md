@@ -869,6 +869,92 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Authentication**: Required
 - **Permissions**: User must have delete permission for the project
 
+### Meta Stats (Global Level)
+- **URL**: `/api/v1/watershed/plans/meta-stats/`
+- **Method**: GET
+- **Description**: Get comprehensive statistics about all watershed plans globally. Excludes test/demo plans. Only accessible to superadmins and API key users.
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins and API key users only
+- **Query Parameters**:
+    - `organization` (optional): Filter by organization ID
+    - `project` (optional): Filter by project ID
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**:
+  ```json
+  {
+      "summary": {
+          "total_plans": 500,
+          "completed_plans": 300,
+          "in_progress_plans": 200,
+          "dpr_generated": 150,
+          "dpr_reviewed": 80,
+          "pending_dpr_generation": 150,
+          "pending_dpr_review": 70
+      },
+      "demand_overview": {
+          "community_demands": 320,
+          "individual_demands": 215
+      },
+      "commons_connect_operational": {
+          "active_tehsils": 25,
+          "active_districts": 10,
+          "active_states": 5
+      },
+      "landscape_stewards": {
+          "total_stewards": 120,
+          "gender_breakdown": {
+              "male": 85,
+              "female": 32,
+              "other": 3
+          },
+          "by_organization": [
+              {"organization_id": 1, "organization_name": "Org X", "steward_count": 40}
+          ]
+      },
+      "completion_rate": 60.0,
+      "dpr_generation_rate": 30.0,
+      "organization_breakdown": [
+          {
+              "organization_id": 1,
+              "organization_name": "Org X",
+              "total_plans": 200,
+              "completed_plans": 120,
+              "dpr_generated": 60,
+              "dpr_reviewed": 30
+          }
+      ],
+      "state_breakdown": [
+          {
+              "state_id": 1,
+              "state_name": "Bihar",
+              "total_plans": 150,
+              "completed_plans": 90,
+              "dpr_generated": 45,
+              "centroid": {"lat": 25.0961, "lon": 85.3131}
+          }
+      ],
+      "filters_applied": {
+          "organization_id": null,
+          "project_id": null,
+          "state_id": null,
+          "district_id": null,
+          "tehsil_id": null
+      }
+  }
+  ```
+- **Notes**:
+    - `demand_overview`: counts Community Demands and Individual Demands across all NRM maintenance (Section E) and NRM works (Section F) records for the filtered plans
+    - `landscape_stewards.total_stewards`: only counts facilitators who are **App User** group members and do **not** belong to the CFPT organization
+    - `landscape_stewards.gender_breakdown`: male/female/other counts from the User table for the active stewards; users without a gender set are excluded from all buckets
+    - `by_organization` in `landscape_stewards` is omitted when `?organization` filter is applied
+    - `organization_breakdown` is only present when no `?organization` filter is applied
+    - `state_breakdown` is present when no tehsil or district filter is applied
+    - `district_breakdown` is present when a state or district filter is applied (but not tehsil)
+    - `tehsil_breakdown` is present when any of state, district, or tehsil filter is applied
+    - All filters also scope `demand_overview` and `landscape_stewards` counts
+
 ### Steward Meta Stats (Global Level)
 - **URL**: `/api/v1/watershed/plans/steward-meta-stats/`
 - **Method**: GET
@@ -963,7 +1049,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ### Steward Listing (Global Level)
 - **URL**: `/api/v1/watershed/plans/steward-listing/`
 - **Method**: GET
-- **Description**: List all stewards with their individual plans and villages. Unlike `steward-meta-stats` which returns aggregates, this returns the full per-steward breakdown.
+- **Description**: List all stewards with their individual plans, villages, organization, and projects. Unlike `steward-meta-stats` which returns aggregates, this returns the full per-steward breakdown.
 - **Authentication**: Required (JWT or API Key)
 - **Permissions**: Superadmins and API key users only
 - **Query Parameters**:
@@ -975,12 +1061,25 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Response**:
   ```json
   {
+      "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
       "total_stewards": 150,
+      "working_states": [
+          {"id": 3, "name": "Bihar"},
+          {"id": 7, "name": "Uttar Pradesh"}
+      ],
       "stewards": [
           {
               "facilitator_name": "John Doe",
               "plan_count": 3,
               "completed_count": 2,
+              "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
+              "projects": [
+                  {"id": 10, "name": "Delhi Watershed Project"},
+                  {"id": 15, "name": "Bihar Watershed Project"}
+              ],
+              "states": [
+                  {"id": 3, "name": "Bihar"}
+              ],
               "villages": ["Village A", "Village B"],
               "plans": [
                   {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A"},
@@ -992,6 +1091,12 @@ Superadmins must specify the organization ID since they can create projects for 
       "filters_applied": {}
   }
   ```
+- **Notes**:
+    - Top-level `organization` (`id` and `name`) is only present when `?organization=<id>` filter is applied
+    - Top-level `working_states`: all distinct states (from `state_soi`) covered by any steward in the filtered context, sorted by name
+    - Per-steward `organization`: the organization the steward belongs to, derived from their plans (single object)
+    - Per-steward `projects`: all distinct projects the steward has plans in
+    - Per-steward `states`: all distinct states that steward has plans in
 
 ### Steward Listing (Project Level)
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-listing/`
