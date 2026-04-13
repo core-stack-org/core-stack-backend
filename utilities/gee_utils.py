@@ -95,6 +95,7 @@ def ee_initialize(
             )
 
         key_dict = json.loads(credentials_blob.decode("utf-8"))
+        key_dict["private_key"] = key_dict["private_key"].replace("\\n", "\n")
         credentials = service_account.Credentials.from_service_account_info(
             key_dict,
             scopes=[
@@ -591,18 +592,24 @@ def is_asset_public(asset_id):
         return False
 
 
-def sync_raster_to_gcs(image, scale, layer_name):
+def sync_raster_to_gcs(image, scale, layer_name, region=None):
     print("inside sync_raster_to_gcs")
-    export_task = ee.batch.Export.image.toCloudStorage(
-        image=image,
-        description="gcs_" + layer_name,
-        bucket=GCS_BUCKET_NAME,
-        fileNamePrefix="nrm_raster/" + layer_name,
-        scale=scale,
-        fileFormat="GeoTIFF",
-        crs="EPSG:4326",
-        maxPixels=1e13,
-    )
+
+    export_args = {
+        "image": image,
+        "description": "gcs_" + layer_name,
+        "bucket": GCS_BUCKET_NAME,
+        "fileNamePrefix": "nrm_raster/" + layer_name,
+        "scale": scale,
+        "fileFormat": "GeoTIFF",
+        "crs": "EPSG:4326",
+        "maxPixels": 1e13,
+    }
+
+    if region is not None:
+        export_args["region"] = region
+
+    export_task = ee.batch.Export.image.toCloudStorage(**export_args)
 
     export_task.start()
     print("Successfully started the sync_raster_to_gcs", export_task.status())

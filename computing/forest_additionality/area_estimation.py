@@ -7,7 +7,7 @@ from rasterio.warp import reproject, Resampling
 
 
 def get_area_estimation(state_name, start_year, mid_pt, end_year, DATA_DIR):
-    PRED_DIR = f"{DATA_DIR}"  # BASE_DIR / "outputs" / "predictions"
+    PRED_DIR = f"{DATA_DIR}/outputs"  # BASE_DIR / "outputs" / "predictions"
     LABEL_BAND = "remapped"  # "9_deforestation"
 
     PIXEL_AREA_HA = 0.09

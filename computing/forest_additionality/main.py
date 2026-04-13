@@ -1,4 +1,4 @@
-import ee
+import os
 
 from nrm_app.settings import BASE_DIR
 from .FC_Change import generate_afforestation_mask
@@ -9,25 +9,24 @@ from .area_estimation import get_area_estimation
 
 def forest_additionality(start_year, mid_pt, end_year, state_name):
     # Initialize the RiskMaps engine
-    dir_path = f"{BASE_DIR}/data/forest_additionality/{state_name}"  # f"/mnt/d/workspaces/BECC/data/GEE_exports_{state_name}"
-    print(dir_path)
+    base_file_path = f"{BASE_DIR}/data/forest_additionality/{state_name}"
+    working_directory = os.path.join(base_file_path, "outputs")
+
+    if not os.path.exists(working_directory):
+        os.makedirs(working_directory)
+
     engine = RiskMaps(
-        dir_path,
-        start_year,
-        mid_pt,
-        end_year,
-        state_name,
+        base_file_path, working_directory, start_year, mid_pt, end_year, state_name
     )
 
-    # ee.Authenticate(auth_mode="notebook")  # , force=True)
-    # ee.Initialize(project="core-stack-dev-2")
-
-    ee_initialize(3)
+    ee_initialize(4)
 
     engine.perform_gee_operations()
 
     engine.run_wo_gee()
 
-    generate_afforestation_mask(state_name, start_year, mid_pt, end_year, dir_path)
+    generate_afforestation_mask(
+        state_name, start_year, mid_pt, end_year, working_directory
+    )
 
-    get_area_estimation(state_name, start_year, mid_pt, end_year, dir_path)
+    get_area_estimation(state_name, start_year, mid_pt, end_year, base_file_path)

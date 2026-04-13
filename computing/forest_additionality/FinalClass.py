@@ -27,7 +27,15 @@ from .util import get_image_resolution  # , get_image_dimension
 
 
 class RiskMaps:
-    def __init__(self, working_directory, start_year, mid_year, end_year, state_name):
+    def __init__(
+        self,
+        base_file_path,
+        working_directory,
+        start_year,
+        mid_year,
+        end_year,
+        state_name,
+    ):
         """
         Initialize the RiskMaps class for generating final risk maps.
 
@@ -161,9 +169,7 @@ class RiskMaps:
         ]
 
         # Drive export path
-        self.drive_folder_path = (
-            self.working_directory
-        )  # f'/mnt/d/workspaces/BECC/data/GEE_exports_{self.state_name}'
+        self.drive_folder_path = base_file_path  # f'/mnt/d/workspaces/BECC/data/GEE_exports_{self.state_name}'
 
         # NRT (Normalized Risk Threshold) placeholder
         self.nrt = None
@@ -193,7 +199,7 @@ class RiskMaps:
                 self.drive_folder_path, f"{self.state_name}_{year}.tif"
             )
             output_pth = os.path.join(
-                self.drive_folder_path, f"{self.state_name}_{year}.tif"
+                self.working_directory, f"{self.state_name}_{year}.tif"
             )
             self.gee_manager.resample_raster(file_pth, output_pth)
 
@@ -214,7 +220,7 @@ class RiskMaps:
         # Calculate Euclidean distance from forest edge at the start of the calibration period
         self.gee_manager.euclidean_dist_calc(
             os.path.join(
-                self.drive_folder_path, f"{self.state_name}_{self.start_year}.tif"
+                self.working_directory, f"{self.state_name}_{self.start_year}.tif"
             ),
             self.forest_edge_distance_start,
         )
@@ -222,7 +228,7 @@ class RiskMaps:
         # Calcuate Euclidean distance from forest edge at the start of the confirmation period
         self.gee_manager.euclidean_dist_calc(
             os.path.join(
-                self.drive_folder_path, f"{self.state_name}_{self.mid_year}.tif"
+                self.working_directory, f"{self.state_name}_{self.mid_year}.tif"
             ),
             self.forest_edge_distance_cnf,
         )
@@ -230,20 +236,20 @@ class RiskMaps:
         # Calculate Euclidean distance from forest edge at the start of the validity period
         self.gee_manager.euclidean_dist_calc(
             os.path.join(
-                self.drive_folder_path, f"{self.state_name}_{self.end_year}.tif"
+                self.working_directory, f"{self.state_name}_{self.end_year}.tif"
             ),
             self.forest_edge_distance_vp,
         )
 
         # Generate deforestation maps
         file1 = os.path.join(
-            self.drive_folder_path, f"{self.state_name}_{self.start_year}.tif"
+            self.working_directory, f"{self.state_name}_{self.start_year}.tif"
         )
         file2 = os.path.join(
-            self.drive_folder_path, f"{self.state_name}_{self.mid_year}.tif"
+            self.working_directory, f"{self.state_name}_{self.mid_year}.tif"
         )
         file3 = os.path.join(
-            self.drive_folder_path, f"{self.state_name}_{self.end_year}.tif"
+            self.working_directory, f"{self.state_name}_{self.end_year}.tif"
         )
 
         self.gee_manager.generate_deforestation_map(

@@ -19,6 +19,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     check_task_status,
     download_tif_from_gcs,
+    gcs_file_exists,
 )
 
 
@@ -220,10 +221,13 @@ class GEEManager:
         # print(state.getInfo())  # or just print(state) if debugging in GEE Python API
 
         for year in years:
-            image = forest_non_forest_cover_maps[year]
+            if not gcs_file_exists(f"nrm_raster/{state_name}_{year}"):
+                image = forest_non_forest_cover_maps[year]
 
-            task_id = sync_raster_to_gcs(image, 30, f"{state_name}_{year}")
-            tasks.append(task_id)
+                task_id = sync_raster_to_gcs(
+                    image, 30, f"{state_name}_{year}", state_geometry
+                )
+                tasks.append(task_id)
 
         check_task_status(tasks)
 
@@ -258,7 +262,7 @@ class GEEManager:
         #         print("All export tasks completed.")
         for year in years:
             download_tif_from_gcs(
-                source_blob_name=f"{state_name}_{year}.tif",
+                source_blob_name=f"nrm_raster/{state_name}_{year}.tif",
                 destination_file_name=f"data/forest_additionality/{state_name}/{state_name}_{year}.tif",
             )
         return None
@@ -367,17 +371,20 @@ class GEEManager:
         # while task.active():
         #     print("Task is running....")
         #     time.sleep(60)
+        if not gcs_file_exists(f"nrm_raster/{state_name}_districts"):
+            task_id = sync_raster_to_gcs(
+                rasterized_districts,
+                30,
+                f"{state_name}_districts",
+                state_districts.geometry(),
+            )
 
-        task_id = sync_raster_to_gcs(
-            rasterized_districts, 30, f"{state_name}_districts"
-        )
-
-        check_task_status([task_id])
+            check_task_status([task_id])
 
         print("Task completed")
 
         download_tif_from_gcs(
-            source_blob_name=f"{state_name}_districts.tif",
+            source_blob_name=f"nrm_raster/{state_name}_districts.tif",
             destination_file_name=f"data/forest_additionality/{state_name}/{state_name}_districts.tif",
         )
 
@@ -470,15 +477,19 @@ class GEEManager:
         # while task.active():
         #     print("Task is running....")
         #     time.sleep(60)
-        task_id = sync_raster_to_gcs(
-            jurisdiction_mask, 30, f"{state_name}_jurisidiction_mask"
-        )
+        if not gcs_file_exists(f"nrm_raster/{state_name}_jurisidiction_mask"):
+            task_id = sync_raster_to_gcs(
+                jurisdiction_mask,
+                30,
+                f"{state_name}_jurisidiction_mask",
+                state.geometry(),
+            )
 
-        check_task_status([task_id])
+            check_task_status([task_id])
         print("Jurisdiction Mask Export completed")
 
         download_tif_from_gcs(
-            source_blob_name=f"{state_name}_jurisidiction_mask.tif",
+            source_blob_name=f"nrm_raster/{state_name}_jurisidiction_mask.tif",
             destination_file_name=f"data/forest_additionality/{state_name}/{state_name}_jurisidiction_mask.tif",
         )
 
