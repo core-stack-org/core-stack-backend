@@ -20,6 +20,16 @@ from .serializers import (
     PlanUpdateSerializer,
 )
 
+from dpr.mapping import classify_demand_type
+from dpr.models import (
+    Agri_maintenance,
+    GW_maintenance,
+    ODK_agri,
+    ODK_groundwater,
+    SWB_RS_maintenance,
+    SWB_maintenance,
+)
+
 STATE_CENTROIDS = {
     "Jammu & Kashmir": {"lat": 34.0837, "lon": 74.7973},
     "Himachal Pradesh": {"lat": 31.1048, "lon": 77.1734},
@@ -66,6 +76,61 @@ TEST_FACILITATOR_EXCLUSIONS = (
     | Q(facilitator_name__icontains="demo")
     | Q(facilitator_name__icontains="facilitator")
 )
+
+
+def _count_demand_types(plan_id_strs):
+    from dpr.mapping import classify_demand_type
+    from dpr.models import (
+        Agri_maintenance,
+        GW_maintenance,
+        ODK_agri,
+        ODK_groundwater,
+        SWB_RS_maintenance,
+        SWB_maintenance,
+    )
+
+    community = 0
+    individual = 0
+
+    def _tally(raw_values):
+        nonlocal community, individual
+        for raw in raw_values:
+            classified = classify_demand_type(raw)
+            if classified == "Community Demand":
+                community += 1
+            elif classified == "Individual Demand":
+                individual += 1
+
+    # Section E — maintenance models
+    # Fetch full JSON dict and extract key in Python to avoid ->operator issues on text columns
+    _tally(
+        (d or {}).get("demand_type")
+        for d in GW_maintenance.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).values_list("data_gw_maintenance", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type")
+        for d in Agri_maintenance.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).values_list("data_agri_maintenance", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type")
+        for d in SWB_maintenance.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).values_list("data_swb_maintenance", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type")
+        for d in SWB_RS_maintenance.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).values_list("data_swb_rs_maintenance", flat=True)
+    )
+
+    # Section F — NRM works models
+    _tally(
+        (d or {}).get("demand_type")
+        for d in ODK_groundwater.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).exclude(status_re="rejected").values_list("data_groundwater", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type_irrigation")
+        for d in ODK_agri.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).exclude(status_re="rejected").values_list("data_agri", flat=True)
+    )
+
+    return {"community_demands": community, "individual_demands": individual}
 
 
 def _build_steward_meta_stats(queryset):
@@ -274,9 +339,12 @@ def _build_steward_listing(queryset):
     villages_by_steward = {}
     orgs_by_steward = {}
     projects_by_steward = {}
+    states_by_steward = {}
+    all_states = {}
     for row in qs.filter(facilitator_name__in=steward_names).values(
         "facilitator_name", "id", "plan", "is_completed", "effective_village",
         "organization", "organization__name", "project", "project__name",
+        "state_soi", "state_soi__state_name",
     ):
         name = row["facilitator_name"]
         plans_by_steward.setdefault(name, []).append(
@@ -292,6 +360,9 @@ def _build_steward_listing(queryset):
             orgs_by_steward.setdefault(name, {})[row["organization"]] = row["organization__name"]
         if row["project"]:
             projects_by_steward.setdefault(name, {})[row["project"]] = row["project__name"]
+        if row["state_soi"]:
+            states_by_steward.setdefault(name, {})[row["state_soi"]] = row["state_soi__state_name"]
+            all_states[row["state_soi"]] = row["state_soi__state_name"]
 
     stewards = [
         {
@@ -306,14 +377,21 @@ def _build_steward_listing(queryset):
                 {"id": k, "name": v}
                 for k, v in projects_by_steward.get(s["facilitator_name"], {}).items()
             ],
+            "states": [
+                {"id": k, "name": v}
+                for k, v in states_by_steward.get(s["facilitator_name"], {}).items()
+            ],
             "villages": sorted(villages_by_steward.get(s["facilitator_name"], [])),
             "plans": plans_by_steward.get(s["facilitator_name"], []),
         }
         for s in per_steward
     ]
 
+    working_states = [{"id": k, "name": v} for k, v in sorted(all_states.items(), key=lambda x: x[1])]
+
     return {
         "total_stewards": len(steward_names),
+        "working_states": working_states,
         "stewards": stewards,
     }
 
@@ -548,6 +626,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
+        plan_id_strs = [str(pid) for pid in base_queryset.values_list("id", flat=True)]
+
         total_plans = base_queryset.count()
         completed_plans = base_queryset.filter(is_completed=True).count()
         dpr_generated = base_queryset.filter(is_dpr_generated=True).count()
@@ -574,6 +654,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             cc_operational_queryset.values("state_soi").distinct().count()
         )
 
+        demand_type_counts = _count_demand_types(plan_id_strs)
+
         steward_queryset = base_queryset.exclude(
             Q(facilitator_name__isnull=True)
             | Q(facilitator_name="")
@@ -590,6 +672,24 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         steward_queryset = steward_queryset.filter(facilitator_name__in=valid_steward_names)
 
         total_stewards = steward_queryset.values("facilitator_name").distinct().count()
+
+        active_facilitator_names = steward_queryset.values_list("facilitator_name", flat=True).distinct()
+        gender_counts = {
+            row["gender"]: row["count"]
+            for row in (
+                User.objects.filter(groups__name="App User")
+                .exclude(organization__name__iexact="CFPT")
+                .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+                .filter(full_name__in=active_facilitator_names)
+                .values("gender")
+                .annotate(count=Count("id"))
+            )
+        }
+        steward_gender_breakdown = {
+            "male": gender_counts.get("M", 0),
+            "female": gender_counts.get("F", 0),
+            "other": gender_counts.get("O", 0),
+        }
 
         steward_by_org = []
         if not organization_id:
@@ -716,6 +816,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
                 "pending_dpr_generation": pending_dpr_generation,
                 "pending_dpr_review": pending_dpr_review,
             },
+            "demand_overview": demand_type_counts,
             "commons_connect_operational": {
                 "active_tehsils": cc_active_tehsils,
                 "active_districts": cc_active_districts,
@@ -723,6 +824,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             },
             "landscape_stewards": {
                 "total_stewards": total_stewards,
+                "gender_breakdown": steward_gender_breakdown,
                 "by_organization": steward_by_org if steward_by_org else None,
             },
             "completion_rate": round((completed_plans / total_plans * 100), 2)
@@ -811,6 +913,11 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
         response_data = _build_steward_listing(steward_qs)
+
+        if organization_id:
+            org = Organization.objects.filter(pk=organization_id).values("id", "name").first()
+            response_data["organization"] = org
+
         response_data["filters_applied"] = {
             "organization_id": organization_id,
             "project_id": project_id,
