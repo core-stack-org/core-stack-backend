@@ -56,7 +56,7 @@ def get_waterbodies_by_admin_and_uid(request):
         print(f"file: {merged_path}")
         merged_data = None
 
-        # 1⃣ **If cached merged file exists → load**
+        # 1**If cached merged file exists → load**
         if os.path.exists(merged_path):
             try:
                 with open(merged_path, "r", encoding="utf-8") as fh:
@@ -172,7 +172,7 @@ def get_waterbodies_by_uid(request):
                 print("Error reading cached file:", e)
                 merged_data = None
 
-        # 2⃣ **If file NOT found OR failed to read → generate using your merge function**
+        # 2**If file NOT found OR failed to read → generate using your merge function**
         if merged_data is None:
             try:
                 print("Generating merged data...")
@@ -278,17 +278,17 @@ def generate_result_excel(request):
                 }
             )
 
-        # ✅ Create DataFrame with EXACT headers
+        #  Create DataFrame with EXACT headers
         df = pd.DataFrame(rows)
 
-        # ⭐ Append derived column (NO utils change)
+        #  Append derived column (NO utils change)
         failure_map = dict(queryset.values_list("id", "failure_reason"))
         df["closest waterbody found"] = df.index.map(
             lambda i: "true" if queryset[i].process else "false"
         )
         df["Reason for not mapped"] = df.index.map(lambda i: queryset[i].failure_reason)
 
-        # ✅ Write Excel to memory
+        #  Write Excel to memory
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="results")
