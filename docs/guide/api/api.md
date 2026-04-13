@@ -981,6 +981,11 @@ Superadmins must specify the organization ID since they can create projects for 
               "facilitator_name": "John Doe",
               "plan_count": 3,
               "completed_count": 2,
+              "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
+              "projects": [
+                  {"id": 10, "name": "Delhi Watershed Project"},
+                  {"id": 15, "name": "Bihar Watershed Project"}
+              ],
               "villages": ["Village A", "Village B"],
               "plans": [
                   {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A"},

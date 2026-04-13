@@ -272,8 +272,11 @@ def _build_steward_listing(queryset):
 
     plans_by_steward = {}
     villages_by_steward = {}
+    orgs_by_steward = {}
+    projects_by_steward = {}
     for row in qs.filter(facilitator_name__in=steward_names).values(
-        "facilitator_name", "id", "plan", "is_completed", "effective_village"
+        "facilitator_name", "id", "plan", "is_completed", "effective_village",
+        "organization", "organization__name", "project", "project__name",
     ):
         name = row["facilitator_name"]
         plans_by_steward.setdefault(name, []).append(
@@ -285,12 +288,24 @@ def _build_steward_listing(queryset):
             }
         )
         villages_by_steward.setdefault(name, set()).add(row["effective_village"])
+        if row["organization"]:
+            orgs_by_steward.setdefault(name, {})[row["organization"]] = row["organization__name"]
+        if row["project"]:
+            projects_by_steward.setdefault(name, {})[row["project"]] = row["project__name"]
 
     stewards = [
         {
             "facilitator_name": s["facilitator_name"],
             "plan_count": s["plan_count"],
             "completed_count": s["completed_count"],
+            "organization": next(
+                ({"id": k, "name": v} for k, v in orgs_by_steward.get(s["facilitator_name"], {}).items()),
+                None,
+            ),
+            "projects": [
+                {"id": k, "name": v}
+                for k, v in projects_by_steward.get(s["facilitator_name"], {}).items()
+            ],
             "villages": sorted(villages_by_steward.get(s["facilitator_name"], [])),
             "plans": plans_by_steward.get(s["facilitator_name"], []),
         }
@@ -565,6 +580,15 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             | Q(facilitator_name__icontains="test")
             | Q(facilitator_name__icontains="demo")
         )
+
+        valid_steward_names = (
+            User.objects.filter(groups__name="App User")
+            .exclude(organization__name__iexact="CFPT")
+            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .values_list("full_name", flat=True)
+        )
+        steward_queryset = steward_queryset.filter(facilitator_name__in=valid_steward_names)
+
         total_stewards = steward_queryset.values("facilitator_name").distinct().count()
 
         steward_by_org = []
