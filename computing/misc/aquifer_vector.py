@@ -126,8 +126,8 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
         area_in_ha = mws.get("area_in_ha")
 
         intersecting_aquifers = aquifers_in_roi.filterBounds(mws_geom)
+        has_aquifers = intersecting_aquifers.size().gt(0)
 
-        # Single pass: intersection computed once, all stats derived from it
         def compute_intersection_stats(aquifer):
             intersection = mws_geom.intersection(aquifer.geometry(), 1)
             intersection_area = intersection.area(1)
@@ -135,7 +135,6 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
             fraction = ee.Number(intersection_area).divide(mws_area)
             weighted_yield = fraction.multiply(aquifer.get("y_value"))
 
-            # Normalize empty principal name to "None"
             principal_raw = ee.String(aquifer.get("Principal_"))
             principal_name = ee.Algorithms.If(
                 principal_raw.equals(""), "None", principal_raw
@@ -152,9 +151,12 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
         aquifers_processed = intersecting_aquifers.map(compute_intersection_stats)
 
         # Total weighted yield — summed across all aquifers
-        total_weighted_yield = aquifers_processed.aggregate_sum("weighted_contribution")
+        total_weighted_yield = ee.Algorithms.If(
+            has_aquifers,
+            aquifers_processed.aggregate_sum("weighted_contribution"),
+            ee.Number(0),
+        )
 
-        # For each watershed, find which aquifers overlap with it and calculate how much of the watershed each aquifer covers (%).
         names_list = aquifers_processed.aggregate_array("principal_name")
         pcts_list = aquifers_processed.aggregate_array("%_area_aquifer")
 
@@ -162,20 +164,42 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
         def accumulate_pcts(aq_name, acc):
             acc = ee.Dictionary(acc)
             aq_name = ee.String(aq_name)
-            # Sum all occurrences by iterating positions where name matches
+
             matching_pcts = pcts_list.zip(names_list).map(
                 lambda pair: ee.Algorithms.If(
                     ee.String(ee.List(pair).get(1)).equals(aq_name),
                     ee.Number(ee.List(pair).get(0)),
-                    0,
+                    ee.Number(0),
                 )
             )
-            total_pct = ee.Array(matching_pcts).reduce(ee.Reducer.sum(), [0]).get([0])
+
+            total_pct = ee.Algorithms.If(
+                matching_pcts.size().gt(0),
+                matching_pcts.reduce(ee.Reducer.sum()),
+                ee.Number(0),
+            )
             return acc.set(aq_name, total_pct)
 
+        # Iterate over all aquifer types except "None" — None is computed separately
         aquifer_pct_dict = ee.Dictionary(
-            ee.List(aquifers_lists).iterate(accumulate_pcts, ee.Dictionary({}))
+            ee.List(aquifers_lists)
+            .remove("None")
+            .iterate(accumulate_pcts, ee.Dictionary({}))
         )
+
+        # Compute total covered percentage (sum of all known aquifer types)
+        total_covered_pct = ee.Number(
+            ee.List(aquifers_lists)
+            .remove("None")
+            .iterate(
+                lambda aq, acc: ee.Number(acc).add(ee.Number(aquifer_pct_dict.get(aq))),
+                ee.Number(0),
+            )
+        )
+
+        # None percent = uncovered area (handles partial coverage + fully uncovered)
+        none_pct = ee.Number(100).subtract(total_covered_pct).max(0)
+        aquifer_pct_dict = aquifer_pct_dict.set("None", none_pct)
 
         # Flatten into individual named properties: principle_aq_{Name}_percent
         aquifer_pct_props = {
@@ -188,7 +212,9 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
             aquifers_processed.sort("intersection_area", False).first()
         )
 
-        principal_value = largest_aquifer.get("Principal_")
+        principal_value = ee.Algorithms.If(
+            has_aquifers, largest_aquifer.get("Principal_"), "None"
+        )
         aquifer_class = ee.Algorithms.If(
             ee.String(principal_value).equals("Alluvium"), "Alluvium", "Hard-Rock"
         )
@@ -197,21 +223,59 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
             "uid": uid,
             "id": feature_id,
             "area_in_ha": area_in_ha,
-            "total_weighted_yield": total_weighted_yield,
-            "%_area_aquifer": largest_aquifer.get("%_area_aquifer"),
+            "total_weighted_yield": ee.Algorithms.If(
+                has_aquifers, total_weighted_yield, ee.Number(0)
+            ),
+            "%_area_aquifer": ee.Algorithms.If(
+                has_aquifers, largest_aquifer.get("%_area_aquifer"), ee.Number(0)
+            ),
             "aquifer_count": intersecting_aquifers.size(),
-            "aquifer_class": aquifer_class,
+            "aquifer_class": ee.Algorithms.If(has_aquifers, aquifer_class, "None"),
             # Per-aquifer % columns (principle_aq_{Name}_percent)
             **aquifer_pct_props,
-            "Age": ee.String(largest_aquifer.get("Age")).cat(""),
-            "Lithology_": ee.Number(largest_aquifer.get("Lithology_")).toInt(),
-            "Major_Aq_1": ee.String(largest_aquifer.get("Major_Aq_1")).cat(""),
-            "Major_Aqui": ee.String(largest_aquifer.get("Major_Aqui")).cat(""),
-            "Principal_": ee.String(largest_aquifer.get("Principal_")).cat(""),
-            "Recommende": ee.Number(largest_aquifer.get("Recommende")).toInt(),
-            "yeild__": ee.String(largest_aquifer.get("yeild__")).cat(""),
-            "zone_m": ee.String(largest_aquifer.get("zone_m")).cat(""),
-            "y_value": largest_aquifer.get("y_value"),
+            "Age": ee.Algorithms.If(
+                has_aquifers,
+                ee.String(largest_aquifer.get("Age")).cat(""),
+                "NA",
+            ),
+            "Lithology_": ee.Algorithms.If(
+                has_aquifers,
+                ee.Number(largest_aquifer.get("Lithology_")).toInt(),
+                ee.Number(-1),
+            ),
+            "Major_Aq_1": ee.Algorithms.If(
+                has_aquifers,
+                ee.String(largest_aquifer.get("Major_Aq_1")).cat(""),
+                "NA",
+            ),
+            "Major_Aqui": ee.Algorithms.If(
+                has_aquifers,
+                ee.String(largest_aquifer.get("Major_Aqui")).cat(""),
+                "NA",
+            ),
+            "Principal_": ee.Algorithms.If(
+                has_aquifers,
+                ee.String(largest_aquifer.get("Principal_")).cat(""),
+                "NA",
+            ),
+            "Recommende": ee.Algorithms.If(
+                has_aquifers,
+                ee.Number(largest_aquifer.get("Recommende")).toInt(),
+                ee.Number(-1),
+            ),
+            "yeild__": ee.Algorithms.If(
+                has_aquifers,
+                ee.String(largest_aquifer.get("yeild__")).cat(""),
+                "NA",
+            ),
+            "zone_m": ee.Algorithms.If(
+                has_aquifers,
+                ee.String(largest_aquifer.get("zone_m")).cat(""),
+                "NA",
+            ),
+            "y_value": ee.Algorithms.If(
+                has_aquifers, largest_aquifer.get("y_value"), ee.Number(0)
+            ),
         }
 
         return ee.Feature(mws_geom, properties)
@@ -219,6 +283,8 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
     fc = roi.map(process_mws_feature)
 
     asset_id = get_gee_asset_path(state, district, block) + description
+    if is_gee_asset_exists(asset_id):
+        ee.data.deleteAsset(asset_id)
     if not is_gee_asset_exists(asset_id):
         task = export_vector_asset_to_gee(fc, description, asset_id)
         check_task_status([task])
