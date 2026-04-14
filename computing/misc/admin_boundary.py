@@ -32,7 +32,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
     """
     It will generate Admin boundary of given location as tehsil levels
     """
-    ee_initialize()
+    ee_initialize(gee_account_id)
     description = (
         "admin_boundary_"
         + valid_gee_text(district.lower())
