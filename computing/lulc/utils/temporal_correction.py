@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path
 from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
+from utilities.constants import CRS_4326
 
 
 @app.task(bind=True)
@@ -434,6 +435,6 @@ def lulc_temporal_correction(
             pyramidingPolicy={"predicted_label": "mode"},
             scale=scale,
             maxPixels=1e13,
-            crs="EPSG:4326",
+            crs=CRS_4326,
         )
         image_export_task.start()

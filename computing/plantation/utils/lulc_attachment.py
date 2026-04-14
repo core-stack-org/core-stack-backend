@@ -1,5 +1,9 @@
 import ee
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import (
+    GEE_DATASET_PATH,
+    INDIA_SAT_LULC_V3_PAN_INDIA,
+    LAND_COVER_CLASSIFICATION_10_METER,
+)
 
 
 def get_lulc_data(suitability_vector, start_year, end_year):
@@ -25,7 +29,7 @@ def india_sat_lulc(suitability_vector, start_year, end_year):
     for year in range(start_year, end_year + 1):
         asset_id = (
             GEE_DATASET_PATH
-            + "/LULC_v3_river_basin/pan_india_lulc_v3_"
+            + INDIA_SAT_LULC_V3_PAN_INDIA
             + str(year)
             + "_"
             + str(year + 1)
@@ -87,7 +91,7 @@ def dw_lulc(suitability_vector, start_year, end_year):
 
     # Retrieve Dynamic World Land Use/Land Cover collection
     # Dynamic World provides high-resolution global land cover classification
-    dynamic_world = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1").filterDate(
+    dynamic_world = ee.ImageCollection(LAND_COVER_CLASSIFICATION_10_METER).filterDate(
         start_date, end_date
     )
 

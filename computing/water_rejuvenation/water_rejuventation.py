@@ -5,7 +5,13 @@ from computing.utils import sync_project_fc_to_geoserver
 from gee_computing.utils import extract_ndmis, classify_checkdams, mask_landsat_clouds
 from nrm_app.celery import app
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import (
+    GEE_PATHS,
+    WATERREJUVENATION,
+    WATERREJ_LULCFORM,
+    SRTM_DIGITAL_ELEVATION,
+    LANDSAT8_T1_CALIBERATED_TOA,
+)
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long,
@@ -138,7 +144,7 @@ def find_watersheds_for_point_with_buffer(latitude, longitude, buffer_distance=1
 
 def generate_lulc_raster_for_intersecting_mws():
     ee_initialize()
-    asset_id = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
+    asset_id = WATERREJUVENATION
     image = ee.Image(PAN_INDIA_LULC_PATH)
 
     # Load or define a vector region (e.g., a country)
@@ -151,7 +157,7 @@ def generate_lulc_raster_for_intersecting_mws():
     task = ee.batch.Export.image.toAsset(
         image=clipped_image,
         description="Export_Clipped_Image",
-        assetId="projects/ee-corestackdev/assets/apps/waterrej/lulcfrom",
+        assetId=WATERREJ_LULCFORM,
         region=roi.geometry(),
         scale=30,
         maxPixels=1e13,
@@ -231,7 +237,7 @@ def calculate_elevation(landsat_collection, lulc_asset_id):
     lulc = ee.Image(lulc_asset_id)
     cropping_mask = lulc.eq(8).Or(lulc.eq(9)).Or(lulc.eq(10)).Or(lulc.eq(11))
     # Load elevation dataset
-    elevation = ee.Image("USGS/SRTMGL1_003")
+    elevation = ee.Image(SRTM_DIGITAL_ELEVATION)
     return elevation, cropping_mask, ndmi_image
 
 
@@ -371,7 +377,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
         lulc_year, proj_obj.id, app_type="WATER_REJ"
     )
     landsat_collection = (
-        ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(start_date, end_date)
         .map(mask_landsat_clouds)
     )
@@ -536,7 +542,7 @@ def generate_ndmi_layer(swb_asset_id, proj_id):
         lulc_year, proj_obj.id, app_type="WATER_REJ"
     )
     landsat = (
-        ee.ImageCollection("LANDSAT/LC08/C02/T1_TOA")
+        ee.ImageCollection(LANDSAT8_T1_CALIBERATED_TOA)
         .filterDate(start_date, end_date)
         .map(mask_landsat_clouds)
     )
