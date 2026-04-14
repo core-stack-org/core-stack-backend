@@ -78,6 +78,15 @@ TEST_FACILITATOR_EXCLUSIONS = (
 )
 
 
+def _app_user_steward_names_qs():
+    return (
+        User.objects.filter(groups__name="App User")
+        .exclude(organization__name__iexact="CFPT")
+        .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+        .values_list("full_name", flat=True)
+    )
+
+
 def _count_demand_types(plan_id_strs):
     from dpr.mapping import classify_demand_type
     from dpr.models import (
@@ -663,13 +672,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             | Q(facilitator_name__icontains="demo")
         )
 
-        valid_steward_names = (
-            User.objects.filter(groups__name="App User")
-            .exclude(organization__name__iexact="CFPT")
-            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
-            .values_list("full_name", flat=True)
-        )
-        steward_queryset = steward_queryset.filter(facilitator_name__in=valid_steward_names)
+        steward_queryset = steward_queryset.filter(facilitator_name__in=_app_user_steward_names_qs())
 
         total_stewards = steward_queryset.values("facilitator_name").distinct().count()
 
@@ -911,7 +914,11 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
-        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        steward_qs = (
+            base_queryset
+            .exclude(TEST_FACILITATOR_EXCLUSIONS)
+            .filter(facilitator_name__in=_app_user_steward_names_qs())
+        )
         response_data = _build_steward_listing(steward_qs)
 
         if organization_id:
@@ -1736,7 +1743,11 @@ class PlanViewSet(viewsets.ModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
-        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        steward_qs = (
+            base_queryset
+            .exclude(TEST_FACILITATOR_EXCLUSIONS)
+            .filter(facilitator_name__in=_app_user_steward_names_qs())
+        )
         response_data = _build_steward_listing(steward_qs)
         response_data["filters_applied"] = {
             "project_id": project_id,
