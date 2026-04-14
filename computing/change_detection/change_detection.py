@@ -20,7 +20,7 @@ from computing.STAC_specs import generate_STAC_layerwise
 def get_change_detection(
     self, state, district, block, start_year, end_year, gee_account_id
 ):
-    # Initialize the Earth Engine
+  
     ee_initialize(gee_account_id)
     param_dict = {
         "Urbanization": built_up,
@@ -58,7 +58,7 @@ def get_change_detection(
         + "_"
         + valid_gee_text(block.lower())
         + "_uid"
-    )
+    ) 
     task_list = []
 
     for change_detection_key, change_detection_values in param_dict.items():
@@ -81,9 +81,11 @@ def get_change_detection(
     print("Change detection task_id_list", task_id_list)
 
     layer_ids = {}
+    asset_ids = []
     for param in param_dict.keys():
         ch_description = f"{description}_{param}_{start_year}_{end_year}"
         asset_id = get_gee_asset_path(state, district, block) + ch_description
+        asset_ids.append(asset_id)
         if is_gee_asset_exists(asset_id):
             layer_id = save_layer_info_to_db(
                 state,
@@ -110,8 +112,7 @@ def get_change_detection(
         start_year,
         end_year,
     )
-    return layer_at_geoserver
-
+    return asset_ids
 
 def built_up(roi_boundary, l1_asset):
     print("built_up function is runing")

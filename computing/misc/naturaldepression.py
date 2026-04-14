@@ -90,4 +90,4 @@ def natural_depression_raster_generation(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True
-    return layer_at_geoserver
+    return raster_asset_id

@@ -661,4 +661,4 @@ def drought_causality(
     except Exception as e:
         print(f"Error syncing aggregated data to GeoServer: {e}")
 
-    return layer_at_geoserver
+    return geo_filename

@@ -22,6 +22,10 @@ from nrm_app.celery import app
 def vectorise_change_detection(
     self, state, district, block, start_year, end_year, gee_account_id
 ):
+    """
+    This function will generate change detection vector for urbanization, Degradation,
+    Deforestation, Afforestation and cropintensity for given location(tehsil level)
+    """
     ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -52,9 +56,11 @@ def vectorise_change_detection(
         "CropIntensity",
     ]
     layer_at_geoserver = False
+    asset_ids = []
     for param in param_list:
         description = f"change_vector_{valid_gee_text(district)}_{valid_gee_text(block)}_{param}_{start_year}_{end_year}"
         asset_id = get_gee_asset_path(state, district, block) + description
+        asset_ids.append(asset_id)
         if is_gee_asset_exists(asset_id):
             layer_id = save_layer_info_to_db(
                 state,
@@ -69,9 +75,10 @@ def vectorise_change_detection(
                 block, district, state, asset_id, param, layer_id
             )
 
-    return layer_at_geoserver
+    return asset_ids
 
 
+# Afforestation
 def afforestation_vector(roi, state, district, block, start_year, end_year):
     args = [
         {"value": 1, "label": "fo_fo"},
@@ -87,6 +94,7 @@ def afforestation_vector(roi, state, district, block, start_year, end_year):
     )
 
 
+# Deforestation
 def deforestation_vector(roi, state, district, block, start_year, end_year):
     args = [
         {"value": 1, "label": "fo_fo"},
@@ -102,6 +110,7 @@ def deforestation_vector(roi, state, district, block, start_year, end_year):
     )
 
 
+# Degradation
 def degradation_vector(roi, state, district, block, start_year, end_year):
 
     args = [
@@ -117,6 +126,7 @@ def degradation_vector(roi, state, district, block, start_year, end_year):
     )
 
 
+# Urbanization
 def urbanization_vector(roi, state, district, block, start_year, end_year):
     args = [
         {"value": 1, "label": "bu_bu"},
@@ -131,6 +141,7 @@ def urbanization_vector(roi, state, district, block, start_year, end_year):
     )
 
 
+# CropnIntensity
 def crop_intensity_vector(roi, state, district, block, start_year, end_year):
 
     args = [
@@ -227,6 +238,8 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
     print(res)
 
     if res["status_code"] == 201 and layer_id:
+
+        # update flag in db whether layer sync to geoserver or not
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
 

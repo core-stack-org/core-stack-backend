@@ -64,7 +64,7 @@ def create_crop_grids(self, state, district, block, gee_account_id):
             task_id_list = check_task_status([task_id])
             print("task_id_list", task_id_list)
     layer_at_geoserver = crop_grids_lulc(state, district, block)
-    return layer_at_geoserver
+    return asset_id
 
 
 def get_block_coordinates(state, district, block):

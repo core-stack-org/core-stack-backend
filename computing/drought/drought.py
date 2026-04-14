@@ -108,10 +108,11 @@ def calculate_drought(
     )
     check_task_status([task_id])
 
-    return push_to_geoserver_db_stc(
+    push_to_geoserver_db_stc(
         asset_id, block, district, end_year, layer_name, start_year, state
     )
 
+    return asset_id
 
 def generate_drought_yearly(
     app_type, asset_folder_list, asset_suffix, start_year, end_year, gee_account_id, roi
