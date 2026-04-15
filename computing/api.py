@@ -28,6 +28,12 @@ from .mws.generate_hydrology import generate_hydrology
 from .utils import (
     Geoserver,
     kml_to_shp,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+from .local_compute_helper import (
+    get_compute_mode as _get_compute_mode,
+    select_compute_task as _select_compute_task,
 )
 from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
@@ -1900,3 +1906,44 @@ def stac_item(request, state, district, block, item_id):
             {"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND
         )
     return Response(data)
+
+
+@api_view(["POST"])
+@schema(None)
+def sync_layer_remote(request):
+    """
+    Called by a local compute instance to persist a layer record on this (prod) backend.
+    Validates the request API key against PROD_BACKEND_API_KEY before writing.
+    """
+    from django.conf import settings
+
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = save_layer_info_to_db(
+            state=d["state"],
+            district=d["district"],
+            block=d["block"],
+            layer_name=d["layer_name"],
+            asset_id=d["asset_id"],
+            dataset_name=d["dataset_name"],
+            sync_to_geoserver=d.get("sync_to_geoserver", False),
+            layer_version=d.get("layer_version", "1.0"),
+            algorithm=d.get("algorithm"),
+            algorithm_version=d.get("algorithm_version", "1.0"),
+            misc=d.get("misc"),
+            is_override=d.get("is_override", False),
+        )
+        if layer_id is None:
+            return Response(
+                {"error": "Failed to save layer — check state/district/block exist on this server."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
+    except KeyError as e:
+        return Response({"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

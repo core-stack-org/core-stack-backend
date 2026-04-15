@@ -241,10 +241,9 @@ def clip_raster_with_roi(roi_gdf, raster_path, output_path, raster_label="Raster
     return str(output_path)
 
 
-def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
+def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
     from utilities.geoserver_utils import Geoserver
 
-    geo = Geoserver()
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     upload_response = geo.create_coveragestore(
         path=file_path,
@@ -258,6 +257,35 @@ def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=
             style_name=style_name,
             workspace=workspace,
         )
+    return upload_response, style_response
+
+
+def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
+    from django.conf import settings
+    from utilities.geoserver_utils import Geoserver
+
+    local_geo = Geoserver()
+    upload_response, style_response = _push_raster_to_geoserver_instance(
+        local_geo, file_path, layer_name, workspace, style_name
+    )
+
+    prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
+    if prod_url:
+        try:
+            prod_geo = Geoserver(
+                service_url=prod_url,
+                username=settings.PROD_GEOSERVER_USERNAME,
+                password=settings.PROD_GEOSERVER_PASSWORD,
+            )
+            _push_raster_to_geoserver_instance(
+                prod_geo, file_path, layer_name, workspace, style_name
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(
+                "Failed to push raster %s to prod GeoServer: %s", layer_name, e
+            )
+
     return upload_response, style_response
 
 
@@ -713,7 +741,7 @@ def compute_mode_lulc_array(reprojected_arrays, lulc_classes=LULC_CLASSES):
     return mode_values
 
 
-def get_compute_mode(request, default="gee"):
+def get_compute_mode(request, default="local"):
     compute = str(request.data.get("compute") or default).strip().lower()
     if compute not in VALID_COMPUTE_TYPES:
         raise ValueError("compute must be either 'gee' or 'local'")

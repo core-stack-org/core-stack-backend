@@ -1,8 +1,12 @@
+import logging
 import os
 
 import geopandas as gpd
 import fiona
 import copy
+import requests
+
+logger = logging.getLogger(__name__)
 
 from computing.models import Layer, Dataset
 from geoadmin.models import (
@@ -601,6 +605,35 @@ def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     sync_project_fc_to_geoserver(merged_final, proj_obj.name, layer_name, "waterrej")
 
 
+def _sync_layer_to_prod_db(payload: dict):
+    from django.conf import settings
+
+    prod_url = getattr(settings, "PROD_BACKEND_URL", "")
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if not prod_url:
+        return
+
+    endpoint = prod_url.rstrip("/") + "/api/v1/computing/sync_layer_remote/"
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers={"X-Api-Key": api_key},
+            timeout=30,
+        )
+        if response.status_code not in (200, 201):
+            logger.warning(
+                "Prod DB sync returned %s for layer %s: %s",
+                response.status_code,
+                payload.get("layer_name"),
+                response.text,
+            )
+        else:
+            logger.info("Layer %s synced to prod DB.", payload.get("layer_name"))
+    except requests.RequestException as e:
+        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+
+
 def save_layer_info_to_db(
     state,
     district,
@@ -703,6 +736,22 @@ def save_layer_info_to_db(
         )
 
     print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
+
+    _sync_layer_to_prod_db({
+        "state": state,
+        "district": district,
+        "block": block,
+        "layer_name": layer_name,
+        "asset_id": asset_id,
+        "dataset_name": dataset_name,
+        "sync_to_geoserver": sync_to_geoserver,
+        "layer_version": layer_version,
+        "algorithm": algorithm,
+        "algorithm_version": algorithm_version,
+        "misc": misc,
+        "is_override": is_override,
+    })
+
     return layer_obj.id
 
 
