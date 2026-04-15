@@ -88,4 +88,4 @@ def generate_agroecological_data(self, state, district, block, gee_account_id):
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True
-    return layer_at_geoserver
+    return asset_id

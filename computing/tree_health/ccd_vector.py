@@ -130,7 +130,7 @@ def tree_health_ccd_vector(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_at_geoserver = True
 
-    return layer_at_geoserver
+    return asset_id
 
 
 def ccd_vector(roi, year, asset_folder_list, asset_suffix, app_type):

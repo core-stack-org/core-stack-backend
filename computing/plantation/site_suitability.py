@@ -110,6 +110,7 @@ def site_suitability(
         sync_suitability_to_geoserver(
             vector_asset_id, organization, asset_name, layer_id
         )
+        return vector_asset_id
     else:
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
@@ -128,6 +129,7 @@ def site_suitability(
             end_year=end_year,
             gee_account_id=gee_account_id,
         )
+        return vector_asset_id
 
         # Sync the results to GeoServer for visualization
         # sync_suitability_to_geoserver(vector_asset_id, state, asset_name, layer_id)

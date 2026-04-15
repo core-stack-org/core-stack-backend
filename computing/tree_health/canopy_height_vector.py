@@ -131,7 +131,7 @@ def tree_health_ch_vector(
         print(f"Error syncing combined data to GeoServer: {e}")
         raise
 
-    return layer_at_geoserver
+    return asset_id
 
 
 def ch_vector(roi, year, asset_folder_list, asset_suffix, app_type):

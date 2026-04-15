@@ -84,4 +84,4 @@ def generate_mws_centroid_data(self, state, district, block, gee_account_id):
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True
 
-    return layer_at_geoserver
+    return asset_id

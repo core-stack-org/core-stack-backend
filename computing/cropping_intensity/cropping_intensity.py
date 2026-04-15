@@ -142,7 +142,7 @@ def generate_cropping_intensity(
         district=district,
         block=block,
     )
-    return layer_at_geoserver
+    return asset_id
 
 
 def generate_gee_asset(

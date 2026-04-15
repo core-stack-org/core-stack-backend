@@ -123,7 +123,7 @@ def tree_health_overall_change_raster(
                 layer_id=layer_id,
                 sync_to_geoserver=layer_at_geoserver,
             )
-    return layer_at_geoserver
+    return asset_id
 
 
 def mask_raster(

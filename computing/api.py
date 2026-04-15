@@ -650,11 +650,12 @@ def get_gee_layer(request):
         print("Exception in get_gee_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Cropping Intensity
 @api_view(["POST"])
 @schema(None)
 def generate_ci_layer(request):
     print("Inside generate_cropping_intensity_layer")
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -662,30 +663,44 @@ def generate_ci_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_cropping_intensity.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_cropping_intensity(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            gee_account_id=gee_account_id,
         )
-        return Response(
-            {"Success": "Cropping Intensity task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Cropping Intensity completed",
+            "execution_id": execution_id,
+            "node_type": "Cropping_Intensity",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_cropping_intensity_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Cropping_Intensity",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# SWB Layer
 @api_view(["POST"])
 @schema(None)
 def generate_swb(request):
     print("Inside generate_swf")
+    start_time = time.time()
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -693,23 +708,37 @@ def generate_swb(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_swb_layer.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_swb_layer(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            gee_account_id=gee_account_id,
         )
-        return Response(
-            {"Success": "Generate swb task initiated"}, status=status.HTTP_200_OK
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "SWB Layer completed",
+            "execution_id": execution_id,
+            "node_type": "SWB_Layer",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_swf api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "SWB_Layer",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Drought
 @api_view(["POST"])
@@ -1259,6 +1288,7 @@ def mws_drought_causality(request):
 @schema(None)
 def tree_health_raster(request):
     print("Inside tree_health_change API")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1266,53 +1296,53 @@ def tree_health_raster(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        tree_health_ccd_raster.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        execution_id = request.data.get("execution_id", "local")
+
+        ccd_asset_ids = tree_health_ccd_raster(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            gee_account_id=gee_account_id,
         )
-        tree_health_ch_raster.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        ch_asset_ids = tree_health_ch_raster(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            gee_account_id=gee_account_id,
         )
-        tree_health_overall_change_raster.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        overall_asset_id = tree_health_overall_change_raster(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            gee_account_id=gee_account_id,
         )
 
-        return Response(
-            {"Success": "tree_health task initiated"},
-            status=status.HTTP_200_OK,
-        )
+        all_asset_ids = ccd_asset_ids + ch_asset_ids + [overall_asset_id]
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Tree Health Rasters completed",
+            "execution_id": execution_id,
+            "node_type": "TreeHealth_Rasters",
+            "asset_ids": all_asset_ids,
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
-        print("Exception in change_detection api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print("Exception in tree_health_raster api :: ", e)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "TreeHealth_Rasters",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Tree Health Vector
 @api_security_check(allowed_methods="POST")
 @schema(None)
 def tree_health_vector(request):
     print("Inside Overall_change_vector")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1320,49 +1350,44 @@ def tree_health_vector(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
+        execution_id = request.data.get("execution_id", "local")
 
-        tree_health_ch_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        ch_asset_id = tree_health_ch_vector(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            gee_account_id=gee_account_id,
         )
-
-        tree_health_ccd_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        ccd_asset_id = tree_health_ccd_vector(
+            state=state, district=district, block=block,
+            start_year=start_year, end_year=end_year,
+            gee_account_id=gee_account_id,
+        )
+        overall_asset_id = tree_health_overall_change_vector(
+            state=state, district=district, block=block,
+            gee_account_id=gee_account_id,
         )
 
-        tree_health_overall_change_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Overall_change_vector task initiated"},
-            status=status.HTTP_200_OK,
-        )
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Tree Health Vectors completed",
+            "execution_id": execution_id,
+            "node_type": "TreeHealth_Vectors",
+            "asset_ids": [ch_asset_id, ccd_asset_id, overall_asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in Overall_change_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "TreeHealth_Vectors",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(["POST"])
 @schema(None)
 def gee_task_status(request):
@@ -1457,47 +1482,53 @@ def restoration_opportunity(request):
             "node_type": "Restoration_Opportunity",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Site Suitability
 @api_view(["POST"])
 @schema(None)
 def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
+    start_time = time.time()
     try:
         project_id = request.data.get("project_id")
         state = request.data.get("state").lower() if request.data.get("state") else None
-        district = (
-            request.data.get("district").lower()
-            if request.data.get("district")
-            else None
-        )
+        district = request.data.get("district").lower() if request.data.get("district") else None
         block = request.data.get("block").lower() if request.data.get("block") else None
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        gee_account_id = (
-            request.data.get("gee_account_id")
-            if request.data.get("gee_account_id")
-            else None
+        gee_account_id = request.data.get("gee_account_id") if request.data.get("gee_account_id") else None
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = site_suitability(
+            project_id,
+            start_year,
+            end_year,
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
         )
-        site_suitability.apply_async(
-            args=[
-                project_id,
-                start_year,
-                end_year,
-                state,
-                district,
-                block,
-                gee_account_id,
-            ],
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Plantation_site_suitability task initiated"},
-            status=status.HTTP_200_OK,
-        )
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Site Suitability completed",
+            "execution_id": execution_id,
+            "node_type": "Site_Suitability",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in Plantation_site_suitability api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Site_Suitability",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 # Aquifer Vector
 @api_view(["POST"])
 @schema(None)
@@ -1847,45 +1878,77 @@ def generate_lcw(request):
         print("Exception in generate_lcw_conflict_data api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Agro Ecological
 @api_view(["POST"])
 @schema(None)
 def generate_agroecological(request):
     print("Inside generate_agroecological_data API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_agroecological_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_agroecological_data(state, district, block, gee_account_id)
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Agroecological Layer completed",
+            "execution_id": execution_id,
+            "node_type": "Agroecological",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_agroecological_data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Agroecological",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Factory CSR
 @api_view(["POST"])
 @schema(None)
 def generate_factory_csr(request):
     print("Inside generate_factory_csr_to_gee API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_factory_csr_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_factory_csr_data(state, district, block, gee_account_id)
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Factory CSR Layer completed",
+            "execution_id": execution_id,
+            "node_type": "Factory_CSR",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_factory_csr_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Factory_CSR",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1907,25 +1970,41 @@ def generate_green_credit(request):
         print("Exception in generate_green_credit_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Mining
 @api_view(["POST"])
 @schema(None)
 def generate_mining(request):
     print("Inside generate_mining_to_gee API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_mining_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_mining_data(state, district, block, gee_account_id)
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "Mining Layer completed",
+            "execution_id": execution_id,
+            "node_type": "Mining",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_mining_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "Mining",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
@@ -2216,25 +2295,41 @@ def generate_mws_connectivity(request):
             "node_type": "MWS_Connectivity",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# MWS Centroid
 @api_view(["POST"])
 @schema(None)
 def generate_mws_centroid(request):
     print("Inside generate_mws_centroid API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_mws_centroid_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_mws_centroid_data(state, district, block, gee_account_id)
+
+        execution_time = time.time() - start_time
+        return Response({
+            "status": "success",
+            "message": "MWS Centroid completed",
+            "execution_id": execution_id,
+            "node_type": "MWS_Centroid",
+            "asset_ids": [asset_id],
+            "hosting_platform": "GEE",
+            "stac_spec": {},
+            "execution_time": execution_time,
+        }, status=status.HTTP_200_OK)
+
     except Exception as e:
         print("Exception in generate_mws_centroid api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "status": "failed",
+            "message": str(e),
+            "execution_id": request.data.get("execution_id", "local"),
+            "node_type": "MWS_Centroid",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])

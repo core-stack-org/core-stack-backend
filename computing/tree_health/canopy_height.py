@@ -56,6 +56,7 @@ def tree_health_ch_raster(
         )
 
     layer_at_geoserver = False
+    asset_ids = []
 
     # Loop for each year
     for year in range(start_year, end_year + 1):
@@ -149,5 +150,5 @@ def tree_health_ch_raster(
                     layer_id=layer_id,
                     sync_to_geoserver=layer_at_geoserver,
                 )
-
-    return layer_at_geoserver
+        asset_ids.append(asset_id)
+    return asset_ids

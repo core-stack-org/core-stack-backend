@@ -125,7 +125,7 @@ def generate_swb_layer(
         district,
         block,
     )
-    return layer_at_geoserver
+    return asset_id
 
 
 def sync_asset_to_db_and_geoserver(
