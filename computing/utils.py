@@ -44,12 +44,7 @@ from utilities.geoserver_utils import Geoserver
 from django.core.mail import EmailMessage, get_connection
 import time
 
-
 logger = logging.getLogger(__name__)
-
-
-def _fc_to_shape_base_dir():
-    return os.path.join(settings.BASE_DIR, "data", "fc_to_shape")
 
 
 def generate_shape_files(path):
@@ -77,7 +72,7 @@ def convert_to_zip(dir_name, file_type):
 
 
 def push_shape_to_geoserver(
-        path, store_name=None, workspace=None, layer_name=None, file_type="shp"
+    path, store_name=None, workspace=None, layer_name=None, file_type="shp"
 ):
     geo = Geoserver()
 
@@ -152,8 +147,9 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
 
 
 def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
-    state_dir = os.path.join(_fc_to_shape_base_dir(), state_name)
-    os.makedirs(state_dir, exist_ok=True)
+    state_dir = os.path.join("data/fc_to_shape", state_name)
+    if not os.path.exists(state_dir):
+        os.mkdir(state_dir)
     path = os.path.join(state_dir, f"{layer_name}")
     # Write the feature collection into json file
     with open(path + ".json", "w") as f:
@@ -177,8 +173,9 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         geojson_fc = get_geojson_from_gcs(layer_name)
     geo = Geoserver()
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join(_fc_to_shape_base_dir(), shp_folder)
-        os.makedirs(state_dir, exist_ok=True)
+        state_dir = os.path.join("data/fc_to_shape", shp_folder)
+        if not os.path.exists(state_dir):
+            os.mkdir(state_dir)
         path = os.path.join(state_dir, f"{layer_name}")
 
         # Convert to GeoDataFrame
@@ -215,8 +212,9 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         geojson_fc = get_geojson_from_gcs(layer_name)
     print(len(geojson_fc["features"]))
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join(_fc_to_shape_base_dir(), project_name)
-        os.makedirs(state_dir, exist_ok=True)
+        state_dir = os.path.join("data/fc_to_shape", project_name)
+        if not os.path.exists(state_dir):
+            os.mkdir(state_dir)
         path = os.path.join(state_dir, f"{layer_name}")
 
         # Convert to GeoDataFrame
@@ -265,13 +263,13 @@ def create_chunk(aoi, description, chunk_size):
 
 
 def merge_chunks(
-        aoi,
-        folder_list,
-        description,
-        chunk_size,
-        chunk_asset_path=GEE_HELPER_PATH,
-        merge_asset_path=GEE_ASSET_PATH,
-        merge_asset_id=None,
+    aoi,
+    folder_list,
+    description,
+    chunk_size,
+    chunk_asset_path=GEE_HELPER_PATH,
+    merge_asset_path=GEE_ASSET_PATH,
+    merge_asset_id=None,
 ):
     print("Merge Chunk task initiated")
     ee_initialize()
@@ -283,7 +281,7 @@ def merge_chunks(
         end = start + chunk_size
         block_name_for_parts = description + "_" + str(start) + "-" + str(end)
         src_asset_id = (
-                get_gee_dir_path(folder_list, chunk_asset_path) + block_name_for_parts
+            get_gee_dir_path(folder_list, chunk_asset_path) + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
@@ -291,7 +289,7 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = merge_asset_id or (
-            get_gee_dir_path(folder_list, merge_asset_path) + description
+        get_gee_dir_path(folder_list, merge_asset_path) + description
     )
     try:
         # Export an ee.FeatureCollection as an Earth Engine asset.
@@ -354,14 +352,8 @@ def get_agri_year_key(season_key):
 
 
 def calculate_precipitation_season(
-        geojson_filepath, draught_asset_id, start_year=None, end_year=None
+    geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
 ):
-    if start_year is None or end_year is None:
-        raise ValueError(
-            "start_year and end_year are required for calculate_precipitation_season."
-        )
-    start_year = int(start_year)
-    end_year = int(end_year)
 
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
@@ -426,17 +418,17 @@ def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
 
     # Build CI and NDVI asset paths
     asset_path_ci = (
-            get_gee_dir_path(
-                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
-            )
-            + ci_asset
+        get_gee_dir_path(
+            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + ci_asset
     )
 
     asset_path_ndvi = (
-            get_gee_dir_path(
-                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
-            )
-            + ndvi_asset
+        get_gee_dir_path(
+            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+        )
+        + ndvi_asset
     )
 
     # Load FeatureCollections
@@ -490,8 +482,9 @@ def get_directory_size(path):
 
 
 def generate_geojson_with_ci_ndvi_ndmi(
-        zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id
+    zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id
 ):
+
     # Load project
     proj_obj = Project.objects.get(pk=proj_id)
 
@@ -615,20 +608,48 @@ def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     sync_project_fc_to_geoserver(merged_final, proj_obj.name, layer_name, "waterrej")
 
 
+def _sync_layer_to_prod_db(payload: dict):
+    from django.conf import settings
+
+    prod_url = getattr(settings, "PROD_BACKEND_URL", "")
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if not prod_url:
+        return
+
+    endpoint = prod_url.rstrip("/") + "/api/v1/computing/sync_layer_remote/"
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers={"X-Api-Key": api_key},
+            timeout=30,
+        )
+        if response.status_code not in (200, 201):
+            logger.warning(
+                "Prod DB sync returned %s for layer %s: %s",
+                response.status_code,
+                payload.get("layer_name"),
+                response.text,
+            )
+        else:
+            logger.info("Layer %s synced to prod DB.", payload.get("layer_name"))
+    except requests.RequestException as e:
+        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+
+
 def save_layer_info_to_db(
-        state,
-        district,
-        block,
-        layer_name,
-        asset_id,
-        dataset_name,
-        sync_to_geoserver=False,
-        layer_version="1.0",
-        algorithm=None,
-        algorithm_version="1.0",
-        misc=None,
-        is_override=False,
-        is_gee_asset=True,
+    state,
+    district,
+    block,
+    layer_name,
+    asset_id,
+    dataset_name,
+    sync_to_geoserver=False,
+    layer_version="1.0",
+    algorithm=None,
+    algorithm_version="1.0",
+    misc=None,
+    is_override=False,
 ):
     print("inside the save_layer_info_to_db function")
 
@@ -646,7 +667,7 @@ def save_layer_info_to_db(
         print("Error fetching in state district block:", e)
         return
 
-    is_public = is_asset_public(asset_id) if is_gee_asset else False
+    is_public = is_asset_public(asset_id)
 
     # Check if there’s an existing layer
     existing_layer = (
@@ -718,6 +739,22 @@ def save_layer_info_to_db(
         )
 
     print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
+
+    _sync_layer_to_prod_db({
+        "state": state,
+        "district": district,
+        "block": block,
+        "layer_name": layer_name,
+        "asset_id": asset_id,
+        "dataset_name": dataset_name,
+        "sync_to_geoserver": sync_to_geoserver,
+        "layer_version": layer_version,
+        "algorithm": algorithm,
+        "algorithm_version": algorithm_version,
+        "misc": misc,
+        "is_override": is_override,
+    })
+
     return layer_obj.id
 
 
@@ -751,12 +788,12 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
 
 
 def update_dashboard_geojson(
-        state=None,
-        district=None,
-        block=None,
-        layer_name=None,
-        workspace_name=None,
-        proj_id=None,
+    state=None,
+    district=None,
+    block=None,
+    layer_name=None,
+    workspace_name=None,
+    proj_id=None,
 ):
     if state and block and block:
         print(f"🔄 Updating GeoJSON for {state}, {district}, {block}")
@@ -890,11 +927,11 @@ def safe_reduce_max(image, geom, scale=30):
 #  MAIN FUNCTION TO PROCESS SWB LAYER
 # ------------------------------------------------------
 def generate_swb_layer_with_max_so_catchment(
-        roi=None,
-        app_type="MWS",
-        asset_suffix=None,
-        asset_folder=None,
-        gee_account_id=None,
+    roi=None,
+    app_type="MWS",
+    asset_suffix=None,
+    asset_folder=None,
+    gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
@@ -970,7 +1007,7 @@ def _sync_layer_to_prod_db(payload: dict):
 
 
 def _update_layer_sync_remote(
-        layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
     prod_url = _get_prod_backend_url()
     if not prod_url or layer_id is None:
@@ -1004,41 +1041,9 @@ def _update_layer_sync_remote(
         )
 
 
-def geoserver_sync_succeeded(sync_result):
-    """Return True when a GeoServer push response indicates success."""
-    if not sync_result:
-        return False
-    if isinstance(sync_result, dict):
-        return sync_result.get("status_code") in (200, 201)
-    return True
-
-
-def mark_layer_synced_to_geoserver(layer_id, sync_result):
-    """Persist GeoServer sync flag and fire STAC auto-trigger signal."""
-    if geoserver_sync_succeeded(sync_result) and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        return True
-    return False
-
-
 def update_layer_sync_status(
-        layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
-    try:
-        from utilities.layer_generation_mode import (
-            is_sync_layer_generation_context_active,
-            record_sync_layer_id,
-        )
-
-        if (
-            is_sync_layer_generation_context_active()
-            and sync_to_geoserver
-            and layer_id is not None
-        ):
-            record_sync_layer_id(layer_id)
-    except Exception:
-        logger.exception("Failed to record sync layer id for STAC response")
-
     if _get_prod_backend_url():
         _update_layer_sync_remote(
             layer_id,
@@ -1074,32 +1079,8 @@ def update_layer_sync_status(
         print(f"Error updating layer sync status: {e}")
 
 
-def _is_cache_valid(cache: dict, workspace: str) -> bool:
-    if workspace not in cache:
-        return False
-    age = time.time() - cache[workspace]["cached_at"]
-    if age > 3600:
-        logger.info(f"Cache expired for {workspace} (age: {int(age)}s)")
-        return False
-    return True
-
-
-def _set_cache(cache: dict, workspace: str, data: set):
-    cache[workspace] = {
-        "data": data,
-        "cached_at": time.time(),
-    }
-
-
-def send_report_email(
-        result,
-        report_type: str = "missing_layers",
-        recipients: list = None,
-) -> bool:
-    """
-    Generic reusable function to email a JSON report.
-    report_type: "missing_layers" or "missing_excel_files"
-    """
+# send missing layer to recipient email
+def send_missing_layers_report(result: dict, recipients: list = None) -> bool:
     if recipients is None:
         recipients = getattr(settings, "MISSING_LAYER_RECIPIENTS", [])
 
@@ -1107,84 +1088,22 @@ def send_report_email(
         recipients = [recipients]
 
     if not recipients:
-        logger.error("No recipients configured for report email.")
+        logger.error("No recipients configured for missing layers report.")
         return False
 
-    if report_type == "missing_layers":
-        subject = "Missing Layers Report"
-        attachment_name = "missing_layers.json"
+    summary = []
+    total_missing = 0
 
-        strict_result = result.get("Mandatory", {})
-        can_be_empty_result = result.get("can_be_empty", {})
-
-        # Filter out workspaces with zero missing layers
-        strict_filtered = {
-            ws: data for ws, data in strict_result.items() if data.get("missing_layers")
-        }
-        can_be_empty_filtered = {
-            ws: data
-            for ws, data in can_be_empty_result.items()
-            if data.get("missing_layers")
-        }
-
-        strict_summary = []
-        total_strict_missing = 0
-        for layer, data in strict_filtered.items():
-            count = len(data.get("missing_layers", []))
-            total_strict_missing += count
-            strict_summary.append(f"{layer}: {count}")
-
-        can_be_empty_summary = []
-        total_can_be_empty_missing = 0
-        for layer, data in can_be_empty_filtered.items():
-            count = len(data.get("missing_layers", []))
-            total_can_be_empty_missing += count
-            can_be_empty_summary.append(f"{layer}: {count}")
-
-        total_missing = total_strict_missing + total_can_be_empty_missing
-
-        body = (
-                "Missing Layers Report\n\n"
-                f"Total Missing: {total_missing}\n"
-                f"  - Mandatory (needs attention): {total_strict_missing}\n"
-                f"  - Can-Be-Empty (may be legitimately absent): {total_can_be_empty_missing}\n\n"
-                "---- Mandatory Workspaces (data expected everywhere) ----\n"
-                + (
-                    "\n".join(strict_summary)
-                    if strict_summary
-                    else "None — nothing missing"
-                )
-                + "\n\n"
-                  "---- Can-Be-Empty Workspaces (some locations may legitimately have no data) ----\n"
-                + (
-                    "\n".join(can_be_empty_summary)
-                    if can_be_empty_summary
-                    else "None — nothing missing"
-                )
-                + "\n\nDetailed report attached."
-        )
-        result = {
-            "Mandatory": strict_filtered,
-            "can_be_empty": can_be_empty_filtered,
-        }
-
-    elif report_type == "missing_excel_files":
-        subject = "Missing Stats Excel/JSON Files Report"
-        attachment_name = "missing_excel_files.json"
-        total_locations = len(result)
-        total_missing_files = sum(len(loc.get("missing_files", [])) for loc in result)
-        total_xlsx_issues = sum(1 for loc in result if loc.get("xlsx_issues"))
-        body = (
-            "Missing Stats Excel/JSON Files Report\n\n"
-            f"Tehsils which files(json/excel) are missing: {total_locations}\n"
-            f"Total missing files: {total_missing_files}\n"
-            f"Tehsils with xlsx sheet missing: {total_xlsx_issues}\n\n"
-            "Detailed report attached."
-        )
-
-    else:
-        logger.error(f"Unknown report_type: {report_type}")
-        return False
+    for layer, data in result.items():
+        count = len(data.get("missing_layers", []))
+        total_missing += count
+        summary.append(f"{layer}: {count}")
+    body = (
+        "Missing Layers Report\n\n"
+        f"Total Missing: {total_missing}\n\n"
+        + "\n".join(summary)
+        + "\n\nDetailed report attached."
+    )
 
     attachment_content = json.dumps(result, indent=4)
     max_retries = 3
@@ -1195,19 +1114,19 @@ def send_report_email(
             connection = get_connection(timeout=120)
             connection.open()
             email = EmailMessage(
-                subject=subject,
+                subject="Missing Layers Report",
                 body=body,
                 from_email=settings.EMAIL_HOST_USER,
                 to=recipients,
                 connection=connection,
             )
             email.attach(
-                attachment_name,
+                "missing_layers.json",
                 attachment_content,
                 "application/json",
             )
             email.send()
-            logger.info(f"{subject} sent to {recipients}")
+            logger.info(f"Missing layers report sent to {recipients}")
             logger.info(
                 f"Attachment size: "
                 f"{len(attachment_content.encode('utf-8')) / 1024:.2f} KB"
@@ -1228,4 +1147,20 @@ def send_report_email(
                     connection.close()
                 except Exception:
                     pass
-    return False
+
+
+def _is_cache_valid(cache: dict, workspace: str) -> bool:
+    if workspace not in cache:
+        return False
+    age = time.time() - cache[workspace]["cached_at"]
+    if age > 3600:
+        logger.info(f"Cache expired for {workspace} (age: {int(age)}s)")
+        return False
+    return True
+
+
+def _set_cache(cache: dict, workspace: str, data: set):
+    cache[workspace] = {
+        "data": data,
+        "cached_at": time.time(),
+    }
