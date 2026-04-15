@@ -34,6 +34,12 @@ from .mws.generate_hydrology import generate_hydrology
 from .utils import (
     Geoserver,
     kml_to_shp,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+from .local_compute_helper import (
+    get_compute_mode as _get_compute_mode,
+    select_compute_task as _select_compute_task,
 )
 from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
