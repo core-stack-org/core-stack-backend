@@ -125,6 +125,8 @@ from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
+from django.conf import settings
+
 
 
 @api_security_check(allowed_methods="POST")
@@ -1957,7 +1959,6 @@ def update_layer_sync_remote(request):
     Called by a local compute instance to update sync/STAC flags on a layer
     record in this (prod) backend.
     """
-    from django.conf import settings
 
     api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
     if api_key and request.headers.get("X-Api-Key") != api_key:
