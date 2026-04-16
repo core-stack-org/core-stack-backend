@@ -48,3 +48,18 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
+
+.codex/
+.history/
+.kilocode/
+.kilocodeignore_
+.local/
+.postman/
+.tldr/
+.tldrignore
+.tmp_point_env/
+installation-terminal-output.txt
+# installation/.local/
+logs/
+# nrm_app/.local/
+pipeline-steps.jpeg
