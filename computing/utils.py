@@ -41,6 +41,8 @@ import json
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
+from django.conf import settings
+
 from datetime import datetime, timedelta
 
 
@@ -605,20 +607,25 @@ def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     sync_project_fc_to_geoserver(merged_final, proj_obj.name, layer_name, "waterrej")
 
 
+def _get_prod_backend_url():
+    return getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
+
+
+def _get_prod_api_key():
+    return getattr(settings, "PROD_BACKEND_API_KEY", "")
+
+
 def _sync_layer_to_prod_db(payload: dict):
-    from django.conf import settings
-
-    prod_url = getattr(settings, "PROD_BACKEND_URL", "")
-    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    prod_url = _get_prod_backend_url()
     if not prod_url:
-        return
+        return None
 
-    endpoint = prod_url.rstrip("/") + "/api/v1/computing/sync_layer_remote/"
+    endpoint = prod_url + "/api/v1/computing/sync_layer_remote/"
     try:
         response = requests.post(
             endpoint,
             json=payload,
-            headers={"X-Api-Key": api_key},
+            headers={"X-Api-Key": _get_prod_api_key()},
             timeout=30,
         )
         if response.status_code not in (200, 201):
@@ -628,10 +635,44 @@ def _sync_layer_to_prod_db(payload: dict):
                 payload.get("layer_name"),
                 response.text,
             )
-        else:
-            logger.info("Layer %s synced to prod DB.", payload.get("layer_name"))
+            return None
+        layer_id = response.json().get("layer_id")
+        logger.info("Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id)
+        return layer_id
     except requests.RequestException as e:
         logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+        return None
+
+
+def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
+    prod_url = _get_prod_backend_url()
+    if not prod_url or layer_id is None:
+        return
+
+    endpoint = prod_url + "/api/v1/computing/update_layer_sync_remote/"
+    payload = {
+        "layer_id": layer_id,
+        "sync_to_geoserver": sync_to_geoserver,
+        "is_stac_specs_generated": is_stac_specs_generated,
+    }
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers={"X-Api-Key": _get_prod_api_key()},
+            timeout=30,
+        )
+        if response.status_code not in (200, 201):
+            logger.warning(
+                "Prod layer sync status update returned %s for layer %s: %s",
+                response.status_code,
+                layer_id,
+                response.text,
+            )
+        else:
+            logger.info("Layer sync status updated on prod DB for id=%s.", layer_id)
+    except requests.RequestException as e:
+        logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
 
 
 def save_layer_info_to_db(
@@ -648,6 +689,22 @@ def save_layer_info_to_db(
     misc=None,
     is_override=False,
 ):
+    if _get_prod_backend_url():
+        return _sync_layer_to_prod_db({
+            "state": state,
+            "district": district,
+            "block": block,
+            "layer_name": layer_name,
+            "asset_id": asset_id,
+            "dataset_name": dataset_name,
+            "sync_to_geoserver": sync_to_geoserver,
+            "layer_version": layer_version,
+            "algorithm": algorithm,
+            "algorithm_version": algorithm_version,
+            "misc": misc,
+            "is_override": is_override,
+        })
+
     print("inside the save_layer_info_to_db function")
 
     dataset = Dataset.objects.get(name=dataset_name)
@@ -736,28 +793,20 @@ def save_layer_info_to_db(
         )
 
     print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
-
-    _sync_layer_to_prod_db({
-        "state": state,
-        "district": district,
-        "block": block,
-        "layer_name": layer_name,
-        "asset_id": asset_id,
-        "dataset_name": dataset_name,
-        "sync_to_geoserver": sync_to_geoserver,
-        "layer_version": layer_version,
-        "algorithm": algorithm,
-        "algorithm_version": algorithm_version,
-        "misc": misc,
-        "is_override": is_override,
-    })
-
     return layer_obj.id
 
 
 def update_layer_sync_status(
     layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
+    if _get_prod_backend_url():
+        _update_layer_sync_remote(
+            layer_id,
+            sync_to_geoserver=sync_to_geoserver,
+            is_stac_specs_generated=is_stac_specs_generated,
+        )
+        return layer_id
+
     try:
         layer_obj = Layer.objects.filter(id=layer_id)
         if sync_to_geoserver is not None:

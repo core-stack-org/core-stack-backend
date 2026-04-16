@@ -1910,6 +1910,35 @@ def stac_item(request, state, district, block, item_id):
 
 @api_view(["POST"])
 @schema(None)
+def update_layer_sync_remote(request):
+    """
+    Called by a local compute instance to update sync/STAC flags on a layer
+    record in this (prod) backend.
+    """
+    from django.conf import settings
+
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = d.get("layer_id")
+        if layer_id is None:
+            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = update_layer_sync_status(
+            layer_id=layer_id,
+            sync_to_geoserver=d.get("sync_to_geoserver"),
+            is_stac_specs_generated=d.get("is_stac_specs_generated"),
+        )
+        return Response({"layer_id": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
 def sync_layer_remote(request):
     """
     Called by a local compute instance to persist a layer record on this (prod) backend.

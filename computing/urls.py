@@ -222,4 +222,5 @@ urlpatterns = [
         name="stac_item",
     ),
     path("sync_layer_remote/", api.sync_layer_remote, name="sync_layer_remote"),
+    path("update_layer_sync_remote/", api.update_layer_sync_remote, name="update_layer_sync_remote"),
 ]
