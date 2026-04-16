@@ -1999,7 +1999,6 @@ def update_layer_sync_remote(request):
     Called by a local compute instance to update sync/STAC flags on a layer
     record in this (prod) backend.
     """
-    from django.conf import settings
 
     api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
     if api_key and request.headers.get("X-Api-Key") != api_key:
