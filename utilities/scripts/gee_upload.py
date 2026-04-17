@@ -17,7 +17,7 @@ file can be streamed instead of loaded fully into memory.
 
 Usage Example:
 `single file upload`
-python -m utilities.scripts.gee_gen_utils \
+python -m utilities.scripts.gee_upload \
   --file data/pan_india_facilities/pan_india_facilities.geojson \
   --service-account-json data/gee_confs/core-stack-learn-818963fa8f26.json \
   --wait \
@@ -25,6 +25,18 @@ python -m utilities.scripts.gee_gen_utils \
   --gcs-prefix proximity \
   --asset-id projects/corestack-datasets/assets/datasets/pan_india_facilities \
   --replace-existing
+
+
+`batch upload`
+python -m utilities.scripts.gee_upload
+--directorydata/pan_india_facilities/
+--gee-account-id
+--wait
+--poll-interval 150
+--gcs-prefix proximity
+--asset-parent projects/corestack-datasets/assets/datasets/facilities
+--make-public
+--replace-existing
 """
 
 from __future__ import annotations
