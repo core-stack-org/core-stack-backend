@@ -65,7 +65,7 @@ def clart_layer(state, district, block):
             + valid_gee_text(block.lower())
         )
         lithology = ee.Image(
-            GEE_ASSET_PATH
+            "projects/ee-corestackdev/assets/apps/mws/"    ## We have hardcoded because now we are using core-stack-dev1 account for the layer pipeline
             + valid_gee_text(state.lower())
             + "/"
             + valid_gee_text(state.lower())
