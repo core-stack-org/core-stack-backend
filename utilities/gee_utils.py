@@ -381,12 +381,10 @@ def gdf_to_ee_fc(gdf):
 
 
 def create_gee_folder(folder_path, gee_project_path):
-    full_path = gee_project_path.rstrip("/") + "/" + folder_path.strip("/")
-    base_parts = gee_project_path.rstrip("/").split("/")
-    full_parts = full_path.split("/")
-    for i in range(len(base_parts), len(full_parts) + 1):
-        sub_path = "/".join(full_parts[:i])
-        print(f"{sub_path=}")
+    full_path = gee_project_path + folder_path
+    parts = full_path.split("/")
+    for i in range(1, len(parts) + 1):
+        sub_path = "/".join(parts[:i])
         try:
             ee.data.getAsset(sub_path)
             print(f"Exists: {sub_path}")
