@@ -853,7 +853,11 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
-        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        steward_qs = (
+            base_queryset
+            .exclude(TEST_FACILITATOR_EXCLUSIONS)
+            .filter(facilitator_name__in=_app_user_steward_names_qs())
+        )
         response_data = _build_steward_meta_stats(steward_qs)
         response_data["filters_applied"] = {
             "organization_id": organization_id,
