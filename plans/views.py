@@ -236,39 +236,6 @@ def _build_steward_meta_stats(queryset):
         )
     ]
 
-    effective_village = Case(
-        When(
-            ~Q(village_name="") & Q(village_name__isnull=False),
-            then=Trim(F("village_name")),
-        ),
-        When(
-            plan__startswith="Plan ",
-            then=Trim(Substr("plan", 6, Length("plan") - Value(5))),
-        ),
-        default=Trim(F("plan")),
-        output_field=CharFieldOutput(max_length=255),
-    )
-    village_level = [
-        {
-            "village_name": s["effective_village"],
-            "tehsil_name": s["tehsil_soi__tehsil_name"],
-            "district_name": s["district_soi__district_name"],
-            "state_name": s["state_soi__state_name"],
-            "steward_count": s["steward_count"],
-        }
-        for s in (
-            queryset.annotate(effective_village=effective_village)
-            .values(
-                "effective_village",
-                "tehsil_soi__tehsil_name",
-                "district_soi__district_name",
-                "state_soi__state_name",
-            )
-            .annotate(steward_count=Count("facilitator_name", distinct=True))
-            .order_by("-steward_count")
-        )
-    ]
-
     total_stewards = combined["total_stewards"] or 0
     active_stewards = combined["active_stewards"] or 0
 
@@ -287,7 +254,6 @@ def _build_steward_meta_stats(queryset):
         "state_level": state_level,
         "district_level": district_level,
         "tehsil_level": tehsil_level,
-        "village_level": village_level,
     }
 
 
