@@ -31,7 +31,7 @@ def generate_zoi(
         asset_folder_list = [proj_obj.name.lower()]
         asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
 
-    generate_zoi1(
+    asset_id_1=generate_zoi1(
         state,
         district,
         block,
@@ -43,7 +43,7 @@ def generate_zoi(
         proj_id,
     )
 
-    generate_zoi_ci(
+    asset_id_2=generate_zoi_ci(
         state,
         district,
         block,
@@ -54,9 +54,11 @@ def generate_zoi(
         proj_id,
     )
 
+    asset_id_3=None
+
     if proj_id:
 
-        get_ndvi_for_zoi(
+        asset_id_3=get_ndvi_for_zoi(
             state=state,
             district=district,
             block=block,
@@ -66,3 +68,4 @@ def generate_zoi(
             gee_account_id=gee_account_id,
             proj_id=proj_id,
         )
+    return [asset_id_1,asset_id_2,asset_id_3]

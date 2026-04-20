@@ -102,6 +102,7 @@ def generate_zoi1(
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         print(layer_name)
         sync_project_fc_to_geoserver(zoi_rings, proj_obj.name, layer_name, "zoi_layers")
+    return asset_id
 
 
 def compute_zoi(feature):

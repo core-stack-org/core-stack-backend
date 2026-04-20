@@ -1067,6 +1067,7 @@ def terrain_lulc_plain_cluster(request):
             "node_type": "Terrain_LULC_Plain",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# CLART
 @api_view(["POST"])
 @schema(None)
 def generate_clart(request):
@@ -1858,26 +1859,48 @@ def layer_status_dashboard(request):
         print("Exception in layer_staus_dashboard api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# LCW Conflict
 @api_view(["POST"])
 @schema(None)
 def generate_lcw(request):
     print("Inside generate_lcw_conflict_data API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_lcw_conflict_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_lcw_conflict_data(
+            state=state, district=district, block=block, gee_account_id=gee_account_id
         )
+        execution_time = time.time() - start_time
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "status": "success",
+                "message": "LCW Conflict completed",
+                "execution_id": execution_id,
+                "node_type": "LCWConflict",
+                "asset_ids": asset_id,
+                "hosting_platform": "GEE",
+                "stac_spec": {},
+                "execution_time": execution_time,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in generate_lcw_conflict_data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response(
+            {
+                "status": "failed",
+                "message": str(e),
+                "execution_id": request.data.get("execution_id", "local"),
+                "node_type": "LCWConflict",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    
 # Agro Ecological
 @api_view(["POST"])
 @schema(None)
@@ -1950,26 +1973,48 @@ def generate_factory_csr(request):
             "node_type": "Factory_CSR",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# Green Credit
 @api_view(["POST"])
 @schema(None)
 def generate_green_credit(request):
     print("Inside generate_green_credit_to_gee API.")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_green_credit_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        execution_id = request.data.get("execution_id", "local")
+
+        asset_id = generate_green_credit_data(
+            state=state, district=district, block=block, gee_account_id=gee_account_id
         )
+        execution_time = time.time() - start_time
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "status": "success",
+                "message": "Green Credit completed",
+                "execution_id": execution_id,
+                "node_type": "GreenCredit",
+                "asset_ids": asset_id,
+                "hosting_platform": "GEE",
+                "stac_spec": {},
+                "execution_time": execution_time,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in generate_green_credit_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        return Response(
+            {
+                "status": "failed",
+                "message": str(e),
+                "execution_id": request.data.get("execution_id", "local"),
+                "node_type": "GreenCredit",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+    
 # Mining
 @api_view(["POST"])
 @schema(None)
@@ -2228,31 +2273,50 @@ def generate_ndvi_timeseries(request):
             "node_type": "NDVI_Timeseries",
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# ZOI
 @api_view(["POST"])
 @schema(None)
 def generate_zoi_to_gee(request):
     print("Inside generate zoi layers")
+    start_time = time.time()
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_zoi.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="waterbody",
-        )
+        execution_id = request.data.get("execution_id", "local")
 
+        asset_ids = generate_zoi(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
+        )
+        execution_time = time.time() - start_time
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "status": "success",
+                "message": "ZOI completed",
+                "execution_id": execution_id,
+                "node_type": "ZOI",
+                "asset_ids": asset_ids,
+                "hosting_platform": "GEE",
+                "stac_spec": {},
+                "execution_time": execution_time,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_mining_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print("Exception in generate_zoi_to_gee api :: ", e)
+        return Response(
+            {
+                "status": "failed",
+                "message": str(e),
+                "execution_id": request.data.get("execution_id", "local"),
+                "node_type": "ZOI",
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 # MWS Connectivity
 @api_view(["POST"])

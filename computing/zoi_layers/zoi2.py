@@ -87,3 +87,4 @@ def generate_zoi_ci(
         fc = ee.FeatureCollection(asset_id_zoi_ci)
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         sync_project_fc_to_geoserver(fc, proj_obj.name, layer_name, "zoi_layers")
+    return asset_id_zoi_ci

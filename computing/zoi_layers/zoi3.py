@@ -80,3 +80,6 @@ def get_ndvi_for_zoi(
         proj_obj = Project.objects.get(pk=proj_id)
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         sync_project_fc_to_geoserver(fc, proj_obj.name, layer_name, "zoi_layers")
+    return ndvi_asset_path
+    
+
