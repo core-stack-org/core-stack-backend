@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timezone
 
 from rest_framework import status
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from drf_yasg.utils import swagger_auto_schema
 
@@ -19,6 +18,7 @@ from utilities.openmeteo_format import (
     success_envelope,
 )
 from utilities.renderers import round_floats
+from utilities.auth_check_decorator import api_security_check
 from .swagger_schemas import waterbodies_by_admin_schema, waterbodies_by_uuid
 from .utils import get_merged_waterbodies_with_zoi
 
@@ -259,7 +259,7 @@ def _handle_waterbodies_request_v2(request, require_uid=False):
 
 
 @swagger_auto_schema(**waterbodies_by_admin_schema)
-@api_view(["GET"])
+@api_security_check(auth_type="API_key")
 def get_waterbodies_by_admin_and_uid(request):
     try:
         return _handle_waterbodies_request(request)
@@ -273,7 +273,7 @@ def get_waterbodies_by_admin_and_uid(request):
 
 
 @swagger_auto_schema(**waterbodies_by_uuid)
-@api_view(["GET"])
+@api_security_check(auth_type="API_key")
 def get_waterbodies_by_uid(request):
     try:
         return _handle_waterbodies_request(request, require_uid=True)
@@ -287,7 +287,7 @@ def get_waterbodies_by_uid(request):
 
 
 @swagger_auto_schema(**waterbodies_by_admin_schema)
-@api_view(["GET"])
+@api_security_check(auth_type="API_key")
 def get_waterbodies_by_admin_and_uid_v2(request):
     try:
         return _handle_waterbodies_request_v2(request)
@@ -301,7 +301,7 @@ def get_waterbodies_by_admin_and_uid_v2(request):
 
 
 @swagger_auto_schema(**waterbodies_by_uuid)
-@api_view(["GET"])
+@api_security_check(auth_type="API_key")
 def get_waterbodies_by_uid_v2(request):
     try:
         return _handle_waterbodies_request_v2(request, require_uid=True)

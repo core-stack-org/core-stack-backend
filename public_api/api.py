@@ -17,6 +17,8 @@ from .views import (
     get_mws_json_from_kyl_indicator,
     get_tehsil_json,
     generate_mws_report_url,
+    get_mws_geometry,
+    get_village_geometries,
 )
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
@@ -29,6 +31,8 @@ from .swagger_schemas import (
     kyl_indicators_schema,
     generate_active_locations_schema,
     get_mws_data_schema,
+    mws_geometries_schema,
+    village_geometries_schema,
 )
 from geoadmin.utils import (
     transform_data,
@@ -37,7 +41,16 @@ from geoadmin.utils import (
 )
 from utilities.openmeteo_format import (
     error_envelope,
-    hourly_structure_from_mws,
+    flat_active_locations_payload,
+    flat_admin_detail_payload,
+    flat_generated_layers_payload,
+    flat_kyl_indicator_payload,
+    flat_mws_report_url_payload,
+    flat_mws_by_latlon_payload,
+    flat_mws_geometry_payload,
+    flat_village_geometries_payload,
+    fortnight_structure_from_mws,
+    legacy_hourly_to_fortnight_inner_block,
     normalize_payload,
     success_envelope,
 )
@@ -134,8 +147,9 @@ def _success_response(data, http_status=status.HTTP_200_OK):
 
 
 def _success_response_v2(data, http_status=status.HTTP_200_OK):
-    """data is already an Open-Meteo inner block (e.g. cached hourly bundle)."""
-    return Response(success_envelope(data), status=http_status)
+    """data is already an Open-Meteo inner block (e.g. cached MWS fortnightly bundle)."""
+    inner = legacy_hourly_to_fortnight_inner_block(data)
+    return Response(success_envelope(inner), status=http_status)
 
 
 def _error_response(message, http_status, details=None):
@@ -144,6 +158,27 @@ def _error_response(message, http_status, details=None):
 
 def _error_response_v2(message, http_status, details=None):
     return _error_response(message, http_status, details)
+
+
+def _get_required_query_param(request, name):
+    value = request.query_params.get(name)
+    if value is None:
+        return None
+    value = str(value).strip()
+    return value if value else None
+
+
+def _normalize_geo_params(request):
+    state_raw = _get_required_query_param(request, "state")
+    district_raw = _get_required_query_param(request, "district")
+    tehsil_raw = _get_required_query_param(request, "tehsil")
+    if not state_raw or not district_raw or not tehsil_raw:
+        return None, None, None
+    return (
+        valid_gee_text(state_raw.lower()),
+        valid_gee_text(district_raw.lower()),
+        valid_gee_text(tehsil_raw.lower()),
+    )
 
 
 def _normalize_external_result(result, default_error="Unable to process request"):
@@ -195,10 +230,16 @@ def get_admin_details_by_lat_lon(request):
             )
 
         properties_list = get_location_info_by_lat_lon(lat, lon)
-        return _normalize_external_result(
-            properties_list,
-            default_error="Unable to retrieve location data for the given coordinates",
-        )
+        if isinstance(properties_list, Response):
+            data = properties_list.data if hasattr(properties_list, "data") else {}
+            message = (
+                data.get("error")
+                or data.get("message")
+                or "Unable to retrieve location data for the given coordinates"
+            )
+            return _error_response(message, properties_list.status_code, details=data)
+        payload = flat_admin_detail_payload(properties_list)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error occurred: {e}")
@@ -242,9 +283,16 @@ def get_mws_by_lat_lon(request):
                 status.HTTP_400_BAD_REQUEST,
             )
         data = get_mws_id_by_lat_lon(lon, lat)
-        return _normalize_external_result(
-            data, default_error="Unable to retrieve MWS id for the given coordinates"
-        )
+        if isinstance(data, Response):
+            payload = data.data if hasattr(data, "data") else {}
+            message = (
+                payload.get("error")
+                or payload.get("message")
+                or "Unable to retrieve MWS id for the given coordinates"
+            )
+            return _error_response(message, data.status_code, details=payload)
+        payload = flat_mws_by_latlon_payload(data)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception while getting the mws_id by lat long", str(e))
         return _error_response(
@@ -263,10 +311,8 @@ def get_mws_data(request):
     """
     print("Inside mws data by excel api")
     try:
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
-        mws_id = request.query_params.get("mws_id")
+        state, district, tehsil = _normalize_geo_params(request)
+        mws_id = _get_required_query_param(request, "mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
             return _error_response(
@@ -326,10 +372,8 @@ def get_mws_data_v2(request):
     """
     print("Inside mws data by excel api v2")
     try:
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
-        mws_id = request.query_params.get("mws_id")
+        state, district, tehsil = _normalize_geo_params(request)
+        mws_id = _get_required_query_param(request, "mws_id")
         regenerate = str(request.query_params.get("regenerate", "")).lower() in {
             "1",
             "true",
@@ -382,7 +426,7 @@ def get_mws_data_v2(request):
                 details=data.get("Error in get mws data"),
             )
 
-        v2_payload = hourly_structure_from_mws(data)
+        v2_payload = fortnight_structure_from_mws(data)
         _save_mws_v2_to_mongo(state_norm, district, tehsil, mws_id, v2_payload)
 
         return _success_response_v2(v2_payload, http_status=status.HTTP_200_OK)
@@ -405,9 +449,7 @@ def generate_tehsil_data(request):
     print("Inside generating tehsil excel data")
     try:
         # Get query parameters
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        state, district, tehsil = _normalize_geo_params(request)
         regenerate = request.query_params.get("regenerate", "").lower()
 
         if state is None or district is None or tehsil is None:
@@ -455,10 +497,8 @@ def get_mws_json_by_kyl_indicator(request):
     """
     print("Inside Mws kyl Indicator api")
     try:
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
-        mws_id = request.query_params.get("mws_id")
+        state, district, tehsil = _normalize_geo_params(request)
+        mws_id = _get_required_query_param(request, "mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
             return _error_response(
@@ -489,12 +529,19 @@ def get_mws_json_by_kyl_indicator(request):
             )
 
         data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
+        if isinstance(data, dict) and data.get("error"):
+            return _error_response(
+                str(data["error"]),
+                status.HTTP_404_NOT_FOUND,
+            )
         if not data:
             return _error_response(
                 "Data not found for the given mws_id.",
                 status.HTTP_404_NOT_FOUND,
             )
-        return _success_response(data, http_status=status.HTTP_200_OK)
+        rows = data if isinstance(data, list) else []
+        payload = flat_kyl_indicator_payload(rows)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
         return _error_response(
@@ -510,9 +557,7 @@ def get_mws_json_by_kyl_indicator(request):
 def get_generated_layer_urls(request):
     try:
         print("Inside Get Generated Layer Urls API.")
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
+        state, district, tehsil = _normalize_geo_params(request)
 
         if state is None or district is None or tehsil is None:
             return _error_response(
@@ -536,7 +581,8 @@ def get_generated_layer_urls(request):
                 "Data not found for this state, district, tehsil.",
                 status.HTTP_404_NOT_FOUND,
             )
-        return _success_response(layers_details_json, http_status=status.HTTP_200_OK)
+        payload = flat_generated_layers_payload(layers_details_json)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error in get_generated_layer_urls: {str(e)}")
@@ -559,10 +605,8 @@ def get_mws_report_urls(request):
         print("Inside Get Generated Layer Urls API.")
 
         # Get and validate parameters
-        state = valid_gee_text(request.query_params.get("state").lower())
-        district = valid_gee_text(request.query_params.get("district").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil").lower())
-        mws_id = request.query_params.get("mws_id")
+        state, district, tehsil = _normalize_geo_params(request)
+        mws_id = _get_required_query_param(request, "mws_id")
 
         if state is None or district is None or tehsil is None or mws_id is None:
             return _error_response(
@@ -608,12 +652,136 @@ def get_mws_report_urls(request):
                 details=err_payload,
             )
 
-        return _success_response(result, http_status=status.HTTP_200_OK)
+        payload = flat_mws_report_url_payload(result)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error in get_generated_layer_urls: {str(e)}")
         return _error_response(
             "Internal server error while fetching MWS report urls",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
+        )
+
+
+#############  Get MWS Geometry  ##################
+@swagger_auto_schema(**mws_geometries_schema)
+@api_security_check(auth_type="API_key")
+def get_mws_geometries(request):
+    """
+    API endpoint to get GeoJSON geometry for a given MWS id.
+    """
+    try:
+        state, district, tehsil = _normalize_geo_params(request)
+        mws_id = _get_required_query_param(request, "mws_id")
+
+        if state is None or district is None or tehsil is None or mws_id is None:
+            return _error_response(
+                "'state', 'district', 'tehsil', and 'mws_id' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (
+            not is_valid_string(state)
+            or not is_valid_string(district)
+            or not is_valid_string(tehsil)
+        ):
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not is_valid_mws_id(mws_id):
+            return _error_response(
+                "MWS id can only contain numbers and underscores",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        result, error_response = get_mws_geometry(state, district, tehsil, mws_id)
+        if error_response:
+            err_payload = (
+                error_response.data if hasattr(error_response, "data") else {}
+            )
+            err_message = (
+                err_payload.get("error")
+                or err_payload.get("message")
+                or err_payload.get("Message")
+                or "Failed to fetch MWS geometry"
+            )
+            return _error_response(
+                err_message,
+                error_response.status_code,
+                details=err_payload,
+            )
+
+        payload = flat_mws_geometry_payload(result)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
+    except Exception as e:
+        print(f"Error in get_mws_geometries: {str(e)}")
+        return _error_response(
+            "Internal server error while fetching MWS geometry",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details=str(e),
+        )
+
+
+#############  Get Village Geometries  ##################
+@swagger_auto_schema(**village_geometries_schema)
+@api_security_check(auth_type="API_key")
+def get_village_geometries_api(request):
+    """
+    API endpoint to get village geometries for a block/tehsil.
+    """
+    try:
+        state, district, tehsil = _normalize_geo_params(request)
+        village_id = _get_required_query_param(request, "village_id")
+
+        if state is None or district is None or tehsil is None:
+            return _error_response(
+                "'state', 'district', and 'tehsil' parameters are required.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (
+            not is_valid_string(state)
+            or not is_valid_string(district)
+            or not is_valid_string(tehsil)
+        ):
+            return _error_response(
+                "State/District/Tehsil must contain only letters, spaces, and underscores",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        if village_id is not None and not str(village_id).isdigit():
+            return _error_response(
+                "village_id must be numeric",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        result, error_response = get_village_geometries(
+            state, district, tehsil, village_id=village_id
+        )
+        if error_response:
+            err_payload = (
+                error_response.data if hasattr(error_response, "data") else {}
+            )
+            err_message = (
+                err_payload.get("error")
+                or err_payload.get("message")
+                or "Failed to fetch village geometries"
+            )
+            return _error_response(
+                err_message,
+                error_response.status_code,
+                details=err_payload,
+            )
+
+        payload = flat_village_geometries_payload(result)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
+    except Exception as e:
+        print(f"Error in get_village_geometries_api: {str(e)}")
+        return _error_response(
+            "Internal server error while fetching village geometries",
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             details=str(e),
         )
@@ -630,13 +798,13 @@ def generate_active_locations(request):
         activated_locations_data = get_activated_location_json()
 
         if activated_locations_data is not None:
-            return _success_response(
-                activated_locations_data, http_status=status.HTTP_200_OK
-            )
+            payload = flat_active_locations_payload(activated_locations_data)
+            return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
         response_data = activated_entities()
         transformed_data = transform_data(data=response_data)
-        return _success_response(transformed_data, http_status=status.HTTP_200_OK)
+        payload = flat_active_locations_payload(transformed_data)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
     except Exception as e:
         print("Exception in proposed_blocks api :: ", e)
