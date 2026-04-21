@@ -299,16 +299,35 @@ Open: `http://localhost:8080/geoserver/web`
 The CoRE Stack algorithms publish layers to specific GeoServer workspaces. **All 8 workspaces must be created manually before running any algo API for the first time.** GeoServer does not create these automatically.
 
 ```bash
-# Create all 8 required workspaces in one shot
-for ws in panchayat_boundaries mws terrain LULC_level_1 LULC_level_2 LULC_level_3 lulc_vector terrain_lulc; do
-  curl -X POST http://localhost:8080/geoserver/rest/workspaces \
+# Create all STACD project workspaces (skips if already exists)
+for ws in \
+  panchayat_boundaries mws mws_layers mws_centroid mws_connectivity \
+  LULC LULC_level_1 LULC_level_2 LULC_level_3 lulc_vector terrain_lulc \
+  terrain change_detection crop_intensity drought drought_causality \
+  soge stream_order restoration aquifer natural_depression \
+  catchment_area_singleflow distance_nearest_upstream_DL slope_percentage \
+  lcw agroecological factory_csr green_credit mining \
+  mws_centroid swb water_bodies nrega_assets plantation \
+  canopy_height ccd tree_overall_ch; do
+  result=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST http://localhost:8087/geoserver/rest/workspaces \
     -H "Content-Type: application/json" -u admin:geoserver \
-    -d "{\"workspace\": {\"name\": \"$ws\"}}"
+    -d "{\"workspace\": {\"name\": \"$ws\"}}")
+  if [ "$result" = "201" ]; then
+    echo "✅ Created: $ws"
+  elif [ "$result" = "409" ]; then
+    echo "⚠️  Already exists: $ws"
+  else
+    echo "❌ Failed ($result): $ws"
+  fi
 done
 
-# Verify all workspaces created
-curl -s http://localhost:8080/geoserver/rest/workspaces.json \
-  -u admin:geoserver | python3 -m json.tool | grep '"name"'
+# Verify
+echo ""
+echo "Total workspaces:"
+curl -s -u admin:geoserver \
+  http://localhost:8087/geoserver/rest/workspaces.json \
+  | python3 -m json.tool | grep '"name"' | wc -l
 ```
 
 **Expected workspaces after setup:** `panchayat_boundaries`, `mws`, `terrain`, `LULC_level_1`, `LULC_level_2`, `LULC_level_3`, `lulc_vector`, `terrain_lulc`
