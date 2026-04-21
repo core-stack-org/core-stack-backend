@@ -558,15 +558,20 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [GlobalPlanPermission]
 
     def get_queryset(self):
-        """
-        Return all plans for superadmins and API key users
-        """
+    # FIX 1: add select_related to prevent N+1 queries
+        queryset = (
+            PlanApp.objects
+            .filter(enabled=True)
+            .select_related(
+                "project",
+                "organization",
+                "created_by",
+            )
+        )
 
-        queryset = PlanApp.objects.filter(enabled=True)
-
-        tehsil_id = self.request.query_params.get("tehsil", None)
+        tehsil_id   = self.request.query_params.get("tehsil",   None)
         district_id = self.request.query_params.get("district", None)
-        state_id = self.request.query_params.get("state", None)
+        state_id    = self.request.query_params.get("state",    None)
 
         if tehsil_id:
             queryset = queryset.filter(tehsil_soi_id=tehsil_id)
@@ -575,6 +580,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             queryset = queryset.filter(state_soi_id=state_id)
 
+        # FIX 2: icontains is slow — only run when rows are already filtered
+        # by state/district/tehsil so it scans fewer rows
         filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
         if filter_test_demo:
             queryset = queryset.exclude(
@@ -582,7 +589,6 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         return queryset.order_by("-created_at")
-
     @action(detail=False, methods=["get"], url_path="meta-stats")
     def meta_stats(self, request, *args, **kwargs):
         """

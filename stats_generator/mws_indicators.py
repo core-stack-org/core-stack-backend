@@ -88,6 +88,7 @@ def generate_mws_data_for_kyl_filters(
                 "factory_csr": -1,
                 "mining": -1,
                 "green_credit": -1,
+                "mws_intersect_swb": -1,
             }
 
             try:
@@ -775,6 +776,41 @@ def generate_mws_data_for_kyl_filters(
                 except Exception as e:
                     factory_csr = 0
 
+                ############ MWS Intersect Swb ########################
+                try:
+                    swb_df = sheets.get("mws_intersect_swb")
+
+                    if swb_df is not -1 and not swb_df.empty:
+                        mws_swb_data = swb_df[swb_df["UID"] == specific_mws_id]
+
+                        mws_intersect_swb = mws_swb_data.apply(
+                            lambda row: {
+                                "swbId": str(row["SWB_UID"]),
+                                "swbName": (
+                                    str(row["Waterbodies_name"])
+                                    if pd.notna(row["Waterbodies_name"])
+                                    else ""
+                                ),
+                                "latitude": (
+                                    float(row["Latitude"])
+                                    if pd.notna(row["Latitude"])
+                                    else None
+                                ),
+                                "longitude": (
+                                    float(row["Longitude"])
+                                    if pd.notna(row["Longitude"])
+                                    else None
+                                ),
+                            },
+                            axis=1,
+                        ).tolist()
+                    else:
+                        mws_intersect_swb = []
+
+                except Exception as e:
+                    print(f"Error in SWB funda: {e}")
+                    mws_intersect_swb = []
+
                 results.append(
                     {
                         "mws_id": specific_mws_id,
@@ -815,6 +851,7 @@ def generate_mws_data_for_kyl_filters(
                         "mining": mining,
                         "green_credit": green_credit,
                         "factory_csr": factory_csr,
+                        "mws_intersect_swb": mws_intersect_swb,
                     }
                 )
 

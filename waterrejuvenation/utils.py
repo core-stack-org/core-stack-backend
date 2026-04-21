@@ -6,6 +6,7 @@ from utilities.constants import (
     GEE_PATHS,
     PAN_INDIA_LULC_V3_DATASET,
     WATER_REJ_GEE_ASSET,
+    WATERREJUVENATION_PROJECT,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -64,7 +65,9 @@ EXPECTED_EXCEL_HEADERS = {
 }
 
 
-def get_filtered_mws_layer_name(project_name, layer_name, project_id="ee-corestackdev"):
+def get_filtered_mws_layer_name(
+    project_name, layer_name, project_id=WATERREJUVENATION_PROJECT
+):
     WATER_REJ_GEE_ASSET = f"projects/{project_id}/assets/apps/waterbody/"
     return (
         WATER_REJ_GEE_ASSET
