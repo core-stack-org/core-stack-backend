@@ -78,15 +78,6 @@ TEST_FACILITATOR_EXCLUSIONS = (
 )
 
 
-def _app_user_steward_names_qs():
-    return (
-        User.objects.filter(groups__name="App User")
-        .exclude(organization__name__iexact="CFPT")
-        .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
-        .values_list("full_name", flat=True)
-    )
-
-
 def _count_demand_types(plan_id_strs):
     from dpr.mapping import classify_demand_type
     from dpr.models import (
@@ -143,16 +134,34 @@ def _count_demand_types(plan_id_strs):
 
 
 def _build_steward_meta_stats(queryset):
-    per_steward = queryset.values("facilitator_name").annotate(
-        plan_count=Count("id"),
-        completed_count=Count("id", filter=Q(is_completed=True)),
-        in_progress_count=Count("id", filter=Q(is_completed=False)),
+    effective_village = Case(
+        When(
+            ~Q(village_name="") & Q(village_name__isnull=False),
+            then=Trim(F("village_name")),
+        ),
+        When(
+            plan__startswith="Plan ",
+            then=Trim(Substr("plan", 6, Length("plan") - Value(5))),
+        ),
+        default=Trim(F("plan")),
+        output_field=CharFieldOutput(max_length=255),
+    )
+    qs = queryset.annotate(effective_village=effective_village)
+
+    total_stewards = qs.values("facilitator_name").distinct().count()
+
+    per_steward = (
+        qs.values("facilitator_name")
+        .annotate(
+            plan_count=Count("id"),
+            completed_count=Count("id", filter=Q(is_completed=True)),
+            in_progress_count=Count("id", filter=Q(is_completed=False)),
+            dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+            dpr_reviewed=Count("id", filter=Q(is_dpr_reviewed=True)),
+        )
     )
 
-    # Single query: total stewards + active stewards + per-steward plan stats
-    combined = per_steward.aggregate(
-        total_stewards=Count("facilitator_name"),
-        active_stewards=Count("facilitator_name", filter=Q(in_progress_count__gt=0)),
+    agg = per_steward.aggregate(
         avg_plans=Avg("plan_count"),
         min_plans=Min("plan_count"),
         max_plans=Max("plan_count"),
@@ -164,7 +173,10 @@ def _build_steward_meta_stats(queryset):
         ),
     )
 
-    dpr_agg = queryset.aggregate(
+    active_stewards = per_steward.filter(in_progress_count__gt=0).count()
+    inactive_stewards = total_stewards - active_stewards
+
+    dpr_agg = qs.aggregate(
         total_dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
         total_dpr_reviewed=Count("id", filter=Q(is_dpr_reviewed=True)),
         pending_dpr_generation=Count(
@@ -175,6 +187,27 @@ def _build_steward_meta_stats(queryset):
         ),
     )
 
+    top_stewards_qs = per_steward.order_by("-plan_count")[:10]
+    top_steward_names = [s["facilitator_name"] for s in top_stewards_qs]
+    village_map = {}
+    for entry in (
+        qs.filter(facilitator_name__in=top_steward_names)
+        .values("facilitator_name", "effective_village")
+        .distinct()
+    ):
+        village_map.setdefault(entry["facilitator_name"], []).append(
+            entry["effective_village"]
+        )
+    top_stewards = [
+        {
+            "facilitator_name": s["facilitator_name"],
+            "plan_count": s["plan_count"],
+            "completed_count": s["completed_count"],
+            "villages": village_map.get(s["facilitator_name"], []),
+        }
+        for s in top_stewards_qs
+    ]
+
     by_organization = [
         {
             "organization_id": s["organization"],
@@ -182,7 +215,7 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            queryset.values("organization", "organization__name")
+            qs.values("organization", "organization__name")
             .annotate(steward_count=Count("facilitator_name", distinct=True))
             .order_by("-steward_count")
         )
@@ -195,7 +228,7 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            queryset.filter(state_soi__isnull=False)
+            qs.filter(state_soi__isnull=False)
             .values("state_soi", "state_soi__state_name")
             .annotate(steward_count=Count("facilitator_name", distinct=True))
             .order_by("-steward_count")
@@ -210,7 +243,7 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            queryset.filter(district_soi__isnull=False)
+            qs.filter(district_soi__isnull=False)
             .values("district_soi", "district_soi__district_name", "state_soi__state_name")
             .annotate(steward_count=Count("facilitator_name", distinct=True))
             .order_by("-steward_count")
@@ -225,7 +258,7 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            queryset.filter(tehsil_soi__isnull=False)
+            qs.filter(tehsil_soi__isnull=False)
             .values(
                 "tehsil_soi",
                 "tehsil_soi__tehsil_name",
@@ -236,24 +269,43 @@ def _build_steward_meta_stats(queryset):
         )
     ]
 
-    total_stewards = combined["total_stewards"] or 0
-    active_stewards = combined["active_stewards"] or 0
+    village_level = [
+        {
+            "village_name": s["effective_village"],
+            "tehsil_name": s["tehsil_soi__tehsil_name"],
+            "district_name": s["district_soi__district_name"],
+            "state_name": s["state_soi__state_name"],
+            "steward_count": s["steward_count"],
+        }
+        for s in (
+            qs.values(
+                "effective_village",
+                "tehsil_soi__tehsil_name",
+                "district_soi__district_name",
+                "state_soi__state_name",
+            )
+            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .order_by("-steward_count")
+        )
+    ]
 
     return {
         "total_stewards": total_stewards,
         "plans_per_steward": {
-            "avg": round(combined["avg_plans"] or 0, 2),
-            "min": combined["min_plans"] or 0,
-            "max": combined["max_plans"] or 0,
+            "avg": round(agg["avg_plans"] or 0, 2),
+            "min": agg["min_plans"] or 0,
+            "max": agg["max_plans"] or 0,
         },
-        "avg_completion_rate": round(combined["avg_completion"] or 0, 2),
+        "avg_completion_rate": round(agg["avg_completion"] or 0, 2),
         "dpr_stats": dpr_agg,
         "active_stewards": active_stewards,
-        "inactive_stewards": total_stewards - active_stewards,
+        "inactive_stewards": inactive_stewards,
+        "top_stewards": top_stewards,
         "by_organization": by_organization,
         "state_level": state_level,
         "district_level": district_level,
         "tehsil_level": tehsil_level,
+        "village_level": village_level,
     }
 
 
@@ -506,15 +558,20 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [GlobalPlanPermission]
 
     def get_queryset(self):
-        """
-        Return all plans for superadmins and API key users
-        """
+    # FIX 1: add select_related to prevent N+1 queries
+        queryset = (
+            PlanApp.objects
+            .filter(enabled=True)
+            .select_related(
+                "project",
+                "organization",
+                "created_by",
+            )
+        )
 
-        queryset = PlanApp.objects.filter(enabled=True)
-
-        tehsil_id = self.request.query_params.get("tehsil", None)
+        tehsil_id   = self.request.query_params.get("tehsil",   None)
         district_id = self.request.query_params.get("district", None)
-        state_id = self.request.query_params.get("state", None)
+        state_id    = self.request.query_params.get("state",    None)
 
         if tehsil_id:
             queryset = queryset.filter(tehsil_soi_id=tehsil_id)
@@ -523,6 +580,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             queryset = queryset.filter(state_soi_id=state_id)
 
+        # FIX 2: icontains is slow — only run when rows are already filtered
+        # by state/district/tehsil so it scans fewer rows
         filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
         if filter_test_demo:
             queryset = queryset.exclude(
@@ -530,7 +589,6 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         return queryset.order_by("-created_at")
-
     @action(detail=False, methods=["get"], url_path="meta-stats")
     def meta_stats(self, request, *args, **kwargs):
         """
@@ -611,7 +669,13 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             | Q(facilitator_name__icontains="demo")
         )
 
-        steward_queryset = steward_queryset.filter(facilitator_name__in=_app_user_steward_names_qs())
+        valid_steward_names = (
+            User.objects.filter(groups__name="App User")
+            .exclude(organization__name__iexact="CFPT")
+            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .values_list("full_name", flat=True)
+        )
+        steward_queryset = steward_queryset.filter(facilitator_name__in=valid_steward_names)
 
         total_stewards = steward_queryset.values("facilitator_name").distinct().count()
 
@@ -819,11 +883,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
-        steward_qs = (
-            base_queryset
-            .exclude(TEST_FACILITATOR_EXCLUSIONS)
-            .filter(facilitator_name__in=_app_user_steward_names_qs())
-        )
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
         response_data = _build_steward_meta_stats(steward_qs)
         response_data["filters_applied"] = {
             "organization_id": organization_id,
@@ -857,11 +917,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
-        steward_qs = (
-            base_queryset
-            .exclude(TEST_FACILITATOR_EXCLUSIONS)
-            .filter(facilitator_name__in=_app_user_steward_names_qs())
-        )
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
         response_data = _build_steward_listing(steward_qs)
 
         if organization_id:
@@ -1686,11 +1742,7 @@ class PlanViewSet(viewsets.ModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
-        steward_qs = (
-            base_queryset
-            .exclude(TEST_FACILITATOR_EXCLUSIONS)
-            .filter(facilitator_name__in=_app_user_steward_names_qs())
-        )
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
         response_data = _build_steward_listing(steward_qs)
         response_data["filters_applied"] = {
             "project_id": project_id,
