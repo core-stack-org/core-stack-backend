@@ -314,8 +314,6 @@ def get_osm_data(state, district, block, uid):
             except Exception as e:
                 logger.info("Not able to fetch the Overpass API Info", e)
 
-        #print("Data Processing", datetime.now())
-        
         # dictionary for storage
         names = {
             "Forests": [],
@@ -725,15 +723,13 @@ def get_osm_data(state, district, block, uid):
             large_reservoirs = [res for res in final_data["reservoirs"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
             
             if large_lakes or large_reservoirs:
-                rname = [temp["name"] for temp in large_lakes]
-                rname += [temp["name"] for temp in large_reservoirs]
-                rarea = [
-                    str(round(temp["area_sq_m"] / 10000, 1)) for temp in large_lakes
-                ]
-                rarea += [
-                    str(round(temp["area_sq_m"] / 10000, 1))
-                    for temp in large_reservoirs
-                ]
+                # Combine, sort by area descending, cap at 5
+                combined_water_bodies = large_lakes + large_reservoirs
+                combined_water_bodies = sorted(combined_water_bodies, key=lambda x: x["area_sq_m"], reverse=True)[:5]
+
+                rname = [temp["name"] for temp in combined_water_bodies]
+                rarea = [str(round(temp["area_sq_m"] / 10000, 1)) for temp in combined_water_bodies]
+
 
                 parameter_block += f". Additionally, large water bodies such as "
                 if len(rname) == 1:
@@ -809,16 +805,12 @@ def get_osm_data(state, district, block, uid):
             large_reservoirs_mws = [res for res in final_data["reservoirs_mws"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
             
             if large_lakes_mws or large_reservoirs_mws:
-                rname = [temp["name"] for temp in large_lakes_mws]
-                rname += [temp["name"] for temp in large_reservoirs_mws]
-                rarea = [
-                    str(round(temp["area_sq_m"] / 10000, 1))
-                    for temp in large_lakes_mws
-                ]
-                rarea += [
-                    str(round(temp["area_sq_m"] / 10000, 1))
-                    for temp in large_reservoirs_mws
-                ]
+                # Combine, sort by area descending, cap at 5
+                combined_water_bodies_mws = large_lakes_mws + large_reservoirs_mws
+                combined_water_bodies_mws = sorted(combined_water_bodies_mws, key=lambda x: x["area_sq_m"], reverse=True)[:5]
+
+                rname = [temp["name"] for temp in combined_water_bodies_mws]
+                rarea = [str(round(temp["area_sq_m"] / 10000, 1)) for temp in combined_water_bodies_mws]
 
                 parameter_mws += f". Additionally, large water bodies such as "
                 if len(rname) == 1:
