@@ -158,13 +158,15 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 # MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
-GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
+GEE_ASSET_PATH_CLART = "projects/ee-corestackdev/assets/apps/mws/"
+
+GEE_ASSET_PATH = "projects/core-stack-dev-2/assets/apps/mws/"
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
 
-GEE_PATH_PLANTATION = "projects/ee-corestackdev/assets/apps/plantation/"
+GEE_PATH_PLANTATION = "projects/core-stack-dev-2/assets/apps/plantation/"
 GEE_PATH_PLANTATION_HELPER = "projects/ee-corestack-helper/assets/apps/plantation/"
 
-GEE_BASE_PATH = "projects/ee-corestackdev/assets/apps"
+GEE_BASE_PATH = "projects/core-stack-dev-2/assets/apps"
 GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
@@ -311,6 +313,7 @@ FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
 WBC = "projects/ext-datasets/assets/datasets/WBC_"
+WATERREJUVENATION_PROJECT = "core-stack-dev-2"
 
 # Plantation
 ANNUAL_PPT = "projects/ee-plantationsitescores/assets/AnnualPrecipitation"

@@ -11,7 +11,11 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from utilities.constants import GEE_ASSET_PATH, SRTM_DIGITAL_ELEVATION, INDIA_LINEAMENTS
+from utilities.constants import (
+    GEE_ASSET_PATH_CLART,
+    SRTM_DIGITAL_ELEVATION,
+    INDIA_LINEAMENTS,
+)
 from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
@@ -65,7 +69,7 @@ def clart_layer(state, district, block):
             + valid_gee_text(block.lower())
         )
         lithology = ee.Image(
-            GEE_ASSET_PATH
+            GEE_ASSET_PATH_CLART
             + valid_gee_text(state.lower())
             + "/"
             + valid_gee_text(state.lower())

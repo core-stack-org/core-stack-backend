@@ -195,7 +195,9 @@ def copy_gee_credentials_into_repo(
     }
 
 
-def upsert_gee_account_from_json(credentials_path, account_name=None, helper_account_id=None):
+def upsert_gee_account_from_json(
+    credentials_path, account_name=None, helper_account_id=None
+):
     credentials_path = os.path.abspath(credentials_path)
     if not os.path.isfile(credentials_path):
         raise GEEInitializationError(
@@ -212,7 +214,9 @@ def upsert_gee_account_from_json(credentials_path, account_name=None, helper_acc
             "The provided credentials JSON does not contain client_email."
         )
 
-    account_name = account_name or os.path.splitext(os.path.basename(credentials_path))[0]
+    account_name = (
+        account_name or os.path.splitext(os.path.basename(credentials_path))[0]
+    )
     account = (
         GEEAccount.objects.filter(service_account_email=service_account_email).first()
         or GEEAccount.objects.filter(name=account_name).first()
@@ -376,16 +380,21 @@ def gdf_to_ee_fc(gdf):
     return ee.FeatureCollection(features)
 
 
-def create_gee_folder(folder_path, gee_project_path=GEE_ASSET_PATH):
-    try:
-        res = ee.data.createAsset(
-            {"type": "Folder"},
-            gee_project_path + folder_path,
-        )
-        print(res)
-        time.sleep(10)
-    except Exception as e:
-        print("Error:", e)
+def create_gee_folder(folder_path, gee_project_path):
+    full_path = gee_project_path + folder_path
+    parts = full_path.split("/")
+    for i in range(1, len(parts) + 1):
+        sub_path = "/".join(parts[:i])
+        try:
+            ee.data.getAsset(sub_path)
+            print(f"Exists: {sub_path}")
+        except:
+            try:
+                ee.data.createAsset({"type": "Folder"}, sub_path)
+                print(f"Created: {sub_path}")
+                time.sleep(1)
+            except Exception as e:
+                print(f"Failed: {sub_path} -> {e}")
 
 
 def create_gee_directory(
