@@ -287,8 +287,8 @@ def _generate_data(
             app_type, gee_obj.helper_account.name
         )
         if not is_gee_asset_exists(ndvi_asset_id):
-            if roi.size().getInfo() > 150:
-                chunk_size = 120
+            if roi.size().getInfo() > 100:
+                chunk_size = 20
                 rois, descs = create_chunk(roi, ndvi_description, chunk_size)
 
                 ee_initialize(gee_obj.helper_account.id)
