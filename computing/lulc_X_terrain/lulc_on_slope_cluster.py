@@ -15,20 +15,14 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
-from nrm_app.settings import GEE_DEFAULT_ACCOUNT_ID
+from utilities.constants import AEZ
 
-def lulc_on_slope_cluster_sync(
-    state, district, block, start_year, end_year,
-    LULC_Raster=None, Terrain_Raster=None,
+
+@app.task(bind=True)
+def lulc_on_slope_cluster(
+    self, state, district, block, start_year, end_year, gee_account_id
 ):
-    """
-    STACD-compatible synchronous version.
-    Returns asset_id directly.
-    """
-    ee_initialize(2)
-
-    start_year = int(start_year)
-    end_year = int(end_year)
+    ee_initialize(gee_account_id)
 
     asset_description = (
         valid_gee_text(district.lower())
@@ -39,7 +33,7 @@ def lulc_on_slope_cluster_sync(
     asset_id = get_gee_asset_path(state, district, block) + asset_description
 
     if not is_gee_asset_exists(asset_id):
-        aez_india = ee.FeatureCollection("users/mtpictd/agro_eco_regions")
+        aez_india = ee.FeatureCollection(AEZ)
 
         landforms = ee.Image(
             get_gee_asset_path(state, district, block)
@@ -49,7 +43,6 @@ def lulc_on_slope_cluster_sync(
             + valid_gee_text(block.lower())
         )  # The eleven landforms raster
 
-        # MWS boundaries — read from your own account (same as async)
         mwsheds = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
@@ -60,119 +53,7 @@ def lulc_on_slope_cluster_sync(
         )
 
         filtered_aez = aez_india.filterBounds(mwsheds.geometry())
-        aez_no = filtered_aez.first().get("ae_regcode").getInfo()
-        print("aez_no=", aez_no)
 
-        lulc_imgs = []
-        for y in range(start_year, end_year + 1):
-            lulc_img = ee.Image(
-                get_gee_asset_path(state, district, block)
-                + valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
-                + "_"
-                + str(y)
-                + "-07-01_"
-                + str(y + 1)
-                + "-06-30_LULCmap_10m"
-            )
-            lulc_imgs.append(lulc_img)
-
-        lulc_img_collection = ee.ImageCollection.fromImages(lulc_imgs)
-        study_area_lulc = lulc_img_collection.mode().clip(mwsheds)
-        study_area_landforms = landforms.clip(mwsheds)
-
-        mwsheds_with_clusters = process_mws(mwsheds)
-        slope_mwsheds = mwsheds_with_clusters.filter(
-            ee.Filter.Or(
-                ee.Filter.eq("terrain_cluster", 0), ee.Filter.eq("terrain_cluster", 3)
-            )
-        )
-        slope_centroids = aez_lulcXterrain_cluster_centroids[f"aez{aez_no}"]["slopes"]
-
-        result = process_feature_collection(
-            slope_mwsheds, study_area_landforms, study_area_lulc, slope_centroids
-        )
-        print("Processing completed successfully")
-        task = export_vector_asset_to_gee(result, asset_description, asset_id)
-        task_id_list = check_task_status([task])
-        print("lulc_on_slope_cluster_sync task completed - task_id_list:", task_id_list)
-
-    layer_at_geoserver = False
-    if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_slope",
-            asset_id=asset_id,
-            dataset_name="Terrain LULC",
-            misc={
-                "start_year": start_year,
-                "end_year": end_year,
-            },
-        )
-        make_asset_public(asset_id)
-
-        fc = ee.FeatureCollection(asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = sync_layer_to_geoserver(
-            state,
-            fc,
-            valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_lulc_slope",
-            "terrain_lulc",
-        )
-        print(res)
-        if res["status_code"] == 201 and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag updated")
-            layer_at_geoserver = True
-
-    # return asset_id for STACD instead of layer_at_geoserver flag
-    return asset_id
-
-@app.task(bind=True)
-def lulc_on_slope_cluster(
-    self, state, district, block, start_year, end_year, gee_account_id=None, LULC_Raster=None, Terrain_Raster=None
-):
-    ee_initialize(gee_account_id or GEE_DEFAULT_ACCOUNT_ID)
-
-    start_year = int(start_year)
-    end_year = int(end_year)
-
-    asset_description = (
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_lulcXslopes_clusters"
-    )
-    asset_id = get_gee_asset_path(state, district, block) + asset_description
-
-    if not is_gee_asset_exists(asset_id):
-        aez_india = ee.FeatureCollection("users/mtpictd/agro_eco_regions")
-
-        landforms = ee.Image(
-            get_gee_asset_path(state, district, block)
-            + "terrain_raster_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-        )
-
-        mwsheds = ee.FeatureCollection(
-            "projects/ee-corestackdev/assets/apps/mws/"
-            + f"{state.lower()}/{district.lower()}/{block.lower()}/"
-            + "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_uid"
-        )
-
-        filtered_aez = aez_india.filterBounds(mwsheds.geometry())
         aez_no = filtered_aez.first().get("ae_regcode").getInfo()
         print("aez_no=", aez_no)
 
@@ -243,8 +124,8 @@ def lulc_on_slope_cluster(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
-
     return asset_id
+
 
 def process_feature_collection(fc, landforms, area_lulc, slope_centroids):
     """
