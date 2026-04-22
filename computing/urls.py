@@ -216,4 +216,5 @@ urlpatterns = [
         api.stac_item,
         name="stac_item",
     ),
+    path("missing_layers/", api.missing_layers, name="missing_layer"),
 ]
