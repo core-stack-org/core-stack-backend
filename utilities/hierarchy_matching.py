@@ -1,0 +1,61 @@
+"""Stable import surface for hierarchy matching and LGD-backed admin resolution."""
+
+from utilities.scripts.admin_postgres_mirror import (
+    DatabaseMirrorPlan,
+    IndexSpec,
+    PostgresConnectionSettings,
+    TableMirrorPlan,
+    load_postgres_connection_settings,
+)
+from utilities.scripts.admin_shape_store import (
+    AdminResolveGateway,
+    ESRIShapeStore,
+    ResolvedAdminRecord,
+    ResolvedAdminScope,
+)
+from utilities.scripts.admin_resolve import (
+    AdminResolution,
+    alias_signature_bundle,
+    CandidateResolution,
+    CandidateScore,
+    HierarchyCandidate,
+    HierarchyResolution,
+    HierarchyScore,
+    LGDHierarchyIndex,
+    SQLiteAdminLookup,
+    SQLiteVillageMatch,
+    StatewiseAuditResult,
+    normalize_lookup_text,
+    normalize_match_text,
+    rank_candidates,
+    resolve_best_candidate,
+    resolve_best_hierarchy_candidate,
+)
+
+__all__ = [
+    "AdminResolution",
+    "AdminResolveGateway",
+    "alias_signature_bundle",
+    "CandidateResolution",
+    "CandidateScore",
+    "DatabaseMirrorPlan",
+    "ESRIShapeStore",
+    "HierarchyCandidate",
+    "HierarchyResolution",
+    "HierarchyScore",
+    "IndexSpec",
+    "LGDHierarchyIndex",
+    "load_postgres_connection_settings",
+    "PostgresConnectionSettings",
+    "ResolvedAdminRecord",
+    "ResolvedAdminScope",
+    "SQLiteAdminLookup",
+    "SQLiteVillageMatch",
+    "StatewiseAuditResult",
+    "TableMirrorPlan",
+    "normalize_lookup_text",
+    "normalize_match_text",
+    "rank_candidates",
+    "resolve_best_candidate",
+    "resolve_best_hierarchy_candidate",
+]
