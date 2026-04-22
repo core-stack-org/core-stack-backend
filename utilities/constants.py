@@ -222,3 +222,5 @@ CATCHMENT_ASSET = "projects/ext-datasets/assets/datasets/catchment_area_multiflo
 STREAM_ORDER_ASSET = (
     "projects/corestack-datasets/assets/datasets/Stream_Order_Raster_India"
 )
+
+AEZ = "users/mtpictd/agro_eco_regions"
