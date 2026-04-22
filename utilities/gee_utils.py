@@ -1,16 +1,12 @@
 import os
-import shutil
 
 import requests
 
 from nrm_app.settings import (
-    BASE_DIR,
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_SERVICE_ACCOUNT_KEY_PATH,
     GEE_DEFAULT_ACCOUNT_ID,
-    GEE_HELPER_ACCOUNT_ID,
-    FERNET_KEY,
 )
 from utilities.constants import (
     GEE_ASSET_PATH,
@@ -29,211 +25,21 @@ from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 import numpy as np
 import tempfile
-from cryptography.fernet import Fernet
 
 
-class GEEInitializationError(RuntimeError):
-    """Raised when Earth Engine credentials cannot be initialized safely."""
-
-
-def _normalize_gee_account_id(account_id=None, project=None):
-    if project == "helper":
-        account_id = GEE_HELPER_ACCOUNT_ID
-
-    if isinstance(account_id, str):
-        lowered = account_id.strip().lower()
-        if lowered == "helper":
-            account_id = GEE_HELPER_ACCOUNT_ID
-        elif lowered == "default":
-            account_id = GEE_DEFAULT_ACCOUNT_ID
-        elif lowered == "datasets":
-            raise GEEInitializationError(
-                "The 'datasets' Earth Engine alias is not configured for this installation path."
-            )
-        else:
-            account_id = account_id.strip()
-
-    if account_id in (None, ""):
-        raise GEEInitializationError(
-            "GEE account id is blank. Set GEE_DEFAULT_ACCOUNT_ID/GEE_HELPER_ACCOUNT_ID in .env."
-        )
-
-    try:
-        return int(account_id)
-    except (TypeError, ValueError) as exc:
-        raise GEEInitializationError(
-            f"GEE account id must be an integer, got {account_id!r}."
-        ) from exc
-
-
-def _get_gee_account(account_id=None, project=None):
-    normalized_account_id = _normalize_gee_account_id(account_id, project=project)
-
-    try:
-        account = GEEAccount.objects.get(pk=normalized_account_id)
-    except GEEAccount.DoesNotExist as exc:
-        raise GEEInitializationError(
-            f"GEEAccount with id={normalized_account_id} was not found."
-        ) from exc
-
-    return normalized_account_id, account
-
-
-def ee_initialize(
-    account_id=GEE_DEFAULT_ACCOUNT_ID,
-    strict=False,
-    log_failure=True,
-    project=None,
-):
-    try:
-        normalized_account_id, account = _get_gee_account(account_id, project=project)
-
-        credentials_blob = account.get_credentials()
-        if not credentials_blob:
-            raise GEEInitializationError(
-                f"GEEAccount id={normalized_account_id} does not have stored credentials."
-            )
-
-        key_dict = json.loads(credentials_blob.decode("utf-8"))
-        credentials = service_account.Credentials.from_service_account_info(
-            key_dict,
-            scopes=[
-                "https://www.googleapis.com/auth/earthengine",
-                "https://www.googleapis.com/auth/devstorage.full_control",
-            ],
-        )
-        ee.Initialize(credentials)
-
-        return True
-    except Exception as exc:
-        if strict:
-            raise
-        if log_failure:
-            print(f"Skipping Earth Engine initialization: {exc}")
-        return False
-
-
-def ee_initialize_safe(account_id=GEE_DEFAULT_ACCOUNT_ID):
-    return ee_initialize(account_id=account_id, strict=False, log_failure=True)
-
-
-def probe_gee_connection(account_id=GEE_DEFAULT_ACCOUNT_ID, project=None):
-    ee_initialize(account_id=account_id, strict=True, project=project)
-    return ee.Number(1).getInfo() == 1
-
-
-def probe_gcs_upload_access(gee_account_id=GEE_DEFAULT_ACCOUNT_ID, cleanup=True):
-    normalized_account_id, account = _get_gee_account(gee_account_id)
-    bucket = gcs_config(gee_account_id=normalized_account_id)
-    blob_name = (
-        f"core-stack-initialisation-probe/account-{normalized_account_id}/"
-        f"{int(time.time())}-{os.getpid()}.txt"
+def ee_initialize(account_id=GEE_DEFAULT_ACCOUNT_ID):
+    account = GEEAccount.objects.get(pk=account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+    credentials = service_account.Credentials.from_service_account_info(
+        key_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/earthengine",
+            "https://www.googleapis.com/auth/devstorage.full_control",
+        ],
     )
-    blob = bucket.blob(blob_name)
+    ee.Initialize(credentials)
 
-    try:
-        blob.upload_from_string(
-            "core-stack gcs upload probe\n",
-            content_type="text/plain",
-        )
-    except Exception as exc:
-        raise GEEInitializationError(
-            f"GCS upload probe failed for bucket '{GCS_BUCKET_NAME}' with "
-            f"account id={normalized_account_id} "
-            f"({account.service_account_email}): {exc}"
-        ) from exc
-
-    cleanup_detail = "Upload succeeded."
-    if cleanup:
-        try:
-            blob.delete()
-            cleanup_detail = "Upload and cleanup succeeded."
-        except Exception as exc:
-            cleanup_detail = (
-                "Upload succeeded, but probe cleanup could not delete the temporary "
-                f"object: {exc}"
-            )
-
-    return {
-        "account_id": normalized_account_id,
-        "service_account_email": account.service_account_email,
-        "bucket_name": GCS_BUCKET_NAME,
-        "blob_name": blob_name,
-        "detail": cleanup_detail,
-    }
-
-
-def copy_gee_credentials_into_repo(
-    credentials_path,
-    destination_dir="data/gee_confs",
-    destination_name=None,
-):
-    source_path = os.path.abspath(credentials_path)
-    if not os.path.isfile(source_path):
-        raise GEEInitializationError(
-            f"GEE credentials file was not found: {source_path}"
-        )
-
-    if os.path.isabs(destination_dir):
-        repo_directory = destination_dir
-    else:
-        repo_directory = os.path.join(BASE_DIR, destination_dir)
-
-    os.makedirs(repo_directory, exist_ok=True)
-
-    file_name = destination_name or os.path.basename(source_path)
-    destination_path = os.path.join(repo_directory, file_name)
-
-    if os.path.abspath(source_path) != os.path.abspath(destination_path):
-        shutil.copy2(source_path, destination_path)
-
-    os.chmod(destination_path, 0o640)
-
-    return {
-        "absolute_path": destination_path,
-        "relative_path": os.path.relpath(destination_path, BASE_DIR),
-    }
-
-
-def upsert_gee_account_from_json(credentials_path, account_name=None, helper_account_id=None):
-    credentials_path = os.path.abspath(credentials_path)
-    if not os.path.isfile(credentials_path):
-        raise GEEInitializationError(
-            f"GEE credentials file was not found: {credentials_path}"
-        )
-
-    with open(credentials_path, "rb") as credentials_file:
-        credentials_payload = credentials_file.read()
-
-    key_dict = json.loads(credentials_payload.decode("utf-8"))
-    service_account_email = key_dict.get("client_email")
-    if not service_account_email:
-        raise GEEInitializationError(
-            "The provided credentials JSON does not contain client_email."
-        )
-
-    account_name = account_name or os.path.splitext(os.path.basename(credentials_path))[0]
-    account = (
-        GEEAccount.objects.filter(service_account_email=service_account_email).first()
-        or GEEAccount.objects.filter(name=account_name).first()
-        or GEEAccount(name=account_name)
-    )
-
-    account.name = account_name
-    account.service_account_email = service_account_email
-    account.credentials_encrypted = Fernet(FERNET_KEY).encrypt(credentials_payload)
-    account.is_visible = True
-    account.save()
-
-    if helper_account_id:
-        helper_id = _normalize_gee_account_id(helper_account_id)
-        if helper_id != account.id:
-            account.helper_account = GEEAccount.objects.get(pk=helper_id)
-    elif account.helper_account_id is None:
-        account.helper_account = account
-
-    account.save()
-    return account
+    return ee, credentials.service_account_email
 
 
 # def ee_initialize(project=None):
@@ -260,23 +66,31 @@ def upsert_gee_account_from_json(credentials_path, account_name=None, helper_acc
 #         print("Exception in gee connection", e)
 
 
-def gcs_config():
-    """
-    STACD/corestack-lite version of gcs_config.
-    Uses Application Default Credentials (ADC) instead of DB-stored service account.
-    Run 'gcloud auth application-default login --no-launch-browser' to set up ADC.
-    Anyone setting up corestack-lite locally needs to run this once.
-    """
-    from google.auth import default as google_auth_default
+def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
+    from google.oauth2 import service_account
 
-    credentials, project = google_auth_default(
+    # # Authenticate Earth Engine
+    # ee_initialize()
+
+    # Authenticate Google Cloud Storage
+    account = GEEAccount.objects.get(pk=gee_account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+    credentials = service_account.Credentials.from_service_account_info(
+        key_dict,
         scopes=[
+            "https://www.googleapis.com/auth/earthengine",
             "https://www.googleapis.com/auth/devstorage.full_control",
-        ]
+        ],
     )
-    storage_client = storage.Client(credentials=credentials, project=project)
+
+    # Create Storage Client
+    storage_client = storage.Client(credentials=credentials)
+
+    # Verify access
     bucket = storage_client.bucket(GCS_BUCKET_NAME)
     return bucket
+
+    # print(list(bucket.list_blobs()))
 
 
 def download_gee_layer(state, district, block):
@@ -857,8 +671,7 @@ def upload_shp_to_gee(
             upload_file_to_gcs(component_path, dest_blob)
 
     # GCS URI to the shapefile
-    gcs_uri = f"gs://{GCS_BUCKET_NAME}/{gcs_blob_name}"
-
+    gcs_uri = f"gs://core_stack/{gcs_blob_name}"
 
     # Upload from GCS to GEE
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id)
