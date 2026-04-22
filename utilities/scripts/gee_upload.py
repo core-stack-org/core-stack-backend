@@ -81,6 +81,9 @@ TERMINAL_TASK_STATES = {"SUCCEEDED", "COMPLETED", "FAILED", "CANCELLED"}
 SUCCESS_TASK_STATES = {"SUCCEEDED", "COMPLETED"}
 DEFAULT_PROGRESS_EVERY_FEATURES = 100000
 DEFAULT_PROGRESS_EVERY_SECONDS = 30.0
+WORLD_BOUNDS_RING = [
+    [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]
+]
 
 
 class GEEUploadError(Exception):
@@ -136,6 +139,43 @@ def summarize_status_for_log(status: Dict[str, Any]) -> str:
     if error_message:
         progress_parts.append(f"error={error_message}")
     return " | ".join(progress_parts)
+
+
+def _is_world_bounds_polygon(bounds_geojson: Any) -> bool:
+    if not isinstance(bounds_geojson, dict):
+        return False
+    if bounds_geojson.get("type") != "Polygon":
+        return False
+    return bounds_geojson.get("coordinates") == WORLD_BOUNDS_RING
+
+
+def inspect_uploaded_asset_geometry_health(ee_module, asset_id: str) -> Dict[str, Any]:
+    """
+    Inspect the first uploaded geometry and flag suspicious whole-world bounds.
+
+    This is intentionally lightweight: one server-side sample is enough to catch
+    the class of ingestion bug where local polygons turn into globe-spanning
+    geodesic arcs after CSV upload.
+    """
+    try:
+        fc = ee_module.FeatureCollection(asset_id)
+        first = ee_module.Feature(fc.first())
+        geom = first.geometry()
+        info = ee_module.Dictionary(
+            {
+                "feature_count": fc.size(),
+                "geometry_type": geom.type(),
+                "geodesic": geom.geodesic(),
+                "bounds": geom.bounds(),
+            }
+        ).getInfo()
+        info["suspicious_world_bounds"] = _is_world_bounds_polygon(info.get("bounds"))
+        return info
+    except Exception as exc:
+        return {
+            "inspection_error": str(exc),
+            "suspicious_world_bounds": False,
+        }
 
 
 def make_json_compatible(value: Any) -> Any:
@@ -398,6 +438,61 @@ def normalize_feature(feature: Any, source_label: str) -> Dict[str, Any]:
     }
 
 
+def prepare_geometry_for_ee_csv(geometry: Any) -> Any:
+    """
+    Normalize a GeoJSON geometry for Earth Engine CSV ingestion.
+
+    Earth Engine defaults EPSG:4326 geometries to geodesic=true unless the
+    geometry explicitly carries a geodesic flag. For village/admin polygons
+    authored as ordinary planar lon/lat coordinate lists, this can turn local
+    edges into globe-spanning arcs and later surface as "unbounded geometry"
+    during `Export.table.*` calls.
+
+    To preserve the original planar interpretation of the uploaded GeoJSON, set
+    `geodesic: false` on non-point geometries unless the source already
+    declares a geodesic preference.
+    """
+    if geometry is None:
+        return None
+    if not isinstance(geometry, dict):
+        return make_json_compatible(geometry)
+
+    def coerce_coordinate_value(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            if value == value.to_integral_value():
+                return int(value)
+            return float(value)
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return value
+            try:
+                if any(char in stripped for char in (".", "e", "E")):
+                    return float(stripped)
+                return int(stripped)
+            except ValueError:
+                return value
+        if isinstance(value, list):
+            return [coerce_coordinate_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [coerce_coordinate_value(item) for item in value]
+        if isinstance(value, dict):
+            coerced = {}
+            for key, item in value.items():
+                if key == "coordinates":
+                    coerced[key] = coerce_coordinate_value(item)
+                else:
+                    coerced[key] = make_json_compatible(item)
+            return coerced
+        return make_json_compatible(value)
+
+    normalized = coerce_coordinate_value(dict(geometry))
+    geometry_type = str(normalized.get("type") or "")
+    if geometry_type not in {"Point", "MultiPoint"} and "geodesic" not in normalized:
+        normalized["geodesic"] = False
+    return normalized
+
+
 def iter_jsonl_features(path: Path) -> Iterator[Dict[str, Any]]:
     with path.open("r", encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
@@ -602,7 +697,7 @@ def convert_vector_source_to_csv(
                 ""
                 if geometry is None
                 else json.dumps(
-                    make_json_compatible(geometry),
+                    prepare_geometry_for_ee_csv(geometry),
                     ensure_ascii=False,
                     separators=(",", ":"),
                 )
@@ -987,6 +1082,29 @@ def upload_vector_file_to_gee(
             if make_public:
                 log_progress(f"Making Earth Engine asset public: {final_asset_id}")
                 result["made_public"] = make_gee_asset_public(ee_module, final_asset_id)
+
+            geometry_health = inspect_uploaded_asset_geometry_health(
+                ee_module, final_asset_id
+            )
+            result["geometry_health"] = geometry_health
+            if geometry_health.get("inspection_error"):
+                log_progress(
+                    f"Uploaded asset geometry health check could not complete: "
+                    f"{geometry_health['inspection_error']}"
+                )
+            else:
+                log_progress(
+                    "Uploaded asset geometry health: "
+                    f"type={geometry_health.get('geometry_type')} | "
+                    f"geodesic={geometry_health.get('geodesic')} | "
+                    f"suspicious_world_bounds={geometry_health.get('suspicious_world_bounds')}"
+                )
+                if geometry_health.get("suspicious_world_bounds"):
+                    result["geometry_warning"] = (
+                        "The uploaded asset's first feature bounds expand to the whole world. "
+                        "This usually indicates broken geodesic interpretation during ingestion."
+                    )
+                    log_progress(f"WARNING: {result['geometry_warning']}")
 
             if cleanup_gcs and gcs_blob_name:
                 try:
