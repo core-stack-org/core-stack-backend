@@ -38,6 +38,12 @@ from shapely.geometry import shape
 from shapely.validation import explain_validity
 import zipfile
 from datetime import datetime, timedelta
+from django.conf import settings
+import logging
+import requests
+
+logger = logging.getLogger(__name__)
+
 
 
 def generate_shape_files(path):
@@ -1013,3 +1019,231 @@ def generate_swb_layer_with_max_so_catchment(
         )
 
     return roi.map(compute_for_feature)
+
+
+
+def _get_prod_backend_url():
+    return getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
+
+
+def _get_prod_api_key():
+    return getattr(settings, "PROD_BACKEND_API_KEY", "")
+
+
+def _sync_layer_to_prod_db(payload: dict):
+    prod_url = _get_prod_backend_url()
+    if not prod_url:
+        return None
+
+    endpoint = prod_url + "/api/v1/computing/sync_layer_remote/"
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers={"X-Api-Key": _get_prod_api_key()},
+            timeout=30,
+        )
+        if response.status_code not in (200, 201):
+            logger.warning(
+                "Prod DB sync returned %s for layer %s: %s",
+                response.status_code,
+                payload.get("layer_name"),
+                response.text,
+            )
+            return None
+        layer_id = response.json().get("layer_id")
+        logger.info("Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id)
+        return layer_id
+    except requests.RequestException as e:
+        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+        return None
+
+
+def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
+    prod_url = _get_prod_backend_url()
+    if not prod_url or layer_id is None:
+        return
+
+    endpoint = prod_url + "/api/v1/computing/update_layer_sync_remote/"
+    payload = {
+        "layer_id": layer_id,
+        "sync_to_geoserver": sync_to_geoserver,
+        "is_stac_specs_generated": is_stac_specs_generated,
+    }
+    try:
+        response = requests.post(
+            endpoint,
+            json=payload,
+            headers={"X-Api-Key": _get_prod_api_key()},
+            timeout=30,
+        )
+        if response.status_code not in (200, 201):
+            logger.warning(
+                "Prod layer sync status update returned %s for layer %s: %s",
+                response.status_code,
+                layer_id,
+                response.text,
+            )
+        else:
+            logger.info("Layer sync status updated on prod DB for id=%s.", layer_id)
+    except requests.RequestException as e:
+        logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
+
+
+def save_layer_info_to_db(
+    state,
+    district,
+    block,
+    layer_name,
+    asset_id,
+    dataset_name,
+    sync_to_geoserver=False,
+    layer_version="1.0",
+    algorithm=None,
+    algorithm_version="1.0",
+    misc=None,
+    is_override=False,
+):
+    if _get_prod_backend_url():
+        return _sync_layer_to_prod_db({
+            "state": state,
+            "district": district,
+            "block": block,
+            "layer_name": layer_name,
+            "asset_id": asset_id,
+            "dataset_name": dataset_name,
+            "sync_to_geoserver": sync_to_geoserver,
+            "layer_version": layer_version,
+            "algorithm": algorithm,
+            "algorithm_version": algorithm_version,
+            "misc": misc,
+            "is_override": is_override,
+        })
+
+    print("inside the save_layer_info_to_db function")
+
+    dataset = Dataset.objects.get(name=dataset_name)
+
+    try:
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
+            district_name__iexact=district, state=state_obj
+        )
+        block_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=block, district=district_obj
+        )
+    except Exception as e:
+        print("Error fetching in state district block:", e)
+        return
+
+    is_public = is_asset_public(asset_id)
+
+    # Check if there’s an existing layer
+    existing_layer = (
+        Layer.objects.filter(
+            dataset=dataset,
+            layer_name=layer_name,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+        )
+        .order_by("-layer_version")
+        .first()
+    )
+
+    if existing_layer:
+        if existing_layer.algorithm_version != algorithm_version:
+            # Algorithm version changed --> create new record with incremented layer_version
+            new_layer_version = str(float(existing_layer.layer_version) + 1)
+            print(
+                f"Algorithm version changed. Creating new layer version: {new_layer_version}"
+            )
+            layer_obj = Layer.objects.create(
+                dataset=dataset,
+                layer_name=layer_name,
+                state=state_obj,
+                district=district_obj,
+                block=block_obj,
+                layer_version=new_layer_version,
+                algorithm=algorithm,
+                algorithm_version=algorithm_version,
+                is_sync_to_geoserver=sync_to_geoserver,
+                is_public_gee_asset=is_public,
+                is_override=is_override,
+                misc=misc,
+                gee_asset_path=asset_id,
+            )
+        else:
+            # Algorithm version is same --> update existing layer
+            print("Algorithm version same. Updating existing layer.")
+            for field, value in {
+                "algorithm": algorithm,
+                "algorithm_version": algorithm_version,
+                "is_sync_to_geoserver": sync_to_geoserver,
+                "is_public_gee_asset": is_public,
+                "is_override": is_override,
+                "misc": misc,
+                "gee_asset_path": asset_id,
+            }.items():
+                setattr(existing_layer, field, value)
+            existing_layer.save()
+            layer_obj = existing_layer
+    else:
+        # No existing record --> create a new one
+        print("No existing layer found. Creating new one.")
+        layer_obj = Layer.objects.create(
+            dataset=dataset,
+            layer_name=layer_name,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_version=layer_version,
+            algorithm=algorithm,
+            algorithm_version=algorithm_version,
+            is_sync_to_geoserver=sync_to_geoserver,
+            is_public_gee_asset=is_public,
+            is_override=is_override,
+            misc=misc,
+            gee_asset_path=asset_id,
+        )
+
+    print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
+    return layer_obj.id
+
+
+def update_layer_sync_status(
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+):
+    if _get_prod_backend_url():
+        _update_layer_sync_remote(
+            layer_id,
+            sync_to_geoserver=sync_to_geoserver,
+            is_stac_specs_generated=is_stac_specs_generated,
+        )
+        return layer_id
+
+    try:
+        layer_obj = Layer.objects.filter(id=layer_id)
+        if sync_to_geoserver is not None:
+            updated_count = layer_obj.update(is_sync_to_geoserver=sync_to_geoserver)
+
+            if updated_count > 0:
+                print(
+                    f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
+                )
+                return layer_id
+
+        if is_stac_specs_generated is not None:
+            updated_count = layer_obj.update(
+                is_stac_specs_generated=is_stac_specs_generated
+            )
+
+            if updated_count > 0:
+                print(
+                    f"Updated sync status to {is_stac_specs_generated} for layer ID: {layer_id}"
+                )
+                return layer_id
+
+    except Exception as e:
+        print(f"Error updating layer sync status: {e}")
+

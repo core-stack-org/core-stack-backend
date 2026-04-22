@@ -10,6 +10,11 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
+from .utils import (
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+from django.conf import settings
 from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
 from .lulc.lulc_vector import vectorise_lulc
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
@@ -1749,3 +1754,70 @@ def stac_item(request, state, district, block, item_id):
             {"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND
         )
     return Response(data)
+
+
+@api_view(["POST"])
+@schema(None)
+def update_layer_sync_remote(request):
+    """
+    Called by a local compute instance to update sync/STAC flags on a layer
+    record in this (prod) backend.
+    """
+
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = d.get("layer_id")
+        if layer_id is None:
+            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = update_layer_sync_status(
+            layer_id=layer_id,
+            sync_to_geoserver=d.get("sync_to_geoserver"),
+            is_stac_specs_generated=d.get("is_stac_specs_generated"),
+        )
+        return Response({"layer_id": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def sync_layer_remote(request):
+    """
+    Called by a local compute instance to persist a layer record on this (prod) backend.
+    Validates the request API key against PROD_BACKEND_API_KEY before writing.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = save_layer_info_to_db(
+            state=d["state"],
+            district=d["district"],
+            block=d["block"],
+            layer_name=d["layer_name"],
+            asset_id=d["asset_id"],
+            dataset_name=d["dataset_name"],
+            sync_to_geoserver=d.get("sync_to_geoserver", False),
+            layer_version=d.get("layer_version", "1.0"),
+            algorithm=d.get("algorithm"),
+            algorithm_version=d.get("algorithm_version", "1.0"),
+            misc=d.get("misc"),
+            is_override=d.get("is_override", False),
+        )
+        if layer_id is None:
+            return Response(
+                {"error": "Failed to save layer — check state/district/block exist on this server."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
+    except KeyError as e:
+        return Response({"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
