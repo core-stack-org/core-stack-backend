@@ -59,31 +59,30 @@ def merge_yearly_layers(
     print(asset_suffix)
     print(asset_folder_list)
     print(f"merge yearly layers {app_type}")
-    # Create required GEE asset path components
+
     ee_initialize(gee_account_id)
     gee_obj = GEEAccount.objects.get(pk=gee_account_id)
-    helper_account_path = build_gee_helper_paths(app_type, gee_obj.helper_account.name)
-    # Create export asset path (must be constant for export)
-    description = f"drought_{asset_suffix}"  # _{start_year}_{end_year}"
-    print(description)
+
+    description = f"drought_{asset_suffix}"
+
     gee_asset = get_gee_dir_path(
         asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
     )
     asset_id = f"{gee_asset}{description}"
+
+    print(description)
     print(asset_id)
 
-    # Check if asset already exists
     if is_gee_asset_exists(asset_id):
         ee.data.deleteAsset(asset_id)
-        # return None
 
     def get_collection_path(year: int) -> str:
-        """Get the full path for a year's collection."""
         asset_path = GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         return f"{get_gee_dir_path(asset_folder_list, asset_path=asset_path)}drought_{asset_suffix}_{year}_v2"
 
-    # Get base feature collection
+    # Base collection
     first_year_fc = ee.FeatureCollection(get_collection_path(start_year))
+
     geometries_with_ids = first_year_fc.map(
         lambda f: ee.Feature(
             f.geometry(),
@@ -96,20 +95,25 @@ def merge_yearly_layers(
     )
 
     def merge_year_data(feature):
-        """Server-side function to merge data from all years."""
         uid = feature.get("uid")
 
         def process_year(prev_feature, year):
-            """Process a single year's data."""
             feat = ee.Feature(prev_feature)
 
-            # Get year's collection
             year_fc = ee.FeatureCollection(get_collection_path(year))
+
+            filtered = year_fc.filter(ee.Filter.equals("uid", uid))
+
+            # ✅ SAFE feature
             year_feature = ee.Feature(
-                year_fc.filter(ee.Filter.equals("uid", uid)).first()
+                ee.Algorithms.If(
+                    filtered.size().gt(0), filtered.first(), ee.Feature(None, {})
+                )
             )
 
-            # Base property names
+            # -------------------------
+            # Property lists
+            # -------------------------
             base_props = [
                 "drought_labels_" + str(year),
                 "dryspell_length_" + str(year),
@@ -131,7 +135,6 @@ def merge_yearly_layers(
                 "total_weeks_" + str(year),
             ]
 
-            # Base property names
             renamed_props = [
                 "drlb_" + str(year),
                 "drysp_" + str(year),
@@ -153,19 +156,23 @@ def merge_yearly_layers(
                 "t_wks_" + str(year),
             ]
 
-            prop_names = ee.List(base_props)
+            # -------------------------
+            # SAFE getter
+            # -------------------------
+            def safe_get(prop):
+                return ee.Algorithms.If(
+                    year_feature.get(prop), year_feature.get(prop), None
+                )
 
-            renamed_prop_names = ee.List(renamed_props)
+            prop_values = ee.List(base_props).map(lambda x: safe_get(x))
 
-            # Get property values
-            prop_values = prop_names.map(lambda x: year_feature.get(x))
+            base_dict = ee.Dictionary.fromLists(ee.List(renamed_props), prop_values)
 
-            # Create base properties dictionary
-            base_dict = ee.Dictionary.fromLists(renamed_prop_names, prop_values)
+            # -------------------------
+            # Rainfall properties
+            # -------------------------
+            all_properties = year_feature.propertyNames()
 
-            all_properties = ee.Feature(year_feature).propertyNames()
-
-            # Filter properties that start with the prefix
             orig_rainfall_names = all_properties.filter(
                 ee.Filter.stringStartsWith("item", "monthly_rainfall_deviation_")
             )
@@ -175,18 +182,24 @@ def merge_yearly_layers(
 
             renamed_rainfall_names = orig_rainfall_names.map(rename_property)
 
-            # Get rainfall values
-            rainfall_values = orig_rainfall_names.map(lambda x: year_feature.get(x))
+            rainfall_values = orig_rainfall_names.map(lambda x: safe_get(x))
 
-            # Create rainfall properties dictionary
             rainfall_dict = ee.Dictionary.fromLists(
                 renamed_rainfall_names, rainfall_values
             )
 
-            # Adding dry_spell length values from previous years with current year
-            total_dryspell = ee.Number(feat.get("avg_dryspell")).add(
-                ee.Number(year_feature.get("dryspell_length_" + str(year)))
+            # -------------------------
+            # SAFE dryspell
+            # -------------------------
+            dryspell_val = ee.Number(
+                ee.Algorithms.If(
+                    year_feature.get("dryspell_length_" + str(year)),
+                    year_feature.get("dryspell_length_" + str(year)),
+                    0,
+                )
             )
+
+            total_dryspell = ee.Number(feat.get("avg_dryspell")).add(dryspell_val)
 
             return (
                 feat.set(base_dict)
@@ -196,21 +209,19 @@ def merge_yearly_layers(
 
         feature = feature.set("avg_dryspell", 0)
 
-        # Process all years
         years = range(start_year, end_year + 1)
         processed_feature = reduce(process_year, years, feature)
 
         num_years = ee.Number(end_year).subtract(start_year).add(1)
+
         avg_dryspell = ee.Number(processed_feature.get("avg_dryspell")).divide(
             num_years
         )
 
-        # Set average dryspell and remove total
         return processed_feature.set("avg_dryspell", avg_dryspell)
 
-    # Process all features
     merged_fc = geometries_with_ids.map(merge_year_data)
 
-    # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(merged_fc, description, asset_id)
+
     return task_id

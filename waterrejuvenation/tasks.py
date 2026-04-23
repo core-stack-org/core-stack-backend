@@ -31,12 +31,15 @@ from utilities.gee_utils import (
     gdf_to_ee_fc,
     get_gee_dir_path,
     make_asset_public,
+    is_gee_asset_exists,
     valid_gee_text,
 )
 import ee
 import logging
 from datetime import datetime
 import geemap
+
+
 from waterrejuvenation.utils import (
     wait_for_task_completion,
     delete_asset_on_GEE,
@@ -72,21 +75,88 @@ def Upload_Desilting_Points(
     is_lulc_required=True,
     gee_account_id=None,
     is_processing_required=True,
+    is_force_regeneration=True,
 ):
     import pandas as pd
+    import requests
+    from django.conf import settings as django_settings
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
 
-    def normalize(val):
+    def normalize_str(val, default="unknown"):
+        """Normalize Excel string-ish fields.
+
+        - Blank/NaN -> "unknown"
+        - Non-blank -> trimmed string
+        """
+        if pd.isna(val):
+            return default
+        if isinstance(val, str):
+            val = val.strip()
+            return val if val else default
+        return str(val) if val is not None else default
+
+    def normalize_float(val):
+        """Normalize Excel numeric fields (lat/lon). Blank/NaN -> None."""
         if pd.isna(val):
             return None
         if isinstance(val, str) and val.strip() == "":
             return None
-        return val
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            return None
+
+    def parse_admin_details_by_latlon(lat, lon):
+        """Call GeoServer API to fetch State/District/Tehsil for a lat/lon."""
+        # Cache to avoid repeated calls for identical coordinates.
+        cache_key = (round(lat, 4), round(lon, 4))
+        if cache_key in admin_cache:
+            return admin_cache[cache_key]
+
+        api_key = os.getenv(
+            "ADMIN_DETAILS_BY_LATLON_API_KEY",
+            os.getenv(
+                "GET_ADMIN_DETAILS_BY_LATLON_API_KEY",
+                os.getenv("GEO_SERVER_PUBLIC_API_KEY") or "",
+            ),
+        )
+        if not api_key:
+            admin_cache[cache_key] = {"State": "unknown", "District": "unknown", "Tehsil": "unknown"}
+            return admin_cache[cache_key]
+
+        url = f"{django_settings.BASE_URL}api/v1/get_admin_details_by_latlon/"
+        headers = {"X-API-Key": api_key}
+        params = {"latitude": lat, "longitude": lon}
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=30)
+            if resp.status_code != 200:
+                admin_cache[cache_key] = {"State": "unknown", "District": "unknown", "Tehsil": "unknown"}
+                return admin_cache[cache_key]
+
+            data = resp.json() if resp.content else {}
+            result = {
+                "State": data.get("State") or "unknown",
+                "District": data.get("District") or "unknown",
+                "Tehsil": data.get("Tehsil") or "unknown",
+            }
+            admin_cache[cache_key] = result
+            return result
+        except Exception as e:
+            logger.warning(f"Admin lookup failed for ({lat}, {lon}): {e}")
+            admin_cache[cache_key] = {
+                "State": "unknown",
+                "District": "unknown",
+                "Tehsil": "unknown",
+            }
+            return admin_cache[cache_key]
 
     ee_initialize(gee_account_id)
 
     wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
+    if is_force_regeneration:
+        wdsl_log = WaterbodiesDesiltingLog.objects.filter(project_id=wb_obj.project_id)
+        wdsl_log.delete()
 
     if wb_obj.process:
         logger.warning("File already processed. Skipping.")
@@ -94,6 +164,7 @@ def Upload_Desilting_Points(
 
     df = pd.read_excel(wb_obj.file)
     merged_features = []
+    admin_cache = {}
 
     for index, row in df.iterrows():
         print(row)
@@ -101,16 +172,18 @@ def Upload_Desilting_Points(
         # Create DB row FIRST (lossless)
         # -----------------------------
         dsilting_obj_log = WaterbodiesDesiltingLog.objects.create(
-            name_of_ngo=normalize(row.get("Name of NGO")),
-            State=normalize(row.get("State")),
-            District=normalize(row.get("District")),
-            Taluka=normalize(row.get("Taluka")),
-            Village=normalize(row.get("Village")),
-            waterbody_name=normalize(row.get("Name of the waterbody ")),
-            lat=normalize(row.get("Latitude")),
-            lon=normalize(row.get("Longitude")),
-            slit_excavated=normalize(row.get("Silt Excavated as per App")),
-            intervention_year=normalize(row.get("Intervention_year")),
+            # For user-facing text fields: blank -> "unknown"
+            name_of_ngo=normalize_str(row.get("Name of NGO")),
+            State=normalize_str(row.get("State")),
+            District=normalize_str(row.get("District")),
+            Taluka=normalize_str(row.get("Taluka")),
+            Village=normalize_str(row.get("Village")),
+            waterbody_name=normalize_str(row.get("Name of the waterbody ")),
+            # For numeric fields: blank -> None (so we can validate/skip)
+            lat=normalize_float(row.get("Latitude")),
+            lon=normalize_float(row.get("Longitude")),
+            slit_excavated=normalize_str(row.get("Silt Excavated as per App")),
+            intervention_year=normalize_str(row.get("Intervention_year")),
             excel_hash=wb_obj.excel_hash,
             project=proj_obj,
             process=False,
@@ -173,6 +246,20 @@ def Upload_Desilting_Points(
         dsilting_obj_log.distance_closest_wb_pixel = distance
         dsilting_obj_log.process = True
         dsilting_obj_log.failure_reason = None
+
+        # If admin fields were blank in Excel, fill using GeoServer API.
+        # We use the nearest water pixel coords to ensure consistency.
+        if (
+            dsilting_obj_log.State == "unknown"
+            or dsilting_obj_log.District == "unknown"
+            or dsilting_obj_log.Taluka == "unknown"
+        ):
+            admin = parse_admin_details_by_latlon(closest_lat, closest_lon)
+            dsilting_obj_log.State = admin.get("State") or "unknown"
+            dsilting_obj_log.District = admin.get("District") or "unknown"
+            # API returns "Tehsil"; DB column is "Taluka"
+            dsilting_obj_log.Taluka = admin.get("Tehsil") or "unknown"
+
         dsilting_obj_log.save()
 
         try:
@@ -244,6 +331,7 @@ def Generate_lulc_mws(
                 asset_folder=asset_folder,
                 asset_suffix=f"{proj_obj.name}_{proj_obj.id}".lower(),
                 app_type="WATERBODY",
+                force_regenerate=True,
             )
             logger.info("luc Task finished for lulc")
     except Exception as e:
@@ -435,90 +523,125 @@ def Genereate_zoi_and_zoi_indicator(
 def BuildDesiltingLayer(
     project_id, asset_suffix=None, asset_folder=None, gee_account_id=None
 ):
-    # ee_initialize(gee_account_id)
-    from .models import WaterbodiesDesiltingLog
+    from waterrejuvenation.models import WaterbodiesDesiltingLog
+
+    # ee_initialize(gee_account_id)  # Uncomment if needed
 
     instance = Project.objects.get(pk=project_id)
     data = WaterbodiesDesiltingLog.objects.filter(
         project_id=project_id, closest_wb_lat__isnull=False, process=True
     )
+
+    # Asset paths
     asset_folder = [instance.name]
-    assst_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
+    asset_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
     asset_id_desilt = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
         )
-        + assst_suffix_desilt
+        + asset_suffix_desilt
     )
 
     delete_asset_on_GEE(asset_id_desilt)
+
+    # File paths
     project_id = instance.id
     org_name = instance.organization.name
     app_type = instance.app_type
     project_name = instance.name
-    filename = (
-        f"{org_name}_{app_type}_{project_id}_{project_name}_{int(datetime.now().timestamp())}"
-        + ".csv"
-    )
+    filename = f"{org_name}_{app_type}_{project_id}_{project_name}_{int(datetime.now().timestamp())}.csv"
     directory = f"{org_name}/{app_type}/{project_id}_{project_name}"
     full_path = os.path.join(SITE_DATA_PATH, directory)
-    file_path = full_path + filename
+    file_path = os.path.join(full_path, filename)
     os.makedirs(full_path, exist_ok=True)
+
+    # Write CSV
+    csv_columns = [
+        "desilt_id",
+        "latitude",
+        "longitude",
+        "desiltingpoint_lat",
+        "desiltingpoint_lon",
+        "Village",
+        "distance_from_desilting_point",
+        "name_of_ngo",
+        "State",
+        "District",
+        "Taluka",
+        "waterbody_name",
+        "slit_excavated",
+        "intervention_year",
+    ]
+
     with open(file_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(
-            [
-                "desilt_id",
-                "latitude",
-                "longitude",
-                "desiltingpoint_lat",
-                "desiltingpoint_lon",
-                "Village",
-                "distance_from_desilting_point",
-                "name_of_ngo",
-                "State",
-                "District",
-                "Taluka",
-                "waterbody_name",
-                "slit_excavated",
-                "intervention_year",
-            ]
-        )
+        writer.writerow(csv_columns)
         for loc in data:
             writer.writerow(
                 [
-                    val if val is not None and str(val).strip() != "" else "N/A"
-                    for val in [
-                        loc.id,
-                        loc.closest_wb_lat,
-                        loc.closest_wb_long,
-                        loc.lat,
-                        loc.lon,
-                        loc.Village,
-                        loc.distance_closest_wb_pixel,
-                        loc.name_of_ngo,
-                        loc.State,
-                        loc.District,
-                        loc.Taluka,
-                        loc.waterbody_name,
-                        loc.slit_excavated,
-                        loc.intervention_year,
-                    ]
+                    loc.id,
+                    loc.closest_wb_lat,
+                    loc.closest_wb_long,
+                    loc.lat,
+                    loc.lon,
+                    loc.Village,
+                    loc.distance_closest_wb_pixel,
+                    loc.name_of_ngo,
+                    loc.State,
+                    loc.District,
+                    loc.Taluka,
+                    loc.waterbody_name,
+                    loc.slit_excavated,
+                    loc.intervention_year,
                 ]
             )
+
+    # Read CSV into DataFrame
     df = pd.read_csv(file_path)
-    df = df.fillna("N/A").replace(r"^\s*$", "N/A", regex=True)
+
+    # --- FIX: handle numeric vs string columns ---
+    numeric_cols = [
+        "latitude",
+        "longitude",
+        "desiltingpoint_lat",
+        "desiltingpoint_lon",
+        "distance_from_desilting_point",
+        "slit_excavated",
+    ]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(
+            df[col], errors="coerce"
+        )  # keeps numbers, NaN if invalid
+
+    # Drop rows without geometry
+    df = df.dropna(subset=["latitude", "longitude"])
+
+    # Fill missing numeric values with 0 (optional)
+    df[numeric_cols] = df[numeric_cols].fillna(0)
+
+    # Fill missing string columns with "N/A"
+    string_cols = [c for c in df.columns if c not in numeric_cols]
+    df[string_cols] = df[string_cols].fillna("N/A").replace(r"^\s*$", "N/A", regex=True)
+
+    # Create GeoDataFrame
     geometry = [Point(xy) for xy in zip(df["longitude"], df["latitude"])]
     gdf = gpd.GeoDataFrame(df, geometry=geometry)
-    gdf.set_crs("EPSG:4326", allow_override=True, inplace=True)
-    gdf = gdf.dropna(subset=["geometry"])
+    gdf.set_crs("EPSG:4326", inplace=True)
+
+    # Convert to GEE FeatureCollection
     fc = gdf_to_ee_fc(gdf)
+
+    # Delete previous asset if exists
     delete_asset_on_GEE(asset_id_desilt)
-    point_tasks = ee.batch.Export.table.toAsset(
-        collection=fc, description=assst_suffix_desilt, assetId=asset_id_desilt
+
+    # Export to GEE
+    task = ee.batch.Export.table.toAsset(
+        collection=fc, description=asset_suffix_desilt, assetId=asset_id_desilt
     )
-    point_tasks.start()
-    wait_for_task_completion(point_tasks)
+    task.start()
+    wait_for_task_completion(task)
+
+    return {"status": "success", "asset_id": asset_id_desilt}
 
 
 def BuildMWSLayer(
@@ -742,24 +865,194 @@ def BuildMWSLayer(
         # -------------------------
         # Export merged FC to GEE asset
         # -------------------------
-        delete_asset_on_GEE(asset_id_wb_mws)
-        task = ee.batch.Export.table.toAsset(
-            collection=merged_fc,
-            description=asset_suffix_wb,
-            assetId=asset_id_wb_mws,
-        )
+        # Earth Engine can reject very large table exports with:
+        # "Request payload size exceeds the limit" (10MB payload limit).
+        # Strategy:
+        # 1) Try exporting the full table.
+        # 2) If it fails with that specific payload-size error, retry using chunk exports.
+        # IMPORTANT:
+        # Calling merged_fc.size().getInfo() can itself fail with the same
+        # "Request payload size exceeds the limit" error for very large tables.
+        # We therefore reuse `final_count` computed earlier for the base table,
+        # and if it's missing we will assume an upper bound only when retrying.
+        merged_count = final_count
 
-        task.start()
-        logger.info("Started export task %s -> %s", task.id, asset_id_wb_mws)
+        # Aggressive fallback chunk size to avoid EE 10MB payload limit.
+        # Slower, but safest for very heavy per-feature payloads.
+        chunk_size = 1
+        chunk_asset_ids = []
 
-        # Wait for completion (uses your helper)
-        wait_for_task_completion(task)
+        def _export_table(collection, description, asset_id):
+            """
+            Start an EE table export and recover once from request_id collision.
+            """
+            try_descriptions = [description, f"{description}_{int(time.time())}"]
+            last_err = None
+            for idx, desc in enumerate(try_descriptions):
+                try:
+                    export_task = ee.batch.Export.table.toAsset(
+                        collection=collection,
+                        description=desc,
+                        assetId=asset_id,
+                    )
+                    export_task.start()
+                    return export_task
+                except ee.EEException as err:
+                    last_err = err
+                    if (
+                        "A different Operation was already started with the given request_id"
+                        in str(err)
+                        and idx < len(try_descriptions) - 1
+                    ):
+                        # Retry immediately with a unique description so EE creates
+                        # a fresh operation/request context.
+                        time.sleep(2)
+                        continue
+                    raise
+            raise last_err
 
-        # After export, optionally refresh or get info
+        export_task = None
         try:
-            exported_count = ee.FeatureCollection(asset_id_wb_mws).size().getInfo()
-        except Exception:
-            exported_count = None
+            if is_gee_asset_exists(asset_id_wb_mws):
+                delete_asset_on_GEE(asset_id_wb_mws)
+            export_task = _export_table(merged_fc, asset_suffix_wb, asset_id_wb_mws)
+            logger.info(
+                "Started export task %s -> %s", export_task.id, asset_id_wb_mws
+            )
+            wait_for_task_completion(export_task)
+            merged_fc = ee.FeatureCollection(asset_id_wb_mws)
+        except ee.EEException as ee_err:
+            msg = str(ee_err)
+            if "Request payload size exceeds the limit" not in msg:
+                raise
+
+            # Retry with chunk exports
+            logger.warning(
+                "Export payload too large. Retrying with chunk exports (chunk_size=%s). Error=%s",
+                chunk_size,
+                msg,
+            )
+            if merged_count is None:
+                # Fallback: pick a conservative upper bound to avoid calling
+                # merged_fc.size().getInfo() (which triggers payload errors).
+                assumed_max_features = chunk_size * 50  # 1000 features
+                merged_count = assumed_max_features
+                logger.warning(
+                    "merged_count unknown; assuming max features=%s (chunk_size=%s, chunks=%s).",
+                    merged_count,
+                    chunk_size,
+                    50,
+                )
+
+            # Export each chunk (reuse existing chunks if present).
+            # Use local GDF chunking so each chunk builds a smaller EE graph.
+            local_chunk_size = 50
+            for start in range(0, len(gdf), local_chunk_size):
+                end = min(start + local_chunk_size, len(gdf))
+                chunk_asset_suffix = f"{asset_suffix_wb}_chunk_{start}-{end}"
+                chunk_asset_id = (
+                    get_gee_dir_path(
+                        asset_folder,
+                        asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"],
+                    )
+                    + chunk_asset_suffix
+                )
+
+                if is_gee_asset_exists(chunk_asset_id):
+                    chunk_asset_ids.append(chunk_asset_id)
+                    continue
+
+                chunk_geojson_op = f"{mws_geojson_op}_chunk_{start}_{end}.geojson"
+                chunk_gdf = gdf.iloc[start:end].copy()
+                chunk_gdf.to_file(chunk_geojson_op, driver="GeoJSON")
+
+                primary_chunk_fc = ee.FeatureCollection(
+                    calculate_precipitation_season(
+                        chunk_geojson_op, draught_asset_id=draught_asset_id
+                    )
+                )
+
+                if drought_count == 0:
+                    chunk_fc = primary_chunk_fc.map(
+                        lambda f: ee.Feature(f).select(
+                            ee.List(ee.Feature(f).propertyNames())
+                        )
+                    )
+                else:
+                    join = ee.Join.saveFirst("match")
+                    ffilter = ee.Filter.equals(leftField="uid", rightField="uid")
+                    joined = join.apply(
+                        primary=primary_chunk_fc,
+                        secondary=drought_fc,
+                        condition=ffilter,
+                    )
+
+                    def _flatten_match(feat):
+                        feat = ee.Feature(feat)
+
+                        def copy_props(_):
+                            match = ee.Feature(feat.get("match"))
+                            match_props = match.propertyNames()
+
+                            def _setter(prop, acc):
+                                acc = ee.Feature(acc)
+                                prop = ee.String(prop)
+                                val = match.get(prop)
+                                new_name = ee.String("drought_").cat(prop)
+                                return acc.set(new_name, val)
+
+                            merged = ee.Feature(match_props.iterate(_setter, feat))
+                            merged = ee.Feature(merged).select(
+                                ee.List(merged.propertyNames()).remove("match")
+                            )
+                            return merged
+
+                        def remove_match(_):
+                            return ee.Feature(feat).select(
+                                ee.List(feat.propertyNames()).remove("match")
+                            )
+
+                        result = ee.Algorithms.If(
+                            feat.get("match"), copy_props(None), remove_match(None)
+                        )
+                        return ee.Feature(result)
+
+                    chunk_fc = ee.FeatureCollection(joined.map(_flatten_match))
+
+                delete_asset_on_GEE(chunk_asset_id)
+                chunk_task = _export_table(chunk_fc, chunk_asset_suffix, chunk_asset_id)
+                logger.info(
+                    "Started chunk export %s -> %s",
+                    chunk_task.id,
+                    chunk_asset_id,
+                )
+                wait_for_task_completion(chunk_task)
+                chunk_asset_ids.append(chunk_asset_id)
+
+            # Merge chunk assets back into a single final asset.
+            merged_fc_final = None
+            for asset_id in chunk_asset_ids:
+                part_fc = ee.FeatureCollection(asset_id)
+                merged_fc_final = (
+                    part_fc
+                    if merged_fc_final is None
+                    else merged_fc_final.merge(part_fc)
+                )
+
+            if is_gee_asset_exists(asset_id_wb_mws):
+                delete_asset_on_GEE(asset_id_wb_mws)
+            export_task = _export_table(
+                merged_fc_final, asset_suffix_wb, asset_id_wb_mws
+            )
+            logger.info(
+                "Started final chunk-merged export -> %s", asset_id_wb_mws
+            )
+            wait_for_task_completion(export_task)
+            merged_fc = ee.FeatureCollection(asset_id_wb_mws)
+
+        # Avoid calling .size().getInfo() here; it can fail with the same
+        # payload-size limitations for very large tables.
+        exported_count = None
 
         # -------------------------
         # Push to GeoServer
@@ -777,7 +1070,9 @@ def BuildMWSLayer(
         return {
             "status": "SUCCESS",
             "asset_id": asset_id_wb_mws,
-            "export_task_id": task.id if hasattr(task, "id") else None,
+            "export_task_id": (
+                export_task.id if export_task and hasattr(export_task, "id") else None
+            ),
             "feature_count": exported_count,
             "message": f"Exported and synced layer {layer_name}",
         }

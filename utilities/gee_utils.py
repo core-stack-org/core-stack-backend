@@ -22,6 +22,7 @@ import time
 import re
 import json
 import subprocess
+import shutil
 from google.cloud import storage
 from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
@@ -598,13 +599,22 @@ def is_asset_public(asset_id):
 
 def sync_raster_to_gcs(image, scale, layer_name):
     print("inside sync_raster_to_gcs")
+    # Optimize large/sparse exports:
+    # - region limits export to image footprint
+    # - skipEmptyTiles avoids writing empty tiles for disjoint ROI
+    # - cloudOptimized produces GeoTIFFs better suited for serving/upload
     export_task = ee.batch.Export.image.toCloudStorage(
         image=image,
         description="gcs_" + layer_name,
         bucket=GCS_BUCKET_NAME,
         fileNamePrefix="nrm_raster/" + layer_name,
         scale=scale,
+        region=image.geometry(),
         fileFormat="GeoTIFF",
+        formatOptions={"cloudOptimized": True},
+        skipEmptyTiles=True,
+        fileDimensions=4096,
+        shardSize=256,
         crs="EPSG:4326",
         maxPixels=1e13,
     )
@@ -620,10 +630,123 @@ def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_nam
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     bucket = gcs_config()
 
-    blob = bucket.blob("nrm_raster/" + gcs_file_name + ".tif")
-    tif_content = blob.download_as_bytes()
+    # Earth Engine may export large GeoTIFFs as multiple files (e.g. "-part-0.tif").
+    # GeoServer expects a single GeoTIFF, so we download and merge parts when needed.
+    expected_blob_name = f"nrm_raster/{gcs_file_name}.tif"
+    expected_blob = bucket.blob(expected_blob_name)
 
-    file_upload_res = geo.upload_raster(tif_content, workspace, layer_name)
+    merge_tmp_root = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "data", "gdal_merge_tmp"
+    )
+    os.makedirs(merge_tmp_root, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(
+        prefix="geoserver_raster_", dir=merge_tmp_root
+    ) as tmpdir:
+        if expected_blob.exists():
+            local_tif_path = os.path.join(
+                tmpdir, os.path.basename(expected_blob_name)
+            )
+            expected_blob.download_to_filename(local_tif_path)
+            with open(local_tif_path, "rb") as f:
+                file_upload_res = geo.upload_raster(f, workspace, layer_name)
+        else:
+            prefix = f"nrm_raster/{gcs_file_name}"
+            part_blobs = []
+            # list_blobs(prefix=...) is bounded because we keep a tight prefix.
+            # Earth Engine naming can vary for large exports, so we match both:
+            # - "<prefix>-part-0.tif" style
+            # - "<prefix>.tif-part-0" style
+            candidate_prefixes = [prefix, expected_blob_name]
+            seen_names = set()
+            for candidate_prefix in candidate_prefixes:
+                for b in bucket.list_blobs(prefix=candidate_prefix):
+                    if b.name == expected_blob_name:
+                        continue
+                    if ".tif" in b.name.lower():
+                        if b.name not in seen_names:
+                            seen_names.add(b.name)
+                            part_blobs.append(b)
+
+            if not part_blobs:
+                raise FileNotFoundError(
+                    f"Expected GeoTIFF not found in GCS: '{expected_blob_name}'. "
+                    f"No part files found with prefix '{prefix}'."
+                )
+            print(
+                f"Expected GeoTIFF missing; found {len(part_blobs)} part file(s) for '{gcs_file_name}'. Merging before GeoServer upload."
+            )
+
+            # Deterministic merge order.
+            part_blobs.sort(key=lambda b: b.name)
+            local_part_paths = []
+            # Use short local filenames to avoid Windows path-length issues with GDAL.
+            for idx, b in enumerate(part_blobs):
+                local_part_path = os.path.join(tmpdir, f"part_{idx}.tif")
+                b.download_to_filename(local_part_path)
+                local_part_paths.append(local_part_path)
+
+            merged_tif_path = os.path.join(tmpdir, "merged.tif")
+
+            # Prefer gdal_merge.py if available; fall back to VRT+translate otherwise.
+            gdal_merge_py = shutil.which("gdal_merge.py")
+            if gdal_merge_py:
+                cmd = ["gdal_merge.py", "-o", merged_tif_path] + local_part_paths
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        f"gdal_merge.py failed (exit={proc.returncode}): {proc.stderr or proc.stdout}"
+                    )
+            else:
+                # Build VRT then translate into a single GeoTIFF.
+                vrt_path = os.path.join(tmpdir, "merged.vrt")
+                gdalbuildvrt = shutil.which("gdalbuildvrt")
+                gdal_translate = shutil.which("gdal_translate")
+                if not gdalbuildvrt or not gdal_translate:
+                    raise RuntimeError(
+                        "GDAL tools not found. Need either 'gdal_merge.py' or both "
+                        "'gdalbuildvrt' and 'gdal_translate' on PATH."
+                    )
+                proc_vrt = subprocess.run(
+                    [gdalbuildvrt, vrt_path] + local_part_paths,
+                    capture_output=True,
+                    text=True,
+                )
+                if proc_vrt.returncode != 0:
+                    raise RuntimeError(
+                        f"gdalbuildvrt failed (exit={proc_vrt.returncode}): {proc_vrt.stderr or proc_vrt.stdout}"
+                    )
+                proc_tr = subprocess.run(
+                    [
+                        gdal_translate,
+                        "-of",
+                        "GTiff",
+                        "-co",
+                        "TILED=YES",
+                        vrt_path,
+                        merged_tif_path,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                if proc_tr.returncode != 0:
+                    raise RuntimeError(
+                        f"gdal_translate failed (exit={proc_tr.returncode}): {proc_tr.stderr or proc_tr.stdout}"
+                    )
+
+            if not os.path.exists(merged_tif_path):
+                # Extra guard: sometimes GDAL returns non-zero or fails to create the file.
+                # Provide the tempdir listing to help diagnose quickly.
+                tmp_files = []
+                for name in os.listdir(tmpdir):
+                    tmp_files.append(name)
+                raise FileNotFoundError(
+                    f"GDAL merge completed but output is missing: '{merged_tif_path}'. "
+                    f"Tempdir contains: {tmp_files}"
+                )
+
+            with open(merged_tif_path, "rb") as f:
+                file_upload_res = geo.upload_raster(f, workspace, layer_name)
     print("File response:", file_upload_res)
     if style_name:
         style_res = geo.publish_style(
@@ -656,8 +779,36 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
 
 def gcs_file_exists(layer_name):
     bucket = gcs_config()
-    blob = bucket.blob(f"nrm_raster/{layer_name}.tif")
-    return blob.exists()
+    expected_blob = bucket.blob(f"nrm_raster/{layer_name}.tif")
+    if expected_blob.exists():
+        return True
+
+    # Earth Engine may export large GeoTIFFs as multiple "-part-*.tif" objects.
+    # In that case, the exact ".tif" name won't exist, but we still want to treat
+    # the raster as "exported" for the next pipeline step.
+    prefix = f"nrm_raster/{layer_name}"
+    for _ in bucket.list_blobs(prefix=prefix):
+        return True
+    return False
+
+
+def delete_gcs_raster_files(layer_name):
+    """
+    Delete existing raster objects for a layer from GCS.
+    Handles both:
+    - nrm_raster/<layer_name>.tif
+    - multipart outputs with prefix nrm_raster/<layer_name>
+    """
+    bucket = gcs_config()
+    prefix = f"nrm_raster/{layer_name}"
+    deleted = 0
+    for blob in bucket.list_blobs(prefix=prefix):
+        try:
+            blob.delete()
+            deleted += 1
+        except Exception as e:
+            print(f"Failed deleting GCS blob {blob.name}: {e}")
+    print(f"Deleted {deleted} GCS blob(s) for layer {layer_name}")
 
 
 def upload_tif_from_gcs_to_gee(gcs_path, asset_id, scale):

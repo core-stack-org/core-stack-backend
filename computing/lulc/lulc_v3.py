@@ -1,6 +1,7 @@
 import datetime
 import time
 from datetime import timedelta
+import re
 import ee
 from dateutil.relativedelta import relativedelta
 
@@ -17,6 +18,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     get_gee_dir_path,
     gcs_file_exists,
+    delete_gcs_raster_files,
 )
 from nrm_app.celery import app
 from .cropping_frequency import *
@@ -28,6 +30,30 @@ from computing.utils import (
 
 from computing.STAC_specs import generate_STAC_layerwise
 from utilities.constants import PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
+
+
+def _parse_lulc_filename_for_years(final_output_filename: str):
+    """
+    final_output_filename format (created in clip_lulc_v3):
+      <prefix>_<startYYYY>-<startMM>-<startDD>_<endYYYY>-<endMM>-<endDD>_LULCmap_<scale>
+
+    We use regex instead of split('_20') because the prefix may contain substrings like '_205'
+    which break naive year parsing (e.g. producing LULC_5_24_...).
+    """
+    # Capture prefix + the two YYYY values around the date segments.
+    m = re.match(
+        r"^(?P<prefix>.*)_(?P<start>\d{4})-\d{2}-\d{2}_(?P<end>\d{4})-\d{2}-\d{2}_",
+        final_output_filename,
+    )
+    if not m:
+        raise ValueError(
+            f"Unexpected LULC filename format: '{final_output_filename}'. "
+            "Expected <prefix>_<YYYY-MM-DD>_<YYYY-MM-DD>_LULCmap_<scale>."
+        )
+    prefix = m.group("prefix")
+    s_year = m.group("start")[2:]
+    e_year = m.group("end")[2:]
+    return prefix, s_year, e_year
 
 
 @app.task(bind=True)
@@ -43,6 +69,7 @@ def clip_lulc_v3(
     asset_folder=None,
     asset_suffix=None,
     app_type="MWS",
+    force_regenerate=False,
 ):
     """
     it will generate raster lulc for all three level for given year at tehsil level.
@@ -80,16 +107,17 @@ def clip_lulc_v3(
     final_output_assetid_array_new = []
 
     layer_obj = None
-    try:
-        layer_obj = get_layer_object(
-            state,
-            district,
-            block,
-            layer_name=f"LULC_17_18_{filename_prefix}_level_3",
-            dataset_name="LULC_level_3",
-        )
-    except Exception as e:
-        print("DB layer not found for lulc.")
+    if not force_regenerate:
+        try:
+            layer_obj = get_layer_object(
+                state,
+                district,
+                block,
+                layer_name=f"LULC_17_18_{filename_prefix}_level_3",
+                dataset_name="LULC_level_3",
+            )
+        except Exception as e:
+            print("DB layer not found for lulc.")
 
     new_loop_start = None
     if layer_obj:
@@ -128,13 +156,21 @@ def clip_lulc_v3(
             pan_india = ee.Image(
                 f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{curr_start_year}_{curr_end_year}"
             )
+            # clipToCollection expects a FeatureCollection; we have geometry here.
             clipped_lulc = pan_india.clip(roi.geometry())
             l1_asset_new.append(clipped_lulc)
 
     task_list = []
     geometry = roi.geometry()
-    if not is_gee_asset_exists(final_output_assetid_array_new[len(l1_asset_new) - 1]):
+    if force_regenerate or not is_gee_asset_exists(
+        final_output_assetid_array_new[len(l1_asset_new) - 1]
+    ):
         for i in range(0, len(l1_asset_new)):
+            if force_regenerate and is_gee_asset_exists(final_output_assetid_array_new[i]):
+                try:
+                    ee.data.deleteAsset(final_output_assetid_array_new[i])
+                except Exception as e:
+                    print("Error deleting existing LULC asset during force regenerate:", e)
             if (
                 is_gee_asset_exists(final_output_assetid_array_new[i])
                 and len(l1_asset_new) <= 2
@@ -195,6 +231,7 @@ def clip_lulc_v3(
         final_output_filename_array_new,
         final_output_assetid_array_new,
         scale,
+        force_regenerate=force_regenerate,
     )
 
     layer_at_geoserver = sync_lulc_to_geoserver(
@@ -210,17 +247,22 @@ def clip_lulc_v3(
 
 
 def sync_lulc_to_gcs(
-    final_output_filename_array_new, final_output_assetid_array_new, scale
+    final_output_filename_array_new,
+    final_output_assetid_array_new,
+    scale,
+    force_regenerate=False,
 ):
     task_ids = []
     for i in range(0, len(final_output_assetid_array_new)):
         make_asset_public(final_output_assetid_array_new[i])
         image = ee.Image(final_output_assetid_array_new[i])
-        name_arr = final_output_filename_array_new[i].split("_20")
-        s_year = name_arr[1][:2]
-        e_year = name_arr[2][:2]
-        layer_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
-        if not gcs_file_exists(layer_name):
+        prefix, s_year, e_year = _parse_lulc_filename_for_years(
+            final_output_filename_array_new[i]
+        )
+        layer_name = "LULC_" + s_year + "_" + e_year + "_" + prefix
+        if force_regenerate:
+            delete_gcs_raster_files(layer_name)
+        if force_regenerate or not gcs_file_exists(layer_name):
             task_ids.append(sync_raster_to_gcs(image, scale, layer_name))
 
     task_id_list = check_task_status(task_ids)
@@ -239,12 +281,10 @@ def sync_lulc_to_geoserver(
     lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     layer_at_geoserver = False
     for i in range(0, len(final_output_filename_array_new)):
-        name_arr = final_output_filename_array_new[i].split(
-            "_20"
-        )  # TODO: better logic than this
-        s_year = name_arr[1][:2]
-        e_year = name_arr[2][:2]
-        gcs_file_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
+        prefix, s_year, e_year = _parse_lulc_filename_for_years(
+            final_output_filename_array_new[i]
+        )
+        gcs_file_name = "LULC_" + s_year + "_" + e_year + "_" + prefix
         print("Syncing " + gcs_file_name + " to geoserver")
         for workspace in lulc_workspaces:
             suff = workspace.replace("LULC", "")
@@ -269,7 +309,7 @@ def sync_lulc_to_geoserver(
             )
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
-                print("STAC: Name array check", name_arr[1])
+                print("STAC: Parsed start year", s_year)
 
                 if workspace == "LULC_level_3":
                     start_year_STAC = "20" + str(

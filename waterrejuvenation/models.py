@@ -73,18 +73,7 @@ class WaterbodiesFileUploadLog(models.Model):
         super().save(*args, **kwargs)
         print(f"is processing required: {self.is_processing_required}")
         print(f"is lullc required: {self.is_lulc_required}")
-        if self.is_compute:
-            Upload_Desilting_Points.apply_async(
-                kwargs={
-                    "file_obj_id": self.id,
-                    "gee_account_id": self.gee_account_id,
-                    "is_lulc_required": self.is_lulc_required,
-                    "is_processing_required": self.is_processing_required,
-                    "is_closest_wp": self.is_closest_wp,
-                },
-                queue="waterbody1",
-            )
-        else:
+        if not self.is_compute:
             logger.info(
                 f"File uploaded by user {self.uploaded_by.username}. Triggering email to superadmins and support"
             )
