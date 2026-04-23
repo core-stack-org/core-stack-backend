@@ -1456,6 +1456,8 @@ def generate_ndvi_timeseries(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
+        mws_count = request.data.get("mws_count")
+        chunk_size = request.data.get("chunk_size")
 
         ndvi_timeseries.apply_async(
             kwargs={
@@ -1465,6 +1467,8 @@ def generate_ndvi_timeseries(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "gee_account_id": gee_account_id,
+                "mws_count": mws_count,
+                "chunk_size": chunk_size,
             },
             queue="nrm",
         )

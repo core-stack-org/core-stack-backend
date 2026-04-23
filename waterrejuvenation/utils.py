@@ -7,7 +7,6 @@ from utilities.constants import (
     PAN_INDIA_LULC_V3_DATASET,
     WATER_REJ_GEE_ASSET,
     WATERREJUVENATION_PROJECT,
-    PAN_INDIA_LULC_BASE_PATH_ID,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -275,7 +274,9 @@ def clip_lulc_output(mws_asset_id, proj_id, gee_project_id):
     lulc_asset_id_base = get_filtered_mws_layer_name(
         proj_obj.name, "clipped_lulc_filtered_mws", gee_project_id
     )
-    PAN_INDIA_LULC_BASE_PATH = PAN_INDIA_LULC_BASE_PATH_ID
+    PAN_INDIA_LULC_BASE_PATH = (
+        "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+    )
     for year in years:
         start, end = year.split("_")[0], year.split("_")[1]
         start_date = f"{start}-07-01"

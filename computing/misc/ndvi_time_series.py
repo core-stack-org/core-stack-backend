@@ -45,6 +45,8 @@ def ndvi_timeseries(
     end_year=None,
     app_type="MWS",
     gee_account_id=None,
+    mws_count=150,
+    chunk_size=100,
 ):
     """
     It will generate ndvi timeseries layer for given location at tehsil level or region of intrest
@@ -116,6 +118,8 @@ def ndvi_timeseries(
                 end_date,
                 roi,
                 gee_account_id,
+                mws_count=mws_count,
+                chunk_size=chunk_size,
             )
             print(new_asset_ids)
 
@@ -134,6 +138,8 @@ def ndvi_timeseries(
             end_date,
             roi,
             gee_account_id,
+            mws_count=mws_count,
+            chunk_size=chunk_size,
         )
 
         print(new_asset_ids)
@@ -255,6 +261,8 @@ def _generate_data(
     end_date,
     roi,
     gee_account_id,
+    mws_count=150,
+    chunk_size=100,
 ):
     print("f_start_date>>>", start_date)
     print("end_date>>>", end_date)
@@ -287,8 +295,8 @@ def _generate_data(
             app_type, gee_obj.helper_account.name
         )
         if not is_gee_asset_exists(ndvi_asset_id):
-            if roi.size().getInfo() > 100:
-                chunk_size = 20
+            if roi.size().getInfo() > mws_count:
+                chunk_size = chunk_size
                 rois, descs = create_chunk(roi, ndvi_description, chunk_size)
 
                 ee_initialize(gee_obj.helper_account.id)
