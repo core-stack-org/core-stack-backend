@@ -41,13 +41,22 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
     "first_name": "John",
     "last_name": "Doe",
     "contact_number": "1234567890",
-    "organization": "optional-organization-uuid"
+    "organization": "optional-organization-uuid-or-name",
+    "age": 30,
+    "education_qualification": "Graduate",
+    "gender": "M",
+    "profile_picture": "<file upload>",
+    "account_type": "individual"
   }
   ```
 - **Response**: Returns the created user object along with access and refresh tokens
-- **Notes**: 
-  - Organization ID is optional
-  - If provided, the user will be associated with that organization
+- **Notes**:
+  - `organization` is optional; accepts either a UUID or an organization name string
+    - If a UUID is provided, the user is linked to that organization
+    - If a name is provided and matches an existing organization, the user is linked to it
+    - If a name is provided and no match exists, a new organization is created
+  - `age`, `education_qualification`, `gender`, `profile_picture`, and `account_type` are all optional
+  - `gender` accepts single-character codes: `"M"` (Male), `"F"` (Female), `"O"` (Other)
 
 ### Get Available Organizations for Registration
 - **URL**: `/api/v1/auth/register/available_organizations/`

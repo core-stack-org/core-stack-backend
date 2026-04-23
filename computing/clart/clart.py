@@ -12,7 +12,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from utilities.constants import (
-    GEE_ASSET_PATH_CLART,
+    GEE_LITHOLOGY_ASSET_PATH,
     SRTM_DIGITAL_ELEVATION,
     INDIA_LINEAMENTS,
 )
@@ -69,7 +69,7 @@ def clart_layer(state, district, block):
             + valid_gee_text(block.lower())
         )
         lithology = ee.Image(
-            GEE_ASSET_PATH_CLART
+            GEE_LITHOLOGY_ASSET_PATH
             + valid_gee_text(state.lower())
             + "/"
             + valid_gee_text(state.lower())
