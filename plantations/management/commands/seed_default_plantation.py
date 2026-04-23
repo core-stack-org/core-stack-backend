@@ -7,7 +7,8 @@ from organization.models import Organization
 from plantations.models import PlantationProfile
 from projects.models import AppType, Project
 
-CFPT_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+DEFAULT_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+DEFAULT_ORG_NAME = "Default Organization"
 DEFAULT_PROJECT_NAME = "Default Plantation Project"
 SYSTEM_USERNAME = "corestack_system"
 
@@ -104,13 +105,13 @@ class Command(BaseCommand):
             self.stdout.write(f"Created system user: {SYSTEM_USERNAME}")
 
         org, created = Organization.objects.get_or_create(
-            id=CFPT_ORG_ID,
-            defaults={"name": "CFPT"},
+            id=DEFAULT_ORG_ID,
+            defaults={"name": DEFAULT_ORG_NAME},
         )
         if created:
-            self.stdout.write("Created organization: CFPT")
+            self.stdout.write("Created organization: Default Organization")
         else:
-            self.stdout.write("Organization CFPT already exists.")
+            self.stdout.write("Organization 'Default Organization' already exists.")
 
         project, created = Project.objects.get_or_create(
             name=DEFAULT_PROJECT_NAME,
