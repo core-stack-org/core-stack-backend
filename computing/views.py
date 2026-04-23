@@ -2,6 +2,7 @@ import requests
 from nrm_app.settings import GEOSERVER_URL
 from utilities.gee_utils import valid_gee_text
 import xml.etree.ElementTree as ET
+from lxml import etree as LET
 from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
@@ -54,6 +55,7 @@ def layer_status(self, state, district, block):
     """
     print(f"{state=}")
     all_workspace_statuses = {}
+    capabilities_cache = {}
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
 
@@ -98,18 +100,28 @@ def layer_status(self, state, district, block):
                     print(f"Invalid XML for layer: {layer_name}")
                     status_code = 400
         else:
-            capabilities_url = (
-                f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
-            )
-            response = requests.get(capabilities_url)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                ns = {"wms": root.tag.split("}")[0].strip("{")}
-                layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
-                available_layers = {layer.text for layer in layers}
+            if workspace not in capabilities_cache:
+                capabilities_url = f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
+                try:
+                    response = requests.get(capabilities_url, timeout=30)
+                    if response.status_code == 200:
+                        parser = LET.XMLParser(recover=True, encoding="utf-8")
+                        root = LET.fromstring(response.content, parser=parser)
+                        ns = {"wms": root.tag.split("}")[0].strip("{")}
+                        layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
+                        capabilities_cache[workspace] = {
+                            layer.text for layer in layers if layer.text
+                        }
+                    else:
+                        capabilities_cache[workspace] = set()
+                except Exception as e:
+                    print(
+                        f"Failed to fetch capabilities for workspace {workspace}: {e}"
+                    )
+                    capabilities_cache[workspace] = set()
 
-                if layer_name in available_layers:
-                    status_code = 200
+            if layer_name in capabilities_cache.get(workspace, set()):
+                status_code = 200
         all_workspace_statuses[workspace_display] = {
             "workspace": workspace,
             "layer_name": layer_name,
