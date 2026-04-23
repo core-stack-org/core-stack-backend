@@ -267,8 +267,18 @@
         <div class="container">
             <h1>Resource and Demand Map Report</h1>
             <div style="margin-top: 15px; font-size: 1.1em; opacity: 0.95;">
-                <div><strong>Plan Name:</strong> {{plan_name}}</div>
-                <div style="margin-top: 5px;"><strong>Plan ID:</strong> {{plan_id}}</div>
+                <div style="display: flex; gap: 40px; justify-content: center; margin-bottom: 10px;">
+                    <div><strong>Plan Name:</strong> {{plan_name}}</div>
+                    <div><strong>Plan ID:</strong> {{plan_id}}</div>
+                </div>
+                {% if plan_details %}
+                <div style="display: flex; gap: 40px; justify-content: center; font-size: 0.9em; opacity: 0.9;">
+                    <div><strong>Village:</strong> {{plan_details.village_name}}</div>
+                    <div><strong>Organization:</strong> {{plan_details.organization_name}}</div>
+                    <div><strong>Project:</strong> {{plan_details.project_name}}</div>
+                    <div><strong>Facilitator:</strong> {{plan_details.facilitator_name}}</div>
+                </div>
+                {% endif %}
             </div>
             <button class="print-button" onclick="printReport()">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
