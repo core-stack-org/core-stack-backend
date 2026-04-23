@@ -2,7 +2,8 @@ import json
 import os
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
-from rest_framework.decorators import api_view, parser_classes, schema
+from rest_framework.decorators import api_view, authentication_classes, parser_classes, permission_classes, schema
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -1761,6 +1762,8 @@ def stac_item(request, state, district, block, item_id):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @schema(None)
 def update_layer_sync_remote(request):
     """
@@ -1789,6 +1792,8 @@ def update_layer_sync_remote(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @schema(None)
 def sync_layer_remote(request):
     """
