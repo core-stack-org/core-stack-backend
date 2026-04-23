@@ -10,7 +10,7 @@ import geopandas as gpd
 DEFAULT_MICROWATERSHED_PATH = (
     "data/base_layers/Microwatershed_v2_with_details.geojson"
 )
-DEFAULT_TEHSIL_PATH = "data/base_layers/SOI_tehsil.geojson"
+DEFAULT_TEHSIL_PATH = "data/admin-boundary/input/soi_tehsil.geojson"
 DEFAULT_OUTPUT_DIR = "data/base_layers/tehsil_watersheds"
 
 STATE_COLUMN_CANDIDATES = ["STATE", "state", "state_name", "State"]

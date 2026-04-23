@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from computing.base_layer_setup import setup_base_layers
 
 
 class ComputingConfig(AppConfig):
@@ -8,6 +9,4 @@ class ComputingConfig(AppConfig):
     def ready(self):
         import computing.tasks  # noqa: F401  (task autodiscovery)
         import computing.signals  # noqa: F401  (post_save -> auto STAC trigger)
-        from computing.base_layer_setup import setup_base_layers
-
         setup_base_layers()
