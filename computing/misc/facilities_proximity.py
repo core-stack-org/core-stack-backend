@@ -44,6 +44,100 @@ from computing.utils import (
 logger = logging.getLogger(__name__)
 from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE, FACILITIES_DATASET_NAME
 
+ADMIN_BOUNDARY_SOURCE_FIELDS = ["state", "district", "tehsil", "vill_ID", "vill_name"]
+ADMIN_BOUNDARY_EXPORT_FIELDS = ["state", "district", "tehsil", "censuscode2011", "censusname"]
+FACILITIES_STATIC_EXPORT_FIELDS = ["core_admin_uid", "shrid2"]
+
+
+def _get_facilities_export_fields(facilities_fc):
+    """Return the facilities fields that should be copied to the output layer."""
+    facilities_property_names = ee.List(
+        ee.Feature(facilities_fc.first()).propertyNames()
+    )
+    distance_fields = facilities_property_names.filter(
+        ee.Filter.stringEndsWith("item", "_distance")
+    )
+    return ee.List(FACILITIES_STATIC_EXPORT_FIELDS).cat(distance_fields).distinct()
+
+
+def _dissolve_admin_boundary(admin_boundary):
+    """
+    Merge repeated admin rows with the same village properties into one geometry.
+
+    This preserves full village shapes while preventing split polygon parts from
+    producing repeated output rows with identical attributes.
+    """
+    admin_export_fc = admin_boundary.select(
+        ADMIN_BOUNDARY_SOURCE_FIELDS,
+        ADMIN_BOUNDARY_EXPORT_FIELDS,
+    )
+    unique_admin_fc = admin_export_fc.distinct(ADMIN_BOUNDARY_EXPORT_FIELDS)
+
+    def merge_duplicate_geometries(feature):
+        feature = ee.Feature(feature)
+        duplicate_filter = ee.Filter.And(
+            ee.Filter.eq("state", feature.get("state")),
+            ee.Filter.eq("district", feature.get("district")),
+            ee.Filter.eq("tehsil", feature.get("tehsil")),
+            ee.Filter.eq("censuscode2011", feature.get("censuscode2011")),
+            ee.Filter.eq("censusname", feature.get("censusname")),
+        )
+        dissolved_geometry = admin_export_fc.filter(duplicate_filter).geometry()
+        return ee.Feature(dissolved_geometry).copyProperties(
+            feature,
+            ADMIN_BOUNDARY_EXPORT_FIELDS,
+        )
+
+    return unique_admin_fc.map(merge_duplicate_geometries)
+
+
+def _build_facilities_output_fc(admin_boundary, facilities_fc):
+    """
+    Preserve admin-boundary geometry and attach facilities metrics after a fast
+    spatial clip.
+
+    The exported layer keeps polygon shapes and core hierarchy columns from the
+    admin-boundary asset, while copying the facilities distance metrics plus the
+    requested identifier fields from the pan-India facilities asset.
+    """
+    facilities_export_fields = _get_facilities_export_fields(facilities_fc)
+    clipped_facilities = facilities_fc.filterBounds(admin_boundary.geometry()).select(
+        ee.List(["censuscode2011"]).cat(facilities_export_fields)
+    )
+    admin_export_fc = _dissolve_admin_boundary(admin_boundary)
+    admin_census_codes = ee.List(admin_export_fc.aggregate_array("censuscode2011")).distinct()
+    clipped_facilities = clipped_facilities.filter(
+        ee.Filter.inList("censuscode2011", admin_census_codes)
+    )
+    join_filter = ee.Filter.equals(
+        leftField="censuscode2011",
+        rightField="censuscode2011",
+    )
+    joined_fc = ee.FeatureCollection(
+        ee.Join.saveFirst(matchKey="facility_match", outer=True).apply(
+            admin_export_fc,
+            clipped_facilities,
+            join_filter,
+        )
+    )
+
+    def attach_facilities_metrics(feature):
+        feature = ee.Feature(feature)
+        facility_match = feature.get("facility_match")
+        admin_feature = feature.select(ADMIN_BOUNDARY_EXPORT_FIELDS)
+        return ee.Feature(
+            ee.Algorithms.If(
+                facility_match,
+                admin_feature.copyProperties(
+                    ee.Feature(facility_match),
+                    facilities_export_fields,
+                ),
+                admin_feature,
+            )
+        )
+
+    return joined_fc.map(attach_facilities_metrics)
+
 
 def generate_facilities_proximity(state, district, block, gee_account_id):
     """
@@ -91,7 +185,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
 
         print(f"[{datetime.now()}] Asset ID: {asset_id}")
 
-        # Step 3: Load admin boundary and filter facilities
+        # Step 3: Load admin boundary and spatially attach facilities metrics
         admin_boundary_path = (
             get_gee_asset_path(
                 state, district, block, GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
@@ -109,13 +203,13 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
         # Load and filter
         facilities_fc = ee.FeatureCollection(GEE_FACILITIES_DATASET_PATH)
         admin_boundary = ee.FeatureCollection(admin_boundary_path)
-        filtered_fc = facilities_fc.filterBounds(admin_boundary.geometry())
+        output_fc = _build_facilities_output_fc(admin_boundary, facilities_fc)
 
         # Step 4: Export as GEE asset
 
         if not is_gee_asset_exists(asset_id):
             print(f"[{datetime.now()}] Exporting to GEE asset...")
-            task_id = export_vector_asset_to_gee(filtered_fc, asset_suffix, asset_id)
+            task_id = export_vector_asset_to_gee(output_fc, asset_suffix, asset_id)
             if task_id:
                 check_task_status([task_id])
             else:
