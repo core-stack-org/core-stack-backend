@@ -261,8 +261,8 @@ def _generate_data(
     end_date,
     roi,
     gee_account_id,
-    mws_count=150,
-    chunk_size=100,
+    mws_count,
+    chunk_size,
 ):
     print("f_start_date>>>", start_date)
     print("end_date>>>", end_date)
