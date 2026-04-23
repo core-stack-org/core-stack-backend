@@ -150,7 +150,6 @@ def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
             print(e)
 
     path = generate_shape_files(path)
-    # return push_shape_to_geoserver(path, workspace=workspace, layer_name=layer_name)
     return push_shape_to_geoserver(path, store_name=layer_name, workspace=workspace, layer_name=layer_name)
 
 
@@ -168,7 +167,6 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
     if len(geojson_fc["features"]) > 0:
         state_dir = os.path.join("data/fc_to_shape", shp_folder)
         if not os.path.exists(state_dir):
-            # os.mkdir(state_dir)
             os.makedirs(state_dir, exist_ok=True)
         path = os.path.join(state_dir, f"{layer_name}")
 
