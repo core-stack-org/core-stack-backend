@@ -434,5 +434,4 @@ lulc_years = [
 ]
 water_classes = [2, 3, 4]
 
-GEE_STORAGE_OLD_PROJECT = env("GEE_STORAGE_ASSET_PROJECT")
 GEE_STORAGE_PROJECT = env("GEE_STORAGE_PROJECT")
