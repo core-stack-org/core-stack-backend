@@ -1,7 +1,10 @@
 # inbuilt libraries
 import io
+import logging
 import os
 from typing import List, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 # third-party libraries
 import requests
@@ -246,6 +249,22 @@ class Geoserver:
         else:
             raise GeoserverException(r.status_code, r.content)
 
+    def ensure_workspace(self, workspace: str):
+        """
+        Creates the workspace if it does not already exist.
+        Never raises — a failed workspace creation is non-fatal; the upload
+        attempt that follows will surface the real error if the workspace is
+        truly missing.
+        """
+        try:
+            url = "{}/rest/workspaces/{}.json".format(self.service_url, workspace)
+            r = self._requests("get", url)
+            if r.status_code == 200:
+                return
+            self.create_workspace(workspace)
+        except Exception as e:
+            logger.warning("ensure_workspace(%s) failed (proceeding anyway): %s", workspace, e)
+
     def delete_workspace(self, workspace: str):
         """
 
@@ -320,7 +339,7 @@ class Geoserver:
         - store: Name of the vector datastore to delete
         """
         print("inside delete_vector_store")
-        url = f"{GEOSERVER_URL}/rest/workspaces/{workspace}/datastores/{store}?recurse=true"
+        url = f"{self.service_url}/rest/workspaces/{workspace}/datastores/{store}?recurse=true"
         resp = self._requests(method="delete", url=url)
         if resp.status_code in [200, 202]:
             print(f"Vector store '{store}' deleted successfully.")
@@ -416,14 +435,13 @@ class Geoserver:
 
         headers = {"content-type": content_type, "Accept": "application/json"}
 
-        r = None
         with open(path, "rb") as f:
             r = self._requests(method="put", url=url, data=f, headers=headers)
 
-            if r.status_code == 201:
-                return r.json()
-            else:
-                raise GeoserverException(r.status_code, r.content)
+        if r.status_code in (200, 201):
+            return r.json()
+        else:
+            raise GeoserverException(r.status_code, r.content)
 
     def upload_raster(
         self,
@@ -513,6 +531,46 @@ class Geoserver:
         else:
             raise GeoserverException(r.status_code, r.content)
 
+    def configure_coverage(
+        self,
+        workspace: str,
+        store: str,
+        coverage: Optional[str] = None,
+        srs: str = "EPSG:4326",
+        projection_policy: str = "FORCE_DECLARED",
+        enabled: bool = True,
+    ):
+        """
+        Force a coverage's declared SRS, projection policy, and enabled state.
+
+        Use this right after ``create_coveragestore`` when the source raster
+        may have missing/unresolvable CRS metadata (e.g. broken PROJ on the
+        writer side). ``FORCE_DECLARED`` tells GeoServer to treat the declared
+        SRS as authoritative instead of relying on the file's native CRS.
+        """
+        coverage_name = coverage or store
+        url = "{0}/rest/workspaces/{1}/coveragestores/{2}/coverages/{3}".format(
+            self.service_url, workspace, store, coverage_name
+        )
+        body = (
+            "<coverage>"
+            f"<name>{coverage_name}</name>"
+            f"<nativeName>{coverage_name}</nativeName>"
+            f"<enabled>{str(enabled).lower()}</enabled>"
+            f"<srs>{srs}</srs>"
+            f"<projectionPolicy>{projection_policy}</projectionPolicy>"
+            "</coverage>"
+        )
+        r = self._requests(
+            method="put",
+            url=url,
+            data=body,
+            headers={"content-type": "application/xml"},
+        )
+        if r.status_code in (200, 201):
+            return r.status_code
+        raise GeoserverException(r.status_code, r.content)
+
     # delete coveragestore(raster)
     def delete_raster_store(self, workspace, store):
         """
@@ -523,7 +581,7 @@ class Geoserver:
         - store: Name of the vector datastore to delete
         """
         print("inside delete_raster_store")
-        url = f"{GEOSERVER_URL}/rest/workspaces/{workspace}/coveragestores/{store}?recurse=true"
+        url = f"{self.service_url}/rest/workspaces/{workspace}/coveragestores/{store}?recurse=true"
         resp = self._requests(method="delete", url=url)
         if resp.status_code in [200, 202]:
             print(f"Raster store '{store}' deleted successfully.")

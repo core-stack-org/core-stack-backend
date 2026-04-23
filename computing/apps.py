@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+from computing.base_layer_setup import setup_base_layers
 
 
 class ComputingConfig(AppConfig):
@@ -6,6 +7,4 @@ class ComputingConfig(AppConfig):
     name = "computing"
 
     def ready(self):
-        from computing.base_layer_setup import setup_base_layers
-
         setup_base_layers()

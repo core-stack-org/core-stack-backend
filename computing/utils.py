@@ -626,7 +626,7 @@ def _sync_layer_to_prod_db(payload: dict):
     if not prod_url:
         return None
 
-    endpoint = prod_url + "/api/v1/computing/sync_layer_remote/"
+    endpoint = prod_url + "/api/v1/sync_layer_remote/"
     try:
         response = requests.post(
             endpoint,
@@ -655,7 +655,7 @@ def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_ge
     if not prod_url or layer_id is None:
         return
 
-    endpoint = prod_url + "/api/v1/computing/update_layer_sync_remote/"
+    endpoint = prod_url + "/api/v1/update_layer_sync_remote/"
     payload = {
         "layer_id": layer_id,
         "sync_to_geoserver": sync_to_geoserver,
@@ -696,7 +696,7 @@ def save_layer_info_to_db(
     is_override=False,
 ):
     if _get_prod_backend_url():
-        return _sync_layer_to_prod_db({
+        layer_id = _sync_layer_to_prod_db({
             "state": state,
             "district": district,
             "block": block,
@@ -710,6 +710,11 @@ def save_layer_info_to_db(
             "misc": misc,
             "is_override": is_override,
         })
+        if layer_id is not None:
+            return layer_id
+        logger.warning(
+            "Prod DB sync failed for layer %s — falling back to local DB write.", layer_name
+        )
 
     print("inside the save_layer_info_to_db function")
 

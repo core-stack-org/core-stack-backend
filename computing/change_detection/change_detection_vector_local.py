@@ -11,10 +11,10 @@ from computing.local_compute_helper import (
     compute_categorical_raster_areas_for_watersheds,
     ensure_file_exists,
     load_precomputed_watersheds,
+    push_local_vector_to_geoserver,
     write_vector_output,
 )
 from computing.utils import (
-    push_shape_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
@@ -162,10 +162,10 @@ def run_change_detection_vector_local(
 
         published_layer_name = _published_layer_name(district, block, param_name)
         if push_to_geoserver:
-            geoserver_response = push_shape_to_geoserver(
-                os.path.splitext(asset_id)[0],
-                workspace=GEOSERVER_WORKSPACE,
+            geoserver_response = push_local_vector_to_geoserver(
+                path=os.path.splitext(asset_id)[0],
                 layer_name=published_layer_name,
+                workspace=GEOSERVER_WORKSPACE,
                 file_type="gpkg",
             )
             print(f"GeoServer response for {param_name}: {geoserver_response}")
