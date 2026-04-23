@@ -16,6 +16,8 @@ from .models import WaterbodiesFileUploadLog
 from .serializers import ExcelFileSerializer
 from rest_framework.views import APIView
 from .utils import get_merged_waterbodies_with_zoi
+import pandas as pd
+from .utils import validate_excel_headers, EXPECTED_EXCEL_HEADERS
 
 
 class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
@@ -56,9 +58,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
 
         # Get project and check if it's a plantation project and enabled
         try:
-            project = Project.objects.get(
-                id=project_id, app_type=AppType.WATERBODY_REJ, enabled=True
-            )
+            project = Project.objects.get(id=project_id, app_type=AppType.WATERBODY_REJ)
         except Project.DoesNotExist:
             return Response(
                 {"detail": "Plantation project not found or not enabled."},
@@ -118,11 +118,31 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 "file": uploaded_file,
                 "project": project.id,
                 "gee_account_id": request.data.get("gee_account_id"),
+                "is_lulc_required": request.data.get("is_lulc_required", True),
+                "is_processing_required": request.data.get(
+                    "is_processing_required", True
+                ),
+                "is_closest_wp": request.data.get("is_closest_wp", True),
+                "is_compute": request.data.get("is_compute", False),
             }
             print(data)
             serializer = self.get_serializer(data=data)
 
             try:
+                uploaded_file.seek(0)
+
+                is_valid, error_msg = validate_excel_headers(
+                    uploaded_file, EXPECTED_EXCEL_HEADERS
+                )
+
+                if not is_valid:
+                    errors.append(
+                        f"File '{uploaded_file.name}' format error: {error_msg}"
+                    )
+                    continue
+
+                # VERY IMPORTANT
+                uploaded_file.seek(0)
                 if serializer.is_valid():
                     print("inside serailizer sv")
                     # Save excel file
@@ -130,7 +150,6 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                         project=project,
                         uploaded_by=request.user,
                         excel_hash=excel_hash,
-                        gee_account_id=request.data.get("gee_account_id"),
                     )
 
                     # # Convert KML to GeoJSON

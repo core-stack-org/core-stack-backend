@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Optional
 
 import requests
@@ -27,8 +28,8 @@ from utilities.constants import (
 )
 
 from .build_layer import build_layer
-from .models import Plan
-from .serializers import PlanSerializer
+from .models import ODKSyncLog, Plan
+from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
 
 
@@ -51,7 +52,7 @@ def get_plans(request):
             plans = Plan.objects.filter(block=block_id)
         else:
             plans = Plan.objects.all()
-        serializer = PlanSerializer(plans, many=True)
+        serializer = PlanAppSerializer(plans, many=True)
         response = {"plans": serializer.data}
 
         return Response(response, status=status.HTTP_200_OK)
@@ -65,7 +66,7 @@ def get_plans(request):
 @schema(None)
 def add_plan(request):
     if request.method == "POST":
-        serializer = PlanSerializer(data=request.data)
+        serializer = PlanAppSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()  # Save the new Plan instance if validation passes
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -88,7 +89,10 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = TMP_LOCATION + str(resource_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = os.path.join(
+        TMP_LOCATION,
+        f"{resource_type}_{plan_id}_{block}.csv",
+    )
 
     odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
 
@@ -117,6 +121,9 @@ def add_resources(request):
             {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+    finally:
+        if os.path.exists(CSV_PATH):
+            os.remove(CSV_PATH)
 
     return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
 
@@ -136,7 +143,10 @@ def add_works(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
-    CSV_PATH = TMP_LOCATION + str(work_type) + "_" + str(plan_id) + "_" + block + ".csv"
+    CSV_PATH = os.path.join(
+        TMP_LOCATION,
+        f"{work_type}_{plan_id}_{block}.csv",
+    )
 
     odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
 
@@ -165,6 +175,9 @@ def add_works(request):
             {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+    finally:
+        if os.path.exists(CSV_PATH):
+            os.remove(CSV_PATH)
 
     return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
 
@@ -245,7 +258,7 @@ def _get_feedback_config() -> Dict[str, Dict[str, Any]]:
 
 
 def _validate_sync_request(
-        request, resource_type: str = None, work_type: str = None, feedback_type: str = None
+    request, resource_type: str = None, work_type: str = None, feedback_type: str = None
 ) -> Optional[Response]:
     """Validate the sync request parameters and content type."""
 
@@ -301,9 +314,21 @@ def _validate_sync_request(
 
 
 def _sync_to_odk(
-        xml_string: str, config: Dict[str, Any], bearer_token: str
+    xml_string: str,
+    config: Dict[str, Any],
+    bearer_token: str,
+    category: str,
+    sync_type: str,
 ) -> Response:
     """Handle the actual sync to ODK for a specific resource or work type."""
+    sync_log = ODKSyncLog.objects.create(
+        category=category,
+        sync_type=sync_type,
+        xml_content=xml_string,
+        odk_url=config["url"],
+        status=ODKSyncLog.SyncStatus.PENDING,
+    )
+
     try:
         response = requests.post(
             config["url"],
@@ -315,11 +340,16 @@ def _sync_to_odk(
         )
         response.raise_for_status()
 
+        odk_response = response.json() if response.content else None
+        sync_log.status = ODKSyncLog.SyncStatus.SUCCESS
+        sync_log.odk_response = odk_response
+        sync_log.save(update_fields=["status", "odk_response"])
+
         return Response(
             {
                 "sync_status": True,
                 "message": config["success_message"],
-                "odk_response": response.json() if response.content else None,
+                "odk_response": odk_response,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -327,6 +357,11 @@ def _sync_to_odk(
     except requests.exceptions.RequestException as e:
         item_name = config["success_message"].split()[0].lower()
         print(f"Error syncing {item_name} data to ODK: {str(e)}")
+
+        sync_log.status = ODKSyncLog.SyncStatus.FAILED
+        sync_log.error_details = str(e)
+        sync_log.save(update_fields=["status", "error_details"])
+
         return Response(
             {
                 "sync_status": False,
@@ -367,28 +402,31 @@ def sync_offline_data(request, resource_type=None, work_type=None, feedback_type
     if resource_type:
         configs = _get_resource_config()
         config = configs[resource_type]
-        sync_type = f"resource type: {resource_type}"
+        category = ODKSyncLog.SyncCategory.RESOURCE
+        item_type = resource_type
     elif work_type:
         configs = _get_work_config()
         config = configs[work_type]
-        sync_type = f"work type: {work_type}"
+        category = ODKSyncLog.SyncCategory.WORK
+        item_type = work_type
     elif feedback_type:
         configs = _get_feedback_config()
         config = configs[feedback_type]
-        sync_type = f"feedback type: {feedback_type}"
+        category = ODKSyncLog.SyncCategory.FEEDBACK
+        item_type = feedback_type
     else:
         return Response(
             {"error": "Invalid request"}, status=status.HTTP_400_BAD_REQUEST
         )
 
     xml_string = request.body.decode("utf-8")
-    print("Sync Type: ", sync_type)
+    print(f"Sync Category: {category}, Type: {item_type}")
 
     try:
         bearer_token = fetch_bearer_token(ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC)
         print("Bearer Token: ", bearer_token)
 
-        return _sync_to_odk(xml_string, config, bearer_token)
+        return _sync_to_odk(xml_string, config, bearer_token, category, item_type)
 
     except Exception as e:
         print("Exception in sync_offline_data api :: ", e)

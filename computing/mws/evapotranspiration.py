@@ -12,6 +12,12 @@ from utilities.gee_utils import (
     merge_fc_into_existing_fc,
 )
 import calendar
+from utilities.constants import (
+    ET_FLDAS_BOUNDING_BOX,
+    ET_FLDAS_ANNUAL,
+    ET_FLDAS_FORTNIGHT,
+    GLDAS,
+)
 
 
 def evapotranspiration(
@@ -166,7 +172,7 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
 
 
 def calculate_et(roi, asset_id, description, start_date, end_date, is_annual):
-    bounding_box = ee.Image("projects/ee-dharmisha-siddharth/assets/Hydro_2020_2021_4")
+    bounding_box = ee.Image(ET_FLDAS_BOUNDING_BOX)
     bbox_geometry = bounding_box.geometry()
     is_within = bbox_geometry.contains(roi.geometry(), ee.ErrorMargin(1))
     if is_within.getInfo():
@@ -210,11 +216,7 @@ def et_fldas(
             if f_end_date > end_date:
                 break
             image_path = (
-                "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_annual/ET_"
-                + str(s_year)
-                + "_"
-                + str(s_year + 1)
-                + "_Hydroyear"
+                ET_FLDAS_ANNUAL + str(s_year) + "_" + str(s_year + 1) + "_Hydroyear"
             )
             s_year += 1
         else:
@@ -223,7 +225,7 @@ def et_fldas(
                 break
 
             image_path = (
-                "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
+                ET_FLDAS_FORTNIGHT
                 + str(f_start_date.date()).replace("-", "")
                 + "_"
                 + str(f_end_date.date()).replace("-", "")
@@ -301,7 +303,7 @@ def et_global_fldas(
     size = shape.size()
     size1 = ee.Number(size).subtract(ee.Number(1))
 
-    fldas_dataset = ee.ImageCollection("NASA/FLDAS/NOAH01/C/GL/M/V001")
+    fldas_dataset = ee.ImageCollection(GLDAS)
 
     while f_start_date < end_date:
         if is_annual:

@@ -7,10 +7,12 @@ from projects.urls import (
 )  # Import the router from projects.urls
 
 from .views import (
+    ForgotPasswordView,
     GroupViewSet,
     LoginView,
     LogoutView,
     RegisterView,
+    ResetPasswordView,
     TokenRefreshView,
     UserProjectGroupViewSet,
     UserViewSet,
@@ -37,6 +39,8 @@ urlpatterns = [
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/login/", LoginView.as_view(), name="login"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
+    path("auth/forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
+    path("auth/reset-password/<uidb64>/<token>/", ResetPasswordView.as_view(), name="reset-password"),
     path("", include(router.urls)),
     path("", include(projects_user_router.urls)),
 ]

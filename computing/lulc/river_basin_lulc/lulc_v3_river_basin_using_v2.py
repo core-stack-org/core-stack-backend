@@ -9,10 +9,16 @@ from utilities.gee_utils import (
 )
 from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
+from utilities.constants import (
+    CGWB_BASIN,
+    LULC_V3_OUTPUT_ASSET_PATH,
+    LULC_V2_RIVER_BASIN_OUTPUT_PATH,
+    CRS_4326,
+)
 
 
 @app.task(bind=True)
-def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
+def lulc_river_basin_v3(self, basin_object_id, start_year, end_year, gee_account_id):
     """
     Args:
         self:
@@ -20,15 +26,15 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         start_year: start year for layer generation
         end_year: end year for layer generation
     """
-    ee_initialize(7)
+    ee_initialize(account_id=gee_account_id)
     print("Inside lulc_river_basin")
 
-    roi_boundary = ee.FeatureCollection(
-        "projects/corestack-datasets/assets/datasets/CGWB_basin"
-    ).filter(ee.Filter.eq("objectid", basin_object_id))
+    roi_boundary = ee.FeatureCollection(CGWB_BASIN).filter(
+        ee.Filter.eq("objectid", basin_object_id)
+    )
 
     filename_prefix = (
-            str(basin_object_id) + "_" + roi_boundary.first().get("ba_name").getInfo()
+        str(basin_object_id) + "_" + roi_boundary.first().get("ba_name").getInfo()
     )
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
@@ -56,15 +62,12 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
             roi_boundary, curr_start_date, curr_end_date
         )
         final_output_filename = curr_filename + "_LULCmap_" + str(scale) + "m"
-        final_output_assetid = (
-                "projects/corestack-datasets/assets/datasets/lulc_v3/"
-                + final_output_filename
-        )
+        final_output_assetid = LULC_V3_OUTPUT_ASSET_PATH + final_output_filename
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         crop_freq_array.append(cropping_frequency_img)
         lulc_v2 = ee.Image(
-            "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
+            LULC_V2_RIVER_BASIN_OUTPUT_PATH
             + filename_prefix
             + "_"
             + str(curr_start_date)
@@ -228,7 +231,7 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
         )
 
     def process_conditions(
-            before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
+        before, middle, after, zero_image, th1, th2, i, length, L1_asset_new
     ):
 
         cond1 = (
@@ -449,6 +452,6 @@ def lulc_river_basin_v3(self, basin_object_id, start_year, end_year):
                 pyramidingPolicy={"predicted_label": "mode"},
                 scale=scale,
                 maxPixels=1e13,
-                crs="EPSG:4326",
+                crs=CRS_4326,
             )
             image_export_task.start()

@@ -11,7 +11,11 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from utilities.constants import GEE_ASSET_PATH
+from utilities.constants import (
+    GEE_LITHOLOGY_ASSET_PATH,
+    SRTM_DIGITAL_ELEVATION,
+    INDIA_LINEAMENTS,
+)
 from nrm_app.celery import app
 from .drainage_density import drainage_density
 from .lithology import generate_lithology_layer
@@ -22,6 +26,9 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def generate_clart_layer(self, state, district, block, gee_account_id):
+    """
+    It will generate clart layer for given location(tehsil level)
+    """
     ee_initialize(gee_account_id)
     drainage_density(state, district, block)
     generate_lithology_layer(state)
@@ -38,14 +45,14 @@ def clart_layer(state, district, block):
     )
     final_output_assetid = get_gee_asset_path(state, district, block) + description
     layer_name = (
-            valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_clart"
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_clart"
     )
     if not is_gee_asset_exists(final_output_assetid):
-        srtm = ee.Image("USGS/SRTMGL1_003")
-        india_lin = ee.Image("projects/ee-harshita-om/assets/india_lineaments")
+        srtm = ee.Image(SRTM_DIGITAL_ELEVATION)
+        india_lin = ee.Image(INDIA_LINEAMENTS)
         roi = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
@@ -62,7 +69,7 @@ def clart_layer(state, district, block):
             + valid_gee_text(block.lower())
         )
         lithology = ee.Image(
-            GEE_ASSET_PATH
+            GEE_LITHOLOGY_ASSET_PATH
             + valid_gee_text(state.lower())
             + "/"
             + valid_gee_text(state.lower())
@@ -244,6 +251,8 @@ def clart_layer(state, district, block):
 
         res = sync_raster_gcs_to_geoserver("clart", layer_name, layer_name, "testClart")
         if res and layer_id:
+
+            # update flag in db whether layer sync to geoserver or not
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
 

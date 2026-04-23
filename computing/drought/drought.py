@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
     get_layer_object,
 )
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, DROUGHT_ALGORITHM
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -37,6 +37,9 @@ def calculate_drought(
     end_year=None,
     gee_account_id=None,
 ):
+    """
+    It will generate drought layer for given location(tehsil level) or region area of intrest
+    """
     ee_initialize(gee_account_id)
 
     if state and district and block:
@@ -177,7 +180,7 @@ def push_to_geoserver_db_stc(
                 layer_name=layer_name,
                 asset_id=asset_id,
                 dataset_name="Drought",
-                algorithm="MOD09A1-NDVI/NDWI",
+                algorithm=DROUGHT_ALGORITHM,
                 algorithm_version="2.0",
                 misc={"start_year": start_year, "end_year": end_year},
             )
@@ -189,6 +192,7 @@ def push_to_geoserver_db_stc(
         res = sync_fc_to_geoserver(fc, state, layer_name, "drought")
         print(res)
         if res["status_code"] == 201 and layer_id:
+            # update flag in db whether layer sync to geoserver or not
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
@@ -218,4 +222,4 @@ def get_last_date(asset_id, layer_obj):
         filtered_col.sort()
         existing_end_year = filtered_col[-1]
 
-    return existing_end_year
+    return int(existing_end_year)

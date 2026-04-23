@@ -18,11 +18,29 @@ import environ
 from corsheaders.defaults import default_headers
 
 env = environ.Env()
-
-environ.Env.read_env()
+ENV_FILE = Path(__file__).resolve().parent / ".env"
+environ.Env.read_env(str(ENV_FILE))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+os.environ.setdefault("BACKEND_DIR", str(BASE_DIR))
+
+
+def resolve_env_path(name, default="", *, trailing_sep=False):
+    raw_value = str(os.environ.get(name, default) or "").strip()
+    if not raw_value:
+        return ""
+
+    raw_value = os.path.expandvars(raw_value)
+    candidate = Path(raw_value).expanduser()
+    if not candidate.is_absolute():
+        candidate = BASE_DIR / candidate
+
+    resolved = os.path.normpath(str(candidate))
+    if trailing_sep:
+        resolved = resolved.rstrip("/\\") + os.sep
+    return resolved
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -32,16 +50,18 @@ SECRET_KEY = env("SECRET_KEY")
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = env("TMP_LOCATION")
+TMP_LOCATION = resolve_env_path(
+    "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
+)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
 AUTH_TOKEN_FB_META = env("AUTH_TOKEN_FB_META")
 ODK_PASSWORD = env("ODK_PASSWORD")
-DEPLOYMENT_DIR = env("DEPLOYMENT_DIR")
+DEPLOYMENT_DIR = resolve_env_path("DEPLOYMENT_DIR", default="$BACKEND_DIR")
 # MARK: ODK Sync Creds
 ODK_USER_EMAIL_SYNC = env("ODK_USER_EMAIL_SYNC")
 ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
@@ -53,20 +73,23 @@ DB_PASSWORD = env("DB_PASSWORD")
 
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
+
 STATIC_ROOT = "static/"
-GEE_HELPER_ACCOUNT_ID = 2
-GEE_DEFAULT_ACCOUNT_ID = 1
+GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
+GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
+ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
 ALLOWED_HOSTS = [
     "geoserver.core-stack.org",
     "127.0.0.1",
     "localhost",
     "0.0.0.0",
     "api-doc.core-stack.org",
-    "0cb52a0325c7.ngrok-free.app",
+    "2f2de623c34b.ngrok-free.app",
     "odk.core-stack.org",
     "unrecognizably-deft-aimee.ngrok-free.dev",
 ]
-
+CE_API_URL = env("CE_API_URL")
+CE_BUCKET_NAME = env("CE_BUCKET_NAME")
 # MARK: Django Apps
 
 INSTALLED_APPS = [
@@ -76,6 +99,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_celery_beat",
     # core apps
     "computing",
     "dpr",
@@ -89,7 +113,6 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework_api_key",
     # project applications
-    "users",
     "organization.apps.OrganizationConfig",
     "projects",
     "plantations",
@@ -100,6 +123,9 @@ INSTALLED_APPS = [
     "gee_computing",
     "waterrejuvenation",
     "apiadmin",
+    "moderation",
+    "users.apps.UsersConfig",
+    "status_monitor",
 ]
 
 # MARK: CORS Settings
@@ -115,7 +141,6 @@ else:
         "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
         "https://uat.dashboard.core-stack.org",
         "https://www.explorer.core-stack.org",
-        "https://www.explorer.core-stack.org/landscape_explorer",
         "https://development.d2s4eeyazvtd2g.amplifyapp.com",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
@@ -262,6 +287,10 @@ USE_I18N = True
 
 USE_TZ = True
 
+# Celery
+CELERY_TIMEZONE = "Asia/Kolkata"
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
@@ -274,7 +303,12 @@ ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
 MEDIA_URL = "/media/"
 
-EXCEL_PATH = env("EXCEL_PATH")
+EXCEL_PATH = resolve_env_path("EXCEL_PATH", default="$BACKEND_DIR", trailing_sep=True)
+EXCEL_DIR = resolve_env_path(
+    "EXCEL_DIR",
+    default="$BACKEND_DIR/data/excel_files",
+    trailing_sep=True,
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -296,14 +330,8 @@ LOGGING = {
     },
     "handlers": {
         "console": {
-            "level": "DEBUG",  # or INFO in production
+            "level": "DEBUG",
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "file": {
-            "level": "INFO",
-            "class": "logging.FileHandler",
-            "filename": os.path.join(BASE_DIR, "logs", "app.log"),
             "formatter": "verbose",
         },
         "mail_admins": {
@@ -313,12 +341,12 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": True,
         },
-        "geoadmin": {  # replace with your Django app name
-            "handlers": ["console", "file"],
+        "geoadmin": {
+            "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,
         },
@@ -337,10 +365,18 @@ EMAIL_USE_TLS = False
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 EMAIL_TIMEOUT = 30
+PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 
-GEOSERVER_URL = env("GEOSERVER_URL")
-GEOSERVER_USERNAME = env("GEOSERVER_USERNAME")
-GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD")
+GEOSERVER_URL = env("GEOSERVER_URL", default="")
+GEOSERVER_USERNAME = env("GEOSERVER_USERNAME", default="")
+GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD", default="")
+
+PROD_GEOSERVER_URL = env("PROD_GEOSERVER_URL", default="")
+PROD_GEOSERVER_USERNAME = env("PROD_GEOSERVER_USERNAME", default="")
+PROD_GEOSERVER_PASSWORD = env("PROD_GEOSERVER_PASSWORD", default="")
+
+PROD_BACKEND_URL = env("PROD_BACKEND_URL", default="")
+PROD_BACKEND_API_KEY = env("PROD_BACKEND_API_KEY", default="")
 
 
 CE_BUCKET_URL = env("CE_BUCKET_URL")
@@ -350,6 +386,9 @@ EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH")
+
+# gcs bucket
+GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
 
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
@@ -374,18 +413,33 @@ S3_ACCESS_KEY = env("S3_ACCESS_KEY")
 S3_BUCKET = env("S3_BUCKET")
 S3_REGION = env("S3_REGION")
 
+# DPR S3 settings
+DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY", default="")
+DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY", default="")
+DPR_S3_REGION = env("DPR_S3_REGION", default="")
+DPR_S3_BUCKET = env("DPR_S3_BUCKET", default="")
+DPR_S3_FOLDER = env("DPR_S3_FOLDER", default="")
+
 # bot_interface settings
 AUTH_TOKEN_360 = env("AUTH_TOKEN_360")
 ES_AUTH = env("ES_AUTH")
 CALL_PATCH_API_KEY = env("CALL_PATCH_API_KEY")
 
 # Community Engagement API Configuration
-WHATSAPP_MEDIA_PATH = env("WHATSAPP_MEDIA_PATH")
+WHATSAPP_MEDIA_PATH = resolve_env_path(
+    "WHATSAPP_MEDIA_PATH",
+    default="$BACKEND_DIR/bot_interface/whatsapp_media",
+    trailing_sep=True,
+)
 
 BASE_URL = "https://geoserver.core-stack.org/"
 DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
 
+PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
+
 FERNET_KEY = env("FERNET_KEY")
+
+API_KEY = env("API_KEY", default="")
 
 
 lulc_years = [
@@ -398,3 +452,5 @@ lulc_years = [
     "2023_2024",
 ]
 water_classes = [2, 3, 4]
+
+GEE_STORAGE_PROJECT = env("GEE_STORAGE_PROJECT")

@@ -21,6 +21,9 @@ from computing.models import *
 
 @app.task(bind=True)
 def generate_fes_clart_layer(self, state, district, block, file_path, gee_account_id):
+    """
+    It will generate fes clart layer for given location(tehsil level).
+    """
     print("Inside generate_fes_clart_layer")
     ee_initialize(gee_account_id)
 

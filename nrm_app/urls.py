@@ -30,7 +30,7 @@ schema_view = get_schema_view(
         description="CoRE Stack API",
         terms_of_service="",
         contact=openapi.Contact(email="support@core-stack.org"),
-        license=openapi.License(name=""),
+        license=openapi.License(name="CC BY 4.0"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
@@ -54,6 +54,9 @@ urlpatterns = [
     path("api/v1/", include("bot_interface.urls"), name="whatsapp_webhook"),
     path("api/v1/", include("waterrejuvenation.urls")),
     path("api/v2/", include("waterrejuvenation.urls_v2")),
+    path("api/v1/", include("moderation.urls")),
+    # Status page
+    path("status/", include("status_monitor.urls")),
     # Swagger Doc
     path(
         "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"

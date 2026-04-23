@@ -20,6 +20,10 @@ from computing.STAC_specs import generate_STAC_layerwise
 def get_change_detection(
     self, state, district, block, start_year, end_year, gee_account_id
 ):
+    """
+    This function will generate change detection raster for urbanization, Degradation,
+    Deforestation, Afforestation and cropintensity for given location(tehsil level)
+    """
     # Initialize the Earth Engine
     ee_initialize(gee_account_id)
     param_dict = {
@@ -101,7 +105,14 @@ def get_change_detection(
             make_asset_public(asset_id)
 
     layer_at_geoserver = sync_to_gcs_geoserver(
-        state, district, block, description, param_dict.keys(), layer_ids
+        state,
+        district,
+        block,
+        description,
+        param_dict.keys(),
+        layer_ids,
+        start_year,
+        end_year,
     )
     return layer_at_geoserver
 
@@ -417,12 +428,15 @@ def change_cropping_intensity(roi_boundary, l1_asset):
     trans_si_do = then.eq(5).And(now.eq(6)).multiply(4)
     trans_si_tr = then.eq(5).And(now.eq(7)).multiply(5)
     trans_do_tr = then.eq(6).And(now.eq(7)).multiply(6)
-    trans_same = (
-        (then.eq(5).And(now.eq(5)))
-        .Or(then.eq(6).And(now.eq(6)))
-        .Or(then.eq(7).And(now.eq(7)))
-        .multiply(7)
-    )
+    si_si = then.eq(5).And(now.eq(5)).multiply(7)
+    do_do = then.eq(6).And(now.eq(6)).multiply(8)
+    tr_tr = then.eq(7).And(now.eq(7)).multiply(9)
+    # trans_same = (
+    #     (then.eq(5).And(now.eq(5)))
+    #     .Or(then.eq(6).And(now.eq(6)))
+    #     .Or(then.eq(7).And(now.eq(7)))
+    #     .multiply(7)
+    # )
 
     # Create a zero image and add transitions
     change_far = (
@@ -437,12 +451,16 @@ def change_cropping_intensity(roi_boundary, l1_asset):
         .add(trans_si_do)
         .add(trans_si_tr)
         .add(trans_do_tr)
-        .add(trans_same)
+        .add(si_si)
+        .add(do_do)
+        .add(tr_tr)
     )
     return change_far
 
 
-def sync_to_gcs_geoserver(state, district, block, description, param_list, layer_ids):
+def sync_to_gcs_geoserver(
+    state, district, block, description, param_list, layer_ids, start_year, end_year
+):
     task_list = []
 
     stac_spec_layer_name_dict = {
@@ -455,9 +473,12 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list, layer
 
     for change in param_list:
         image = ee.Image(
-            get_gee_asset_path(state, district, block) + description + "_" + change
+            get_gee_asset_path(state, district, block)
+            + f"{description}_{change}_{start_year}_{end_year}"
         )
-        task_id = sync_raster_to_gcs(image, 10, description + "_" + change)
+        task_id = sync_raster_to_gcs(
+            image, 10, f"{description}_{change}_{start_year}_{end_year}"
+        )
         task_list.append(task_id)
     task_id_list = check_task_status(task_list)
     print("task_id sync to gcs ", task_id_list)
@@ -466,11 +487,12 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list, layer
     for change in param_list:
         res = sync_raster_gcs_to_geoserver(
             "change_detection",
-            description + "_" + change,
+            f"{description}_{change}_{start_year}_{end_year}",
             description + "_" + change,
             change.lower(),
         )
         if res and layer_ids[change]:
+            # update flag in db whether layer sync to geoserver or not
             sync_status = update_layer_sync_status(
                 layer_id=layer_ids[change], sync_to_geoserver=True
             )
@@ -482,7 +504,7 @@ def sync_to_gcs_geoserver(state, district, block, description, param_list, layer
                 state=state, district=district, block=block, layer_name=layer_name
             )
             update_layer_sync_status(
-                layer_id=layer_ids[change], is_stac_specs_generated=True
+                layer_id=layer_ids[change], is_stac_specs_generated=layer_STAC_generated
             )
 
             if sync_status:

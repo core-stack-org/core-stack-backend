@@ -118,13 +118,20 @@
         "SendLocationRequest": [
           "failure"
         ]
+      },{
+       "CommunityByLocation": [
+          "community_member"
+        ]
       }
     ]
   },
   {
     "name": "CommunityByLocation",
     "preAction": [
-      {
+     {
+        "data": {
+          "getDataFrom": { "field": "data", "state": "SendLocationRequest" }
+        },
         "function": "send_community_by_location"
       }
     ],

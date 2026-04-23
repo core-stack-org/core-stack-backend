@@ -1,5 +1,5 @@
 import ee
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH, LAND_COVER_CLASSIFICATION_10_METER
 
 
 def mask_s2cloud(image):
@@ -19,7 +19,7 @@ def mask_s2cloud(image):
 
 def get_barrenland_prediction(roi_boundary, start_date, end_date):
     DW_ic = (
-        ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+        ee.ImageCollection(LAND_COVER_CLASSIFICATION_10_METER)
         .filterBounds(roi_boundary)
         .filterDate(start_date, end_date)
         .select("bare", "label")
@@ -37,7 +37,7 @@ def dw_based_shrub_cleaning(
     roi_boundary, current_prediction_output, start_date, end_date
 ):
     DW_ic = (
-        ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+        ee.ImageCollection(LAND_COVER_CLASSIFICATION_10_METER)
         .filterBounds(roi_boundary)
         .filterDate(start_date, end_date)
         .select("shrub_and_scrub", "label")

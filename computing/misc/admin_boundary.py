@@ -17,7 +17,11 @@ from utilities.gee_utils import (
     upload_shp_to_gee,
     make_asset_public,
 )
-from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
+from utilities.constants import (
+    ADMIN_BOUNDARY_INPUT_DIR,
+    ADMIN_BOUNDARY_OUTPUT_DIR,
+    SOI_TEHSIL,
+)
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 from computing.STAC_specs import generate_STAC_layerwise
@@ -25,7 +29,10 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
-    ee_initialize()
+    """
+    It will generate Admin boundary of given location as tehsil levels
+    """
+    ee_initialize(gee_account_id)
     description = (
         "admin_boundary_"
         + valid_gee_text(district.lower())
@@ -43,10 +50,10 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
-                "admin_boundary_"
-                + valid_gee_text(district.lower())
-                + "_"
-                + valid_gee_text(block.lower())
+            "admin_boundary_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
         )
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         upload_shp_to_gee(layer_path, layer_name, asset_id)
@@ -121,7 +128,7 @@ def clip_block_from_admin_boundary(state, district, block):
     if census_2011 is not None and "TEHSIL" in list(census_2011.columns):
         admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
     else:
-        soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
+        soi = gpd.read_file(SOI_TEHSIL)
 
         soi = soi[(soi["STATE"].str.lower() == state)]
         soi = soi[(soi["District"].str.lower() == district)]

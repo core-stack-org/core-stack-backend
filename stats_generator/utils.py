@@ -28,7 +28,6 @@ def fetch_layers_for_excel_generation():
 def get_url(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
     geojson_url = f"{GEOSERVER_URL}/{workspace}/ows?service=WFS&version=1.0.0&request=GetFeature&typeName={workspace}:{layer_name}&outputFormat=application/json"
-    print("Geojson url", geojson_url)
     return geojson_url
 
 
@@ -41,7 +40,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     os.makedirs(district_path, exist_ok=True)
     xlsx_file = os.path.join(district_path, f"{district}_{block}.xlsx")
 
-    workspaces_to_process = set(specific_sheets) if specific_sheets else None
+    workspaces_to_process = specific_sheets
 
     # Handle existing sheets when adding specific workspaces
     results = []
@@ -101,6 +100,9 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "swb":
                 create_excel_for_swb(
                     geojson_data, xlsx_file, writer, start_year, end_year
+                )
+                create_excel_for_mws_intersect_swb(
+                    geojson_data, writer, district, block
                 )
             elif workspace == "nrega_assets":
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
@@ -211,7 +213,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "restoration":
                 create_excel_for_restoration(geojson_data, xlsx_file, writer)
             elif workspace == "aquifer":
-                create_excel_for_aquifer(geojson_data, xlsx_file, writer)
+                create_excel_for_aquifer(geojson_data, writer)
             elif workspace == "soge":
                 create_excel_for_soge(geojson_data, xlsx_file, writer)
             elif workspace == "lcw":
@@ -224,12 +226,177 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_green_credit(geojson_data, writer)
             elif workspace == "mining":
                 create_excel_for_mining(geojson_data, writer)
+            elif workspace == "stream_order":
+                create_excel_for_stream_order(geojson_data, writer)
+            elif workspace == "mws_connectivity":
+                create_excel_for_mws_connectivity(geojson_data, writer)
+            elif workspace == "mws":
+                create_excel_for_mws(geojson_data, writer)
+            elif workspace == "facilities_proximity":
+                create_excel_for_facilities(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
+    print("Inside create_excel_for_mws_intersect_swb")
+
+    # --- Fetch MWS layer ---
+    mws_layer_name = f"mws_{district}_{block}"
+    mws_data_url = get_url("mws", mws_layer_name)
+
+    mws_response = requests.get(mws_data_url)
+    if mws_response.status_code != 200:
+        print(f"Error fetching MWS data: {mws_response.status_code}")
+        return
+
+    mws_geojson = mws_response.json()
+
+    def calculate_intersection_area(geom1, geom2):
+        if geom1.intersects(geom2):
+            return geom1.intersection(geom2).area
+        return 0
+
+    rows = []
+
+    for mws_feature in mws_geojson["features"]:
+        mws_props = mws_feature["properties"]
+        mws_uid = mws_props.get("uid")
+        mws_geom = shape(mws_feature["geometry"])
+
+        for swb_feature in swb_geojson["features"]:
+            swb_props = swb_feature["properties"]
+            swb_geom = shape(swb_feature["geometry"])
+
+            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
+
+            if intersection_area > 0:
+                # waterbodies centroid calculation
+                centroid = swb_geom.centroid
+                lon, lat = centroid.x, centroid.y
+
+                rows.append(
+                    {
+                        "UID": mws_uid,
+                        "SWB_UID": swb_props.get("UID"),
+                        "Waterbodies_name": swb_props.get("water_body_name"),
+                        "Latitude": lat,
+                        "Longitude": lon,
+                    }
+                )
+
+    df = pd.DataFrame(rows)
+
+    if not df.empty:
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(6)
+
+    df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
+    print("Excel sheet 'mws_intersect_swb' created successfully")
+
+
+def create_excel_for_facilities(data, writer):
+    features = data["features"]
+    df_data = [feature["properties"] for feature in features]
+
+    df = pd.DataFrame(df_data)
+
+    # keep first columns
+    first_cols = ["lgd_village", "lgd_village_name"]
+    other_cols = [c for c in df.columns if c not in first_cols]
+    df = df[first_cols + other_cols]
+
+    df.to_excel(writer, sheet_name="facilities_proximity", index=False)
+    print("Excel file created for facilities_proximity")
+
+
+def create_excel_for_mws(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "watershed_code": properties.get("wsconc", ""),
+            "basin_code": properties.get("bacode", ""),
+            "sub_basin_code": properties.get("sbcode", ""),
+        }
+
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="mws", index=False)
+    print("Excel file created for mws")
+
+
+def create_excel_for_mws_connectivity(data, writer):
+    """
+    direction_map = {
+                      '0': 'No Direction',
+                      '1': 'North-East',
+                      '2': 'East',
+                      '3': 'South-East',
+                      '4': 'South',
+                      '5': 'South-West',
+                      '6': 'West',
+                      '7': 'North-West',
+                      '8': 'North'
+                    }
+    """
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "direction": properties["direction"],
+            "downstream_mws": properties["downstream"],
+            "upstream_mws": properties["upstream"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df.replace("", "unknown", inplace=True)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="mws_connectivity", index=False)
+    print("Excel file created for mws_connectivity")
+
+
+def create_excel_for_stream_order(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties["uid"],
+            "order_1_area_percent": properties["1"],
+            "order_2_area_percent": properties["2"],
+            "order_3_area_percent": properties["3"],
+            "order_4_area_percent": properties["4"],
+            "order_5_area_percent": properties["5"],
+            "order_6_area_percent": properties["6"],
+            "order_7_area_percent": properties["7"],
+            "order_8_area_percent": properties["8"],
+            "order_9_area_percent": properties["9"],
+            "order_10_area_percent": properties["10"],
+            "order_11_area_percent": properties["11"],
+        }
+
+        df_data.append(row)
+    df = pd.DataFrame(df_data)
+    df.replace("", "unknown", inplace=True)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="stream_order", index=False)
+    print("Excel file created for stream order")
 
 
 def create_excel_for_mining(data, writer):
@@ -263,7 +430,7 @@ def create_excel_for_green_credit(data, writer):
         row = {
             "UID": properties["uid"],
             "division": properties["division"],
-            "parcel_id": properties["parcel_id"],
+            # "parcel_id": properties["parcel_id"],
             "land_info": properties["land_info"],
             "kml_url": properties["kml_url"],
         }
@@ -363,117 +530,76 @@ def create_excel_for_soge(data, xlsx_file, writer):
     print(f"Excel file created for soge_vector")
 
 
-def create_excel_for_aquifer(data, xlsx_file, writer):
+def create_excel_for_aquifer(data, writer):
     df_data = []
     features = data["features"]
 
-    # List of all principal aquifers
-    principal_aquifers = [
-        "Laterite",
-        "Basalt",
-        "Sandstone",
-        "Shale",
-        "Limestone",
-        "Granite",
-        "Schist",
-        "Quartzite",
-        "Charnockite",
-        "Khondalite",
-        "Banded Gneissic Complex",
-        "Gneiss",
-        "Intrusive",
-        "Alluvium",
-        "None",
-    ]
-
-    # First pass - collect all data
     for feature in features:
         properties = feature["properties"]
-        area_aquifer = properties.get("%_area_aquifer") or properties.get("%_area_aqu")
-
+        if properties.get("aquifer_class", "") == "Hard-Rock":
+            aquifer_class = "Hard Rock"
+        else:
+            aquifer_class = "Alluvium"
         row = {
-            "UID": properties.get("uid"),
-            "area_in_ha": properties.get("area_in_ha"),
-            "principal_aquifer": properties.get("Principal_"),
-            "%_area_aquifer": area_aquifer,
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "aquifer_class": aquifer_class,
+            "principle_aq_Alluvium_percent": properties.get(
+                "principle_aq_Alluvium_percent", "0"
+            ),
+            "principle_aq_Banded Gneissic Complex_percent": properties.get(
+                "principle_aq_Banded Gneissic Complex_percent", "0"
+            ),
+            "principle_aq_Basalt_percent": properties.get(
+                "principle_aq_Basalt_percent", "0"
+            ),
+            "principle_aq_Charnockite_percent": properties.get(
+                "principle_aq_Charnockite_percent", "0"
+            ),
+            "principle_aq_Gneiss_percent": properties.get(
+                "principle_aq_Gneiss_percent", "0"
+            ),
+            "principle_aq_Granite_percent": properties.get(
+                "principle_aq_Granite_percent", "0"
+            ),
+            "principle_aq_Intrusive_percent": properties.get(
+                "principle_aq_Intrusive_percent", "0"
+            ),
+            "principle_aq_Khondalite_percent": properties.get(
+                "principle_aq_Khondalite_percent", "0"
+            ),
+            "principle_aq_Laterite_percent": properties.get(
+                "principle_aq_Laterite_percent", "0"
+            ),
+            "principle_aq_Limestone_percent": properties.get(
+                "principle_aq_Limestone_percent", "0"
+            ),
+            "principle_aq_Quartzite_percent": properties.get(
+                "principle_aq_Quartzite_percent", "0"
+            ),
+            "principle_aq_Sandstone_percent": properties.get(
+                "principle_aq_Sandstone_percent", "0"
+            ),
+            "principle_aq_Schist_percent": properties.get(
+                "principle_aq_Schist_percent", "0"
+            ),
+            "principle_aq_Shale_percent": properties.get(
+                "principle_aq_Shale_percent", "0"
+            ),
+            "principle_aq_None_percent": properties.get(
+                "principle_aq_None_percent", "0"
+            ),
         }
 
         df_data.append(row)
 
-    df = pd.DataFrame(df_data).sort_values(["UID"])
-
-    # Create empty columns for all aquifer percentages
-    for aquifer in principal_aquifers:
-        df[f"principle_aq_{aquifer}_percent"] = 0
-
-    # Group by UID
-    grouped = df.groupby("UID")
-
-    processed_rows = []
-    for uid, group in grouped:
-        # Create a base row with common values
-        base_row = {
-            "UID": uid,
-            "area_in_ha": group["area_in_ha"].iloc[
-                0
-            ],  # Should be same for all rows with same UID
-            "aquifer_count": len(group),  # Count of unique aquifers for this UID
-        }
-
-        # Initialize all percentage columns
-        aquifer_percentages = {
-            f"principle_aq_{aq}_percent": 0 for aq in principal_aquifers
-        }
-
-        # Process each entry in the group
-        for _, row in group.iterrows():
-            # Set aquifer percentage - handle None case
-            aquifer = (
-                row["principal_aquifer"] if row["principal_aquifer"] != "" else "None"
-            )
-            if aquifer in principal_aquifers:
-                aquifer_percentages[f"principle_aq_{aquifer}_percent"] += row[
-                    "%_area_aquifer"
-                ]
-
-        # Find the dominant aquifer (the one with the highest percentage)
-        max_aquifer = None
-        max_percentage = 0
-
-        for aquifer in principal_aquifers:
-            percentage = aquifer_percentages[f"principle_aq_{aquifer}_percent"]
-            if percentage > max_percentage:
-                max_percentage = percentage
-                max_aquifer = aquifer
-
-        aquifer_class = "Alluvium" if max_aquifer == "Alluvium" else "Hard Rock"
-
-        # Combine all data for this UID
-        combined_row = {
-            **base_row,
-            "aquifer_class": aquifer_class,
-            **aquifer_percentages,
-        }
-
-        processed_rows.append(combined_row)
-
-    # Create final dataframe
-    final_df = pd.DataFrame(processed_rows)
-
+    df = pd.DataFrame(df_data)
     # Round numeric values
-    numeric_cols = final_df.select_dtypes(include=["number"]).columns
-    final_df[numeric_cols] = final_df[numeric_cols].round(2)
-
-    # Reorder columns for better readability
-    original_cols = ["UID", "area_in_ha", "aquifer_class"]
-    aquifer_cols = sorted(
-        [col for col in final_df.columns if col.startswith("principle_aq_")]
-    )
-
-    final_df = final_df[original_cols + aquifer_cols]
-
-    final_df.to_excel(writer, sheet_name="aquifer_vector", index=False)
-    print(f"Excel file created for aquifer_vector")
+    numeric_cols = df.select_dtypes(include=["number"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+    df = df.sort_values(["UID"])
+    df.to_excel(writer, sheet_name="aquifer_vector", index=False)
+    print("Excel file created for aquifer_vector")
 
 
 def create_excel_for_restoration(data, xlsx_file, writer):
@@ -512,13 +638,13 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "afforestation_area_in_ha": properties["Afforestat"],
-            "deforestation_area_in_ha": properties["Deforestat"],
-            "degradation_area_in_ha": properties["Degradatio"],
-            "improvement_area_in_ha": properties["Improvemen"],
-            "missing_data_in_ha": properties["Missing Da"],
+            "afforestation_area_in_ha": properties["Afforestation"],
+            "deforestation_area_in_ha": properties["Deforestation"],
+            "degradation_area_in_ha": properties["Degradation"],
+            "improvement_area_in_ha": properties["Improvement"],
+            "missing_data_in_ha": properties["Missing Data"],
             "no_change_area_in_ha": properties["No_Change"],
-            "partially_degraded_area_in_ha": properties["Partially_"],
+            "partially_degraded_area_in_ha": properties["Partially_Degraded"],
         }
 
         df_data.append(row)
@@ -544,15 +670,15 @@ def create_excel_for_ccd(data, xlsx_file, writer, start_year, end_year):
             "area_in_ha": properties["area_in_ha"],
         }
 
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             row["high_density_area_in_ha_" + str(year)] = properties.get(
-                "hi_de_" + str(year), None
+                "High_Density_" + str(year), None
             )
             row["low_density_area_in_ha_" + str(year)] = properties.get(
-                "lo_de_" + str(year), None
+                "Low_Density_" + str(year), None
             )
             row["missing_data_area_in_ha_" + str(year)] = properties.get(
-                "mi_da_" + str(year), None
+                "Missing_Data_" + str(year), None
             )
 
         df_data.append(row)
@@ -579,18 +705,18 @@ def create_excel_for_ch(data, xlsx_file, writer, start_year, end_year):
             "area_in_ha": properties["area_in_ha"],
         }
 
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             row["short_trees_area_in_ha_" + str(year)] = properties.get(
-                "sh_tr_" + str(year), None
+                "Short_Trees_" + str(year), None
             )
             row["medium_trees_area_in_ha_" + str(year)] = properties.get(
-                "md_tr_" + str(year), None
+                "Medium_Height_Trees_" + str(year), None
             )
             row["tall_trees_area_in_ha_" + str(year)] = properties.get(
-                "tl_tr_" + str(year), None
+                "Tall_Trees_" + str(year), None
             )
             row["missing_data_area_in_ha_" + str(year)] = properties.get(
-                "mi_da_" + str(year), None
+                "Missing_Data_" + str(year), None
             )
 
         df_data.append(row)
@@ -617,7 +743,7 @@ def create_excel_for_drought_causality(data, xlsx_file, writer, start_year, end_
             "area_in_ha": properties["area_in_ha"],
         }
 
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             row["severe_moderate_drought_causality_" + str(year)] = properties.get(
                 "se_mo_" + str(year), None
             )
@@ -680,13 +806,15 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
             {
                 "UID": uid,
                 "area_in_ha": properties.get("area_in_ha", None),
-                "double_to_single_area_in_ha": properties.get("do_si", None),
-                "double_to_triple_area_in_ha": properties.get("do_tr", None),
+                "single_to_single_area_in_ha": properties.get("si_si", None),
                 "single_to_double_area_in_ha": properties.get("si_do", None),
                 "single_to_triple_area_in_ha": properties.get("si_tr", None),
-                "triple_to_double_area_in_ha": properties.get("tr_do", None),
+                "double_to_single_area_in_ha": properties.get("do_si", None),
+                "double_to_double_area_in_ha": properties.get("do_do", None),
+                "double_to_triple_area_in_ha": properties.get("do_tr", None),
                 "triple_to_single_area_in_ha": properties.get("tr_si", None),
-                "no_change_area_in_ha": properties.get("same", None),
+                "triple_to_double_area_in_ha": properties.get("tr_do", None),
+                "triple_to_triple_area_in_ha": properties.get("tr_tr", None),
                 "total_change_crop_intensity_area_in_ha": properties.get(
                     "total_chan", None
                 ),
@@ -807,18 +935,24 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
 
     village_geojson = response.json()
 
-    def calculate_intersection_area(village_geom, mws_geom):
+    def calculate_intersection_area_ha(village_geom, mws_geom, mws_area_ha):
         if village_geom.intersects(mws_geom):
             intersection = village_geom.intersection(mws_geom)
-            return intersection.area
+            if mws_geom.area == 0:
+                return 0
+            # ratio of intersection to full MWS geometry area (both in degrees²)
+            ratio = intersection.area / mws_geom.area
+            return ratio * mws_area_ha
         return 0
 
     mws_villages_dict = {}
 
     for mws_feature in mws_geojson["features"]:
         mws_uid = mws_feature["properties"]["uid"]
+        mws_area = mws_feature["properties"]["area_in_ha"]
         mws_geom = shape(mws_feature["geometry"])
         village_ids = set()
+        village_details = {}
 
         for village_feature in village_geojson["features"]:
             village_id = village_feature["properties"]["vill_ID"]
@@ -826,22 +960,41 @@ def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, b
                 continue
 
             village_geom = shape(village_feature["geometry"])
-            area_intersected = calculate_intersection_area(village_geom, mws_geom)
-            if area_intersected > 0:
+            area_intersected_ha = calculate_intersection_area_ha(
+                village_geom, mws_geom, mws_area
+            )
+            if area_intersected_ha > 0:
                 village_ids.add(village_id)
+                percentage_of_area = (
+                    (area_intersected_ha / mws_area) * 100 if mws_area > 0 else 0
+                )
+                village_details[village_id] = {
+                    "area_intersect": round(area_intersected_ha, 2),
+                    "percentage_of_area": round(percentage_of_area, 2),
+                }
+
         if village_ids:
-            mws_villages_dict[mws_uid] = list(village_ids)
+            mws_villages_dict[mws_uid] = {
+                "area_in_ha": mws_area,
+                "village_ids": list(village_ids),
+                "village_details": village_details,
+            }
 
     data = [
-        {"MWS UID": mws_uid, "Village IDs": village_ids}
-        for mws_uid, village_ids in mws_villages_dict.items()
+        {
+            "MWS UID": mws_uid,
+            "area_in_ha": values["area_in_ha"],
+            "Village IDs": values["village_ids"],
+            "Village Details": values["village_details"],
+        }
+        for mws_uid, values in mws_villages_dict.items()
     ]
 
     df = pd.DataFrame(data)
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
     df.to_excel(writer, sheet_name="mws_intersect_villages", index=False)
-    print("The data has been saved to mws_intersect_villages.xlsx")
+    print("The data has been saved to mws_intersect_villages")
 
 
 # def create_excel_village_inters_mwss(mws_geojson, xlsx_file, writer, district, block):
@@ -1639,7 +1792,7 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
 
     data = {"UID": []}
     for variable in variables:
-        for year in range(start_year, end_year):
+        for year in range(start_year, end_year + 1):
             for season in seasons:
                 end_to_year = year + 1
                 column_name = f"{variable}_{season}_in_mm_{year}-{end_to_year}"
@@ -1648,7 +1801,7 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
     for feature_data in processed_data:
         data["UID"].append(feature_data["UID"])
         for variable in variables:
-            for year in range(start_year, end_year):
+            for year in range(start_year, end_year + 1):
                 for season in seasons:
                     end_to_year = year + 1
                     column_name = f"{variable}_{season}_in_mm_{year}-{end_to_year}"
@@ -1809,14 +1962,14 @@ def generate_stats_excel_file(state, district, block):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-            from .mws_indicators import generate_mws_data_for_kyl_filters
-            from .village_indicators import get_generate_filter_data_village
-            from public_api.views import get_tehsil_json
+        from .mws_indicators import generate_mws_data_for_kyl_filters
+        from .village_indicators import get_generate_filter_data_village
+        from public_api.views import get_tehsil_json
 
-            get_vector_layer_geoserver(state, district, block)
-            generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
-            get_generate_filter_data_village(state, district, block, 1)
-            get_tehsil_json(state, district, block, 1)
+        get_vector_layer_geoserver(state, district, block)
+        get_tehsil_json(state, district, block, 1)
+        generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
+        get_generate_filter_data_village(state, district, block, 1)
 
         if not os.path.exists(file_path):
             return Response(
@@ -1856,9 +2009,9 @@ def add_sheets_to_excel(state, district, block, sheets):
         from .village_indicators import get_generate_filter_data_village
         from public_api.views import get_tehsil_json
 
+        get_tehsil_json(state, district, block, 1)
         generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
         get_generate_filter_data_village(state, district, block, 1)
-        get_tehsil_json(state, district, block, 1)
 
         successful = [r for r in results if r["status"] == "success"]
         failed = [r for r in results if r["status"] == "failed"]

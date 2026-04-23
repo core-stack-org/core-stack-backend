@@ -1,3 +1,4 @@
+import json
 import os
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
@@ -9,6 +10,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
+from .utils import (
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+from django.conf import settings
+from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
 from .lulc.lulc_vector import vectorise_lulc
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
@@ -55,7 +62,7 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from .views import layer_status
+from .views import layer_status, get_layers_of_workspace, check_missing_layers
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
@@ -66,6 +73,10 @@ from .misc.naturaldepression import generate_natural_depression_data
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
 from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
+from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid import generate_mws_centroid_data
+from .misc.facilities_proximity import generate_facilities_proximity_task
+from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 
 
 @api_security_check(allowed_methods="POST")
@@ -352,8 +363,9 @@ def lulc_v3_river_basin(request):
         basin_object_id = request.data.get("basin_object_id")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
         lulc_river_basin_v3.apply_async(
-            args=[basin_object_id, start_year, end_year], queue="nrm"
+            args=[basin_object_id, start_year, end_year, gee_account_id], queue="nrm"
         )
         return Response({"Success": "lulc_v3_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -789,6 +801,8 @@ def tree_health_raster(request):
                 "state": state,
                 "district": district,
                 "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
                 "gee_account_id": gee_account_id,
             },
             queue="nrm",
@@ -814,15 +828,7 @@ def tree_health_vector(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        tree_health_overall_change_vector.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
-        )
+
         tree_health_ch_vector.apply_async(
             kwargs={
                 "state": state,
@@ -834,6 +840,7 @@ def tree_health_vector(request):
             },
             queue="nrm",
         )
+
         tree_health_ccd_vector.apply_async(
             kwargs={
                 "state": state,
@@ -841,6 +848,16 @@ def tree_health_vector(request):
                 "block": block,
                 "start_year": start_year,
                 "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+
+        tree_health_overall_change_vector.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
                 "gee_account_id": gee_account_id,
             },
             queue="nrm",
@@ -1444,6 +1461,8 @@ def generate_ndvi_timeseries(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
+        mws_count = request.data.get("mws_count")
+        chunk_size = request.data.get("chunk_size")
 
         ndvi_timeseries.apply_async(
             kwargs={
@@ -1453,6 +1472,8 @@ def generate_ndvi_timeseries(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "gee_account_id": gee_account_id,
+                "mws_count": mws_count,
+                "chunk_size": chunk_size,
             },
             queue="nrm",
         )
@@ -1489,4 +1510,330 @@ def generate_zoi_to_gee(request):
         )
     except Exception as e:
         print("Exception in generate_mining_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_mws_connectivity(request):
+    print("Inside generate_mws_connectivity_to_gee API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_mws_connectivity_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mws_connectivity_to_gee api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_mws_centroid(request):
+    print("Inside generate_mws_centroid API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_mws_centroid_data.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mws_centroid api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_facilities_proximity(request):
+    print("Inside generate_facilities_proximity API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_facilities_proximity_task.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_facilities_proximity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_stac_collection(request):
+    try:
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        layer_name = request.data.get("layer_name")
+        layer_type = request.data.get("layer_type")
+        start_year = request.data.get("start_year", "")
+        upload_to_s3 = request.data.get("upload_to_s3", False)
+        overwrite = request.data.get("overwrite", False)
+
+        if not all([state, district, block, layer_name, layer_type]):
+            return Response(
+                {
+                    "error": "state, district, block, layer_name, and layer_type are required"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if layer_type not in ("raster", "vector"):
+            return Response(
+                {"error": "layer_type must be 'raster' or 'vector'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        _make_stac_task().apply_async(
+            kwargs={
+                "layer_type": layer_type,
+                "state": state,
+                "district": district,
+                "block": block,
+                "layer_name": layer_name,
+                "start_year": start_year,
+                "upload_to_s3": upload_to_s3,
+                "overwrite": overwrite,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "STAC collection generation initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_stac_collection api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ---------------------------------------------------------------------------
+# STAC catalog read helpers
+# ---------------------------------------------------------------------------
+
+_STAC_ROOT = os.path.join(
+    BASE_DIR,
+    "data",
+    "STAC_specs",
+    "CorestackCatalogs_merged_collection",
+)
+_TEHSIL = "tehsil_wise"
+
+
+def _read_json(path):
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+@api_view(["GET"])
+@schema(None)
+def get_stac_catalog(request):
+    state = request.query_params.get("state", "").strip()
+    district = request.query_params.get("district", "").strip()
+    block = request.query_params.get("block", "").strip()
+
+    base = STACConfig().stac_files_dir
+
+    if state:
+        state = sanitize_text(state.lower())
+    if district:
+        district = sanitize_text(district.lower())
+    if block:
+        block = sanitize_text(block.lower())
+
+    if not state:
+        path = os.path.join(base, "catalog.json")
+    elif not district:
+        path = os.path.join(base, _TEHSIL, state, "collection.json")
+    elif not block:
+        path = os.path.join(base, _TEHSIL, state, district, "collection.json")
+    else:
+        path = os.path.join(base, _TEHSIL, state, district, block, "collection.json")
+
+    data = _read_json(path)
+    if data is None:
+        return Response(
+            {"error": f"Catalog not found at requested scope"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    from django.http import JsonResponse
+
+    return JsonResponse(data, content_type="application/geo+json")
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_root_catalog(request):
+    data = _read_json(os.path.join(_STAC_ROOT, "catalog.json"))
+    if data is None:
+        return Response(
+            {"error": "Root catalog not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_state_collection(request, state):
+    path = os.path.join(_STAC_ROOT, _TEHSIL, state.lower(), "collection.json")
+    data = _read_json(path)
+    if data is None:
+        return Response(
+            {"error": f"State collection not found: {state}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_district_collection(request, state, district):
+    path = os.path.join(
+        _STAC_ROOT, _TEHSIL, state.lower(), district.lower(), "collection.json"
+    )
+    data = _read_json(path)
+    if data is None:
+        return Response(
+            {"error": f"District collection not found: {district}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_block_collection(request, state, district, block):
+    path = os.path.join(
+        _STAC_ROOT,
+        _TEHSIL,
+        state.lower(),
+        district.lower(),
+        block.lower(),
+        "collection.json",
+    )
+    data = _read_json(path)
+    if data is None:
+        return Response(
+            {"error": f"Block collection not found: {block}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    return Response(data)
+
+
+@api_view(["GET"])
+@schema(None)
+def stac_item(request, state, district, block, item_id):
+    path = os.path.join(
+        _STAC_ROOT,
+        _TEHSIL,
+        state.lower(),
+        district.lower(),
+        block.lower(),
+        item_id,
+        f"{item_id}.json",
+    )
+    data = _read_json(path)
+    if data is None:
+        return Response(
+            {"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND
+        )
+    return Response(data)
+
+
+@api_view(["POST"])
+@schema(None)
+def update_layer_sync_remote(request):
+    """
+    Called by a local compute instance to update sync/STAC flags on a layer
+    record in this (prod) backend.
+    """
+
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = d.get("layer_id")
+        if layer_id is None:
+            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = update_layer_sync_status(
+            layer_id=layer_id,
+            sync_to_geoserver=d.get("sync_to_geoserver"),
+            is_stac_specs_generated=d.get("is_stac_specs_generated"),
+        )
+        return Response({"layer_id": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def sync_layer_remote(request):
+    """
+    Called by a local compute instance to persist a layer record on this (prod) backend.
+    Validates the request API key against PROD_BACKEND_API_KEY before writing.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = save_layer_info_to_db(
+            state=d["state"],
+            district=d["district"],
+            block=d["block"],
+            layer_name=d["layer_name"],
+            asset_id=d["asset_id"],
+            dataset_name=d["dataset_name"],
+            sync_to_geoserver=d.get("sync_to_geoserver", False),
+            layer_version=d.get("layer_version", "1.0"),
+            algorithm=d.get("algorithm"),
+            algorithm_version=d.get("algorithm_version", "1.0"),
+            misc=d.get("misc"),
+            is_override=d.get("is_override", False),
+        )
+        if layer_id is None:
+            return Response(
+                {"error": "Failed to save layer — check state/district/block exist on this server."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
+    except KeyError as e:
+        return Response({"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_layers(request):
+    try:
+        workspace = request.query_params.get("workspace").lower()
+        result = check_missing_layers(workspace)
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_layers_for_workspace api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

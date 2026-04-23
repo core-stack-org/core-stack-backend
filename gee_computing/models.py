@@ -5,6 +5,7 @@ from nrm_app.settings import FERNET_KEY
 
 class GEEAccount(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    account_email = models.CharField(max_length=100, blank=True, null=True)
     service_account_email = models.EmailField()
     helper_account = models.ForeignKey(
         "self",

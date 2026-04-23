@@ -164,6 +164,59 @@ urlpatterns = [
     path(
         "generate_zoi_data/",
         api.generate_zoi_to_gee,
-        name="generate_mining_data",
+        name="generate_zoi_data",
     ),
+    path(
+        "generate_mws_connectivity_data/",
+        api.generate_mws_connectivity,
+        name="generate_mws_connectivity_data",
+    ),
+    path(
+        "generate_mws_centroid/",
+        api.generate_mws_centroid,
+        name="generate-mws-centroid",
+    ),
+    path(
+        "generate_facilities_proximity/",
+        api.generate_facilities_proximity,
+        name="generate_facilities_proximity",
+    ),
+    path(
+        "generate_stac_collection/",
+        api.generate_stac_collection,
+        name="generate_stac_collection",
+    ),
+    path(
+        "get_stac_catalog/",
+        api.get_stac_catalog,
+        name="get_stac_catalog",
+    ),
+    path(
+        "stac/",
+        api.stac_root_catalog,
+        name="stac_root_catalog",
+    ),
+    path(
+        "stac/<str:state>/",
+        api.stac_state_collection,
+        name="stac_state_collection",
+    ),
+    path(
+        "stac/<str:state>/<str:district>/",
+        api.stac_district_collection,
+        name="stac_district_collection",
+    ),
+    path(
+        "stac/<str:state>/<str:district>/<str:block>/",
+        api.stac_block_collection,
+        name="stac_block_collection",
+    ),
+    path(
+        "stac/<str:state>/<str:district>/<str:block>/items/<str:item_id>/",
+        api.stac_item,
+        name="stac_item",
+    ),
+    path("sync_layer_remote/", api.sync_layer_remote, name="sync_layer_remote"),
+    path("update_layer_sync_remote/", api.update_layer_sync_remote, name="update_layer_sync_remote"),
+    path("missing_layers/", api.missing_layers, name="missing_layer"),
 ]

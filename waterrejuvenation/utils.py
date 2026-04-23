@@ -2,7 +2,12 @@ from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from computing.utils import sync_project_fc_to_geoserver
 
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import (
+    GEE_PATHS,
+    PAN_INDIA_LULC_V3_DATASET,
+    WATER_REJ_GEE_ASSET,
+    WATERREJUVENATION_PROJECT,
+)
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long,
@@ -18,8 +23,7 @@ from utilities.gee_utils import (
 import numpy as np
 from nrm_app.settings import MEDIA_ROOT
 
-WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-WATER_REJ_TEST_GEE_ASSET = "projects/ee-kapil-test/assets/apps/waterbody/"
+
 import time
 import ee
 import logging
@@ -34,7 +38,6 @@ import os
 import requests
 import json
 
-
 years = [
     "2017_2018",
     "2018_2019",
@@ -45,8 +48,26 @@ years = [
     "2023_2024",
 ]
 
+# utils.py
 
-def get_filtered_mws_layer_name(project_name, layer_name, project_id="ee-corestackdev"):
+EXPECTED_EXCEL_HEADERS = {
+    "sr no.",
+    "name of ngo",
+    "state",
+    "district",
+    "taluka",
+    "village",
+    "name of the waterbody",
+    "latitude",
+    "longitude",
+    "silt excavated as per app",
+    "intervention_year",
+}
+
+
+def get_filtered_mws_layer_name(
+    project_name, layer_name, project_id=WATERREJUVENATION_PROJECT
+):
     WATER_REJ_GEE_ASSET = f"projects/{project_id}/assets/apps/waterbody/"
     return (
         WATER_REJ_GEE_ASSET
@@ -125,10 +146,7 @@ def get_waterbody_id_for_lat_long(excel_hash, water_body_asset_id):
 def get_water_mask(year):
     # Define your water classes
     water_classes = [2, 3, 4]
-    image = ee.Image(
-        "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
-        + year
-    )
+    image = ee.Image(PAN_INDIA_LULC_V3_DATASET + year)
     water_mask = (
         image.select("predicted_label")
         .remap(water_classes, [1] * len(water_classes), 0)
@@ -163,15 +181,13 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
     """
 
     print("Given lat long")
-    print(lat, lon)
+    print(f"-----{lat}----{lon}---")
     point = ee.Geometry.Point([lon, lat])
 
     # Create water masks from each LULC year
     water_masks = []
     for year in lulc_years:
-        image = ee.Image(
-            f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}"
-        )
+        image = ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}")
         water_mask = (
             image.select("predicted_label")
             .remap(water_classes, [1] * len(water_classes), 0)
@@ -414,7 +430,7 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
 
         # Define export task details
         ndvi_description = f"ndvi_{start_year}_{description}"
-        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"[:100]
+        ndvi_asset_id = f"{asset_id}_ndvi_{start_year}"
 
         # Remove previous asset if it exists to avoid overwrite issues
         if is_gee_asset_exists(ndvi_asset_id):
@@ -718,11 +734,11 @@ def get_merged_waterbodies_with_zoi(
             f"&maxFeatures={maxf}&outputFormat=application/json"
         )
 
-    standard_layer = f"surface_waterbodies_{district_l}_{block_l}"
+    standard_layer = f"swb3_{district_l}_{block_l}"
     zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
 
-    standard_wfs = build_wfs("water_bodies", standard_layer, max_features)
-    zoi_wfs = build_wfs("water_bodies", zoi_layer, max_features)
+    standard_wfs = build_wfs("swb", standard_layer, max_features)
+    zoi_wfs = build_wfs("swb", zoi_layer, max_features)
 
     # fetch and return uid->props dict
     def fetch_uid_props(wfs_url, generate_from_props=False):
@@ -779,7 +795,7 @@ def get_merged_waterbodies_with_zoi(
 
     # If both failed, return None
     if standard_map is None and zoi_map is None:
-        print("❌ Both standard and ZOI fetch failed.")
+        print(" Both standard and ZOI fetch failed.")
         return None
 
     # Merge: union of UIDs from both maps
@@ -818,3 +834,21 @@ def get_merged_waterbodies_with_zoi(
 
     print(f"Saved merged → {merged_path} ({len(merged)} UIDs)")
     return merged
+
+
+def validate_excel_headers(file_obj, expected_headers):
+    try:
+        df = pd.read_excel(file_obj, nrows=0)
+
+        uploaded_headers = {str(col).strip().lower() for col in df.columns}
+
+        missing = expected_headers - uploaded_headers
+        extra = uploaded_headers - expected_headers
+
+        if missing:
+            return (False, f"Missing required columns: {', '.join(sorted(missing))}")
+
+        return True, None
+
+    except Exception as e:
+        return False, f"Invalid Excel file format: {str(e)}"

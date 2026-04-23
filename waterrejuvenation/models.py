@@ -1,3 +1,4 @@
+import logging
 from email.policy import default
 
 from django.db import models
@@ -5,12 +6,16 @@ from django.db import models
 from gee_computing.models import GEEAccount
 from geoadmin.models import State, District
 import uuid
+
+from geoadmin.tasks import send_email_notification
 from projects.models import Project, AppType
 import os
-
+from .email_texts import UPLOAD_MESSAGE_TEMPLATE
 from users.models import User
 from utilities.constants import SITE_DATA_PATH
 from .tasks import Upload_Desilting_Points
+
+logger = logging.getLogger(__name__)
 
 
 # Create your models here.
@@ -47,6 +52,10 @@ class WaterbodiesFileUploadLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     process = models.BooleanField(default=False)
     gee_account_id = models.IntegerField(null=True, blank=True)
+    is_processing_required = models.BooleanField(default=True)
+    is_lulc_required = models.BooleanField(default=True)
+    is_closest_wp = models.BooleanField(default=True)
+    is_compute = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -62,16 +71,57 @@ class WaterbodiesFileUploadLog(models.Model):
             self.excel_hash = file_hash.hexdigest()
 
         super().save(*args, **kwargs)
-        Upload_Desilting_Points.apply_async(
+        print(f"is processing required: {self.is_processing_required}")
+        print(f"is lullc required: {self.is_lulc_required}")
+        if self.is_compute:
+            Upload_Desilting_Points.apply_async(
                 kwargs={
-                        "file_obj_id": self.id,
-                        "gee_project_id": self.gee_account_id,
-                        "is_closest_wp": True,
-                    "is_lulc_required": True,
-                    },
-                queue="waterbody1"
+                    "file_obj_id": self.id,
+                    "gee_account_id": self.gee_account_id,
+                    "is_lulc_required": self.is_lulc_required,
+                    "is_processing_required": self.is_processing_required,
+                    "is_closest_wp": self.is_closest_wp,
+                },
+                queue="waterbody1",
             )
+        else:
+            logger.info(
+                f"File uploaded by user {self.uploaded_by.username}. Triggering email to superadmins and support"
+            )
+            attachments = [self.file.path]
+            subject = f"File uploaded on waterbody project for {self.project.name} with id {self.project.id}"
+            user_name = self.uploaded_by.username
+            proj_name = self.project.name
+            proj_id = self.project.id
 
+            upload_message = UPLOAD_MESSAGE_TEMPLATE.format(
+                username=user_name, proj_name=proj_name, proj_id=proj_id
+            )
+            body = upload_message
+            to_emails = ["kapil.dadheech@gramvaani.org"]
+            attachments = []
+
+            if self.file:
+                file_field = self.file
+
+                attachments.append(
+                    {
+                        "filename": file_field.name.split("/")[-1],
+                        "content": file_field.read(),  # bytes
+                        "mimetype": (
+                            file_field.file.content_type
+                            if hasattr(file_field.file, "content_type")
+                            else "application/octet-stream"
+                        ),
+                    }
+                )
+            send_email_notification(
+                subject=subject,
+                text_body="",
+                html_body=body,
+                to_emails=to_emails,
+                attachments=attachments,
+            )
 
     class Meta:
         ordering = ["-created_at"]
@@ -94,8 +144,8 @@ class WaterbodiesDesiltingLog(models.Model):
     Taluka = models.CharField(max_length=255, null=True)
     Village = models.CharField(max_length=255, null=True)
     waterbody_name = models.CharField(max_length=255, null=True)
-    lat = models.FloatField()
-    lon = models.FloatField()
+    lat = models.FloatField(null=True)
+    lon = models.FloatField(null=True)
     slit_excavated = models.CharField(max_length=255, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     process = models.BooleanField(default=False)
@@ -106,6 +156,9 @@ class WaterbodiesDesiltingLog(models.Model):
     distance_closest_wb_pixel = models.IntegerField(null=True)
     excel_hash = models.CharField(max_length=64, null=True)
     intervention_year = models.CharField(max_length=255, null=True)
+    failure_reason = models.TextField(
+        null=True, blank=True, help_text="Reason why processing failed"
+    )
 
     def __str__(self):
         return self.waterbody_name

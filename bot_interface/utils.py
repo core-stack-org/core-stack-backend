@@ -33,6 +33,8 @@ from django.core.exceptions import ObjectDoesNotExist
 
 import logging
 
+from nrm_app.settings import CE_API_URL
+
 logger = logging.getLogger(__name__)
 
 
@@ -1202,6 +1204,8 @@ def detect_url(text):
 
 
 def convert_image_hdpi(filepath):
+    import os
+
     from bot_interface.api import WHATSAPP_MEDIA_PATH
 
     image_name = filepath.split("/")[-1]
@@ -1213,7 +1217,8 @@ def convert_image_hdpi(filepath):
     img_format = img.format.lower()
     hdpi_im_key = file_identifier + "_hdpi." + img_format
     print(str(hdpi_im_key))
-    im_hdpi_file = WHATSAPP_MEDIA_PATH + "hdpi/" + hdpi_im_key
+    im_hdpi_file = os.path.join(WHATSAPP_MEDIA_PATH, "hdpi", hdpi_im_key)
+    os.makedirs(os.path.dirname(im_hdpi_file), exist_ok=True)
     print(str(im_hdpi_file))
     width_0, height_0 = img.size
     hdpi_fixed_width_in_pixel = 480
@@ -1390,7 +1395,7 @@ def check_user_community_status_direct(bot_number: str) -> tuple[bool, Dict[str,
 
 
 def check_user_community_status_http(
-        user_number: str, base_url: str = "https://geoserver.core-stack.org/api/v1"
+    user_number: str, base_url: str = CE_API_URL
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Check if a user (by phone number) is part of any community using HTTP API calls.
@@ -1410,7 +1415,7 @@ def check_user_community_status_http(
             }
 
         # Make HTTP request to the community engagement API
-        url = f"{base_url}/is_user_in_community/"
+        url = f"{base_url}is_user_in_community/"
         payload = {"number": user_number}
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
 
@@ -1453,7 +1458,7 @@ def check_user_community_status_http(
 
 
 def get_community_by_lat_lon(
-    lat: str, lon: str, base_url: str = "https://geoserver.core-stack.org/api/v1"
+    lat: str, lon: str, base_url: str = CE_API_URL
 ) -> Tuple[bool, Dict[str, Any]]:
     """Get community by latitude and longitude"""
     try:

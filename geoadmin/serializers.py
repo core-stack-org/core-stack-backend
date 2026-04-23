@@ -1,20 +1,21 @@
 from rest_framework import serializers
-from .models import State, District, Block
+
+from .models import DistrictSOI, StateSOI, TehsilSOI
 
 
 class StateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = State
+        model = StateSOI
         fields = "__all__"
 
 
 class DistrictSerializer(serializers.ModelSerializer):
     class Meta:
-        model = District
+        model = DistrictSOI
         fields = "__all__"
 
 
 class BlockSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Block
+        model = TehsilSOI
         fields = "__all__"

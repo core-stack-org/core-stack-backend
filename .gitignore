@@ -9,6 +9,7 @@ venv/
 *.pyc
 .idea/
 .DS_Store
+.cursor/
 
 # Django
 *.log

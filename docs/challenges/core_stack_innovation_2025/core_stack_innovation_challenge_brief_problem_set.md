@@ -1,5 +1,9 @@
 
-# CoRE Stack Innovation Challenge on Geospatial Programming: Nov-Dec 2025
+# CoRE Stack Innovation Challenge on Geospatial Programming: Nov 2025 - Jan 2026
+
+## Update: Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
+
+---
 
 Inviting ecologists, water-security researchers, geospatial programmers, and community practitioners to build open-source solutions, analyses, and tools using the CoRE Stack datasets and APIs to improve socio-ecological resilience and support community-led landscape action.
 
@@ -69,11 +73,16 @@ More generally, combine all of the above and describe the most important changes
 ### Problems requiring integration with external data
 8. Using external data of agricultural market locations (e.g., APMC mandis), analyze whether proximity to markets correlates with cropping intensity and produce visualizations and statistical tests. If you can identify the time when new markets came up, this can become a potential natural experiment to study the interaction between market proximity and cropping pattern changes. 
 9. The CoRE stack itself provides many other datasets that have not been integrated into APIs as yet. For example, the connectivity graph of micro-watersheds (which micro-watersheds drain into which one) and stream-ordering of areas can be analyzed against deforestation occurrences to understand if deforestation is happening more in low-lying areas (that are suitable for agriculture) or in upland areas (where trees might be cut for logging). This can help determine precise policy action for an area.
-10. On similar lines, recent global datasets released on identifying natural forests can be used to study the extent of deforestation or degradation within natural forest ecosystems or outside. Assessments on forest cover changes are otherwise hard to validate due to varying definitions of what constitutes a forest. 
+10. On similar lines, recent global datasets released on identifying natural forests can be used to study the extent of deforestation or degradation within natural forest ecosystems or outside. Assessments on forest cover changes are otherwise hard to validate due to varying definitions of what constitutes a forest.
+11. INREM Foundation has proposed [several ideas](https://docs.google.com/document/d/1vyrRZSGf3IrCOFtyjS-nfSS2Un1vvZJi/edit?usp=sharing&ouid=116413035808485050246&rtpof=true&sd=true) on water safety: How to use available data on water safety measurements and combine it with surface and groundwater flow models to build wall-to-wall maps, provide decision support for planning of groundwater recharge structures that can layer freshwater over saline aquifers, use chemical composition from water measurements to understand aquifer connectivity, and build public health risk maps by layering water safety against water use for human or livestock consumption. Contact Sunder and team for mentorship if you are interested in pursuing this idea.
+12. Professor Kaustubh Rau from APU has proposed building dashboards to track the [ecology of waterbodies](https://docs.google.com/document/d/1Sr1_SPXqu7O7W8-pfzuYgZdh4gurKlOE/edit?usp=drive_link&ouid=116413035808485050246&rtpof=true&sd=true), including data on surface water availability and cropping patterns from the remote sensing analysis available in the CoRE stack, with biodiversity data pulled via APIs from citizen science platforms like eBird and iNaturalist. Further, how to make it easier for ecologists to collect data on a regular basis about the waterbodies.
+13. Dr Madhura Niphadkar from the Wildlife Conservation Trust has proposed ideas on finding the [command area of reservoirs](https://docs.google.com/document/d/11MngkKdoOQlA3lWrGfqRarGOPBreR9nl/edit?usp=sharing&ouid=116413035808485050246&rtpof=true&sd=true) by intersecting the canal network with the reservoir. Further, to extend this with potential groundwater recharge from the canals. This can be useful to investigate cropping patterns in the command area and compare them with cropping patterns outside the command area. 
  
 ---
 
 ## 6. Resources & starting points
+## Update: Weekly on-boarding calls have been ongoing - see the notes and call recordings on the [main challenge page](https://core-stack.org/core-stack-innovation-challenge-1st-edition/).
+
 - First start with understanding the data in the CoRE stack. The easiest is to check out the Know Your Landscape dashboard: https://www.explorer.core-stack.org/
 - And the pan-India [Google Earth Engine app](https://ee-corestackdev.projects.earthengine.app/view/core-stack-gee-app)
 - You can also take a look at the CoRE Stack technical manual (datasets & methods) to understand the methodologies that have been used: https://core-stack.org/core-stack-technical-manual-v2/
@@ -109,7 +118,7 @@ Submissions will be scored on:
 ---
 
 ## 9. Prizes
-- TBD.
+- Cash prizes of Rs 10,000 for exciting solutions and merch from FOSS United for all participants. 
 - Additionally, mentorship sessions with domain experts in the CoRE stack network for top finalists.
 - And opportunities to integrate winning work into the CoRE Stack ecosystem and technical support for adoption.
 
@@ -118,9 +127,9 @@ Submissions will be scored on:
 ## 10. Timeline & milestones
 - Launch: `Nov 22, 2025`
 - Weekly developer community calls / mentorship: `Fridays, 3-4pm`
-- Submission deadline: `Dec 31, 2025`
-- Shortlist & demos: `Jan 15, 2026`
-- Winners announced & prize distribution: `Jan 31, 2026`
+- Submission deadline: ~~`Dec 31, 2025`~~ we have converted this to rolling contributions
+- Shortlist & demos: ~~`Jan 15, 2026`~~ discussed in the weekly dev calls
+- Winners announced & prize distribution: ~~`Jan 31, 2026`~~ converted to rolling contributions and evaluations
 
 ---
 

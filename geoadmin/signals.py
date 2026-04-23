@@ -2,11 +2,11 @@
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Block
+from .models import TehsilSOI
 import json
 from pathlib import Path
 from django.conf import settings
-from .utils import activated_entities, transform_data
+from .utils import activated_tehsils, transform_data
 
 # Define cache file path
 
@@ -17,7 +17,7 @@ def generate_activated_locations_json_data():
         Path(settings.BASE_DIR) / "data/activated_locations/active_locations.json"
     )
     try:
-        response_data = activated_entities()
+        response_data = activated_tehsils()
         transformed_data = transform_data(data=response_data)
 
         # Write to JSON file
@@ -30,7 +30,7 @@ def generate_activated_locations_json_data():
         raise
 
 
-@receiver(post_save, sender=Block)
+@receiver(post_save, sender=TehsilSOI)
 def update_generate_activated_locations_json_data(sender, instance, created, **kwargs):
     """Only regenerate data if active_status field was modified"""
     try:

@@ -1,28 +1,25 @@
-from computing.utils import generate_swb_layer_with_max_so_catchment
-from utilities.constants import GEE_PATHS
+import ee
+
+from utilities.constants import GEE_PATHS, WBC
 from utilities.gee_utils import (
-    valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
 )
-import ee
-
-from waterrejuvenation.utils import add_on_drainage_flag
 
 
-def waterbody_catchment_streamorder_properties(
+def waterbody_wbc_intersection(
     roi=None,
     state=None,
-    district=None,
-    block=None,
-    project_id=None,
     asset_suffix=None,
     asset_folder_list=None,
     app_type=None,
-    gee_account_id=None,
 ):
-    print(f"asset suffix swb4: {asset_suffix}")
+    if not state:
+        print("State name must be provided to run this script")
+        return None
+
+    # Swapped naming: WBC intersection now exports as SWB4.
     description = "swb4_" + asset_suffix
     asset_id = (
         get_gee_dir_path(
@@ -30,8 +27,14 @@ def waterbody_catchment_streamorder_properties(
         )
         + description
     )
-    asset_suffix_swb4 = "swb4_" + asset_suffix
-    swb3_asset = (
+
+    # Check if the asset already exists to avoid redundant processing
+    if is_gee_asset_exists(asset_id):
+        return None, asset_id
+
+    # Load census state and water bodies feature collections
+    census_state = ee.FeatureCollection(WBC + state.upper().replace(" ", "") + "_UPD")
+    water_bodies = ee.FeatureCollection(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
@@ -39,35 +42,145 @@ def waterbody_catchment_streamorder_properties(
         + asset_suffix
     )
 
-    swb2_asset = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + "swb2_"
-        + asset_suffix
-    )
-    try:
-        ee.data.getAsset(swb3_asset)
-        water_bodies = ee.FeatureCollection(swb3_asset)
-    except Exception as e:
-        print("SWB3 does not exist")
-        water_bodies = ee.FeatureCollection(swb2_asset)
+    # Filter points and polygons within the area of interest (aoi)
+    points = census_state.filterBounds(roi)
+    polygons = water_bodies.filterBounds(roi)
 
-    print(f"asset_i{water_bodies}")
-    swb4_fs = generate_swb_layer_with_max_so_catchment(
-        roi=water_bodies,
-        asset_suffix=asset_suffix,
-        asset_folder=asset_folder_list,
-        app_type=app_type,
-        gee_account_id=gee_account_id,
-    )
-    asset_id_dl = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    feature_collection = points
+
+    # Function to handle null or missing area values
+    def replace_null_area(feature):
+        # Extract water body attributes, handling potential null values
+        area = ee.Number(feature.get("water_spread_area_of_water_body"))
+        capacity = ee.Number(feature.get("storage_capacity_water_body_original"))
+        depth = ee.Number(feature.get("max_depth_water_body_fully_filled"))
+
+        # Ensure non-null values or default to 0
+        area = ee.Algorithms.If(area, area, 0)
+        capacity = ee.Algorithms.If(capacity, capacity, 0)
+        depth = ee.Algorithms.If(depth, depth, 0)
+        area = ee.Number(area)
+        capacity = ee.Number(capacity)
+        depth = ee.Number(depth)
+        # Calculate area if not provided, using capacity and depth
+        new_area = ee.Algorithms.If(
+            area.neq(0),
+            area,
+            ee.Algorithms.If(
+                capacity and depth, capacity.divide(depth).divide(10000), 0
+            ),
         )
-        + "drainage_lines_"
-        + asset_suffix
+        return feature.set("water_spread_area_of_water_body", new_area)
+
+    # Apply area replacement to all features
+    points = feature_collection.map(replace_null_area)
+
+    # Buffer points to create search areas
+    buffered_points = points.map(lambda feature: feature.buffer(90))
+
+    # Create a spatial filter to find intersecting features
+    spatial_filter = ee.Filter.intersects(
+        leftField=".geo", rightField=".geo", maxError=10
     )
-    swb4_fs_on_drainage = add_on_drainage_flag(swb4_fs, asset_id_dl)
-    task_id = export_vector_asset_to_gee(swb4_fs_on_drainage, description, asset_id)
+
+    # Perform a spatial join to find intersecting polygons for each point
+    intersect_joined = ee.Join.saveAll("intersections").apply(
+        primary=buffered_points, secondary=polygons, condition=spatial_filter
+    )
+
+    # Function to select the closest polygon to each point
+    def select_closest_polygon(feature):
+        # Calculate the spread area of the water body
+        spread = ee.Number(feature.get("water_spread_area_of_water_body"))
+        spread = spread.multiply(10000)
+        intersections = ee.List(feature.get("intersections"))
+
+        # Calculate the difference between intersection areas
+        def compute_difference(fc2_feature):
+            area_ored = ee.Number(fc2_feature.get("area_ored"))
+            difference = area_ored.subtract(spread).abs()
+            return ee.Feature(
+                None, {"difference": difference, "uid": fc2_feature.get("UID")}
+            )
+
+        # Find the polygon with the closest area match
+        fc2_intersecting = ee.FeatureCollection(intersections)
+        fc2_with_difference = fc2_intersecting.map(compute_difference)
+        sorted_fc2 = fc2_with_difference.sort("difference", True)
+        closest_feature = sorted_fc2.first()
+        return feature.set("closest_polygon_id", closest_feature.get("uid"))
+
+    # Apply closest polygon selection
+    fc1_with_closest_polygon = intersect_joined.map(select_closest_polygon)
+    fc1 = fc1_with_closest_polygon
+    fc2 = water_bodies
+
+    # Join water bodies with points based on closest polygon
+    join_filter = ee.Filter.equals(leftField="UID", rightField="closest_polygon_id")
+    joined_fc = ee.Join.saveAll(matchesKey="matches").apply(
+        primary=fc2, secondary=fc1, condition=join_filter
+    )
+
+    # Add census IDs to features
+    def add_census_id(feature):
+        matches = ee.List(feature.get("matches"))
+        census_ids = matches.map(lambda m: ee.Feature(m).get("unique_id"))
+        return feature.set("census_id", census_ids.get(0))
+
+    fc2_with_census_id = joined_fc.map(add_census_id)
+    fc2 = fc2_with_census_id
+    fc1 = water_bodies
+
+    # Remove unnecessary match properties
+    def remove_property(feat, prop):
+        properties = feat.propertyNames()
+        select_properties = properties.filter(ee.Filter.neq("item", prop))
+        return feat.select(select_properties)
+
+    new_fc = fc2.map(lambda feat: remove_property(feat, "matches"))
+    fc2_without_matrices = new_fc
+
+    # Add census ID to features without matches
+    fc1_with_census_id = fc1.map(lambda feat: feat.set("census_id", "NA"))
+
+    # Filter and merge feature collections
+    uid_list = fc2_without_matrices.aggregate_array("UID").distinct()
+    filtered_fc1 = fc1_with_census_id.filter(ee.Filter.inList("UID", uid_list).Not())
+
+    first_fc = ee.FeatureCollection(filtered_fc1.merge(fc2_without_matrices))
+
+    # Perform a join with census state data
+    second_fc = census_state
+    field_filter = ee.Filter.equals(leftField="census_id", rightField="unique_id")
+    join = ee.Join.saveAll(matchesKey="matches", ordering="unique_id", ascending=True)
+    joined = join.apply(primary=first_fc, secondary=second_fc, condition=field_filter)
+
+    # Merge properties from matched features
+    def merge_props(feature):
+        matches = ee.List(feature.get("matches"))
+        census_feature = ee.Feature(matches.get(0))
+        return feature.copyProperties(census_feature)
+
+    merged = joined.map(merge_props)
+    merged = merged.map(lambda feat: remove_property(feat, "matches"))
+
+    # Identify and set columns unique to the merged dataset
+    columns1 = ee.List(merged.first().propertyNames())
+    columns2 = ee.List(filtered_fc1.first().propertyNames())
+    unique_to_list1 = columns1.removeAll(columns2)
+
+    # Set unique columns to "NA" for features without matches
+    def set_columns_to_na(feature):
+        return ee.Feature(
+            unique_to_list1.iterate(
+                lambda column_name, feat: ee.Feature(feature).set(column_name, "NA"),
+                feature,
+            )
+        )
+
+    filtered_fc1 = filtered_fc1.map(set_columns_to_na)
+    final_upd = filtered_fc1.merge(merged)
+
+    # Export the final feature collection to Google Earth Engine asset
+    task_id = export_vector_asset_to_gee(final_upd, description, asset_id)
     return task_id, asset_id

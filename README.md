@@ -2,8 +2,7 @@
 
 ### Installation
 
-We provide a single installation script that handles everything:
-
+We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
 - Installs **Miniconda** and sets up the Python environment
 - Installs & configures **PostgreSQL**
 - Installs & configures **Apache with mod_wsgi**
@@ -38,7 +37,23 @@ chmod +x install.sh
 > The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run
 > migrations, and configure Apache.
 
-#### 3. Open in Browser
+> For any installation issues, check [Installation Documentation](./installation/INSTALLATION.md) and [Troubleshooting Guide](./installation/TROUBLESHOOTING.md).
+
+#### 3. Running the server
+After the successfull installation of all the packages, run the following commands to start the Django server:
+```bash
+conda activate corestack-backend (or whatever is the name of your virtual environment)
+python manage.py runserver
+```
+- **Running celery:**
+If you are running some tasks, you need to run 
+```bash
+celery -A nrm_app worker -l info -Q nrm
+```
+where 'nrm_app' is the app_name and 'nrm' is the rabbitmq queue.
+
+
+#### 4. Open in Browser
 
 - API Docs: [http://localhost](http://localhost)
 - Django Admin: [http://localhost/admin/](http://localhost/admin/)
@@ -89,4 +104,4 @@ how to integrate custom pipelines on the CoREStack backend.
 
 ### Further references
 - [DB Design](https://github.com/core-stack-org/core-stack-backend/wiki/DB-Design) 
-- [API Doc](https://github.com/core-stack-org/core-stack-backend/wiki/Project-API-Doc)
+- [API Doc](https://api-doc.core-stack.org/)

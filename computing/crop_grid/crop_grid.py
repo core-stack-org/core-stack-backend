@@ -17,14 +17,14 @@ from utilities.gee_utils import (
 )
 from .crop_gridXlulc import crop_grids_lulc
 from nrm_app.celery import app
-from utilities.constants import (
-    ADMIN_BOUNDARY_INPUT_DIR,
-    CROP_GRID_PATH,
-)
+from utilities.constants import SOI_TEHSIL, CROP_GRID_PATH, CRS_4326
 
 
 @app.task(bind=True)
 def create_crop_grids(self, state, district, block, gee_account_id):
+    """
+    It will generate crop grid layer for the given location (tehsil level)
+    """
     ee_initialize(gee_account_id)
     description = (
         "crop_grid_"
@@ -68,7 +68,7 @@ def create_crop_grids(self, state, district, block, gee_account_id):
 
 
 def get_block_coordinates(state, district, block):
-    soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
+    soi = gpd.read_file(SOI_TEHSIL)
 
     soi = soi[(soi["STATE"].str.lower() == state)]
     soi = soi[(soi["District"].str.lower() == district)]
@@ -206,7 +206,7 @@ def convert_geojson_to_fc(state, district, block, path, geom_len):
         for i in range(gdf.shape[0]):
             unique_ids.append(block + "_" + str(i))
         gdf["uid"] = unique_ids
-        gdf = gdf.to_crs("EPSG:4326")
+        gdf = gdf.to_crs(CRS_4326)
 
         ee_fc = gdf_to_ee_fc(gdf)
         features.extend(ee_fc)

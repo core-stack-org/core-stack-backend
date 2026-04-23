@@ -53,16 +53,12 @@ def generate_mws_data_for_kyl_filters(
 ):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = (
-        EXCEL_PATH
-        + "data/stats_excel_files/"
-        + state_folder
-        + "/"
-        + district_folder
-        + "/"
-        + district
-        + "_"
-        + block
+    file_xl_path = os.path.join(
+        EXCEL_PATH,
+        "data/stats_excel_files",
+        state_folder,
+        district_folder,
+        f"{district}_{block}",
     )
     if regenerate:
         file_path = None
@@ -92,6 +88,7 @@ def generate_mws_data_for_kyl_filters(
                 "factory_csr": -1,
                 "mining": -1,
                 "green_credit": -1,
+                "mws_intersect_swb": -1,
             }
 
             try:
@@ -424,6 +421,27 @@ def generate_mws_data_for_kyl_filters(
                         avg_perc_rabi_surface_water_mws
                     ) = avg_perc_zaid_surface_water_mws = 0
 
+                ################# SWB Trend ######################
+                try:
+                    df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
+                        sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
+                    ]
+                    swb_T = df_swb_annual_mws_data.filter(
+                        like="total_area_in_ha"
+                    ).dropna()  # Drop rows with NaN for trend calculation
+                    swb_T = swb_T.iloc[0].dropna().tolist()
+                    result = mk.original_test(swb_T)
+
+                    trend_swb = None
+                    if result.trend == "no trend":
+                        trend_swb = "0"
+                    elif result.trend == "increasing":
+                        trend_swb = "1"
+                    else:
+                        trend_swb = "-1"
+                except:
+                    trend_swb = "-1"
+
                 ######### G Trend  #################
                 G_Trend = (
                     hydro_annual_mws_data.filter(like="G")
@@ -538,7 +556,7 @@ def generate_mws_data_for_kyl_filters(
                     ).iloc[0]
                     mws_intersect_villages = ast.literal_eval(mws_intersect_villages)
                 except:
-                    mws_intersect_villages = ""
+                    mws_intersect_villages = []
 
                 ############  Change Detection Degradation  ###################
                 try:
@@ -573,8 +591,15 @@ def generate_mws_data_for_kyl_filters(
                         .iloc[0]
                     )
                     degradation_land_area = degr_sum + crp_sum
+                    change_in_cropping_intensity_area = (
+                        df_change_crp_detection_mws_data.get(
+                            "total_change_crop_intensity_area_in_ha", None
+                        ).iloc[0]
+                    )
+
                 except:
                     degradation_land_area = 0
+                    change_in_cropping_intensity_area = 0
 
                 ############  Change Detection Afforestation  ###################
                 try:
@@ -602,12 +627,6 @@ def generate_mws_data_for_kyl_filters(
                         sheets["change_detection_deforestation"]["UID"]
                         == specific_mws_id
                     ]
-                    deforestation_column = [
-                        "forest_to_scrub_land_area_in_ha",
-                        "forest_to_barren_area_in_ha",
-                        "forest_to_built_up_area_in_ha",
-                        "forest_to_farm_area_in_ha",
-                    ]
                     deforestation_land_area = df_change_defo_detection_mws_data.get(
                         "total_deforestation_area_in_ha", None
                     ).iloc[0]
@@ -619,12 +638,6 @@ def generate_mws_data_for_kyl_filters(
                     df_change_urba_detection_mws_data = sheets[
                         "change_detection_urbanization"
                     ][sheets["change_detection_urbanization"]["UID"] == specific_mws_id]
-                    urbanization_column = [
-                        "barren_shrub_to_built_up_area_in_ha",
-                        "built_up_to_built_up_area_in_ha",
-                        "tree_farm_to_built_up_area_in_ha",
-                        "water_to_built_up_area_in_ha",
-                    ]
                     urbanization_land_area = df_change_urba_detection_mws_data.get(
                         "total_urbanization_area_in_ha", None
                     ).iloc[0]
@@ -694,7 +707,7 @@ def generate_mws_data_for_kyl_filters(
                     1: "Semi-Critical",
                     2: "Critical",
                     3: "Over Exploited",
-                    4: "Saline",
+                    4: "Not Assessed",
                 }
 
                 class_to_id = {v: k for k, v in Soge_class.items()}
@@ -709,7 +722,7 @@ def generate_mws_data_for_kyl_filters(
                         class_to_id.get(soge_class_name, "")
                     )  # Returns None if not found
                 except Exception:
-                    soge_class = -1
+                    soge_class = 4
 
                 ################## LCW Conflict  ######################
                 ## if count is 0 then Areas with no conflicts else Areas with conflicts
@@ -763,6 +776,41 @@ def generate_mws_data_for_kyl_filters(
                 except Exception as e:
                     factory_csr = 0
 
+                ############ MWS Intersect Swb ########################
+                try:
+                    swb_df = sheets.get("mws_intersect_swb")
+
+                    if swb_df is not -1 and not swb_df.empty:
+                        mws_swb_data = swb_df[swb_df["UID"] == specific_mws_id]
+
+                        mws_intersect_swb = mws_swb_data.apply(
+                            lambda row: {
+                                "swbId": str(row["SWB_UID"]),
+                                "swbName": (
+                                    str(row["Waterbodies_name"])
+                                    if pd.notna(row["Waterbodies_name"])
+                                    else ""
+                                ),
+                                "latitude": (
+                                    float(row["Latitude"])
+                                    if pd.notna(row["Latitude"])
+                                    else None
+                                ),
+                                "longitude": (
+                                    float(row["Longitude"])
+                                    if pd.notna(row["Longitude"])
+                                    else None
+                                ),
+                            },
+                            axis=1,
+                        ).tolist()
+                    else:
+                        mws_intersect_swb = []
+
+                except Exception as e:
+                    print(f"Error in SWB funda: {e}")
+                    mws_intersect_swb = []
+
                 results.append(
                     {
                         "mws_id": specific_mws_id,
@@ -779,6 +827,7 @@ def generate_mws_data_for_kyl_filters(
                         "avg_kharif_surface_water_mws": avg_kharif_surface_water_mws,
                         "avg_rabi_surface_water_mws": avg_rabi_surface_water_mws,
                         "avg_zaid_surface_water_mws": avg_zaid_surface_water_mws,
+                        "trend_swb": trend_swb,
                         "trend_g": trend_g,
                         "drought_category": drought_category,
                         "avg_number_dry_spell": avg_dry_spell_in_weeks,
@@ -788,7 +837,10 @@ def generate_mws_data_for_kyl_filters(
                         "degradation_land_area": round(degradation_land_area, 4),
                         "increase_in_tree_cover": round(afforestation_land_area, 4),
                         "decrease_in_tree_cover": round(deforestation_land_area, 4),
-                        "built_up_area": round(urbanization_land_area, 4),
+                        "degradation_cropping_intensity": round(
+                            change_in_cropping_intensity_area, 4
+                        ),
+                        "urbanization_area": round(urbanization_land_area, 4),
                         "lulc_slope_category": lulc_slope_category,
                         "lulc_plain_category": lulc_plain_category,
                         "area_wide_scale_restoration": round(wide_scale_restoration, 4),
@@ -799,6 +851,7 @@ def generate_mws_data_for_kyl_filters(
                         "mining": mining,
                         "green_credit": green_credit,
                         "factory_csr": factory_csr,
+                        "mws_intersect_swb": mws_intersect_swb,
                     }
                 )
 
@@ -865,16 +918,12 @@ def generate_mws_data_for_kyl_filters(
 def get_mws_KYL_filter_data(state, district, block, file_type):
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
-    file_xl_path = (
-        EXCEL_PATH
-        + "data/stats_excel_files/"
-        + state_folder
-        + "/"
-        + district_folder
-        + "/"
-        + district
-        + "_"
-        + block
+    file_xl_path = os.path.join(
+        EXCEL_PATH,
+        "data/stats_excel_files",
+        state_folder,
+        district_folder,
+        f"{district}_{block}",
     )
 
     file_path = None

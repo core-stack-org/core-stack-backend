@@ -1,0 +1,64 @@
+{
+  "Forms": [
+    {
+      "name": "Settlement",
+      "form_id": "Add_Settlements_form%20_V1.0.1",
+      "display": "Resource Mapping => Settlement Form "
+    },
+    {
+      "name": "Well",
+      "form_id": "Add_well_form_V1.0.1",
+      "display": "Resource Mapping => Add Well Form"
+    },
+    {
+      "name": "Waterbody",
+      "form_id": "Add_Waterbodies_Form_V1.0.3",
+      "display": "Resource Mapping => Add Water Structures Form "
+    },
+    {
+      "name": "Crop",
+      "form_id": "crop_form_V1.0.0",
+      "display": "Resource Mapping => Cropping Pattern Form"
+    },
+    {
+      "name": "Groundwater",
+      "form_id": "NRM_form_propose_new_recharge_structure_V1.0.0",
+      "display": "Planning New => Propose New Recharge Structure"
+    },
+    {
+      "name": "Agri",
+      "form_id": "NRM_form_Agri_Screen_V1.0.0",
+      "display": "Planning New => Propose New Irrigation Work"
+    },
+    {
+      "name": "Livelihood",
+      "form_id": "NRM%20Livelihood%20Form",
+      "display": "Planning New => Livelihood Details"
+    },
+    {
+      "name": "Agrohorticulture",
+      "form_id": "Agrohorticulture",
+      "display": "Planning New => Agrohorticulture"
+    },
+    {
+      "name": "Surface Water Body Maintenance",
+      "form_id": "NRM_form_NRM_form_Waterbody_Screen_V1.0.0",
+      "display": "Planning Maintenance => Propose Maintenance on Surface Water structures"
+    },
+    {
+      "name": "Surface Water Body Remotely Sensed Maintenance",
+      "form_id": "Surface_Waterbody_RS_Maintenance_form%20_V1.0.1",
+      "display": "Planning Maintenance => Propose Maintenance of Remotely Sensed Water Structure"
+    },
+    {
+      "name": "Agri Maintenance",
+      "form_id": "Propose_Maintenance_on_Existing_Irrigation_Structures_V1.1.1",
+      "display": "Planning Maintenance => Propose Maintenance On Existing Irrigation Structures"
+    },
+    {
+      "name": "GroundWater Maintenance",
+      "form_id": "Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1",
+      "display": "Planning Maintenance => Propose Maintenance On Existing Water Recharge Structures"
+    }
+  ]
+}

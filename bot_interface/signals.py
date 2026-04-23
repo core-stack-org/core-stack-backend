@@ -11,6 +11,7 @@ from django.utils import timezone
 from community_engagement.api import item_type
 from .models import UserLogs
 from .interface.whatsapp import WhatsAppInterface
+from .tasks import process_and_submit_work_demand
 
 logger = logging.getLogger(__name__)
 
@@ -71,24 +72,10 @@ def process_work_demand_on_completion(sender, instance, created, **kwargs):
         return  # Only process new records
 
     # Check if this is a work demand completion log
-    if (
-        instance.key1 == "useraction"
-        and instance.value1 == "work_demand"
-        and instance.misc
-        and "work_demand_data" in instance.misc
-    ):
 
-        logger.info(f"Work demand completion detected for UserLogs ID: {instance.id}")
-
-        # Process asynchronously to avoid blocking the SMJ flow
-        thread = threading.Thread(
-            target=async_process_work_demand, args=(instance.id,), daemon=True
-        )
-        thread.start()
-        logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")
-
-    else:
-
-        logger.info(
-            f"UserLogs ID {instance.id} does not match work demand criteria: key1={instance.key1}, value1={instance.value1}, misc_keys={list(instance.misc.keys()) if instance.misc else None}"
-        )
+    logger.info(f"Work demand completion detected for UserLogs ID: {instance.id}")
+    process_and_submit_work_demand.apply_async(
+        kwargs={"user_log_id": instance.id},
+        queue="whatsapp",
+    )
+    logger.info(f"Started async processing thread for UserLogs ID: {instance.id}")

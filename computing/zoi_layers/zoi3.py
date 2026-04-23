@@ -3,7 +3,12 @@ from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 from nrm_app.celery import app
 from projects.models import Project
 from utilities.constants import GEE_PATHS
-from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_dir_path
+from utilities.gee_utils import (
+    ee_initialize,
+    valid_gee_text,
+    get_gee_dir_path,
+    is_gee_asset_exists,
+)
 from waterrejuvenation.utils import wait_for_task_completion
 import ee
 
@@ -25,9 +30,7 @@ def get_ndvi_for_zoi(
     from waterrejuvenation.utils import get_ndvi_data
 
     if not proj_id:
-        description_zoi = (
-            "cropping_intensity_zoi_" + asset_suffix + "_" + str(start_year)
-        )
+        description_zoi = "cropping_intensity_zoi_" + asset_suffix
         asset_id_zoi = (
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -36,9 +39,7 @@ def get_ndvi_for_zoi(
         )
     else:
 
-        description_zoi = (
-            "cropping_intensity_zoi_" + asset_suffix + "_" + str(start_year)
-        )
+        description_zoi = "cropping_intensity_zoi_" + asset_suffix
         asset_id_zoi = (
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -46,7 +47,7 @@ def get_ndvi_for_zoi(
             + description_zoi
         )
 
-    description_ndvi = "zoi_ndvi_" + asset_suffix
+    description_ndvi = asset_suffix
     ndvi_asset_path = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]

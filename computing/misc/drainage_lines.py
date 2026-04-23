@@ -17,7 +17,10 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     get_gee_dir_path,
 )
-from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
+from utilities.constants import (
+    GEE_PATHS,
+    PAN_INDIA_DRAINAGE_LINES_DATASET,
+)
 from nrm_app.celery import app
 from computing.STAC_specs import generate_STAC_layerwise
 
@@ -35,11 +38,13 @@ def clip_drainage_lines(
     app_type="MWS",
     proj_id=None,
 ):
+    """
+    It will generate drainage line layer for given location at tehsil level
+
+    """
     print("started drainage line")
     ee_initialize(gee_account_id)
-    pan_india_drainage = ee.FeatureCollection(
-        GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
-    )
+    pan_india_drainage = ee.FeatureCollection(PAN_INDIA_DRAINAGE_LINES_DATASET)
     description = ""
     if state and district and block:
         roi = ee.FeatureCollection(
@@ -65,9 +70,9 @@ def clip_drainage_lines(
         state = proj_obj.name
         asset_id = (
             get_gee_dir_path(
-                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+                [proj_obj.name], asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
             )
-            + asset_suffix
+            + description
         )
 
     print(asset_id)
@@ -79,6 +84,7 @@ def clip_drainage_lines(
     print("task_id_list", task_id_list)
     make_asset_public(asset_id)
     layer_at_geoserver = False
+    layer_id = None
     if is_gee_asset_exists(asset_id):
         if state and district and block:
             layer_id = save_layer_info_to_db(

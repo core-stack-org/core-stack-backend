@@ -8,6 +8,7 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, schema
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from utilities.auth_check_decorator import api_security_check
@@ -15,10 +16,37 @@ from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
 
 from .gen_dpr import (
-    create_dpr_document,
-    get_mws_ids_for_report,
     get_plan_details,
-    send_dpr_email,
+)
+from .serializers import (
+    CropSerializer,
+    DPRSummarySerializer,
+    LivelihoodSerializer,
+    LivestockSerializer,
+    MaintenanceSerializer,
+    NRMWorkSerializer,
+    SettlementSerializer,
+    TeamDetailsSerializer,
+    VillageBriefSerializer,
+    WaterbodySerializer,
+    WellSerializer,
+)
+from .services import (
+    get_crops_data,
+    get_dpr_report_status,
+    get_dpr_summary,
+    get_dpr_status_tracking,
+    get_livestock_data,
+    get_livelihood_data,
+    get_maintenance_data,
+    get_nrm_works_data,
+    get_settlements_data,
+    get_team_details,
+    get_village_brief,
+    get_waterbodies_data,
+    get_wells_data,
+    patch_dpr_report_status,
+    update_demand_status,
 )
 from .gen_multi_mws_report import (
     get_cropping_mws_data,
@@ -46,11 +74,11 @@ from .gen_mws_report import (
     get_water_balance_data,
     get_factory_data,
     get_mining_data,
-    get_green_credit_data
+    get_green_credit_data,
 )
 from .gen_tehsil_report import (
-    get_tehsil_data, 
-    get_pattern_intensity, 
+    get_tehsil_data,
+    get_pattern_intensity,
     get_agri_water_stress_data,
     get_agri_water_drought_data,
     get_agri_water_irrigation_data,
@@ -60,10 +88,11 @@ from .gen_tehsil_report import (
     get_socio_economic_caste_data,
     get_socio_economic_nrega_data,
     get_fishery_water_potential_data,
-    get_agroforestry_transition_data
+    get_agroforestry_transition_data,
 )
 from .gen_report_download import render_pdf_with_firefox
-from .utils import validate_email
+from .utils import validate_email, transform_name
+from .tasks import generate_dpr_task
 
 state_param = openapi.Parameter(
     "state",
@@ -104,16 +133,21 @@ authorization_param = openapi.Parameter(
 logger = setup_logger(__name__)
 
 
+# MARK: Generate DPR
 @api_view(["POST"])
-@auth_free
 @schema(None)
+@auth_free
 def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
+        regenerate = request.data.get("regenerate", False)
 
         logger.info(
-            "Generating DPR for plan ID: %s and email ID: %s", plan_id, email_id
+            "Generating DPR for plan ID: %s and email ID: %s (regenerate=%s)",
+            plan_id,
+            email_id,
+            regenerate,
         )
 
         valid_email = validate_email(email_id)
@@ -130,55 +164,13 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        doc = create_dpr_document(plan)
-
-        mws_Ids = get_mws_ids_for_report(plan)
-
-        mws_reports = []
-        successful_mws_ids = []
-
-        state = str(plan.state.state_name).lower().replace(" ", "_")
-        district = str(plan.district.district_name).lower().replace(" ", "_")
-        block = str(plan.block.block_name).lower().replace(" ", "_")
-
-        for ids in mws_Ids:
-            try:
-                report_html_url = (
-                    f"https://geoserver.core-stack.org/api/v1/download_mws_report/"
-                    f"?state={state}&district={district}&block={block}&uid={ids}"
-                )
-                #mws_report = render_pdf_with_firefox(report_html_url)
-                mws_reports.append(report_html_url)
-                successful_mws_ids.append(ids)
-            except Exception as e:
-                logger.error(f"Failed to generate MWS report for ID {ids}: {e}")
-
-        resource_report = None
-        resource_html_url = (
-            f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
-            f"?district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
-        )
-
-        try:
-            resource_report = render_pdf_with_firefox(resource_html_url)
-        except Exception as e:
-            logger.error(f"Failed to generate resource report: {e}")
-
-        send_dpr_email(
-            doc=doc,
-            email_id=email_id,
-            plan_name=plan.plan,
-            mws_reports=mws_reports,
-            mws_Ids=successful_mws_ids,
-            resource_report=resource_report,
-            resource_report_url=resource_html_url,
-        )
+        generate_dpr_task.apply_async(args=[plan_id, email_id, regenerate], queue="dpr")
 
         return Response(
             {
-                "message": f"DPR generated successfully and sent to the email ID: {email_id}"
+                "message": f"DPR generation task initiated and will be sent to the email ID: {email_id}"
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_202_ACCEPTED,
         )
 
     except Exception as e:
@@ -209,6 +201,7 @@ def generate_dpr(request):
         500: openapi.Response(description="Internal Server Error"),
     },
 )
+# MARK: MWS Report
 @api_security_check(auth_type="Auth_free")
 @schema(None)
 def generate_mws_report(request):
@@ -318,11 +311,19 @@ def generate_mws_report(request):
         )
 
         # ? LCW and Industrial Data Description
-        lcw_desc = get_land_conflict_industrial_data(result["state"], result["district"], result["block"], result["uid"])
-        factory_desc = get_factory_data(result["state"], result["district"], result["block"], result["uid"])
-        mining_desc = get_mining_data(result["state"], result["district"], result["block"], result["uid"])
+        lcw_desc = get_land_conflict_industrial_data(
+            result["state"], result["district"], result["block"], result["uid"]
+        )
+        factory_desc = get_factory_data(
+            result["state"], result["district"], result["block"], result["uid"]
+        )
+        mining_desc = get_mining_data(
+            result["state"], result["district"], result["block"], result["uid"]
+        )
 
-        green_credits = get_green_credit_data(result["state"], result["district"], result["block"], result["uid"])
+        green_credits = get_green_credit_data(
+            result["state"], result["district"], result["block"], result["uid"]
+        )
 
         context = {
             "district": result["district"],
@@ -338,7 +339,7 @@ def generate_mws_report(request):
             "urbanization": urbanization,
             "restore_desc": restore_desc,
             "double_crop_des": double_crop_des,
-            "year_range_text" : year_range_text,
+            "year_range_text": year_range_text,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,
@@ -385,10 +386,10 @@ def generate_mws_report(request):
             "wb_years": json.dumps(wb_years),
             "drysp_all": json.dumps(drysp_all),
             "dg_years": json.dumps(dg_years),
-            "lcw_desc" : lcw_desc,
-            "factory_desc" : factory_desc,
-            "mining_desc" : mining_desc,
-            "green_credit_desc" : green_credits
+            "lcw_desc": lcw_desc,
+            "factory_desc": factory_desc,
+            "mining_desc": mining_desc,
+            "green_credit_desc": green_credits,
         }
 
         # print("Api Processing End 1", datetime.now())
@@ -401,8 +402,8 @@ def generate_mws_report(request):
 
 
 @api_view(["GET"])
-@auth_free
 @schema(None)
+@auth_free
 def generate_resource_report(request):
     try:
         # ? district, block, plan_id
@@ -416,7 +417,7 @@ def generate_resource_report(request):
             "district": result["district"],
             "block": result["block"],
             "plan_id": result["plan_id"],
-            "plan_name" : result["plan_name"]
+            "plan_name": result["plan_name"],
         }
 
         return render(request, "resource-report.html", context)
@@ -426,8 +427,8 @@ def generate_resource_report(request):
 
 
 @api_view(["GET"])
-@auth_free
 @schema(None)
+@auth_free
 def download_mws_report(request):
     # Require the usual params, but render from your external domain
     required = ("state", "district", "block", "uid")
@@ -459,61 +460,99 @@ def generate_tehsil_report(request):
 
         for key, value in params.items():
             result[key] = value
-        
+
         # ? OSM description generation
         parameter_block = get_tehsil_data(
             result["state"], result["district"], result["block"]
         )
 
-        #? Pattern intensity
-        mws_pattern_intensity = get_pattern_intensity(result["state"], result["district"], result["block"])
+        # ? Pattern intensity
+        mws_pattern_intensity_with_active_pattern = get_pattern_intensity(
+            result["state"], result["district"], result["block"]
+        )
+
+        mws_pattern_intensity = mws_pattern_intensity_with_active_pattern.get(
+            "intensity", None
+        )
+
+        mws_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "mws_active_patterns", []
+        )
+
+        pattern_display_mapping = mws_pattern_intensity_with_active_pattern.get(
+            "pattern_display_mapping", []
+        )
 
         # ? Agriculture data
-        groundwater_stress = get_agri_water_stress_data(result["state"], result["district"], result["block"])
-        high_drought_incidence, weighted_drought_timeline = get_agri_water_drought_data(result["state"], result["district"], result["block"])
-        high_irrigation_risk, irrigation_timeline = get_agri_water_irrigation_data(result["state"], result["district"], result["block"])
-        low_yield, yield_sankey = get_agri_low_yield_data(result["state"], result["district"], result["block"])
-        forest_degradation, forest_sankey = get_forest_degrad_data(result["state"], result["district"], result["block"])
-        mining_presence, mining_pie = get_mining_presence_data(result["state"], result["district"], result["block"])
-        socio_caste, caste_pie = get_socio_economic_caste_data(result["state"], result["district"], result["block"])
-        socio_nrega, nrega_pie = get_socio_economic_nrega_data(result["state"], result["district"], result["block"])
-        fishery_potential, fishery_timeline = get_fishery_water_potential_data(result["state"], result["district"], result["block"])
-        agroforestry_transition, agroforestry_sankey = get_agroforestry_transition_data(result["state"], result["district"], result["block"])
+        groundwater_stress = get_agri_water_stress_data(
+            result["state"], result["district"], result["block"]
+        )
+        high_drought_incidence, weighted_drought_timeline = get_agri_water_drought_data(
+            result["state"], result["district"], result["block"]
+        )
+        high_irrigation_risk, irrigation_timeline = get_agri_water_irrigation_data(
+            result["state"], result["district"], result["block"]
+        )
+        low_yield, yield_sankey = get_agri_low_yield_data(
+            result["state"], result["district"], result["block"]
+        )
+        forest_degradation, forest_sankey = get_forest_degrad_data(
+            result["state"], result["district"], result["block"]
+        )
+        mining_presence, mining_pie = get_mining_presence_data(
+            result["state"], result["district"], result["block"]
+        )
+        socio_caste, caste_pie = get_socio_economic_caste_data(
+            result["state"], result["district"], result["block"]
+        )
+        socio_nrega, nrega_pie = get_socio_economic_nrega_data(
+            result["state"], result["district"], result["block"]
+        )
+        fishery_potential, fishery_timeline = get_fishery_water_potential_data(
+            result["state"], result["district"], result["block"]
+        )
+        agroforestry_transition, agroforestry_sankey = get_agroforestry_transition_data(
+            result["state"], result["district"], result["block"]
+        )
 
+        # print("Active Patterns", active_pattern)
+        active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "active_patterns", []
+        )
+
+        village_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "village_active_patterns", []
+        )
+
+        # =====================================================
 
         context = {
+            "state": result["state"],
             "district": result["district"],
             "block": result["block"],
             "block_osm": parameter_block,
-
             "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
-
+            "active_pattern": active_pattern,
+            "village_active_pattern": village_active_pattern,
+            "pattern_display_mapping_json": pattern_display_mapping,
+            "mws_active_patterns_json": json.dumps(mws_active_pattern),
             "groundwater_stress_json": json.dumps(groundwater_stress),
-
             "high_drought_incidence_json": json.dumps(high_drought_incidence),
-            "drought_timeline_json" : json.dumps(weighted_drought_timeline),
-
+            "drought_timeline_json": json.dumps(weighted_drought_timeline),
             "high_irrigation_risk_json": json.dumps(high_irrigation_risk),
             "irrigation_timeline_json": json.dumps(irrigation_timeline),
-
             "low_yield_json": json.dumps(low_yield),
             "yield_sankey_json": json.dumps(yield_sankey),
-
             "forest_degradation_json": json.dumps(forest_degradation),
             "forest_sankey_json": json.dumps(forest_sankey),
-
             "mining_presence_json": json.dumps(mining_presence),
             "mining_pie_json": json.dumps(mining_pie),
-
             "socio_caste_json": json.dumps(socio_caste),
             "caste_pie_json": json.dumps(caste_pie),
-
             "socio_nrega_json": json.dumps(socio_nrega),
             "nrega_pie_json": json.dumps(nrega_pie),
-
             "fishery_potential_json": json.dumps(fishery_potential),
             "fishery_timeline_json": json.dumps(fishery_timeline),
-
             "agroforestry_transition_json": json.dumps(agroforestry_transition),
             "agroforestry_sankey_json": json.dumps(agroforestry_sankey),
         }
@@ -523,3 +562,203 @@ def generate_tehsil_report(request):
     except Exception as e:
         logger.exception("Exception in generate_tehsil_report api :: ", e)
         return render(request, "error-page.html", {})
+
+
+# ---------------------------------------------------------------------------
+# DPR Data API
+# ---------------------------------------------------------------------------
+
+VALID_MAINTENANCE_TYPES = {"gw", "agri", "swb", "swb_rs"}
+
+
+class DPRPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+
+def _get_plan_or_404(plan_id):
+    plan = get_plan_details(plan_id)
+    if plan is None:
+        return None, Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+    return plan, None
+
+
+def _paginated_response(request, data, serializer_class):
+    paginator = DPRPagination()
+    page = paginator.paginate_queryset(data, request)
+    serializer = serializer_class(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+# MARK: DPR Summary
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_summary(request, plan_id):
+    plan, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    data = get_dpr_summary(plan_id)
+    data["plan_name"] = plan.plan
+    data["village_name"] = plan.village_name
+    return Response(DPRSummarySerializer(data).data)
+
+
+# MARK: Section A
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_team_details(request, plan_id):
+    plan, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(TeamDetailsSerializer(get_team_details(plan)).data)
+
+
+# MARK: Section B
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_village_brief(request, plan_id):
+    plan, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(VillageBriefSerializer(get_village_brief(plan)).data)
+
+
+# MARK: Section C
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_settlements(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_settlements_data(plan_id), SettlementSerializer)
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_crops(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_crops_data(plan_id), CropSerializer)
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_livestock(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_livestock_data(plan_id), LivestockSerializer)
+
+
+# MARK: Section D
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_wells(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_wells_data(plan_id), WellSerializer)
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_waterbodies(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_waterbodies_data(plan_id), WaterbodySerializer)
+
+
+# MARK: Section E
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_maintenance(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    maintenance_type = request.query_params.get("type", "gw")
+    if maintenance_type not in VALID_MAINTENANCE_TYPES:
+        return Response(
+            {"error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return _paginated_response(request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer)
+
+
+# MARK: Section F
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_nrm_works(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_nrm_works_data(plan_id), NRMWorkSerializer)
+
+
+# MARK: Section G
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_livelihood(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)
+
+
+# MARK: DPR Status Tracking
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_status_tracking(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+    return Response(get_dpr_status_tracking(plan_id))
+
+
+# MARK: DPR Report Workflow Status
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET", "PATCH"])
+@schema(None)
+def dpr_report_status(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+
+    if request.method == "GET":
+        data = get_dpr_report_status(plan_id)
+        if data is None:
+            return Response(
+                {"error": "DPR report not found for this plan"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(data)
+
+    result, error = patch_dpr_report_status(plan_id, request.data, request.user)
+    if error:
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(result)
+
+
+# MARK: Update Demand Status
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["PATCH"])
+@schema(None)
+def dpr_update_demand_status(request, plan_id):
+    _, err = _get_plan_or_404(plan_id)
+    if err:
+        return err
+
+    resource_type = request.data.get("resource_type")
+    resource_id = request.data.get("resource_id")
+    new_status = request.data.get("status")
+
+    if not all([resource_type, resource_id, new_status]):
+        return Response(
+            {"error": "resource_type, resource_id, and status are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    result, error = update_demand_status(plan_id, resource_type, resource_id, new_status)
+    if error:
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+    return Response(result)

@@ -11,7 +11,6 @@ from computing.utils import (
     update_dashboard_geojson,
     sync_project_fc_to_geoserver,
 )
-from constants.pan_india_path import CATCHMENT_AREA, STREAM_ORDER_RASTER
 from geoadmin.models import (
     District,
     State_Disritct_Block_Properties,
@@ -21,7 +20,7 @@ from geoadmin.models import (
 )
 from nrm_app.celery import app
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, STREAM_ORDER_ASSET, CATCHMENT_AREA
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -31,8 +30,14 @@ from utilities.gee_utils import (
     make_asset_public,
     check_task_status,
 )
+from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 
-from waterrejuvenation.utils import calculate_zoi_area, wait_for_task_completion
+from waterrejuvenation.utils import (
+    calculate_zoi_area,
+    wait_for_task_completion,
+    delete_asset_on_GEE,
+)
+from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 
 
 def generate_zoi1(
@@ -44,18 +49,23 @@ def generate_zoi1(
     asset_folder_list=None,
     app_type="MWS",
     gee_account_id=None,
+    proj_id=None,
 ):
     print("insdie zoi")
     ee_initialize(gee_account_id)
-    description = "swb4_" + asset_suffix
+    description = "swb3_" + asset_suffix
     asset_id = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + description
     )
-
-    roi = ee.FeatureCollection(asset_id)
+    if roi:
+        print("inside roi")
+        print(roi)
+        roi = ee.FeatureCollection(roi)
+    else:
+        roi = ee.FeatureCollection(asset_id)
     description_zoi = "zoi_" + asset_suffix
     asset_id_zoi = (
         get_gee_dir_path(
@@ -63,7 +73,9 @@ def generate_zoi1(
         )
         + description_zoi
     )
-
+    delete_asset_on_GEE(asset_id_zoi)
+    start_date = "2017-07-01"
+    end_date = "2025-06-30"
     zoi_fc = roi.map(compute_zoi)
     zoi_fc = ee.FeatureCollection(zoi_fc)
     zoi_rings = zoi_fc.filter(ee.Filter.gt("zoi_wb", 0)).map(create_ring)
@@ -71,6 +83,24 @@ def generate_zoi1(
         zoi_task = export_vector_asset_to_gee(zoi_rings, description_zoi, asset_id_zoi)
         check_task_status([zoi_task])
         make_asset_public(asset_id_zoi)
+    if state and district and block:
+        layer_name = f"waterbodies_zoi_{asset_suffix}"
+        print(layer_name)
+        layer_at_geoserver = sync_asset_to_db_and_geoserver(
+            asset_id_zoi,
+            layer_name,
+            asset_suffix,
+            start_date,
+            end_date,
+            state,
+            district,
+            block,
+        )
+    else:
+        proj_obj = Project.objects.get(pk=proj_id)
+        layer_name = f"waterbodies_zoi_{asset_suffix}"
+        print(layer_name)
+        sync_project_fc_to_geoserver(zoi_rings, proj_obj.name, layer_name, "zoi_layers")
 
 
 def compute_zoi(feature):

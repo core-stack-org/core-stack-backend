@@ -3,8 +3,9 @@ from computing.zoi_layers.zoi2 import generate_zoi_ci
 from computing.zoi_layers.zoi3 import get_ndvi_for_zoi
 from projects.models import Project
 from utilities.gee_utils import ee_initialize, valid_gee_text, check_task_status
-from waterrejuvenation.utils import wait_for_task_completion
+from waterrejuvenation.utils import wait_for_task_completion, delete_asset_on_GEE
 from nrm_app.celery import app
+
 
 @app.task()
 def generate_zoi(
@@ -18,7 +19,7 @@ def generate_zoi(
     gee_account_id=None,
     proj_id=None,
 ):
-    print (f"gee account id {gee_account_id}")
+    print(f"gee account id {gee_account_id}")
     ee_initialize(gee_account_id)
     if state and district and block:
         asset_suffix = (
@@ -39,6 +40,7 @@ def generate_zoi(
         asset_folder_list,
         app_type,
         gee_account_id,
+        proj_id,
     )
 
     generate_zoi_ci(
@@ -49,15 +51,18 @@ def generate_zoi(
         asset_folder_list,
         app_type,
         gee_account_id,
+        proj_id,
     )
 
-    get_ndvi_for_zoi(
-        state=state,
-        district=district,
-        block=block,
-        asset_suffix=asset_suffix,
-        asset_folder_list=asset_folder_list,
-        app_type=app_type,
-        gee_account_id=gee_account_id,
-        proj_id=proj_id,
-    )
+    if proj_id:
+
+        get_ndvi_for_zoi(
+            state=state,
+            district=district,
+            block=block,
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+            gee_account_id=gee_account_id,
+            proj_id=proj_id,
+        )

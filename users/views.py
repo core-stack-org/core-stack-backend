@@ -1,18 +1,29 @@
 import logging
 
+from django.conf import settings
 from django.contrib.auth.models import Group
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.shortcuts import render
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.views import View
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from organization.models import Organization
 from projects.models import Project
+from utilities.mailutils import send_email
 
 from .models import User, UserProjectGroup
 from .serializers import (
+    AdminResetPasswordSerializer,
+    ForgotPasswordSerializer,
     GroupSerializer,
     PasswordChangeSerializer,
     UserProjectGroupSerializer,
@@ -39,7 +50,9 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
             organizations = Organization.objects.all().order_by("name")
         else:
             organizations = (
-                Organization.objects.filter(projects__app_type=app_type)
+                Organization.objects.filter(
+                    projects__app_type=app_type, projects__enabled=True
+                )
                 .distinct()
                 .order_by("name")
             )
@@ -255,6 +268,30 @@ class UserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], permission_classes=[IsSuperAdminOrOrgAdmin])
+    def reset_password(self, request, pk=None):
+        target_user = self.get_object()
+
+        if not request.user.is_superadmin:
+            if target_user.organization != request.user.organization:
+                return Response(
+                    {"detail": "You can only reset passwords for users in your organization."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        serializer = AdminResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        target_user.set_password(serializer.validated_data["new_password"])
+        target_user.save()
+
+        OutstandingToken.objects.filter(user=target_user).delete()
+
+        return Response(
+            {"detail": f"Password for {target_user.username} has been reset successfully."},
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=["put"])
     def set_organization(self, request, pk=None):
         """Assign user to an organization."""
@@ -396,12 +433,16 @@ class UserViewSet(viewsets.ModelViewSet):
                         "description": upg.project.description,
                         "app_type": upg.project.app_type,
                         "enabled": upg.project.enabled,
-                        "organization": str(upg.project.organization.id)
-                        if upg.project.organization
-                        else None,
-                        "organization_name": upg.project.organization.name
-                        if upg.project.organization
-                        else None,
+                        "organization": (
+                            str(upg.project.organization.id)
+                            if upg.project.organization
+                            else None
+                        ),
+                        "organization_name": (
+                            upg.project.organization.name
+                            if upg.project.organization
+                            else None
+                        ),
                     },
                     "role": {"id": upg.group.id, "name": upg.group.name},
                 }
@@ -533,3 +574,99 @@ class UserProjectGroupViewSet(viewsets.ModelViewSet):
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
+
+
+password_reset_token_generator = PasswordResetTokenGenerator()
+
+
+class ForgotPasswordView(APIView):
+    permission_classes = [permissions.AllowAny]
+    schema = None
+
+    GENERIC_MSG = "If a matching account exists and has an email on file, a password reset link has been sent."
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        username = serializer.validated_data["username"]
+        provided_email = serializer.validated_data.get("email")
+
+        user = User.objects.filter(username=username).first()
+        if user is None:
+            return Response({"detail": self.GENERIC_MSG}, status=status.HTTP_200_OK)
+
+        target_email = user.email
+        if not target_email:
+            if not provided_email:
+                return Response(
+                    {"detail": "No email address on file for this account. Please provide an email to receive the reset link.",
+                     "email_required": True},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            user.email = provided_email
+            user.save(update_fields=["email"])
+            target_email = provided_email
+
+        token = password_reset_token_generator.make_token(user)
+        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+        reset_url = request.build_absolute_uri(
+            f"/api/v1/auth/reset-password/{uidb64}/{token}/"
+        )
+
+        html_body = render(
+            request, "password_reset_email.html",
+            {"user": user, "reset_url": reset_url},
+        ).content.decode()
+
+        send_email(
+            subject="Password Reset Request - CoRE Stack",
+            text_body=f"Hi {user.first_name or user.username},\n\nClick the link to reset your password:\n{reset_url}\n\nIf you did not request this, ignore this email.",
+            to_emails=[target_email],
+            html_body=html_body,
+        )
+
+        return Response({"detail": self.GENERIC_MSG}, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(View):
+
+    def _get_user(self, uidb64):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            return User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return None
+
+    def get(self, request, uidb64, token):
+        user = self._get_user(uidb64)
+        if user is None or not password_reset_token_generator.check_token(user, token):
+            return render(request, "password_reset_invalid.html", status=400)
+        return render(request, "password_reset.html", {"uidb64": uidb64, "token": token})
+
+    def post(self, request, uidb64, token):
+        user = self._get_user(uidb64)
+        if user is None or not password_reset_token_generator.check_token(user, token):
+            return render(request, "password_reset_invalid.html", status=400)
+
+        new_password = request.POST.get("new_password", "")
+        confirm_password = request.POST.get("confirm_password", "")
+
+        if not new_password or len(new_password) < 8:
+            return render(request, "password_reset.html", {
+                "uidb64": uidb64, "token": token,
+                "error": "Password must be at least 8 characters long.",
+            })
+
+        if new_password != confirm_password:
+            return render(request, "password_reset.html", {
+                "uidb64": uidb64, "token": token,
+                "error": "Passwords do not match.",
+            })
+
+        user.set_password(new_password)
+        user.save()
+
+        OutstandingToken.objects.filter(user=user).delete()
+
+        return render(request, "password_reset_done.html")

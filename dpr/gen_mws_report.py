@@ -14,19 +14,12 @@ from scipy.spatial.distance import jensenshannon
 
 from .models import Overpass_Block_Details
 
-from nrm_app.settings import GEOSERVER_URL
-from nrm_app.settings import OVERPASS_URL
+from nrm_app.settings import EXCEL_DIR, GEOSERVER_URL, OVERPASS_URL
 from utilities.logger import setup_logger
-import environ
-
-env = environ.Env()
-# reading .env file
-environ.Env.read_env()
 
 logger = setup_logger(__name__)
 
-# TODO: fix the path issue <> shiv and ksheetiz
-DATA_DIR_TEMP = env("EXCEL_DIR")
+DATA_DIR_TEMP = EXCEL_DIR
 
 
 # ? MARK: HELPER FUNCTIONS
@@ -321,8 +314,6 @@ def get_osm_data(state, district, block, uid):
             except Exception as e:
                 logger.info("Not able to fetch the Overpass API Info", e)
 
-        #print("Data Processing", datetime.now())
-        
         # dictionary for storage
         names = {
             "Forests": [],
@@ -732,15 +723,13 @@ def get_osm_data(state, district, block, uid):
             large_reservoirs = [res for res in final_data["reservoirs"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
             
             if large_lakes or large_reservoirs:
-                rname = [temp["name"] for temp in large_lakes]
-                rname += [temp["name"] for temp in large_reservoirs]
-                rarea = [
-                    str(round(temp["area_sq_m"] / 10000, 1)) for temp in large_lakes
-                ]
-                rarea += [
-                    str(round(temp["area_sq_m"] / 10000, 1))
-                    for temp in large_reservoirs
-                ]
+                # Combine, sort by area descending, cap at 5
+                combined_water_bodies = large_lakes + large_reservoirs
+                combined_water_bodies = sorted(combined_water_bodies, key=lambda x: x["area_sq_m"], reverse=True)[:5]
+
+                rname = [temp["name"] for temp in combined_water_bodies]
+                rarea = [str(round(temp["area_sq_m"] / 10000, 1)) for temp in combined_water_bodies]
+
 
                 parameter_block += f". Additionally, large water bodies such as "
                 if len(rname) == 1:
@@ -816,16 +805,12 @@ def get_osm_data(state, district, block, uid):
             large_reservoirs_mws = [res for res in final_data["reservoirs_mws"] if res["area_sq_m"] >= MIN_AREA_THRESHOLD]
             
             if large_lakes_mws or large_reservoirs_mws:
-                rname = [temp["name"] for temp in large_lakes_mws]
-                rname += [temp["name"] for temp in large_reservoirs_mws]
-                rarea = [
-                    str(round(temp["area_sq_m"] / 10000, 1))
-                    for temp in large_lakes_mws
-                ]
-                rarea += [
-                    str(round(temp["area_sq_m"] / 10000, 1))
-                    for temp in large_reservoirs_mws
-                ]
+                # Combine, sort by area descending, cap at 5
+                combined_water_bodies_mws = large_lakes_mws + large_reservoirs_mws
+                combined_water_bodies_mws = sorted(combined_water_bodies_mws, key=lambda x: x["area_sq_m"], reverse=True)[:5]
+
+                rname = [temp["name"] for temp in combined_water_bodies_mws]
+                rarea = [str(round(temp["area_sq_m"] / 10000, 1)) for temp in combined_water_bodies_mws]
 
                 parameter_mws += f". Additionally, large water bodies such as "
                 if len(rname) == 1:
@@ -1741,15 +1726,16 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                         if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
                             area_under_rb_nd += yearly_area_rb[0][0]
 
-                if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd ) * 100
+                # Handle division by zero for non-drought years
+                if area_under_kh_nd > 0:
+                    percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd) * 100
 
                     if result.trend == "increasing":
-                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh,2)}% from the Kharif to the Rabi season."
+                        parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh, 2)}% from the Kharif to the Rabi season."
                     elif result.trend == "decreasing":
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
                     else:
-                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh,2)}% in rabi."
+                        parameter_swb_3 += f"In non-drought years, surface water in kharif typically decreases by {round(percent_rb_kh, 2)}% in rabi."
 
             if len(drought_years):
                 area_under_rb = 0
@@ -1770,16 +1756,17 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                         if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
                             area_under_rb += yearly_area_rb[0][0]
                 
-                if area_under_kh_nd:
-                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh ) * 100
+                # Handle division by zero for drought years
+                if area_under_kh > 0:
+                    percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh) * 100
 
-                if result.trend == "increasing":
-                    parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh,2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                elif result.trend == "decreasing":
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                else:
-                    parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh,2)} % from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-
+                    if result.trend == "increasing":
+                        parameter_swb_3 += f" However, during drought years, this reduction reaches {round(percent_rb_kh, 2)}% from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    elif result.trend == "decreasing":
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                    else:
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+ 
             # ? Data yearwise for waterbody
             selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
             selected_columns_rabi = [col for col in df.columns if col.startswith("rabi_area_in_ha_")]
@@ -1911,6 +1898,7 @@ def get_water_balance_data(state, district, block, uid):
                     non_drought_years.append(match_exp.group(0))
 
 
+
         #? Good Rainfall Years
         if len(non_drought_years):
 
@@ -1923,30 +1911,58 @@ def get_water_balance_data(state, district, block, uid):
 
                 #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
-                rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
-                avg_rainfall += rainfall[0]
+                if selected_column_precp:
+                    rainfall_data = df.loc[df["UID"] == uid, selected_column_precp].values
+                    if len(rainfall_data) > 0 and len(rainfall_data[0]) > 0:
+                        rainfall = rainfall_data[0][0]
+                        avg_rainfall += rainfall
+                    else:
+                        continue  # Skip this year if no rainfall data
+                else:
+                    continue
 
                 #? Monsoon Onset
                 selected_column_onset = [col for col in df_drought.columns if col.startswith("monsoon_onset_" + year)]
-                onset = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values[0]
-                monsoon_onset.append(onset[0])
+                if selected_column_onset:
+                    onset_data = df_drought.loc[df_drought["UID"] == uid, selected_column_onset].values
+                    if len(onset_data) > 0 and len(onset_data[0]) > 0:
+                        onset = onset_data[0][0]
+                        monsoon_onset.append(onset)
 
                 #? Fortnight Delg Calc
                 selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
                 selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
                 selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
-                delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
-                delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
-                delg_zd = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values[0]
+                delg_kh_val = 0
+                delg_rb_val = 0
+                delg_zd_val = 0
 
-                avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
+                if selected_column_kh:
+                    delg_kh_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values
+                    if len(delg_kh_data) > 0 and len(delg_kh_data[0]) > 0:
+                        delg_kh_val = delg_kh_data[0][0]
+
+                if selected_column_rb:
+                    delg_rb_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values
+                    if len(delg_rb_data) > 0 and len(delg_rb_data[0]) > 0:
+                        delg_rb_val = delg_rb_data[0][0]
+
+                if selected_column_zd:
+                    delg_zd_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values
+                    if len(delg_zd_data) > 0 and len(delg_zd_data[0]) > 0:
+                        delg_zd_val = delg_zd_data[0][0]
+
+                avg_fortnight_delg += (delg_kh_val + delg_rb_val + delg_zd_val)
 
                 #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
-                runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
-
-                runoff_percent += ((runoff[0] / rainfall[0]) * 100)
+                if selected_column_runoff:
+                    runoff_data = df.loc[df["UID"] == uid, selected_column_runoff].values
+                    if len(runoff_data) > 0 and len(runoff_data[0]) > 0:
+                        runoff = runoff_data[0][0]
+                        if rainfall > 0:  # Avoid division by zero
+                            runoff_percent += ((runoff / rainfall) * 100)
             
             avg_rainfall = avg_rainfall / len(non_drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(non_drought_years)
@@ -1982,25 +1998,51 @@ def get_water_balance_data(state, district, block, uid):
 
                 #? Rainfall
                 selected_column_precp = [col for col in df.columns if col.startswith("Precipitation_in_mm_" + year)]
-                rainfall = df.loc[df["UID"] == uid, selected_column_precp].values[0]
-                avg_rainfall += rainfall[0]
+                rainfall = None
+                if selected_column_precp:
+                    rainfall_data = df.loc[df["UID"] == uid, selected_column_precp].values
+                    if len(rainfall_data) > 0 and len(rainfall_data[0]) > 0:
+                        rainfall = rainfall_data[0][0]
+                        avg_rainfall += rainfall
+                    else:
+                        continue  # Skip this year if no rainfall data
+                else:
+                    continue
 
                 #? Fortnight Delg Calc
                 selected_column_kh = [col for col in df_seasonal.columns if col.startswith("delta g_kharif_in_mm_" + year)]
                 selected_column_rb = [col for col in df_seasonal.columns if col.startswith("delta g_rabi_in_mm_" + year)]
                 selected_column_zd = [col for col in df_seasonal.columns if col.startswith("delta g_zaid_in_mm_" + year)]
 
-                delg_kh = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values[0]
-                delg_rb = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values[0]
-                delg_zd = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values[0]
+                delg_kh_val = 0
+                delg_rb_val = 0
+                delg_zd_val = 0
 
-                avg_fortnight_delg += (delg_kh[0] + delg_rb[0] + delg_zd[0])
+                if selected_column_kh:
+                    delg_kh_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_kh].values
+                    if len(delg_kh_data) > 0 and len(delg_kh_data[0]) > 0:
+                        delg_kh_val = delg_kh_data[0][0]
+
+                if selected_column_rb:
+                    delg_rb_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_rb].values
+                    if len(delg_rb_data) > 0 and len(delg_rb_data[0]) > 0:
+                        delg_rb_val = delg_rb_data[0][0]
+
+                if selected_column_zd:
+                    delg_zd_data = df_seasonal.loc[df_seasonal["UID"] == uid, selected_column_zd].values
+                    if len(delg_zd_data) > 0 and len(delg_zd_data[0]) > 0:
+                        delg_zd_val = delg_zd_data[0][0]
+
+                avg_fortnight_delg += (delg_kh_val + delg_rb_val + delg_zd_val)
 
                 #? Runoff
                 selected_column_runoff = [col for col in df.columns if col.startswith("RunOff_in_mm_" + year)]
-                runoff = df.loc[df["UID"] == uid, selected_column_runoff].values[0]
-
-                runoff_percent += ((runoff[0] / rainfall[0]) * 100)
+                if selected_column_runoff and rainfall is not None:
+                    runoff_data = df.loc[df["UID"] == uid, selected_column_runoff].values
+                    if len(runoff_data) > 0 and len(runoff_data[0]) > 0:
+                        runoff = runoff_data[0][0]
+                        if rainfall > 0:  # Avoid division by zero
+                            runoff_percent += ((runoff / rainfall) * 100)
 
             avg_rainfall = avg_rainfall / len(drought_years)
             avg_fortnight_delg = avg_fortnight_delg / len(drought_years)

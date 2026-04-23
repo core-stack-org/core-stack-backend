@@ -34,11 +34,11 @@ def crop_grids_lulc(state, district, block):
 
     # Generate crop tiles
     description = (
-            "crop_gridXlulc_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_with_uid_16ha"
+        "crop_gridXlulc_"
+        + valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_with_uid_16ha"
     )
 
     asset_id = get_gee_asset_path(state, district, block) + description
@@ -68,6 +68,8 @@ def crop_grids_lulc(state, district, block):
             crop_tiles, state, layer_name, workspace="crop_grid_layers"
         )
         if res["status_code"] == 201 and layer_id:
+
+            # update flag in db whether layer sync to geoserver or not
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True

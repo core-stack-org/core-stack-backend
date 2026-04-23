@@ -12,6 +12,7 @@ from .api import (
     get_merged_waterbodies_with_zoi,
     get_waterbodies_by_admin_and_uid,
     get_waterbodies_by_uid,
+    generate_result_excel,
 )
 
 # Nested router registration (unchanged)
@@ -38,5 +39,10 @@ urlpatterns = [
         "get_waterbody_data/",
         get_waterbodies_by_uid,
         name="generate_waterbodies_data",
+    ),
+    path(
+        "get_uploaded_result/",
+        generate_result_excel,
+        name="genereate_result_uploaded_excel",
     ),
 ]

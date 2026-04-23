@@ -1,9 +1,10 @@
 import ee
+from utilities.constants import FABDEM
 
 
 def generate_terrain_classified_raster(feature):
     # dem = ee.Image("USGS/SRTMGL1_003")
-    fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
+    fabdem = ee.ImageCollection(FABDEM)
     dem = (
         fabdem.mosaic().setDefaultProjection("EPSG:3857", None, 30).rename("elevation")
     )

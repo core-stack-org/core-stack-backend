@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, CATCHMENT_AREA
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -18,7 +18,6 @@ from utilities.gee_utils import (
     make_asset_public,
     get_gee_dir_path,
 )
-from constants.pan_india_urls import CATCHMETN_AREA
 
 
 @app.task(bind=True)
@@ -34,6 +33,9 @@ def generate_catchment_area_singleflow(
     asset_folder=None,
     app_type="MWS",
 ):
+    """
+    It will generate catchment layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     if state and district and block:
         description = (
@@ -55,7 +57,7 @@ def generate_catchment_area_singleflow(
 
     else:
         roi_boundary = ee.FeatureCollection(roi_path)
-        description = "catchment_area_" + asset_suffix
+        description = "catchment_area_" + asset_suffix + "_raster"
 
         asset_id = (
             get_gee_dir_path(
@@ -64,7 +66,7 @@ def generate_catchment_area_singleflow(
             + description
         )
 
-    catchment_area_raster = ee.Image(CATCHMETN_AREA)
+    catchment_area_raster = ee.Image(CATCHMENT_AREA)
     raster = catchment_area_raster.clip(roi_boundary.geometry())
 
     # Generate raster Layer

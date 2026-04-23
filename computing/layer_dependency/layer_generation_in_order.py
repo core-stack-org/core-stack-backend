@@ -1,5 +1,4 @@
 from nrm_app.celery import app
-import json
 from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
 from computing.mws.mws import mws_layer
@@ -45,10 +44,16 @@ from computing.misc.factory_csr import generate_factory_csr_data
 from computing.misc.green_credit import generate_green_credit_data
 from computing.misc.mining_data import generate_mining_data
 from computing.plantation.site_suitability import site_suitability
+from computing.mws.mws_connectivity import generate_mws_connectivity_data
+from computing.misc.ndvi_time_series import ndvi_timeseries
+from computing.zoi_layers.zoi import generate_zoi
+from computing.misc.facilities_proximity import generate_facilities_proximity_task
+from computing.mws.mws_centroid import generate_mws_centroid_data
 from utilities.gee_utils import valid_gee_text
-from .layer_map import *
+import os
 from nrm_app.celery import app
 from computing.models import Layer
+import json
 
 status = {}
 
@@ -88,8 +93,14 @@ def layer_generate_map(
     if end_year:
         global_args["end_year"] = end_year
 
+    # Load JSON configuration
+    map_config = load_map_config(map_order)
+
+    if not map_config:
+        return f"Map configuration not found for {map_order}"
+
     # triggering map at parent level
-    for func in eval(map_order):
+    for func in map_config:
         parent_function = func["name"]
         parent_func = globals().get(parent_function)
         args = get_args(
@@ -151,6 +162,77 @@ def layer_generate_map(
     return f"{status = }"
 
 
+def load_map_config(map_order):
+    """
+    Load map configuration from JSON file based on map_order.
+    """
+    config_path = os.path.join("data", "layers", "layer_dependency", "layer_map.json")
+    with open(config_path, "r") as f:
+        all_configs = json.load(f)
+    return all_configs.get(map_order, [])
+
+
+def load_end_year_rules():
+    """
+    Load end year rules from JSON.
+    """
+    config_path = os.path.join(
+        "data", "layers", "layer_dependency", "end_year_rules.json"
+    )
+    with open(config_path, "r") as f:
+        return json.load(f)
+
+
+# check the dependency layer is available or not
+class DependencyValidator:
+
+    @staticmethod
+    def clip_lulc_v3(district, block):
+        return (
+            Layer.objects.filter(
+                layer_name__icontains=f"{valid_gee_text(district)}_{valid_gee_text(block)}_level_"
+            ).count()
+            == 24
+        )
+
+    @staticmethod
+    def terrain_raster(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_terrain_raster"
+        ).exists()
+
+    @staticmethod
+    def generate_catchment_area_singleflow(district, block):
+        return Layer.objects.filter(
+            layer_name=f"catchment_area_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
+        ).exists()
+
+    @staticmethod
+    def generate_stream_order(district, block):
+        return Layer.objects.filter(
+            layer_name=f"stream_order_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector"
+        ).exists()
+
+    @staticmethod
+    def clip_drainage_lines(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+            dataset__name="Drainage",
+        ).exists()
+
+    @staticmethod
+    def generate_cropping_intensity(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_intensity"
+        ).exists()
+
+    @staticmethod
+    def generate_swb_layer(district, block):
+        return Layer.objects.filter(
+            layer_name=f"surface_waterbodies_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        ).exists()
+
+
 def run_layer_with_dependency(
     deps, node_func_name, node_func_obj, state, district, block, args
 ):
@@ -158,15 +240,9 @@ def run_layer_with_dependency(
     This function checks dependency of layer if it is generated or not and call the pipeline functions and maintain status of each function,
     """
     for dep in deps:
-        if dep == "clip_lulc_v3":
-            l = Layer.objects.filter(
-                layer_name__icontains=f"_{valid_gee_text(block.lower())}_level_"
-            )
-            if len(l) == 21:
-                status[dep] = True
-            else:
-                status[dep] = False
-        if not status.get(dep, False):
+        checker = getattr(DependencyValidator, dep, None)
+        status[dep] = checker(district, block) if checker else False
+        if not status[dep]:
             print(
                 f"Skipping {node_func_name} because dependency {dep} failed or not executed."
             )
@@ -174,13 +250,16 @@ def run_layer_with_dependency(
             break
     else:
         try:
+            end_year_rules = load_end_year_rules()
             if node_func_name in end_year_rules:
                 args["end_year"] = end_year_rules[node_func_name]
+            if node_func_name == "site_suitability":
+                args["project_id"] = None
             print(
                 f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
             )
             result = (
-                node_func_obj(state, district, block, **args)
+                node_func_obj(state=state, district=district, block=block, **args)
                 if args
                 else node_func_obj(state, district, block)
             )

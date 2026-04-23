@@ -31,6 +31,11 @@ class UserSerializer(serializers.ModelSerializer):
             "groups",
             "project_details",
             "is_superadmin",
+            "age",
+            "education_qualification",
+            "gender",
+            "profile_picture",
+            "account_type",
         ]
         read_only_fields = ["id", "is_active"]
 
@@ -90,6 +95,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "last_name",
             "contact_number",
             "organization",
+            "age",
+            "education_qualification",
+            "gender",
+            "profile_picture",
+            "account_type",
         ]
         read_only_fields = ["id"]
 
@@ -154,6 +164,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             first_name=validated_data.get("first_name", ""),
             last_name=validated_data.get("last_name", ""),
             contact_number=validated_data.get("contact_number", ""),
+            age=validated_data.get("age"),
+            education_qualification=validated_data.get("education_qualification", ""),
+            gender=validated_data.get("gender", ""),
+            profile_picture=validated_data.get("profile_picture"),
+            account_type=validated_data.get("account_type"),
         )
 
         if org_obj:
@@ -164,7 +179,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
                 created_by=user,  # <-- here we set created_by to the same new user
             )
             user.organization = org_obj
-
         user.save()
         return user
 
@@ -204,6 +218,17 @@ class UserProjectGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProjectGroup
         fields = ["id", "user_id", "username", "group_id", "group_name", "project_id"]
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=False)
+
+
+class AdminResetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(
+        required=True, write_only=True, validators=[validate_password]
+    )
 
 
 class PasswordChangeSerializer(serializers.Serializer):
