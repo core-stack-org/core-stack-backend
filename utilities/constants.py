@@ -161,7 +161,7 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 # MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
-GEE_LITHOLOGY_ASSET_PATH = f"projects/ee-corestackdev/assets/apps/mws/"
+GEE_LITHOLOGY_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
 GEE_ASSET_PATH = f"projects/{GEE_STORAGE_PROJECT}/assets/apps/mws/"
 GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
@@ -298,9 +298,9 @@ WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
 SOI_TEHSIL = "data/admin-boundary/input/soi_tehsil.geojson"
 FABDEM = "projects/sat-io/open-datasets/FABDEM"
-WATERREJUVENATION = f"projects/ee-corestackdev/assets/apps/waterrej/proj1"
-WATERREJ_LULCFORM = f"projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
-WATER_REJ_GEE_ASSET = f"projects/ee-corestackdev/assets/apps/waterbody/"
+WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
+WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
+WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
 PAN_INDIA_LULC_V3_DATASET = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
 )
@@ -316,7 +316,7 @@ NATURAL_DEPRESSION = (
     "projects/corestack-datasets/assets/datasets/Natural_depression_raster"
 )
 CATCHMENT_AREA = "projects/ext-datasets/assets/datasets/catchment_area_singleflow"
-PAN_INDIA_LULC_PATH = f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
 # CRS
 CRS_4326 = "EPSG:4326"
 
