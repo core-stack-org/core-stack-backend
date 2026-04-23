@@ -7,16 +7,12 @@ from nrm_app.settings import (
     BASE_DIR,
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
-    GEE_SERVICE_ACCOUNT_KEY_PATH,
     GEE_DEFAULT_ACCOUNT_ID,
     GEE_HELPER_ACCOUNT_ID,
     FERNET_KEY,
-)
-from utilities.constants import (
-    GEE_ASSET_PATH,
     GCS_BUCKET_NAME,
-    GEE_PATHS,
 )
+from utilities.constants import GEE_ASSET_PATH
 import ee, geetools
 import time
 import re
@@ -874,7 +870,7 @@ def upload_shp_to_gee(
             upload_file_to_gcs(component_path, dest_blob)
 
     # GCS URI to the shapefile
-    gcs_uri = f"gs://core_stack/{gcs_blob_name}"
+    gcs_uri = f"gs://{GCS_BUCKET_NAME}/{gcs_blob_name}"
 
     # Upload from GCS to GEE
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id)

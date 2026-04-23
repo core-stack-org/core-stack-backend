@@ -2,6 +2,7 @@ import requests
 from nrm_app.settings import GEOSERVER_URL
 from utilities.gee_utils import valid_gee_text
 import xml.etree.ElementTree as ET
+from lxml import etree as LET
 from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
@@ -54,6 +55,7 @@ def layer_status(self, state, district, block):
     """
     print(f"{state=}")
     all_workspace_statuses = {}
+    capabilities_cache = {}
     district = valid_gee_text(district.lower())
     block = valid_gee_text(block.lower())
 
@@ -98,18 +100,28 @@ def layer_status(self, state, district, block):
                     print(f"Invalid XML for layer: {layer_name}")
                     status_code = 400
         else:
-            capabilities_url = (
-                f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
-            )
-            response = requests.get(capabilities_url)
-            if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                ns = {"wms": root.tag.split("}")[0].strip("{")}
-                layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
-                available_layers = {layer.text for layer in layers}
+            if workspace not in capabilities_cache:
+                capabilities_url = f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
+                try:
+                    response = requests.get(capabilities_url, timeout=30)
+                    if response.status_code == 200:
+                        parser = LET.XMLParser(recover=True, encoding="utf-8")
+                        root = LET.fromstring(response.content, parser=parser)
+                        ns = {"wms": root.tag.split("}")[0].strip("{")}
+                        layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
+                        capabilities_cache[workspace] = {
+                            layer.text for layer in layers if layer.text
+                        }
+                    else:
+                        capabilities_cache[workspace] = set()
+                except Exception as e:
+                    print(
+                        f"Failed to fetch capabilities for workspace {workspace}: {e}"
+                    )
+                    capabilities_cache[workspace] = set()
 
-                if layer_name in available_layers:
-                    status_code = 200
+            if layer_name in capabilities_cache.get(workspace, set()):
+                status_code = 200
         all_workspace_statuses[workspace_display] = {
             "workspace": workspace,
             "layer_name": layer_name,
@@ -189,6 +201,55 @@ def get_layers_of_workspace(self, workspace):
         return []
 
 
+def check_missing_layers(workspace):
+    missing_layers = []
+    print(f"{workspace=}")
+    workspace_config = load_workspace_config()
+    workspace_types = get_workspace_types(workspace)
+    print(f"Found types: {workspace_types}")
+    if not workspace_types:
+        print(f"No config found for workspace: {workspace}")
+        return {"no config found": []}
+    layer_config = get_layer_config_by_type(
+        workspace_config, workspace, workspace_types
+    )
+    # fetch raster layers once
+    available_raster_layers = valid_raster_layers_for_workspace(workspace)
+    count = 0
+    active_tehsils = TehsilSOI.objects.filter(active_status=True)
+    for tehsil in active_tehsils:
+        state = tehsil.district.state.state_name
+        district = tehsil.district.district_name
+        tehsil = tehsil.tehsil_name
+        district_name = valid_gee_text(district.lower())
+        tehsil_name = valid_gee_text(tehsil.lower())
+        for layer_type, config in layer_config.items():
+            prefix = config.get("prefix")
+            suffix = config.get("suffix")
+            layer_name_parts = [
+                prefix,
+                district_name,
+                tehsil_name,
+                suffix,
+            ]
+            layer_name = "_".join(part for part in layer_name_parts if part)
+            # raster check
+            if layer_type == "raster":
+                count += 1
+                if layer_name not in available_raster_layers:
+                    missing_layers.append(state + " " + layer_name)
+
+            # vector check
+            elif layer_type == "vector":
+                count += 1
+                is_valid = is_valid_vector_layer(workspace, layer_name)
+
+                if not is_valid:
+                    missing_layers.append(state + " " + layer_name)
+
+    return {"missing_layers": missing_layers, "layer_count": count}
+
+
 def valid_raster_layers_for_workspace(workspace):
     """
 
@@ -228,3 +289,41 @@ def is_valid_vector_layer(workspace, layer_name):
         root = ET.fromstring(res_layer_url.text)
         total_features = int(root.attrib.get("numberOfFeatures", 0))
         return True if total_features > 0 else False
+
+
+def get_workspace_types(workspace_name):
+    """
+    Return all layer types for a given workspace name from DB.
+    Example: ['raster', 'vector']
+    """
+    return list(
+        Dataset.objects.filter(workspace=workspace_name)
+        .values_list("layer_type", flat=True)
+        .distinct()
+    )
+
+
+def get_layer_config_by_type(workspace_config, workspace_name, layer_types):
+    """
+    Return prefix and suffix for each layer type.
+
+    Args:
+        workspace_config (dict): config JSON
+        workspace_name (str): dataset name
+        layer_types (list): ['raster', 'vector']
+
+    Returns:
+        dict
+    """
+    result = {}
+
+    for config in workspace_config.values():
+        if config.get("name") == workspace_name and config.get("type") in layer_types:
+            layer_type = config["type"]
+
+            result[layer_type] = {
+                "prefix": config.get("prefix"),
+                "suffix": config.get("suffix"),
+            }
+
+    return result

@@ -700,7 +700,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         steward_by_org = []
         if not organization_id:
             org_steward_stats = (
-                steward_queryset.values("organization", "organization__name")
+                steward_queryset.exclude(organization__name__iexact="CFPT")
+                .values("organization", "organization__name")
                 .annotate(steward_count=Count("facilitator_name", distinct=True))
                 .order_by("-steward_count")
             )
@@ -720,7 +721,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         if not organization_id:
             org_stats = (
-                base_queryset.values("organization", "organization__name")
+                base_queryset.exclude(organization__name__iexact="CFPT")
+                .values("organization", "organization__name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -1450,7 +1452,8 @@ class PlanViewSet(viewsets.ModelViewSet):
         total_stewards = steward_queryset.values("facilitator_name").distinct().count()
 
         steward_by_org = (
-            steward_queryset.values("organization", "organization__name")
+            steward_queryset.exclude(organization__name__iexact="CFPT")
+            .values("organization", "organization__name")
             .annotate(steward_count=Count("facilitator_name", distinct=True))
             .order_by("-steward_count")
         )

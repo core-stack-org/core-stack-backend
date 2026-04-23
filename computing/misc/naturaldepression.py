@@ -15,7 +15,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from constants.pan_india_urls import NATURAL_DEPRESSION
+from utilities.constants import NATURAL_DEPRESSION_EXTERNAL_DATASET
 
 
 @app.task(bind=True)
@@ -37,7 +37,7 @@ def generate_natural_depression_data(self, state, district, block, gee_account_i
         + "_uid"
     )
 
-    natural_depression = ee.Image(NATURAL_DEPRESSION)
+    natural_depression = ee.Image(NATURAL_DEPRESSION_EXTERNAL_DATASET)
     raster = natural_depression.clip(roi.geometry())
 
     # Generate raster Layer

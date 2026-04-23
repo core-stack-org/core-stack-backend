@@ -17,7 +17,6 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
-
 env = environ.Env()
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 environ.Env.read_env(str(ENV_FILE))
@@ -42,6 +41,7 @@ def resolve_env_path(name, default="", *, trailing_sep=False):
         resolved = resolved.rstrip("/\\") + os.sep
     return resolved
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -53,7 +53,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = resolve_env_path("TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True)
+TMP_LOCATION = resolve_env_path(
+    "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
+)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
@@ -365,9 +367,16 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 EMAIL_TIMEOUT = 30
 PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 
-GEOSERVER_URL = env("GEOSERVER_URL")
-GEOSERVER_USERNAME = env("GEOSERVER_USERNAME")
-GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD")
+GEOSERVER_URL = env("GEOSERVER_URL", default="")
+GEOSERVER_USERNAME = env("GEOSERVER_USERNAME", default="")
+GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD", default="")
+
+PROD_GEOSERVER_URL = env("PROD_GEOSERVER_URL", default="")
+PROD_GEOSERVER_USERNAME = env("PROD_GEOSERVER_USERNAME", default="")
+PROD_GEOSERVER_PASSWORD = env("PROD_GEOSERVER_PASSWORD", default="")
+
+PROD_BACKEND_URL = env("PROD_BACKEND_URL", default="")
+PROD_BACKEND_API_KEY = env("PROD_BACKEND_API_KEY", default="")
 
 
 CE_BUCKET_URL = env("CE_BUCKET_URL")
@@ -377,6 +386,9 @@ EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH")
+
+# gcs bucket
+GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
 
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
@@ -392,11 +404,11 @@ S3_BUCKET = env("S3_BUCKET")
 S3_REGION = env("S3_REGION")
 
 # DPR S3 settings
-DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY")
-DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY")
-DPR_S3_REGION = env("DPR_S3_REGION")
-DPR_S3_BUCKET = env("DPR_S3_BUCKET")
-DPR_S3_FOLDER = env("DPR_S3_FOLDER")
+DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY", default="")
+DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY", default="")
+DPR_S3_REGION = env("DPR_S3_REGION", default="")
+DPR_S3_BUCKET = env("DPR_S3_BUCKET", default="")
+DPR_S3_FOLDER = env("DPR_S3_FOLDER", default="")
 
 # bot_interface settings
 AUTH_TOKEN_360 = env("AUTH_TOKEN_360")
@@ -430,3 +442,5 @@ lulc_years = [
     "2023_2024",
 ]
 water_classes = [2, 3, 4]
+
+GEE_STORAGE_PROJECT = env("GEE_STORAGE_PROJECT")
