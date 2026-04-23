@@ -11,7 +11,6 @@ from computing.utils import (
     update_dashboard_geojson,
     sync_project_fc_to_geoserver,
 )
-from constants.pan_india_path import CATCHMENT_AREA, STREAM_ORDER_RASTER
 from geoadmin.models import (
     District,
     State_Disritct_Block_Properties,
@@ -21,7 +20,7 @@ from geoadmin.models import (
 )
 from nrm_app.celery import app
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, STREAM_ORDER_ASSET, CATCHMENT_AREA
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,

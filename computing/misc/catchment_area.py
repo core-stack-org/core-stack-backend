@@ -5,7 +5,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, CATCHMENT_AREA
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -18,7 +18,6 @@ from utilities.gee_utils import (
     make_asset_public,
     get_gee_dir_path,
 )
-from constants.pan_india_urls import CATCHMETN_AREA
 
 
 @app.task(bind=True)
@@ -67,7 +66,7 @@ def generate_catchment_area_singleflow(
             + description
         )
 
-    catchment_area_raster = ee.Image(CATCHMETN_AREA)
+    catchment_area_raster = ee.Image(CATCHMENT_AREA)
     raster = catchment_area_raster.clip(roi_boundary.geometry())
 
     # Generate raster Layer

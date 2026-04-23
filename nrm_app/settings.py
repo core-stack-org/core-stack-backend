@@ -17,7 +17,6 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
-
 env = environ.Env()
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 environ.Env.read_env(str(ENV_FILE))
@@ -42,6 +41,7 @@ def resolve_env_path(name, default="", *, trailing_sep=False):
         resolved = resolved.rstrip("/\\") + os.sep
     return resolved
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -53,7 +53,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = resolve_env_path("TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True)
+TMP_LOCATION = resolve_env_path(
+    "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
+)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
@@ -437,3 +439,5 @@ lulc_years = [
     "2023_2024",
 ]
 water_classes = [2, 3, 4]
+
+GEE_STORAGE_PROJECT = env("GEE_STORAGE_PROJECT")

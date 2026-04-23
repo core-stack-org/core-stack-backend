@@ -1,6 +1,6 @@
 import ee
 from nrm_app.celery import app
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, CCD_RASTER
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -15,7 +15,6 @@ from utilities.gee_utils import (
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from computing.STAC_specs import generate_STAC_layerwise
-from constants.pan_india_urls import CCD_RASTER
 
 
 # Celery task to generate CCD raster
