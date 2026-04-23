@@ -52,6 +52,7 @@ from utilities.openmeteo_format import (
     fortnight_structure_from_mws,
     legacy_hourly_to_fortnight_inner_block,
     normalize_payload,
+    tehsil_structure_from_dict,
     success_envelope,
 )
 
@@ -477,7 +478,8 @@ def generate_tehsil_data(request):
 
         # Get JSON (from cache or generate)
         json_data = get_tehsil_json(state, district, tehsil, regenerate)
-        return _success_response(json_data, http_status=status.HTTP_200_OK)
+        payload = tehsil_structure_from_dict(json_data)
+        return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
     except Exception as e:
         print(f"Error: {str(e)}")

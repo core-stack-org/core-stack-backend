@@ -1,6 +1,7 @@
 """
 Open-Meteo-style API payloads: aligned time arrays + units, shared across apps.
 """
+import json
 import re
 
 from utilities.renderers import round_floats
@@ -339,8 +340,7 @@ def _normalize_period_label(period):
         end = int(period[5:])
         return f"{start}-{end}"
     if len(period) == 4:
-        year = int(period)
-        return f"{year}-{year + 1}"
+        return period
     return period
 
 
@@ -348,6 +348,28 @@ def _has_timeseries_keys(payload):
     if not isinstance(payload, dict):
         return False
     return any(YEAR_SUFFIX_RE.match(str(key)) for key in payload.keys())
+
+
+def _decode_fortnight_series(value):
+    """Decode a {date: value} timeseries from dict/JSON-string payloads."""
+    decoded = value
+    if isinstance(decoded, str):
+        text = decoded.strip()
+        if not text:
+            return None
+        try:
+            decoded = json.loads(text)
+        except Exception:
+            return None
+    if not isinstance(decoded, dict):
+        return None
+
+    out = {}
+    for key, val in decoded.items():
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", str(key)):
+            return None
+        out[str(key)] = val
+    return out
 
 
 def annual_structure_from_dict(item):
@@ -391,18 +413,44 @@ def annual_structure_from_dict(item):
 
     annual = {"time": periods}
     annual_units = {"time": "period"}
+    fortnight = {"time": []}
+    fortnight_units = {"time": "iso8601", "time_step": "15_days"}
+
     for metric in metric_names:
-        annual[metric] = [grouped[period].get(metric) for period in periods]
+        values = [grouped[period].get(metric) for period in periods]
+        decoded_series = [_decode_fortnight_series(v) for v in values]
+
+        # If a metric is date-value timeseries (like NDVI), expose it as fortnight data.
+        if any(series is not None for series in decoded_series) and all(
+            series is not None or raw is None
+            for series, raw in zip(decoded_series, values)
+        ):
+            flat_points = []
+            for series in decoded_series:
+                if not series:
+                    continue
+                for date_key, metric_value in series.items():
+                    flat_points.append((date_key, metric_value))
+            flat_points.sort(key=lambda x: x[0])
+
+            fortnight["time"].extend([point[0] for point in flat_points])
+            fortnight[metric] = [point[1] for point in flat_points]
+            fortnight_units[metric] = _infer_unit(metric)
+            continue
+
+        annual[metric] = values
         annual_units[metric] = _infer_unit(metric)
 
-    return round_floats(
-        {
-            "metadata": metadata,
-            "annual": annual,
-            "annual_units": annual_units,
-        },
-        precision=2,
-    )
+    response = {
+        "metadata": metadata,
+        "annual": annual,
+        "annual_units": annual_units,
+    }
+    if len(fortnight["time"]) > 0:
+        response["fortnight"] = fortnight
+        response["fortnight_units"] = fortnight_units
+
+    return round_floats(response, precision=2)
 
 
 def _convert_nested_timeseries(value):
@@ -413,6 +461,219 @@ def _convert_nested_timeseries(value):
     if isinstance(value, list):
         return [_convert_nested_timeseries(v) for v in value]
     return value
+
+
+def _safe_json_dict(value):
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            return None
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def _looks_like_iso_date_map(data):
+    if not isinstance(data, dict) or len(data) == 0:
+        return False
+    return all(re.match(r"^\d{4}-\d{2}-\d{2}$", str(k)) for k in data.keys())
+
+
+def _to_float_or_none(value):
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
+def _normalize_key_name(key):
+    k = str(key).strip().lower().replace(" ", "_")
+    k = k.replace("block", "tehsil")
+    k = k.replace("afforestation", "tree_cover_increase")
+    k = k.replace("deforestation", "tree_cover_decrease")
+    return k
+
+
+def _split_key_unit(key):
+    for suffix, unit in (
+        ("_in_ha", "ha"),
+        ("_in_km", "km"),
+        ("_in_m", "m"),
+        ("_in_percent", "%"),
+        ("_percent", "%"),
+    ):
+        if key.endswith(suffix):
+            return key[: -len(suffix)], unit
+    return key, _infer_unit(key)
+
+
+def _stringify_precise_coord(value):
+    f = _to_float_or_none(value)
+    if f is None:
+        return value
+    return f"{f:.7f}"
+
+
+def _ensure_code_string(value):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    as_float = _to_float_or_none(value)
+    if as_float is not None and as_float.is_integer():
+        return str(int(as_float))
+    return str(value)
+
+
+def _dict_to_keys_values(data):
+    keys = list(data.keys())
+    return {
+        "keys": [str(k) for k in keys],
+        "values": [data.get(k) for k in keys],
+    }
+
+
+def _extract_stream_order_arrays(row):
+    pairs = []
+    drop_keys = []
+    for key, value in row.items():
+        m = re.match(
+            r"^(?:stream_order[_\-\s]*|order_)(\d+)(?:_area(?:_percent)?|_percent|_km)?$",
+            key,
+        )
+        if m:
+            pairs.append((int(m.group(1)), value))
+            drop_keys.append(key)
+    if not pairs:
+        return row
+    pairs.sort(key=lambda x: x[0])
+    for key in drop_keys:
+        row.pop(key, None)
+    row["order"] = [str(k) for k, _ in pairs]
+    row["value"] = [v for _, v in pairs]
+    return row
+
+
+def _extract_aquifer_arrays(row):
+    pairs = []
+    drop_keys = []
+    for key, value in row.items():
+        m = re.match(r"^princip(?:le|al)_aq_(.+?)(?:_percent)?$", key)
+        if m:
+            cls = m.group(1).replace("_", " ")
+            pairs.append((cls, value))
+            drop_keys.append(key)
+    if not pairs:
+        return row
+    for key in drop_keys:
+        row.pop(key, None)
+    row["aquifer_classes"] = [k for k, _ in pairs]
+    row["aquifer_percentages"] = [v for _, v in pairs]
+    return row
+
+
+def _normalize_tehsil_row(sheet_name, row):
+    if not isinstance(row, dict):
+        return row, {}
+
+    out = {}
+    units = {}
+    for raw_key, raw_value in row.items():
+        key = _normalize_key_name(raw_key)
+        key, unit = _split_key_unit(key)
+
+        value = raw_value
+        parsed_map = _safe_json_dict(value)
+        if isinstance(parsed_map, dict):
+            if _looks_like_iso_date_map(parsed_map):
+                items = sorted(parsed_map.items(), key=lambda x: str(x[0]))
+                value = {
+                    "time": [str(k) for k, _ in items],
+                    "values": [v for _, v in items],
+                }
+                units[key] = "index" if "ndvi" in key else unit
+                out[key] = value
+                continue
+            value = _dict_to_keys_values(parsed_map)
+
+        if sheet_name == "mws_intersect_swb" and key in {"latitude", "longitude"}:
+            value = _stringify_precise_coord(value)
+        if sheet_name == "facilities_proximity" and key in {"censuscode2001", "censuscode2011"}:
+            value = _ensure_code_string(value)
+            unit = "id"
+
+        out[key] = value
+        if key not in units:
+            units[key] = unit
+
+    if sheet_name == "stream_order":
+        out = _extract_stream_order_arrays(out)
+        for unit_key in list(units.keys()):
+            if re.match(
+                r"^(?:stream_order[_\-\s]*|order_)(\d+)(?:_area(?:_percent)?|_percent|_km)?$",
+                unit_key,
+            ):
+                units.pop(unit_key, None)
+        units["order"] = "order"
+        units["value"] = "%"
+    if sheet_name == "aquifer_vector":
+        out = _extract_aquifer_arrays(out)
+        units["aquifer_classes"] = "class"
+        units["aquifer_percentages"] = "%"
+
+    if sheet_name == "facilities_proximity":
+        for key in list(out.keys()):
+            if "distance" in key or "proximity" in key or key.endswith("_km"):
+                units[key] = "km"
+    if sheet_name == "drought_causality":
+        units["severe_moderate_drought_causality"] = "category"
+        units["mild_drought_causality"] = "category"
+
+    return out, units
+
+
+def tehsil_structure_from_dict(payload):
+    """Normalize tehsil sheet payloads into consistent keys + explicit units."""
+    if not isinstance(payload, dict):
+        return {"tehsil_data": {}, "tehsil_units": {}}
+
+    tehsil_data = {}
+    tehsil_units = {}
+    for sheet_name, rows in payload.items():
+        normalized_sheet = _normalize_key_name(sheet_name)
+        if normalized_sheet == "canopy_height":
+            normalized_sheet = "canopy_height"
+        if not isinstance(rows, list):
+            tehsil_data[normalized_sheet] = rows
+            tehsil_units[normalized_sheet] = {}
+            continue
+
+        normalized_rows = []
+        sheet_units = {}
+        for row in rows:
+            normalized_row, row_units = _normalize_tehsil_row(normalized_sheet, row)
+            normalized_rows.append(normalized_row)
+            for key, unit in row_units.items():
+                sheet_units.setdefault(key, unit)
+
+        tehsil_data[normalized_sheet] = normalized_rows
+        tehsil_units[normalized_sheet] = sheet_units
+
+    return round_floats(
+        {
+            "tehsil_data": tehsil_data,
+            "tehsil_units": tehsil_units,
+        },
+        precision=2,
+    )
 
 
 def fortnight_structure_from_mws(payload):

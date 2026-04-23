@@ -41,7 +41,7 @@ def _success_response_for_admin(merged_data, state_norm, district_l, block_l):
     body["location"] = {
         "state": state_norm,
         "district": district_l,
-        "block": block_l,
+        "tehsil": block_l,
     }
     return Response(round_floats(body, precision=2), status=status.HTTP_200_OK)
 
@@ -52,7 +52,7 @@ def _success_response_for_uid(item, uid, state_norm, district_l, block_l):
     body["location"] = {
         "state": state_norm,
         "district": district_l,
-        "block": block_l,
+        "tehsil": block_l,
     }
     return Response(round_floats(body, precision=2), status=status.HTTP_200_OK)
 
@@ -235,7 +235,7 @@ def _handle_waterbodies_request(request, require_uid=False):
         uid_str, item = _get_uid_item(merged_data, uid)
         if item is None:
             return _error_response(
-                f"UID '{uid}' not found for state={state_norm}, district={district_l}, block={block_l}.",
+                f"UID '{uid}' not found for state={state_norm}, district={district_l}, tehsil={block_l}.",
                 status.HTTP_404_NOT_FOUND,
             )
         return _success_response_for_uid(
