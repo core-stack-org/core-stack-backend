@@ -156,8 +156,6 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 )
 
 # MARK: GEE Paths
-GCS_BUCKET_NAME = "core_stack"
-
 GEE_ASSET_PATH_CLART = "projects/ee-corestackdev/assets/apps/mws/"
 
 GEE_ASSET_PATH = "projects/core-stack-dev-2/assets/apps/mws/"
