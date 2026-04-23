@@ -482,9 +482,8 @@ def download_report(request):
 
 
 @api_view(["GET"])
-@auth_free
 @schema(None)
-@api_security_check(auth_type="Auth_free")
+@auth_free
 def generate_tehsil_report(request):
     try:
         # ? district, block, mwsId

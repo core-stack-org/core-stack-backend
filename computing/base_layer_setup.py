@@ -20,6 +20,10 @@ TEHSIL_WATERSHEDS_DIR = _PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
 
 _GDRIVE_ADMIN_BOUNDARY_FILE_ID = "1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d"
 
+MICROWATERSHED_PATH = _PROJECT_ROOT / "data/base_layers/Microwatershed_v2_with_details.geojson"
+# TODO: fill in the Google Drive file ID for Microwatershed_v2_with_details.geojson
+_GDRIVE_MICROWATERSHED_FILE_ID = ""
+
 # Ordered oldest → newest; each file is ~7-8 GB.
 _LULC_GDRIVE_FILES = [
     ("lulc_v3_2017_2018.tif", "1VidwEQqkwtoHqqdUqdwURWyiGd-OteaJ"),
@@ -155,17 +159,91 @@ def ensure_lulc_rasters():
             raise
 
 
+def ensure_microwatershed():
+    """
+    Downloads the pan-India microwatershed GeoJSON from Google Drive if not already present.
+    Requires `gdown` on PATH.
+    Fill in _GDRIVE_MICROWATERSHED_FILE_ID above once the Drive link is available.
+    """
+    if MICROWATERSHED_PATH.exists():
+        logger.info("Microwatershed file already exists at %s, skipping.", MICROWATERSHED_PATH)
+        return
+
+    if not _GDRIVE_MICROWATERSHED_FILE_ID:
+        logger.warning(
+            "Microwatershed file not found at %s and no Google Drive file ID is configured. "
+            "Set _GDRIVE_MICROWATERSHED_FILE_ID in base_layer_setup.py or place the file manually.",
+            MICROWATERSHED_PATH,
+        )
+        return
+
+    MICROWATERSHED_PATH.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("Downloading Microwatershed_v2_with_details.geojson from Google Drive...")
+    try:
+        subprocess.run(
+            ["gdown", _GDRIVE_MICROWATERSHED_FILE_ID, "-O", str(MICROWATERSHED_PATH)],
+            check=True,
+        )
+        logger.info("Saved microwatershed file to %s", MICROWATERSHED_PATH)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logger.error("Failed to download microwatershed file: %s", e)
+        if MICROWATERSHED_PATH.exists():
+            MICROWATERSHED_PATH.unlink()
+        raise
+
+
+def ensure_tehsil_watersheds():
+    """
+    Generates per-tehsil watershed .gpkg files by spatially intersecting the
+    microwatershed dataset against SOI tehsil boundaries.
+    Skipped entirely if the output directory is already populated.
+    Both source files (SOI tehsil + microwatershed) must exist first.
+    """
+    if _is_dir_populated(TEHSIL_WATERSHEDS_DIR):
+        logger.info("Tehsil watershed files already present at %s, skipping.", TEHSIL_WATERSHEDS_DIR)
+        return
+
+    if not SOI_TEHSIL_PATH.exists():
+        logger.warning(
+            "Cannot generate tehsil watersheds: SOI tehsil file missing at %s.", SOI_TEHSIL_PATH
+        )
+        return
+
+    if not MICROWATERSHED_PATH.exists():
+        logger.warning(
+            "Cannot generate tehsil watersheds: microwatershed file missing at %s.", MICROWATERSHED_PATH
+        )
+        return
+
+    TEHSIL_WATERSHEDS_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info("Generating tehsil watershed files (this may take a while)...")
+
+    from computing.terrain_descriptor.store_watersheds_for_tehsils import (
+        generate_tehsil_watershed_copies,
+    )
+
+    generate_tehsil_watershed_copies(
+        microwatershed_path=str(MICROWATERSHED_PATH),
+        tehsil_path=str(SOI_TEHSIL_PATH),
+        output_dir=str(TEHSIL_WATERSHEDS_DIR),
+        output_format="gpkg",
+        overwrite=False,
+    )
+    logger.info("Tehsil watershed files ready at %s", TEHSIL_WATERSHEDS_DIR)
+
+
 def ensure_village_boundaries_dir():
     """
     Ensures the village boundaries directory exists.
     TODO: add download logic once the source is determined.
     """
     VILLAGE_BOUNDARIES_DIR.mkdir(parents=True, exist_ok=True)
-    TEHSIL_WATERSHEDS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def setup_base_layers():
     ensure_soi_tehsil()
     ensure_admin_boundary_data()
-    ensure_lulc_rasters()
+    # ensure_lulc_rasters()
+    # ensure_microwatershed()
+    # ensure_tehsil_watersheds()
     ensure_village_boundaries_dir()

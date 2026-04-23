@@ -241,15 +241,37 @@ def clip_raster_with_roi(roi_gdf, raster_path, output_path, raster_label="Raster
     return str(output_path)
 
 
-def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
-    from utilities.geoserver_utils import Geoserver
+RASTER_DECLARED_SRS = "EPSG:4326"
 
+
+def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
+    import logging
+
+    _log = logging.getLogger(__name__)
+
+    geo.ensure_workspace(workspace)
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     upload_response = geo.create_coveragestore(
         path=file_path,
         workspace=workspace,
         layer_name=layer_name,
     )
+    try:
+        geo.configure_coverage(
+            workspace=workspace,
+            store=layer_name,
+            coverage=layer_name,
+            srs=RASTER_DECLARED_SRS,
+            projection_policy="REPROJECT_TO_DECLARED",
+            enabled=True,
+        )
+    except Exception as e:
+        _log.warning(
+            "Failed to force SRS on coverage %s:%s: %s",
+            workspace,
+            layer_name,
+            e,
+        )
     style_response = None
     if style_name:
         style_response = geo.publish_style(
@@ -260,13 +282,80 @@ def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, st
     return upload_response, style_response
 
 
-def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
+def _verify_raster_layer(geo, workspace, layer_name):
+    """Return True iff a layer (not just the store) is registered on the server."""
+    from utilities.geoserver_utils import GeoserverException
+
+    try:
+        geo.get_layer(layer_name=layer_name, workspace=workspace)
+        return True
+    except GeoserverException:
+        return False
+    except Exception:
+        return False
+
+
+def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_type="gpkg"):
+    from computing.utils import convert_to_zip
+
+    geo.ensure_workspace(workspace)
+    try:
+        geo.delete_vector_store(workspace=workspace, store=layer_name)
+    except Exception:
+        pass
+
+    zip_path = convert_to_zip(path, file_type)
+    return geo.create_shp_datastore(
+        path=zip_path,
+        store_name=layer_name,
+        workspace=workspace,
+        file_extension=file_type,
+    )
+
+
+def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"):
+    import logging
     from django.conf import settings
     from utilities.geoserver_utils import Geoserver
+
+    _log = logging.getLogger(__name__)
+
+    local_geo = Geoserver()
+    response = _push_vector_to_geoserver_instance(local_geo, path, layer_name, workspace, file_type)
+    _log.info("Pushed vector %s to local GeoServer.", layer_name)
+
+    prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
+    if prod_url:
+        try:
+            prod_geo = Geoserver(
+                service_url=prod_url,
+                username=settings.PROD_GEOSERVER_USERNAME,
+                password=settings.PROD_GEOSERVER_PASSWORD,
+            )
+            _push_vector_to_geoserver_instance(prod_geo, path, layer_name, workspace, file_type)
+            _log.info("Pushed vector %s to prod GeoServer (%s).", layer_name, prod_url)
+        except Exception as e:
+            _log.error("Failed to push vector %s to prod GeoServer: %s", layer_name, e)
+
+    return response
+
+
+def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
+    import logging
+    from django.conf import settings
+    from utilities.geoserver_utils import Geoserver
+
+    _log = logging.getLogger(__name__)
 
     local_geo = Geoserver()
     upload_response, style_response = _push_raster_to_geoserver_instance(
         local_geo, file_path, layer_name, workspace, style_name
+    )
+    local_layer_ok = _verify_raster_layer(local_geo, workspace, layer_name)
+    _log.info(
+        "Pushed raster %s to local GeoServer (layer_exists=%s).",
+        layer_name,
+        local_layer_ok,
     )
 
     prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
@@ -277,14 +366,27 @@ def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=
                 username=settings.PROD_GEOSERVER_USERNAME,
                 password=settings.PROD_GEOSERVER_PASSWORD,
             )
-            _push_raster_to_geoserver_instance(
+            prod_upload, prod_style = _push_raster_to_geoserver_instance(
                 prod_geo, file_path, layer_name, workspace, style_name
             )
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(
-                "Failed to push raster %s to prod GeoServer: %s", layer_name, e
+            prod_layer_ok = _verify_raster_layer(prod_geo, workspace, layer_name)
+            _log.info(
+                "Pushed raster %s to prod GeoServer (%s) "
+                "(layer_exists=%s, upload=%s, style=%s).",
+                layer_name,
+                prod_url,
+                prod_layer_ok,
+                prod_upload,
+                prod_style,
             )
+            if not prod_layer_ok:
+                _log.error(
+                    "Prod raster push for %s created store but NO layer. "
+                    "Coverage auto-config likely failed on prod GeoServer.",
+                    layer_name,
+                )
+        except Exception as e:
+            _log.error("Failed to push raster %s to prod GeoServer: %s", layer_name, e)
 
     return upload_response, style_response
 
