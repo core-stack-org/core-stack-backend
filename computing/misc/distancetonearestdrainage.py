@@ -15,7 +15,7 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from constants.pan_india_urls import DISTANCE_TO_UPSTREAM_DL
+from utilities.constants import DISTANCE_TO_UPSTREAM_DL
 
 
 @app.task(bind=True)

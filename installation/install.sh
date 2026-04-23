@@ -58,6 +58,7 @@ STEP_ORDER=(
     "rabbitmq"
     "conda_env"
     "env_file"
+    "geoserver"
     "collectstatic"
     "django_migrations"
     "seed_data"
@@ -80,6 +81,7 @@ function step_label() {
         django_migrations) echo "Run Django migrations" ;;
         seed_data) echo "Load seed data" ;;
         superuser) echo "Ensure test superuser" ;;
+        geoserver) echo "Install GeoServer" ;;
         gee_configuration) echo "Configure Google Earth Engine" ;;
         admin_boundary_data) echo "Download admin-boundary data" ;;
         initialisation_check) echo "Run internal API initialisation check" ;;
@@ -732,6 +734,190 @@ function install_rabbitmq() {
     mark_step_complete "rabbitmq"
 }
 
+GEOSERVER_DEFAULT_URL="http://localhost:8080/geoserver"
+GEOSERVER_DEFAULT_USER="admin"
+GEOSERVER_DEFAULT_PASS="geoserver"
+GEOSERVER_WORKSPACE="corestack"
+
+function geoserver_deployed() {
+    [ -d "/opt/tomcat/webapps/geoserver" ]
+}
+
+function tomcat_running() {
+    curl -sf http://localhost:8080 >/dev/null 2>&1
+}
+
+function wait_for_geoserver_rest() {
+    local url="${1:-$GEOSERVER_DEFAULT_URL}"
+    local user="${2:-$GEOSERVER_DEFAULT_USER}"
+    local pass="${3:-$GEOSERVER_DEFAULT_PASS}"
+    local elapsed=0
+    local timeout=120
+
+    echo "Waiting for GeoServer REST API to be ready (up to ${timeout}s)..."
+    while [ "$elapsed" -lt "$timeout" ]; do
+        local http_code
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -u "${user}:${pass}" \
+            "${url}/rest/workspaces.json" 2>/dev/null)
+        if [ "$http_code" = "200" ]; then
+            echo "GeoServer REST API is ready."
+            return 0
+        fi
+        sleep 5
+        elapsed=$((elapsed + 5))
+    done
+
+    echo "WARNING: GeoServer REST API did not become ready after ${timeout}s."
+    return 1
+}
+
+function ensure_geoserver_workspace() {
+    local workspace="${1:-$GEOSERVER_WORKSPACE}"
+    local url="${2:-$GEOSERVER_DEFAULT_URL}"
+    local user="${3:-$GEOSERVER_DEFAULT_USER}"
+    local pass="${4:-$GEOSERVER_DEFAULT_PASS}"
+    local http_code
+
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -u "${user}:${pass}" \
+        "${url}/rest/workspaces/${workspace}.json" 2>/dev/null)
+
+    if [ "$http_code" = "200" ]; then
+        echo "GeoServer workspace '${workspace}' already exists."
+        return 0
+    fi
+
+    echo "Creating GeoServer workspace '${workspace}'..."
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" \
+        -u "${user}:${pass}" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        -d "{\"workspace\": {\"name\": \"${workspace}\"}}" \
+        "${url}/rest/workspaces" 2>/dev/null)
+
+    if [ "$http_code" = "201" ]; then
+        echo "GeoServer workspace '${workspace}' created."
+    else
+        echo "WARNING: Failed to create GeoServer workspace '${workspace}' (HTTP ${http_code})."
+        return 1
+    fi
+}
+
+function install_geoserver() {
+    local tomcat_version="9.0.98"
+    local geoserver_version="2.23.6"
+    local tomcat_dir="/opt/tomcat"
+    local tomcat_tar="/tmp/apache-tomcat-${tomcat_version}.tar.gz"
+    local geoserver_zip="/tmp/geoserver-${geoserver_version}-war.zip"
+    local geoserver_war_dir="/tmp/geoserver-war"
+
+    if geoserver_deployed; then
+        echo "GeoServer already deployed at $tomcat_dir/webapps/geoserver."
+        if ! tomcat_running; then
+            echo "Starting Tomcat..."
+            sudo "$tomcat_dir/bin/startup.sh"
+        fi
+        wait_for_geoserver_rest && ensure_geoserver_workspace || true
+        mark_step_complete "geoserver"
+        return
+    fi
+
+    if ! command -v java >/dev/null 2>&1; then
+        echo "Installing Java..."
+        sudo apt-get update
+        sudo apt-get install -y default-jdk
+    else
+        echo "Java already installed ($(java -version 2>&1 | head -n1))."
+    fi
+
+    if ! getent group tomcat >/dev/null 2>&1; then
+        sudo groupadd tomcat
+    fi
+    if ! id -u tomcat >/dev/null 2>&1; then
+        sudo useradd -s /bin/false -g tomcat -d "$tomcat_dir" tomcat
+    fi
+
+    if [ ! -f "$tomcat_dir/bin/startup.sh" ]; then
+        echo "Downloading Tomcat $tomcat_version..."
+        wget -qL \
+            "https://archive.apache.org/dist/tomcat/tomcat-9/v${tomcat_version}/bin/apache-tomcat-${tomcat_version}.tar.gz" \
+            -O "$tomcat_tar"
+        sudo mkdir -p "$tomcat_dir"
+        sudo tar xzf "$tomcat_tar" -C "$tomcat_dir" --strip-components=1
+        rm -f "$tomcat_tar"
+        echo "Tomcat $tomcat_version installed at $tomcat_dir."
+    else
+        echo "Tomcat already installed at $tomcat_dir."
+    fi
+
+    sudo chgrp -R tomcat "$tomcat_dir"
+    sudo chmod -R g+r "$tomcat_dir/conf"
+    sudo chmod g+x "$tomcat_dir/conf"
+    sudo chown -R tomcat "$tomcat_dir/webapps" "$tomcat_dir/work" "$tomcat_dir/temp" "$tomcat_dir/logs"
+
+    if ! tomcat_running; then
+        echo "Starting Tomcat..."
+        sudo "$tomcat_dir/bin/startup.sh"
+        sleep 5
+    fi
+
+    echo "Downloading GeoServer $geoserver_version WAR (~108MB)..."
+    wget -L \
+        "https://sourceforge.net/projects/geoserver/files/GeoServer/${geoserver_version}/geoserver-${geoserver_version}-war.zip/download" \
+        -O "$geoserver_zip"
+
+    local zip_size
+    zip_size=$(stat -c%s "$geoserver_zip" 2>/dev/null || echo 0)
+    if [ "$zip_size" -lt 10000000 ]; then
+        echo "ERROR: GeoServer download appears incomplete (${zip_size} bytes). Re-run this step."
+        rm -f "$geoserver_zip"
+        return 1
+    fi
+
+    sudo apt-get install -y unzip
+    rm -rf "$geoserver_war_dir"
+    unzip -q "$geoserver_zip" -d "$geoserver_war_dir"
+    sudo cp "$geoserver_war_dir/geoserver.war" "$tomcat_dir/webapps/"
+    rm -rf "$geoserver_zip" "$geoserver_war_dir"
+
+    echo "Waiting for GeoServer to deploy (up to 60s)..."
+    local elapsed=0
+    while [ "$elapsed" -lt 60 ]; do
+        if geoserver_deployed; then
+            break
+        fi
+        sleep 5
+        elapsed=$((elapsed + 5))
+    done
+
+    if ! geoserver_deployed; then
+        echo "WARNING: GeoServer webapps directory not found after ${elapsed}s."
+        echo "Check deployment logs: sudo tail -20 $tomcat_dir/logs/catalina.out"
+        return 1
+    fi
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        if [ -z "$(current_env_value "$APP_ENV_FILE" "GEOSERVER_URL")" ]; then
+            set_env_value "$APP_ENV_FILE" "GEOSERVER_URL" "http://localhost:8080/geoserver/"
+        fi
+        if [ -z "$(current_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME")" ]; then
+            set_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME" "admin"
+        fi
+        if [ -z "$(current_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD")" ]; then
+            set_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD" "geoserver"
+        fi
+        echo "GeoServer credentials written to .env."
+    fi
+
+    wait_for_geoserver_rest && ensure_geoserver_workspace || true
+
+    echo "GeoServer $geoserver_version running at http://localhost:8080/geoserver/web/"
+    echo "  Username: admin | Password: geoserver"
+    echo "  IMPORTANT: Change the default password after first login."
+    mark_step_complete "geoserver"
+}
+
 function apply_env_overrides() {
     local env_file="$1"
 
@@ -988,12 +1174,33 @@ function collect_static_files() {
     mark_step_complete "collectstatic"
 }
 
+function reset_django_migrations() {
+    echo "Resetting Django migrations..."
+    cd "$BACKEND_DIR"
+
+    find . -path "*/migrations/*.py" -not -name "__init__.py" -delete
+    find . -path "*/migrations/*.pyc" -delete
+
+    find . -maxdepth 2 -name "apps.py" -type f | while IFS= read -r f; do
+        d=$(dirname "$f")
+        mkdir -p "$d/migrations"
+        touch "$d/migrations/__init__.py"
+    done
+
+    echo "Migrations cleaned."
+}
+
 function run_django_migrations() {
     echo "Running Django migrations..."
     activate_conda_env
+
+    reset_django_migrations
+
     cd "$BACKEND_DIR"
     python manage.py makemigrations --skip-checks
+    python manage.py migrate --plan --skip-checks
     python manage.py migrate --fake-initial --skip-checks
+
     echo "Django migrations complete."
     mark_step_complete "django_migrations"
 }
@@ -1015,16 +1222,19 @@ function load_seed_data() {
         return
     fi
 
+    activate_conda_env
+    cd "$BACKEND_DIR"
+
     if [ "$force" -ne 1 ] && seed_data_loaded; then
         echo "Seed data already looks loaded. Keeping the existing database contents."
+        python manage.py seed_default_plantation --skip-checks
         mark_step_complete "seed_data"
         return
     fi
 
     echo "Loading seed data..."
-    activate_conda_env
-    cd "$BACKEND_DIR"
     python manage.py loaddata --skip-checks "$seed_file"
+    python manage.py seed_default_plantation --skip-checks
     echo "Seed data loaded."
     mark_step_complete "seed_data"
 }
@@ -1338,6 +1548,12 @@ function download_admin_boundary_data() {
     local extraction_root="$BACKEND_DIR/data/.admin-boundary-extract"
     local fileid="1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d"
 
+    if [ "$force" -ne 1 ] && admin_boundary_data_present; then
+        echo "Admin-boundary data already present. Skipping download."
+        mark_step_complete "admin_boundary_data"
+        return
+    fi
+
     if [ "$force" -ne 1 ] && normalize_existing_admin_boundary_data; then
         echo "Existing admin-boundary data detected. Keeping it."
         return
@@ -1490,6 +1706,9 @@ function run_step() {
             ;;
         env_file)
             generate_env_file
+            ;;
+        geoserver)
+            install_geoserver
             ;;
         collectstatic)
             collect_static_files
