@@ -136,6 +136,7 @@ else:
     CORS_ALLOWED_ORIGINS = [
         "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
         "https://nrm.core-stack.org",
+        "https://master.d1rx3d0dyjc5v7.amplifyapp.com"
         "https://nrm.gramvaanidev.org",
         "https://dashboard.core-stack.org",
         "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
