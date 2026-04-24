@@ -144,6 +144,7 @@ def run_change_detection_vector_local(
             class_definitions=class_definitions,
         )
 
+        published_layer_name = _published_layer_name(district, block, param_name)
         output_stub = _output_stub(district, block, param_name, start_year, end_year)
         output_path = build_output_vector_path(
             layer_name=output_stub,
@@ -156,11 +157,9 @@ def run_change_detection_vector_local(
         asset_id = write_vector_output(
             gdf=result_gdf,
             output_path=output_path,
-            layer_name=output_stub,
+            layer_name=published_layer_name,
         )
         print(f"Saved local change detection vector: {asset_id}")
-
-        published_layer_name = _published_layer_name(district, block, param_name)
         if push_to_geoserver:
             geoserver_response = push_local_vector_to_geoserver(
                 path=os.path.splitext(asset_id)[0],
