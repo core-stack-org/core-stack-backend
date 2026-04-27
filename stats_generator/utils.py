@@ -306,7 +306,7 @@ def create_excel_for_facilities(data, writer):
     df = pd.DataFrame(df_data)
 
     # keep first columns
-    first_cols = ["lgd_village", "lgd_village_name"]
+    first_cols = ["censuscode2011", "censusname"]
     other_cols = [c for c in df.columns if c not in first_cols]
     df = df[first_cols + other_cols]
 
@@ -816,7 +816,7 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
                 "triple_to_double_area_in_ha": properties.get("tr_do", None),
                 "triple_to_triple_area_in_ha": properties.get("tr_tr", None),
                 "total_change_crop_intensity_area_in_ha": properties.get(
-                    "total_chan", None
+                    "total_chan", properties.get("total_change", None)
                 ),
             }
         )
