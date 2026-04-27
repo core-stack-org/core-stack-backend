@@ -350,7 +350,7 @@ def _generate_data(
                 else:
                     print(f"Merge failed to start for {ndvi_description}")
             else:
-                _, last_date = _generate_ndvi(
+                task_id, last_date = _generate_ndvi(
                     ndvi_asset_id,
                     asset_folder_list,
                     app_type,
@@ -362,6 +362,8 @@ def _generate_data(
                     ndvi_description,
                     f_end_date,
                 )
+                if task_id:
+                    check_task_status([task_id])
         f_start_date = f_end_date
         last_date = str(f_start_date.date())
     return asset_ids, last_date

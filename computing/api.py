@@ -2,7 +2,13 @@ import json
 import os
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
-from rest_framework.decorators import api_view, authentication_classes, parser_classes, permission_classes, schema
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    parser_classes,
+    permission_classes,
+    schema,
+)
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
@@ -1462,8 +1468,8 @@ def generate_ndvi_timeseries(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        mws_count = request.data.get("mws_count")
-        chunk_size = request.data.get("chunk_size")
+        mws_count = request.data.get("mws_count") or 150
+        chunk_size = request.data.get("chunk_size") or 100
 
         ndvi_timeseries.apply_async(
             kwargs={
@@ -1779,7 +1785,9 @@ def update_layer_sync_remote(request):
         d = request.data
         layer_id = d.get("layer_id")
         if layer_id is None:
-            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         result = update_layer_sync_status(
             layer_id=layer_id,
@@ -1822,12 +1830,16 @@ def sync_layer_remote(request):
         )
         if layer_id is None:
             return Response(
-                {"error": "Failed to save layer — check state/district/block exist on this server."},
+                {
+                    "error": "Failed to save layer — check state/district/block exist on this server."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
     except KeyError as e:
-        return Response({"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

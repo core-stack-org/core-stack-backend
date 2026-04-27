@@ -38,7 +38,7 @@ def extract_facilities(df_facilities, v_id):
     if df_facilities.empty:
         return DEFAULT_VALUE.copy()
 
-    fac_row = df_facilities[df_facilities["lgd_village"] == v_id]
+    fac_row = df_facilities[df_facilities["censuscode2011"] == v_id]
     if fac_row.empty:
         return DEFAULT_VALUE.copy()
 

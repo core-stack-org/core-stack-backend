@@ -67,23 +67,24 @@ def generate_terrain_raster_clip(
             )
             + f"terrain_raster_{asset_suffix}"
         )
-    # Load ROI geometry
-    roi = ee.FeatureCollection(roi_asset_id)
 
-    # Load the raster image and clip to ROI
-    pan_india_raster = ee.Image(PAN_INDIA_RASTER_FABDEM)
+    if not is_gee_asset_exists(asset_id):
+        # Load ROI geometry
+        roi = ee.FeatureCollection(roi_asset_id)
 
-    task = export_raster_asset_to_gee(
-        image=pan_india_raster.clip(roi.union().geometry()),
-        description=asset_suffix,
-        asset_id=asset_id,
-        scale=30,
-        region=roi.geometry(),
-    )
+        # Load the raster image and clip to ROI
+        pan_india_raster = ee.Image(PAN_INDIA_RASTER_FABDEM)
 
-    # Check task status
-    task_id_list = check_task_status([task])
-    print(f"Task completed. Task IDs: {task_id_list}")
+        task = export_raster_asset_to_gee(
+            image=pan_india_raster.clip(roi.union().geometry()),
+            description=asset_suffix,
+            asset_id=asset_id,
+            scale=30,
+            region=roi.geometry(),
+        )
+        # Check task status
+        task_id_list = check_task_status([task])
+        print(f"Task completed. Task IDs: {task_id_list}")
 
     # Check if asset was created
     layer_id = None

@@ -712,35 +712,6 @@ def save_layer_info_to_db(
     return layer_obj.id
 
 
-def update_layer_sync_status(
-    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
-):
-    try:
-        layer_obj = Layer.objects.filter(id=layer_id)
-        if sync_to_geoserver is not None:
-            updated_count = layer_obj.update(is_sync_to_geoserver=sync_to_geoserver)
-
-            if updated_count > 0:
-                print(
-                    f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
-                )
-                return layer_id
-
-        if is_stac_specs_generated is not None:
-            updated_count = layer_obj.update(
-                is_stac_specs_generated=is_stac_specs_generated
-            )
-
-            if updated_count > 0:
-                print(
-                    f"Updated sync status to {is_stac_specs_generated} for layer ID: {layer_id}"
-                )
-                return layer_id
-
-    except Exception as e:
-        print(f"Error updating layer sync status: {e}")
-
-
 def get_existing_end_year(dataset_name, layer_name):
     """fetch objects from db on the basis of dataset name and layer_name"""
     dataset = Dataset.objects.get(name=dataset_name)
@@ -1035,7 +1006,7 @@ def _sync_layer_to_prod_db(payload: dict):
     if not prod_url:
         return None
 
-    endpoint = prod_url + "/api/v1/computing/sync_layer_remote/"
+    endpoint = prod_url + "/api/v1/sync_layer_remote/"
     try:
         response = requests.post(
             endpoint,
@@ -1064,7 +1035,7 @@ def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_ge
     if not prod_url or layer_id is None:
         return
 
-    endpoint = prod_url + "/api/v1/computing/update_layer_sync_remote/"
+    endpoint = prod_url + "/api/v1/update_layer_sync_remote/"
     payload = {
         "layer_id": layer_id,
         "sync_to_geoserver": sync_to_geoserver,
