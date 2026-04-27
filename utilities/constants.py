@@ -259,7 +259,7 @@ VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
 PAN_INDIA_L3_LULC_CLUSTERS = (
     "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
 )
-AEZ = "users/mtpictd/agro_eco_regions"
+AEZ = "projects/ext-datasets/assets/datasets/Agro_Ecological_Zones"
 FACILITIES_DATASET_NAME = "Facilities Proximity"
 LCW_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/lcw_conflict_pan_india"
 MINING_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/Mining_data_pan_india"
