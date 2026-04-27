@@ -183,7 +183,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": [
-        "rest_framework.renderers.JSONRenderer",
+        "utilities.renderers.RoundedJSONRenderer",
     ],
 }
 
@@ -392,6 +392,16 @@ GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PA
 GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
 
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
+
+# MongoDB cache settings (optional)
+MONGODB_URI = env("MONGODB_URI", default="")
+MONGODB_DB_NAME = env("MONGODB_DB_NAME", default="core_stack")
+MONGODB_WATERBODIES_COLLECTION = env(
+    "MONGODB_WATERBODIES_COLLECTION", default="waterbodies_cache"
+)
+MONGODB_PUBLIC_API_V2_COLLECTION = env(
+    "MONGODB_PUBLIC_API_V2_COLLECTION", default="public_api_mws_v2_cache"
+)
 
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
