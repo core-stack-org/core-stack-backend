@@ -123,10 +123,9 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     # Convert datetime columns
     for col in block_metadata_df.columns:
         if col != "geometry":
-            if pd.api.types.is_datetime64_any_dtype(block_metadata_df[col]):
-                block_metadata_df[col] = (
-                    block_metadata_df[col].astype(str).replace("NaT", None)
-                )
+            block_metadata_df[col] = block_metadata_df[col].apply(
+                lambda x: str(x) if pd.notnull(x) else None
+            )
 
     # Save Shapefile
     nrega_folder_name = (
@@ -179,7 +178,6 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         )
 
         make_asset_public(nrega_asset_id)
-
         res = push_shape_to_geoserver(output_dir, workspace="nrega_assets")
 
         if res["status_code"] == 201 and layer_id:
