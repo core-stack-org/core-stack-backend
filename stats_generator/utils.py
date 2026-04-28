@@ -234,11 +234,102 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_mws(geojson_data, writer)
             elif workspace == "facilities_proximity":
                 create_excel_for_facilities(geojson_data, writer)
+            elif workspace == "ndvi_timeseries":
+                print("Inside elif ndvi timeseries")
+                processed_data = [
+                    process_feature_ndvi(feature)
+                    for feature in geojson_data["features"]
+                ]
+                db_layer_name = layer["layer_name"].format(
+                    district=district, block=block
+                )
+                sheet = None
+                if db_layer_name == f"ndvi_timeseries_{district}_{block}_crop":
+                    sheet = "crop"
+                elif db_layer_name == f"ndvi_timeseries_{district}_{block}_tree":
+                    sheet = "tree"
+                elif db_layer_name == f"ndvi_timeseries_{district}_{block}_shrub":
+                    sheet = "shrub"
+                create_excel_seasonal_ndvi(
+                    processed_data, writer, start_year, end_year, sheet
+                )
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
+    return results
+
+
+def create_excel_seasonal_ndvi(processed_data, writer, start_year, end_year, sheet):
+    print("Inside elif ndvi timeseries seasonal")
+    seasons = ["kharif", "rabi", "zaid"]
+
+    data = {"UID": []}
+
+    # Create columns
+    for year in range(start_year, end_year + 1):
+        for season in seasons:
+            end_to_year = year + 1
+            column_name = f"ndvi_{season}_{year}-{end_to_year}"
+            data[column_name] = []
+
+    for feature_data in processed_data:
+        data["UID"].append(feature_data["UID"])
+
+        for year in range(start_year, end_year + 1):
+            for season in seasons:
+                end_to_year = year + 1
+                column_name = f"ndvi_{season}_{year}-{end_to_year}"
+                values = feature_data["ndvi"].get(season, {}).get(year, [])
+
+                # average NDVI
+                if values:
+                    avg_value = sum(values) / len(values)
+                else:
+                    avg_value = 0.0
+
+                data[column_name].append(avg_value)
+
+    df = pd.DataFrame(data)
+    df = df.sort_values("UID")
+
+    # round values
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(3)
+    df.to_excel(writer, sheet_name=f"ndvi_seasonal_{sheet}", index=False)
+    print(f"Excel file created: ndvi_seasonal {sheet}")
+
+
+def process_feature_ndvi(feature):
+    print("Inside elif ndvi timeseries features")
+    uid = feature["properties"]["uid"]
+    results = {"UID": uid, "ndvi": {"kharif": {}, "rabi": {}, "zaid": {}}}
+
+    for key, value in feature["properties"].items():
+        try:
+            date = datetime.strptime(key, "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        year = date.year
+        month = date.month
+        season = get_season(month)
+
+        if season == "rabi":
+            current_year = year - 1 if month in (1, 2) else year
+        elif season == "zaid":
+            current_year = year - 1 if month in (3, 4, 5, 6) else year
+        else:
+            current_year = year
+
+        try:
+            ndvi_value = float(value)
+        except:
+            continue
+
+        results["ndvi"][season].setdefault(current_year, [])
+        results["ndvi"][season][current_year].append(ndvi_value)
     return results
 
 
