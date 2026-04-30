@@ -1592,6 +1592,7 @@ def generate_stac_collection(request):
         start_year = request.data.get("start_year", "")
         upload_to_s3 = request.data.get("upload_to_s3", False)
         overwrite = request.data.get("overwrite", False)
+        overwrite_metadata = request.data.get("overwrite_metadata", False)
 
         if not all([state, district, block, layer_name, layer_type]):
             return Response(
@@ -1617,6 +1618,7 @@ def generate_stac_collection(request):
                 "start_year": start_year,
                 "upload_to_s3": upload_to_s3,
                 "overwrite": overwrite,
+                "overwrite_metadata": overwrite_metadata,
             },
             queue="nrm",
         )
