@@ -19,7 +19,8 @@ def normalize_name(name: str) -> str:
 
 class Command(BaseCommand):
     help = (
-        "Fill latitude/longitude for PlanApp entries using GeoServer settlement layers"
+        "Fill latitude/longitude for PlanApp entries using GeoServer layers "
+        "(settlement → plan_gw → plan_agri → livelihood)"
     )
 
     def add_arguments(self, parser):
@@ -39,12 +40,21 @@ class Command(BaseCommand):
             help="Overwrite existing coordinates",
         )
 
-    def get_settlement_layer_name(self, plan):
+    def _layer_suffix(self, plan):
         district_name = normalize_name(plan.district_soi.district_name)
         tehsil_name = normalize_name(plan.tehsil_soi.tehsil_name)
-        return f"settlement_{plan.id}_{district_name}_{tehsil_name}"
+        return f"{plan.id}_{district_name}_{tehsil_name}"
 
-    def fetch_settlement_coordinates(self, layer_name, workspace="resources"):
+    def get_candidate_layers(self, plan):
+        suffix = self._layer_suffix(plan)
+        return [
+            ("resources", f"settlement_{suffix}"),
+            ("works", f"plan_gw_{suffix}"),
+            ("works", f"plan_agri_{suffix}"),
+            ("works", f"livelihood_{suffix}"),
+        ]
+
+    def fetch_coordinates(self, layer_name, workspace="resources"):
         url = (
             f"{GEOSERVER_URL}/{workspace}/ows?"
             f"service=WFS&version=1.0.0&request=GetFeature"
@@ -137,13 +147,20 @@ class Command(BaseCommand):
         self.stdout.write(f"Found {len(plans)} plans to process")
 
         updated = 0
-        skipped = 0
         errors = 0
 
         with transaction.atomic():
             for plan in plans:
-                layer_name = self.get_settlement_layer_name(plan)
-                coords, error = self.fetch_settlement_coordinates(layer_name)
+                coords = None
+                matched_layer = None
+                last_errors = []
+
+                for workspace, layer_name in self.get_candidate_layers(plan):
+                    coords, error = self.fetch_coordinates(layer_name, workspace)
+                    if coords:
+                        matched_layer = f"{workspace}:{layer_name}"
+                        break
+                    last_errors.append(f"{workspace}:{layer_name} → {error}")
 
                 if coords:
                     lat, lon = coords
@@ -153,17 +170,18 @@ class Command(BaseCommand):
                         plan.save(update_fields=["latitude", "longitude"])
                     updated += 1
                     self.stdout.write(
-                        self.style.SUCCESS(f"Plan {plan.id}: Set ({lat}, {lon})")
-                    )
-                elif error:
-                    errors += 1
-                    self.stdout.write(
-                        self.style.ERROR(
-                            f"Plan {plan.id}: {error} (layer: {layer_name})"
+                        self.style.SUCCESS(
+                            f"Plan {plan.id}: Set ({lat}, {lon}) from {matched_layer}"
                         )
                     )
                 else:
-                    skipped += 1
+                    errors += 1
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Plan {plan.id}: No coordinates found. Tried:\n"
+                            + "\n".join(f"  {e}" for e in last_errors)
+                        )
+                    )
 
         self.stdout.write("\n" + "=" * 50)
-        self.stdout.write(f"Updated: {updated}, Skipped: {skipped}, Errors: {errors}")
+        self.stdout.write(f"Updated: {updated}, Errors: {errors}")
