@@ -1,6 +1,6 @@
 # plans/views.py
 from django.db.models import Avg, Case, CharField as CharFieldOutput, Count, F, Max, Min, Q, Value, When
-from django.db.models.functions import Concat, Length, Substr, Trim
+from django.db.models.functions import Coalesce, Concat, Length, Substr, Trim
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
@@ -77,24 +77,35 @@ TEST_FACILITATOR_EXCLUSIONS = (
     | Q(facilitator_name__icontains="facilitator")
 )
 
+CFPT_ORG_ID = "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6"
 
+STEWARD_FULL_NAME = Trim(
+    Concat("first_name", Value(" "), Coalesce("last_name", Value("")))
+)
+
+
+# MARK: Demand Type Counting 
 def _count_demand_types(plan_id_strs):
     from dpr.mapping import classify_demand_type
     from dpr.models import (
         Agri_maintenance,
         GW_maintenance,
         ODK_agri,
+        ODK_agrohorticulture,
         ODK_groundwater,
+        ODK_livelihood,
         SWB_RS_maintenance,
         SWB_maintenance,
     )
 
     community = 0
     individual = 0
+    total = 0
 
     def _tally(raw_values):
-        nonlocal community, individual
+        nonlocal community, individual, total
         for raw in raw_values:
+            total += 1
             classified = classify_demand_type(raw)
             if classified == "Community Demand":
                 community += 1
@@ -130,10 +141,66 @@ def _count_demand_types(plan_id_strs):
         for d in ODK_agri.objects.filter(plan_id__in=plan_id_strs).exclude(is_deleted=True).exclude(status_re="rejected").values_list("data_agri", flat=True)
     )
 
-    return {"community_demands": community, "individual_demands": individual}
+    # Section G — Livelihood works (G.1 Livestock/Fisheries, G.2 Plantations/Kitchen Gardens)
+    def _livelihood_demand_types():
+        for dl in (
+            d or {}
+            for d in ODK_livelihood.objects.filter(plan_id__in=plan_id_strs)
+            .exclude(is_deleted=True)
+            .exclude(status_re="rejected")
+            .values_list("data_livelihood", flat=True)
+        ):
+            livestock = dl.get("Livestock") or {}
+            fisheries = dl.get("fisheries") or {}
+            plantations = dl.get("plantations") or {}
+            kitchen_garden = dl.get("kitchen_gardens") or {}
+
+            if (
+                str(livestock.get("is_demand_livestock", "")).lower() == "yes"
+                or str(dl.get("select_one_demand_promoting_livestock", "")).lower() == "yes"
+            ):
+                yield livestock.get("livestock_demand")
+
+            if (
+                str(fisheries.get("is_demand_fisheris", "")).lower() == "yes"
+                or str(dl.get("select_one_demand_promoting_fisheries", "")).lower() == "yes"
+            ):
+                yield fisheries.get("demand_type_fisheries")
+
+            if (
+                str(dl.get("select_one_demand_plantation", "")).lower() == "yes"
+                or str(plantations.get("select_plantation_demands", "")).lower() == "yes"
+            ):
+                yield plantations.get("demand_type_plantations")
+
+            if (
+                str(dl.get("indi_assets", "")).lower() == "yes"
+                or str(kitchen_garden.get("assets_kg", "")).lower() == "yes"
+            ):
+                yield kitchen_garden.get("demand_type_kitchen_garden")
+
+    _tally(_livelihood_demand_types())
+
+    _tally(
+        (d or {}).get("demand_type_plantations")
+        for d in ODK_agrohorticulture.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .exclude(status_re="rejected")
+        .values_list("data_agohorticulture", flat=True)
+    )
+
+    return {"community_demands": community, "individual_demands": individual, "total_demands": total}
 
 
 def _build_steward_meta_stats(queryset):
+    valid_steward_names = (
+        User.objects.filter(groups__name="App User")
+        .exclude(organization_id=CFPT_ORG_ID)
+        .annotate(full_name=STEWARD_FULL_NAME)
+        .values_list("full_name", flat=True)
+    )
+    queryset = queryset.filter(facilitator_name__in=valid_steward_names)
+
     effective_village = Case(
         When(
             ~Q(village_name="") & Q(village_name__isnull=False),
@@ -187,27 +254,6 @@ def _build_steward_meta_stats(queryset):
         ),
     )
 
-    top_stewards_qs = per_steward.order_by("-plan_count")[:10]
-    top_steward_names = [s["facilitator_name"] for s in top_stewards_qs]
-    village_map = {}
-    for entry in (
-        qs.filter(facilitator_name__in=top_steward_names)
-        .values("facilitator_name", "effective_village")
-        .distinct()
-    ):
-        village_map.setdefault(entry["facilitator_name"], []).append(
-            entry["effective_village"]
-        )
-    top_stewards = [
-        {
-            "facilitator_name": s["facilitator_name"],
-            "plan_count": s["plan_count"],
-            "completed_count": s["completed_count"],
-            "villages": village_map.get(s["facilitator_name"], []),
-        }
-        for s in top_stewards_qs
-    ]
-
     by_organization = [
         {
             "organization_id": s["organization"],
@@ -215,7 +261,8 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            qs.values("organization", "organization__name")
+            qs.exclude(organization_id=CFPT_ORG_ID)
+            .values("organization", "organization__name")
             .annotate(steward_count=Count("facilitator_name", distinct=True))
             .order_by("-steward_count")
         )
@@ -300,7 +347,6 @@ def _build_steward_meta_stats(queryset):
         "dpr_stats": dpr_agg,
         "active_stewards": active_stewards,
         "inactive_stewards": inactive_stewards,
-        "top_stewards": top_stewards,
         "by_organization": by_organization,
         "state_level": state_level,
         "district_level": district_level,
@@ -310,6 +356,14 @@ def _build_steward_meta_stats(queryset):
 
 
 def _build_steward_listing(queryset):
+    valid_steward_names = (
+        User.objects.filter(groups__name="App User")
+        .exclude(organization_id=CFPT_ORG_ID)
+        .annotate(full_name=STEWARD_FULL_NAME)
+        .values_list("full_name", flat=True)
+    )
+    queryset = queryset.filter(facilitator_name__in=valid_steward_names)
+
     effective_village = Case(
         When(
             ~Q(village_name="") & Q(village_name__isnull=False),
@@ -672,7 +726,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         valid_steward_names = (
             User.objects.filter(groups__name="App User")
             .exclude(organization__name__iexact="CFPT")
-            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .annotate(full_name=STEWARD_FULL_NAME)
             .values_list("full_name", flat=True)
         )
         steward_queryset = steward_queryset.filter(facilitator_name__in=valid_steward_names)
@@ -685,7 +739,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             for row in (
                 User.objects.filter(groups__name="App User")
                 .exclude(organization__name__iexact="CFPT")
-                .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+                .annotate(full_name=STEWARD_FULL_NAME)
                 .filter(full_name__in=active_facilitator_names)
                 .values("gender")
                 .annotate(count=Count("id"))
@@ -999,7 +1053,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         user = (
             User.objects.select_related("organization")
-            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .annotate(full_name=STEWARD_FULL_NAME)
             .filter(full_name__iexact=facilitator_name)
             .first()
         )
@@ -1784,7 +1838,7 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         user = (
             User.objects.select_related("organization")
-            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .annotate(full_name=STEWARD_FULL_NAME)
             .filter(full_name__iexact=facilitator_name)
             .first()
         )

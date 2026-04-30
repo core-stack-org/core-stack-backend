@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 import requests
@@ -6,6 +7,14 @@ from django.db import transaction
 
 from nrm_app.settings import GEOSERVER_PASSWORD, GEOSERVER_URL, GEOSERVER_USERNAME
 from plans.models import PlanApp
+
+
+def normalize_name(name: str) -> str:
+    name = re.sub(r"[()]", "", name)
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"_+", "_", name)
+    name = re.sub(r"^_|_$", "", name)
+    return name.lower()
 
 
 class Command(BaseCommand):
@@ -31,8 +40,8 @@ class Command(BaseCommand):
         )
 
     def get_settlement_layer_name(self, plan):
-        district_name = plan.district_soi.district_name.lower().replace(" ", "_")
-        tehsil_name = plan.tehsil_soi.tehsil_name.lower().replace(" ", "_")
+        district_name = normalize_name(plan.district_soi.district_name)
+        tehsil_name = normalize_name(plan.tehsil_soi.tehsil_name)
         return f"settlement_{plan.id}_{district_name}_{tehsil_name}"
 
     def fetch_settlement_coordinates(self, layer_name, workspace="resources"):
