@@ -217,6 +217,20 @@ urlpatterns = [
         name="stac_item",
     ),
     path("sync_layer_remote/", api.sync_layer_remote, name="sync_layer_remote"),
-    path("update_layer_sync_remote/", api.update_layer_sync_remote, name="update_layer_sync_remote"),
+    path(
+        "update_layer_sync_remote/",
+        api.update_layer_sync_remote,
+        name="update_layer_sync_remote",
+    ),
     path("missing_layers/", api.missing_layers, name="missing_layer"),
+    path(
+        "generate_fabdem_raster/",
+        api.generate_fabdem_raster,
+        name="generate-fab-dem-raster",
+    ),
+    path(
+        "generate_canal_vector/",
+        api.generate_canal_vector,
+        name="generate-canal-vector",
+    ),
 ]

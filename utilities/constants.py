@@ -356,3 +356,5 @@ CH_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ch_"
 TREE_OVERALL_CHANGE = (
     "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2022"
 )
+
+CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
