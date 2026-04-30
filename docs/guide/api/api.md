@@ -2145,7 +2145,8 @@ All names are case-insensitive. Collections are only available after `generate_s
     "layer_type": "raster",
     "start_year": "2023",
     "upload_to_s3": false,
-    "overwrite": false
+    "overwrite": false,
+    "overwrite_metadata": false
   }
   ```
 - **Required Fields**:
@@ -2157,7 +2158,8 @@ All names are case-insensitive. Collections are only available after `generate_s
 - **Optional Fields**:
   - `start_year` (string, default: `""`): Starting year for the collection
   - `upload_to_s3` (boolean, default: `false`): Whether to upload the generated collection to S3
-  - `overwrite` (boolean, default: `false`): Whether to overwrite an existing collection
+  - `overwrite` (boolean, default: `false`): Whether to re-generate and replace an existing STAC item on disk
+  - `overwrite_metadata` (boolean, default: `false`): Whether to re-download shared reference CSVs (layer descriptions, vector column descriptions) from GitHub. Use this when the upstream metadata has changed; otherwise the locally cached copies are used.
 - **Success Response** (`200 OK`):
   ```json
   {
@@ -2180,4 +2182,5 @@ All names are case-insensitive. Collections are only available after `generate_s
 - **Notes**:
   - The generation runs asynchronously; a `200` response only confirms the task was enqueued.
   - Use `upload_to_s3: true` to persist the output to S3 after generation.
-  - Use `overwrite: true` to regenerate and replace an existing collection.
+  - Use `overwrite: true` to re-generate and replace an existing STAC item without touching the cached metadata CSVs.
+  - Use `overwrite_metadata: true` to force a fresh download of the shared layer-description and vector-column-description CSVs from GitHub. This is independent of `overwrite` — you can refresh metadata without re-generating the STAC item, or combine both flags.
