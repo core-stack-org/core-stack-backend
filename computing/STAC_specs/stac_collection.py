@@ -195,9 +195,9 @@ class MetadataProvider:
     def __init__(self, config):
         self.config = config
 
-    def get_layer_description(self, layer_name, overwrite=False):
+    def get_layer_description(self, layer_name, overwrite_metadata=False):
         path = self.config.layer_desc_csv
-        if os.path.exists(path) and not overwrite:
+        if os.path.exists(path) and not overwrite_metadata:
             df = pd.read_csv(path)
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -233,9 +233,9 @@ class MetadataProvider:
             "theme": row["theme"],
         }
 
-    def get_vector_column_descriptions(self, ee_layer_name, overwrite=False):
+    def get_vector_column_descriptions(self, ee_layer_name, overwrite_metadata=False):
         path = self.config.column_desc_csv
-        if os.path.exists(path) and not overwrite:
+        if os.path.exists(path) and not overwrite_metadata:
             df = pd.read_csv(path)
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -542,8 +542,9 @@ class BaseSTACItemBuilder(ABC):
         self._ws = None
         self._gs_layer = None
 
-    def build(self, state, district, block, layer_name, overwrite=False, **kwargs):
-        description = self.metadata.get_layer_description(layer_name, overwrite)
+    def build(self, state, district, block, layer_name, overwrite=False,
+              overwrite_metadata=False, **kwargs):
+        description = self.metadata.get_layer_description(layer_name, overwrite_metadata)
         layer_map = self.metadata.get_layer_mapping(
             layer_name, district, block, kwargs.get("start_year", ""),
         )
@@ -552,7 +553,8 @@ class BaseSTACItemBuilder(ABC):
         if item is None:
             return None
         item = self._add_data_asset(item, layer_map)
-        item = self._add_extensions(item, layer_map, overwrite=overwrite, **kwargs)
+        item = self._add_extensions(item, layer_map, overwrite_metadata=overwrite_metadata,
+                                    **kwargs)
         self._add_style_asset(item, layer_map)
         item = self._add_thumbnail(item, state, district, block,
                                    layer_name, layer_map, **kwargs)
@@ -743,7 +745,7 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
 
     def _add_extensions(self, item, layer_map, **kw):
         col_desc = self.metadata.get_vector_column_descriptions(
-            layer_map["ee_layer_name"], kw.get("overwrite", False),
+            layer_map["ee_layer_name"], kw.get("overwrite_metadata", False),
         )
         desc_map = dict(zip(col_desc["column_name"], col_desc["column_description"]))
 
@@ -780,11 +782,13 @@ class STACCollectionGenerator:
         return (self.config, self.geoserver, self.metadata, self.style_parser)
 
     def generate_raster(self, state, district, block, layer_name,
-                        start_year="", upload_to_s3=False, overwrite=False):
+                        start_year="", upload_to_s3=False, overwrite=False,
+                        overwrite_metadata=False):
         state, district, block = (sanitize_text(x.lower()) for x in (state, district, block))
         builder = RasterSTACItemBuilder(*self._builder_args())
         item = builder.build(state, district, block, layer_name,
-                             overwrite=overwrite, start_year=start_year)
+                             overwrite=overwrite, overwrite_metadata=overwrite_metadata,
+                             start_year=start_year)
         if item is None:
             return False
         self.catalog_mgr.update(state, district, block, item)
@@ -793,10 +797,11 @@ class STACCollectionGenerator:
         return True
 
     def generate_vector(self, state, district, block, layer_name,
-                        upload_to_s3=False, overwrite=False):
+                        upload_to_s3=False, overwrite=False, overwrite_metadata=False):
         state, district, block = (sanitize_text(x.lower()) for x in (state, district, block))
         builder = VectorSTACItemBuilder(*self._builder_args())
-        item = builder.build(state, district, block, layer_name, overwrite=overwrite)
+        item = builder.build(state, district, block, layer_name,
+                             overwrite=overwrite, overwrite_metadata=overwrite_metadata)
         if item is None:
             return False
         self.catalog_mgr.update(state, district, block, item)
@@ -819,17 +824,20 @@ def _make_celery_task():
     @app.task(bind=True)
     def generate_stac_collection_task(self, layer_type, state, district, block,
                                       layer_name, start_year="",
-                                      upload_to_s3=False, overwrite=False):
+                                      upload_to_s3=False, overwrite=False,
+                                      overwrite_metadata=False):
         generator = STACCollectionGenerator()
         if layer_type == "raster":
             return generator.generate_raster(
                 state, district, block, layer_name,
                 start_year=start_year, upload_to_s3=upload_to_s3, overwrite=overwrite,
+                overwrite_metadata=overwrite_metadata,
             )
         elif layer_type == "vector":
             return generator.generate_vector(
                 state, district, block, layer_name,
                 upload_to_s3=upload_to_s3, overwrite=overwrite,
+                overwrite_metadata=overwrite_metadata,
             )
         else:
             raise ValueError(f"Unknown layer_type: {layer_type}")
