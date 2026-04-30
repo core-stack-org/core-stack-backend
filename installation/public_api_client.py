@@ -276,7 +276,7 @@ def _load_hierarchy_matching_backend() -> tuple[dict[str, Any], str, Exception |
             candidates: list[str],
             *,
             limit: int = 3,
-            auto_accept_score: float = 0.84,
+            auto_accept_score: float = 0.80,
             min_margin: float = 0.06,
             min_score: float = 0.0,
         ) -> FallbackCandidateResolution:
@@ -309,7 +309,7 @@ def _load_hierarchy_matching_backend() -> tuple[dict[str, Any], str, Exception |
             district_query: str | None = None,
             tehsil_query: str | None = None,
             limit: int = 3,
-            auto_accept_score: float = 0.84,
+            auto_accept_score: float = 0.80,
             min_margin: float = 0.06,
         ) -> FallbackHierarchyResolution:
             ranked: list[FallbackHierarchyScore] = []
@@ -409,7 +409,7 @@ DEFAULT_ACTIVE_LOCATIONS_FILE = (
     / "activated_locations"
     / "active_locations.json"
 )
-DEFAULT_FUZZY_AUTO_ACCEPT_SCORE = 0.84
+DEFAULT_FUZZY_AUTO_ACCEPT_SCORE = 0.80
 DEFAULT_FUZZY_MIN_MARGIN = 0.06
 FILTER_FUZZY_AUTO_ACCEPT_SCORE = 0.70
 FILTER_FUZZY_MIN_MARGIN = 0.08
