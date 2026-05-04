@@ -2106,6 +2106,8 @@ Approve the DPR without touching individual records:
 | `APPROVED` | `is_dpr_approved = True` |
 | `REJECTED` | _(no change to plan fields)_ |
 
+**Reverse sync**: When `PlanApp.is_dpr_approved` is set to `True` via the Update Watershed Plan endpoint (`PUT`/`PATCH`), the linked `DPR_Report.status` is automatically set to `APPROVED`. This only fires when the field transitions from `False` → `True`, not on repeated updates.
+
 **Error Responses**:
 - `400 Bad Request` — no fields provided, or invalid value for any field
 - `404 Not Found` — plan or DPR report not found
