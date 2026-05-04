@@ -282,9 +282,7 @@ def get_osm_data(state, district, block, uid):
             way["highway"="construction"]({miny},{minx},{maxy},{maxx});
             way["highway"="milestone"]({miny},{minx},{maxy},{maxx});
         );
-        out body;
-        >;
-        out skel qt;
+        out body geom;
         """
 
         response = {}
@@ -297,22 +295,40 @@ def get_osm_data(state, district, block, uid):
             logger.info(f"No cached data found. Fetching from Overpass API for location: {district}_{block}")
             
             try:
-                response = requests.get(OVERPASS_URL, params={"data": overpass_query})
+                headers = {
+                    'Accept': 'application/json',
+                    'User-Agent': 'CoreStack-GIS/1.0'
+                }
+                
+                response = requests.post(
+                    OVERPASS_URL,
+                    data={"data": overpass_query},
+                    headers=headers,
+                    timeout=60  # Overpass can be slow for large queries
+                )
+                response.raise_for_status()
                 response = response.json()
                 
                 # if DEBUG: 
-                    # Save to file (locally)
-                    # with open('overpass_response.json', 'w', encoding='utf-8') as f:
-                    #     json.dump(response, f, indent=2, ensure_ascii=False)
+                #     with open('overpass_response.json', 'w', encoding='utf-8') as f:
+                #         json.dump(response, f, indent=2, ensure_ascii=False)
 
                 block_detail = Overpass_Block_Details.objects.create(
-                    location = f"{district}_{block}",
-                    overpass_response = response
+                    location=f"{district}_{block}",
+                    overpass_response=response
                 )
                 logger.info(f"Response saved to DB for location: {district}_{block}")
             
+            except requests.exceptions.Timeout:
+                logger.error(f"Overpass API timeout for {district}_{block}")
+                raise
+            except requests.exceptions.HTTPError as e:
+                logger.error(f"HTTP {e.response.status_code} error fetching Overpass data: {e.response.text[:200]}")
+                raise
             except Exception as e:
-                logger.info("Not able to fetch the Overpass API Info", e)
+                # FIX: Don't pass exception as format argument
+                logger.error(f"Failed to fetch Overpass API data: {str(e)}")
+                raise
 
         # dictionary for storage
         names = {
