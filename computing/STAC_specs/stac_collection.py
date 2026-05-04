@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import datetime
-import functools
 import os
 import re
 import subprocess
@@ -205,10 +204,17 @@ class MetadataProvider:
             df.to_csv(path)
 
         match = df[df["layer_name"] == layer_name]
-        return match["layer_description"].iloc[0] if not match.empty else ""
+        desc = match["layer_description"].iloc[0] if not match.empty else ""
+        return desc if desc else layer_name.replace("_", " ").title()
 
-    def get_layer_mapping(self, layer_name, district, block, start_year=""):
-        df = pd.read_csv(self.config.layer_map_csv)
+    def get_layer_mapping(self, layer_name, district, block, start_year="", overwrite_metadata=False):
+        path = self.config.layer_map_csv
+        if os.path.exists(path) and not overwrite_metadata:
+            df = pd.read_csv(path)
+        else:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
+            df.to_csv(path)
         row = df[df["layer_name"] == layer_name].iloc[0]
         gs_layer = row["geoserver_layer_name"]
 
@@ -547,6 +553,7 @@ class BaseSTACItemBuilder(ABC):
         description = self.metadata.get_layer_description(layer_name, overwrite_metadata)
         layer_map = self.metadata.get_layer_mapping(
             layer_name, district, block, kwargs.get("start_year", ""),
+            overwrite_metadata=overwrite_metadata,
         )
         item = self._create_item(state, district, block, layer_name,
                                  description, layer_map, **kwargs)
@@ -754,7 +761,7 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
             {
                 "name": col["name"],
                 "type": col["type"],
-                "description": desc_map.get(col["name"], ""),
+                "description": desc_map.get(col["name"]) or col["name"],
             }
             for col in self._columns
         ]
@@ -815,31 +822,43 @@ class STACCollectionGenerator:
 
 
 # ---------------------------------------------------------------------------
-# Celery task entry point
+# Celery task entry point (module-level so workers autoload by task name)
 # ---------------------------------------------------------------------------
 
-@functools.lru_cache(maxsize=1)
-def _make_celery_task():
-    
-    @app.task(bind=True)
-    def generate_stac_collection_task(self, layer_type, state, district, block,
-                                      layer_name, start_year="",
-                                      upload_to_s3=False, overwrite=False,
-                                      overwrite_metadata=False):
-        generator = STACCollectionGenerator()
-        if layer_type == "raster":
-            return generator.generate_raster(
-                state, district, block, layer_name,
-                start_year=start_year, upload_to_s3=upload_to_s3, overwrite=overwrite,
-                overwrite_metadata=overwrite_metadata,
-            )
-        elif layer_type == "vector":
-            return generator.generate_vector(
-                state, district, block, layer_name,
-                upload_to_s3=upload_to_s3, overwrite=overwrite,
-                overwrite_metadata=overwrite_metadata,
-            )
-        else:
-            raise ValueError(f"Unknown layer_type: {layer_type}")
 
-    return generate_stac_collection_task
+@app.task(bind=True)
+def generate_stac_collection_task(
+    self,
+    layer_type,
+    state,
+    district,
+    block,
+    layer_name,
+    start_year="",
+    upload_to_s3=False,
+    overwrite=False,
+    overwrite_metadata=False,
+):
+    generator = STACCollectionGenerator()
+    if layer_type == "raster":
+        return generator.generate_raster(
+            state,
+            district,
+            block,
+            layer_name,
+            start_year=start_year,
+            upload_to_s3=upload_to_s3,
+            overwrite=overwrite,
+            overwrite_metadata=overwrite_metadata,
+        )
+    if layer_type == "vector":
+        return generator.generate_vector(
+            state,
+            district,
+            block,
+            layer_name,
+            upload_to_s3=upload_to_s3,
+            overwrite=overwrite,
+            overwrite_metadata=overwrite_metadata,
+        )
+    raise ValueError(f"Unknown layer_type: {layer_type}")
