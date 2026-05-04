@@ -34,8 +34,10 @@ from .serializers import (
 from .services import (
     get_crops_data,
     get_dpr_report_status,
+    get_dpr_report_status_summary,
     get_dpr_summary,
     get_dpr_status_tracking,
+    get_global_status_tracking,
     get_livestock_data,
     get_livelihood_data,
     get_maintenance_data,
@@ -705,6 +707,53 @@ def dpr_livelihood(request, plan_id):
     if err:
         return err
     return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)
+
+
+# MARK: DPR Report Status Summary
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_report_status_summary(request):
+    filters = {}
+    for key in ("state_id", "district_id", "block_id", "organization_id"):
+        val = request.query_params.get(key)
+        if val:
+            try:
+                filters[key] = int(val)
+            except ValueError:
+                return Response(
+                    {"error": f"'{key}' must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+    return Response(get_dpr_report_status_summary(filters))
+
+
+# MARK: Global Status Tracking
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_global_status_tracking(request):
+    filters = {}
+    for key in ("state_id", "district_id", "block_id", "organization_id"):
+        val = request.query_params.get(key)
+        if val:
+            try:
+                filters[key] = int(val)
+            except ValueError:
+                return Response(
+                    {"error": f"'{key}' must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+    status_filter = request.query_params.get("status")
+    if status_filter:
+        from .services import VALID_DEMAND_STATUSES
+        if status_filter not in VALID_DEMAND_STATUSES:
+            return Response(
+                {"error": f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        filters["status"] = status_filter
+
+    return Response(get_global_status_tracking(filters))
 
 
 # MARK: DPR Status Tracking

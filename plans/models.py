@@ -6,11 +6,10 @@ from projects.models import Project
 from users.models import User
 
 PLAN_STATUS_CHOICES = [
-    ("IN_PROGRESS", "IN_PROGRESS"),
-    ("DPR_REVIEW_PHASE", "DPR_REVIEW_PHASE"),
-    ("DPR_SUBMISSION_PHASE", "DPR_SUBMISSION_PHASE"),
-    ("ARCHIVED", "ARCHIVED"),
     ("COMPLETED", "COMPLETED"),
+    ("SUBMITTED", "SUBMITTED"),
+    ("APPROVED", "APPROVED"),
+    ("REJECTED", "REJECTED"),
 ]
 
 
