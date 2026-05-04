@@ -992,7 +992,6 @@ def generate_swb_layer_with_max_so_catchment(
     return roi.map(compute_for_feature)
 
 
-
 def _get_prod_backend_url():
     return getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
 
@@ -1023,14 +1022,20 @@ def _sync_layer_to_prod_db(payload: dict):
             )
             return None
         layer_id = response.json().get("layer_id")
-        logger.info("Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id)
+        logger.info(
+            "Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id
+        )
         return layer_id
     except requests.RequestException as e:
-        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+        logger.error(
+            "Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e
+        )
         return None
 
 
-def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
+def _update_layer_sync_remote(
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+):
     prod_url = _get_prod_backend_url()
     if not prod_url or layer_id is None:
         return
@@ -1058,56 +1063,10 @@ def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_ge
         else:
             logger.info("Layer sync status updated on prod DB for id=%s.", layer_id)
     except requests.RequestException as e:
-        logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
-
-
-def save_layer_info_to_db(
-    state,
-    district,
-    block,
-    layer_name,
-    asset_id,
-    dataset_name,
-    sync_to_geoserver=False,
-    layer_version="1.0",
-    algorithm=None,
-    algorithm_version="1.0",
-    misc=None,
-    is_override=False,
-):
-    if _get_prod_backend_url():
-        return _sync_layer_to_prod_db({
-            "state": state,
-            "district": district,
-            "block": block,
-            "layer_name": layer_name,
-            "asset_id": asset_id,
-            "dataset_name": dataset_name,
-            "sync_to_geoserver": sync_to_geoserver,
-            "layer_version": layer_version,
-            "algorithm": algorithm,
-            "algorithm_version": algorithm_version,
-            "misc": misc,
-            "is_override": is_override,
-        })
-
-    print("inside the save_layer_info_to_db function")
-
-    dataset = Dataset.objects.get(name=dataset_name)
-
-    try:
-        state_obj = StateSOI.objects.get(state_name__iexact=state)
-        district_obj = DistrictSOI.objects.get(
-            district_name__iexact=district, state=state_obj
+        logger.error(
+            "Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e
         )
-        block_obj = TehsilSOI.objects.get(
-            tehsil_name__iexact=block, district=district_obj
-        )
-    except Exception as e:
-        print("Error fetching in state district block:", e)
-        return
 
-    is_public = is_asset_public(asset_id)
 
     # Check if there’s an existing layer
     existing_layer = (
@@ -1217,4 +1176,3 @@ def update_layer_sync_status(
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
-
