@@ -83,7 +83,7 @@ from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
-from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
+from .STAC_specs.stac_collection import generate_stac_collection_task
 
 
 @api_security_check(allowed_methods="POST")
@@ -1608,7 +1608,7 @@ def generate_stac_collection(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _make_stac_task().apply_async(
+        generate_stac_collection_task.apply_async(
             kwargs={
                 "layer_type": layer_type,
                 "state": state,

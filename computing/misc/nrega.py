@@ -11,9 +11,7 @@ from computing.utils import (
 from utilities.constants import (
     NREGA_ASSETS_OUTPUT_DIR,
 )
-import boto3
-from io import BytesIO
-from nrm_app.settings import NREGA_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY
+from nrm_app.settings import NREGA_BUCKET
 from utilities.gee_utils import (
     gdf_to_ee_fc,
     export_vector_asset_to_gee,
@@ -45,26 +43,25 @@ def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
 
 @app.task(bind=True)
 def clip_nrega_district_block(self, state, district, block, gee_account_id):
-    print("Start nrega asset clipping")
+    print(f"Start nrega asset clipping for {state} - {district} - {block}")
     """
     It will generate nrega layer for given location at tehsil level
     """
     ee_initialize(gee_account_id)
-    s3 = boto3.resource(
-        "s3",
-        region_name="ap-south-1",
-        aws_access_key_id=S3_ACCESS_KEY,
-        aws_secret_access_key=S3_SECRET_KEY,
-    )
 
-    key = f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+    nrega_geojson_file = (
+        f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+    )
+    nrega_file_url = (
+        f"https://{NREGA_BUCKET}.s3.ap-south-1.amazonaws.com/{nrega_geojson_file}"
+    )
     layer_at_geoserver = False
 
     try:
-        file_obj = s3.Object(NREGA_BUCKET, key).get()
-        gdf = gpd.read_file(BytesIO(file_obj["Body"].read()))
+        gdf = gpd.read_file(nrega_file_url)
+        print("File loaded successfully")
     except Exception as e:
-        print("Error while reading file from S3:", e)
+        print("Error while reading public file:", e)
         return layer_at_geoserver
 
     # Ensure CRS
