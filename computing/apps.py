@@ -4,3 +4,6 @@ from django.apps import AppConfig
 class ComputingConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "computing"
+
+    def ready(self):
+        import computing.tasks
