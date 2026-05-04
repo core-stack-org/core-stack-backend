@@ -15,7 +15,6 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
-from utilities.constants import AEZ
 
 
 @app.task(bind=True)
@@ -33,7 +32,7 @@ def lulc_on_plain_cluster(
     asset_id = get_gee_asset_path(state, district, block) + asset_description
 
     if not is_gee_asset_exists(asset_id):
-        aez_india = ee.FeatureCollection(AEZ)
+        aez_india = ee.FeatureCollection("users/mtpictd/agro_eco_regions")
 
         landforms = ee.Image(
             get_gee_asset_path(state, district, block)
@@ -75,19 +74,63 @@ def lulc_on_plain_cluster(
         study_area_lulc = lulc_img_collection.mode().clip(mwsheds)
         study_area_landforms = landforms.clip(mwsheds)
 
-        mwsheds_with_clusters = process_mws(mwsheds)
-        plain_mwsheds = mwsheds_with_clusters.filter(
-            ee.Filter.neq("terrain_cluster", 2)
-        )
         plain_centroids = aez_lulcXterrain_cluster_centroids[f"aez{aez_no}"]["plains"]
 
-        result = process_feature_collection(
-            plain_mwsheds, study_area_landforms, study_area_lulc, plain_centroids
-        )
-        print("Processing completed successfully")
-        task = export_vector_asset_to_gee(result, asset_description, asset_id)
-        task_id_list = check_task_status([task])
-        print("lulc_on_slope_cluster task completed - task_id_list:", task_id_list)
+        size = mwsheds.size().getInfo()
+        chunk_size = 50
+        mwsheds_list = mwsheds.toList(size) if size > 0 else ee.List([])
+
+        tasks = []
+        temp_assets = []
+        for i in range(0, size, chunk_size):
+            chunk_mwsheds = ee.FeatureCollection(mwsheds_list.slice(i, i + chunk_size))
+            chunk_with_clusters = process_mws(chunk_mwsheds)
+            plain_chunk = chunk_with_clusters.filter(
+                ee.Filter.neq("terrain_cluster", 2)
+            )
+
+            result_chunk = process_feature_collection(
+                plain_chunk, study_area_landforms, study_area_lulc, plain_centroids
+            )
+            chunk_asset_description = f"{asset_description}_{i}"
+            chunk_asset_id = f"{asset_id}_{i}"
+            temp_assets.append(chunk_asset_id)
+
+            task = export_vector_asset_to_gee(
+                result_chunk, chunk_asset_description, chunk_asset_id
+            )
+            if task:
+                tasks.append(task)
+
+        print("Started all chunk tasks")
+        task_id_list = check_task_status(tasks)
+        print("All chunk tasks completed:", task_id_list)
+
+        # Merge all chunks into one feature collection
+        valid_assets = [
+            chunk_id for chunk_id in temp_assets if is_gee_asset_exists(chunk_id)
+        ]
+        if valid_assets:
+            fc_list = [ee.FeatureCollection(chunk_id) for chunk_id in valid_assets]
+            merged_fc = ee.FeatureCollection(fc_list).flatten()
+
+            print("Starting merge task")
+            final_task = export_vector_asset_to_gee(
+                merged_fc, asset_description, asset_id
+            )
+            if final_task:
+                final_task_status = check_task_status([final_task])
+                print("Final merge task completed:", final_task_status)
+
+            # Clean up temporary assets
+            for chunk_id in valid_assets:
+                try:
+                    ee.data.deleteAsset(chunk_id)
+                    print(f"Deleted temp asset {chunk_id}")
+                except Exception as e:
+                    print(f"Failed to delete {chunk_id}: {e}")
+        else:
+            print("No valid chunks were generated.")
 
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):

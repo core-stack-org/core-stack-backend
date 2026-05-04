@@ -120,7 +120,7 @@ from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from django.conf import settings
-
+from .misc.digital_elevation_model import generate_dem_raster
 
 
 @api_security_check(allowed_methods="POST")
@@ -1926,7 +1926,9 @@ def update_layer_sync_remote(request):
         d = request.data
         layer_id = d.get("layer_id")
         if layer_id is None:
-            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         result = update_layer_sync_status(
             layer_id=layer_id,
@@ -1967,11 +1969,35 @@ def sync_layer_remote(request):
         )
         if layer_id is None:
             return Response(
-                {"error": "Failed to save layer — check state/district/block exist on this server."},
+                {
+                    "error": "Failed to save layer — check state/district/block exist on this server."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
     except KeyError as e:
-        return Response({"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_fabdem_raster(request):
+    print("Inside generate DEM raster layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_dem_raster.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print(f"Exception in generate DEM raster layer for {district} - {block}:: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
