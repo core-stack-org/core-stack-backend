@@ -13,6 +13,7 @@ from computing.local_compute_helper import (
     push_local_raster_to_geoserver,
     read_validated_vector_file,
     write_vector_output,
+    _push_raster_to_geoserver_instance,
 )
 
 LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
@@ -75,13 +76,19 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            from utilities.geoserver_utils import Geoserver
+            # from utilities.geoserver_utils import Geoserver
 
-            gs = Geoserver()
+            # gs = Geoserver()
 
-            # Pre-delete from our workspace to avoid "already exists" conflict
-            # across any workspace (e.g. stale store in workspace 'ne')
-            gs.delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
+            # # Pre-delete from our workspace to avoid "already exists" conflict
+            # # across any workspace (e.g. stale store in workspace 'ne')
+            # gs.delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
+            # local_geo = Geoserver()
+            # prod_geo = Geoserver(
+            #     service_url=prod_url,
+            #     username=settings.PROD_GEOSERVER_USERNAME,
+            #     password=settings.PROD_GEOSERVER_PASSWORD,
+            # )
 
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
