@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import datetime
+import logging
 import os
 import re
 import subprocess
@@ -15,9 +16,14 @@ from shapely.geometry import mapping, Polygon
 
 from computing.STAC_specs import constants
 from nrm_app.settings import (
-    BASE_DIR, S3_ACCESS_KEY, S3_SECRET_KEY,
-    GEOSERVER_USERNAME, GEOSERVER_PASSWORD,
+    BASE_DIR,
+    S3_ACCESS_KEY,
+    S3_SECRET_KEY,
+    GEOSERVER_USERNAME,
+    GEOSERVER_PASSWORD,
 )
+
+log = logging.getLogger(__name__)
 
 
 
@@ -40,6 +46,8 @@ JAVA_TYPE_MAP = {
     "java.sql.Date": "datetime64",
     "java.sql.Timestamp": "datetime64",
 }
+
+_THUMBNAIL_LONG_SIDE = 512
 
 
 @dataclass
@@ -95,21 +103,37 @@ class GeoServerClient:
             f"typeName={workspace}:{layer_name}&outputFormat=application/json"
         )
 
-    def wms_thumbnail_url(self, workspace, layer_name, bbox):
+    def wms_thumbnail_url(self, workspace, layer_name, bbox, style=""):
         bbox_str = ",".join(map(str, bbox))
+        width, height = self._thumbnail_dims(bbox)
         return (
             f"{self.base_url}/{workspace}/wms?"
             f"service=WMS&version=1.1.0&request=GetMap&"
             f"layers={workspace}:{layer_name}&"
             f"bbox={bbox_str}&"
-            f"width=300&height=300&srs=EPSG:4326&styles=&format=image/png"
+            f"width={width}&height={height}&srs=EPSG:4326&"
+            f"styles={style}&format=image/png&bgcolor=0xFFFFFF"
         )
+
+    @staticmethod
+    def _thumbnail_dims(bbox):
+        lon_range = max(bbox[2] - bbox[0], 1e-9)
+        lat_range = max(bbox[3] - bbox[1], 1e-9)
+        aspect = lon_range / lat_range
+        if aspect >= 1:
+            return _THUMBNAIL_LONG_SIDE, max(int(_THUMBNAIL_LONG_SIDE / aspect), 1)
+        return max(int(_THUMBNAIL_LONG_SIDE * aspect), 1), _THUMBNAIL_LONG_SIDE
 
     # -- raster metadata via WCS DescribeCoverage ----------------------------
 
     def fetch_raster_metadata(self, describe_url):
+        log.info("Fetching raster metadata: %s", describe_url)
         response = self._get(describe_url)
         if response.status_code != 200:
+            log.error(
+                "Raster DescribeCoverage failed [status=%s] url=%s body=%s",
+                response.status_code, describe_url, response.text[:300],
+            )
             return None
 
         root = ET.fromstring(response.content)
@@ -140,7 +164,7 @@ class GeoServerClient:
         else:
             shape = [0, 0]
 
-        return bbox, mapping(footprint), "EPSG:4326", shape
+        return bbox, mapping(footprint), 4326, shape
 
     # -- vector metadata via REST API ----------------------------------------
     # Single lightweight JSON call replaces downloading the full GeoJSON.
@@ -150,8 +174,13 @@ class GeoServerClient:
             f"{self.base_url}/rest/workspaces/{workspace}"
             f"/featuretypes/{layer_name}.json"
         )
+        log.info("Fetching vector metadata: %s", url)
         response = self._get(url)
         if response.status_code != 200:
+            log.error(
+                "Vector featuretype fetch failed [status=%s] url=%s body=%s",
+                response.status_code, url, response.text[:300],
+            )
             return None
 
         ft = response.json()["featureType"]
@@ -174,15 +203,66 @@ class GeoServerClient:
 
         return bbox, mapping(footprint), columns
 
+    # -- GeoServer style introspection ---------------------------------------
+    # Resolves the layer's default style so the WMS thumbnail request applies
+    # the actual SLD configured on GeoServer instead of the bare fallback.
+
+    def fetch_layer_default_style(self, workspace, layer_name):
+        url = f"{self.base_url}/rest/layers/{workspace}:{layer_name}.json"
+        log.info("Fetching layer info: %s", url)
+        response = self._get(url)
+        if response.status_code != 200:
+            log.error(
+                "Layer info fetch failed [status=%s] url=%s body=%s",
+                response.status_code, url, response.text[:300],
+            )
+            return None
+
+        layer = response.json().get("layer", {})
+        default_style = layer.get("defaultStyle") or {}
+        style_name = default_style.get("name")
+        if not style_name:
+            log.warning("No defaultStyle set for %s:%s", workspace, layer_name)
+            return None
+        log.info("Layer %s:%s default style = %s", workspace, layer_name, style_name)
+        return style_name
+
+    def list_workspace_styles(self, workspace):
+        url = f"{self.base_url}/rest/workspaces/{workspace}/styles.json"
+        response = self._get(url)
+        if response.status_code != 200:
+            log.error(
+                "List styles failed [status=%s] url=%s body=%s",
+                response.status_code, url, response.text[:300],
+            )
+            return []
+        styles = response.json().get("styles") or {}
+        return [s["name"] for s in (styles.get("style") or [])]
+
     # -- thumbnail download (WMS GetMap — works for both raster & vector) ----
 
     def download_thumbnail(self, url, output_path):
+        log.info("Downloading thumbnail: %s", url)
         response = self._get(url)
+        content_type = response.headers.get("Content-Type", "")
         if response.status_code != 200:
+            log.error(
+                "Thumbnail download failed [status=%s] content_type=%s url=%s body=%s",
+                response.status_code, content_type, url, response.text[:300],
+            )
+            return False
+        if "image" not in content_type:
+            log.error(
+                "Thumbnail response is not an image [content_type=%s] url=%s body=%s",
+                content_type, url, response.text[:300],
+            )
             return False
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as f:
             f.write(response.content)
+        log.info(
+            "Thumbnail saved [%d bytes] -> %s", len(response.content), output_path,
+        )
         return True
 
 
@@ -201,7 +281,7 @@ class MetadataProvider:
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.LAYER_DESC_GITHUB_URL)
-            df.to_csv(path)
+            df.to_csv(path, index=False)
 
         match = df[df["layer_name"] == layer_name]
         desc = match["layer_description"].iloc[0] if not match.empty else ""
@@ -214,7 +294,7 @@ class MetadataProvider:
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
-            df.to_csv(path)
+            df.to_csv(path, index=False)
         row = df[df["layer_name"] == layer_name].iloc[0]
         gs_layer = row["geoserver_layer_name"]
 
@@ -246,7 +326,7 @@ class MetadataProvider:
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.VECTOR_COLUMN_DESC_GITHUB_URL)
-            df.to_csv(path)
+            df.to_csv(path, index=False)
 
         return df[df["ee_layer_name"] == ee_layer_name].rename(
             {"column_name_description": "column_description"}, axis=1
@@ -324,27 +404,46 @@ class CatalogManager:
 
     def update(self, state, district, block, item):
         bbox = item.bbox
+        log.info("Updating catalog: state=%s district=%s block=%s item=%s bbox=%s",
+                 state, district, block, item.id, bbox)
 
         block_existed = self._upsert_block(state, district, block, bbox, item)
         if block_existed:
+            log.info("Block collection existed; merged item into it")
+            self._expand_extent(self._district_dir(state, district), bbox)
+            self._expand_extent(self._state_dir(state), bbox)
             return True
 
         block_coll = self._new_block_collection(state, district, block, bbox, item)
 
         district_existed = self._upsert_district(state, district, bbox, block_coll)
         if district_existed:
+            log.info("District existed; created new block under it")
+            self._expand_extent(self._state_dir(state), bbox)
             return True
 
         district_coll = self._new_district_collection(state, district, bbox, block_coll)
 
         state_existed = self._upsert_state(state, bbox, district_coll)
         if state_existed:
+            log.info("State existed; created new district under it")
             return True
 
         state_coll = self._new_state_collection(state, bbox, district_coll)
+        log.info("Created new state collection; updating tehsil and root catalogs")
         self._upsert_tehsil(state_coll)
         self._upsert_root()
         return True
+
+    def _expand_extent(self, dir_path, bbox):
+        path = os.path.join(dir_path, "collection.json")
+        if not os.path.exists(path):
+            return
+        coll = pystac.read_file(path)
+        coll.extent.spatial.bboxes = [
+            self._merge_bboxes(coll.extent.spatial.bboxes[0], bbox)
+        ]
+        coll.save_object()
 
     # -- block ---------------------------------------------------------------
 
@@ -524,14 +623,30 @@ class S3Syncer:
         self.secret_key = secret_key
 
     def sync(self, folder_path, s3_uri):
-        os.environ["AWS_ACCESS_KEY_ID"] = self.access_key
-        os.environ["AWS_SECRET_ACCESS_KEY"] = self.secret_key
-        source = os.path.basename(folder_path)
-        destination = s3_uri + source + "/"
+        source = os.path.relpath(folder_path, BASE_DIR)
+        destination = s3_uri + os.path.basename(folder_path) + "/"
+        env = {
+            **os.environ,
+            "AWS_ACCESS_KEY_ID": self.access_key,
+            "AWS_SECRET_ACCESS_KEY": self.secret_key,
+        }
+        log.info("S3 sync starting: %s -> %s (cwd=%s)", source, destination, BASE_DIR)
         result = subprocess.run(
             ["aws", "s3", "sync", source, destination],
+            cwd=BASE_DIR, env=env,
             capture_output=True, text=True,
         )
+        if result.returncode == 0:
+            log.info(
+                "S3 sync OK: %s -> %s\n%s",
+                source, destination, result.stdout.strip() or "(no changes)",
+            )
+        else:
+            log.error(
+                "S3 sync FAILED [rc=%s]: %s -> %s\nstdout:\n%s\nstderr:\n%s",
+                result.returncode, source, destination,
+                result.stdout.strip(), result.stderr.strip(),
+            )
         return result.returncode
 
 
@@ -550,14 +665,20 @@ class BaseSTACItemBuilder(ABC):
 
     def build(self, state, district, block, layer_name, overwrite=False,
               overwrite_metadata=False, **kwargs):
+        log.info(
+            "Building STAC item: state=%s district=%s block=%s layer=%s kwargs=%s",
+            state, district, block, layer_name, kwargs,
+        )
         description = self.metadata.get_layer_description(layer_name, overwrite_metadata)
         layer_map = self.metadata.get_layer_mapping(
             layer_name, district, block, kwargs.get("start_year", ""),
             overwrite_metadata=overwrite_metadata,
         )
+        log.debug("Resolved layer_map: %s", layer_map)
         item = self._create_item(state, district, block, layer_name,
                                  description, layer_map, **kwargs)
         if item is None:
+            log.error("Item creation returned None for layer=%s", layer_name)
             return None
         item = self._add_data_asset(item, layer_map)
         item = self._add_extensions(item, layer_map, overwrite_metadata=overwrite_metadata,
@@ -565,6 +686,10 @@ class BaseSTACItemBuilder(ABC):
         self._add_style_asset(item, layer_map)
         item = self._add_thumbnail(item, state, district, block,
                                    layer_name, layer_map, **kwargs)
+        log.info(
+            "Built STAC item id=%s assets=%s bbox=%s",
+            item.id, list(item.assets.keys()), item.bbox,
+        )
         return item
 
     @abstractmethod
@@ -585,9 +710,21 @@ class BaseSTACItemBuilder(ABC):
         start_year = kw.get("start_year", "")
         fname = self._thumbnail_filename(state, district, block, layer_name, start_year)
         path = os.path.join(self.config.thumbnail_dir, fname)
-        url = self.geoserver.wms_thumbnail_url(self._ws, self._gs_layer, item.bbox)
+        style = self.geoserver.fetch_layer_default_style(self._ws, self._gs_layer) or ""
+        url = self.geoserver.wms_thumbnail_url(
+            self._ws, self._gs_layer, item.bbox, style=style,
+        )
         if self.geoserver.download_thumbnail(url, path):
             self._add_thumbnail_asset(item, path)
+            log.info(
+                "Thumbnail asset attached to item=%s style=%s href=%s",
+                item.id, style or "(WMS default)", item.assets["thumbnail"].href,
+            )
+        else:
+            log.warning(
+                "Skipping thumbnail asset for item=%s (download failed). url=%s",
+                item.id, url,
+            )
         return item
 
     @staticmethod
@@ -622,7 +759,7 @@ class BaseSTACItemBuilder(ABC):
     def _item_id(state, district, block, layer_name, start_year=""):
         parts = [state, district, block, layer_name]
         if start_year:
-            parts.append(start_year)
+            parts.append(str(start_year))
         return "_".join(parts)
 
     @staticmethod
@@ -649,7 +786,8 @@ class RasterSTACItemBuilder(BaseSTACItemBuilder):
         desc_url = self.geoserver.raster_describe_url(ws, gs_layer)
         meta = self.geoserver.fetch_raster_metadata(desc_url)
         if meta is None:
-            print(f"STAC_Error: Could not fetch metadata for {layer_name}")
+            log.error("Could not fetch raster metadata for layer=%s ws=%s gs_layer=%s",
+                      layer_name, ws, gs_layer)
             return None
 
         bbox, footprint, crs, shape = meta
@@ -719,7 +857,8 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
 
         meta = self.geoserver.fetch_vector_metadata(ws, gs_layer)
         if meta is None:
-            print(f"STAC_Error: Could not fetch metadata for {layer_name}")
+            log.error("Could not fetch vector metadata for layer=%s ws=%s gs_layer=%s",
+                      layer_name, ws, gs_layer)
             return None
 
         bbox, footprint, columns = meta
@@ -791,34 +930,63 @@ class STACCollectionGenerator:
     def generate_raster(self, state, district, block, layer_name,
                         start_year="", upload_to_s3=False, overwrite=False,
                         overwrite_metadata=False):
+        log.info(
+            "generate_raster start: state=%s district=%s block=%s layer=%s "
+            "start_year=%s upload_to_s3=%s overwrite=%s overwrite_metadata=%s",
+            state, district, block, layer_name, start_year,
+            upload_to_s3, overwrite, overwrite_metadata,
+        )
         state, district, block = (sanitize_text(x.lower()) for x in (state, district, block))
         builder = RasterSTACItemBuilder(*self._builder_args())
         item = builder.build(state, district, block, layer_name,
                              overwrite=overwrite, overwrite_metadata=overwrite_metadata,
                              start_year=start_year)
         if item is None:
+            log.error("generate_raster aborted: item not built for layer=%s", layer_name)
             return False
         self.catalog_mgr.update(state, district, block, item)
         if upload_to_s3:
             self._sync_s3()
+        else:
+            log.info("Skipping S3 sync (upload_to_s3=False)")
+        log.info("generate_raster done: item=%s", item.id)
         return True
 
     def generate_vector(self, state, district, block, layer_name,
                         upload_to_s3=False, overwrite=False, overwrite_metadata=False):
+        log.info(
+            "generate_vector start: state=%s district=%s block=%s layer=%s "
+            "upload_to_s3=%s overwrite=%s overwrite_metadata=%s",
+            state, district, block, layer_name,
+            upload_to_s3, overwrite, overwrite_metadata,
+        )
         state, district, block = (sanitize_text(x.lower()) for x in (state, district, block))
         builder = VectorSTACItemBuilder(*self._builder_args())
         item = builder.build(state, district, block, layer_name,
                              overwrite=overwrite, overwrite_metadata=overwrite_metadata)
         if item is None:
+            log.error("generate_vector aborted: item not built for layer=%s", layer_name)
             return False
         self.catalog_mgr.update(state, district, block, item)
         if upload_to_s3:
             self._sync_s3()
+        else:
+            log.info("Skipping S3 sync (upload_to_s3=False)")
+        log.info("generate_vector done: item=%s", item.id)
         return True
 
     def _sync_s3(self):
-        self.s3_syncer.sync(self.config.stac_files_dir, self.config.s3_uri)
-        self.s3_syncer.sync(self.config.thumbnail_dir, self.config.s3_uri)
+        log.info("Starting S3 sync of STAC catalog and thumbnails to %s", self.config.s3_uri)
+        rc_catalog = self.s3_syncer.sync(self.config.stac_files_dir, self.config.s3_uri)
+        rc_thumbs = self.s3_syncer.sync(self.config.thumbnail_dir, self.config.s3_uri)
+        if rc_catalog == 0 and rc_thumbs == 0:
+            log.info("S3 sync complete: catalog + thumbnails uploaded successfully")
+        else:
+            log.error(
+                "S3 sync incomplete: catalog_rc=%s thumbnails_rc=%s",
+                rc_catalog, rc_thumbs,
+            )
+        return rc_catalog == 0 and rc_thumbs == 0
 
 
 # ---------------------------------------------------------------------------
