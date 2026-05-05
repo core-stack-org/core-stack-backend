@@ -17,7 +17,7 @@ from computing.local_compute_helper import (
 
 LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
 TERRAIN_RASTER_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
-GEOSERVER_STYLE = None
+GEOSERVER_STYLE = "Terrain_Style_11_Classes"
 GEOSERVER_WORKSPACE = "digital_elevation_model"
 ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
@@ -79,7 +79,7 @@ def run_raster_fabdem_local(
 
             # Pre-delete from our workspace to avoid "already exists" conflict
             # across any workspace (e.g. stale store in workspace 'ne')
-            delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
+            # delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
 
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
