@@ -75,7 +75,6 @@ def generate_dem_layer(
         )
 
     fabdem_img = ee.ImageCollection(FABDEM)
-    # CRS updated to 3857 beacuse of using tiles and Open Layers use the same.
     dem_raster = (
         fabdem_img.mosaic()
         .setDefaultProjection("EPSG:3857", None, 30)
