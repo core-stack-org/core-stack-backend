@@ -92,6 +92,8 @@ class PlanCreateSerializer(serializers.ModelSerializer):
             "is_dpr_generated",
             "is_dpr_reviewed",
             "is_dpr_approved",
+            "latitude",
+            "longitude",
         ]
 
     def validate(self, data):
@@ -161,6 +163,8 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
             "is_dpr_generated",
             "is_dpr_reviewed",
             "is_dpr_approved",
+            "latitude",
+            "longitude",
         ]
 
     def validate(self, data):

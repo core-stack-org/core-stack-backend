@@ -75,11 +75,11 @@ def extract_facilities(df_facilities, v_id):
         "public_distribution_system": get_max(
             [
                 row.get("pds_distance", -1),
-                row.get("csc_distance", -1),
             ]
         ),
         "financial_inclusion": get_max(
             [
+                row.get("csc_distance", -1),
                 row.get("bank_mitra_distance", -1),
                 row.get("bank_branch_distance", -1),
                 row.get("bank_atm_distance", -1),

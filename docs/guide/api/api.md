@@ -1845,6 +1845,8 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 
 | Endpoint | Paginated | Data Source |
 |---|---|---|
+| `GET dpr_data/report-status-summary/` | No | Count of `DPR_Report` records grouped by workflow status |
+| `GET dpr_data/status-tracking/` | No | Global totals by status across all plans (no per-plan detail) |
 | `GET dpr_data/{id}/summary/` | No | All ODK models (counts only) |
 | `GET dpr_data/{id}/team-details/` | No | `PlanApp` |
 | `GET dpr_data/{id}/village-brief/` | No | `PlanApp` + `ODK_settlement` |
@@ -1856,14 +1858,101 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 | `GET dpr_data/{id}/maintenance/?type=gw\|agri\|swb\|swb_rs` | Yes | `GW_maintenance`, `Agri_maintenance`, `SWB_maintenance`, `SWB_RS_maintenance` |
 | `GET dpr_data/{id}/nrm-works/` | Yes | `ODK_groundwater` + `ODK_agri` |
 | `GET dpr_data/{id}/livelihood/` | Yes | `ODK_livelihood` + `ODK_agrohorticulture` |
-| `GET dpr_data/{id}/status-tracking/` | No | All resource + demand models (counts by status) |
+| `GET dpr_data/{id}/status-tracking/` | No | All resource + demand models (counts by status, scoped to one plan) |
 | `PATCH dpr_data/{id}/demand-status/` | No | Any resource/demand model (single record update) |
 | `GET dpr_data/{id}/report-status/` | No | `DPR_Report` (current workflow status) |
 | `PATCH dpr_data/{id}/report-status/` | No | `DPR_Report` (update workflow status) |
 
 ---
 
-### Status Tracking
+### DPR Report Status Summary
+
+- **URL**: `/api/v1/dpr_data/report-status-summary/`
+- **Method**: GET
+- **Description**: Returns the count of `DPR_Report` records grouped by their workflow status. Use this to render summary badges or a dashboard card (e.g. "55 DPRs submitted, 40 approved").
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Query Parameters** (all optional):
+
+| Parameter | Type | Description |
+|---|---|---|
+| `state_id` | integer | Filter to DPR reports whose plan belongs to this state |
+| `district_id` | integer | Filter to DPR reports whose plan belongs to this district |
+| `block_id` | integer | Filter to DPR reports whose plan belongs to this block |
+| `organization_id` | integer | Filter to DPR reports whose plan belongs to this organization |
+
+- **Response**:
+  ```json
+  {
+    "total": 150,
+    "breakdown": {
+      "PENDING":   42,
+      "SUBMITTED": 55,
+      "APPROVED":  40,
+      "REVERTED":  8,
+      "REJECTED":  5
+    }
+  }
+  ```
+- **Notes**:
+  - All statuses from `DPR_STATUS_CHOICES` are always present in `breakdown`, even if their count is `0`.
+  - `total` is the sum of all status counts within the filtered scope.
+- **Error Responses**:
+  - `400 Bad Request` — non-integer value passed for any filter parameter
+
+---
+
+### Global Status Tracking
+
+- **URL**: `/api/v1/dpr_data/status-tracking/`
+- **Method**: GET
+- **Description**: Returns a per-plan breakdown of resource and demand counts by status, across **all** plans. Runs one `GROUP BY` query per model (12 total) regardless of plan count — designed for dashboard/review queue views.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Query Parameters** (all optional):
+
+| Parameter | Type | Description |
+|---|---|---|
+| `state_id` | integer | Filter to plans in this state |
+| `district_id` | integer | Filter to plans in this district |
+| `block_id` | integer | Filter to plans in this block |
+| `organization_id` | integer | Filter to plans belonging to this organization |
+| `status` | string | Only return plans that have ≥1 resource or demand in this status. One of `PENDING`, `SUBMITTED`, `APPROVED`, `REVERTED`, `REJECTED` |
+
+- **Response**:
+  ```json
+  {
+    "plan_count": 120,
+    "totals": {
+      "PENDING":   { "resources": 30, "demands": 20 },
+      "SUBMITTED": { "resources": 20, "demands": 10 },
+      "APPROVED":  { "resources": 15, "demands": 8 },
+      "REJECTED":  { "resources": 2,  "demands": 1 },
+      "REVERTED":  { "resources": 0,  "demands": 0 }
+    }
+  }
+  ```
+- **Notes**:
+  - `plan_count` is the number of plans included in the aggregation (after applying any filters).
+  - `totals` are scoped to the filtered plan set, not all plans globally.
+  - When `?status=SUBMITTED` is passed, `plan_count` and `totals` are computed over only the plans that have at least one resource or demand in `SUBMITTED` state — useful for a review queue summary badge.
+  - For per-plan breakdown, use `GET /api/v1/dpr_data/{plan_id}/status-tracking/` per plan.
+  - **Resources**: `ODK_settlement`, `ODK_well`, `ODK_waterbody`, `ODK_crop`
+  - **Demands**: `ODK_groundwater`, `ODK_agri`, `ODK_livelihood`, `ODK_agrohorticulture`, `GW_maintenance`, `SWB_RS_maintenance`, `SWB_maintenance`, `Agri_maintenance`
+  - Only `enabled=True` plans are included. Deleted records (`is_deleted=True`) are excluded from all counts.
+- **Examples**:
+  ```
+  GET /api/v1/dpr_data/status-tracking/
+  GET /api/v1/dpr_data/status-tracking/?state_id=3
+  GET /api/v1/dpr_data/status-tracking/?district_id=12&organization_id=1
+  GET /api/v1/dpr_data/status-tracking/?status=SUBMITTED
+  GET /api/v1/dpr_data/status-tracking/?block_id=55&status=APPROVED
+  ```
+- **Error Responses**:
+  - `400 Bad Request` — non-integer value passed for `state_id`, `district_id`, `block_id`, or `organization_id`
+  - `400 Bad Request` — `status` value not in `DEMAND_STATUS_CHOICES`
+
+---
+
+### Status Tracking (Per Plan)
 
 - **URL**: `/api/v1/dpr_data/{plan_id}/status-tracking/`
 - **Method**: GET
@@ -2009,6 +2098,16 @@ Approve the DPR without touching individual records:
 }
 ```
 
+**Side effects on the linked `PlanApp`** (one-way — fields are never automatically reset to `False`):
+
+| `status` set to | `PlanApp` fields auto-updated |
+|---|---|
+| `SUBMITTED` | `is_completed = True`, `is_dpr_reviewed = True` |
+| `APPROVED` | `is_dpr_approved = True` |
+| `REJECTED` | _(no change to plan fields)_ |
+
+**Reverse sync**: When `PlanApp.is_dpr_approved` is set to `True` via the Update Watershed Plan endpoint (`PUT`/`PATCH`), the linked `DPR_Report.status` is automatically set to `APPROVED`. This only fires when the field transitions from `False` → `True`, not on repeated updates.
+
 **Error Responses**:
 - `400 Bad Request` — no fields provided, or invalid value for any field
 - `404 Not Found` — plan or DPR report not found
@@ -2145,7 +2244,8 @@ All names are case-insensitive. Collections are only available after `generate_s
     "layer_type": "raster",
     "start_year": "2023",
     "upload_to_s3": false,
-    "overwrite": false
+    "overwrite": false,
+    "overwrite_metadata": false
   }
   ```
 - **Required Fields**:
@@ -2157,7 +2257,8 @@ All names are case-insensitive. Collections are only available after `generate_s
 - **Optional Fields**:
   - `start_year` (string, default: `""`): Starting year for the collection
   - `upload_to_s3` (boolean, default: `false`): Whether to upload the generated collection to S3
-  - `overwrite` (boolean, default: `false`): Whether to overwrite an existing collection
+  - `overwrite` (boolean, default: `false`): Whether to re-generate and replace an existing STAC item on disk
+  - `overwrite_metadata` (boolean, default: `false`): Whether to re-download shared reference CSVs (layer descriptions, vector column descriptions) from GitHub. Use this when the upstream metadata has changed; otherwise the locally cached copies are used.
 - **Success Response** (`200 OK`):
   ```json
   {
@@ -2180,4 +2281,5 @@ All names are case-insensitive. Collections are only available after `generate_s
 - **Notes**:
   - The generation runs asynchronously; a `200` response only confirms the task was enqueued.
   - Use `upload_to_s3: true` to persist the output to S3 after generation.
-  - Use `overwrite: true` to regenerate and replace an existing collection.
+  - Use `overwrite: true` to re-generate and replace an existing STAC item without touching the cached metadata CSVs.
+  - Use `overwrite_metadata: true` to force a fresh download of the shared layer-description and vector-column-description CSVs from GitHub. This is independent of `overwrite` — you can refresh metadata without re-generating the STAC item, or combine both flags.

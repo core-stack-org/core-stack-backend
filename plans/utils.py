@@ -17,6 +17,7 @@ from utilities.constants import (
     ODK_URL_swb,
     ODK_URL_waterbody,
     ODK_URL_well,
+    ODK_URL_crop
 )
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ def fetch_odk_data(csv_path, resource_type, block, plan_id):
         "settlement": ODK_URL_settlement,
         "well": ODK_URL_well,
         "waterbody": ODK_URL_waterbody,
+        "cropping" : ODK_URL_crop, 
         "plan_gw": ODK_URL_gw,
         "main_swb": ODK_URL_swb,
         "plan_agri": ODK_URL_agri,
@@ -82,6 +84,11 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
         )
     elif resource_type == "waterbody":
         modified_response_list = modify_response_list_waterbody(
+            response_list, block, plan_id
+        )
+    
+    elif resource_type == "cropping":
+        modified_response_list = modify_reponse_list_cropping(
             response_list, block, plan_id
         )
 
@@ -121,7 +128,7 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
         logger.warning(f"No ODK data found for the given Plan ID: {plan_id}")
         return False
 
-    if resource_type in ["settlement", "well", "waterbody"]:
+    if resource_type in ["settlement", "well", "waterbody", "cropping"]:
         header_keys = modified_response_list[0].keys()
         print("FIELD NAMES", header_keys)
         with open(csv_path, "w", encoding="utf-8") as output_file:
@@ -379,6 +386,85 @@ def modify_response_list_waterbody(res, block, plan_id):
             print("Exception in adding a water structure record: ", e)
             continue
         res_list.append(result)
+    return res_list
+
+
+# MARK: Modify ODK Cropping Data
+def modify_reponse_list_cropping(res, block, plan_id):
+    res_list = []
+    print(f"block name: {block} and plan id: {plan_id}")
+    
+    for result in res:
+        if result is None:
+            continue
+        
+        if result.get("__system", {}).get("reviewState") == "rejected":
+            continue
+        
+        try:
+            if normalize_name(result.get("block_name").lower()) != normalize_name(block):
+                continue
+        except AttributeError:
+            continue
+        
+
+        if str(result.get("plan_id")) != str(plan_id):
+            continue
+        
+
+        latitude = None
+        longitude = None
+
+        if (
+            isinstance(result, dict)
+            and result.get("GPS_point") is not None
+            and result["GPS_point"].get("point_mapappearance") is not None
+            and "coordinates" in result["GPS_point"]["point_mapappearance"]
+        ):
+            try:
+                latitude = result["GPS_point"]["point_mapappearance"]["coordinates"][1]
+                longitude = result["GPS_point"]["point_mapappearance"]["coordinates"][0]
+            except Exception as e:
+                print(f"Could not get the coordinates for crop patch: {e}")
+
+        if latitude is not None and longitude is not None:
+            print(result)
+            result["latitude"] = latitude
+            result["longitude"] = longitude
+
+        result["status_re"] = result["__system"]["reviewState"]
+        result["crop_id"] = result["__id"]
+        
+        # Settlement and land basic information (5 keys)
+        result["sett_name"] = result.get("beneficiary_settlement", "") or ""
+        result["uncropp_br"] = result.get("Uncropped_barren_land", "") or ""
+        result["irrigatn"] = result.get("select_multiple_widgets", "") or ""
+        result["land_cls"] = result.get("select_one_classified", "") or ""
+        result["crop_seas"] = result.get("select_one_practice", "") or ""
+        
+        # Kharif season information (3 keys)
+        result["crop_khrf"] = result.get("select_multiple_cropping_kharif", "") or ""
+        result["crop_kh_o"] = result.get("select_multiple_cropping_kharif_other", "") or ""
+        result["area_khrf"] = result.get("total_area_cultivation_kharif", "") or ""
+        
+        # Rabi season information (3 keys)
+        result["crops_rabi"] = result.get("select_multiple_cropping_Rabi", "") or ""
+        result["crop_rb_o"] = result.get("select_multiple_cropping_Rabi_other", "") or ""
+        result["area_rabi"] = result.get("total_area_cultivation_Rabi", "") or ""
+        
+        # Zaid season information (3 keys)
+        result["crops_zaid"] = result.get("select_multiple_cropping_Zaid", "") or ""
+        result["crop_zd_o"] = result.get("select_multiple_cropping_Zaid_other", "") or ""
+        result["area_zaid"] = result.get("total_area_cultivation_Zaid", "") or ""
+        
+        # Soil and productivity information (4 keys)
+        result["productiv"] = result.get("select_one_productivity", "") or ""
+        result["soil_deg"] = result.get("soil_degraded", "") or ""
+        result["deg_reas"] = result.get("select_one_reason_degradation", "") or ""
+        result["deg_reas2"] = result.get("select_one_reason_degradation_1", "") or ""
+        
+        res_list.append(result)
+    
     return res_list
 
 
