@@ -3,6 +3,7 @@ from utilities.gee_utils import valid_gee_text
 from nrm_app.celery import app
 
 from computing.local_compute_helper import (
+    PROJECT_ROOT,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
     build_output_vector_path,
@@ -14,15 +15,15 @@ from computing.local_compute_helper import (
     write_vector_output,
 )
 
-LOCAL_OUTPUT_BASE_DIR = "data/terrain/fabdem_local"
+LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
+TERRAIN_RASTER_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
 GEOSERVER_STYLE = None
 GEOSERVER_WORKSPACE = "digital_elevation_model"
 ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
-TERRAIN_RASTER_PATH = "data/fabdem/fabdem_pan_india.tif"
 
 
 # ---------------------------------------------------------------------------
-# Stage 1 — Raster  (unchanged logic, minor cleanups)
+# Stage 1 — Raster
 # ---------------------------------------------------------------------------
 
 
@@ -74,6 +75,12 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
+            from computing.utils import delete_raster_store
+
+            # Pre-delete from our workspace to avoid "already exists" conflict
+            # across any workspace (e.g. stale store in workspace 'ne')
+            delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
+
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
                 layer_name=layer_name,
@@ -223,13 +230,13 @@ def run_vector_fabdem_local(
                 "For non state/district/block runs, `asset_suffix` is required."
             )
         layer_name = f"{asset_suffix}_dem_vector".lower()
-        # For custom ROI runs, watersheds == ROI itself (single-polygon stats)
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
             district=district,
             block=block,
             precomputed_roi_dir=precomputed_roi_dir,
         )
+        print(f"Watershed boundary source: {watershed_source}")
 
     result_gdf = _compute_watershed_dem_stats(watersheds_gdf, raster_path)
     print(f"Computed DEM stats for {len(result_gdf)} watersheds")

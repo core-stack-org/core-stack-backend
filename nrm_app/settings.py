@@ -17,7 +17,6 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
-
 env = environ.Env()
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 environ.Env.read_env(str(ENV_FILE))
@@ -42,6 +41,7 @@ def resolve_env_path(name, default="", *, trailing_sep=False):
         resolved = resolved.rstrip("/\\") + os.sep
     return resolved
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -53,7 +53,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = resolve_env_path("TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True)
+TMP_LOCATION = resolve_env_path(
+    "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
+)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
@@ -139,7 +141,6 @@ else:
         "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
         "https://uat.dashboard.core-stack.org",
         "https://www.explorer.core-stack.org",
-        "https://www.explorer.core-stack.org/landscape_explorer",
         "https://development.d2s4eeyazvtd2g.amplifyapp.com",
         "http://127.0.0.1:8000",
         "http://127.0.0.1:3000",
