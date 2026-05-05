@@ -1,6 +1,9 @@
 from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
+from computing.utils import (
+    push_shape_to_geoserver,
+)
 
 from computing.local_compute_helper import (
     PROJECT_ROOT,
@@ -13,7 +16,6 @@ from computing.local_compute_helper import (
     push_local_raster_to_geoserver,
     read_validated_vector_file,
     write_vector_output,
-    _push_raster_to_geoserver_instance,
 )
 
 LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
@@ -76,10 +78,9 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            from django.conf import settings
             from utilities.geoserver_utils import Geoserver
 
-            # Delete stale store from ALL workspaces it might exist in
+            # Step 1 — Pre-delete stale store from any workspace it may exist in
             geo = Geoserver()
             for ws in ("ne", GEOSERVER_WORKSPACE):
                 try:
@@ -88,8 +89,9 @@ def run_raster_fabdem_local(
                         f"Deleted stale raster store '{layer_name}' from workspace '{ws}'"
                     )
                 except Exception:
-                    pass  # "not found" is fine — we just want it gone
+                    pass  # not found is fine — we just want it gone
 
+            # Step 2 — Upload raster → creates coveragestore
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
                 layer_name=layer_name,
@@ -98,6 +100,31 @@ def run_raster_fabdem_local(
             )
             print(f"GeoServer upload response: {upload_res}")
             print(f"GeoServer style  response: {style_res}")
+
+            # Step 3 — Explicitly publish the coverage as a layer so it appears
+            #           in Layer Preview (store exists but layer not auto-published)
+            try:
+                geo.publish_layer(
+                    layer_name=layer_name,
+                    workspace=GEOSERVER_WORKSPACE,
+                    store_name=layer_name,
+                    store_type="coverageStore",
+                )
+                print(f"Published raster layer '{layer_name}' to Layer Preview.")
+            except Exception as publish_err:
+                print(f"publish_layer warning (non-blocking): {publish_err}")
+
+            # Step 4 — Apply style to the published layer
+            try:
+                geo.publish_style(
+                    layer_name=layer_name,
+                    style_name=GEOSERVER_STYLE,
+                    workspace=GEOSERVER_WORKSPACE,
+                )
+                print(f"Style '{GEOSERVER_STYLE}' applied to '{layer_name}'.")
+            except Exception as style_err:
+                print(f"publish_style warning (non-blocking): {style_err}")
+
         except Exception as error:
             print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
             return False, None
@@ -120,16 +147,19 @@ def run_raster_fabdem_local(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("Sync to GeoServer flag updated")
 
-            layer_stac_generated = generate_STAC_layerwise.generate_raster_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="terrain_raster",
-            )
-            update_layer_sync_status(
-                layer_id=layer_id,
-                is_stac_specs_generated=layer_stac_generated,
-            )
+            try:
+                layer_stac_generated = generate_STAC_layerwise.generate_raster_stac(
+                    state=state,
+                    district=district,
+                    block=block,
+                    layer_name="terrain_raster",
+                )
+                update_layer_sync_status(
+                    layer_id=layer_id,
+                    is_stac_specs_generated=layer_stac_generated,
+                )
+            except Exception as stac_err:
+                print(f"STAC generation warning (non-blocking): {stac_err}")
 
     # Pass clipped_raster_path to Stage 2 via orchestrator
     return True, clipped_raster_path
@@ -266,7 +296,6 @@ def run_vector_fabdem_local(
 
     if push_to_geoserver:
         import os
-        from computing.utils import push_shape_to_geoserver
 
         try:
             geoserver_response = push_shape_to_geoserver(
