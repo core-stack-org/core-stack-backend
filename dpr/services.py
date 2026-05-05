@@ -606,6 +606,9 @@ def _build_global_status_totals(type_map, plan_ids=None):
     return totals
 
 
+CFPT_ORG_ID = "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6"
+
+
 def get_global_status_tracking(filters=None):
     """
     Returns global totals of resource and demand counts by status, with optional
@@ -616,12 +619,20 @@ def get_global_status_tracking(filters=None):
         state_id, district_id, block_id, organization_id  -- geo/org scoping
         status -- filter the plan set to only plans that have at least one
                   resource/demand in this status before computing totals
+
+    Test/demo plans and the CFPT organisation are always excluded.
     """
+    from django.db.models import Q
     from plans.models import PlanApp
 
     filters = filters or {}
 
-    plan_qs = PlanApp.objects.filter(enabled=True)
+    plan_qs = (
+        PlanApp.objects
+        .filter(enabled=True)
+        .exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
+        .exclude(organization_id=CFPT_ORG_ID)
+    )
     if filters.get("state_id"):
         plan_qs = plan_qs.filter(state_id=filters["state_id"])
     if filters.get("district_id"):
@@ -759,12 +770,15 @@ def get_dpr_report_status_summary(filters=None):
     """
     Returns counts of DPR_Report records grouped by status, with optional
     geo/org filtering through the related PlanApp.
+    Test/demo plans and the CFPT organisation are always excluded.
     """
-    from django.db.models import Count
+    from django.db.models import Count, Q
 
     filters = filters or {}
 
-    qs = DPR_Report.objects.all()
+    qs = DPR_Report.objects.exclude(
+        Q(plan_id__plan__icontains="test") | Q(plan_id__plan__icontains="demo")
+    ).exclude(plan_id__organization_id=CFPT_ORG_ID)
     if filters.get("state_id"):
         qs = qs.filter(plan_id__state_id=filters["state_id"])
     if filters.get("district_id"):
@@ -827,6 +841,8 @@ def patch_dpr_report_status(plan_id, payload, user):
         plan = report.plan_id
         plan_fields = []
         if new_status == "SUBMITTED":
+            _bulk_update_group(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED")
+            _bulk_update_group(DEMAND_TYPE_MAP, plan_id, "SUBMITTED")
             plan.is_completed = True
             plan.is_dpr_reviewed = True
             plan_fields = ["is_completed", "is_dpr_reviewed", "updated_at"]
