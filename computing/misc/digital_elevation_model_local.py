@@ -75,7 +75,7 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            from computing.utils import delete_raster_store
+            # from computing.utils import delete_raster_store
 
             # Pre-delete from our workspace to avoid "already exists" conflict
             # across any workspace (e.g. stale store in workspace 'ne')
