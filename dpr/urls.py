@@ -3,6 +3,9 @@ from django.urls import path
 from . import api
 
 urlpatterns = [
+    path("dpr_data/report-status-summary/", api.dpr_report_status_summary, name="dpr_report_status_summary"),
+    path("dpr_data/status-tracking/", api.dpr_global_status_tracking, name="dpr_global_status_tracking"),
+
     path("generate_dpr/", api.generate_dpr, name="generate_dpr"),
     path("generate_mws_report/", api.generate_mws_report, name="generate_mws_report"),
     path("generate_resource_report/", api.generate_resource_report, name="generate_resource_report"),
