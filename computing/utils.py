@@ -992,7 +992,6 @@ def _update_layer_sync_remote(
             "Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e
         )
 
-
     # Check if there’s an existing layer
     existing_layer = (
         Layer.objects.filter(
