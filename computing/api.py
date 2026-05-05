@@ -83,7 +83,6 @@ from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
-from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
@@ -1593,6 +1592,7 @@ def generate_stac_collection(request):
         layer_name = request.data.get("layer_name")
         layer_type = request.data.get("layer_type")
         start_year = request.data.get("start_year", "")
+        end_year = request.data.get("end_year", "")
         upload_to_s3 = request.data.get("upload_to_s3", False)
         overwrite = request.data.get("overwrite", False)
         overwrite_metadata = request.data.get("overwrite_metadata", False)
@@ -1619,6 +1619,7 @@ def generate_stac_collection(request):
                 "block": block,
                 "layer_name": layer_name,
                 "start_year": start_year,
+                "end_year": end_year,
                 "upload_to_s3": upload_to_s3,
                 "overwrite": overwrite,
                 "overwrite_metadata": overwrite_metadata,
