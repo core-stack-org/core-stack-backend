@@ -765,7 +765,7 @@ class BaseSTACItemBuilder(ABC):
     @staticmethod
     def _layer_title(display_name, start_year=""):
         if start_year:
-            return f"{display_name} : {start_year}-{int(start_year) + 1}"
+            return f"{display_name} : {start_year}"
         return display_name
 
     @staticmethod
