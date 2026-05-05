@@ -76,19 +76,19 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            # from utilities.geoserver_utils import Geoserver
+            from django.conf import settings
+            from utilities.geoserver_utils import Geoserver
 
-            # gs = Geoserver()
-
-            # # Pre-delete from our workspace to avoid "already exists" conflict
-            # # across any workspace (e.g. stale store in workspace 'ne')
-            # gs.delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
-            # local_geo = Geoserver()
-            # prod_geo = Geoserver(
-            #     service_url=prod_url,
-            #     username=settings.PROD_GEOSERVER_USERNAME,
-            #     password=settings.PROD_GEOSERVER_PASSWORD,
-            # )
+            # Delete stale store from ALL workspaces it might exist in
+            geo = Geoserver()
+            for ws in ("ne", GEOSERVER_WORKSPACE):
+                try:
+                    geo.delete_raster_store(layer_name, workspace=ws)
+                    print(
+                        f"Deleted stale raster store '{layer_name}' from workspace '{ws}'"
+                    )
+                except Exception:
+                    pass  # "not found" is fine — we just want it gone
 
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
