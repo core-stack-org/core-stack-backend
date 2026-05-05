@@ -588,6 +588,81 @@ def _count_by_status(type_map, plan_id, target_status):
     return total
 
 
+def _build_global_status_totals(type_map, plan_ids=None):
+    """
+    Returns {status: count} aggregated across all plans and all models in type_map.
+    Runs one GROUP BY query per model — O(models), not O(plans).
+    """
+    from django.db.models import Count
+
+    totals = defaultdict(int)
+    for model, pk_field, demand_field in type_map.values():
+        qs = model.objects.exclude(is_deleted=True)
+        if plan_ids is not None:
+            qs = qs.filter(plan_id__in=plan_ids)
+        rows = qs.values(demand_field).annotate(count=Count(pk_field))
+        for row in rows:
+            totals[row[demand_field]] += row["count"]
+    return totals
+
+
+def get_global_status_tracking(filters=None):
+    """
+    Returns global totals of resource and demand counts by status, with optional
+    geo/org filtering. Does not return per-plan detail — use the per-plan
+    status-tracking endpoint for that.
+
+    filters (dict, optional):
+        state_id, district_id, block_id, organization_id  -- geo/org scoping
+        status -- filter the plan set to only plans that have at least one
+                  resource/demand in this status before computing totals
+    """
+    from plans.models import PlanApp
+
+    filters = filters or {}
+
+    plan_qs = PlanApp.objects.filter(enabled=True)
+    if filters.get("state_id"):
+        plan_qs = plan_qs.filter(state_id=filters["state_id"])
+    if filters.get("district_id"):
+        plan_qs = plan_qs.filter(district_id=filters["district_id"])
+    if filters.get("block_id"):
+        plan_qs = plan_qs.filter(block_id=filters["block_id"])
+    if filters.get("organization_id"):
+        plan_qs = plan_qs.filter(organization_id=filters["organization_id"])
+
+    plan_ids = list(plan_qs.values_list("id", flat=True))
+
+    status_filter = filters.get("status")
+    if status_filter:
+        # Narrow plan_ids to only those with ≥1 record in the requested status
+        matching_ids = set()
+        for model, pk_field, demand_field in ALL_TYPE_MAP.values():
+            ids = (
+                model.objects
+                .exclude(is_deleted=True)
+                .filter(plan_id__in=plan_ids, **{demand_field: status_filter})
+                .values_list("plan_id", flat=True)
+                .distinct()
+            )
+            matching_ids.update(str(i) for i in ids)
+        plan_ids = [pid for pid in plan_ids if str(pid) in matching_ids]
+
+    resource_totals = _build_global_status_totals(RESOURCE_TYPE_MAP, plan_ids)
+    demand_totals = _build_global_status_totals(DEMAND_TYPE_MAP, plan_ids)
+
+    return {
+        "plan_count": len(plan_ids),
+        "totals": {
+            st: {
+                "resources": resource_totals.get(st, 0),
+                "demands": demand_totals.get(st, 0),
+            }
+            for st in VALID_DEMAND_STATUSES
+        },
+    }
+
+
 def get_dpr_status_tracking(plan_id):
     return {
         "statuses": [
@@ -680,13 +755,47 @@ def _bulk_update_group(type_map, plan_id, new_status):
         )
 
 
+def get_dpr_report_status_summary(filters=None):
+    """
+    Returns counts of DPR_Report records grouped by status, with optional
+    geo/org filtering through the related PlanApp.
+    """
+    from django.db.models import Count
+
+    filters = filters or {}
+
+    qs = DPR_Report.objects.all()
+    if filters.get("state_id"):
+        qs = qs.filter(plan_id__state_id=filters["state_id"])
+    if filters.get("district_id"):
+        qs = qs.filter(plan_id__district_id=filters["district_id"])
+    if filters.get("block_id"):
+        qs = qs.filter(plan_id__block_id=filters["block_id"])
+    if filters.get("organization_id"):
+        qs = qs.filter(plan_id__organization_id=filters["organization_id"])
+
+    rows = qs.values("status").annotate(count=Count("dpr_report_id"))
+    breakdown = {row["status"]: row["count"] for row in rows}
+
+    return {
+        "total": sum(breakdown.values()),
+        "breakdown": {st: breakdown.get(st, 0) for st, _ in DPR_STATUS_CHOICES},
+    }
+
+
 def patch_dpr_report_status(plan_id, payload, user):
     """
     payload keys (all optional, at least one required):
       status               – updates DPR_Report.status (SUBMITTED / APPROVED / REJECTED)
       resources_submitted  – bulk-sets demand_status on all resource models
       demands_submitted    – bulk-sets demand_status on all demand models
+
+    Side effects on PlanApp (one-way — never reset automatically):
+      SUBMITTED → is_completed = True, is_dpr_reviewed = True
+      APPROVED  → is_dpr_approved = True
     """
+    from django.utils import timezone
+
     new_status = payload.get("status")
     resources_status = payload.get("resources_submitted")
     demands_status = payload.get("demands_submitted")
@@ -702,7 +811,7 @@ def patch_dpr_report_status(plan_id, payload, user):
             return None, f"Invalid {label} status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
 
     try:
-        report = DPR_Report.objects.get(plan_id=plan_id)
+        report = DPR_Report.objects.select_related("plan_id").get(plan_id=plan_id)
     except DPR_Report.DoesNotExist:
         return None, "DPR report not found for this plan"
 
@@ -712,9 +821,22 @@ def patch_dpr_report_status(plan_id, payload, user):
     if demands_status:
         _bulk_update_group(DEMAND_TYPE_MAP, plan_id, demands_status)
 
-    from django.utils import timezone
     if new_status:
         report.status = new_status
+
+        plan = report.plan_id
+        plan_fields = []
+        if new_status == "SUBMITTED":
+            plan.is_completed = True
+            plan.is_dpr_reviewed = True
+            plan_fields = ["is_completed", "is_dpr_reviewed", "updated_at"]
+        elif new_status == "APPROVED":
+            plan.is_dpr_approved = True
+            plan_fields = ["is_dpr_approved", "updated_at"]
+        if plan_fields:
+            plan.updated_at = timezone.now()
+            plan.save(update_fields=plan_fields)
+
     report.last_updated_at = timezone.now()
     report.last_updated_by = user
     report.save(update_fields=["status", "last_updated_at", "last_updated_by"])

@@ -23,6 +23,7 @@ from .serializers import (
 from dpr.mapping import classify_demand_type
 from dpr.models import (
     Agri_maintenance,
+    DPR_Report,
     GW_maintenance,
     ODK_agri,
     ODK_groundwater,
@@ -1279,12 +1280,22 @@ class PlanViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
+        was_approved = instance.is_dpr_approved
+
         update_serializer = PlanUpdateSerializer(
             instance, data=request.data, partial=partial, context={"request": request}
         )
         update_serializer.is_valid(raise_exception=True)
 
         updated_instance = update_serializer.save()
+
+        # If is_dpr_approved just flipped to True, mirror that onto DPR_Report.status
+        if not was_approved and updated_instance.is_dpr_approved:
+            DPR_Report.objects.filter(plan_id=updated_instance.pk).update(
+                status="APPROVED",
+                last_updated_at=timezone.now(),
+                last_updated_by=request.user,
+            )
 
         response_data = {
             "plan_data": PlanAppSerializer(updated_instance).data,
