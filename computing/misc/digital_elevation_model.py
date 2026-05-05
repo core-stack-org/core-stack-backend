@@ -28,7 +28,7 @@ from computing.utils import (
 
 
 @app.task(bind=True)
-def generate_dem_raster(
+def generate_dem_layer(
     self,
     state=None,
     district=None,
@@ -75,12 +75,13 @@ def generate_dem_raster(
         )
 
     fabdem_img = ee.ImageCollection(FABDEM)
+    # CRS updated to 3857 beacuse of using tiles and Open Layers use the same.
     dem_raster = (
         fabdem_img.mosaic()
         .setDefaultProjection("EPSG:3857", None, 30)
         .rename("elevation")
     )
-    raster = dem_raster.clip(roi_boundary.geometry())
+    clip_dem_raster = dem_raster.clip(roi_boundary.geometry())
 
     # Generate raster Layer
     layer_status = dem_raster_generation(
@@ -90,7 +91,7 @@ def generate_dem_raster(
         block=block,
         description=description,
         roi=roi_boundary,
-        raster=raster,
+        clip_dem_raster=clip_dem_raster,
         proj_id=proj_id,
     )
 
@@ -100,7 +101,7 @@ def generate_dem_raster(
 
 
 def dem_raster_generation(
-    raster,
+    clip_dem_raster,
     roi,
     proj_id=None,
     state=None,
@@ -109,13 +110,13 @@ def dem_raster_generation(
     description=None,
     asset_id=None,
 ):
-    workspacename = "digital_elevation_model"
+    workspacename = "dem"
     if proj_id:
         proj_obj = Project.objects.get(pk=proj_id)
 
     if not is_gee_asset_exists(asset_id):
         task_id = export_raster_asset_to_gee(
-            image=raster,
+            image=clip_dem_raster,
             description=description,
             asset_id=asset_id,
             scale=30,
@@ -147,7 +148,7 @@ def dem_raster_generation(
             workspacename,
             description,
             description,
-            "digital_elevation_model",
+            "dem_style",
         )
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
@@ -216,7 +217,7 @@ def vectorize_fabdem(mws_fc, raster_asset_id, state, district, block):
             block,
             layer_name=description,
             asset_id=asset_id,
-            dataset_name="Dem Vector",
+            dataset_name="DEM Vector",
         )
 
         fc_geojson = fc.getInfo()

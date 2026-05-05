@@ -224,9 +224,9 @@ urlpatterns = [
     ),
     path("missing_layers/", api.missing_layers, name="missing_layer"),
     path(
-        "generate_fabdem_raster/",
-        api.generate_fabdem_raster,
-        name="generate-fab-dem-raster",
+        "generate_fabdem_layer/",
+        api.generate_fabdem_layer,
+        name="generate-fab-dem-layer",
     ),
     path(
         "generate_canal_vector/",
