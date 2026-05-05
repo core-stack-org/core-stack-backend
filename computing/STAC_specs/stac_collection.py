@@ -15,8 +15,11 @@ from shapely.geometry import mapping, Polygon
 
 from computing.STAC_specs import constants
 from nrm_app.settings import (
-    BASE_DIR, S3_ACCESS_KEY, S3_SECRET_KEY,
-    GEOSERVER_USERNAME, GEOSERVER_PASSWORD,
+    BASE_DIR,
+    S3_ACCESS_KEY,
+    S3_SECRET_KEY,
+    GEOSERVER_USERNAME,
+    GEOSERVER_PASSWORD,
 )
 
 
@@ -140,7 +143,7 @@ class GeoServerClient:
         else:
             shape = [0, 0]
 
-        return bbox, mapping(footprint), "EPSG:4326", shape
+        return bbox, mapping(footprint), 4326, shape
 
     # -- vector metadata via REST API ----------------------------------------
     # Single lightweight JSON call replaces downloading the full GeoJSON.
@@ -201,7 +204,7 @@ class MetadataProvider:
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.LAYER_DESC_GITHUB_URL)
-            df.to_csv(path)
+            df.to_csv(path, index=False)
 
         match = df[df["layer_name"] == layer_name]
         desc = match["layer_description"].iloc[0] if not match.empty else ""
@@ -214,7 +217,7 @@ class MetadataProvider:
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
-            df.to_csv(path)
+            df.to_csv(path, index=False)
         row = df[df["layer_name"] == layer_name].iloc[0]
         gs_layer = row["geoserver_layer_name"]
 
@@ -246,7 +249,7 @@ class MetadataProvider:
         else:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.VECTOR_COLUMN_DESC_GITHUB_URL)
-            df.to_csv(path)
+            df.to_csv(path, index=False)
 
         return df[df["ee_layer_name"] == ee_layer_name].rename(
             {"column_name_description": "column_description"}, axis=1
@@ -327,12 +330,15 @@ class CatalogManager:
 
         block_existed = self._upsert_block(state, district, block, bbox, item)
         if block_existed:
+            self._expand_extent(self._district_dir(state, district), bbox)
+            self._expand_extent(self._state_dir(state), bbox)
             return True
 
         block_coll = self._new_block_collection(state, district, block, bbox, item)
 
         district_existed = self._upsert_district(state, district, bbox, block_coll)
         if district_existed:
+            self._expand_extent(self._state_dir(state), bbox)
             return True
 
         district_coll = self._new_district_collection(state, district, bbox, block_coll)
@@ -345,6 +351,16 @@ class CatalogManager:
         self._upsert_tehsil(state_coll)
         self._upsert_root()
         return True
+
+    def _expand_extent(self, dir_path, bbox):
+        path = os.path.join(dir_path, "collection.json")
+        if not os.path.exists(path):
+            return
+        coll = pystac.read_file(path)
+        coll.extent.spatial.bboxes = [
+            self._merge_bboxes(coll.extent.spatial.bboxes[0], bbox)
+        ]
+        coll.save_object()
 
     # -- block ---------------------------------------------------------------
 
@@ -524,12 +540,16 @@ class S3Syncer:
         self.secret_key = secret_key
 
     def sync(self, folder_path, s3_uri):
-        os.environ["AWS_ACCESS_KEY_ID"] = self.access_key
-        os.environ["AWS_SECRET_ACCESS_KEY"] = self.secret_key
-        source = os.path.basename(folder_path)
-        destination = s3_uri + source + "/"
+        source = os.path.relpath(folder_path, BASE_DIR)
+        destination = s3_uri + os.path.basename(folder_path) + "/"
+        env = {
+            **os.environ,
+            "AWS_ACCESS_KEY_ID": self.access_key,
+            "AWS_SECRET_ACCESS_KEY": self.secret_key,
+        }
         result = subprocess.run(
             ["aws", "s3", "sync", source, destination],
+            cwd=BASE_DIR, env=env,
             capture_output=True, text=True,
         )
         return result.returncode
@@ -622,7 +642,7 @@ class BaseSTACItemBuilder(ABC):
     def _item_id(state, district, block, layer_name, start_year=""):
         parts = [state, district, block, layer_name]
         if start_year:
-            parts.append(start_year)
+            parts.append(str(start_year))
         return "_".join(parts)
 
     @staticmethod
