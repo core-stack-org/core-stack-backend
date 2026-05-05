@@ -75,11 +75,13 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            from utilities.geoserver_utils import delete_raster_store
+            from utilities.geoserver_utils import Geoserver
+
+            gs = Geoserver()
 
             # Pre-delete from our workspace to avoid "already exists" conflict
             # across any workspace (e.g. stale store in workspace 'ne')
-            delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
+            gs.delete_raster_store(layer_name, workspace=GEOSERVER_WORKSPACE)
 
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
