@@ -121,6 +121,12 @@ from .misc.facilities_proximity import generate_facilities_proximity_task
 from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from django.conf import settings
 from .misc.digital_elevation_model import generate_dem_raster
+from .misc.digital_elevation_model import (
+    generate_dem_raster as generate_dem_raster_gee_task,
+)
+from .misc.digital_elevation_model_local import (
+    generate_febdem_raster_clip as generate_febdem_raster_clip_local_task,
+)
 
 
 @api_security_check(allowed_methods="POST")
@@ -1992,9 +1998,13 @@ def generate_fabdem_raster(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_dem_raster.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_dem_raster_gee_task,
+            generate_febdem_raster_clip_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
