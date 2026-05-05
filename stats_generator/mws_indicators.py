@@ -654,8 +654,30 @@ def generate_mws_data_for_kyl_filters(
                         if not df_lulc_slope_mws_data.empty
                         else None
                     )
+
+                    lulc_tree_on_slope = (
+                        df_lulc_slope_mws_data.get(
+                            "forests_area_percent", pd.Series([0])
+                        )
+                        .fillna(0)
+                        .iloc[0]
+                        if not df_lulc_slope_mws_data.empty
+                        else 0
+                    )
+
+                    lulc_shrubs_on_slope = (
+                        df_lulc_slope_mws_data.get(
+                            "shrub_scrubs_area_percent", pd.Series([0])
+                        )
+                        .fillna(0)
+                        .iloc[0]
+                        if not df_lulc_slope_mws_data.empty
+                        else 0
+                    )
                 except:
                     lulc_slope_category = ""
+                    lulc_tree_on_slope = 0
+                    lulc_shrubs_on_slope = 0
 
                 try:
                     df_lulc_plain_mws_data = sheets["terrain_lulc_plain"][
@@ -666,8 +688,22 @@ def generate_mws_data_for_kyl_filters(
                         if not df_lulc_plain_mws_data.empty
                         else None
                     )
+                    # Sum the cropping area percentages
+                    cropping_columns = [
+                        "single_non_kharif_area_percent",
+                        "single_kharif_area_percent",
+                        "double_cropping_area_percent",
+                        "triple_cropping_area_percent",
+                    ]
+
+                    # Or if you want the total sum of all values
+                    lulc_crops_on_plain = round(
+                        df_lulc_plain_mws_data[cropping_columns].fillna(0).sum().sum(),
+                        2,
+                    )
                 except:
                     lulc_plain_category = ""
+                    lulc_crops_on_plain = 0
 
                 ################# Restoration Vector  #########################
                 try:
@@ -852,6 +888,9 @@ def generate_mws_data_for_kyl_filters(
                         "green_credit": green_credit,
                         "factory_csr": factory_csr,
                         "mws_intersect_swb": mws_intersect_swb,
+                        "area_tree_on_slope": lulc_tree_on_slope,
+                        "area_shrubs_on_slope": lulc_shrubs_on_slope,
+                        "area_crops_on_plain": round(lulc_crops_on_plain, 2),
                     }
                 )
 
