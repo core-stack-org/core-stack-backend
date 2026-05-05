@@ -5,48 +5,33 @@ from django.core.management.base import BaseCommand
 
 from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
 from geoadmin.models import StateSOI
-
+from pathlib import Path
+from django.conf import settings
 
 # ---------------------------------------------------------------------------
-# Canonical 33 layer suffixes derived from a fully-covered reference block.
-# Every block should have exactly these layers (prefixed with
-# {state}_{district}_{block}_).
+# Canonical layer suffixes are loaded from:
+#   data/STAC_specs/canonical_layers.json
+# Maintain that file to add/remove layers — no code changes needed.
 # ---------------------------------------------------------------------------
-CANONICAL_LAYER_SUFFIXES = [
-    "land_use_land_cover_raster_2017",
-    "land_use_land_cover_raster_2018",
-    "land_use_land_cover_raster_2019",
-    "land_use_land_cover_raster_2020",
-    "land_use_land_cover_raster_2021",
-    "land_use_land_cover_raster_2022",
-    "land_use_land_cover_raster_2023",
-    "land_use_land_cover_raster_2024",
-    "terrain_raster",
-    "clart_raster",
-    "wri_restoration_raster",
-    "natural_depressions_raster",
-    "stream_order_raster",
-    "distance_to_upstream_drainage_line_raster",
-    "catchment_area_singleflow_raster",
-    "slope_percentage_raster",
-    "admin_boundaries_vector",
-    "aquifer_vector",
-    "drainage_lines_vector",
-    "surface_water_bodies_vector",
-    "nrega_vector",
-    "terrain_vector",
-    "cropping_intensity_vector",
-    "stage_of_groundwater_extraction_vector",
-    "drought_frequency_vector",
-    "change_in_well_depth_vector",
-    "water_balance_fortnightly_vector",
-    "change_tree_cover_gain_raster",
-    "change_tree_cover_loss_raster",
-    "change_cropping_reduction_raster",
-    "change_urbanization_raster",
-    "change_cropping_intensity_raster",
-    "mws_connectivity_vector",
-]
+CANONICAL_LAYERS_JSON = (
+    Path(settings.BASE_DIR) / "data" / "STAC_specs" / "STATS" / "canonical_layers.json"
+)
+
+
+def _load_canonical_layers() -> list:
+    path = os.path.normpath(CANONICAL_LAYERS_JSON)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"canonical_layers.json not found at: {path}\n"
+            "Please create data/STAC_specs/canonical_layers.json as a JSON list of layer suffixes."
+        )
+    with open(path) as f:
+        layers = json.load(f)
+    if not isinstance(layers, list) or not layers:
+        raise ValueError(
+            f"canonical_layers.json must be a non-empty JSON list. Got: {type(layers)}"
+        )
+    return layers
 
 
 def _sanitize(text: str) -> str:
@@ -54,7 +39,9 @@ def _sanitize(text: str) -> str:
     return sanitize_text(text.lower())
 
 
-def _layer_suffix_from_item_id(item_id: str, state_s: str, district_s: str, block_s: str) -> str:
+def _layer_suffix_from_item_id(
+    item_id: str, state_s: str, district_s: str, block_s: str
+) -> str:
     """
     Strip the {state}_{district}_{block}_ prefix from a layer item ID to get
     the canonical suffix.  Falls back to returning the full item_id if the
@@ -62,7 +49,7 @@ def _layer_suffix_from_item_id(item_id: str, state_s: str, district_s: str, bloc
     """
     prefix = f"{state_s}_{district_s}_{block_s}_"
     if item_id.startswith(prefix):
-        return item_id[len(prefix):]
+        return item_id[len(prefix) :]
     # Some IDs may use slightly different sanitisation; try a simple strip of
     # the first three underscore-segments.
     parts = item_id.split("_")
@@ -71,8 +58,9 @@ def _layer_suffix_from_item_id(item_id: str, state_s: str, district_s: str, bloc
     return item_id
 
 
-def _get_present_suffixes(block_dir: str, collection_path: str,
-                          state_s: str, district_s: str, block_s: str) -> set:
+def _get_present_suffixes(
+    block_dir: str, collection_path: str, state_s: str, district_s: str, block_s: str
+) -> set:
     """Return the set of layer suffixes present in the block's STAC collection."""
     try:
         with open(collection_path) as f:
@@ -124,9 +112,9 @@ def _load_active_locations(state_filter=None):
 
 class Command(BaseCommand):
     help = (
-        "For every active block that has a STAC collection, report which of "
-        "the 33 canonical layers are missing.  Blocks with no STAC at all are "
-        "also listed."
+        "For every active block that has a STAC collection, report which "
+        "canonical layers are missing (loaded from canonical_layers.json). "
+        "Blocks with no STAC at all are also listed."
     )
 
     def add_arguments(self, parser):
@@ -139,7 +127,7 @@ class Command(BaseCommand):
             "--incomplete-only",
             action="store_true",
             default=False,
-            help="Skip blocks that already have all 33 layers",
+            help="Skip blocks that already have all canonical layers",
         )
         parser.add_argument(
             "--csv",
@@ -149,17 +137,29 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Load canonical layers from JSON at runtime
+        try:
+            canonical_layer_suffixes = _load_canonical_layers()
+        except (FileNotFoundError, ValueError) as e:
+            self.stderr.write(self.style.ERROR(str(e)))
+            return
+
+        canonical_count = len(canonical_layer_suffixes)
+        canonical_set = set(canonical_layer_suffixes)
+
         config = STACConfig()
         tehsil_dir = os.path.join(config.stac_files_dir, config.tehsil_dirname)
 
-        self.stdout.write(f"STAC directory : {tehsil_dir}")
-        self.stdout.write(f"Canonical layers: {len(CANONICAL_LAYER_SUFFIXES)}\n")
-
-        canonical_set = set(CANONICAL_LAYER_SUFFIXES)
+        self.stdout.write(f"STAC directory   : {tehsil_dir}")
+        self.stdout.write(
+            f"Canonical layers : {canonical_count} (loaded from canonical_layers.json)\n"
+        )
 
         active_locations = _load_active_locations(options["state"])
         if not active_locations:
-            self.stderr.write(self.style.WARNING("No active locations found in the database."))
+            self.stderr.write(
+                self.style.WARNING("No active locations found in the database.")
+            )
             return
 
         csv_rows = []  # (state, district, block, missing_layer)
@@ -169,9 +169,9 @@ class Command(BaseCommand):
         total_no_stac = 0
 
         for state_name, district_name, tehsil_name in sorted(active_locations):
-            state_s   = _sanitize(state_name)
+            state_s = _sanitize(state_name)
             district_s = _sanitize(district_name)
-            block_s   = _sanitize(tehsil_name)
+            block_s = _sanitize(tehsil_name)
 
             block_dir = os.path.join(tehsil_dir, state_s, district_s, block_s)
             coll_path = os.path.join(block_dir, "collection.json")
@@ -184,10 +184,14 @@ class Command(BaseCommand):
                             f"NO STAC  | {state_name} / {district_name} / {tehsil_name}"
                         )
                     )
-                csv_rows.append((state_name, district_name, tehsil_name, "NO_STAC_COLLECTION"))
+                csv_rows.append(
+                    (state_name, district_name, tehsil_name, "NO_STAC_COLLECTION")
+                )
                 continue
 
-            present = _get_present_suffixes(block_dir, coll_path, state_s, district_s, block_s)
+            present = _get_present_suffixes(
+                block_dir, coll_path, state_s, district_s, block_s
+            )
             missing = sorted(canonical_set - present)
 
             if not missing:
@@ -196,7 +200,7 @@ class Command(BaseCommand):
                     self.stdout.write(
                         self.style.SUCCESS(
                             f"COMPLETE | {state_name} / {district_name} / {tehsil_name}"
-                            f"  [33/33]"
+                            f"  [{canonical_count}/{canonical_count}]"
                         )
                     )
                 continue
@@ -205,7 +209,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.WARNING(
                     f"MISSING  | {state_name} / {district_name} / {tehsil_name}"
-                    f"  [{len(present)}/33 present, {len(missing)} missing]"
+                    f"  [{len(present)}/{canonical_count} present, {len(missing)} missing]"
                 )
             )
             for layer in missing:
@@ -219,19 +223,22 @@ class Command(BaseCommand):
         self.stdout.write("SUMMARY")
         self.stdout.write("=" * 60)
         self.stdout.write(f"  Total active blocks  : {total}")
-        self.stdout.write(self.style.SUCCESS(
-            f"  Complete (33/33)     : {total_complete}"
-        ))
-        self.stdout.write(self.style.WARNING(
-            f"  Incomplete (<33)     : {total_incomplete}"
-        ))
-        self.stdout.write(self.style.ERROR(
-            f"  No STAC at all       : {total_no_stac}"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"  Complete ({canonical_count}/{canonical_count})     : {total_complete}"
+            )
+        )
+        self.stdout.write(
+            self.style.WARNING(
+                f"  Incomplete (<{canonical_count})     : {total_incomplete}"
+            )
+        )
+        self.stdout.write(self.style.ERROR(f"  No STAC at all       : {total_no_stac}"))
 
         # Optional CSV export
         if options["csv"]:
             import csv
+
             with open(options["csv"], "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["state", "district", "block", "missing_layer"])
