@@ -86,10 +86,6 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
                 "transform": clipped_transform,
                 "nodata": ZERO_NODATA,
                 "compress": "lzw",
-                "tiled": True,
-                "blockxsize": 256,
-                "blockysize": 256,
-                "crs": "EPSG:3857",  # Explicitly set CRS to ensure GeoServer ingestion
             }
         )
 
@@ -98,22 +94,6 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
 
     print(f"Local clipped FABDEM raster written to: {output_path}")
     return str(output_path)
-
-
-# ---------------------------------------------------------------------------
-# Naming Helpers — consistent with change_detection_local.py
-# ---------------------------------------------------------------------------
-
-
-def _slug(value, fallback):
-    return valid_gee_text(str(value).strip().lower()) or fallback
-
-
-def _published_layer_name(district, block):
-    """
-    Constructs the layer name for GeoServer: {district}_{block}_dem_raster
-    """
-    return f"{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}_dem_raster"
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +112,10 @@ def run_raster_fabdem_local(
     sync_layer_metadata=False,
 ):
     if state and district and block:
-        published_layer_name = _published_layer_name(district, block)
+        layer_name = (
+            f"{valid_gee_text(str(district).strip().lower())}_"
+            f"{valid_gee_text(str(block).strip().lower())}_dem_raster"
+        )
         roi_gdf = load_precomputed_roi(
             state=state,
             district=district,
@@ -144,14 +127,14 @@ def run_raster_fabdem_local(
             raise ValueError(
                 "For non state/district/block runs, both `roi` and `asset_suffix` are required."
             )
-        published_layer_name = f"{asset_suffix}_dem_raster".lower()
+        layer_name = f"{asset_suffix}_dem_raster".lower()
         roi_gdf = read_validated_vector_file(
             roi,
             f"ROI file has no valid geometries: {roi}",
         )
 
     output_raster_path = build_output_raster_path(
-        layer_name=published_layer_name,
+        layer_name=layer_name,
         output_base_dir=LOCAL_OUTPUT_BASE_DIR,
         state=state,
         district=district,
@@ -171,18 +154,45 @@ def run_raster_fabdem_local(
             geo = Geoserver()
             for ws in ("ne", GEOSERVER_WORKSPACE):
                 try:
-                    geo.delete_raster_store(published_layer_name, workspace=ws)
+                    geo.delete_raster_store(layer_name, workspace=ws)
+                    print(
+                        f"Deleted stale raster store '{layer_name}' from workspace '{ws}'"
+                    )
                 except Exception:
                     pass
 
-            # Step 2 — Upload raster → creates and configures coveragestore
+            # Step 2 — Upload raster → creates coveragestore
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
-                layer_name=published_layer_name,
+                layer_name=layer_name,
                 workspace=GEOSERVER_WORKSPACE,
                 style_name=GEOSERVER_STYLE,
             )
-            print(f"GeoServer sync successful: {upload_res}")
+            print(f"GeoServer upload response: {upload_res}")
+            print(f"GeoServer style  response: {style_res}")
+
+            # # Step 3 — Explicitly publish coverage as layer → appears in Layer Preview
+            # try:
+            #     geo.publish_layer(
+            #         layer_name=layer_name,
+            #         workspace=GEOSERVER_WORKSPACE,
+            #         store_name=layer_name,
+            #         store_type="coverageStore",
+            #     )
+            #     print(f"Published raster layer '{layer_name}' to Layer Preview.")
+            # except Exception as publish_err:
+            #     print(f"publish_layer warning (non-blocking): {publish_err}")
+
+            # # Step 4 — Apply style to the published layer
+            # try:
+            #     geo.publish_style(
+            #         layer_name=layer_name,
+            #         style_name=GEOSERVER_STYLE,
+            #         workspace=GEOSERVER_WORKSPACE,
+            #     )
+            #     print(f"Style '{GEOSERVER_STYLE}' applied to '{layer_name}'.")
+            # except Exception as style_err:
+            #     print(f"publish_style warning (non-blocking): {style_err}")
 
         except Exception as error:
             print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
@@ -196,9 +206,9 @@ def run_raster_fabdem_local(
             state=state,
             district=district,
             block=block,
-            layer_name=published_layer_name,
+            layer_name=layer_name,
             asset_id=clipped_raster_path,
-            dataset_name="DEM Raster",
+            dataset_name="Terrain Raster",
             algorithm="FABDEM",
             algorithm_version="2.0",
         )
@@ -211,7 +221,7 @@ def run_raster_fabdem_local(
                     state=state,
                     district=district,
                     block=block,
-                    layer_name="digital_elevation_model_raster",
+                    layer_name="terrain_raster",
                 )
                 update_layer_sync_status(
                     layer_id=layer_id,

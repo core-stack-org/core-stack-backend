@@ -10,15 +10,10 @@ from rasterio.mask import mask
 from shapely.geometry import mapping
 from utilities.gee_utils import valid_gee_text
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PRECOMPUTED_TEHSIL_WATERSHED_DIR = (
-    PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
-)
+PRECOMPUTED_TEHSIL_WATERSHED_DIR = PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
-AEZ_VECTOR_PATH = (
-    PROJECT_ROOT / "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
-)
+AEZ_VECTOR_PATH = PROJECT_ROOT / "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
 LULC_BASE_DIR = PROJECT_ROOT / "data/base_layers/lulc"
 TERRAIN_RASTER_PATH = (
     PROJECT_ROOT / "data/base_layers/terrain_raster_fabdam_pan_india.tif"
@@ -241,8 +236,12 @@ def clip_raster_with_roi(roi_gdf, raster_path, output_path, raster_label="Raster
     return str(output_path)
 
 
-def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
+def _push_raster_to_geoserver_instance(
+    geo, file_path, layer_name, workspace, style_name
+):
     from utilities.geoserver_utils import Geoserver
+
+    print("Pushing raster instance to geoserver start")
 
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     upload_response = geo.create_coveragestore(
@@ -257,10 +256,12 @@ def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, st
             style_name=style_name,
             workspace=workspace,
         )
+    print("Pushing raster instance to geoserver end")
     return upload_response, style_response
 
 
 def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
+    print("Pushing raster to geoserver start")
     from django.conf import settings
     from utilities.geoserver_utils import Geoserver
 
@@ -282,12 +283,13 @@ def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=
             )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(
                 "Failed to push raster %s to prod GeoServer: %s", layer_name, e
             )
 
+    print("Pushing raster to geoserver end")
     return upload_response, style_response
-
 
 
 def compute_pixel_area_grid(transform, height, width, crs):
@@ -300,14 +302,15 @@ def compute_pixel_area_grid(transform, height, width, crs):
         lat_top = transform.f + (row_indices * transform.e)
         lat_bottom = lat_top + transform.e
         earth_radius_m = 6378137.0
-        row_areas = (earth_radius_m**2) * lon_width_radians * np.abs(
-            np.sin(np.deg2rad(lat_top)) - np.sin(np.deg2rad(lat_bottom))
+        row_areas = (
+            (earth_radius_m**2)
+            * lon_width_radians
+            * np.abs(np.sin(np.deg2rad(lat_top)) - np.sin(np.deg2rad(lat_bottom)))
         )
         return np.broadcast_to(row_areas[:, None], (height, width))
 
     pixel_area = abs(transform.a * transform.e)
     return np.full((height, width), pixel_area, dtype=np.float64)
-
 
 
 def compute_categorical_raster_areas_for_watersheds(
@@ -329,8 +332,7 @@ def compute_categorical_raster_areas_for_watersheds(
         nodata = src.nodata
         computed_rows = []
         empty_result = {
-            class_definition["label"]: 0.0
-            for class_definition in class_definitions
+            class_definition["label"]: 0.0 for class_definition in class_definitions
         }
 
         total = len(working_gdf)
@@ -375,7 +377,9 @@ def compute_categorical_raster_areas_for_watersheds(
 
             row_result = {}
             for class_definition in class_definitions:
-                raw_values = class_definition.get("values", class_definition.get("value"))
+                raw_values = class_definition.get(
+                    "values", class_definition.get("value")
+                )
                 if isinstance(raw_values, (list, tuple, set, np.ndarray)):
                     class_values = list(raw_values)
                 else:
@@ -406,7 +410,9 @@ def compute_union_categorical_area_across_rasters_for_watersheds(
     output_column,
 ):
     if not raster_paths:
-        raise ValueError("At least one raster path is required for union area computation.")
+        raise ValueError(
+            "At least one raster path is required for union area computation."
+        )
 
     for raster_path in raster_paths:
         ensure_file_exists(raster_path, "Categorical raster")
@@ -552,9 +558,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
     with rasterio.open(raster_path) as src:
         working_gdf = watersheds_gdf.copy()
         if working_gdf.crs is None:
-            raise ValueError(
-                "Watershed CRS is missing; cannot align with raster CRS."
-            )
+            raise ValueError("Watershed CRS is missing; cannot align with raster CRS.")
         if src.crs and working_gdf.crs != src.crs:
             working_gdf = working_gdf.to_crs(src.crs)
 
@@ -614,9 +618,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
 
             plain_prop = _fraction(values, valid_mask, PLAIN_CLASSES)
             valley_prop = _fraction(values, valid_mask, VALLEY_CLASSES)
-            hill_slopes_prop = _fraction(
-                values, valid_mask, HILL_SLOPES_CLASSES
-            )
+            hill_slopes_prop = _fraction(values, valid_mask, HILL_SLOPES_CLASSES)
             ridge_prop = _fraction(values, valid_mask, RIDGE_CLASSES)
             slopy_prop = _fraction(values, valid_mask, SLOPY_CLASSES)
 
@@ -643,9 +645,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
             )
 
             if index % 200 == 0 or index == total:
-                print(
-                    f"Computed terrain properties for {index}/{total} watersheds"
-                )
+                print(f"Computed terrain properties for {index}/{total} watersheds")
 
     result = watersheds_gdf.copy()
     computed_df = pd.DataFrame(computed_rows)
@@ -669,9 +669,7 @@ def resolve_lulc_raster_paths(
 
 def get_watershed_areas_in_hectares(watersheds_gdf):
     if "area_in_ha" in watersheds_gdf.columns:
-        area_in_ha = pd.to_numeric(
-            watersheds_gdf["area_in_ha"], errors="coerce"
-        )
+        area_in_ha = pd.to_numeric(watersheds_gdf["area_in_ha"], errors="coerce")
         if area_in_ha.notna().any():
             return area_in_ha
     projected = watersheds_gdf.to_crs("EPSG:6933")
