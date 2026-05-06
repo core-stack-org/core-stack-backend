@@ -265,9 +265,10 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            qs.exclude(organization_id=CFPT_ORG_ID)
+            valid_steward_qs
+            .filter(organization__isnull=False)
             .values("organization", "organization__name")
-            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            .annotate(steward_count=Count("id"))
             .order_by("-steward_count")
         )
     ]
@@ -725,29 +726,32 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         demand_type_counts = _count_demand_types(plan_id_strs)
 
+        valid_steward_qs = (
+            User.objects.filter(groups__name="App User")
+            .exclude(organization__name__iexact="CFPT")
+        )
+        if organization_id:
+            valid_steward_qs = valid_steward_qs.filter(organization_id=organization_id)
+        total_stewards = valid_steward_qs.count()
+
+        valid_steward_names = (
+            valid_steward_qs
+            .annotate(full_name=STEWARD_FULL_NAME)
+            .values_list("full_name", flat=True)
+        )
+
         steward_queryset = base_queryset.exclude(
             Q(facilitator_name__isnull=True)
             | Q(facilitator_name="")
             | Q(facilitator_name__icontains="test")
             | Q(facilitator_name__icontains="demo")
-        )
-
-        valid_steward_names = (
-            User.objects.filter(groups__name="App User")
-            .exclude(organization__name__iexact="CFPT")
-            .annotate(full_name=STEWARD_FULL_NAME)
-            .values_list("full_name", flat=True)
-        )
-        steward_queryset = steward_queryset.filter(facilitator_name__in=valid_steward_names)
-
-        total_stewards = steward_queryset.values("facilitator_name").distinct().count()
+        ).filter(facilitator_name__in=valid_steward_names)
 
         active_facilitator_names = steward_queryset.values_list("facilitator_name", flat=True).distinct()
         gender_counts = {
             row["gender"]: row["count"]
             for row in (
-                User.objects.filter(groups__name="App User")
-                .exclude(organization__name__iexact="CFPT")
+                valid_steward_qs
                 .annotate(full_name=STEWARD_FULL_NAME)
                 .filter(full_name__in=active_facilitator_names)
                 .values("gender")
@@ -762,13 +766,13 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         steward_by_org = []
         if not organization_id:
-            org_steward_stats = (
-                steward_queryset.exclude(organization__name__iexact="CFPT")
+            for stat in (
+                valid_steward_qs
+                .filter(organization__isnull=False)
                 .values("organization", "organization__name")
-                .annotate(steward_count=Count("facilitator_name", distinct=True))
+                .annotate(steward_count=Count("id"))
                 .order_by("-steward_count")
-            )
-            for stat in org_steward_stats:
+            ):
                 steward_by_org.append(
                     {
                         "organization_id": stat["organization"],
@@ -1516,27 +1520,25 @@ class PlanViewSet(viewsets.ModelViewSet):
             cc_operational_queryset.values("state_soi").distinct().count()
         )
 
-        steward_queryset = base_queryset.exclude(
-            Q(facilitator_name__isnull=True)
-            | Q(facilitator_name="")
-            | Q(facilitator_name__icontains="test")
-            | Q(facilitator_name__icontains="demo")
+        valid_steward_qs = (
+            User.objects.filter(groups__name="App User")
+            .exclude(organization__name__iexact="CFPT")
         )
-        total_stewards = steward_queryset.values("facilitator_name").distinct().count()
+        total_stewards = valid_steward_qs.count()
 
-        steward_by_org = (
-            steward_queryset.exclude(organization__name__iexact="CFPT")
-            .values("organization", "organization__name")
-            .annotate(steward_count=Count("facilitator_name", distinct=True))
-            .order_by("-steward_count")
-        )
         steward_by_org_list = [
             {
                 "organization_id": stat["organization"],
                 "organization_name": stat["organization__name"],
                 "steward_count": stat["steward_count"],
             }
-            for stat in steward_by_org
+            for stat in (
+                valid_steward_qs
+                .filter(organization__isnull=False)
+                .values("organization", "organization__name")
+                .annotate(steward_count=Count("id"))
+                .order_by("-steward_count")
+            )
         ]
 
         state_breakdown = []
