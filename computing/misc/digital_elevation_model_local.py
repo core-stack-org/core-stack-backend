@@ -47,26 +47,18 @@ ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 def _clip_fabdem_with_roi(roi_gdf, output_path):
     """
     Clips pan-India FABDEM raster to ROI.
-    Explicitly writes EPSG:3857 WKT to avoid broken PROJ corrupting the CRS.
+    Reprojects ROI to match raster CRS (EPSG:3857) using pyproj's own data dir,
+    bypassing the broken system PROJ installation.
     """
     import pyproj
     import geopandas as gpd
-    from rasterio.crs import CRS as RasterioCRS
-
-    # Force PROJ to use its own data dir BEFORE any CRS operation
-    proj_data_dir = pyproj.datadir.get_data_dir()
-    os.environ["PROJ_DATA"] = proj_data_dir
-    os.environ["PROJ_LIB"] = proj_data_dir
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    # Build a clean EPSG:3857 CRS object from the authority code directly
-    # This avoids relying on PROJ db lookups that the broken installation breaks
-    target_crs_wkt = RasterioCRS.from_epsg(3857)
 
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
         raster_crs = src.crs
 
+        # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
         if roi_gdf.crs != raster_crs:
             roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
         else:
@@ -94,20 +86,11 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
                 "transform": clipped_transform,
                 "nodata": ZERO_NODATA,
                 "compress": "lzw",
-                # ✅ Force clean EPSG:3857 — don't inherit potentially corrupt CRS from src
-                "crs": target_crs_wkt,
             }
         )
 
     with rasterio.open(output_path, "w", **out_meta) as dst:
         dst.write(clipped_array)
-
-    # ✅ Verify what actually got written
-    with rasterio.open(output_path) as verify:
-        print(
-            f"Written CRS authority: {verify.crs.to_authority()}"
-        )  # Should be ('EPSG', '3857')
-        print(f"Written CRS WKT snippet: {verify.crs.to_wkt()[:80]}")
 
     print(f"Local clipped FABDEM raster written to: {output_path}")
     return str(output_path)
