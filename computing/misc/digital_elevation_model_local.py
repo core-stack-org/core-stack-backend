@@ -60,8 +60,7 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
 
         # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
         if roi_gdf.crs != raster_crs:
-            with pyproj.proj.ProjError.collect():
-                roi_in_raster_crs = roi_gdf.to_crs(raster_crs.to_epsg())
+            roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
         else:
             roi_in_raster_crs = roi_gdf
 
