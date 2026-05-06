@@ -244,11 +244,13 @@ def _push_raster_to_geoserver_instance(
     print("Pushing raster instance to geoserver start")
 
     geo.delete_raster_store(workspace=workspace, store=layer_name)
+    print("Deleted raster store")
     upload_response = geo.create_coveragestore(
         path=file_path,
         workspace=workspace,
         layer_name=layer_name,
     )
+    print("Uploading raster")
     style_response = None
     if style_name:
         style_response = geo.publish_style(
