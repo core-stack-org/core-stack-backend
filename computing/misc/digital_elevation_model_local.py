@@ -45,22 +45,14 @@ ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
 
 def _clip_fabdem_with_roi(roi_gdf, output_path):
-    """
-    Clips pan-India FABDEM raster to ROI.
-    Reprojects ROI to match raster CRS (EPSG:3857) using pyproj's own data dir,
-    bypassing the broken system PROJ installation.
-    """
-    import pyproj
-    import geopandas as gpd
-
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
-        raster_crs = src.crs
+        raster_crs = src.crs  # Already EPSG:3857 — use it directly
 
-        # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
-        if roi_gdf.crs != raster_crs:
-            roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
+        # Reproject ROI to match raster CRS if needed (ROI is usually EPSG:4326)
+        if roi_gdf.crs.to_epsg() != raster_crs.to_epsg():
+            roi_in_raster_crs = roi_gdf.to_crs(raster_crs)
         else:
             roi_in_raster_crs = roi_gdf
 
@@ -68,11 +60,9 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
         if roi_union is None or roi_union.is_empty:
             raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
 
-        roi_shape = mapping(roi_union)
-
         clipped_array, clipped_transform = mask(
             src,
-            shapes=[roi_shape],
+            shapes=[mapping(roi_union)],
             crop=True,
             filled=True,
             nodata=ZERO_NODATA,
@@ -86,6 +76,8 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
                 "transform": clipped_transform,
                 "nodata": ZERO_NODATA,
                 "compress": "lzw",
+                # ✅ CRS comes straight from source — no PROJ db lookup needed
+                "crs": raster_crs,
             }
         )
 
