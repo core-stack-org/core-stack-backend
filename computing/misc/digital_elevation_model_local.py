@@ -13,7 +13,6 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
     build_output_vector_path,
-    clip_raster_with_roi,
     get_union_geometry,
     load_precomputed_roi,
     load_precomputed_watersheds,
@@ -40,26 +39,28 @@ GEOSERVER_WORKSPACE = "digital_elevation_model"
 ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
 
-
-
 # ---------------------------------------------------------------------------
-# Internal clip helper — explicitly uses EPSG:3857 for reprojection
+# Internal clip helper — reprojects ROI to raster CRS using correct PROJ
 # ---------------------------------------------------------------------------
 
 
 def _clip_fabdem_with_roi(roi_gdf, output_path):
     """
     Clips pan-India FABDEM raster to ROI.
-    Explicitly uses EPSG:3857 for reprojection to bypass broken PROJ/CRS issues.
+    Reprojects ROI to match raster CRS (EPSG:3857) using pyproj's own data dir,
+    bypassing the broken system PROJ installation.
     """
+    import pyproj
+    import geopandas as gpd
+
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
-        # Reproject ROI to EPSG:3857 explicitly as requested by user
-        target_crs = "EPSG:3857"
-        if roi_gdf.crs != target_crs:
-            print(f"Reprojecting ROI from {roi_gdf.crs} to {target_crs}")
-            roi_in_raster_crs = roi_gdf.to_crs(target_crs)
+        raster_crs = src.crs
+
+        # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
+        if roi_gdf.crs != raster_crs:
+            roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
         else:
             roi_in_raster_crs = roi_gdf
 
@@ -85,7 +86,6 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
                 "transform": clipped_transform,
                 "nodata": ZERO_NODATA,
                 "compress": "lzw",
-                "crs": target_crs,
             }
         )
 
@@ -148,7 +148,20 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            # Sync local raster to GeoServer (handles deletion, upload, and styling)
+            from utilities.geoserver_utils import Geoserver
+
+            # Step 1 — Pre-delete stale store from any workspace it may exist in
+            geo = Geoserver()
+            for ws in ("ne", GEOSERVER_WORKSPACE):
+                try:
+                    geo.delete_raster_store(layer_name, workspace=ws)
+                    print(
+                        f"Deleted stale raster store '{layer_name}' from workspace '{ws}'"
+                    )
+                except Exception:
+                    pass
+
+            # Step 2 — Upload raster → creates coveragestore
             upload_res, style_res = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
                 layer_name=layer_name,
@@ -156,7 +169,31 @@ def run_raster_fabdem_local(
                 style_name=GEOSERVER_STYLE,
             )
             print(f"GeoServer upload response: {upload_res}")
-            print(f"GeoServer style response: {style_res}")
+            print(f"GeoServer style  response: {style_res}")
+
+            # Step 3 — Explicitly publish coverage as layer → appears in Layer Preview
+            try:
+                geo.publish_layer(
+                    layer_name=layer_name,
+                    workspace=GEOSERVER_WORKSPACE,
+                    store_name=layer_name,
+                    store_type="coverageStore",
+                )
+                print(f"Published raster layer '{layer_name}' to Layer Preview.")
+            except Exception as publish_err:
+                print(f"publish_layer warning (non-blocking): {publish_err}")
+
+            # Step 4 — Apply style to the published layer
+            try:
+                geo.publish_style(
+                    layer_name=layer_name,
+                    style_name=GEOSERVER_STYLE,
+                    workspace=GEOSERVER_WORKSPACE,
+                )
+                print(f"Style '{GEOSERVER_STYLE}' applied to '{layer_name}'.")
+            except Exception as style_err:
+                print(f"publish_style warning (non-blocking): {style_err}")
+
         except Exception as error:
             print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
             return False, None
