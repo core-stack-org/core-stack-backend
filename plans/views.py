@@ -194,9 +194,14 @@ def _count_demand_types(plan_id_strs):
 
 
 def _build_steward_meta_stats(queryset):
-    valid_steward_names = (
+    valid_steward_qs = (
         User.objects.filter(groups__name="App User")
         .exclude(organization_id=CFPT_ORG_ID)
+    )
+    total_stewards = valid_steward_qs.count()
+
+    valid_steward_names = (
+        valid_steward_qs
         .annotate(full_name=STEWARD_FULL_NAME)
         .values_list("full_name", flat=True)
     )
@@ -215,8 +220,6 @@ def _build_steward_meta_stats(queryset):
         output_field=CharFieldOutput(max_length=255),
     )
     qs = queryset.annotate(effective_village=effective_village)
-
-    total_stewards = qs.values("facilitator_name").distinct().count()
 
     per_steward = (
         qs.values("facilitator_name")
@@ -357,9 +360,14 @@ def _build_steward_meta_stats(queryset):
 
 
 def _build_steward_listing(queryset):
-    valid_steward_names = (
+    valid_steward_qs = (
         User.objects.filter(groups__name="App User")
         .exclude(organization_id=CFPT_ORG_ID)
+    )
+    total_stewards = valid_steward_qs.count()
+
+    valid_steward_names = (
+        valid_steward_qs
         .annotate(full_name=STEWARD_FULL_NAME)
         .values_list("full_name", flat=True)
     )
@@ -445,7 +453,7 @@ def _build_steward_listing(queryset):
     working_states = [{"id": k, "name": v} for k, v in sorted(all_states.items(), key=lambda x: x[1])]
 
     return {
-        "total_stewards": len(steward_names),
+        "total_stewards": total_stewards,
         "working_states": working_states,
         "stewards": stewards,
     }

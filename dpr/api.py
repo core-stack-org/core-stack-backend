@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import date, datetime
 
 from django.http import HttpResponse, HttpResponseBadRequest
@@ -714,7 +715,7 @@ def dpr_livelihood(request, plan_id):
 @schema(None)
 def dpr_report_status_summary(request):
     filters = {}
-    for key in ("state_id", "district_id", "block_id", "organization_id"):
+    for key in ("state_id", "district_id", "block_id"):
         val = request.query_params.get(key)
         if val:
             try:
@@ -724,6 +725,15 @@ def dpr_report_status_summary(request):
                     {"error": f"'{key}' must be an integer"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+    org_id = request.query_params.get("organization_id")
+    if org_id:
+        try:
+            filters["organization_id"] = str(uuid.UUID(org_id))
+        except ValueError:
+            return Response(
+                {"error": "'organization_id' must be a valid UUID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
     return Response(get_dpr_report_status_summary(filters))
 
 
@@ -732,7 +742,7 @@ def dpr_report_status_summary(request):
 @schema(None)
 def dpr_global_status_tracking(request):
     filters = {}
-    for key in ("state_id", "district_id", "block_id", "organization_id"):
+    for key in ("state_id", "district_id", "block_id"):
         val = request.query_params.get(key)
         if val:
             try:
@@ -742,6 +752,15 @@ def dpr_global_status_tracking(request):
                     {"error": f"'{key}' must be an integer"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+    org_id = request.query_params.get("organization_id")
+    if org_id:
+        try:
+            filters["organization_id"] = str(uuid.UUID(org_id))
+        except ValueError:
+            return Response(
+                {"error": "'organization_id' must be a valid UUID"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     status_filter = request.query_params.get("status")
     if status_filter:
