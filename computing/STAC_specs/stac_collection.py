@@ -928,28 +928,43 @@ class STACCollectionGenerator:
         return (self.config, self.geoserver, self.metadata, self.style_parser)
 
     def generate_raster(self, state, district, block, layer_name,
-                        start_year="", upload_to_s3=False, overwrite=False,
-                        overwrite_metadata=False):
+                        start_year="", end_year="", upload_to_s3=False,
+                        overwrite=False, overwrite_metadata=False):
         log.info(
             "generate_raster start: state=%s district=%s block=%s layer=%s "
-            "start_year=%s upload_to_s3=%s overwrite=%s overwrite_metadata=%s",
-            state, district, block, layer_name, start_year,
+            "start_year=%s end_year=%s upload_to_s3=%s overwrite=%s overwrite_metadata=%s",
+            state, district, block, layer_name, start_year, end_year,
             upload_to_s3, overwrite, overwrite_metadata,
         )
         state, district, block = (sanitize_text(x.lower()) for x in (state, district, block))
         builder = RasterSTACItemBuilder(*self._builder_args())
-        item = builder.build(state, district, block, layer_name,
-                             overwrite=overwrite, overwrite_metadata=overwrite_metadata,
-                             start_year=start_year)
-        if item is None:
-            log.error("generate_raster aborted: item not built for layer=%s", layer_name)
+
+        if start_year and end_year:
+            years = [str(y) for y in range(int(start_year), int(end_year) + 1)]
+        else:
+            years = [start_year]
+
+        built = []
+        for year in years:
+            item = builder.build(state, district, block, layer_name,
+                                 overwrite=overwrite, overwrite_metadata=overwrite_metadata,
+                                 start_year=year)
+            if item is None:
+                log.error("generate_raster aborted: item not built for layer=%s year=%s", layer_name, year)
+                continue
+            self.catalog_mgr.update(state, district, block, item)
+            log.info("generate_raster built item=%s", item.id)
+            built.append(item.id)
+
+        if not built:
+            log.error("generate_raster: no items were built for layer=%s", layer_name)
             return False
-        self.catalog_mgr.update(state, district, block, item)
+
         if upload_to_s3:
             self._sync_s3()
         else:
             log.info("Skipping S3 sync (upload_to_s3=False)")
-        log.info("generate_raster done: item=%s", item.id)
+        log.info("generate_raster done: built %d item(s)=%s", len(built), built)
         return True
 
     def generate_vector(self, state, district, block, layer_name,
@@ -1003,6 +1018,7 @@ def generate_stac_collection_task(
     block,
     layer_name,
     start_year="",
+    end_year="",
     upload_to_s3=False,
     overwrite=False,
     overwrite_metadata=False,
@@ -1015,6 +1031,7 @@ def generate_stac_collection_task(
             block,
             layer_name,
             start_year=start_year,
+            end_year=end_year,
             upload_to_s3=upload_to_s3,
             overwrite=overwrite,
             overwrite_metadata=overwrite_metadata,
