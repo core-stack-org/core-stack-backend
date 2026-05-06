@@ -21,6 +21,17 @@ from computing.local_compute_helper import (
     write_vector_output,
 )
 
+# ---------------------------------------------------------------------------
+# Fix broken PROJ installation BEFORE any pyproj/geopandas import uses it
+# ---------------------------------------------------------------------------
+try:
+    import pyproj
+
+    os.environ["PROJ_DATA"] = pyproj.datadir.get_data_dir()
+    os.environ["PROJ_LIB"] = pyproj.datadir.get_data_dir()
+except Exception:
+    pass
+
 LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
 TERRAIN_RASTER_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
 GEOSERVER_STYLE = "Terrain_Style_11_Classes"
@@ -29,25 +40,37 @@ ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
 
 # ---------------------------------------------------------------------------
-# Internal clip helper — no CRS reprojection (single image, same CRS as ROI)
+# Internal clip helper — reprojects ROI to raster CRS using correct PROJ
 # ---------------------------------------------------------------------------
 
 
 def _clip_fabdem_with_roi(roi_gdf, output_path):
     """
-    Clips pan-India FABDEM raster to ROI without any CRS reprojection.
-    ROI and raster are assumed to share the same CRS.
-    Bypasses clip_raster_with_roi() to avoid the broken PROJ transformer.
+    Clips pan-India FABDEM raster to ROI.
+    Reprojects ROI to match raster CRS (EPSG:3857) using pyproj's own data dir,
+    bypassing the broken system PROJ installation.
     """
+    import pyproj
+    import geopandas as gpd
+
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    roi_union = get_union_geometry(roi_gdf)
-    if roi_union is None or roi_union.is_empty:
-        raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
-
-    roi_shape = mapping(roi_union)
-
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
+        raster_crs = src.crs
+
+        # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
+        if roi_gdf.crs != raster_crs:
+            with pyproj.proj.ProjError.collect():
+                roi_in_raster_crs = roi_gdf.to_crs(raster_crs.to_epsg())
+        else:
+            roi_in_raster_crs = roi_gdf
+
+        roi_union = get_union_geometry(roi_in_raster_crs)
+        if roi_union is None or roi_union.is_empty:
+            raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
+
+        roi_shape = mapping(roi_union)
+
         clipped_array, clipped_transform = mask(
             src,
             shapes=[roi_shape],
@@ -119,7 +142,6 @@ def run_raster_fabdem_local(
         block=block,
     )
 
-    # Use inline clip — bypasses clip_raster_with_roi to avoid PROJ CRS error
     clipped_raster_path = _clip_fabdem_with_roi(
         roi_gdf=roi_gdf,
         output_path=str(output_raster_path),
@@ -138,7 +160,7 @@ def run_raster_fabdem_local(
                         f"Deleted stale raster store '{layer_name}' from workspace '{ws}'"
                     )
                 except Exception:
-                    pass  # not found is fine — we just want it gone
+                    pass
 
             # Step 2 — Upload raster → creates coveragestore
             upload_res, style_res = push_local_raster_to_geoserver(
@@ -150,7 +172,7 @@ def run_raster_fabdem_local(
             print(f"GeoServer upload response: {upload_res}")
             print(f"GeoServer style  response: {style_res}")
 
-            # Step 3 — Explicitly publish coverage as layer so it appears in Layer Preview
+            # Step 3 — Explicitly publish coverage as layer → appears in Layer Preview
             try:
                 geo.publish_layer(
                     layer_name=layer_name,
@@ -230,18 +252,17 @@ def _compute_watershed_dem_stats(watersheds_gdf, raster_path):
     Output columns mirror GEE's .select():
         uid, area_in_ha, min_elevation, max_elevation, mean_elevation
     """
-    import rasterio
     from rasterstats import zonal_stats
 
     with rasterio.open(raster_path) as src:
         raster_crs = src.crs
         pixel_area_ha = (abs(src.res[0]) * abs(src.res[1])) / 10_000.0
 
-    # No CRS reprojection — ROI and raster share the same CRS
+    # Reproject watersheds to raster CRS for accurate zonal stats
     watersheds_for_stats = (
         watersheds_gdf
         if watersheds_gdf.crs == raster_crs
-        else watersheds_gdf.set_crs(raster_crs, allow_override=True)
+        else watersheds_gdf.to_crs(raster_crs.to_epsg())
     )
 
     stats = zonal_stats(
