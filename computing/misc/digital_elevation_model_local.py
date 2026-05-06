@@ -46,56 +46,62 @@ ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
 def _clip_fabdem_with_roi(roi_gdf, output_path):
     """
-    Clips pan-India FABDEM raster to ROI.
-    Reprojects ROI to match raster CRS (EPSG:3857) using pyproj's own data dir,
-    bypassing the broken system PROJ installation.
+    Simple FABDEM clipping using ROI boundary geometry.
+    Assumes ROI and raster are already in same CRS.
     """
-    import pyproj
-    import geopandas as gpd
+
+    import os
+    import numpy as np
+    import rasterio
+    from rasterio.mask import mask
+    from shapely.geometry import mapping
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
-        raster_crs = src.crs
 
-        # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
-        if roi_gdf.crs != raster_crs:
-            roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
-        else:
-            roi_in_raster_crs = roi_gdf
+        # Convert ROI geometry to GeoJSON-like mapping
+        roi_union = roi_gdf.unary_union
 
-        roi_union = get_union_geometry(roi_in_raster_crs)
-        if roi_union is None or roi_union.is_empty:
-            raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
+        if roi_union.is_empty:
+            raise ValueError("ROI geometry is empty.")
 
-        roi_shape = mapping(roi_union)
+        roi_shape = [mapping(roi_union)]
 
+        # Clip raster
         clipped_array, clipped_transform = mask(
             src,
-            shapes=[roi_shape],
+            roi_shape,
             crop=True,
             filled=True,
             nodata=ZERO_NODATA,
         )
-        from rasterio.crs import CRS
 
+        # Convert datatype for GeoServer compatibility
+        clipped_array = clipped_array.astype("float32")
+
+        # Copy metadata from source raster
         out_meta = src.meta.copy()
-        out_meta["crs"] = CRS.from_epsg(3857)
+
         out_meta.update(
             {
                 "driver": "GTiff",
                 "height": clipped_array.shape[1],
                 "width": clipped_array.shape[2],
                 "transform": clipped_transform,
-                "nodata": ZERO_NODATA,
-                "compress": "lzw",
+                "nodata": float(ZERO_NODATA),
+                "dtype": "float32",
+                "tiled": True,
+                "BIGTIFF": "NO",
             }
         )
 
+    # Write clipped raster
     with rasterio.open(output_path, "w", **out_meta) as dst:
         dst.write(clipped_array)
 
     print(f"Local clipped FABDEM raster written to: {output_path}")
+
     return str(output_path)
 
 
