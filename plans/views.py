@@ -193,11 +193,13 @@ def _count_demand_types(plan_id_strs):
     return {"community_demands": community, "individual_demands": individual, "total_demands": total}
 
 
-def _build_steward_meta_stats(queryset):
+def _build_steward_meta_stats(queryset, organization_id=None):
     valid_steward_qs = (
         User.objects.filter(groups__name="App User")
         .exclude(organization_id=CFPT_ORG_ID)
     )
+    if organization_id:
+        valid_steward_qs = valid_steward_qs.filter(organization_id=organization_id)
     total_stewards = valid_steward_qs.count()
 
     valid_steward_names = (
@@ -953,7 +955,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
         steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
-        response_data = _build_steward_meta_stats(steward_qs)
+        response_data = _build_steward_meta_stats(steward_qs, organization_id=organization_id)
         response_data["filters_applied"] = {
             "organization_id": organization_id,
             "project_id": project_id,
@@ -1735,7 +1737,15 @@ class PlanViewSet(viewsets.ModelViewSet):
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
         steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
-        response_data = _build_steward_meta_stats(steward_qs)
+
+        effective_org_id = None
+        if not (user.is_superadmin or user.is_superuser):
+            if user.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            ).exists():
+                effective_org_id = user.organization_id
+
+        response_data = _build_steward_meta_stats(steward_qs, organization_id=effective_org_id)
         response_data["filters_applied"] = {
             "project_id": project_id,
             "state_id": state_id,
