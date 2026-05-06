@@ -4,6 +4,7 @@ from rasterio.mask import mask
 from shapely.geometry import mapping
 
 from utilities.gee_utils import valid_gee_text
+import pyproj
 
 from nrm_app.celery import app
 from computing.utils import push_shape_to_geoserver
@@ -25,8 +26,6 @@ from computing.local_compute_helper import (
 # Fix broken PROJ installation BEFORE any pyproj/geopandas import uses it
 # ---------------------------------------------------------------------------
 try:
-    import pyproj
-
     os.environ["PROJ_DATA"] = pyproj.datadir.get_data_dir()
     os.environ["PROJ_LIB"] = pyproj.datadir.get_data_dir()
 except Exception:
@@ -34,8 +33,8 @@ except Exception:
 
 LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
 TERRAIN_RASTER_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
-GEOSERVER_STYLE = "Terrain_Style_11_Classes"
-GEOSERVER_WORKSPACE = "digital_elevation_model"
+GEOSERVER_STYLE = "dem"
+GEOSERVER_WORKSPACE = "dem"
 ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
 
@@ -50,9 +49,6 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
     Reprojects ROI to match raster CRS (EPSG:3857) using pyproj's own data dir,
     bypassing the broken system PROJ installation.
     """
-    import pyproj
-    import geopandas as gpd
-
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
@@ -208,27 +204,13 @@ def run_raster_fabdem_local(
             block=block,
             layer_name=layer_name,
             asset_id=clipped_raster_path,
-            dataset_name="Terrain Raster",
+            dataset_name="DEM Raster",
             algorithm="FABDEM",
-            algorithm_version="2.0",
+            algorithm_version="1.0",
         )
         if layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("Sync to GeoServer flag updated")
-
-            try:
-                layer_stac_generated = generate_STAC_layerwise.generate_raster_stac(
-                    state=state,
-                    district=district,
-                    block=block,
-                    layer_name="terrain_raster",
-                )
-                update_layer_sync_status(
-                    layer_id=layer_id,
-                    is_stac_specs_generated=layer_stac_generated,
-                )
-            except Exception as stac_err:
-                print(f"STAC generation warning (non-blocking): {stac_err}")
 
     return True, clipped_raster_path
 
