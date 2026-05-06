@@ -245,6 +245,9 @@ def _push_raster_to_geoserver_instance(
 
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     print("Deleted raster store")
+    print("file path", file_path)
+    print("workspace", workspace)
+    print("layer name", layer_name)
     upload_response = geo.create_coveragestore(
         path=file_path,
         workspace=workspace,
