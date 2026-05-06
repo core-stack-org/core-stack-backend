@@ -1,16 +1,19 @@
+import os
+import rasterio
+from rasterio.mask import mask
+from shapely.geometry import mapping
+
 from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
-from computing.utils import (
-    push_shape_to_geoserver,
-)
+from computing.utils import push_shape_to_geoserver
 
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
     build_output_vector_path,
-    clip_raster_with_roi,
+    get_union_geometry,
     load_precomputed_roi,
     load_precomputed_watersheds,
     push_local_raster_to_geoserver,
@@ -23,6 +26,52 @@ TERRAIN_RASTER_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
 GEOSERVER_STYLE = "Terrain_Style_11_Classes"
 GEOSERVER_WORKSPACE = "digital_elevation_model"
 ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
+
+
+# ---------------------------------------------------------------------------
+# Internal clip helper — no CRS reprojection (single image, same CRS as ROI)
+# ---------------------------------------------------------------------------
+
+
+def _clip_fabdem_with_roi(roi_gdf, output_path):
+    """
+    Clips pan-India FABDEM raster to ROI without any CRS reprojection.
+    ROI and raster are assumed to share the same CRS.
+    Bypasses clip_raster_with_roi() to avoid the broken PROJ transformer.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    roi_union = get_union_geometry(roi_gdf)
+    if roi_union is None or roi_union.is_empty:
+        raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
+
+    roi_shape = mapping(roi_union)
+
+    with rasterio.open(TERRAIN_RASTER_PATH) as src:
+        clipped_array, clipped_transform = mask(
+            src,
+            shapes=[roi_shape],
+            crop=True,
+            filled=True,
+            nodata=ZERO_NODATA,
+        )
+        out_meta = src.meta.copy()
+        out_meta.update(
+            {
+                "driver": "GTiff",
+                "height": clipped_array.shape[1],
+                "width": clipped_array.shape[2],
+                "transform": clipped_transform,
+                "nodata": ZERO_NODATA,
+                "compress": "lzw",
+            }
+        )
+
+    with rasterio.open(output_path, "w", **out_meta) as dst:
+        dst.write(clipped_array)
+
+    print(f"Local clipped FABDEM raster written to: {output_path}")
+    return str(output_path)
 
 
 # ---------------------------------------------------------------------------
@@ -69,12 +118,12 @@ def run_raster_fabdem_local(
         district=district,
         block=block,
     )
-    clipped_raster_path = clip_raster_with_roi(
+
+    # Use inline clip — bypasses clip_raster_with_roi to avoid PROJ CRS error
+    clipped_raster_path = _clip_fabdem_with_roi(
         roi_gdf=roi_gdf,
-        raster_path=TERRAIN_RASTER_PATH,
-        output_path=output_raster_path,
+        output_path=str(output_raster_path),
     )
-    print(f"Local clipped FABDEM raster written to: {clipped_raster_path}")
 
     if push_to_geoserver:
         try:
@@ -101,8 +150,7 @@ def run_raster_fabdem_local(
             print(f"GeoServer upload response: {upload_res}")
             print(f"GeoServer style  response: {style_res}")
 
-            # Step 3 — Explicitly publish the coverage as a layer so it appears
-            #           in Layer Preview (store exists but layer not auto-published)
+            # Step 3 — Explicitly publish coverage as layer so it appears in Layer Preview
             try:
                 geo.publish_layer(
                     layer_name=layer_name,
@@ -161,7 +209,6 @@ def run_raster_fabdem_local(
             except Exception as stac_err:
                 print(f"STAC generation warning (non-blocking): {stac_err}")
 
-    # Pass clipped_raster_path to Stage 2 via orchestrator
     return True, clipped_raster_path
 
 
@@ -190,10 +237,11 @@ def _compute_watershed_dem_stats(watersheds_gdf, raster_path):
         raster_crs = src.crs
         pixel_area_ha = (abs(src.res[0]) * abs(src.res[1])) / 10_000.0
 
+    # No CRS reprojection — ROI and raster share the same CRS
     watersheds_for_stats = (
         watersheds_gdf
         if watersheds_gdf.crs == raster_crs
-        else watersheds_gdf.to_crs(raster_crs)
+        else watersheds_gdf.set_crs(raster_crs, allow_override=True)
     )
 
     stats = zonal_stats(
@@ -295,8 +343,6 @@ def run_vector_fabdem_local(
     print(f"Saved local DEM vector: {asset_id}")
 
     if push_to_geoserver:
-        import os
-
         try:
             geoserver_response = push_shape_to_geoserver(
                 os.path.splitext(asset_id)[0],
@@ -371,7 +417,7 @@ def run_fabdem_local(
         district=district,
         block=block,
         asset_suffix=asset_suffix,
-        raster_path=clipped_raster_path,  # Stage 1 output fed directly to Stage 2
+        raster_path=clipped_raster_path,
         precomputed_roi_dir=precomputed_roi_dir,
         push_to_geoserver=push_to_geoserver,
         sync_layer_metadata=sync_layer_metadata,
