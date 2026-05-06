@@ -481,7 +481,7 @@ class ODKAgriAdmin(admin.ModelAdmin):
                     "moderated_by",
                     "moderation_reason",
                     "moderation_bookmark",
-                    "irrigation_structure_demand_status",
+                    "irrigation_work_demand_status",
                     "data_before_moderation",
                 ),
             },
@@ -578,7 +578,7 @@ class ODKCropAdmin(admin.ModelAdmin):
                     "moderated_by",
                     "moderation_reason",
                     "moderation_bookmark",
-                    "crop_demand_status",
+                    "crop_pattern_demand_status",
                     "data_before_moderation",
                 ),
             },
@@ -699,7 +699,7 @@ class GWMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid", "data_before_moderation"]
+    readonly_fields = ["gw_maintenance_id", "uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -756,7 +756,7 @@ class SWBRSMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid", "data_before_moderation"]
+    readonly_fields = ["swb_rs_maintenance_id", "uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -813,7 +813,7 @@ class SWBMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid", "data_before_moderation"]
+    readonly_fields = ["swb_maintenance_id", "uuid", "data_before_moderation"]
 
     fieldsets = (
         (
@@ -870,7 +870,7 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["uuid", "data_before_moderation"]
+    readonly_fields = ["agri_maintenance_id", "uuid", "data_before_moderation"]
 
     fieldsets = (
         (
