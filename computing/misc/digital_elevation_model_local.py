@@ -148,13 +148,13 @@ def run_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            from utilities.geoserver_utils import Geoserver
+            # from utilities.geoserver_utils import Geoserver
 
-            # Step 1 — Pre-delete stale store from any workspace it may exist in
-            geo = Geoserver()
-            # for ws in ("ne", GEOSERVER_WORKSPACE):
-            #     try:
-            geo.delete_raster_store(GEOSERVER_WORKSPACE, layer_name)
+            # # Step 1 — Pre-delete stale store from any workspace it may exist in
+            # geo = Geoserver()
+            # # for ws in ("ne", GEOSERVER_WORKSPACE):
+            # #     try:
+            # geo.delete_raster_store(GEOSERVER_WORKSPACE, layer_name)
             # print(
             #     f"Deleted stale raster store '{layer_name}' from workspace '{ws}'"
             # )
