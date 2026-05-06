@@ -77,7 +77,10 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
             filled=True,
             nodata=ZERO_NODATA,
         )
+        from rasterio.crs import CRS
+
         out_meta = src.meta.copy()
+        out_meta["crs"] = CRS.from_epsg(3857)
         out_meta.update(
             {
                 "driver": "GTiff",
