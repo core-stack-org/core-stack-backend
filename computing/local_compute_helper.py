@@ -248,6 +248,32 @@ def _push_raster_to_geoserver_instance(
     print("file path", file_path)
     print("workspace", workspace)
     print("layer name", layer_name)
+    import rasterio
+    import os
+
+    print("\n========== GEOTIFF DEBUG ==========")
+
+    print(f"File exists: {os.path.exists(file_path)}")
+    print(f"File size: {os.path.getsize(file_path)} bytes")
+
+    with rasterio.open(file_path) as src:
+        print(f"Driver: {src.driver}")
+        print(f"CRS: {src.crs}")
+        print(f"Width: {src.width}")
+        print(f"Height: {src.height}")
+        print(f"Bands: {src.count}")
+        print(f"Dtypes: {src.dtypes}")
+        print(f"Nodata: {src.nodata}")
+        print(f"Transform: {src.transform}")
+        print(f"Bounds: {src.bounds}")
+        print(f"Compression: {src.compression}")
+
+        arr = src.read(1)
+
+        print(f"Min Pixel: {arr.min()}")
+        print(f"Max Pixel: {arr.max()}")
+
+    print("===================================\n")
     upload_response = geo.create_coveragestore(
         path=file_path,
         workspace=workspace,
