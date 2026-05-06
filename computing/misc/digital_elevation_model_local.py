@@ -43,6 +43,60 @@ ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
 
 # ---------------------------------------------------------------------------
+# Internal clip helper — explicitly uses EPSG:3857 for reprojection
+# ---------------------------------------------------------------------------
+
+
+def _clip_fabdem_with_roi(roi_gdf, output_path):
+    """
+    Clips pan-India FABDEM raster to ROI.
+    Explicitly uses EPSG:3857 for reprojection to bypass broken PROJ/CRS issues.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    with rasterio.open(TERRAIN_RASTER_PATH) as src:
+        # Reproject ROI to EPSG:3857 explicitly as requested by user
+        target_crs = "EPSG:3857"
+        if roi_gdf.crs != target_crs:
+            print(f"Reprojecting ROI from {roi_gdf.crs} to {target_crs}")
+            roi_in_raster_crs = roi_gdf.to_crs(target_crs)
+        else:
+            roi_in_raster_crs = roi_gdf
+
+        roi_union = get_union_geometry(roi_in_raster_crs)
+        if roi_union is None or roi_union.is_empty:
+            raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
+
+        roi_shape = mapping(roi_union)
+
+        clipped_array, clipped_transform = mask(
+            src,
+            shapes=[roi_shape],
+            crop=True,
+            filled=True,
+            nodata=ZERO_NODATA,
+        )
+        out_meta = src.meta.copy()
+        out_meta.update(
+            {
+                "driver": "GTiff",
+                "height": clipped_array.shape[1],
+                "width": clipped_array.shape[2],
+                "transform": clipped_transform,
+                "nodata": ZERO_NODATA,
+                "compress": "lzw",
+                "crs": target_crs,
+            }
+        )
+
+    with rasterio.open(output_path, "w", **out_meta) as dst:
+        dst.write(clipped_array)
+
+    print(f"Local clipped FABDEM raster written to: {output_path}")
+    return str(output_path)
+
+
+# ---------------------------------------------------------------------------
 # Stage 1 — Raster
 # ---------------------------------------------------------------------------
 
@@ -87,10 +141,9 @@ def run_raster_fabdem_local(
         block=block,
     )
 
-    clipped_raster_path = clip_raster_with_roi(
+    clipped_raster_path = _clip_fabdem_with_roi(
         roi_gdf=roi_gdf,
-        raster_path=TERRAIN_RASTER_PATH,
-        output_path=output_raster_path,
+        output_path=str(output_raster_path),
     )
 
     if push_to_geoserver:
