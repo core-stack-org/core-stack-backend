@@ -48,15 +48,15 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     with rasterio.open(TERRAIN_RASTER_PATH) as src:
-        raster_crs = src.crs  # Already EPSG:3857 — use it directly
+        # raster_crs = src.crs  # Already EPSG:3857 — use it directly
 
-        # Reproject ROI to match raster CRS if needed (ROI is usually EPSG:4326)
-        if roi_gdf.crs.to_epsg() != raster_crs.to_epsg():
-            roi_in_raster_crs = roi_gdf.to_crs(raster_crs)
-        else:
-            roi_in_raster_crs = roi_gdf
+        # # Reproject ROI to match raster CRS if needed (ROI is usually EPSG:4326)
+        # if roi_gdf.crs.to_epsg() != raster_crs.to_epsg():
+        #     roi_in_raster_crs = roi_gdf.to_crs(raster_crs)
+        # else:
+        #     roi_in_raster_crs = roi_gdf
 
-        roi_union = get_union_geometry(roi_in_raster_crs)
+        roi_union = get_union_geometry(roi_gdf)
         if roi_union is None or roi_union.is_empty:
             raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
 
@@ -77,7 +77,6 @@ def _clip_fabdem_with_roi(roi_gdf, output_path):
                 "nodata": ZERO_NODATA,
                 "compress": "lzw",
                 # ✅ CRS comes straight from source — no PROJ db lookup needed
-                "crs": raster_crs,
             }
         )
 
