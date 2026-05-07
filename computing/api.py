@@ -127,6 +127,7 @@ from .misc.digital_elevation_model import (
 from .misc.digital_elevation_model_local import (
     generate_febdem_raster_clip as generate_febdem_raster_clip_local_task,
 )
+from .misc.canal_layer import canal_vector
 
 
 @api_security_check(allowed_methods="POST")
@@ -2010,4 +2011,26 @@ def generate_fabdem_raster(request):
         )
     except Exception as e:
         print(f"Exception in generate DEM raster layer for {district} - {block}:: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_canal_vector(request):
+    print("Inside generate canal vector layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        canal_vector.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print(
+            f"Exception in generate canal vector layer for {district} - {block}:: ", e
+        )
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
