@@ -357,4 +357,7 @@ TREE_OVERALL_CHANGE = (
     "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2022"
 )
 
+# FOREST STRUCTURE
+FOREST_STRUCTURE_RASTER = "projects/corestack-foreststructure/assets/forest_structure/annual_"
+
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"

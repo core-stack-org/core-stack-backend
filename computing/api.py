@@ -62,6 +62,8 @@ from .drought.drought_causality import drought_causality
 from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
 from .tree_health.ccd_vector import tree_health_ccd_vector
+from .forest_structure.forest_structure_raster import forest_structure_raster
+from .forest_structure.forest_structure_vector import forest_structure_vector
 from .plantation.site_suitability import site_suitability
 from .misc.aquifer_vector import generate_aquifer_vector
 from .misc.soge_vector import generate_soge_vector
@@ -877,6 +879,72 @@ def tree_health_vector(request):
         )
     except Exception as e:
         print("Exception in Overall_change_vector api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_forest_structure_raster(request):
+    print("Inside generate_forest_structure_raster API")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        
+        forest_structure_raster.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        
+        return Response(
+            {"Success": "forest_structure_raster task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_structure_raster api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_forest_structure_vector(request):
+    print("Inside generate_forest_structure_vector API")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        
+        forest_structure_vector.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        
+        return Response(
+            {"Success": "forest_structure_vector task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_structure_vector api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
