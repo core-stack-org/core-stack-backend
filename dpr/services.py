@@ -634,11 +634,11 @@ def get_global_status_tracking(filters=None):
         .exclude(organization_id=CFPT_ORG_ID)
     )
     if filters.get("state_id"):
-        plan_qs = plan_qs.filter(state_id=filters["state_id"])
+        plan_qs = plan_qs.filter(state_soi_id=filters["state_id"])
     if filters.get("district_id"):
-        plan_qs = plan_qs.filter(district_id=filters["district_id"])
+        plan_qs = plan_qs.filter(district_soi_id=filters["district_id"])
     if filters.get("block_id"):
-        plan_qs = plan_qs.filter(block_id=filters["block_id"])
+        plan_qs = plan_qs.filter(tehsil_soi_id=filters["block_id"])
     if filters.get("organization_id"):
         plan_qs = plan_qs.filter(organization_id=filters["organization_id"])
 
@@ -780,20 +780,23 @@ def get_dpr_report_status_summary(filters=None):
         Q(plan_id__plan__icontains="test") | Q(plan_id__plan__icontains="demo")
     ).exclude(plan_id__organization_id=CFPT_ORG_ID)
     if filters.get("state_id"):
-        qs = qs.filter(plan_id__state_id=filters["state_id"])
+        qs = qs.filter(plan_id__state_soi_id=filters["state_id"])
     if filters.get("district_id"):
-        qs = qs.filter(plan_id__district_id=filters["district_id"])
+        qs = qs.filter(plan_id__district_soi_id=filters["district_id"])
     if filters.get("block_id"):
-        qs = qs.filter(plan_id__block_id=filters["block_id"])
+        qs = qs.filter(plan_id__tehsil_soi_id=filters["block_id"])
     if filters.get("organization_id"):
         qs = qs.filter(plan_id__organization_id=filters["organization_id"])
 
     rows = qs.values("status").annotate(count=Count("dpr_report_id"))
     breakdown = {row["status"]: row["count"] for row in rows}
 
+    result = {st: breakdown.get(st, 0) for st, _ in DPR_STATUS_CHOICES}
+    result["SUBMITTED"] = breakdown.get("SUBMITTED", 0) + breakdown.get("APPROVED", 0)
+
     return {
         "total": sum(breakdown.values()),
-        "breakdown": {st: breakdown.get(st, 0) for st, _ in DPR_STATUS_CHOICES},
+        "breakdown": result,
     }
 
 
