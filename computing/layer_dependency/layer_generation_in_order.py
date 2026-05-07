@@ -232,6 +232,13 @@ class DependencyValidator:
             layer_name=f"surface_waterbodies_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         ).exists()
 
+    @staticmethod
+    def generate_tehsil_shape_file_data(district, block):
+        return Layer.objects.filter(
+            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+            dataset__name="Admin Boundary",
+        ).exists()
+
 
 def run_layer_with_dependency(
     deps, node_func_name, node_func_obj, state, district, block, args
