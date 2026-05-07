@@ -234,12 +234,39 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_mws(geojson_data, writer)
             elif workspace == "facilities_proximity":
                 create_excel_for_facilities(geojson_data, writer)
+            elif workspace == "dem":
+                create_excel_for_dem(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_dem(data, writer):
+    print("Inside create_excel_for DEM")
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "min_elevation": properties.get("min_elevation", ""),
+            "max_elevation": properties.get("max_elevation", ""),
+            "mean_elevation": properties.get("mean_elevation", ""),
+        }
+
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+    df.to_excel(writer, sheet_name="dem", index=False)
+    print("Excel file created for dem")
 
 
 def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):

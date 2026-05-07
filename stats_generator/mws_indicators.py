@@ -89,6 +89,7 @@ def generate_mws_data_for_kyl_filters(
                 "mining": -1,
                 "green_credit": -1,
                 "mws_intersect_swb": -1,
+                "dem": -1,
             }
 
             try:
@@ -847,6 +848,45 @@ def generate_mws_data_for_kyl_filters(
                     print(f"Error in SWB funda: {e}")
                     mws_intersect_swb = []
 
+                ############ DEM (Digital Elevation Model) ########################
+                try:
+                    dem_df = sheets.get("dem")
+                    if dem_df is not -1 and not dem_df.empty:
+                        mws_dem_data = dem_df[dem_df["UID"] == specific_mws_id]
+
+                        # Average of all UID mean elevations
+                        overall_mean_elevation = dem_df["mean_elevation"].mean()
+                        if not mws_dem_data.empty:
+                            row = mws_dem_data.iloc[0]
+                            relief = round(
+                                row["max_elevation"] - row["min_elevation"], 2
+                            )
+                            mean_elevation = round(row["mean_elevation"], 2)
+
+                            # Relative mean elevation
+                            if overall_mean_elevation != 0:
+                                relative_mean_elevation = round(
+                                    (mean_elevation - overall_mean_elevation), 2
+                                )
+                            else:
+                                relative_mean_elevation = 0
+
+                        else:
+                            relief = 0
+                            mean_elevation = 0
+                            relative_mean_elevation = 0
+
+                    else:
+                        relief = 0
+                        mean_elevation = 0
+                        relative_mean_elevation = 0
+
+                except Exception as e:
+                    print(f"Error in DEM funda: {e}")
+                    relief = 0
+                    mean_elevation = 0
+                    relative_mean_elevation = 0
+
                 results.append(
                     {
                         "mws_id": specific_mws_id,
@@ -891,6 +931,9 @@ def generate_mws_data_for_kyl_filters(
                         "area_tree_on_slope": lulc_tree_on_slope,
                         "area_shrubs_on_slope": lulc_shrubs_on_slope,
                         "area_crops_on_plain": round(lulc_crops_on_plain, 2),
+                        "relief": relief,
+                        "mean_elevation": mean_elevation,
+                        "relative_mean_elevation": relative_mean_elevation,
                     }
                 )
 
