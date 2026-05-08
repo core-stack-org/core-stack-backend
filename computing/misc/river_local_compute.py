@@ -97,7 +97,9 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
     final_gdf = gpd.GeoDataFrame(final_df, crs=rivers_gdf.crs)
 
     # Filter out empty or non-line geometries
-    final_gdf = final_gdf[final_gdf.geometry.type.isin(["LineString", "MultiLineString"])]
+    final_gdf = final_gdf[
+        final_gdf.geometry.type.isin(["LineString", "MultiLineString"])
+    ]
     final_gdf = final_gdf[~final_gdf.geometry.is_empty]
 
     # Drop index_right if exists

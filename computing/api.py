@@ -2059,9 +2059,7 @@ def generate_river_data(request):
             river_vector,
             river_vector_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
             status=status.HTTP_200_OK,
