@@ -26,7 +26,13 @@ RIVER_VECTOR_PATH = PROJECT_ROOT / "data/river/River_pan_india.geojson"
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/river/river_local"
 GEOSERVER_WORKSPACE = "river"
 
-
+def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
+    """
+    Mirroring the logic of river_layer.py (GEE):
+    1. Clips rivers to ROI boundaries.
+    2. Separates matched rivers (inside watersheds) and gap rivers (outside watersheds but inside ROI).
+    3. Produces a Line layer with MWS UID and area attached to each segment.
+    """
     watersheds_gdf = validate_geometry(watersheds_gdf)
     rivers_gdf = validate_geometry(rivers_gdf)
 
