@@ -2,7 +2,6 @@ import os
 import json
 import datetime
 import pandas as pd
-import geopandas as gpd
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
@@ -21,8 +20,8 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-CANAL_VECTOR_PATH = PROJECT_ROOT / "data/base_layers/canal_pan_india.gpkg"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/misc/canal_local"
+CANAL_VECTOR_PATH = PROJECT_ROOT / "data/canal/Canal_pan_india.geojson"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/canal/canal_local"
 GEOSERVER_WORKSPACE = "canal"
 
 
@@ -78,9 +77,9 @@ def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
         watersheds_result
     ).astype(float)
 
-    # Use EPSG:6933 (Equal Area) for accurate spatial operations
-    watersheds_projected = watersheds_result.to_crs("EPSG:6933")
-    canals_projected = canals_gdf.to_crs("EPSG:6933")
+    # Use the original datasets for intersection
+    watersheds_projected = watersheds_result
+    canals_projected = canals_gdf
 
     computed_rows = []
     total = len(watersheds_projected)

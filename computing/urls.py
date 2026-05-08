@@ -232,9 +232,4 @@ urlpatterns = [
         api.generate_fabdem_raster,
         name="generate-fab-dem-raster",
     ),
-    path(
-        "generate_canal_vector/",
-        api.generate_canal_vector,
-        name="generate-canal-vector",
-    ),
 ]
