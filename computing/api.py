@@ -128,6 +128,7 @@ from .misc.digital_elevation_model_local import (
     generate_febdem_raster_clip as generate_febdem_raster_clip_local_task,
 )
 from .misc.canal_layer import canal_vector
+from .misc.canal_local_compute import canal_vector as canal_vector_local_task
 
 
 @api_security_check(allowed_methods="POST")
@@ -2023,11 +2024,18 @@ def generate_canal_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        canal_vector.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            canal_vector,
+            canal_vector_local_task,
+        )
+        task.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print(
