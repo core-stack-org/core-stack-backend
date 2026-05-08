@@ -27,16 +27,8 @@ LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/river/river_local"
 GEOSERVER_WORKSPACE = "river"
 
 
-    target_crs = "EPSG:4326"
-
-    # Ensure CRS is set and aligned
-    if watersheds_gdf.crs is None:
-        watersheds_gdf.set_crs(target_crs, inplace=True)
-    if rivers_gdf.crs is None:
-        rivers_gdf.set_crs(target_crs, inplace=True)
-
-    watersheds_gdf = validate_geometry(watersheds_gdf).to_crs(target_crs)
-    rivers_gdf = validate_geometry(rivers_gdf).to_crs(target_crs)
+    watersheds_gdf = validate_geometry(watersheds_gdf)
+    rivers_gdf = validate_geometry(rivers_gdf)
 
     # CRITICAL: Reset index to ensure unique mapping for intersection
     watersheds_gdf = watersheds_gdf.reset_index(drop=True)
@@ -98,10 +90,10 @@ GEOSERVER_WORKSPACE = "river"
         result_segments.append(gap_rivers)
 
     if not result_segments:
-        return gpd.GeoDataFrame(columns=rivers_gdf.columns, crs=target_crs)
+        return gpd.GeoDataFrame(columns=rivers_gdf.columns, crs=rivers_gdf.crs)
 
     # ── Step 6: Merge, Clean and Fix Geometries ─────────────────────
-    final_gdf = gpd.GeoDataFrame(pd.concat(result_segments, ignore_index=True), crs=target_crs)
+    final_gdf = gpd.GeoDataFrame(pd.concat(result_segments, ignore_index=True), crs=rivers_gdf.crs)
     
     # Cast to string to ensure database/geoserver compatibility
     final_gdf["uid"] = final_gdf["uid"].astype(str)

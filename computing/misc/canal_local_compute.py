@@ -34,16 +34,8 @@ def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
     2. Separates matched canals (inside watersheds) and gap canals (outside watersheds but inside ROI).
     3. Produces a Line layer with MWS UID and area attached to each segment.
     """
-    target_crs = "EPSG:4326"
-
-    # Ensure CRS is set and aligned
-    if watersheds_gdf.crs is None:
-        watersheds_gdf.set_crs(target_crs, inplace=True)
-    if canals_gdf.crs is None:
-        canals_gdf.set_crs(target_crs, inplace=True)
-
-    watersheds_gdf = validate_geometry(watersheds_gdf).to_crs(target_crs)
-    canals_gdf = validate_geometry(canals_gdf).to_crs(target_crs)
+    watersheds_gdf = validate_geometry(watersheds_gdf)
+    canals_gdf = validate_geometry(canals_gdf)
 
     # CRITICAL: Reset index to ensure unique mapping for intersection
     watersheds_gdf = watersheds_gdf.reset_index(drop=True)
@@ -104,10 +96,10 @@ def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
         result_segments.append(gap_canals)
 
     if not result_segments:
-        return gpd.GeoDataFrame(columns=canals_gdf.columns, crs=target_crs)
+        return gpd.GeoDataFrame(columns=canals_gdf.columns, crs=canals_gdf.crs)
 
     # ── Step 6: Merge, Clean and Fix Geometries ─────────────────────
-    final_gdf = gpd.GeoDataFrame(pd.concat(result_segments, ignore_index=True), crs=target_crs)
+    final_gdf = gpd.GeoDataFrame(pd.concat(result_segments, ignore_index=True), crs=canals_gdf.crs)
     
     # Cast to string to ensure database/geoserver compatibility
     final_gdf["uid"] = final_gdf["uid"].astype(str)
