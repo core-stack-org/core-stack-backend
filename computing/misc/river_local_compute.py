@@ -21,82 +21,80 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-CANAL_VECTOR_PATH = PROJECT_ROOT / "data/canal/Canal_pan_india.geojson"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/canal/canal_local"
-GEOSERVER_WORKSPACE = "canal"
+RIVER_VECTOR_PATH = PROJECT_ROOT / "data/river/River_pan_india.geojson"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/river/river_local"
+GEOSERVER_WORKSPACE = "river"
 
 
-def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
+def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
     """
-    Mirroring the logic of canal_layer.py (GEE):
-    1. Clips canals to ROI boundaries.
-    2. Separates matched canals (inside watersheds) and gap canals (outside watersheds but inside ROI).
+    Mirroring the logic of river_layer.py (GEE):
+    1. Clips rivers to ROI boundaries.
+    2. Separates matched rivers (inside watersheds) and gap rivers (outside watersheds but inside ROI).
     3. Produces a Line layer with MWS UID and area attached to each segment.
     """
     watersheds_gdf = validate_geometry(watersheds_gdf)
-    canals_gdf = validate_geometry(canals_gdf)
+    rivers_gdf = validate_geometry(rivers_gdf)
 
     # ── Outer dissolved boundary of the entire ROI ─────────────────
     outer_boundary = watersheds_gdf.geometry.unary_union
 
-    # ── Step 1: Filter canals that touch the outer boundary ────────
-    canals_in_roi = canals_gdf[canals_gdf.intersects(outer_boundary)].copy()
+    # ── Step 1: Filter rivers that touch the outer boundary ────────
+    rivers_in_roi = rivers_gdf[rivers_gdf.intersects(outer_boundary)].copy()
 
-    if canals_in_roi.empty:
-        print("No canals found within the outer boundary.")
-        return canals_in_roi
+    if rivers_in_roi.empty:
+        print("No rivers found within the outer boundary.")
+        return rivers_in_roi
 
-    # ── Step 2: For each canal, collect every watershed it touches ──
-    # Using inner join to find matched canals
+    # ── Step 2: For each river, collect every watershed it touches ──
+    # Using inner join to find matched rivers
     matched_joined = gpd.sjoin(
-        canals_in_roi,
+        rivers_in_roi,
         watersheds_gdf[["uid", "area_in_ha", "geometry"]],
         how="inner",
         predicate="intersects",
     )
 
-    # ── Step 3: Identify Gap Canals (no watershed match) ───────────
-    # A canal is a "gap" if it hits the outer boundary but no specific watershed
+    # ── Step 3: Identify Gap Rivers (no watershed match) ───────────
     matched_indices = matched_joined.index.unique()
-    gap_canals = canals_in_roi.loc[~canals_in_roi.index.isin(matched_indices)].copy()
+    gap_rivers = rivers_in_roi.loc[~rivers_in_roi.index.isin(matched_indices)].copy()
 
     result_segments = []
 
-    # ── Step 4: Expand matched canals → clip to individual watersheds ──
+    # ── Step 4: Expand matched rivers → clip to individual watersheds ──
     if not matched_joined.empty:
-        print(f"Clipping {len(matched_joined)} matched canal segments...")
+        print(f"Clipping {len(matched_joined)} matched river segments...")
 
         def clip_matched(row):
-            canal_geom = row.geometry
+            river_geom = row.geometry
             # index_right is the index of the intersecting watershed in watersheds_gdf
             watershed_geom = watersheds_gdf.at[row.index_right, "geometry"]
-            row.geometry = canal_geom.intersection(watershed_geom)
+            row.geometry = river_geom.intersection(watershed_geom)
             return row
 
         matched_fc = matched_joined.apply(clip_matched, axis=1)
         result_segments.append(matched_fc)
 
-    # ── Step 5: Handle gap canals → clip to outer ROI boundary ─────
-    if not gap_canals.empty:
-        print(f"Clipping {len(gap_canals)} gap canal segments...")
-        gap_canals["uid"] = ""
-        gap_canals["area_in_ha"] = ""
+    # ── Step 5: Handle gap rivers → clip to outer ROI boundary ─────
+    if not gap_rivers.empty:
+        print(f"Clipping {len(gap_rivers)} gap river segments...")
+        gap_rivers["uid"] = ""
+        gap_rivers["area_in_ha"] = ""
 
         def clip_gap(row):
             row.geometry = row.geometry.intersection(outer_boundary)
             return row
 
-        gap_fc = gap_canals.apply(clip_gap, axis=1)
+        gap_fc = gap_rivers.apply(clip_gap, axis=1)
         result_segments.append(gap_fc)
 
     if not result_segments:
         # Return empty GDF with correct columns
-        return gpd.GeoDataFrame(columns=canals_gdf.columns, crs=canals_gdf.crs)
+        return gpd.GeoDataFrame(columns=rivers_gdf.columns, crs=rivers_gdf.crs)
 
     # ── Step 6: Merge and Clean ───────────────────────────────────
-    # Use pandas concat then cast to GeoDataFrame
     final_df = pd.concat(result_segments, ignore_index=True)
-    final_gdf = gpd.GeoDataFrame(final_df, crs=canals_gdf.crs)
+    final_gdf = gpd.GeoDataFrame(final_df, crs=rivers_gdf.crs)
 
     # Filter out empty or non-line geometries
     final_gdf = final_gdf[final_gdf.geometry.type.isin(["LineString", "MultiLineString"])]
@@ -109,24 +107,24 @@ def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
     return final_gdf
 
 
-def run_canal_vector_local(
+def run_river_vector_local(
     state=None,
     district=None,
     block=None,
     asset_suffix=None,
     roi=None,
-    canal_vector_path=CANAL_VECTOR_PATH,
+    river_vector_path=RIVER_VECTOR_PATH,
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
     """
-    Orchestrates the local canal vector generation.
+    Orchestrates the local river vector generation.
     """
     if state and district and block:
         layer_name = (
             f"{valid_gee_text(str(district).strip().lower())}_"
-            f"{valid_gee_text(str(block).strip().lower())}_canal_vector"
+            f"{valid_gee_text(str(block).strip().lower())}_river_vector"
         )
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
@@ -140,25 +138,25 @@ def run_canal_vector_local(
             raise ValueError(
                 "For non state/district/block runs, both `roi` and `asset_suffix` are required."
             )
-        layer_name = f"{asset_suffix}_canal_vector".lower()
+        layer_name = f"{asset_suffix}_river_vector".lower()
         watersheds_gdf = read_validated_vector_file(
             roi,
             f"ROI file has no valid geometries: {roi}",
         )
         print(f"ROI source: {roi}")
 
-    if not os.path.exists(canal_vector_path):
-        raise FileNotFoundError(f"Canal source file not found: {canal_vector_path}")
+    if not os.path.exists(river_vector_path):
+        raise FileNotFoundError(f"River source file not found: {river_vector_path}")
 
-    print(f"Loading canal source: {canal_vector_path}")
-    canals_gdf = read_validated_vector_file(
-        canal_vector_path,
-        f"Canal source file has no valid geometries: {canal_vector_path}",
+    print(f"Loading river source: {river_vector_path}")
+    rivers_gdf = read_validated_vector_file(
+        river_vector_path,
+        f"River source file has no valid geometries: {river_vector_path}",
     )
 
-    result_gdf = _compute_canal_properties_for_watersheds(
+    result_gdf = _compute_river_properties_for_watersheds(
         watersheds_gdf=watersheds_gdf,
-        canals_gdf=canals_gdf,
+        rivers_gdf=rivers_gdf,
     )
 
     output_path = build_output_vector_path(
@@ -174,7 +172,7 @@ def run_canal_vector_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local canal vector: {asset_id}")
+    print(f"Saved local river vector: {asset_id}")
 
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
@@ -192,17 +190,17 @@ def run_canal_vector_local(
             block=block,
             layer_name=layer_name,
             asset_id=asset_id,
-            dataset_name="Canal Vector",
+            dataset_name="River Vector",
         )
         if layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("Sync to GeoServer flag updated for canal vector")
+            print("Sync to GeoServer flag updated for river vector")
 
     return True
 
 
 @app.task(bind=True)
-def canal_vector(
+def river_vector(
     self,
     state=None,
     district=None,
@@ -214,11 +212,11 @@ def canal_vector(
     gee_account_id=None,
 ):
     """
-    Celery task for local canal vector generation.
-    Matches signature of canal_layer.py
+    Celery task for local river vector generation.
+    Matches signature of river_layer.py
     """
     _ = self, asset_folder_list, app_type, gee_account_id
-    return run_canal_vector_local(
+    return run_river_vector_local(
         state=state,
         district=district,
         block=block,
