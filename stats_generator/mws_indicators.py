@@ -494,7 +494,7 @@ def generate_mws_data_for_kyl_filters(
                                     f"Severe_in_weeks_{year}"
                                 ]
                             )
-                            > 5
+                            >= 5
                             else 0
                         )
                         for year in years

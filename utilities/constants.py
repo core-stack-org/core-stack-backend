@@ -1,5 +1,5 @@
 # import
-from nrm_app.settings import GEE_STORAGE_PROJECT
+from nrm_app.settings import GEE_STORAGE_PROJECT, GEE_STORAGE_PROJECT_HELPER
 
 # Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
@@ -164,13 +164,15 @@ GCS_BUCKET_NAME = "core_stack"
 GEE_LITHOLOGY_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
 GEE_ASSET_PATH = f"projects/{GEE_STORAGE_PROJECT}/assets/apps/mws/"
-GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
+GEE_HELPER_PATH = f"projects/{GEE_STORAGE_PROJECT_HELPER}/assets/apps/mws/"
 
 GEE_PATH_PLANTATION = f"projects/{GEE_STORAGE_PROJECT}/assets/apps/plantation/"
-GEE_PATH_PLANTATION_HELPER = "projects/ee-corestack-helper/assets/apps/plantation/"
+GEE_PATH_PLANTATION_HELPER = (
+    f"projects/{GEE_STORAGE_PROJECT_HELPER}/assets/apps/plantation/"
+)
 
 GEE_BASE_PATH = f"projects/{GEE_STORAGE_PROJECT}/assets/apps"
-GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
+GEE_HELPER_BASE_PATH = f"projects/{GEE_STORAGE_PROJECT_HELPER}/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
 AQUIFER_DATASET_PATH = "projects/corestack-datasets/assets/datasets/Aquifer_vector"
