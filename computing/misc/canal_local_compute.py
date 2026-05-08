@@ -217,16 +217,6 @@ def run_canal_vector_local(
     print(f"Saved local canal vector: {asset_id}")
 
     if push_to_geoserver:
-        # Ensure workspace exists
-        from utilities.geoserver_utils import Geoserver
-
-        geo = Geoserver()
-        try:
-            geo.get_workspace(GEOSERVER_WORKSPACE)
-        except Exception:
-            print(f"Creating workspace '{GEOSERVER_WORKSPACE}'")
-            geo.create_workspace(GEOSERVER_WORKSPACE)
-
         geoserver_response = push_shape_to_geoserver(
             os.path.splitext(asset_id)[0],
             workspace=GEOSERVER_WORKSPACE,
