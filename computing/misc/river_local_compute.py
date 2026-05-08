@@ -19,6 +19,7 @@ from computing.utils import (
     push_shape_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
+    fix_invalid_geometry_in_gdf,
 )
 
 RIVER_VECTOR_PATH = PROJECT_ROOT / "data/river/River_pan_india.geojson"
@@ -26,17 +27,19 @@ LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/river/river_local"
 GEOSERVER_WORKSPACE = "river"
 
 
-def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
-    """
-    Mirroring the logic of river_layer.py (GEE):
-    1. Clips rivers to ROI boundaries.
-    2. Separates matched rivers (inside watersheds) and gap rivers (outside watersheds but inside ROI).
-    3. Produces a Line layer with MWS UID and area attached to each segment.
-    """
-    # 0. Ensure same CRS for all spatial operations (using WGS84 for GeoServer compatibility)
     target_crs = "EPSG:4326"
+
+    # Ensure CRS is set and aligned
+    if watersheds_gdf.crs is None:
+        watersheds_gdf.set_crs(target_crs, inplace=True)
+    if rivers_gdf.crs is None:
+        rivers_gdf.set_crs(target_crs, inplace=True)
+
     watersheds_gdf = validate_geometry(watersheds_gdf).to_crs(target_crs)
     rivers_gdf = validate_geometry(rivers_gdf).to_crs(target_crs)
+
+    # CRITICAL: Reset index to ensure unique mapping for intersection
+    watersheds_gdf = watersheds_gdf.reset_index(drop=True)
 
     # ── Outer dissolved boundary of the entire ROI ─────────────────
     outer_boundary = watersheds_gdf.geometry.unary_union
@@ -68,14 +71,16 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
         print(f"Clipping {len(matched_joined)} matched river segments...")
 
         def clip_matched(row):
-            river_geom = row.geometry
-            # index_right is the index of the intersecting watershed in watersheds_gdf
-            watershed_geom = watersheds_gdf.at[row.index_right, "geometry"]
-            row.geometry = river_geom.intersection(watershed_geom)
-            return row
+            # Using the unique index from watersheds_gdf to get geometry
+            watershed_geom = watersheds_gdf.geometry.iloc[row.index_right]
+            return row.geometry.intersection(watershed_geom)
 
-        matched_fc = matched_joined.apply(clip_matched, axis=1)
-        result_segments.append(matched_fc)
+        matched_joined["geometry"] = matched_joined.apply(clip_matched, axis=1)
+        # Keep only LineStrings
+        matched_joined = matched_joined[
+            matched_joined.geometry.type.isin(["LineString", "MultiLineString"])
+        ]
+        result_segments.append(matched_joined)
 
     # ── Step 5: Handle gap rivers → clip to outer ROI boundary ─────
     if not gap_rivers.empty:
@@ -84,29 +89,35 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
         gap_rivers["area_in_ha"] = ""
 
         def clip_gap(row):
-            row.geometry = row.geometry.intersection(outer_boundary)
-            return row
+            return row.geometry.intersection(outer_boundary)
 
-        gap_fc = gap_rivers.apply(clip_gap, axis=1)
-        result_segments.append(gap_fc)
+        gap_rivers["geometry"] = gap_rivers.apply(clip_gap, axis=1)
+        gap_rivers = gap_rivers[
+            gap_rivers.geometry.type.isin(["LineString", "MultiLineString"])
+        ]
+        result_segments.append(gap_rivers)
 
     if not result_segments:
-        # Return empty GDF with correct columns
         return gpd.GeoDataFrame(columns=rivers_gdf.columns, crs=target_crs)
 
-    # ── Step 6: Merge and Clean ───────────────────────────────────
-    final_df = pd.concat(result_segments, ignore_index=True)
-    final_gdf = gpd.GeoDataFrame(final_df, crs=target_crs)
+    # ── Step 6: Merge, Clean and Fix Geometries ─────────────────────
+    final_gdf = gpd.GeoDataFrame(pd.concat(result_segments, ignore_index=True), crs=target_crs)
+    
+    # Cast to string to ensure database/geoserver compatibility
+    final_gdf["uid"] = final_gdf["uid"].astype(str)
+    final_gdf["area_in_ha"] = final_gdf["area_in_ha"].astype(str)
 
-    # Filter out empty or non-line geometries
-    final_gdf = final_gdf[
-        final_gdf.geometry.type.isin(["LineString", "MultiLineString"])
-    ]
+    # Filter out empty
     final_gdf = final_gdf[~final_gdf.geometry.is_empty]
+    
+    # Clean geometries using the same helper as GEE pipeline
+    final_gdf = fix_invalid_geometry_in_gdf(final_gdf)
 
-    # Drop index_right if exists
     if "index_right" in final_gdf.columns:
         final_gdf = final_gdf.drop(columns=["index_right"])
+
+    return final_gdf
+
 
     return final_gdf
 
