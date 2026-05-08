@@ -1,10 +1,16 @@
 import ee
+
 from computing.utils import (
     sync_fc_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from utilities.constants import GEE_PATHS, CANAL_PAN_INDIA_ASSET
+
+from utilities.constants import (
+    GEE_PATHS,
+    CANAL_PAN_INDIA_ASSET,
+)
+
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -14,52 +20,8 @@ from utilities.gee_utils import (
     make_asset_public,
     get_gee_dir_path,
 )
+
 from nrm_app.celery import app
-
-
-def build_canal_json(f):
-    """
-    Build a single canal feature as a JSON object string: {...}
-    Runs entirely server-side as a GEE expression — safe inside .map()
-    """
-
-    def kv(key, val):
-        """String property → "key":"value" or "key":"" if null"""
-        v = ee.Algorithms.If(
-            val,
-            ee.String('"').cat(ee.String(val)).cat('"'),
-            ee.String('""'),
-        )
-        return ee.String('"').cat(key).cat('":').cat(ee.String(v))
-
-    def kv_num(key, val):
-        """Numeric property → "key":123 or "key":null if null"""
-        v = ee.Algorithms.If(
-            val,
-            ee.String(val),
-            ee.String("null"),
-        )
-        return ee.String('"').cat(key).cat('":').cat(ee.String(v))
-
-    pairs = ee.List(
-        [
-            kv("canname", f.get("canname")),
-            kv("cancode", f.get("cancode")),
-            kv("prjname", f.get("prjname")),
-            kv("prjcode", f.get("prjcode")),
-            kv("state", f.get("state")),
-            kv("cn_purp", f.get("cn_purp")),
-            kv("cn_ss", f.get("cn_ss")),
-            kv("cn_st", f.get("cn_st")),
-            kv("cn_type", f.get("cn_type")),
-            kv("status_yr", f.get("status_yr")),
-            kv_num("can_type", f.get("can_type")),
-            kv_num("objectid", f.get("objectid")),
-            kv_num("st_length", f.get("st_length(")),
-        ]
-    )
-
-    return ee.String("{").cat(ee.String(pairs.join(","))).cat("}")
 
 
 @app.task(bind=True)
@@ -74,145 +36,177 @@ def canal_vector(
     app_type="MWS",
     gee_account_id=None,
 ):
-    # ── Initialize Earth Engine ───────────────────────────────────────────
+    """
+    Generate canal vector layer.
+
+    Final Output per feature:
+    - Geometry  : Canal segment clipped to watershed boundary (or outer ROI
+                  boundary if no individual watershed matches)
+    - uid       : Watershed UID (blank string "" if no watershed matched)
+    - area_in_ha: Watershed area (blank string "" if no watershed matched)
+    - All original canal attributes (canname, cancode, prjname, etc.)
+
+    Cases handled:
+    1. Canal intersects one watershed        → 1 clipped feature, uid filled
+    2. Canal intersects N watersheds         → N clipped features, uid filled
+    3. Canal inside outer ROI but no         → 1 feature clipped to outer ROI,
+       individual watershed match              uid = "", area_in_ha = ""
+    4. Canal outside ROI entirely            → dropped
+    """
+
+    # ------------------------------------------------------------------
+    # Initialize Earth Engine
+    # ------------------------------------------------------------------
     ee_initialize(gee_account_id)
 
     print(f"Inside process canal_vector for {state} - {district} - {block}")
 
-    # ── Prepare ROI and asset path ────────────────────────────────────────
+    # ------------------------------------------------------------------
+    # Prepare ROI
+    # ------------------------------------------------------------------
     if state and district and block:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
-        roi = ee.FeatureCollection(
+        roi_asset_id = (
             get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
             )
             + f"filtered_mws_{asset_suffix}_uid"
         )
+        roi = ee.FeatureCollection(roi_asset_id)
 
+    else:
+        roi = ee.FeatureCollection(roi)
+
+    # ------------------------------------------------------------------
+    # Asset details
+    # ------------------------------------------------------------------
     description = f"{asset_suffix}_canal_vector"
 
     asset_id = (
         get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
         + description
     )
 
-    # ── Create asset if it does not exist ─────────────────────────────────
+    print(f"Asset ID: {asset_id}")
+
+    # ------------------------------------------------------------------
+    # Create asset
+    # ------------------------------------------------------------------
     if not is_gee_asset_exists(asset_id):
-        roi = ee.FeatureCollection(roi)
+
+        print("Loading canal dataset...")
         pan_india_data = ee.FeatureCollection(CANAL_PAN_INDIA_ASSET)
 
-        # STEP 1 ── Clip canals to ROI bounding box
-        clipped_canals = pan_india_data.filterBounds(roi.geometry())
+        # ── Outer dissolved boundary of the entire ROI ─────────────────
+        # Used to:
+        #   (a) rough-filter canals to the study area
+        #   (b) clip "gap" canals that fall between watershed polygons
+        outer_boundary = roi.geometry().dissolve(maxError=1)
 
-        # STEP 2 ── For each CANAL find every ROI polygon it intersects
-        #           Canal = left, ROI = right
-        #           → a canal touching N polygons produces N roi_matches
-        spatial_filter = ee.Filter.intersects(
-            leftField=".geo", rightField=".geo", maxError=1
+        # ── Step 1: Filter canals that touch the outer boundary at all ──
+        canals_in_roi = pan_india_data.filterBounds(outer_boundary)
+
+        print(
+            f"Canals found within outer boundary: " f"{canals_in_roi.size().getInfo()}"
         )
-        save_all_join = ee.Join.saveAll(matchesKey="roi_matches")
-        canals_with_roi = save_all_join.apply(clipped_canals, roi, spatial_filter)
 
-        # STEP 3 ── Flatten to one feature per (canal × ROI polygon) pair
-        def canal_to_roi_features(canal_feat):
+        # ── Step 2: For each canal, collect every watershed it touches ──
+        # Canal = left, ROI polygon = right
+        # A canal crossing N watersheds → N entries in roi_matches
+        spatial_filter = ee.Filter.intersects(
+            leftField=".geo",
+            rightField=".geo",
+            maxError=1,
+        )
+        join = ee.Join.saveAll(matchesKey="roi_matches")
+        joined_data = join.apply(canals_in_roi, roi, spatial_filter)
+
+        # Canals that DID match at least one watershed
+        matched_canals = joined_data.filter(
+            ee.Filter.listContains("roi_matches", None).Not()
+        )
+
+        # Canals inside outer boundary but with ZERO watershed matches
+        # → these are the "gap" canals visible in the red area
+        matched_canal_ids = matched_canals.aggregate_array("objectid")
+        gap_canals = canals_in_roi.filter(
+            ee.Filter.inList("objectid", matched_canal_ids).Not()
+        )
+
+        print(f"Canals matched to watersheds : " f"{matched_canals.size().getInfo()}")
+        print(f"Gap canals (no watershed match): " f"{gap_canals.size().getInfo()}")
+
+        # ── Step 3: Expand matched canals → one feature per watershed ───
+        def expand_canal(canal_feat, acc):
             canal_feat = ee.Feature(canal_feat)
             roi_matches = ee.List(canal_feat.get("roi_matches"))
-            canal_json = build_canal_json(canal_feat)
 
-            def make_pair(roi_feat):
+            def clip_to_watershed(roi_feat):
                 roi_feat = ee.Feature(roi_feat)
-                uid = roi_feat.get("uid")
-                area_in_ha = roi_feat.get("area_in_ha")
-
-                return ee.Feature(roi_feat.geometry()).set(
-                    {
-                        "uid": uid,
-                        "area_in_ha": area_in_ha,
-                        "canal_available": True,
-                        "misc": ee.String("[").cat(canal_json).cat("]"),
-                    }
+                clipped_geom = canal_feat.geometry().intersection(
+                    roi_feat.geometry(),
+                    ee.ErrorMargin(1),
+                )
+                return (
+                    ee.Feature(clipped_geom)
+                    .copyProperties(canal_feat)
+                    .set("uid", roi_feat.get("uid"))
+                    .set("area_in_ha", roi_feat.get("area_in_ha"))
+                    .set("roi_matches", None)
                 )
 
-            return roi_matches.map(make_pair)
+            return ee.List(acc).cat(roi_matches.map(clip_to_watershed))
 
-        paired_fc = ee.FeatureCollection(
-            canals_with_roi.toList(canals_with_roi.size())
-            .map(canal_to_roi_features)
-            .flatten()
-        )
+        matched_list = ee.List(matched_canals.iterate(expand_canal, ee.List([])))
+        matched_fc = ee.FeatureCollection(matched_list)
 
-        # STEP 4 ── Group by uid → merge multiple canal JSON strings per polygon
-        uid_filter = ee.Filter.equals(leftField="uid", rightField="uid")
-        group_join = ee.Join.saveAll(matchesKey="same_uid")
-        grouped = group_join.apply(
-            paired_fc.distinct("uid"),  # one representative feature per uid
-            paired_fc,
-            uid_filter,
-        )
-
-        def merge_canals_for_uid(feature):
-            feature = ee.Feature(feature)
-            uid = feature.get("uid")
-            area_in_ha = feature.get("area_in_ha")
-            matches = ee.List(feature.get("same_uid"))
-
-            # misc per pair is "[{...}]" — strip brackets to get "{...}"
-            def extract_inner(f):
-                f = ee.Feature(f)
-                raw = ee.String(f.get("misc"))
-                return raw.slice(1, raw.length().subtract(1))
-
-            canal_parts = matches.map(extract_inner)
-            misc_json = ee.String("[").cat(ee.String(canal_parts.join(","))).cat("]")
-
-            return ee.Feature(feature.geometry()).set(
-                {
-                    "uid": uid,
-                    "area_in_ha": area_in_ha,
-                    "canal_available": True,
-                    "misc": misc_json,
-                    "same_uid": None,
-                }
+        # ── Step 4: Handle gap canals ────────────────────────────────────
+        # Clip to the outer dissolved boundary so geometry stays inside
+        # the study area, but uid/area_in_ha are left blank
+        def make_gap_feature(canal_feat):
+            canal_feat = ee.Feature(canal_feat)
+            clipped_geom = canal_feat.geometry().intersection(
+                outer_boundary,
+                ee.ErrorMargin(1),
+            )
+            return (
+                ee.Feature(clipped_geom)
+                .copyProperties(canal_feat)
+                .set("uid", ee.String(""))
+                .set("area_in_ha", ee.String(""))
+                .set("roi_matches", None)
             )
 
-        canal_fc = ee.FeatureCollection(grouped.map(merge_canals_for_uid))
+        gap_fc = gap_canals.map(make_gap_feature)
 
-        # STEP 5 ── Find ROI polygons with NO intersecting canal
-        joined_uids = canal_fc.aggregate_array("uid")
-        no_canal_roi = roi.filter(ee.Filter.inList("uid", joined_uids).Not())
+        # ── Step 5: Merge matched + gap features ─────────────────────────
+        result_fc = matched_fc.merge(gap_fc)
 
-        def make_blank(f):
-            f = ee.Feature(f)
-            return ee.Feature(f.geometry()).set(
-                {
-                    "uid": f.get("uid"),
-                    "area_in_ha": f.get("area_in_ha"),
-                    "canal_available": False,
-                    "misc": ee.String("[]"),
-                }
-            )
+        print(f"Matched canal segments : {matched_fc.size().getInfo()}")
+        print(f"Gap canal segments     : {gap_fc.size().getInfo()}")
+        print(f"Total canal segments   : {result_fc.size().getInfo()}")
 
-        blank_fc = no_canal_roi.map(make_blank)
-
-        # STEP 6 ── Merge canal + no-canal feature collections
-        result_fc = canal_fc.merge(blank_fc)
-
-        print(f"Total features with canal   : {canal_fc.size().getInfo()}")
-        print(f"Total features without canal: {blank_fc.size().getInfo()}")
-        print(f"Total result features       : {result_fc.size().getInfo()}")
-
+        # ── Step 6: Export ────────────────────────────────────────────────
+        print("Exporting canal vector asset...")
         task = export_vector_asset_to_gee(result_fc, description, asset_id)
-        task_id_list = check_task_status([task])
-        print(f"Task completed. Task IDs: {task_id_list}")
+        check_task_status([task])
 
-    # ── Publish and sync if asset exists ──────────────────────────────────
+    # ------------------------------------------------------------------
+    # Publish & Sync
+    # ------------------------------------------------------------------
+    layer_at_geoserver = False
+
     if is_gee_asset_exists(asset_id):
+
+        print("Asset exists. Publishing...")
         make_asset_public(asset_id)
 
         layer_id = save_layer_info_to_db(
@@ -224,15 +218,14 @@ def canal_vector(
             "Canal Vector",
         )
 
-        layer_at_geoserver = False
-        merged_fc = ee.FeatureCollection(asset_id)
+        fc = ee.FeatureCollection(asset_id)
 
-        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canal")
+        print("Syncing to GeoServer...")
+        sync_res = sync_fc_to_geoserver(fc, state, description, "canal")
 
-        if sync_res["status_code"] == 201 and layer_id:
+        if sync_res and sync_res.get("status_code") == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("Sync to GeoServer flag updated")
             layer_at_geoserver = True
 
-        return layer_at_geoserver
-
-    return None
+    return layer_at_geoserver
