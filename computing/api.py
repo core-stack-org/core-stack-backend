@@ -129,6 +129,7 @@ from .misc.digital_elevation_model_local import (
 )
 from .misc.canal_layer import canal_vector
 from .misc.canal_local_compute import canal_vector as canal_vector_local_task
+from .misc.river_layer import river_vector
 
 
 @api_security_check(allowed_methods="POST")
@@ -2039,4 +2040,24 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_river_data(request):
+    print("Inside river data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        river_vector.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in river data api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

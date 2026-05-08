@@ -331,3 +331,4 @@ SUBSOILTEXTURE = "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLAS
 RASTER_DRAINAGE = "projects/ee-plantationsitescores/assets/Raster-Drainage"
 PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
+RIVER_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/River_pan_india"

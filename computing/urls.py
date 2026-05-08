@@ -237,4 +237,9 @@ urlpatterns = [
         api.generate_canal_vector,
         name="generate-canal-vector",
     ),
+    path(
+        "generate_river_data/",
+        api.generate_river_data,
+        name="generate-river-data",
+    ),
 ]
