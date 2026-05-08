@@ -26,6 +26,7 @@ RIVER_VECTOR_PATH = PROJECT_ROOT / "data/river/River_pan_india.geojson"
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/river/river_local"
 GEOSERVER_WORKSPACE = "river"
 
+
 def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
     """
     Mirroring the logic of river_layer.py (GEE):
@@ -99,23 +100,22 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
         return gpd.GeoDataFrame(columns=rivers_gdf.columns, crs=rivers_gdf.crs)
 
     # ── Step 6: Merge, Clean and Fix Geometries ─────────────────────
-    final_gdf = gpd.GeoDataFrame(pd.concat(result_segments, ignore_index=True), crs=rivers_gdf.crs)
-    
+    final_gdf = gpd.GeoDataFrame(
+        pd.concat(result_segments, ignore_index=True), crs=rivers_gdf.crs
+    )
+
     # Cast to string to ensure database/geoserver compatibility
     final_gdf["uid"] = final_gdf["uid"].astype(str)
     final_gdf["area_in_ha"] = final_gdf["area_in_ha"].astype(str)
 
     # Filter out empty
     final_gdf = final_gdf[~final_gdf.geometry.is_empty]
-    
+
     # Clean geometries using the same helper as GEE pipeline
     final_gdf = fix_invalid_geometry_in_gdf(final_gdf)
 
     if "index_right" in final_gdf.columns:
         final_gdf = final_gdf.drop(columns=["index_right"])
-
-    return final_gdf
-
 
     return final_gdf
 
