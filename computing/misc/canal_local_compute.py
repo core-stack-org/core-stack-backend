@@ -33,8 +33,10 @@ def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
     2. Separates matched canals (inside watersheds) and gap canals (outside watersheds but inside ROI).
     3. Produces a Line layer with MWS UID and area attached to each segment.
     """
-    watersheds_gdf = validate_geometry(watersheds_gdf)
-    canals_gdf = validate_geometry(canals_gdf)
+    # 0. Ensure same CRS for all spatial operations (using WGS84 for GeoServer compatibility)
+    target_crs = "EPSG:4326"
+    watersheds_gdf = validate_geometry(watersheds_gdf).to_crs(target_crs)
+    canals_gdf = validate_geometry(canals_gdf).to_crs(target_crs)
 
     # ── Outer dissolved boundary of the entire ROI ─────────────────
     outer_boundary = watersheds_gdf.geometry.unary_union
@@ -91,12 +93,12 @@ def _compute_canal_properties_for_watersheds(watersheds_gdf, canals_gdf):
 
     if not result_segments:
         # Return empty GDF with correct columns
-        return gpd.GeoDataFrame(columns=canals_gdf.columns, crs=canals_gdf.crs)
+        return gpd.GeoDataFrame(columns=canals_gdf.columns, crs=target_crs)
 
     # ── Step 6: Merge and Clean ───────────────────────────────────
     # Use pandas concat then cast to GeoDataFrame
     final_df = pd.concat(result_segments, ignore_index=True)
-    final_gdf = gpd.GeoDataFrame(final_df, crs=canals_gdf.crs)
+    final_gdf = gpd.GeoDataFrame(final_df, crs=target_crs)
 
     # Filter out empty or non-line geometries
     final_gdf = final_gdf[final_gdf.geometry.type.isin(["LineString", "MultiLineString"])]
