@@ -28,12 +28,7 @@ GEOSERVER_WORKSPACE = "river"
 
 
 def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
-    """
-    Clips rivers to ROI boundaries.
-    - Matched rivers  → clipped to each intersecting watershed, uid + area_in_ha attached
-    - Gap rivers      → clipped to outer dissolved boundary, uid = "", area_in_ha = ""
-    - Empty/invalid geometries are dropped throughout
-    """
+
     watersheds_gdf = validate_geometry(watersheds_gdf).reset_index(drop=True)
     rivers_gdf = validate_geometry(rivers_gdf).reset_index(drop=True)
 
@@ -48,16 +43,19 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
 
     print(f"Rivers within outer boundary: {len(rivers_in_roi)}")
 
-    # ── Step 2: Spatial join – river (left) × watershed (right) ──────────
-    # Keep original river index so we can identify gap rivers later
+    # ── Step 2: Spatial join ──────────────────────────────────────────────
+    # Watersheds get a named integer index column for safe lookup after join
+    watersheds_indexed = watersheds_gdf[["uid", "area_in_ha", "geometry"]].copy()
+    watersheds_indexed.index.name = "ws_idx"
+
     joined = gpd.sjoin(
         rivers_in_roi,
-        watersheds_gdf[["uid", "area_in_ha", "geometry"]].reset_index(
-            names="ws_iloc"  # positional index of watershed row
-        ),
+        watersheds_indexed,
         how="inner",
         predicate="intersects",
     )
+    # index_right now holds the watersheds_gdf integer index (0-based)
+    # because we reset_index(drop=True) above — iloc and loc are equivalent
 
     matched_river_indices = joined.index.unique()
     gap_rivers = rivers_in_roi.loc[
@@ -67,72 +65,126 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
     print(f"Matched river-watershed pairs : {len(joined)}")
     print(f"Gap rivers (no watershed hit) : {len(gap_rivers)}")
 
+    # ── DEBUG: print first few rows to verify index_right ────────────────
+    print("joined columns:", joined.columns.tolist())
+    print("joined index_right sample:\n", joined["index_right"].head())
+    print("watersheds_gdf index sample:\n", watersheds_gdf.index[:5].tolist())
+
     result_segments = []
 
-    # ── Step 3: Clip each matched river to its specific watershed ─────────
+    # ── Step 3: Clip matched rivers to their watershed ────────────────────
     if not joined.empty:
+        clipped_rows = []
 
-        def clip_to_watershed(row):
-            """
-            row.ws_iloc is the positional index of the matched watershed row.
-            Using iloc here is correct and safe — ws_iloc was set from
-            reset_index() so it maps 1-to-1 with watersheds_gdf.iloc positions.
-            """
+        for idx, row in joined.iterrows():
             try:
-                ws_geom = watersheds_gdf.geometry.iloc[int(row["ws_iloc"])]
-                clipped = row.geometry.intersection(ws_geom)
-                if clipped.is_empty or not clipped.is_valid:
-                    return None
-                return clipped
+                ws_idx = int(row["index_right"])  # integer positional index
+                ws_geom = watersheds_gdf.loc[ws_idx, "geometry"]
+                river_geom = row.geometry
+
+                # ── DEBUG ──
+                print(
+                    f"  River idx={idx} ws_idx={ws_idx} "
+                    f"river_type={river_geom.geom_type} "
+                    f"river_valid={river_geom.is_valid} "
+                    f"ws_valid={ws_geom.is_valid}"
+                )
+
+                # Fix geometries before intersection
+                if not river_geom.is_valid:
+                    river_geom = river_geom.buffer(0)
+                if not ws_geom.is_valid:
+                    ws_geom = ws_geom.buffer(0)
+
+                clipped = river_geom.intersection(ws_geom)
+
+                print(
+                    f"    clipped type={clipped.geom_type} "
+                    f"empty={clipped.is_empty} "
+                    f"valid={clipped.is_valid} "
+                    f"bounds={clipped.bounds}"
+                )
+
+                if clipped is None or clipped.is_empty or not clipped.is_valid:
+                    print(f"    → DROPPED (empty/invalid)")
+                    continue
+
+                # Extract only line parts (intersection may add points)
+                if clipped.geom_type == "GeometryCollection":
+                    from shapely.ops import unary_union
+
+                    lines = [
+                        g
+                        for g in clipped.geoms
+                        if g.geom_type in ("LineString", "MultiLineString")
+                    ]
+                    if not lines:
+                        print(f"    → DROPPED (no lines in GeometryCollection)")
+                        continue
+                    clipped = unary_union(lines)
+
+                if clipped.geom_type not in ("LineString", "MultiLineString"):
+                    print(f"    → DROPPED (not a line: {clipped.geom_type})")
+                    continue
+
+                new_row = row.copy()
+                new_row["geometry"] = clipped
+                clipped_rows.append(new_row)
+                print(f"    → KEPT")
+
             except Exception as e:
-                print(f"Clip error for river index {row.name}: {e}")
-                return None
+                print(f"  Clip error river idx={idx}: {e}")
+                continue
 
-        joined = joined.copy()
-        joined["geometry"] = joined.apply(clip_to_watershed, axis=1)
+        if clipped_rows:
+            matched_fc = gpd.GeoDataFrame(clipped_rows, crs=rivers_gdf.crs)
+            result_segments.append(matched_fc)
+            print(f"Valid matched segments kept: {len(clipped_rows)}")
+        else:
+            print("No matched segments survived clipping.")
 
-        # Drop rows where clipping failed or produced empty geometry
-        joined = joined[joined["geometry"].notna()]
-        joined = joined[~joined["geometry"].is_empty]
-        joined = joined[joined["geometry"].is_valid]
-
-        # Keep only line geometries (intersection may produce points at edges)
-        joined = joined[
-            joined.geometry.geom_type.isin(["LineString", "MultiLineString"])
-        ]
-
-        if not joined.empty:
-            result_segments.append(joined)
-
-    # ── Step 4: Clip gap rivers to outer boundary ─────────────────────────
+    # ── Step 4: Gap rivers ────────────────────────────────────────────────
     if not gap_rivers.empty:
+        clipped_gaps = []
 
-        def clip_to_outer(row):
+        for idx, row in gap_rivers.iterrows():
             try:
                 clipped = row.geometry.intersection(outer_boundary)
-                if clipped.is_empty or not clipped.is_valid:
-                    return None
-                return clipped
+
+                if clipped is None or clipped.is_empty or not clipped.is_valid:
+                    continue
+
+                if clipped.geom_type == "GeometryCollection":
+                    from shapely.ops import unary_union
+
+                    lines = [
+                        g
+                        for g in clipped.geoms
+                        if g.geom_type in ("LineString", "MultiLineString")
+                    ]
+                    if not lines:
+                        continue
+                    clipped = unary_union(lines)
+
+                if clipped.geom_type not in ("LineString", "MultiLineString"):
+                    continue
+
+                new_row = row.copy()
+                new_row["geometry"] = clipped
+                new_row["uid"] = ""
+                new_row["area_in_ha"] = ""
+                clipped_gaps.append(new_row)
+
             except Exception as e:
-                print(f"Gap clip error for river index {row.name}: {e}")
-                return None
+                print(f"  Gap clip error river idx={idx}: {e}")
+                continue
 
-        gap_rivers = gap_rivers.copy()
-        gap_rivers["uid"] = ""
-        gap_rivers["area_in_ha"] = ""
-        gap_rivers["geometry"] = gap_rivers.apply(clip_to_outer, axis=1)
+        if clipped_gaps:
+            gap_fc = gpd.GeoDataFrame(clipped_gaps, crs=rivers_gdf.crs)
+            result_segments.append(gap_fc)
+            print(f"Valid gap segments kept: {len(clipped_gaps)}")
 
-        gap_rivers = gap_rivers[gap_rivers["geometry"].notna()]
-        gap_rivers = gap_rivers[~gap_rivers["geometry"].is_empty]
-        gap_rivers = gap_rivers[gap_rivers["geometry"].is_valid]
-        gap_rivers = gap_rivers[
-            gap_rivers.geometry.geom_type.isin(["LineString", "MultiLineString"])
-        ]
-
-        if not gap_rivers.empty:
-            result_segments.append(gap_rivers)
-
-    # ── Step 5: Merge all segments ────────────────────────────────────────
+    # ── Step 5: Merge ─────────────────────────────────────────────────────
     if not result_segments:
         print("No valid river segments after clipping.")
         return gpd.GeoDataFrame(columns=rivers_gdf.columns, crs=rivers_gdf.crs)
@@ -143,35 +195,29 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
     )
 
     # ── Step 6: Final cleanup ─────────────────────────────────────────────
-    # Cast to string for GeoServer/DB compatibility
     final_gdf["uid"] = final_gdf["uid"].astype(str)
     final_gdf["area_in_ha"] = final_gdf["area_in_ha"].astype(str)
 
-    # Drop helper columns
-    for col in ["index_right", "ws_iloc"]:
+    for col in ["index_right", "ws_idx"]:
         if col in final_gdf.columns:
             final_gdf = final_gdf.drop(columns=[col])
 
-    # Drop empty / invalid geometries (final safety net)
     final_gdf = final_gdf[~final_gdf.geometry.is_empty]
     final_gdf = final_gdf[final_gdf.geometry.is_valid]
     final_gdf = final_gdf[final_gdf.geometry.notna()]
-
-    # Fix any remaining geometry issues
     final_gdf = fix_invalid_geometry_in_gdf(final_gdf)
 
-    # Drop anything that still has a null/empty bbox
+    # Bbox sanity check
     final_gdf = final_gdf[
         final_gdf.geometry.apply(
             lambda g: g is not None
             and not g.is_empty
-            and g.bounds != (0.0, 0.0, 0.0, 0.0)
-            and g.bounds[0] <= g.bounds[2]  # minX <= maxX
-            and g.bounds[1] <= g.bounds[3]  # minY <= maxY
+            and g.bounds[0] <= g.bounds[2]
+            and g.bounds[1] <= g.bounds[3]
         )
     ]
 
-    print(f"Final valid river segments    : {len(final_gdf)}")
+    print(f"Final valid river segments: {len(final_gdf)}")
     return final_gdf
 
 
