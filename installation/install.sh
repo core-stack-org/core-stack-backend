@@ -707,8 +707,7 @@ function install_postgres() {
         sudo apt-get install -y postgresql postgresql-contrib postgis libpq-dev
     fi
 
-    sudo systemctl start postgresql
-    sudo systemctl enable postgresql
+    sudo service postgresql start || sudo pg_ctlcluster 14 main start
 
     echo "Setting up PostgreSQL user/database..."
     sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$POSTGRES_USER'" | grep -q 1 || \
@@ -729,8 +728,7 @@ function install_rabbitmq() {
         sudo apt-get install -y rabbitmq-server
     fi
 
-    sudo systemctl start rabbitmq-server
-    sudo systemctl enable rabbitmq-server
+    sudo service rabbitmq-server start
     echo "RabbitMQ ready."
     mark_step_complete "rabbitmq"
 }

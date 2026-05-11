@@ -103,8 +103,9 @@ def transform_data(data):
 
 def get_activated_location_json():
     """Read proposed blocks data from JSON file"""
+    data_dir = Path(getattr(settings, "DATA_DIR", Path(settings.BASE_DIR) / "data"))
     activate_locations_file_path = (
-        Path(settings.BASE_DIR) / "data/activated_locations/active_locations.json"
+        data_dir / "activated_locations" / "active_locations.json"
     )
     try:
         if activate_locations_file_path.exists():
