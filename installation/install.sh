@@ -81,7 +81,7 @@ function step_label() {
         django_migrations) echo "Run Django migrations" ;;
         seed_data) echo "Load seed data" ;;
         superuser) echo "Ensure test superuser" ;;
-        geoserver) echo "Install GeoServer" ;;
+        geoserver) echo "Configure GeoServer connection/workspace" ;;
         gee_configuration) echo "Configure Google Earth Engine" ;;
         admin_boundary_data) echo "Download admin-boundary data" ;;
         initialisation_check) echo "Run internal API initialisation check" ;;
@@ -736,21 +736,30 @@ function install_rabbitmq() {
 
 GEOSERVER_DEFAULT_URL="http://localhost:8080/geoserver"
 GEOSERVER_DEFAULT_USER="admin"
-GEOSERVER_DEFAULT_PASS="geoserver"
 GEOSERVER_WORKSPACE="corestack"
-
-function geoserver_deployed() {
-    [ -d "/opt/tomcat/webapps/geoserver" ]
-}
-
-function tomcat_running() {
-    curl -sf http://localhost:8080 >/dev/null 2>&1
-}
+GEOSERVER_WORKSPACES_DEFAULT=(
+    "corestack"
+    "works"
+    "resources"
+    "facilities_proximity"
+    "swb"
+    "water_bodies"
+    "zoi_layers"
+    "catchment_area_singleflow"
+    "nrega_assets"
+    "stream_order"
+    "ndvi_timeseries"
+    "plantation"
+    "customkml"
+    "LULC_level_1"
+    "LULC_level_2"
+    "LULC_level_3"
+)
 
 function wait_for_geoserver_rest() {
     local url="${1:-$GEOSERVER_DEFAULT_URL}"
     local user="${2:-$GEOSERVER_DEFAULT_USER}"
-    local pass="${3:-$GEOSERVER_DEFAULT_PASS}"
+    local pass="${3:-}"
     local elapsed=0
     local timeout=120
 
@@ -776,7 +785,7 @@ function ensure_geoserver_workspace() {
     local workspace="${1:-$GEOSERVER_WORKSPACE}"
     local url="${2:-$GEOSERVER_DEFAULT_URL}"
     local user="${3:-$GEOSERVER_DEFAULT_USER}"
-    local pass="${4:-$GEOSERVER_DEFAULT_PASS}"
+    local pass="${4:-}"
     local http_code
 
     http_code=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -804,117 +813,119 @@ function ensure_geoserver_workspace() {
     fi
 }
 
-function install_geoserver() {
-    local tomcat_version="9.0.98"
-    local geoserver_version="2.23.6"
-    local tomcat_dir="/opt/tomcat"
-    local tomcat_tar="/tmp/apache-tomcat-${tomcat_version}.tar.gz"
-    local geoserver_zip="/tmp/geoserver-${geoserver_version}-war.zip"
-    local geoserver_war_dir="/tmp/geoserver-war"
+function parse_workspace_list() {
+    local raw_csv="$1"
+    local -n out_ref="$2"
+    local token=""
+    local value=""
+    local seen=""
 
-    if geoserver_deployed; then
-        echo "GeoServer already deployed at $tomcat_dir/webapps/geoserver."
-        if ! tomcat_running; then
-            echo "Starting Tomcat..."
-            sudo "$tomcat_dir/bin/startup.sh"
-        fi
-        wait_for_geoserver_rest && ensure_geoserver_workspace || true
-        mark_step_complete "geoserver"
-        return
-    fi
-
-    if ! command -v java >/dev/null 2>&1; then
-        echo "Installing Java..."
-        sudo apt-get update
-        sudo apt-get install -y default-jdk
-    else
-        echo "Java already installed ($(java -version 2>&1 | head -n1))."
-    fi
-
-    if ! getent group tomcat >/dev/null 2>&1; then
-        sudo groupadd tomcat
-    fi
-    if ! id -u tomcat >/dev/null 2>&1; then
-        sudo useradd -s /bin/false -g tomcat -d "$tomcat_dir" tomcat
-    fi
-
-    if [ ! -f "$tomcat_dir/bin/startup.sh" ]; then
-        echo "Downloading Tomcat $tomcat_version..."
-        wget -qL \
-            "https://archive.apache.org/dist/tomcat/tomcat-9/v${tomcat_version}/bin/apache-tomcat-${tomcat_version}.tar.gz" \
-            -O "$tomcat_tar"
-        sudo mkdir -p "$tomcat_dir"
-        sudo tar xzf "$tomcat_tar" -C "$tomcat_dir" --strip-components=1
-        rm -f "$tomcat_tar"
-        echo "Tomcat $tomcat_version installed at $tomcat_dir."
-    else
-        echo "Tomcat already installed at $tomcat_dir."
-    fi
-
-    sudo chgrp -R tomcat "$tomcat_dir"
-    sudo chmod -R g+r "$tomcat_dir/conf"
-    sudo chmod g+x "$tomcat_dir/conf"
-    sudo chown -R tomcat "$tomcat_dir/webapps" "$tomcat_dir/work" "$tomcat_dir/temp" "$tomcat_dir/logs"
-
-    if ! tomcat_running; then
-        echo "Starting Tomcat..."
-        sudo "$tomcat_dir/bin/startup.sh"
-        sleep 5
-    fi
-
-    echo "Downloading GeoServer $geoserver_version WAR (~108MB)..."
-    wget -L \
-        "https://sourceforge.net/projects/geoserver/files/GeoServer/${geoserver_version}/geoserver-${geoserver_version}-war.zip/download" \
-        -O "$geoserver_zip"
-
-    local zip_size
-    zip_size=$(stat -c%s "$geoserver_zip" 2>/dev/null || echo 0)
-    if [ "$zip_size" -lt 10000000 ]; then
-        echo "ERROR: GeoServer download appears incomplete (${zip_size} bytes). Re-run this step."
-        rm -f "$geoserver_zip"
-        return 1
-    fi
-
-    sudo apt-get install -y unzip
-    rm -rf "$geoserver_war_dir"
-    unzip -q "$geoserver_zip" -d "$geoserver_war_dir"
-    sudo cp "$geoserver_war_dir/geoserver.war" "$tomcat_dir/webapps/"
-    rm -rf "$geoserver_zip" "$geoserver_war_dir"
-
-    echo "Waiting for GeoServer to deploy (up to 60s)..."
-    local elapsed=0
-    while [ "$elapsed" -lt 60 ]; do
-        if geoserver_deployed; then
-            break
-        fi
-        sleep 5
-        elapsed=$((elapsed + 5))
+    out_ref=()
+    raw_csv="${raw_csv//$'\n'/,}"
+    IFS=',' read -r -a tokens <<< "$raw_csv"
+    for token in "${tokens[@]}"; do
+        value="$(trim "$token")"
+        value="$(strip_wrapping_quotes "$value")"
+        [ -n "$value" ] || continue
+        case ",$seen," in
+            *",$value,"*) continue ;;
+        esac
+        out_ref+=("$value")
+        seen="${seen},${value}"
     done
+}
 
-    if ! geoserver_deployed; then
-        echo "WARNING: GeoServer webapps directory not found after ${elapsed}s."
-        echo "Check deployment logs: sudo tail -20 $tomcat_dir/logs/catalina.out"
+function ensure_geoserver_workspaces() {
+    local url="$1"
+    local user="$2"
+    local pass="$3"
+    local workspaces_csv="$4"
+    local workspace_list=()
+    local workspace=""
+
+    if [ -n "$workspaces_csv" ]; then
+        parse_workspace_list "$workspaces_csv" workspace_list
+    fi
+    if [ "${#workspace_list[@]}" -eq 0 ]; then
+        workspace_list=("${GEOSERVER_WORKSPACES_DEFAULT[@]}")
+    fi
+
+    echo "Ensuring GeoServer workspaces..."
+    for workspace in "${workspace_list[@]}"; do
+        ensure_geoserver_workspace "$workspace" "$url" "$user" "$pass" || true
+    done
+}
+
+function configure_geoserver() {
+    local geoserver_url="${GEOSERVER_URL_ARG:-}"
+    local geoserver_user="${GEOSERVER_USERNAME_ARG:-}"
+    local geoserver_pass="${GEOSERVER_PASSWORD_ARG:-}"
+    local geoserver_workspaces_csv=""
+    local prompt_value=""
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        [ -n "$geoserver_url" ] || geoserver_url="$(current_env_value "$APP_ENV_FILE" "GEOSERVER_URL")"
+        [ -n "$geoserver_user" ] || geoserver_user="$(current_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME")"
+        [ -n "$geoserver_pass" ] || geoserver_pass="$(current_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD")"
+        geoserver_workspaces_csv="$(current_env_value "$APP_ENV_FILE" "GEOSERVER_WORKSPACES")"
+    fi
+
+    geoserver_url="$(trim "$geoserver_url")"
+    geoserver_url="$(strip_wrapping_quotes "$geoserver_url")"
+    geoserver_url="${geoserver_url%/}"
+    if [ -z "$geoserver_url" ]; then
+        geoserver_url="$GEOSERVER_DEFAULT_URL"
+    fi
+
+    if [ -t 0 ]; then
+        echo "GeoServer installation is skipped. Use your Docker GeoServer instance."
+        read -r -p "GeoServer URL [$geoserver_url]: " prompt_value
+        if [ -n "$prompt_value" ]; then
+            geoserver_url="$(trim "$prompt_value")"
+            geoserver_url="$(strip_wrapping_quotes "$geoserver_url")"
+            geoserver_url="${geoserver_url%/}"
+        fi
+
+        if [ -z "$geoserver_user" ]; then
+            read -r -p "GeoServer username [$GEOSERVER_DEFAULT_USER]: " prompt_value
+            geoserver_user="$(trim "$prompt_value")"
+            geoserver_user="$(strip_wrapping_quotes "$geoserver_user")"
+        fi
+        if [ -z "$geoserver_user" ]; then
+            geoserver_user="$GEOSERVER_DEFAULT_USER"
+        fi
+
+        if [ -z "$geoserver_pass" ]; then
+            read -r -s -p "GeoServer password: " geoserver_pass
+            echo ""
+            geoserver_pass="$(trim "$geoserver_pass")"
+            geoserver_pass="$(strip_wrapping_quotes "$geoserver_pass")"
+        fi
+    fi
+
+    if [ -z "$geoserver_user" ] || [ -z "$geoserver_pass" ]; then
+        echo "ERROR: GeoServer username/password are required."
+        echo "Provide --input geoserver_username=... and --input geoserver_password=..."
         return 1
     fi
 
     if [ -f "$APP_ENV_FILE" ]; then
-        if [ -z "$(current_env_value "$APP_ENV_FILE" "GEOSERVER_URL")" ]; then
-            set_env_value "$APP_ENV_FILE" "GEOSERVER_URL" "http://localhost:8080/geoserver/"
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_URL" "$geoserver_url/"
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME" "$geoserver_user"
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD" "$geoserver_pass"
+        if [ -z "$geoserver_workspaces_csv" ]; then
+            geoserver_workspaces_csv="$(IFS=,; echo "${GEOSERVER_WORKSPACES_DEFAULT[*]}")"
+            set_env_value "$APP_ENV_FILE" "GEOSERVER_WORKSPACES" "$geoserver_workspaces_csv"
         fi
-        if [ -z "$(current_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME")" ]; then
-            set_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME" "admin"
-        fi
-        if [ -z "$(current_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD")" ]; then
-            set_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD" "geoserver"
-        fi
-        echo "GeoServer credentials written to .env."
+        echo "GeoServer connection details written to .env."
     fi
 
-    wait_for_geoserver_rest && ensure_geoserver_workspace || true
+    wait_for_geoserver_rest "$geoserver_url" "$geoserver_user" "$geoserver_pass" && \
+        ensure_geoserver_workspaces "$geoserver_url" "$geoserver_user" "$geoserver_pass" "$geoserver_workspaces_csv" || true
 
-    echo "GeoServer $geoserver_version running at http://localhost:8080/geoserver/web/"
-    echo "  Username: admin | Password: geoserver"
-    echo "  IMPORTANT: Change the default password after first login."
+    echo "GeoServer configuration complete."
+    echo "  URL: ${geoserver_url}/web/"
+    echo "  Default workspace: ${GEOSERVER_WORKSPACE}"
     mark_step_complete "geoserver"
 }
 
@@ -1708,7 +1719,7 @@ function run_step() {
             generate_env_file
             ;;
         geoserver)
-            install_geoserver
+            configure_geoserver
             ;;
         collectstatic)
             collect_static_files
