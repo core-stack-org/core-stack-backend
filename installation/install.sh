@@ -10,6 +10,7 @@ INSTALL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONDA_ENV_YAML="$INSTALL_SCRIPT_DIR/environment.yml"
 BACKEND_DIR="$(cd "$INSTALL_SCRIPT_DIR/.." && pwd)"
 INSTALL_INVOCATION_DIR="$PWD"
+CORE_STACK_DATA_DIR="${CORE_STACK_DATA_DIR:-$HOME/core-stack-data}"
 POSTGRES_USER="corestack_admin"
 POSTGRES_DB="corestack_db"
 POSTGRES_PASSWORD="corestack@123"
@@ -545,13 +546,13 @@ function directory_has_contents() {
 }
 
 function admin_boundary_data_present() {
-    local admin_boundary_dir="$BACKEND_DIR/data/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
     [ -f "$admin_boundary_dir/input/soi_tehsil.geojson" ] && \
         find "$admin_boundary_dir/input" -mindepth 2 -name '*.geojson' -print -quit 2>/dev/null | grep -q .
 }
 
 function nested_admin_boundary_data_present() {
-    local nested_admin_boundary_dir="$BACKEND_DIR/data/admin-boundary/admin-boundary"
+    local nested_admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary/admin-boundary"
     [ -f "$nested_admin_boundary_dir/input/soi_tehsil.geojson" ] && \
         find "$nested_admin_boundary_dir/input" -mindepth 2 -name '*.geojson' -print -quit 2>/dev/null | grep -q .
 }
@@ -571,7 +572,7 @@ function move_directory_contents() {
 }
 
 function normalize_existing_admin_boundary_data() {
-    local admin_boundary_dir="$BACKEND_DIR/data/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
     local nested_admin_boundary_dir="$admin_boundary_dir/admin-boundary"
 
     if admin_boundary_data_present; then
@@ -610,7 +611,7 @@ function normalize_existing_admin_boundary_data() {
 
 function finalize_admin_boundary_extraction() {
     local extracted_root="$1"
-    local admin_boundary_dir="$BACKEND_DIR/data/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
     local candidate_dir=""
     local first_child=""
 
@@ -1098,13 +1099,17 @@ function generate_env_file() {
         fi
 
         case "$var_name" in
+            DATA_DIR)
+                echo "DATA_DIR=$CORE_STACK_DATA_DIR" >> "$env_file"
+                mkdir -p "$CORE_STACK_DATA_DIR"
+                ;;
             WHATSAPP_MEDIA_PATH)
                 echo 'WHATSAPP_MEDIA_PATH=$BACKEND_DIR/bot_interface/whatsapp_media' >> "$env_file"
                 mkdir -p "$BACKEND_DIR/bot_interface/whatsapp_media"
                 ;;
             EXCEL_DIR)
-                echo 'EXCEL_DIR=$BACKEND_DIR/data/excel_files' >> "$env_file"
-                mkdir -p "$BACKEND_DIR/data/excel_files"
+                echo 'EXCEL_DIR=$DATA_DIR/excel_files' >> "$env_file"
+                mkdir -p "$CORE_STACK_DATA_DIR/excel_files"
                 ;;
             EXCEL_PATH)
                 echo 'EXCEL_PATH=$BACKEND_DIR' >> "$env_file"
@@ -1119,9 +1124,14 @@ function generate_env_file() {
         echo 'BACKEND_DIR=.' >> "$env_file"
     fi
 
+    if ! grep -q '^DATA_DIR=' "$env_file"; then
+        echo "DATA_DIR=$CORE_STACK_DATA_DIR" >> "$env_file"
+        mkdir -p "$CORE_STACK_DATA_DIR"
+    fi
+
     if ! grep -q '^EXCEL_DIR=' "$env_file"; then
-        echo 'EXCEL_DIR=$BACKEND_DIR/data/excel_files' >> "$env_file"
-        mkdir -p "$BACKEND_DIR/data/excel_files"
+        echo 'EXCEL_DIR=$DATA_DIR/excel_files' >> "$env_file"
+        mkdir -p "$CORE_STACK_DATA_DIR/excel_files"
     fi
 
     if ! grep -q '^WHATSAPP_MEDIA_PATH=' "$env_file"; then
@@ -1135,10 +1145,11 @@ function generate_env_file() {
 
     apply_env_overrides "$env_file"
     maybe_set_installer_managed_path_value "$env_file" "BACKEND_DIR" "$BACKEND_DIR" "." "."
+    maybe_set_installer_managed_path_value "$env_file" "DATA_DIR" "$BACKEND_DIR/data" "data" "$CORE_STACK_DATA_DIR"
     maybe_set_installer_managed_path_value "$env_file" "DEPLOYMENT_DIR" "$BACKEND_DIR" "." '$BACKEND_DIR'
     maybe_set_installer_managed_path_value "$env_file" "TMP_LOCATION" "$BACKEND_DIR/tmp" "tmp" '$BACKEND_DIR/tmp'
     maybe_set_installer_managed_path_value "$env_file" "WHATSAPP_MEDIA_PATH" "$BACKEND_DIR/bot_interface/whatsapp_media" "bot_interface/whatsapp_media" '$BACKEND_DIR/bot_interface/whatsapp_media'
-    maybe_set_installer_managed_path_value "$env_file" "EXCEL_DIR" "$BACKEND_DIR/data/excel_files" "data/excel_files" '$BACKEND_DIR/data/excel_files'
+    maybe_set_installer_managed_path_value "$env_file" "EXCEL_DIR" "$BACKEND_DIR/data/excel_files" "data/excel_files" '$DATA_DIR/excel_files'
     maybe_set_installer_managed_path_value "$env_file" "EXCEL_PATH" "$BACKEND_DIR" "." '$BACKEND_DIR'
     set_env_value "$env_file" "PUBLIC_API_BASE_URL" "$(normalize_public_api_base_url "${PUBLIC_API_BASE_URL_ARG:-$(current_env_value "$env_file" "PUBLIC_API_BASE_URL")}")"
     if [ -z "$(current_env_value "$env_file" "PUBLIC_API_BASE_URL")" ]; then
@@ -1536,8 +1547,9 @@ function persist_optional_inputs_to_env() {
 function ensure_dirs() {
     mkdir -p "$BACKEND_DIR/logs"
     touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
-    mkdir -p "$BACKEND_DIR/data/activated_locations"
-    mkdir -p "$BACKEND_DIR/data/excel_files"
+    mkdir -p "$CORE_STACK_DATA_DIR"
+    mkdir -p "$CORE_STACK_DATA_DIR/activated_locations"
+    mkdir -p "$CORE_STACK_DATA_DIR/excel_files"
     mkdir -p "$BACKEND_DIR/tmp"
     mkdir -p "$INSTALL_STATE_DIR"
     echo "Required directories ready."
@@ -1554,9 +1566,9 @@ function install_gdown_if_missing() {
 
 function download_admin_boundary_data() {
     local force="${1:-0}"
-    local admin_boundary_dir="$BACKEND_DIR/data/admin-boundary"
-    local archive_path="$BACKEND_DIR/dataset.7z"
-    local extraction_root="$BACKEND_DIR/data/.admin-boundary-extract"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
+    local archive_path="$CORE_STACK_DATA_DIR/dataset.7z"
+    local extraction_root="$CORE_STACK_DATA_DIR/.admin-boundary-extract"
     local fileid="1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d"
 
     if [ "$force" -ne 1 ] && admin_boundary_data_present; then
@@ -1573,7 +1585,7 @@ function download_admin_boundary_data() {
     echo "Downloading admin-boundary data (~8GB, this may take a while)..."
     rm -rf "$admin_boundary_dir" "$extraction_root"
     rm -f "$archive_path"
-    mkdir -p "$BACKEND_DIR/data" "$extraction_root"
+    mkdir -p "$CORE_STACK_DATA_DIR" "$extraction_root"
 
     install_gdown_if_missing
     sudo apt-get install -y p7zip-full
