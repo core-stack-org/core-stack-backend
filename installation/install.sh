@@ -1177,7 +1177,10 @@ function generate_env_file() {
         echo "FERNET_KEY generated and added to .env"
     fi
 
-    chown "$USER:$USER" "$env_file" 2>/dev/null || true
+    local resolved_user="${USER:-$(id -un 2>/dev/null || true)}"
+    if [ -n "$resolved_user" ]; then
+        chown "$resolved_user:$resolved_user" "$env_file" 2>/dev/null || true
+    fi
     chmod 640 "$env_file"
 
     echo "Total variables in .env: $(grep -c '^[A-Za-z_]' "$env_file")"
