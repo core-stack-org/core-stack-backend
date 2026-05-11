@@ -10,6 +10,9 @@ from rasterio.mask import mask
 from shapely.geometry import mapping
 from utilities.gee_utils import valid_gee_text
 
+from computing.utils import convert_to_zip
+import logging
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRECOMPUTED_TEHSIL_WATERSHED_DIR = (
@@ -242,10 +245,10 @@ def clip_raster_with_roi(roi_gdf, raster_path, output_path, raster_label="Raster
 
 
 RASTER_DECLARED_SRS = "EPSG:4326"
+VECTOR_DECLARED_SRS = "EPSG:4326"
 
 
 def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
-    import logging
 
     _log = logging.getLogger(__name__)
 
@@ -296,7 +299,7 @@ def _verify_raster_layer(geo, workspace, layer_name):
 
 
 def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_type="gpkg"):
-    from computing.utils import convert_to_zip
+    _log = logging.getLogger(__name__)
 
     geo.ensure_workspace(workspace)
     try:
@@ -305,12 +308,28 @@ def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_ty
         pass
 
     zip_path = convert_to_zip(path, file_type)
-    return geo.create_shp_datastore(
+    response = geo.create_shp_datastore(
         path=zip_path,
         store_name=layer_name,
         workspace=workspace,
         file_extension=file_type,
     )
+    try:
+        geo.configure_featuretype(
+            workspace=workspace,
+            store=layer_name,
+            featuretype=layer_name,
+            srs=VECTOR_DECLARED_SRS,
+            projection_policy="FORCE_DECLARED",
+        )
+    except Exception as e:
+        _log.warning(
+            "Failed to force SRS on featuretype %s:%s: %s",
+            workspace,
+            layer_name,
+            e,
+        )
+    return response
 
 
 def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"):

@@ -182,6 +182,7 @@ def run_change_detection_vector_local(
                 layer_name=published_layer_name,
                 asset_id=asset_id,
                 dataset_name="Change Detection Vector",
+                misc={"is_computed_locally": True},
             )
             if layer_id and push_to_geoserver:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
