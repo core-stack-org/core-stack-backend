@@ -681,132 +681,6 @@ def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_ge
         logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
 
 
-def save_layer_info_to_db(
-    state,
-    district,
-    block,
-    layer_name,
-    asset_id,
-    dataset_name,
-    sync_to_geoserver=False,
-    layer_version="1.0",
-    algorithm=None,
-    algorithm_version="1.0",
-    misc=None,
-    is_override=False,
-):
-    if _get_prod_backend_url():
-        layer_id = _sync_layer_to_prod_db({
-            "state": state,
-            "district": district,
-            "block": block,
-            "layer_name": layer_name,
-            "asset_id": asset_id,
-            "dataset_name": dataset_name,
-            "sync_to_geoserver": sync_to_geoserver,
-            "layer_version": layer_version,
-            "algorithm": algorithm,
-            "algorithm_version": algorithm_version,
-            "misc": misc,
-            "is_override": is_override,
-        })
-        if layer_id is not None:
-            return layer_id
-        logger.warning(
-            "Prod DB sync failed for layer %s — falling back to local DB write.", layer_name
-        )
-
-    print("inside the save_layer_info_to_db function")
-
-    dataset = Dataset.objects.get(name=dataset_name)
-
-    try:
-        state_obj = StateSOI.objects.get(state_name__iexact=state)
-        district_obj = DistrictSOI.objects.get(
-            district_name__iexact=district, state=state_obj
-        )
-        block_obj = TehsilSOI.objects.get(
-            tehsil_name__iexact=block, district=district_obj
-        )
-    except Exception as e:
-        print("Error fetching in state district block:", e)
-        return
-
-    is_public = is_asset_public(asset_id)
-
-    # Check if there’s an existing layer
-    existing_layer = (
-        Layer.objects.filter(
-            dataset=dataset,
-            layer_name=layer_name,
-            state=state_obj,
-            district=district_obj,
-            block=block_obj,
-        )
-        .order_by("-layer_version")
-        .first()
-    )
-
-    if existing_layer:
-        if existing_layer.algorithm_version != algorithm_version:
-            # Algorithm version changed --> create new record with incremented layer_version
-            new_layer_version = str(float(existing_layer.layer_version) + 1)
-            print(
-                f"Algorithm version changed. Creating new layer version: {new_layer_version}"
-            )
-            layer_obj = Layer.objects.create(
-                dataset=dataset,
-                layer_name=layer_name,
-                state=state_obj,
-                district=district_obj,
-                block=block_obj,
-                layer_version=new_layer_version,
-                algorithm=algorithm,
-                algorithm_version=algorithm_version,
-                is_sync_to_geoserver=sync_to_geoserver,
-                is_public_gee_asset=is_public,
-                is_override=is_override,
-                misc=misc,
-                gee_asset_path=asset_id,
-            )
-        else:
-            # Algorithm version is same --> update existing layer
-            print("Algorithm version same. Updating existing layer.")
-            for field, value in {
-                "algorithm": algorithm,
-                "algorithm_version": algorithm_version,
-                "is_sync_to_geoserver": sync_to_geoserver,
-                "is_public_gee_asset": is_public,
-                "is_override": is_override,
-                "misc": misc,
-                "gee_asset_path": asset_id,
-            }.items():
-                setattr(existing_layer, field, value)
-            existing_layer.save()
-            layer_obj = existing_layer
-    else:
-        # No existing record --> create a new one
-        print("No existing layer found. Creating new one.")
-        layer_obj = Layer.objects.create(
-            dataset=dataset,
-            layer_name=layer_name,
-            state=state_obj,
-            district=district_obj,
-            block=block_obj,
-            layer_version=layer_version,
-            algorithm=algorithm,
-            algorithm_version=algorithm_version,
-            is_sync_to_geoserver=sync_to_geoserver,
-            is_public_gee_asset=is_public,
-            is_override=is_override,
-            misc=misc,
-            gee_asset_path=asset_id,
-        )
-
-    print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
-    return layer_obj.id
-
-
 def get_existing_end_year(dataset_name, layer_name):
     """fetch objects from db on the basis of dataset name and layer_name"""
     dataset = Dataset.objects.get(name=dataset_name)
@@ -1088,73 +962,6 @@ def generate_swb_layer_with_max_so_catchment(
 
 
 
-def _get_prod_backend_url():
-    return getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
-
-
-def _get_prod_api_key():
-    return getattr(settings, "PROD_BACKEND_API_KEY", "")
-
-
-def _sync_layer_to_prod_db(payload: dict):
-    prod_url = _get_prod_backend_url()
-    if not prod_url:
-        return None
-
-    endpoint = prod_url + "/api/v1/sync_layer_remote/"
-    try:
-        response = requests.post(
-            endpoint,
-            json=payload,
-            headers={"X-Api-Key": _get_prod_api_key()},
-            timeout=30,
-        )
-        if response.status_code not in (200, 201):
-            logger.warning(
-                "Prod DB sync returned %s for layer %s: %s",
-                response.status_code,
-                payload.get("layer_name"),
-                response.text,
-            )
-            return None
-        layer_id = response.json().get("layer_id")
-        logger.info("Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id)
-        return layer_id
-    except requests.RequestException as e:
-        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
-        return None
-
-
-def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
-    prod_url = _get_prod_backend_url()
-    if not prod_url or layer_id is None:
-        return
-
-    endpoint = prod_url + "/api/v1/update_layer_sync_remote/"
-    payload = {
-        "layer_id": layer_id,
-        "sync_to_geoserver": sync_to_geoserver,
-        "is_stac_specs_generated": is_stac_specs_generated,
-    }
-    try:
-        response = requests.post(
-            endpoint,
-            json=payload,
-            headers={"X-Api-Key": _get_prod_api_key()},
-            timeout=30,
-        )
-        if response.status_code not in (200, 201):
-            logger.warning(
-                "Prod layer sync status update returned %s for layer %s: %s",
-                response.status_code,
-                layer_id,
-                response.text,
-            )
-        else:
-            logger.info("Layer sync status updated on prod DB for id=%s.", layer_id)
-    except requests.RequestException as e:
-        logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
-
 
 def save_layer_info_to_db(
     state,
@@ -1171,7 +978,7 @@ def save_layer_info_to_db(
     is_override=False,
 ):
     if _get_prod_backend_url():
-        return _sync_layer_to_prod_db({
+        layer_id = _sync_layer_to_prod_db({
             "state": state,
             "district": district,
             "block": block,
@@ -1185,6 +992,11 @@ def save_layer_info_to_db(
             "misc": misc,
             "is_override": is_override,
         })
+        if layer_id is not None:
+            return layer_id
+        logger.warning(
+            "Prod DB sync failed for layer %s — falling back to local DB write.", layer_name
+        )
 
     print("inside the save_layer_info_to_db function")
 
@@ -1242,13 +1054,14 @@ def save_layer_info_to_db(
         else:
             # Algorithm version is same --> update existing layer
             print("Algorithm version same. Updating existing layer.")
+            merged_misc = {**(existing_layer.misc or {}), **(misc or {})}
             for field, value in {
                 "algorithm": algorithm,
                 "algorithm_version": algorithm_version,
                 "is_sync_to_geoserver": sync_to_geoserver,
                 "is_public_gee_asset": is_public,
                 "is_override": is_override,
-                "misc": misc,
+                "misc": merged_misc,
                 "gee_asset_path": asset_id,
             }.items():
                 setattr(existing_layer, field, value)
