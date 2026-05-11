@@ -80,7 +80,7 @@ def generate_dem_layer(
         .setDefaultProjection("EPSG:3857", None, 30)
         .rename("elevation")
     )
-    clip_dem_raster = dem_raster.clip(roi_boundary.geometry())
+    raster = dem_raster.clip(roi_boundary.geometry())
 
     # Generate raster Layer
     layer_status = dem_raster_generation(
@@ -90,7 +90,7 @@ def generate_dem_layer(
         block=block,
         description=description,
         roi=roi_boundary,
-        clip_dem_raster=clip_dem_raster,
+        raster=raster,
         proj_id=proj_id,
     )
 
@@ -100,7 +100,7 @@ def generate_dem_layer(
 
 
 def dem_raster_generation(
-    clip_dem_raster,
+    raster,
     roi,
     proj_id=None,
     state=None,
@@ -115,7 +115,7 @@ def dem_raster_generation(
 
     if not is_gee_asset_exists(asset_id):
         task_id = export_raster_asset_to_gee(
-            image=clip_dem_raster,
+            image=raster,
             description=description,
             asset_id=asset_id,
             scale=30,
@@ -147,7 +147,7 @@ def dem_raster_generation(
             workspacename,
             description,
             description,
-            "dem_style",
+            "dem",
         )
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
@@ -216,7 +216,7 @@ def vectorize_fabdem(mws_fc, raster_asset_id, state, district, block):
             block,
             layer_name=description,
             asset_id=asset_id,
-            dataset_name="DEM Vector",
+            dataset_name="Dem Vector",
         )
 
         fc_geojson = fc.getInfo()
