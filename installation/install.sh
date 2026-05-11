@@ -10,7 +10,7 @@ INSTALL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONDA_ENV_YAML="$INSTALL_SCRIPT_DIR/environment.yml"
 BACKEND_DIR="$(cd "$INSTALL_SCRIPT_DIR/.." && pwd)"
 INSTALL_INVOCATION_DIR="$PWD"
-CORE_STACK_DATA_DIR="$HOME/core-stack-data"
+CORE_STACK_DATA_DIR="/var/tmp/core-stack-data"
 POSTGRES_USER="corestack_admin"
 POSTGRES_DB="corestack_db"
 POSTGRES_PASSWORD="corestack@123"
@@ -27,6 +27,8 @@ PUBLIC_API_BASE_URL_ARG=""
 GEOSERVER_URL_ARG=""
 GEOSERVER_USERNAME_ARG=""
 GEOSERVER_PASSWORD_ARG=""
+GEOSERVER_CONFIG_ARG=""
+DATA_DIR_ARG=""
 STEP_START_FROM=""
 LIST_STEPS_ONLY=0
 DEFAULT_PUBLIC_API_BASE_URL="https://geoserver.core-stack.org/api/v1"
@@ -42,6 +44,7 @@ declare -a OPTIONAL_INPUT_KEYS=(
     "geoserver_url"
     "geoserver_username"
     "geoserver_password"
+    "data_dir"
 )
 declare -A OPTIONAL_INPUT_VALUES=()
 
@@ -59,6 +62,7 @@ STEP_ORDER=(
     "rabbitmq"
     "conda_env"
     "env_file"
+    "data_dir_path"
     "geoserver"
     "collectstatic"
     "django_migrations"
@@ -78,6 +82,7 @@ function step_label() {
         rabbitmq) echo "Install RabbitMQ" ;;
         conda_env) echo "Set up conda environment" ;;
         env_file) echo "Generate/update .env" ;;
+        data_dir_path) echo "Update DATA_DIR path" ;;
         collectstatic) echo "Collect static files" ;;
         django_migrations) echo "Run Django migrations" ;;
         seed_data) echo "Load seed data" ;;
@@ -101,6 +106,8 @@ Options:
   --skip A,B,C          Skip the listed comma-separated steps.
   --input KEY=VALUE     Provide an optional installer input.
   --gee-json PATH       Import this GEE service-account JSON without prompting.
+  --geoserver-config    Configure GeoServer only: URL,USERNAME,PASSWORD
+  --data-dir PATH       Set DATA_DIR path (also updates EXCEL_DIR).
   --list-steps          Print the available installer steps and exit.
   -h, --help            Show this help text.
 
@@ -177,6 +184,7 @@ function optional_input_description() {
         geoserver_url) echo "GeoServer base URL used for publish/download validation, for example https://host/geoserver" ;;
         geoserver_username) echo "GeoServer REST username used by internal publish flows" ;;
         geoserver_password) echo "GeoServer REST password used by internal publish flows" ;;
+        data_dir) echo "Absolute directory used for DATA_DIR and related downloaded data" ;;
         *) echo "" ;;
     esac
 }
@@ -189,6 +197,7 @@ function optional_input_example() {
         geoserver_url) echo "geoserver_url=https://host/geoserver" ;;
         geoserver_username) echo "geoserver_username=admin" ;;
         geoserver_password) echo "geoserver_password=your-password" ;;
+        data_dir) echo "data_dir=/var/tmp/core-stack-data" ;;
         *) echo "" ;;
     esac
 }
@@ -221,6 +230,9 @@ function normalize_optional_input_key() {
             ;;
         geoserver_password)
             echo "geoserver_password"
+            ;;
+        data_dir)
+            echo "data_dir"
             ;;
         *)
             echo "$candidate"
@@ -270,6 +282,10 @@ function set_optional_input_value() {
             ;;
         geoserver_password)
             GEOSERVER_PASSWORD_ARG="$value"
+            ;;
+        data_dir)
+            DATA_DIR_ARG="$value"
+            CORE_STACK_DATA_DIR="$value"
             ;;
     esac
 }
@@ -351,6 +367,16 @@ function parse_args() {
                 [ "$#" -gt 0 ] || { echo "--gee-json requires a file path."; exit 1; }
                 set_optional_input_value "gee_json" "$1"
                 ;;
+            --geoserver-config)
+                shift
+                [ "$#" -gt 0 ] || { echo "--geoserver-config requires URL,USERNAME,PASSWORD."; exit 1; }
+                GEOSERVER_CONFIG_ARG="$(trim "$1")"
+                ;;
+            --data-dir)
+                shift
+                [ "$#" -gt 0 ] || { echo "--data-dir requires an absolute path."; exit 1; }
+                set_optional_input_value "data_dir" "$1"
+                ;;
             --list-steps)
                 LIST_STEPS_ONLY=1
                 ;;
@@ -372,6 +398,34 @@ function parse_args() {
         echo "Use either --from or --only, not both."
         exit 1
     fi
+
+    if [ -n "$GEOSERVER_CONFIG_ARG" ]; then
+        local gs_config_url=""
+        local gs_config_user=""
+        local gs_config_pass=""
+
+        IFS=',' read -r gs_config_url gs_config_user gs_config_pass <<< "$GEOSERVER_CONFIG_ARG"
+        gs_config_url="$(trim "${gs_config_url:-}")"
+        gs_config_user="$(trim "${gs_config_user:-}")"
+        gs_config_pass="$(trim "${gs_config_pass:-}")"
+        gs_config_url="$(strip_wrapping_quotes "$gs_config_url")"
+        gs_config_user="$(strip_wrapping_quotes "$gs_config_user")"
+        gs_config_pass="$(strip_wrapping_quotes "$gs_config_pass")"
+
+        if [ -z "$gs_config_url" ] || [ -z "$gs_config_user" ] || [ -z "$gs_config_pass" ]; then
+            echo "Invalid --geoserver-config value."
+            echo "Expected: --geoserver-config http://geoserver:8080/geoserver,admin,geoserver"
+            exit 1
+        fi
+
+        set_optional_input_value "geoserver_url" "$gs_config_url"
+        set_optional_input_value "geoserver_username" "$gs_config_user"
+        set_optional_input_value "geoserver_password" "$gs_config_pass"
+
+        if [ -z "$STEP_START_FROM" ] && [ "${#ONLY_STEPS[@]}" -eq 0 ]; then
+            ONLY_STEPS=("geoserver")
+        fi
+    fi
 }
 
 function print_optional_input_catalog() {
@@ -385,11 +439,14 @@ function print_optional_input_catalog() {
     echo "CLI shortcuts:"
     echo "  --input gee_json=/full/path/to/service-account.json"
     echo "  --gee-json /full/path/to/service-account.json"
+    echo "  --geoserver-config http://geoserver:8080/geoserver,admin,geoserver"
     echo "  --input public_api_key=your-public-api-key"
     echo "  --input public_api_base_url=https://geoserver.core-stack.org/api/v1"
     echo "  --input geoserver_url=https://host/geoserver"
     echo "  --input geoserver_username=admin"
     echo "  --input geoserver_password=your-password"
+    echo "  --input data_dir=/var/tmp/core-stack-data"
+    echo "  --data-dir /var/tmp/core-stack-data"
     echo "You can enter KEY=VALUE pairs, CLI-style values like --gee-json /path,"
     echo "or multiple comma-separated entries in one line."
 }
@@ -759,8 +816,8 @@ function wait_for_geoserver_rest() {
     local url="${1:-$GEOSERVER_DEFAULT_URL}"
     local user="${2:-$GEOSERVER_DEFAULT_USER}"
     local pass="${3:-}"
+    local timeout="${4:-120}"
     local elapsed=0
-    local timeout=120
 
     echo "Waiting for GeoServer REST API to be ready (up to ${timeout}s)..."
     while [ "$elapsed" -lt "$timeout" ]; do
@@ -841,6 +898,7 @@ function ensure_geoserver_workspaces() {
     local workspaces_csv="$4"
     local workspace_list=()
     local workspace=""
+    local failed_workspaces=()
 
     if [ -n "$workspaces_csv" ]; then
         parse_workspace_list "$workspaces_csv" workspace_list
@@ -851,8 +909,58 @@ function ensure_geoserver_workspaces() {
 
     echo "Ensuring GeoServer workspaces..."
     for workspace in "${workspace_list[@]}"; do
-        ensure_geoserver_workspace "$workspace" "$url" "$user" "$pass" || true
+        if ! ensure_geoserver_workspace "$workspace" "$url" "$user" "$pass"; then
+            failed_workspaces+=("$workspace")
+        fi
     done
+
+    if [ "${#failed_workspaces[@]}" -gt 0 ]; then
+        echo "ERROR: Failed to ensure one or more GeoServer workspaces:"
+        for workspace in "${failed_workspaces[@]}"; do
+            echo "  - $workspace"
+        done
+        return 1
+    done
+
+    return 0
+}
+
+function select_reachable_geoserver_url() {
+    local preferred_url="$1"
+    local user="$2"
+    local pass="$3"
+    local -n selected_url_ref="$4"
+    local candidate_urls=()
+    local seen=""
+    local candidate=""
+
+    selected_url_ref=""
+
+    candidate_urls+=("$preferred_url")
+    candidate_urls+=("$GEOSERVER_DEFAULT_URL")
+    candidate_urls+=("http://geoserver:8080/geoserver")
+    candidate_urls+=("http://host.docker.internal:8080/geoserver")
+    candidate_urls+=("http://localhost:8080/geoserver")
+
+    for candidate in "${candidate_urls[@]}"; do
+        candidate="$(trim "$candidate")"
+        candidate="$(strip_wrapping_quotes "$candidate")"
+        candidate="${candidate%/}"
+        [ -n "$candidate" ] || continue
+
+        case ",$seen," in
+            *",$candidate,"*) continue ;;
+        esac
+        seen="${seen},${candidate}"
+
+        echo "Probing GeoServer URL: $candidate"
+        if wait_for_geoserver_rest "$candidate" "$user" "$pass" 20; then
+            selected_url_ref="$candidate"
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 function configure_geoserver() {
@@ -860,6 +968,7 @@ function configure_geoserver() {
     local geoserver_user="${GEOSERVER_USERNAME_ARG:-}"
     local geoserver_pass="${GEOSERVER_PASSWORD_ARG:-}"
     local geoserver_workspaces_csv=""
+    local selected_geoserver_url=""
     local prompt_value=""
 
     if [ -f "$APP_ENV_FILE" ]; then
@@ -909,23 +1018,85 @@ function configure_geoserver() {
     fi
 
     if [ -f "$APP_ENV_FILE" ]; then
-        set_env_value "$APP_ENV_FILE" "GEOSERVER_URL" "$geoserver_url/"
-        set_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME" "$geoserver_user"
-        set_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD" "$geoserver_pass"
         if [ -z "$geoserver_workspaces_csv" ]; then
             geoserver_workspaces_csv="$(IFS=,; echo "${GEOSERVER_WORKSPACES_DEFAULT[*]}")"
-            set_env_value "$APP_ENV_FILE" "GEOSERVER_WORKSPACES" "$geoserver_workspaces_csv"
         fi
+    fi
+
+    if ! select_reachable_geoserver_url "$geoserver_url" "$geoserver_user" "$geoserver_pass" selected_geoserver_url; then
+        echo "ERROR: Could not connect to GeoServer REST with the provided credentials."
+        echo "Tried URL candidates: $geoserver_url, $GEOSERVER_DEFAULT_URL, http://geoserver:8080/geoserver, http://host.docker.internal:8080/geoserver, http://localhost:8080/geoserver"
+        return 1
+    fi
+
+    if ! ensure_geoserver_workspaces "$selected_geoserver_url" "$geoserver_user" "$geoserver_pass" "$geoserver_workspaces_csv"; then
+        echo "ERROR: GeoServer workspace setup failed."
+        return 1
+    fi
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_URL" "$selected_geoserver_url/"
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_USERNAME" "$geoserver_user"
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_PASSWORD" "$geoserver_pass"
+        set_env_value "$APP_ENV_FILE" "GEOSERVER_WORKSPACES" "$geoserver_workspaces_csv"
         echo "GeoServer connection details written to .env."
     fi
 
-    wait_for_geoserver_rest "$geoserver_url" "$geoserver_user" "$geoserver_pass" && \
-        ensure_geoserver_workspaces "$geoserver_url" "$geoserver_user" "$geoserver_pass" "$geoserver_workspaces_csv" || true
-
     echo "GeoServer configuration complete."
-    echo "  URL: ${geoserver_url}/web/"
+    echo "  URL: ${selected_geoserver_url}/web/"
     echo "  Default workspace: ${GEOSERVER_WORKSPACE}"
     mark_step_complete "geoserver"
+}
+
+function update_data_dir_path() {
+    local target_data_dir="${DATA_DIR_ARG:-}"
+    local existing_data_dir=""
+    local prompt_value=""
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        existing_data_dir="$(current_env_value "$APP_ENV_FILE" "DATA_DIR")"
+        if [ -z "$target_data_dir" ] && [ -n "$existing_data_dir" ]; then
+            target_data_dir="$existing_data_dir"
+        fi
+    fi
+
+    target_data_dir="$(trim "$target_data_dir")"
+    target_data_dir="$(strip_wrapping_quotes "$target_data_dir")"
+    if [ -z "$target_data_dir" ]; then
+        target_data_dir="$CORE_STACK_DATA_DIR"
+    fi
+    target_data_dir="${target_data_dir%/}"
+
+    if [ -t 0 ] && [ -z "$DATA_DIR_ARG" ]; then
+        echo "Configure data directory used by installer/runtime."
+        read -r -p "DATA_DIR [$target_data_dir]: " prompt_value
+        if [ -n "$prompt_value" ]; then
+            target_data_dir="$(trim "$prompt_value")"
+            target_data_dir="$(strip_wrapping_quotes "$target_data_dir")"
+            target_data_dir="${target_data_dir%/}"
+        fi
+    fi
+
+    if [ -z "$target_data_dir" ]; then
+        echo "ERROR: DATA_DIR path cannot be empty."
+        return 1
+    fi
+
+    CORE_STACK_DATA_DIR="$target_data_dir"
+    DATA_DIR_ARG="$target_data_dir"
+
+    mkdir -p "$CORE_STACK_DATA_DIR"
+    mkdir -p "$CORE_STACK_DATA_DIR/excel_files"
+    mkdir -p "$CORE_STACK_DATA_DIR/activated_locations"
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        set_env_value "$APP_ENV_FILE" "DATA_DIR" "$CORE_STACK_DATA_DIR"
+        set_env_value "$APP_ENV_FILE" "EXCEL_DIR" "$CORE_STACK_DATA_DIR/excel_files"
+    fi
+
+    echo "DATA_DIR configured: $CORE_STACK_DATA_DIR"
+    echo "EXCEL_DIR configured: $CORE_STACK_DATA_DIR/excel_files"
+    mark_step_complete "data_dir_path"
 }
 
 function apply_env_overrides() {
@@ -1730,6 +1901,9 @@ function run_step() {
             ;;
         env_file)
             generate_env_file
+            ;;
+        data_dir_path)
+            update_data_dir_path
             ;;
         geoserver)
             configure_geoserver
