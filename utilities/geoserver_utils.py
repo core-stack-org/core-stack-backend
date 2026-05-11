@@ -571,6 +571,41 @@ class Geoserver:
             return r.status_code
         raise GeoserverException(r.status_code, r.content)
 
+    def configure_featuretype(
+        self,
+        workspace: str,
+        store: str,
+        featuretype: Optional[str] = None,
+        srs: str = "EPSG:4326",
+        projection_policy: str = "FORCE_DECLARED",
+    ):
+        """
+        Force a featuretype's declared SRS and projection policy.
+
+        Use after publishing a vector store when the source file may have
+        missing or mismatched CRS metadata. ``FORCE_DECLARED`` treats the
+        declared SRS as authoritative without reprojecting coordinates.
+        """
+        ft_name = featuretype or store
+        url = "{0}/rest/workspaces/{1}/datastores/{2}/featuretypes/{3}".format(
+            self.service_url, workspace, store, ft_name
+        )
+        body = (
+            "<featureType>"
+            f"<srs>{srs}</srs>"
+            f"<projectionPolicy>{projection_policy}</projectionPolicy>"
+            "</featureType>"
+        )
+        r = self._requests(
+            method="put",
+            url=url,
+            data=body,
+            headers={"content-type": "application/xml"},
+        )
+        if r.status_code in (200, 201):
+            return r.status_code
+        raise GeoserverException(r.status_code, r.content)
+
     # delete coveragestore(raster)
     def delete_raster_store(self, workspace, store):
         """
