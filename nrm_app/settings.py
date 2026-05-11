@@ -56,6 +56,7 @@ DEBUG = env.bool("DEBUG", default=False)
 TMP_LOCATION = resolve_env_path(
     "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
 )
+DATA_DIR = resolve_env_path("DATA_DIR", default="$BACKEND_DIR/data")
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
@@ -302,13 +303,13 @@ STATIC_ROOT = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 
 # Media files (User uploaded content)
-MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
+MEDIA_ROOT = DATA_DIR
 MEDIA_URL = "/media/"
 
 EXCEL_PATH = resolve_env_path("EXCEL_PATH", default="$BACKEND_DIR", trailing_sep=True)
 EXCEL_DIR = resolve_env_path(
     "EXCEL_DIR",
-    default="$BACKEND_DIR/data/excel_files",
+    default="$DATA_DIR/excel_files",
     trailing_sep=True,
 )
 

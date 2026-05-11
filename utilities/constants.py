@@ -1,30 +1,36 @@
 # import
-from nrm_app.settings import GEE_STORAGE_PROJECT
+import os
+
+from nrm_app.settings import DATA_DIR, GEE_STORAGE_PROJECT
+
+
+def _data_path(*parts):
+    return os.path.join(DATA_DIR, *parts)
 
 # Directory Path
-ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
-ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
+ADMIN_BOUNDARY_INPUT_DIR = _data_path("admin-boundary", "input")
+ADMIN_BOUNDARY_OUTPUT_DIR = _data_path("admin-boundary", "output")
 
-NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
-NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
+NREGA_ASSETS_INPUT_DIR = _data_path("nrega_assets", "input")
+NREGA_ASSETS_OUTPUT_DIR = _data_path("nrega_assets", "output")
 
-MERGE_MWS_PATH = "data/merge_mws"
+MERGE_MWS_PATH = _data_path("merge_mws")
 
-RASTERS_PATH = "data/rasters"
-CROP_GRID_PATH = "data/crop_grid"
+RASTERS_PATH = _data_path("rasters")
+CROP_GRID_PATH = _data_path("crop_grid")
 
-KML_PATH = "data/kml/"
-SHAPEFILE_DIR = "data/kml/shapefiles"
+KML_PATH = os.path.join(_data_path("kml"), "")
+SHAPEFILE_DIR = _data_path("kml", "shapefiles")
 
-DRAINAGE_LINES_SHAPEFILES = "data/drainage_lines/input"
-BASIN_BOUNDARIES = "data/drainage_lines/input/basin_boundaries"
-DRAINAGE_LINES_OUTPUT = "data/drainage_lines/output"
-DRAINAGE_DENSITY_OUTPUT = "data/drainage_density"
+DRAINAGE_LINES_SHAPEFILES = _data_path("drainage_lines", "input")
+BASIN_BOUNDARIES = _data_path("drainage_lines", "input", "basin_boundaries")
+DRAINAGE_LINES_OUTPUT = _data_path("drainage_lines", "output")
+DRAINAGE_DENSITY_OUTPUT = _data_path("drainage_density")
 
-LITHOLOGY_PATH = "data/lithology/"
-SITE_DATA_PATH = "data/site_data"
+LITHOLOGY_PATH = os.path.join(_data_path("lithology"), "")
+SITE_DATA_PATH = _data_path("site_data")
 
-WHATSAPP_MEDIA_PATH = "data/whatsapp_media/"
+WHATSAPP_MEDIA_PATH = os.path.join(_data_path("whatsapp_media"), "")
 
 
 # MARK: ODK URLs
@@ -296,7 +302,7 @@ INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
 ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
 WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
-SOI_TEHSIL = "data/admin-boundary/input/soi_tehsil.geojson"
+SOI_TEHSIL = _data_path("admin-boundary", "input", "soi_tehsil.geojson")
 FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"

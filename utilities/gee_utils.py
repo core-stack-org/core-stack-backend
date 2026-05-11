@@ -5,6 +5,7 @@ import requests
 
 from nrm_app.settings import (
     BASE_DIR,
+    DATA_DIR,
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
     GEE_DEFAULT_ACCOUNT_ID,
@@ -161,7 +162,7 @@ def probe_gcs_upload_access(gee_account_id=GEE_DEFAULT_ACCOUNT_ID, cleanup=True)
 
 def copy_gee_credentials_into_repo(
     credentials_path,
-    destination_dir="data/gee_confs",
+    destination_dir=os.path.join(DATA_DIR, "gee_confs"),
     destination_name=None,
 ):
     source_path = os.path.abspath(credentials_path)

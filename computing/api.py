@@ -2,7 +2,7 @@ import json
 import os
 import inspect
 import requests
-from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
+from nrm_app.settings import DATA_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -95,6 +95,14 @@ def _build_mws_asset_id(state, district, block, description):
         get_gee_dir_path([state, district, block], asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"])
         + description
     )
+
+
+def _build_lulc_v3_asset_id(state, district, block, year):
+    description = (
+        f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        f"_{year}-07-01_{year + 1}-06-30_LULCmap_10m"
+    )
+    return _build_mws_asset_id(state, district, block, description)
 
 
 def _task_started_response(message, task=None, asset_id=None):
@@ -416,19 +424,33 @@ def lulc_v3(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        clip_lulc_v3.apply_async(
+        asset_id = _build_lulc_v3_asset_id(state, district, block, end_year)
+
+        if bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False)):
+            task_result = clip_lulc_v3.apply(
+                args=[state, district, block, start_year, end_year, gee_account_id]
+            )
+            if task_result.failed():
+                return Response(
+                    {"error": str(task_result.result), "asset_id": asset_id},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            return Response(
+                {"Success": "LULC v3 completed", "asset_id": asset_id},
+                status=status.HTTP_200_OK,
+            )
+
+        task = clip_lulc_v3.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
-        return Response(
-            {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
-        )
+        return _task_started_response("LULC v3 task initiated", task=task, asset_id=asset_id)
     except Exception as e:
         print("Exception in lulc_v3 api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1130,8 +1152,7 @@ def fes_clart_upload_layer(request):
         filename = f'{district.strip().replace(" ", "_")}_{block.strip().replace(" ", "_")}_clart_fes{file_extension}'
 
         temp_upload_dir = os.path.join(
-            BASE_DIR,
-            "data",
+            DATA_DIR,
             "fes_clart_file",
             state.strip().replace(" ", "_"),
             district.strip().replace(" ", "_"),
@@ -1738,8 +1759,7 @@ def generate_stac_collection(request):
 # ---------------------------------------------------------------------------
 
 _STAC_ROOT = os.path.join(
-    BASE_DIR,
-    "data",
+    DATA_DIR,
     "STAC_specs",
     "CorestackCatalogs_merged_collection",
 )
