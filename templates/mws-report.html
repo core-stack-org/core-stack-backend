@@ -624,7 +624,6 @@
             background: #FFFFFF !important;
             border-radius: 4px;
             padding: 8px 10px !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
             font-size: 11px;
             font-family: 'Roboto', 'Arial', sans-serif;
             z-index: 10;
@@ -652,7 +651,7 @@
         .ol-scale-value {
             font-size: 13px !important;
             font-weight: 800 !important;
-            color: #000000 !important;
+            color: #ffffff !important;
             text-align: center;
             padding: 4px 0 !important;
             background: transparent !important;
@@ -669,9 +668,10 @@
             background: rgba(255, 255, 255, 0.95);
             border-radius: 2px;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
-            width: 220px;
-            max-width: 220px;
-            max-height: 300px;
+            width: 10vw;
+            height : 10vh;
+            max-width: 10vw;
+            max-height: 10vh;
             overflow-y: auto;
             overflow-x: hidden;
             font-family: 'Roboto', 'Arial', sans-serif;
@@ -3164,16 +3164,16 @@
                 labels: dg_years,
                 datasets: [
                     {
-                        label: 'Moderate Weeks',
-                        data: mod_weeks,
-                        backgroundColor: '#EB984E',
-                        stack: 'ms',           // <-- stack group A (Moderate+Severe)
-                    },
-                    {
                         label: 'Severe Weeks',
                         data: sev_weeks,
                         backgroundColor: '#E74C3C',
                         stack: 'ms',           // <-- same stack as Moderate
+                    },
+                    {
+                        label: 'Moderate Weeks',
+                        data: mod_weeks,
+                        backgroundColor: '#EB984E',
+                        stack: 'ms',           // <-- stack group A (Moderate+Severe)
                     },
                     {
                         label: 'Dryspell Weeks',
