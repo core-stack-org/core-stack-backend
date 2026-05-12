@@ -360,3 +360,4 @@ TREE_OVERALL_CHANGE = (
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
+RIVER_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/River_pan_india"

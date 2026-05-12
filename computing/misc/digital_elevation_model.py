@@ -222,9 +222,7 @@ def vectorize_fabdem(mws_fc, raster_asset_id, state, district, block):
         fc_geojson = fc.getInfo()
         fc_geojson = {"features": fc_geojson["features"], "type": fc_geojson["type"]}
 
-        res = sync_layer_to_geoserver(
-            state, fc_geojson, description, "digital_elevation_model"
-        )
+        res = sync_layer_to_geoserver(state, fc_geojson, description, "dem")
 
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
