@@ -89,6 +89,7 @@ from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from utilities.layer_generation_mode import sync_layer_generation_if_enabled
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import get_gee_dir_path, valid_gee_text
+from gee_computing.models import GEEAccount
 
 
 def _build_mws_asset_id(state, district, block, description):
@@ -124,6 +125,23 @@ def generate_admin_boundary(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
+        if gee_account_id in (None, ""):
+            return Response(
+                {"error": "gee_account_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            gee_account_id = int(gee_account_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "gee_account_id must be an integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not GEEAccount.objects.filter(pk=gee_account_id).exists():
+            return Response(
+                {"error": f"GEEAccount with id={gee_account_id} was not found."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task = generate_tehsil_shape_file_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
@@ -147,7 +165,9 @@ def generate_admin_boundary(request):
         )
     except Exception as e:
         print("Exception in generate_block_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_security_check(allowed_methods="POST")
