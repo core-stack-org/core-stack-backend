@@ -322,12 +322,10 @@ def create_excel_for_dem(data, writer):
     df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
 
     df = df.sort_values(["UID"])
-
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
     df.to_excel(writer, sheet_name="dem", index=False)
-
     print("Excel file created for dem")
 
 
