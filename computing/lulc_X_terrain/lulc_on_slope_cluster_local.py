@@ -9,12 +9,12 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
+from computing.config_loader import LULC_SLOPE_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     AEZ_VECTOR_PATH,
     LULC_BASE_DIR,
     MIN_WATERSHED_AREA_HA,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
     TERRAIN_RASTER_PATH,
     build_output_vector_path as _build_output_vector_path,
     compute_mode_lulc_array as _compute_mode_lulc_array,
@@ -36,7 +36,6 @@ from computing.utils import (
 from .utils import aez_lulcXterrain_cluster_centroids
 
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/lulc_X_terrain/lulc_slope_clusters_local"
 GEOSERVER_WORKSPACE = "terrain_lulc"
 SLOPE_LULC_FIELD_MAPPING = {
     "barren": 7,
