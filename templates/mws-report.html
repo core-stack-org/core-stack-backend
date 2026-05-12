@@ -143,15 +143,12 @@
 
         .legend-note {
             color: #6c757d;
-            /* gray */
             text-align: center;
             font-size: 0.9rem;
             font-style: italic;
             margin: 6px 0 0;
-            /* tight spacing under legend */
         }
 
-        /* Print Button Styles */
         .print-button {
             position: absolute;
             top: 20px;
@@ -180,7 +177,6 @@
             position: absolute;
             top: 20px;
             right: 140px;
-            /* shift left of the PDF button */
             background-color: #0078d4;
             color: white;
             border: none;
@@ -197,7 +193,6 @@
             background-color: #005a9e;
         }
 
-        /* Land Conflict Section Styles */
         .conflict-section {
             margin-top: 20px;
         }
@@ -216,7 +211,6 @@
             line-height: 1.6;
         }
 
-        /* Land Conflict List Styles */
         .conflict-list {
             margin-top: 20px;
         }
@@ -282,7 +276,6 @@
             height: 12px;
         }
 
-        /* Factory Section Styles */
         .factory-section {
             margin-top: 40px;
         }
@@ -301,7 +294,6 @@
             line-height: 1.6;
         }
 
-        /* Factory List Styles */
         .factory-list {
             margin-top: 20px;
         }
@@ -379,7 +371,6 @@
             color: #2c3e50;
         }
 
-        /* Mining Section Styles */
         .mining-section {
             margin-top: 40px;
         }
@@ -398,7 +389,6 @@
             line-height: 1.6;
         }
 
-        /* Mining List Styles */
         .mining-list {
             margin-top: 20px;
         }
@@ -474,7 +464,6 @@
             color: #2c3e50;
         }
 
-        /* Green Credit Section Styles */
         .green-credit-section {
             margin-top: 40px;
         }
@@ -493,7 +482,6 @@
             line-height: 1.6;
         }
 
-        /* Green Credit List Styles */
         .green-credit-list {
             margin-top: 20px;
         }
@@ -567,7 +555,6 @@
             color: #2c3e50;
         }
 
-        /* Show more button for green credit */
         .show-more-button.green-credit-btn {
             background-color: #27ae60;
         }
@@ -576,7 +563,6 @@
             background-color: #229954;
         }
 
-        /* Collapsible sections */
         .collapsible-list {
             position: relative;
         }
@@ -627,32 +613,254 @@
             display: none;
         }
 
-        @media print {
-            .doc-button {
-                display: none;
-            }
+        /* ============================================================================
+           SCALE - SOLID WHITE BACKGROUND WITH BLACK TEXT
+           ============================================================================ */
 
-            .legend-note {
-                margin-top: 3em;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
+        .ol-scale {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            background: #FFFFFF !important;
+            border-radius: 4px;
+            padding: 8px 10px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            font-size: 11px;
+            font-family: 'Roboto', 'Arial', sans-serif;
+            z-index: 10;
+            border: 1px solid #666 !important;
+        }
 
-            .show-more-button {
-                display: none !important;
-            }
+        .ol-scale-singlebar,
+        .ol-scale-multibars {
+            background: transparent !important;
+            border: none !important;
+            padding: 4px 0 !important;
+            margin: 0 !important;
+        }
 
-            .print-button {
-                display: none;
-            }
+        .ol-scale-singlebar {
+            border-bottom: 3px solid #000 !important;
+            border-left: 3px solid #000 !important;
+            border-right: 3px solid #000 !important;
+        }
 
-            .hidden-item {
-                display: none !important;
+        .ol-scale-multibars {
+            border-bottom: 3px solid #000 !important;
+        }
+
+        .ol-scale-value {
+            font-size: 13px !important;
+            font-weight: 800 !important;
+            color: #000000 !important;
+            text-align: center;
+            padding: 4px 0 !important;
+            background: transparent !important;
+            margin: 3px 0 0 0 !important;
+            display: block;
+            letter-spacing: 0.3px;
+        }
+
+        /* Legend - TOP RIGHT */
+        .google-maps-legend {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 2px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
+            width: 220px;
+            max-width: 220px;
+            max-height: 300px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            font-family: 'Roboto', 'Arial', sans-serif;
+            z-index: 9;
+            padding: 0;
+            animation: slideInRight 0.3s ease-out;
+        }
+
+        .legend-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px 8px 12px;
+            border-bottom: 1px solid #e8e8e8;
+            flex-shrink: 0;
+        }
+
+        .legend-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #202124;
+            margin: 0;
+        }
+
+        .legend-close {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #70757a;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .legend-close:hover {
+            color: #202124;
+        }
+
+        .legend-section {
+            padding: 8px 0;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        .legend-section:last-child {
+            border-bottom: none;
+        }
+
+        .legend-section-title {
+            padding: 6px 12px 6px 12px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #70757a;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .legend-item {
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+
+        .legend-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .legend-checkbox {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .legend-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #1f73e8;
+            margin: 0 10px 0 0;
+            flex-shrink: 0;
+        }
+
+        .legend-checkbox label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            flex: 1;
+            margin: 0;
+        }
+
+        .legend-line {
+            display: inline-block;
+            width: 20px;
+            height: 2px;
+            margin-right: 10px;
+            border-radius: 1px;
+            flex-shrink: 0;
+        }
+
+        .village-line {
+            background-color: #FFFF00;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .mws-line {
+            background-color: #87CEEB;
+            box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .legend-text {
+            font-size: 12px;
+            color: #202124;
+            font-weight: 400;
+        }
+
+        .google-maps-legend::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .google-maps-legend::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .google-maps-legend::-webkit-scrollbar-thumb {
+            background: #dadce0;
+            border-radius: 3px;
+        }
+
+        .google-maps-legend::-webkit-scrollbar-thumb:hover {
+            background: #9aa0a6;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
             }
         }
 
-        /* Print-specific styles */
-        /* Print-specific styles */
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .google-maps-legend {
+                width: 200px;
+                max-width: 200px;
+                max-height: 250px;
+                top: 10px;
+                right: 10px;
+            }
+
+            .legend-header {
+                padding: 8px 10px 6px 10px;
+            }
+
+            .legend-section {
+                padding: 6px 0;
+            }
+
+            .legend-item {
+                padding: 5px 10px;
+            }
+
+            .ol-scale {
+                bottom: 10px;
+                right: 10px;
+                font-size: 10px;
+                padding: 6px 8px !important;
+            }
+
+            .ol-scale-value {
+                font-size: 11px !important;
+                padding: 3px 0 !important;
+            }
+        }
+
+        /* ============================================================================
+           PRINT MODE - OPTIMIZED FOR CTRL+P PDF
+           ============================================================================ */
+
         @media print {
             * {
                 box-sizing: border-box;
@@ -682,6 +890,12 @@
                 print-color-adjust: exact !important;
             }
 
+            .doc-button,
+            .print-button,
+            .show-more-button {
+                display: none !important;
+            }
+
             .chart-container {
                 height: 250px !important;
                 width: 100% !important;
@@ -692,7 +906,6 @@
                 overflow: visible;
             }
 
-            /* AGGRESSIVE MAP PRINT STYLES */
             .map {
                 width: 100% !important;
                 height: 500px !important;
@@ -705,7 +918,6 @@
                 margin: 20px 0 !important;
             }
 
-            /* Target all OpenLayers elements inside maps */
             .map,
             .map>div,
             .map .ol-viewport,
@@ -717,7 +929,6 @@
                 max-height: 500px !important;
             }
 
-            /* Force canvas to respect container size during print */
             .map canvas,
             .map .ol-layer canvas {
                 width: 100% !important;
@@ -767,7 +978,6 @@
                 max-width: none !important;
             }
 
-            /* Target specific map IDs */
             #mainMap,
             #mainMap>div,
             #mainMap .ol-viewport {
@@ -881,7 +1091,6 @@
                 min-height: 500px !important;
             }
 
-            /* Force OpenLayers viewport to match container */
             .ol-viewport {
                 position: absolute !important;
                 width: 100% !important;
@@ -890,7 +1099,6 @@
                 left: 0 !important;
             }
 
-            /* Ensure canvas fills the viewport */
             .ol-layer canvas {
                 position: absolute !important;
                 width: 100% !important;
@@ -906,7 +1114,6 @@
                 height: 400px !important;
             }
 
-            /* Ensure no transform interference */
             .map .ol-layer {
                 width: 100% !important;
                 height: 100% !important;
@@ -951,7 +1158,62 @@
                 display: table-footer-group;
             }
 
-            /* Land Conflict Section Styles */
+            /* LEGEND HIDDEN IN PRINT */
+            .google-maps-legend {
+                display: none !important;
+                visibility: hidden !important;
+            }
+
+            /* SCALE IN PRINT MODE */
+            .ol-scale {
+                display: block !important;
+                position: absolute;
+                bottom: 15px;
+                right: 15px;
+                width: auto;
+                min-width: 100px;
+                background: #FFFFFF !important;
+                border-radius: 4px;
+                padding: 8px 10px !important;
+                box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+                z-index: 20 !important;
+                border: 1px solid #666 !important;
+                font-size: 10px !important;
+            }
+
+            .ol-scale-singlebar,
+            .ol-scale-multibars {
+                background: transparent !important;
+                border: none !important;
+                padding: 4px 0 !important;
+                margin: 0 !important;
+            }
+
+            .ol-scale-singlebar {
+                border-bottom: 3px solid #000 !important;
+                border-left: 3px solid #000 !important;
+                border-right: 3px solid #000 !important;
+            }
+
+            .ol-scale-multibars {
+                border-bottom: 3px solid #000 !important;
+            }
+
+            .ol-scale-value {
+                font-size: 13px !important;
+                font-weight: 800 !important;
+                color: #000000 !important;
+                text-align: center;
+                padding: 4px 0 !important;
+                background: transparent !important;
+                margin: 3px 0 0 0 !important;
+                display: block;
+                letter-spacing: 0.3px;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Rest of print styles */
             .conflict-section h3 {
                 border-bottom: 2px solid #e74c3c !important;
                 -webkit-print-color-adjust: exact !important;
@@ -978,7 +1240,6 @@
                 color: #3498db !important;
             }
 
-            /* Factory Section Styles */
             .factory-section h3 {
                 border-bottom: 2px solid #3498db !important;
                 -webkit-print-color-adjust: exact !important;
@@ -1001,7 +1262,6 @@
                 print-color-adjust: exact !important;
             }
 
-            /* Mining Section Styles */
             .mining-section h3 {
                 border-bottom: 2px solid #f39c12 !important;
                 -webkit-print-color-adjust: exact !important;
@@ -1046,23 +1306,12 @@
                 print-color-adjust: exact !important;
             }
 
-            /* Collapsible sections - hide buttons */
-            .show-more-button {
-                display: none !important;
-            }
-
-            .doc-button,
-            .print-button {
-                display: none;
-            }
-
             .legend-note {
                 margin-top: 1em;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            /* Page setup for better printing */
             @page {
                 size: A4 portrait;
                 margin: 1cm;
@@ -1733,393 +1982,554 @@
         </div>
     </footer>
     <script>
-
-        console.log("This is Desc : ",  )
-
-        const baseLayer = new ol.layer.Tile({
-            source: new ol.source.XYZ({
-                url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                maxZoom: 30,
-                transition: 500,
-            }),
-            preload: 4,
+    const baseLayer = new ol.layer.Tile({
+        source: new ol.source.XYZ({
+            url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+            maxZoom: 30,
+            transition: 500,
+        }),
+        preload: 4,
+    });
+    
+    const view = new ol.View({
+        center: [78.9, 23.6],
+        zoom: 10,
+        projection: "EPSG:4326",
+        constrainResolution: true,
+        smoothExtentConstraint: true,
+        smoothResolutionConstraint: true,
+    });
+    
+    const mainMap = new ol.Map({
+        target: 'mainMap',
+        layers: [baseLayer],
+        view: view,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    });
+    
+    // ============================================================================
+    // HELPER FUNCTION: Add village boundaries with spatial filtering
+    // ============================================================================
+    const addVillageBoundariesToMap = async (map, mwsFeature) => {
+        try {
+            const mwsGeometry = mwsFeature.getGeometry();
+            const mwsUid = mwsFeature.get('uid');
+            
+            if (!mwsGeometry || !mwsUid) {
+                return;
+            }
+    
+            // Get the bounding box of the MWS
+            const extent = mwsGeometry.getExtent();
+            const minLon = extent[0];
+            const minLat = extent[1];
+            const maxLon = extent[2];
+            const maxLat = extent[3];
+    
+            // Create WFS URL with BBOX filter (simpler, more compatible)
+            const baseUrl = 'https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows';
+            
+            // BBOX filter syntax: BBOX(geometry_column, minx, miny, maxx, maxy)
+            const bboxFilter = `BBOX(the_geom,${minLon},${minLat},${maxLon},${maxLat})`;
+    
+            const params = new URLSearchParams({
+                service: 'WFS',
+                version: '1.0.0',
+                request: 'GetFeature',
+                typeName: `panchayat_boundaries:{{district}}_{{block}}`,
+                outputFormat: 'application/json',
+                CQL_FILTER: bboxFilter
+            });
+    
+            const url = baseUrl + '?' + params.toString();
+    
+            // Fetch villages from GeoServer
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                return;
+            }
+    
+            const geoJsonData = await response.json();
+    
+            // Check if we got any features
+            if (!geoJsonData.features || geoJsonData.features.length === 0) {
+                return;
+            }
+    
+            // Create vector source from GeoJSON
+            const villageSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(geoJsonData)
+            });
+    
+            // Create and style the village layer
+            const villageLayer = new ol.layer.Vector({
+                source: villageSource,
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'yellow',
+                        width: 1.5,
+                    }),
+                    // fill: new ol.style.Fill({
+                    //     color: 'rgba(255, 255, 0, 0.1)',
+                    // }),
+                }),
+                zIndex: 5,
+            });
+    
+            // Add layer to map
+            map.addLayer(villageLayer);
+    
+            // Handle errors silently
+            villageSource.on('change', (e) => {
+                if (villageSource.getState() === 'error') {
+                    // Silently handle errors
+                }
+            });
+    
+        } catch (error) {
+            // Gracefully handle any errors without breaking map rendering
+        }
+    };
+    
+    // ============================================================================
+    // WMS AND VECTOR LAYER DEFINITIONS
+    // ============================================================================
+    
+    const wmsLayer = new ol.layer.Image({
+        source: new ol.source.ImageWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                'STYLES': 'Terrain_Style_11_Classes'
+            },
+            ratio: 1,
+            serverType: 'geoserver',
+        }),
+        visible: true,
+        name: 'terrain_raster'
+    })
+    
+    const degradRaster = new ol.layer.Image({
+        source: new ol.source.ImageWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
+                'STYLES': "degradation"
+            },
+            ratio: 1,
+            serverType: 'geoserver',
+        }),
+        visible: true,
+        name: 'degrad_raster'
+    })
+    
+    const lulcRaster = new ol.layer.Image({
+        source: new ol.source.ImageWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                'STYLES': "lulc_level_3_style"
+            },
+            ratio: 1,
+            serverType: 'geoserver',
+        }),
+        visible: true,
+        name: 'lulc_raster'
+    })
+    
+    const waterRaster = new ol.layer.Image({
+        source: new ol.source.ImageWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                'STYLES': "lulc_water_pixels"
+            },
+            ratio: 1,
+            serverType: 'geoserver',
+        }),
+        visible: true,
+        name: 'water_raster'
+    })
+    
+    const urbanRaster = new ol.layer.Image({
+        source: new ol.source.ImageWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
+                'STYLES': "urbanization"
+            },
+            ratio: 1,
+            serverType: 'geoserver',
+        }),
+        visible: true,
+        name: 'tree_raster'
+    })
+    
+    const treeReduceRaster = new ol.layer.Image({
+        source: new ol.source.ImageWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
+                'STYLES': "deforestation"
+            },
+            ratio: 1,
+            serverType: 'geoserver',
+        }),
+        visible: true,
+        name: 'tree_raster'
+    })
+    
+    // ============================================================================
+    // MAP INITIALIZATION (with village boundaries)
+    // ============================================================================
+    
+    const tempView1 = new ol.View({
+        center: [78.9, 23.6],
+        zoom: 10,
+        projection: "EPSG:4326",
+        constrainResolution: true,
+        smoothExtentConstraint: true,
+        smoothResolutionConstraint: true,
+    })
+    
+    const TerrainMap = new ol.Map({
+        target: 'terrainMap',
+        layers: [wmsLayer],
+        view: tempView1,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const ComparisonMap1 = new ol.Map({
+        target: 'compMap1',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: tempView1,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const tempView2 = new ol.View({
+        center: [78.9, 23.6],
+        zoom: 10,
+        projection: "EPSG:4326",
+        constrainResolution: true,
+        smoothExtentConstraint: true,
+        smoothResolutionConstraint: true,
+    })
+    
+    const ComparisonMap2 = new ol.Map({
+        target: 'compMap2',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: tempView2,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const tempView3 = new ol.View({
+        center: [78.9, 23.6],
+        zoom: 10,
+        projection: "EPSG:4326",
+        constrainResolution: true,
+        smoothExtentConstraint: true,
+        smoothResolutionConstraint: true,
+    })
+    
+    const ComparisonMap3 = new ol.Map({
+        target: 'compMap3',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: tempView3,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const tempView4 = new ol.View({
+        center: [78.9, 23.6],
+        zoom: 10,
+        projection: "EPSG:4326",
+        constrainResolution: true,
+        smoothExtentConstraint: true,
+        smoothResolutionConstraint: true,
+    })
+    
+    const ComparisonMap4 = new ol.Map({
+        target: 'compMap4',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: tempView4,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const tempView5 = new ol.View({
+        center: [78.9, 23.6],
+        zoom: 10,
+        projection: "EPSG:4326",
+        constrainResolution: true,
+        smoothExtentConstraint: true,
+        smoothResolutionConstraint: true,
+    })
+    
+    const ComparisonMap5 = new ol.Map({
+        target: 'compMap5',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: tempView5,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const lulcMap = new ol.Map({
+        target: 'lulcMap',
+        layers: [lulcRaster],
+        view: tempView2,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const DegradMap = new ol.Map({
+        target: 'degradLandMap',
+        layers: [degradRaster],
+        view: tempView3,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const treeReduceMap = new ol.Map({
+        target: 'treeReduceMap',
+        layers: [treeReduceRaster],
+        view: tempView4,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const swbMap = new ol.Map({
+        target: 'swbMap',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        }),
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const sogeMap = new ol.Map({
+        target: 'sogeMap',
+        layers: [
+            new ol.layer.Tile({
+                source: new ol.source.XYZ({
+                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                    maxZoom: 30,
+                    transition: 500,
+                }),
+                preload: 4,
+            })
+        ],
+        view: new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        }),
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    const urbanMap = new ol.Map({
+        target: 'urbanMap',
+        layers: [urbanRaster],
+        view: tempView5,
+        interactions: new ol.Collection([
+            new ol.interaction.DragPan(),
+            new ol.interaction.KeyboardPan(),
+            new ol.interaction.KeyboardZoom(),
+        ])
+    })
+    
+    // ============================================================================
+    // FETCH MWS BOUNDARIES AND ADD TO MAIN MAP
+    // ============================================================================
+    
+    fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+    
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                let strokeColor = 'skyblue';
+                let fillColor = 'rgba(135, 206, 235, 0.4)';
+    
+                if (uid === '{{mws_id}}') {
+                    strokeColor = 'yellow';
+                    fillColor = 'rgba(255, 255, 0, 0.4)';
+                }
+    
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
+                });
+            };
+    
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+    
+            mainMap.addLayer(vectorLayer);
+    
+            const arr = vectorSource.getExtent();
+            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+            mainMap.getView().setCenter(mapcenter);
+        })
+        .catch(error => {
+            // Silently handle fetch errors
         });
-
-        const view = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        });
-
-        const mainMap = new ol.Map({
-            target: 'mainMap',
-            layers: [baseLayer],
-            view: view,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        });
-
-        const wmsLayer = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
-                    'STYLES': 'Terrain_Style_11_Classes'
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'terrain_raster'
-        })
-
-        const degradRaster = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
-                    'STYLES': "degradation"
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'degrad_raster'
-        })
-
-        const lulcRaster = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
-                    'STYLES': "lulc_level_3_style"
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'lulc_raster'
-        })
-
-        const waterRaster = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
-                    'STYLES': "lulc_water_pixels"
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'water_raster'
-        })
-
-        const urbanRaster = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
-                    'STYLES': "urbanization"
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'tree_raster'
-        })
-
-        const treeReduceRaster = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
-                    'STYLES': "deforestation"
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'tree_raster'
-        })
-
-        const tempView1 = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const TerrainMap = new ol.Map({
-            target: 'terrainMap',
-            layers: [wmsLayer],
-            view: tempView1,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const ComparisonMap1 = new ol.Map({
-            target: 'compMap1',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: tempView1,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const tempView2 = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const ComparisonMap2 = new ol.Map({
-            target: 'compMap2',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: tempView2,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const tempView3 = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const ComparisonMap3 = new ol.Map({
-            target: 'compMap3',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: tempView3,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const tempView4 = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const ComparisonMap4 = new ol.Map({
-            target: 'compMap4',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: tempView4,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const tempView5 = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const ComparisonMap5 = new ol.Map({
-            target: 'compMap5',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: tempView5,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const lulcMap = new ol.Map({
-            target: 'lulcMap',
-            layers: [lulcRaster],
-            view: tempView2,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const DegradMap = new ol.Map({
-            target: 'degradLandMap',
-            layers: [degradRaster],
-            view: tempView3,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const treeReduceMap = new ol.Map({
-            target: 'treeReduceMap',
-            layers: [treeReduceRaster],
-            view: tempView4,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const swbMap = new ol.Map({
-            target: 'swbMap',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            }),
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const sogeMap = new ol.Map({
-            target: 'sogeMap',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            }),
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const urbanMap = new ol.Map({
-            target: 'urbanMap',
-            layers: [urbanRaster],
-            view: tempView5,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+    
+    // ============================================================================
+    // FETCH FEATURE BY UID AND APPLY SPATIAL FILTERING
+    // ============================================================================
+    
+    const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
+        await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
             .then(response => response.json())
             .then(data => {
+                const features = new ol.format.GeoJSON().readFeatures(data);
+                const feature = features.find(f => f.get('uid') === uid);
+    
                 const vectorSource = new ol.source.Vector({
-                    features: new ol.format.GeoJSON().readFeatures(data),
+                    features: [feature],
                 });
-
-                const styleFunction = feature => {
-                    const uid = feature.get('uid');
-                    let strokeColor = 'skyblue'; // Default stroke color
-                    let fillColor = 'rgba(135, 206, 235, 0.4)'; // Default fill color with 0.4 opacity
-
-                    if (uid === '{{mws_id}}') {
-                        strokeColor = 'yellow';
-                        fillColor = 'rgba(255, 255, 0, 0.4)';
-                    }
-
+    
+                if (feature) {
+                    // Apply crop filter to all WMS layers
+                    var crop = new ol.filter.Crop({
+                        feature: feature,
+                        wrapX: true,
+                        inner: false
+                    })
+                    wmsLayer1.addFilter(crop);
+                    degradRaster1.addFilter(crop);
+                    lulcRaster1.addFilter(crop);
+                    treeReduceRaster1.addFilter(crop);
+                    urbanRaster1.addFilter(crop);
+    
+                    // Add village boundaries to all comparison maps with spatial filter
+                    addVillageBoundariesToMap(ComparisonMap1, feature);
+                    addVillageBoundariesToMap(ComparisonMap2, feature);
+                    addVillageBoundariesToMap(ComparisonMap3, feature);
+                    addVillageBoundariesToMap(ComparisonMap4, feature);
+                    addVillageBoundariesToMap(ComparisonMap5, feature);
+                    addVillageBoundariesToMap(swbMap, feature);
+                    addVillageBoundariesToMap(sogeMap, feature);
+                }
+    
+                const styleFunctionComp = feature => {
+                    strokeColor = 'skyblue';
+                    fillColor = 'rgba(135, 206, 235, 0.4)';
                     return new ol.style.Style({
                         stroke: new ol.style.Stroke({
                             color: strokeColor,
@@ -2130,195 +2540,232 @@
                         }),
                     });
                 };
-
-                const vectorLayer = new ol.layer.Vector({
+    
+                const vectorLayerComp = new ol.layer.Vector({
                     source: vectorSource,
-                    style: styleFunction,
+                    style: styleFunctionComp,
                 });
-
-                mainMap.addLayer(vectorLayer);
-
+    
+                ComparisonMap1.addLayer(vectorLayerComp)
+                ComparisonMap2.addLayer(vectorLayerComp)
+                ComparisonMap3.addLayer(vectorLayerComp)
+                ComparisonMap4.addLayer(vectorLayerComp)
+                ComparisonMap5.addLayer(vectorLayerComp)
+                swbMap.addLayer(vectorLayerComp)
+    
                 const arr = vectorSource.getExtent();
                 const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-                mainMap.getView().setCenter(mapcenter);
+    
+                TerrainMap.getView().setCenter(mapcenter);
+                TerrainMap.getView().setZoom(13);
+    
+                DegradMap.getView().setCenter(mapcenter);
+                DegradMap.getView().setZoom(13);
+    
+                lulcMap.getView().setCenter(mapcenter);
+                lulcMap.getView().setZoom(13);
+    
+                treeReduceMap.getView().setCenter(mapcenter);
+                treeReduceMap.getView().setZoom(13);
+    
+                ComparisonMap1.getView().setCenter(mapcenter);
+                ComparisonMap1.getView().setZoom(13);
+    
+                ComparisonMap2.getView().setCenter(mapcenter);
+                ComparisonMap2.getView().setZoom(13);
+    
+                ComparisonMap3.getView().setCenter(mapcenter);
+                ComparisonMap3.getView().setZoom(13);
+    
+                ComparisonMap4.getView().setCenter(mapcenter);
+                ComparisonMap4.getView().setZoom(13);
+    
+                ComparisonMap5.getView().setCenter(mapcenter);
+                ComparisonMap5.getView().setZoom(13);
+    
+                urbanMap.getView().setCenter(mapcenter);
+                urbanMap.getView().setZoom(13);
+    
+                swbMap.getView().setCenter(mapcenter);
+                swbMap.getView().setZoom(13);
+    
+                sogeMap.getView().setCenter(mapcenter);
+                sogeMap.getView().setZoom(13);
             })
-            .catch(error => console.error('Error fetching GeoJSON:', error));
-
-        // Fetch GeoJSON data and extract a feature by UID
-        const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
-            await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
-                .then(response => response.json())
-                .then(data => {
-                    const features = new ol.format.GeoJSON().readFeatures(data);
-
-                    const feature = features.find(f => f.get('uid') === uid);
-
-                    const vectorSource = new ol.source.Vector({
-                        features: [feature],
-                    });
-
-                    if (feature) {
-                        var crop = new ol.filter.Crop({
-                            feature: feature,
-                            wrapX: true,
-                            inner: false
-                        })
-                        wmsLayer1.addFilter(crop);
-                        degradRaster1.addFilter(crop);
-                        lulcRaster1.addFilter(crop);
-                        treeReduceRaster1.addFilter(crop);
-                        urbanRaster1.addFilter(crop);
-                        //waterRaster1.addFilter(crop);
-                    }
-
-                    const styleFunctionComp = feature => {
-                        strokeColor = 'yellow';
-                        fillColor = 'rgba(255, 255, 0, 0.1)';
-                        return new ol.style.Style({
-                            stroke: new ol.style.Stroke({
-                                color: strokeColor,
-                                width: 2,
-                            }),
-                            fill: new ol.style.Fill({
-                                color: fillColor,
-                            }),
-                        });
-                    };
-
-                    const vectorLayerComp = new ol.layer.Vector({
-                        source: vectorSource,
-                        style: styleFunctionComp,
-                    });
-
-                    ComparisonMap1.addLayer(vectorLayerComp)
-                    ComparisonMap2.addLayer(vectorLayerComp)
-                    ComparisonMap3.addLayer(vectorLayerComp)
-                    ComparisonMap4.addLayer(vectorLayerComp)
-                    ComparisonMap5.addLayer(vectorLayerComp)
-                    swbMap.addLayer(vectorLayerComp)
-
-                    const arr = vectorSource.getExtent();
-                    const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-
-                    TerrainMap.getView().setCenter(mapcenter);
-                    TerrainMap.getView().setZoom(13);
-
-                    DegradMap.getView().setCenter(mapcenter);
-                    DegradMap.getView().setZoom(13);
-
-                    lulcMap.getView().setCenter(mapcenter);
-                    lulcMap.getView().setZoom(13);
-
-                    treeReduceMap.getView().setCenter(mapcenter);
-                    treeReduceMap.getView().setZoom(13);
-
-                    ComparisonMap1.getView().setCenter(mapcenter);
-                    ComparisonMap1.getView().setZoom(13);
-
-                    ComparisonMap2.getView().setCenter(mapcenter);
-                    ComparisonMap2.getView().setZoom(13);
-
-                    ComparisonMap3.getView().setCenter(mapcenter);
-                    ComparisonMap3.getView().setZoom(13);
-
-                    ComparisonMap4.getView().setCenter(mapcenter);
-                    ComparisonMap4.getView().setZoom(13);
-
-                    ComparisonMap5.getView().setCenter(mapcenter);
-                    ComparisonMap5.getView().setZoom(13);
-
-                    urbanMap.getView().setCenter(mapcenter);
-                    urbanMap.getView().setZoom(13);
-
-                    swbMap.getView().setCenter(mapcenter);
-                    swbMap.getView().setZoom(13);
-
-                    sogeMap.getView().setCenter(mapcenter);
-                    sogeMap.getView().setZoom(13);
+            .catch(error => {
+                // Silently handle fetch errors
+            });
+    };
+    
+    // ============================================================================
+    // FETCH SURFACE WATERBODIES
+    // ============================================================================
+    
+    fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+    
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'rgb(0, 150, 255)',
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(137, 207, 240, 0.4)',
+                    }),
                 })
-                .catch(error => console.error('Error fetching GeoJSON:', error));
-        };
-
-        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
-            .then(response => response.json())
-            .then(data => {
-                const vectorSource = new ol.source.Vector({
-                    features: new ol.format.GeoJSON().readFeatures(data),
-                });
-
-                const vectorLayer = new ol.layer.Vector({
-                    source: vectorSource,
-                    style: new ol.style.Style({
-                        stroke: new ol.style.Stroke({
-                            color: 'rgb(0, 150, 255)',
-                            width: 2,
-                        }),
-                        fill: new ol.style.Fill({
-                            color: 'rgba(137, 207, 240, 0.4)',
-                        }),
-                    })
-                });
-
-                swbMap.addLayer(vectorLayer);
-                swbMap.addLayer(waterRaster);
-            })
-            .catch(error => console.error('Error fetching GeoJSON:', error));
-
-        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
-            .then(response => response.json())
-            .then(data => {
-                const vectorSource = new ol.source.Vector({
-                    features: new ol.format.GeoJSON().readFeatures(data),
-                });
-
-                const styleFunction = feature => {
-                    const uid = feature.get('uid');
-                    const type = feature.get('class');
-                    let strokeColor = 'rgba(51, 51, 51, 0.0)'; // Default stroke color
-                    let fillColor = 'rgba(135, 206, 235, 0.0)'; // Default fill color with 0.4 opacity
-
-                    if (uid === '{{mws_id}}') {
-                        if (type === "Safe") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
-                            fillColor = "rgba(255, 255, 255, 0.4)";
-                        } else if (type === "Semi-critical") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
-                            fillColor = "rgba(224, 243, 248, 0.4)";
-                        } else if (type === "Critical") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
-                            fillColor = "rgba(69, 117, 180, 0.4)";
-                        } else if (type === "Not Assessed") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
-                            fillColor = "rgba(169, 169, 169, 0.4)";
-                        } else {
-                            strokeColor = "rgba(51, 51, 51, 1)";
-                            fillColor = "rgba(49, 54, 149, 0.4)";
-                        }
+            });
+    
+            swbMap.addLayer(vectorLayer);
+            swbMap.addLayer(waterRaster);
+        })
+        .catch(error => {
+            // Silently handle fetch errors
+        });
+    
+    // ============================================================================
+    // FETCH GROUNDWATER EXTRACTION STATUS
+    // ============================================================================
+    
+    fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
+        .then(response => response.json())
+        .then(data => {
+            const vectorSource = new ol.source.Vector({
+                features: new ol.format.GeoJSON().readFeatures(data),
+            });
+    
+            const styleFunction = feature => {
+                const uid = feature.get('uid');
+                const type = feature.get('class');
+                let strokeColor = 'rgba(51, 51, 51, 0.0)';
+                let fillColor = 'rgba(135, 206, 235, 0.0)';
+    
+                if (uid === '{{mws_id}}') {
+                    if (type === "Safe") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(255, 255, 255, 0.4)";
+                    } else if (type === "Semi-critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(224, 243, 248, 0.4)";
+                    } else if (type === "Critical") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(69, 117, 180, 0.4)";
+                    } else if (type === "Not Assessed") {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(169, 169, 169, 0.4)";
+                    } else {
+                        strokeColor = "rgba(51, 51, 51, 1)";
+                        fillColor = "rgba(49, 54, 149, 0.4)";
                     }
-
-                    return new ol.style.Style({
-                        stroke: new ol.style.Stroke({
-                            color: strokeColor,
-                            width: 2,
-                        }),
-                        fill: new ol.style.Fill({
-                            color: fillColor,
-                        }),
-                    });
-                };
-
-                const vectorLayer = new ol.layer.Vector({
-                    source: vectorSource,
-                    style: styleFunction,
+                }
+    
+                return new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: strokeColor,
+                        width: 2,
+                    }),
+                    fill: new ol.style.Fill({
+                        color: fillColor,
+                    }),
                 });
+            };
+    
+            const vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: styleFunction,
+            });
+    
+            sogeMap.addLayer(vectorLayer);
+        })
+        .catch(error => {
+            // Silently handle fetch errors
+        });
+    
+    // ============================================================================
+    // EXTRACT FEATURE AND APPLY FILTERING
+    // ============================================================================
+    
+    fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
+    // Function to add scale control to a map
+    const addVisualScaleBar = (map) => {
+        const scaleControl = new ol.control.ScaleLine({
+            units: 'metric',
+            bar: true,
+            steps: 4,
+            text: true,
+            minWidth: 100
+        });
+        map.addControl(scaleControl);
+    };
+
+    const addGoogleMapsLegend = (mapElement) => {
+        if (mapElement.querySelector('.google-maps-legend')) {
+            return;
+        }
+
+        const legendHTML = `
+            <div class="google-maps-legend">
+                
+                <div class="legend-section">
+                    <div class="legend-section-title">Boundaries</div>
+                    
+                    <div class="legend-item">
+                        <div class="legend-checkbox">
+                            <label for="village-${mapElement.id}">
+                                <span class="legend-line village-line"></span>
+                                <span class="legend-text">Village Boundary</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="legend-item">
+                        <div class="legend-checkbox">
+                            <label for="mws-${mapElement.id}">
+                                <span class="legend-line mws-line"></span>
+                                <span class="legend-text">MWS Boundary</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        mapElement.insertAdjacentHTML('beforeend', legendHTML);
+    };
+
+    const initializeMapControls = () => {
+        // Add scale bars to ALL maps
+        if (typeof mainMap !== 'undefined') addVisualScaleBar(mainMap);
+
+        if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
+        if (typeof ComparisonMap2 !== 'undefined') addVisualScaleBar(ComparisonMap2);
+        if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
+        if (typeof ComparisonMap4 !== 'undefined') addVisualScaleBar(ComparisonMap4);
+        if (typeof ComparisonMap5 !== 'undefined') addVisualScaleBar(ComparisonMap5);
 
 
-                sogeMap.addLayer(vectorLayer);
-            })
-            .catch(error => console.error('Error fetching GeoJSON:', error));
+        if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
+        if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
+        if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
-        // Extract Feature
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
+        // Add legends to boundary maps
+        const boundaryMaps = ['mainMap', 'compMap1', 'compMap2', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'sogeMap'];
+        
+        boundaryMaps.forEach(mapId => {
+            const mapElement = document.getElementById(mapId);
+            if (mapElement) {
+                addGoogleMapsLegend(mapElement);
+            }
+        });
+    };
+
+    // Initialize after page loads
+    setTimeout(initializeMapControls, 1000);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
@@ -2806,167 +3253,141 @@
             tableBody.appendChild(row);
         })
 
-        //Setting the Date Time of Report being saved or printed
-        const currentDate = new Date();
-
-        // Format the date as "Month Day, Year" (e.g., "March 3, 2025")
-        const formattedDate = currentDate.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-
         // Toggle show more/less for collapsible lists
-        function toggleList(listId, button) {
-            const list = document.getElementById(listId);
-            const hiddenItems = list.querySelectorAll('.hidden-item');
-            const isExpanded = button.textContent.includes('Show Less');
-
-            hiddenItems.forEach(item => {
-                if (isExpanded) {
-                    item.style.display = 'none';
-                } else {
-                    item.style.display = 'flex';
-                }
-            });
-
-            if (isExpanded) {
-                const count = hiddenItems.length;
-                button.textContent = `Show More (${count} more)`;
-            } else {
-                button.textContent = 'Show Less';
-            }
+function toggleList(listId, button) {
+    const list = document.getElementById(listId);
+    const hiddenItems = list.querySelectorAll('.hidden-item');
+    const isExpanded = button.textContent.includes('Show Less');
+ 
+    hiddenItems.forEach(item => {
+        if (isExpanded) {
+            item.style.display = 'none';
+        } else {
+            item.style.display = 'flex';
         }
-
-
-        // Insert the formatted date into the span
-        document.getElementById("report-date").textContent = formattedDate;
-        function printReport() {
-            console.log('Print button clicked!'); // Debug line
-
-            try {
-                // Trigger print
-                window.print();
-
-            } catch (error) {
-                console.error('Error in printReport:', error);
-                // Fallback - just print
-                window.print();
-            }
+    });
+ 
+    if (isExpanded) {
+        const count = hiddenItems.length;
+        button.textContent = `Show More (${count} more)`;
+    } else {
+        button.textContent = 'Show Less';
+    }
+}
+ 
+// Set report date
+const currentDate = new Date();
+const formattedDate = currentDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+});
+document.getElementById("report-date").textContent = formattedDate;
+ 
+// Print functionality
+function printReport() {
+    window.print();
+}
+ 
+window.printReport = printReport;
+ 
+// Beforeprint event handler
+window.addEventListener('beforeprint', function () {
+    const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap,
+        urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
+        ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
+ 
+    allMaps.forEach(function (map) {
+        if (map) {
+            map.updateSize();
+            map.renderSync();
         }
-
-        // Also attach to window object as backup
-        window.printReport = printReport;
-
-        // Update the beforeprint event handler to force map rendering
-        window.addEventListener('beforeprint', function () {
-            console.log('Preparing for print...');
-            const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap,
-                urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
-
-            allMaps.forEach(function (map) {
-                if (map) {
-                    // Force the map to recalculate its size
+    });
+});
+ 
+window.addEventListener('afterprint', function () {
+    const printVisibleItems = document.querySelectorAll('.print-visible');
+    printVisibleItems.forEach(item => {
+        item.classList.remove('print-visible');
+    });
+ 
+    const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap,
+        urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
+        ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
+ 
+    setTimeout(function () {
+        allMaps.forEach(function (map) {
+            if (map) {
+                try {
                     map.updateSize();
-                    // Force synchronous rendering
-                    map.renderSync();
-                }
-            });
+                } catch (e) { }
+            }
         });
-        window.addEventListener('afterprint', function () {
-            console.log('Print complete');
-
-            // Remove the print-visible class after printing
-            const printVisibleItems = document.querySelectorAll('.print-visible');
-            printVisibleItems.forEach(item => {
-                item.classList.remove('print-visible');
+    }, 100);
+});
+ 
+// Maps ready detection
+(function () {
+    const layersToWatch = [
+        baseLayer,
+        wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
+    ].filter(Boolean);
+ 
+    let pending = 0;
+    let resolveReady;
+    const readyPromise = new Promise(res => (resolveReady = res));
+ 
+    function hookSource(src) {
+        if (src && src.on) {
+            src.on('tileloadstart', () => pending++);
+            src.on(['tileloadend', 'tileloaderror'], () => { 
+                pending = Math.max(0, pending - 1); 
+                check(); 
             });
-
-            // Force maps to restore to normal size
-            const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap,
-                urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
-
-            setTimeout(function () {
-                allMaps.forEach(function (map) {
-                    if (map) {
-                        try {
-                            map.updateSize();
-                        } catch (e) { }
-                    }
-                });
-            }, 100);
-        });
-        (function () {
-            // layers we want to wait on
-            const layersToWatch = [
-                /* tile */
-                baseLayer,
-                /* image/WMS */
-                wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
-            ].filter(Boolean);
-
-            let pending = 0;
-            let resolveReady;
-            const readyPromise = new Promise(res => (resolveReady = res));
-
-            function hookSource(src) {
-                // Works for Tile sources
-                if (src && src.on) {
-                    src.on('tileloadstart', () => pending++);
-                    src.on(['tileloadend', 'tileloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
-                    // Works for ImageWMS
-                    src.on('imageloadstart', () => pending++);
-                    src.on(['imageloadend', 'imageloaderror'], () => { pending = Math.max(0, pending - 1); check(); });
-                }
-            }
-
-            layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
-
-            // consider SWB vector overlay too (not critical for basemap):
-            // hookSource(vectorLayer.getSource()); // if you want to block on this as well
-
-            let renderedOnce = false;
-            function afterRender() {
-                renderedOnce = true;
-                check();
-            }
-
-            // when any map renders, note it
-            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
-                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
-                .filter(Boolean)
-                .forEach(m => m.once('rendercomplete', afterRender));
-
-            // Charts: flip a flag when you finish constructing them
-            window.__chartsReady = true; // you already set animation: {duration: 0}, so they’re instant
-
-            let settleTimer;
-            function check() {
-                // resolve only when nothing is loading, at least one render happened, and charts are done
-                if (pending === 0 && renderedOnce && window.__chartsReady) {
-                    // give the browser a breath to paint the final frame
-                    clearTimeout(settleTimer);
-                    settleTimer = setTimeout(() => {
-                        try {
-                            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
-                                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
-                                .filter(Boolean)
-                                .forEach(m => m.renderSync());
-                        } catch (e) { }
-                        window.__mapsReady = true;
-                        resolveReady(true);
-                    }, 300);
-                }
-            }
-
-            // expose a promise Selenium can await if you prefer execute_async_script
-            window.__mapsReadyPromise = readyPromise;
-
-            // kick the check once in case nothing loads (rare)
-            setTimeout(check, 0);
-        })();
+            src.on('imageloadstart', () => pending++);
+            src.on(['imageloadend', 'imageloaderror'], () => { 
+                pending = Math.max(0, pending - 1); 
+                check(); 
+            });
+        }
+    }
+ 
+    layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
+ 
+    let renderedOnce = false;
+    function afterRender() {
+        renderedOnce = true;
+        check();
+    }
+ 
+    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+        ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+        .filter(Boolean)
+        .forEach(m => m.once('rendercomplete', afterRender));
+ 
+    window.__chartsReady = true;
+ 
+    let settleTimer;
+    function check() {
+        if (pending === 0 && renderedOnce && window.__chartsReady) {
+            clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => {
+                try {
+                    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
+                        ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                        .filter(Boolean)
+                        .forEach(m => m.renderSync());
+                } catch (e) { }
+                window.__mapsReady = true;
+                resolveReady(true);
+            }, 300);
+        }
+    }
+ 
+    window.__mapsReadyPromise = readyPromise;
+ 
+    setTimeout(check, 0);
+})();
 
     </script>
 </body>
