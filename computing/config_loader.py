@@ -92,5 +92,6 @@ LULC_GDRIVE_FILES: list[tuple[str, str]] = [
 CHANGE_DETECTION_RASTER_OUTPUT_DIR: Path = _abs(_output_entry("change_detection", 0)["path"])
 CHANGE_DETECTION_VECTOR_OUTPUT_DIR: Path = _abs(_output_entry("change_detection", 1)["path"])
 LULC_VECTOR_OUTPUT_DIR: Path = _abs(_output_entry("lulc", 0)["path"])
+LULC_V3_OUTPUT_DIR: Path = _abs(_output_entry("lulc", 1)["path"])
 LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _abs(_output_entry("lulc_x_terrain", 0)["path"])
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _abs(_output_entry("misc", 0)["path"])
