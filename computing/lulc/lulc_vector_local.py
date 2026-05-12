@@ -3,10 +3,10 @@ import os
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
+from computing.config_loader import LULC_VECTOR_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     load_precomputed_watersheds,
@@ -18,9 +18,6 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-
-
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/lulc/lulc_vector_local"
 GEOSERVER_WORKSPACE = "lulc_vector"
 LOCAL_ALGORITHM = "local_lulc_vector"
 LOCAL_ALGORITHM_VERSION = "local-1.0"

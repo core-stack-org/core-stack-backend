@@ -5,9 +5,12 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
+from computing.config_loader import (
+    AQUIFER_VECTOR_PATH,
+    AQUIFER_VECTOR_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
+)
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
     build_output_vector_path,
     get_watershed_areas_in_hectares,
     load_precomputed_watersheds,
@@ -20,10 +23,6 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-
-
-AQUIFER_VECTOR_PATH = PROJECT_ROOT / "data/base_layers/Aquifer_vector.geojson"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/misc/aquifer_vector_local"
 GEOSERVER_WORKSPACE = "aquifer"
 
 YIELD_VALUE_MAP = {

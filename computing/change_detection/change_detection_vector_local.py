@@ -3,9 +3,12 @@ import os
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
+from computing.config_loader import (
+    CHANGE_DETECTION_RASTER_OUTPUT_DIR as CHANGE_RASTER_OUTPUT_BASE_DIR,
+    CHANGE_DETECTION_VECTOR_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
+)
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
     build_output_raster_path,
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
@@ -18,10 +21,6 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-
-
-CHANGE_RASTER_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/change_detection/change_detection_local"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/change_detection/change_detection_vector_local"
 GEOSERVER_WORKSPACE = "change_detection"
 
 CHANGE_VECTOR_CLASS_DEFINITIONS = {

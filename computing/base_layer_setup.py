@@ -1,40 +1,24 @@
 import logging
 import subprocess
-from pathlib import Path
 
 import requests
-from django.conf import settings
-
 from utilities.constants import GEOSERVER_BASE
 
+from computing.config_loader import (
+    ADMIN_BOUNDARY_INPUT_DIR,
+    ADMIN_BOUNDARY_OUTPUT_DIR,
+    GDRIVE_ADMIN_BOUNDARY_FILE_ID as _GDRIVE_ADMIN_BOUNDARY_FILE_ID,
+    GDRIVE_MICROWATERSHED_FILE_ID as _GDRIVE_MICROWATERSHED_FILE_ID,
+    LULC_BASE_DIR as LULC_DIR,
+    LULC_GDRIVE_FILES as _LULC_GDRIVE_FILES,
+    MICROWATERSHED_PATH,
+    PRECOMPUTED_TEHSIL_WATERSHED_DIR as TEHSIL_WATERSHEDS_DIR,
+    PROJECT_ROOT,
+    SOI_TEHSIL_PATH,
+    VILLAGE_BOUNDARIES_DIR,
+)
+
 logger = logging.getLogger(__name__)
-
-_PROJECT_ROOT = Path(settings.BASE_DIR)
-
-SOI_TEHSIL_PATH = _PROJECT_ROOT / "data/admin-boundary/input/soi_tehsil.geojson"
-ADMIN_BOUNDARY_INPUT_DIR = _PROJECT_ROOT / "data/admin-boundary/input"
-ADMIN_BOUNDARY_OUTPUT_DIR = _PROJECT_ROOT / "data/admin-boundary/output"
-LULC_DIR = _PROJECT_ROOT / "data/base_layers/lulc"
-VILLAGE_BOUNDARIES_DIR = _PROJECT_ROOT / "data/base_layers/village_boundaries"
-TEHSIL_WATERSHEDS_DIR = _PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
-
-_GDRIVE_ADMIN_BOUNDARY_FILE_ID = "1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d"
-
-MICROWATERSHED_PATH = _PROJECT_ROOT / "data/base_layers/Microwatershed_v2_with_details.geojson"
-# TODO: fill in the Google Drive file ID for Microwatershed_v2_with_details.geojson
-_GDRIVE_MICROWATERSHED_FILE_ID = ""
-
-# Ordered oldest → newest; each file is ~7-8 GB.
-_LULC_GDRIVE_FILES = [
-    ("lulc_v3_2017_2018.tif", "1VidwEQqkwtoHqqdUqdwURWyiGd-OteaJ"),
-    ("lulc_v3_2018_2019.tif", "1ZeLMAiBfolMrfEJkFnOlvb8OjSqC9vHP"),
-    ("lulc_v3_2019_2020.tif", "1gx5VwJCHI-WUDJIwWv48OvbybBe9y0PR"),
-    ("lulc_v3_2020_2021.tif", "1xbOt3-t1Ws5olq2Q88Tk32KnUVNKUXqe"),
-    ("lulc_v3_2021_2022.tif", "1m8ZnUBbTp-fcH_JcRTUEceRaa8WewQmz"),
-    ("lulc_v3_2022_2023.tif", "1_S0VESClg7s-DloAqxrfU8mLHhNSBfp7"),
-    ("lulc_v3_2023_2024.tif", "1JVfl67ARRv7TPV5lyLnjoSfWDiXtvXjY"),
-    ("lulc_v3_2024_2025.tif", "1CPV03S47s0asEJqdAozbNOT1lkgr0YkG"),
-]
 
 _SOI_WFS_PARAMS = {
     "service": "WFS",
@@ -92,7 +76,7 @@ def ensure_admin_boundary_data():
     ADMIN_BOUNDARY_INPUT_DIR.mkdir(parents=True, exist_ok=True)
     ADMIN_BOUNDARY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    archive_path = _PROJECT_ROOT / "dataset.7z"
+    archive_path = PROJECT_ROOT / "dataset.7z"
     logger.info("Downloading admin boundary data (~8 GB) from Google Drive...")
     try:
         subprocess.run(
@@ -106,7 +90,7 @@ def ensure_admin_boundary_data():
     logger.info("Extracting admin boundary data...")
     try:
         subprocess.run(
-            ["7z", "x", str(archive_path), f"-o{_PROJECT_ROOT / 'data/admin-boundary'}"],
+            ["7z", "x", str(archive_path), f"-o{PROJECT_ROOT / 'data/admin-boundary'}"],
             check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as e:

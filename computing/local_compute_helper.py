@@ -14,18 +14,15 @@ from computing.utils import convert_to_zip
 import logging
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PRECOMPUTED_TEHSIL_WATERSHED_DIR = (
-    PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
+from computing.config_loader import (
+    AEZ_VECTOR_PATH,
+    LULC_BASE_DIR,
+    PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    PROJECT_ROOT,
+    TERRAIN_RASTER_PATH,
 )
+
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
-AEZ_VECTOR_PATH = (
-    PROJECT_ROOT / "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
-)
-LULC_BASE_DIR = PROJECT_ROOT / "data/base_layers/lulc"
-TERRAIN_RASTER_PATH = (
-    PROJECT_ROOT / "data/base_layers/terrain_raster_fabdam_pan_india.tif"
-)
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
 LULC_CLASSES = np.arange(1, 13, dtype=np.int16)
