@@ -116,6 +116,10 @@ ODK_SYNC_URL_LIVELIHOOD = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM%20Livelihood%20Form/submissions"
 )
 
+ODK_SYNC_URL_AGROHORTICULTURE = (
+    ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Agrohorticulture/submissions"
+)
+
 ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
