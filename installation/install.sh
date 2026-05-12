@@ -920,7 +920,7 @@ function ensure_geoserver_workspaces() {
             echo "  - $workspace"
         done
         return 1
-    done
+    fi
 
     return 0
 }
