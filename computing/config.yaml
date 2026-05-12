@@ -98,6 +98,11 @@ local_compute_outputs:
           pattern: "lulc_vector_{district}_{block}.gpkg"
           geoserver_workspace: lulc_vector
 
+        # lulc_v3_local.py
+        - path: data/lulc/lulc_v3_local/{state}/{district}/{block}/
+          pattern: "{district}_{block}_{start_year}-07-01_{end_year}-06-30_LULCmap_10m.tif"
+          geoserver_workspace: LULC_v3
+
     lulc_x_terrain:
         # lulc_on_slope_cluster_local.py
         - path: data/lulc_X_terrain/lulc_slope_clusters_local/{state}/{district}/{block}/

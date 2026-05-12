@@ -537,6 +537,7 @@ def run_change_detection_local(
                 misc={
                     "start_year": start_year,
                     "end_year": end_year,
+                    "is_generated_locally": True,
                 },
             )
             if layer_id and push_to_geoserver:
