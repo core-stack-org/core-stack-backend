@@ -18,6 +18,7 @@ from utilities.constants import (
     ODK_SYNC_URL_GW_MAINTENANCE,
     ODK_SYNC_URL_IRRIGATION_STRUCTURE,
     ODK_SYNC_URL_LIVELIHOOD,
+    ODK_SYNC_URL_AGROHORTICULTURE,
     ODK_SYNC_URL_RECHARGE_STRUCTURE,
     ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
     ODK_SYNC_URL_SETTLEMENT,
@@ -236,6 +237,10 @@ def _get_work_config() -> Dict[str, Dict[str, Any]]:
             "url": ODK_SYNC_URL_LIVELIHOOD,
             "success_message": "Livelihood data synced successfully",
         },
+        "agrohorticulture": {
+            "url": ODK_SYNC_URL_AGROHORTICULTURE,
+            "success_message": "Agrohorticulture data synced successfully",
+        },
     }
 
 
@@ -287,6 +292,7 @@ def _validate_sync_request(
             "propose_maintenance_ws_swb",
             "propose_maintenance_irrigation_st",
             "livelihood",
+            "agrohorticulture"
         ]
         if work_type not in valid_work_types:
             return Response(
