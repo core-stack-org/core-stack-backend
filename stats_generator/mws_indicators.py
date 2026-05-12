@@ -896,7 +896,6 @@ def generate_mws_data_for_kyl_filters(
                         mws_canal_data = canal_df[canal_df["UID"] == specific_mws_id]
                         if not mws_canal_data.empty:
                             canal_available = True
-
                         else:
                             canal_available = False
 
@@ -914,7 +913,6 @@ def generate_mws_data_for_kyl_filters(
                         mws_river_data = river_df[river_df["UID"] == specific_mws_id]
                         if not mws_river_data.empty:
                             river_available = True
-
                         else:
                             river_available = False
 
