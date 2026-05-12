@@ -45,6 +45,10 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def _fc_to_shape_base_dir():
+    return os.path.join(settings.BASE_DIR, "data", "fc_to_shape")
+
+
 
 def generate_shape_files(path):
     gdf = gpd.read_file(path + ".json")
@@ -146,9 +150,8 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
 
 
 def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
-    state_dir = os.path.join("data/fc_to_shape", state_name)
-    if not os.path.exists(state_dir):
-        os.mkdir(state_dir)
+    state_dir = os.path.join(_fc_to_shape_base_dir(), state_name)
+    os.makedirs(state_dir, exist_ok=True)
     path = os.path.join(state_dir, f"{layer_name}")
     # Write the feature collection into json file
     with open(path + ".json", "w") as f:
@@ -172,9 +175,8 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         geojson_fc = get_geojson_from_gcs(layer_name)
     geo = Geoserver()
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", shp_folder)
-        if not os.path.exists(state_dir):
-            os.mkdir(state_dir)
+        state_dir = os.path.join(_fc_to_shape_base_dir(), shp_folder)
+        os.makedirs(state_dir, exist_ok=True)
         path = os.path.join(state_dir, f"{layer_name}")
 
         # Convert to GeoDataFrame
@@ -211,9 +213,8 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         geojson_fc = get_geojson_from_gcs(layer_name)
     print(len(geojson_fc["features"]))
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", project_name)
-        if not os.path.exists(state_dir):
-            os.mkdir(state_dir)
+        state_dir = os.path.join(_fc_to_shape_base_dir(), project_name)
+        os.makedirs(state_dir, exist_ok=True)
         path = os.path.join(state_dir, f"{layer_name}")
 
         # Convert to GeoDataFrame

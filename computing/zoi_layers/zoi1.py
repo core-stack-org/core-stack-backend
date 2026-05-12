@@ -50,6 +50,8 @@ def generate_zoi1(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
+    start_date="2017-07-01",
+    end_date="2025-06-30",
 ):
     print("insdie zoi")
     ee_initialize(gee_account_id)
@@ -74,8 +76,6 @@ def generate_zoi1(
         + description_zoi
     )
     delete_asset_on_GEE(asset_id_zoi)
-    start_date = "2017-07-01"
-    end_date = "2025-06-30"
     zoi_fc = roi.map(compute_zoi)
     zoi_fc = ee.FeatureCollection(zoi_fc)
     zoi_rings = zoi_fc.filter(ee.Filter.gt("zoi_wb", 0)).map(create_ring)

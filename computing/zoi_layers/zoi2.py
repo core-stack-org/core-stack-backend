@@ -19,6 +19,10 @@ def generate_zoi_ci(
     gee_account_id=None,
     proj_id=None,
     roi=None,
+    start_date="2017-07-01",
+    end_date="2025-06-30",
+    start_year=2017,
+    end_year=2024,
 ):
     from computing.cropping_intensity.cropping_intensity import (
         generate_cropping_intensity,
@@ -56,12 +60,10 @@ def generate_zoi_ci(
         asset_folder_list=asset_folder_list,
         asset_suffix=asset_suffix,
         app_type=app_type,
-        start_year=2017,
-        end_year=2024,
+        start_year=start_year,
+        end_year=end_year,
         gee_account_id=gee_account_id,
     )
-    start_date = "2017-07-01"
-    end_date = "2025-06-30"
     description_zoi_ci = f"cropping_intensity_zoi_{asset_suffix}"
 
     asset_id_zoi_ci = (

@@ -1,6 +1,7 @@
 import json
 import os
 import inspect
+from datetime import datetime
 import requests
 from nrm_app.settings import DATA_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
@@ -123,11 +124,26 @@ def generate_admin_boundary(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_tehsil_shape_file_data.apply_async(
+        task = generate_tehsil_shape_file_data.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
         )
+        asset_id = _build_mws_asset_id(
+            state,
+            district,
+            block,
+            "admin_boundary_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower()),
+        )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "status": "initiated",
+                "message": "Successfully initiated",
+                "task_id": task.id,
+                "asset_id": asset_id,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in generate_block_layer api :: ", e)
@@ -261,7 +277,9 @@ def generate_mws_layer(request):
         return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
     except Exception as e:
         print("Exception in generate_mws_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_security_check(allowed_methods="POST")
@@ -1616,12 +1634,32 @@ def generate_zoi_to_gee(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
+        start_date = request.data.get("start_date")
+        end_date = request.data.get("end_date")
+
+        if bool(start_date) ^ bool(end_date):
+            return Response(
+                {"error": "Pass both start_date and end_date together in YYYY-MM-DD format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if start_date and end_date:
+            try:
+                datetime.strptime(start_date, "%Y-%m-%d")
+                datetime.strptime(end_date, "%Y-%m-%d")
+            except ValueError:
+                return Response(
+                    {"error": "start_date and end_date must be in YYYY-MM-DD format."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         generate_zoi.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
                 "gee_account_id": gee_account_id,
+                "start_date": start_date,
+                "end_date": end_date,
             },
             queue="waterbody",
         )

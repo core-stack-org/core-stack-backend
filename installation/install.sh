@@ -809,7 +809,8 @@ GEOSERVER_WORKSPACES_DEFAULT=(
     "customkml"
     "LULC_level_1"
     "LULC_level_2"
-    "LULC_level_3"
+    "LULC_level_3",
+    "panchayat_boundaries"
 )
 
 function wait_for_geoserver_rest() {
@@ -1719,6 +1720,7 @@ function persist_optional_inputs_to_env() {
 function ensure_dirs() {
     mkdir -p "$BACKEND_DIR/logs"
     touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
+    mkdir -p "$BACKEND_DIR/data/fc_to_shape"
     mkdir -p "$CORE_STACK_DATA_DIR"
     mkdir -p "$CORE_STACK_DATA_DIR/activated_locations"
     mkdir -p "$CORE_STACK_DATA_DIR/excel_files"
