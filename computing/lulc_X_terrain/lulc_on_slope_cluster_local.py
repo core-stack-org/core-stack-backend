@@ -339,7 +339,7 @@ def run_lulc_on_slope_cluster_local(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Terrain LULC",
-            misc={"start_year": start_year, "end_year": end_year},
+            misc={"start_year": start_year, "end_year": end_year, "is_generated_locally": True},
         )
         if layer_id and push_to_geoserver:
             update_layer_sync_status(

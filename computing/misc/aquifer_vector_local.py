@@ -368,6 +368,7 @@ def run_aquifer_vector_local(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Aquifer",
+            misc={"is_generated_locally": True},
         )
         if layer_id and push_to_geoserver:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)

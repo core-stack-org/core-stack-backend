@@ -1,10 +1,10 @@
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
+from computing.config_loader import LULC_V3_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
     build_output_raster_path,
     clip_raster_with_roi,
     load_precomputed_roi,
@@ -14,9 +14,6 @@ from computing.local_compute_helper import (
 )
 from computing.models import Dataset
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
-
-
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/lulc/lulc_v3_local"
 GEOSERVER_WORKSPACE = "LULC_v3"
 GEOSERVER_STYLE = "lulc_level_3_style"
 LOCAL_ALGORITHM = "local_lulc_v3_clip"
@@ -175,6 +172,7 @@ def run_lulc_v3_local(
                 misc={
                     "start_year": start_year,
                     "end_year": end_year,
+                    "is_generated_locally": True,
                 },
                 algorithm=LOCAL_ALGORITHM,
                 algorithm_version=LOCAL_ALGORITHM_VERSION,
