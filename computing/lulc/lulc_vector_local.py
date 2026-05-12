@@ -1,3 +1,4 @@
+import logging
 import os
 
 from nrm_app.celery import app
@@ -18,6 +19,9 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+
+logger = logging.getLogger(__name__)
+
 GEOSERVER_WORKSPACE = "lulc_vector"
 LOCAL_ALGORITHM = "local_lulc_vector"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
@@ -83,7 +87,7 @@ def run_lulc_vector_local(
         block=block,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    print(f"Watershed boundary source: {watershed_source}")
+    logger.info("Watershed boundary source: %s", watershed_source)
 
     layer_name = _layer_name(district, block)
     result_gdf = watersheds_gdf.copy()
@@ -94,7 +98,7 @@ def run_lulc_vector_local(
     )
 
     for year, raster_path in zip(range(start_year, end_year + 1), raster_paths):
-        print(f"Computing local LULC vector properties for {year}-{year + 1}: {raster_path}")
+        logger.info("Computing LULC vector properties for %d-%d: %s", year, year + 1, raster_path)
         year_result = compute_categorical_raster_areas_for_watersheds(
             watersheds_gdf=result_gdf,
             raster_path=raster_path,
@@ -117,21 +121,9 @@ def run_lulc_vector_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local LULC vector: {asset_id}")
+    logger.info("Saved local LULC vector: %s", asset_id)
 
-    if push_to_geoserver:
-        geoserver_response = push_shape_to_geoserver(
-            os.path.splitext(asset_id)[0],
-            workspace=GEOSERVER_WORKSPACE,
-            layer_name=layer_name,
-            file_type="gpkg",
-        )
-        print(f"GeoServer response: {geoserver_response}")
-        if not isinstance(geoserver_response, dict) or geoserver_response.get(
-            "status_code"
-        ) not in (200, 201):
-            return False
-
+    layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -148,7 +140,22 @@ def run_lulc_vector_local(
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
-        if layer_id and push_to_geoserver:
+        logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
+
+    if push_to_geoserver:
+        geoserver_response = push_shape_to_geoserver(
+            os.path.splitext(asset_id)[0],
+            workspace=GEOSERVER_WORKSPACE,
+            layer_name=layer_name,
+            file_type="gpkg",
+        )
+        logger.info("GeoServer response for %s: %s", layer_name, geoserver_response)
+        if not isinstance(geoserver_response, dict) or geoserver_response.get(
+            "status_code"
+        ) not in (200, 201):
+            logger.error("GeoServer upload failed for layer %s", layer_name)
+            return False
+        if layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return True
