@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -35,6 +36,7 @@ from computing.utils import (
 
 from .utils import aez_lulcXterrain_cluster_centroids
 
+logger = logging.getLogger(__name__)
 
 GEOSERVER_WORKSPACE = "terrain_lulc"
 SLOPE_LULC_FIELD_MAPPING = {
@@ -192,9 +194,7 @@ def _assign_slope_clusters(
                     )
 
                 if index % 200 == 0 or index == total:
-                    print(
-                        f"Computed slope LULC clusters for {index}/{total} watersheds"
-                    )
+                    logger.info("Computed slope LULC clusters for %d/%d watersheds", index, total)
         finally:
             for lulc_src in lulc_sources:
                 lulc_src.close()
@@ -313,10 +313,11 @@ def run_lulc_on_slope_cluster_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local slope-cluster vector: {asset_id}")
-    print(f"Watershed boundary source: {watershed_source}")
-    print(f"Resolved AEZ code: {aez_code}")
+    logger.info("Saved local slope-cluster vector: %s", asset_id)
+    logger.info("Watershed boundary source: %s", watershed_source)
+    logger.info("Resolved AEZ code: %s", aez_code)
 
+    geoserver_ok = False
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
             str(output_path.with_suffix("")),
@@ -324,13 +325,18 @@ def run_lulc_on_slope_cluster_local(
             layer_name=layer_name,
             file_type="gpkg",
         )
-        print(f"GeoServer response: {geoserver_response}")
+        geoserver_ok = (
+            isinstance(geoserver_response, dict)
+            and geoserver_response.get("status_code") in (200, 201)
+        )
+        if geoserver_ok:
+            logger.info("GeoServer upload succeeded for layer %s", layer_name)
+        else:
+            logger.error(
+                "GeoServer upload failed for layer %s: %s", layer_name, geoserver_response
+            )
 
-        if not isinstance(geoserver_response, dict) or geoserver_response.get(
-            "status_code"
-        ) not in (200, 201):
-            return False
-
+    layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -339,15 +345,18 @@ def run_lulc_on_slope_cluster_local(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Terrain LULC",
-            misc={"start_year": start_year, "end_year": end_year, "is_generated_locally": True},
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_generated_locally": True,
+                "geoserver_available": geoserver_ok,
+            },
         )
-        if layer_id and push_to_geoserver:
-            update_layer_sync_status(
-                layer_id=layer_id,
-                sync_to_geoserver=True,
-            )
+        logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
+        if layer_id and geoserver_ok:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
-    return True
+    return geoserver_ok if push_to_geoserver else True
 
 
 def _generate_lulc_on_slope_cluster_local_task(

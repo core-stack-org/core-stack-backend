@@ -979,7 +979,13 @@ def save_layer_info_to_db(
         else:
             # Algorithm version is same --> update existing layer
             print("Algorithm version same. Updating existing layer.")
-            merged_misc = {**(existing_layer.misc or {}), **(misc or {})}
+            _deprecated_misc_keys = {"is_computed_locally"}
+            base_misc = {
+                k: v
+                for k, v in (existing_layer.misc or {}).items()
+                if k not in _deprecated_misc_keys
+            }
+            merged_misc = {**base_misc, **(misc or {})}
             for field, value in {
                 "algorithm": algorithm,
                 "algorithm_version": algorithm_version,

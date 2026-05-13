@@ -109,6 +109,11 @@ local_compute_outputs:
           pattern: "{district}_{block}_lulc_slope.gpkg"
           geoserver_workspace: terrain_lulc
 
+        # lulc_on_plain_cluster_local.py
+        - path: data/lulc_X_terrain/lulc_plain_clusters_local/{state}/{district}/{block}/
+          pattern: "{district}_{block}_lulc_plain.gpkg"
+          geoserver_workspace: terrain_lulc
+
     misc:
         # aquifer_vector_local.py
         - path: data/misc/aquifer_vector_local/{state}/{district}/{block}/
