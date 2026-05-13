@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import ExitStack
 
@@ -10,12 +11,12 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
+from computing.config_loader import LULC_PLAIN_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     AEZ_VECTOR_PATH,
     LULC_BASE_DIR,
     MIN_WATERSHED_AREA_HA,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    PROJECT_ROOT,
     TERRAIN_RASTER_PATH,
     build_output_vector_path as _build_output_vector_path,
     compute_mode_lulc_array as _compute_mode_lulc_array,
@@ -36,8 +37,8 @@ from computing.utils import (
 
 from .utils import aez_lulcXterrain_cluster_centroids
 
+logger = logging.getLogger(__name__)
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/lulc_X_terrain/lulc_plain_clusters_local"
 GEOSERVER_WORKSPACE = "terrain_lulc"
 
 PLAIN_LULC_FIELD_MAPPING = {
@@ -202,9 +203,7 @@ def _assign_plain_clusters(
                 )
 
             if index % 200 == 0 or index == total:
-                print(
-                    f"Computed plain LULC clusters for {index}/{total} watersheds"
-                )
+                logger.info("Computed plain LULC clusters for %d/%d watersheds", index, total)
 
     result = plain_watersheds_gdf.copy()
     computed_df = pd.DataFrame(computed_rows)
@@ -320,11 +319,11 @@ def run_lulc_on_plain_cluster_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local plain-cluster vector: {asset_id}")
-    print(f"Watershed boundary source: {watershed_source}")
-    print(f"Resolved AEZ code: {aez_code}")
+    logger.info("Saved local plain-cluster vector: %s", asset_id)
+    logger.info("Watershed boundary source: %s", watershed_source)
+    logger.info("Resolved AEZ code: %s", aez_code)
 
-    geoserver_response = None
+    geoserver_ok = False
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
             os.path.splitext(asset_id)[0],
@@ -332,13 +331,18 @@ def run_lulc_on_plain_cluster_local(
             layer_name=layer_name,
             file_type="gpkg",
         )
-        print(f"GeoServer response: {geoserver_response}")
+        geoserver_ok = (
+            isinstance(geoserver_response, dict)
+            and geoserver_response.get("status_code") in (200, 201)
+        )
+        if geoserver_ok:
+            logger.info("GeoServer upload succeeded for layer %s", layer_name)
+        else:
+            logger.error(
+                "GeoServer upload failed for layer %s: %s", layer_name, geoserver_response
+            )
 
-        if not isinstance(geoserver_response, dict) or geoserver_response.get(
-            "status_code"
-        ) not in (200, 201):
-            return False
-
+    layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -347,15 +351,18 @@ def run_lulc_on_plain_cluster_local(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Terrain LULC",
-            misc={"start_year": start_year, "end_year": end_year},
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_generated_locally": True,
+                "geoserver_available": geoserver_ok,
+            },
         )
-        if layer_id and push_to_geoserver:
-            update_layer_sync_status(
-                layer_id=layer_id,
-                sync_to_geoserver=True,
-            )
+        logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
+        if layer_id and geoserver_ok:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
-    return True
+    return geoserver_ok if push_to_geoserver else True
 
 
 def _generate_lulc_on_plain_cluster_local_task(

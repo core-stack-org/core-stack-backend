@@ -123,6 +123,25 @@ def run_lulc_vector_local(
     )
     logger.info("Saved local LULC vector: %s", asset_id)
 
+    geoserver_ok = False
+    if push_to_geoserver:
+        geoserver_response = push_shape_to_geoserver(
+            os.path.splitext(asset_id)[0],
+            workspace=GEOSERVER_WORKSPACE,
+            layer_name=layer_name,
+            file_type="gpkg",
+        )
+        geoserver_ok = (
+            isinstance(geoserver_response, dict)
+            and geoserver_response.get("status_code") in (200, 201)
+        )
+        if geoserver_ok:
+            logger.info("GeoServer upload succeeded for layer %s", layer_name)
+        else:
+            logger.error(
+                "GeoServer upload failed for layer %s: %s", layer_name, geoserver_response
+            )
+
     layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
@@ -136,29 +155,16 @@ def run_lulc_vector_local(
                 "start_year": start_year,
                 "end_year": end_year,
                 "is_generated_locally": True,
+                "geoserver_available": geoserver_ok,
             },
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
         logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-
-    if push_to_geoserver:
-        geoserver_response = push_shape_to_geoserver(
-            os.path.splitext(asset_id)[0],
-            workspace=GEOSERVER_WORKSPACE,
-            layer_name=layer_name,
-            file_type="gpkg",
-        )
-        logger.info("GeoServer response for %s: %s", layer_name, geoserver_response)
-        if not isinstance(geoserver_response, dict) or geoserver_response.get(
-            "status_code"
-        ) not in (200, 201):
-            logger.error("GeoServer upload failed for layer %s", layer_name)
-            return False
-        if layer_id:
+        if layer_id and geoserver_ok:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
-    return True
+    return geoserver_ok if push_to_geoserver else True
 
 
 def _vectorise_lulc_local_task(
