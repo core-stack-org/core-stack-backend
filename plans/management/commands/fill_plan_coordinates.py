@@ -10,7 +10,7 @@ from plans.models import PlanApp
 
 
 def normalize_name(name: str) -> str:
-    name = re.sub(r"[()]", "", name)
+    name = re.sub(r"\s*\(.*?\)", "", name)
     name = re.sub(r"\s+", "_", name)
     name = re.sub(r"_+", "_", name)
     name = re.sub(r"^_|_$", "", name)

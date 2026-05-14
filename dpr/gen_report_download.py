@@ -18,8 +18,40 @@ from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-FIREFOX_BIN = os.environ.get("FIREFOX_BIN")  # optional explicit path
+FIREFOX_BIN = os.environ.get("FIREFOX_BIN")
 GECKODRIVER_LOG = os.environ.get("GECKODRIVER_LOG", "geckodriver.log")
+
+# ---- Cache geckodriver path in memory ----
+_geckodriver_path = None
+
+
+def _get_geckodriver_path():
+    """
+    Get geckodriver path. Install only on first call.
+    
+    Why this works:
+    - First request: install & cache
+    - All subsequent requests: return cached path (instant)
+    - No race conditions because geckodriver is already cached on disk
+    """
+    global _geckodriver_path
+    
+    # Already cached in this process
+    if _geckodriver_path:
+        return _geckodriver_path
+    
+    # Check env override
+    if os.environ.get("GECKODRIVER_PATH"):
+        _geckodriver_path = os.environ.get("GECKODRIVER_PATH")
+        logger.info("PDF: using GECKODRIVER_PATH from env: %s", _geckodriver_path)
+        return _geckodriver_path
+    
+    # Install once (only happens on first request in this worker process)
+    logger.info("PDF: installing geckodriver...")
+    _geckodriver_path = GeckoDriverManager().install()
+    logger.info("PDF: ✓ geckodriver installed at: %s", _geckodriver_path)
+    
+    return _geckodriver_path
 
 
 def render_pdf_with_firefox(
@@ -33,9 +65,9 @@ def render_pdf_with_firefox(
 ) -> bytes:
     opts = FirefoxOptions()
     opts.add_argument("-headless")
-    opts.add_argument("--no-remote")  # isolate profiles on shared hosts
+    opts.add_argument("--no-remote")
 
-    # ---- choose binary (prefer explicit env, then ESR, then regular) ----
+    # ---- choose binary ----
     firefox_bin = os.environ.get("FIREFOX_BIN")
     if firefox_bin and os.path.exists(firefox_bin):
         chosen = firefox_bin
@@ -52,12 +84,12 @@ def render_pdf_with_firefox(
     opts.binary_location = chosen
     logger.info("PDF: using Firefox binary at %s", chosen)
 
-    # ---- geckodriver path (cache or baked) ----
-    geckopath = os.environ.get("GECKODRIVER_PATH") or GeckoDriverManager().install()
+    # ---- geckodriver path (cached after first call) ----
+    geckopath = _get_geckodriver_path()
+    logger.info("PDF: using geckodriver at %s", geckopath)
 
     # ---- logs ----
     try:
-        # prefer project logs dir if available
         base_dir = os.path.dirname(os.path.dirname(__file__))
     except Exception:
         base_dir = os.getcwd()
@@ -65,11 +97,10 @@ def render_pdf_with_firefox(
     os.makedirs(logs_dir, exist_ok=True)
     log_path = os.environ.get("GECKODRIVER_LOG", os.path.join(logs_dir, "geckodriver.log"))
     log_file = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
-    logger.info("PDF: using geckodriver at %s (logs -> %s)", geckopath, log_path)
 
     service = FirefoxService(executable_path=geckopath, log_output=log_file)
 
-    # ---- sanitize environment to avoid Conda/GTK/NSS conflicts ----
+    # ---- sanitize environment ----
     for var in (
             "LD_LIBRARY_PATH",
             "DYLD_LIBRARY_PATH",
@@ -82,7 +113,7 @@ def render_pdf_with_firefox(
             os.environ.pop(var, None)
     os.environ.setdefault("XDG_RUNTIME_DIR", TMP_LOCATION)
 
-    # ---- optionally force a fresh, writable profile to /tmp ----
+    # ---- temp profile ----
     profile_dir = tempfile.mkdtemp(prefix="ffprof_")
     opts.add_argument("-profile")
     opts.add_argument(profile_dir)
@@ -91,7 +122,6 @@ def render_pdf_with_firefox(
     driver = webdriver.Firefox(options=opts, service=service)
 
     try:
-        # a larger viewport helps ensure tiles/charts load at print scale
         try:
             driver.set_window_rect(width=viewport_width, height=viewport_height)
         except Exception:
@@ -105,17 +135,14 @@ def render_pdf_with_firefox(
             lambda d: d.execute_script("return document.readyState") == "complete"
         )
 
-        # 2) App-specific readiness (expects your HTML to set window.__mapsReady = true
-        #    OR expose window.__mapsReadyPromise that resolves when maps/WMS/charts are done)
+        # 2) App-specific readiness
         def _maps_ready(drv):
             try:
                 return bool(drv.execute_script("return window.__mapsReady === true;"))
             except Exception:
                 return False
 
-        # Try quick check first
         if not _maps_ready(driver):
-            # Fallback to awaiting a promise if provided by the page
             try:
                 driver.set_script_timeout(ready_timeout)
                 ok = driver.execute_async_script(
@@ -133,17 +160,15 @@ def render_pdf_with_firefox(
                     """
                 )
                 if not ok:
-                    # If promise path failed, use a hard wait for a positive flag within timeout
                     WebDriverWait(driver, ready_timeout).until(_maps_ready)
             except Exception:
-                # Last resort: wait for a key element to exist AND give a short settle delay
                 logger.warning("PDF: __mapsReady not available; using element presence fallback")
                 WebDriverWait(driver, 60).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "canvas, #mainMap"))
                 )
                 time.sleep(0.5)
 
-        # Give the renderer a couple of frames to flush (no arbitrary long sleep)
+        # Give renderer a couple frames
         try:
             driver.set_script_timeout(10)
             driver.execute_async_script(
@@ -158,7 +183,6 @@ def render_pdf_with_firefox(
         # 3) Print to PDF
         p = PrintOptions()
         try:
-            # Selenium 4 expects lowercase; if not supported, ValueError is caught
             p.orientation = "landscape" if print_landscape else "portrait"
         except Exception:
             pass
@@ -179,9 +203,7 @@ def render_pdf_with_firefox(
             log_file.close()
         except Exception:
             pass
-        # cleanup of profile_dir is optional; geckodriver may still hold files briefly
         try:
-            # best-effort cleanup
             for root, dirs, files in os.walk(profile_dir, topdown=False):
                 for name in files:
                     try:

@@ -30,6 +30,7 @@ model_map = {
     "GroundWater Maintenance": GW_maintenance,
     "Surface Water Body Maintenance": SWB_maintenance,
     "Surface Water Body Remotely Sensed Maintenance": SWB_RS_maintenance,
+    "Agrohorticulture": ODK_agrohorticulture,
 }
 
 feedback_form = [
