@@ -131,6 +131,9 @@ from .misc.canal_layer import canal_vector
 from .misc.canal_local_compute import canal_vector as canal_vector_local_task
 from .misc.river_layer import river_vector
 from .misc.river_local_compute import river_vector as river_vector_local_task
+from .misc.drainage_density_local_compute import (
+    drainage_density as drainage_density_vector_local_task,
+)
 
 
 @api_security_check(allowed_methods="POST")
@@ -2058,6 +2061,30 @@ def generate_river_data(request):
             compute,
             river_vector,
             river_vector_local_task,
+        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
+        return Response(
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in river data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_drainage_density_data(request):
+    print("Inside river data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            drainage_density_vector_local_task,
         )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(

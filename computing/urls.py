@@ -242,4 +242,9 @@ urlpatterns = [
         api.generate_river_data,
         name="generate-river-data",
     ),
+    path(
+        "generate_density_vector/",
+        api.generate_drainage_density_data,
+        name="generate-drainage-density-vector",
+    ),
 ]
