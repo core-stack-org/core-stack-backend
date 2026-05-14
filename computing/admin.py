@@ -1,7 +1,23 @@
 from django.contrib import admin
 from .models import *
 
-# Register your models here.
+
+class IsGeneratedLocallyFilter(admin.SimpleListFilter):
+    title = "is generated locally"
+    parameter_name = "is_generated_locally"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("true", "Yes"),
+            ("false", "No"),
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value() == "true":
+            return queryset.filter(misc__is_generated_locally=True)
+        if self.value() == "false":
+            return queryset.exclude(misc__is_generated_locally=True)
+        return queryset
 
 
 @admin.register(Layer)
@@ -14,6 +30,7 @@ class LayerAdmin(admin.ModelAdmin):
         "is_sync_to_geoserver",
         "layer_version",
         "dataset",
+        IsGeneratedLocallyFilter,
     ]
 
 

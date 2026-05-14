@@ -32,6 +32,16 @@ def sanitize_text(text):
     return text.replace(" ", "_")
 
 
+def _clean_csv_value(v, default=None):
+    """Convert pandas NaN/NA to default so values are JSON-safe."""
+    try:
+        if pd.isna(v):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
 _STAC_DATA = os.path.join(BASE_DIR, "data", "STAC_specs")
 
 JAVA_TYPE_MAP = {
@@ -285,6 +295,7 @@ class MetadataProvider:
 
         match = df[df["layer_name"] == layer_name]
         desc = match["layer_description"].iloc[0] if not match.empty else ""
+        desc = _clean_csv_value(desc, "")
         return desc if desc else layer_name.replace("_", " ").title()
 
     def get_layer_mapping(self, layer_name, district, block, start_year="", overwrite_metadata=False):
@@ -310,13 +321,13 @@ class MetadataProvider:
             gs_layer = gs_layer.format(district=district, block=block)
 
         return {
-            "workspace": row["geoserver_workspace_name"],
+            "workspace": _clean_csv_value(row["geoserver_workspace_name"], ""),
             "layer_name": gs_layer,
-            "style_file_url": row["style_file_url"],
-            "display_name": row["display_name"],
-            "ee_layer_name": row["ee_layer_name"],
-            "gsd": row["spatial_resolution_in_meters"],
-            "theme": row["theme"],
+            "style_file_url": _clean_csv_value(row["style_file_url"], ""),
+            "display_name": _clean_csv_value(row["display_name"], ""),
+            "ee_layer_name": _clean_csv_value(row["ee_layer_name"], ""),
+            "gsd": _clean_csv_value(row["spatial_resolution_in_meters"]),
+            "theme": _clean_csv_value(row["theme"], ""),
         }
 
     def get_vector_column_descriptions(self, ee_layer_name, overwrite_metadata=False):
@@ -798,7 +809,7 @@ class RasterSTACItemBuilder(BaseSTACItemBuilder):
             "title": self._layer_title(layer_map["display_name"], start_year),
             "description": description,
             "gsd": layer_map["gsd"],
-            "keywords": [layer_map["theme"]],
+            "keywords": [t for t in [layer_map["theme"]] if t],
         }
         if start_year:
             sd = pd.to_datetime(f"{start_year}-{constants.AGRI_YEAR_START_DATE}")
@@ -875,7 +886,7 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
                 "description": description,
                 "start_datetime": constants.DEFAULT_START_DATE.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "end_datetime": constants.DEFAULT_END_DATE.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "keywords": [layer_map["theme"]],
+                "keywords": [t for t in [layer_map["theme"]] if t],
             },
         )
         return item
@@ -893,7 +904,10 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
         col_desc = self.metadata.get_vector_column_descriptions(
             layer_map["ee_layer_name"], kw.get("overwrite_metadata", False),
         )
-        desc_map = dict(zip(col_desc["column_name"], col_desc["column_description"]))
+        desc_map = {
+            k: _clean_csv_value(v, "")
+            for k, v in zip(col_desc["column_name"], col_desc["column_description"])
+        }
 
         tbl = pystac.extensions.table.TableExtension.ext(item, add_if_missing=True)
         tbl.columns = [
