@@ -1,6 +1,8 @@
 import os
+from pathlib import Path
 
 import geopandas as gpd
+from shapely.geometry import box
 
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
@@ -20,9 +22,28 @@ from computing.local_compute_helper import (
 )
 
 DRAINAGE_DENSITY_VECTOR_PATH = (
-    PROJECT_ROOT / "data/drainage_density/drainage_density_pan_india.geojson"
+    PROJECT_ROOT / "data/drainage_density/drainage_density_pan_india.gpkg"
 )
 GEOSERVER_WORKSPACE = "drainage_density"
+
+
+def _load_drainage_density_for_roi(watersheds_gdf):
+    """
+    Loads only drainage density features overlapping the study area bbox.
+    GPKG has a spatial index so only matching tiles are read — fast.
+    """
+    bounds = watersheds_gdf.geometry.total_bounds  # minx, miny, maxx, maxy
+    bbox_geom = box(*bounds)
+
+    print(
+        f"Loading drainage density (bbox indexed read): {DRAINAGE_DENSITY_VECTOR_PATH}"
+    )
+    print(f"Study area bounds: {bounds}")
+
+    dd_gdf = gpd.read_file(DRAINAGE_DENSITY_VECTOR_PATH, bbox=bbox_geom)
+
+    print(f"Loaded {len(dd_gdf)} features within bounding box")
+    return dd_gdf
 
 
 def _compute_drainage_density_for_watersheds(watersheds_gdf, drainage_density_gdf):
@@ -30,7 +51,6 @@ def _compute_drainage_density_for_watersheds(watersheds_gdf, drainage_density_gd
     Clips pan-India drainage density polygons to watershed boundaries.
     One feature per (drainage_density × watershed) intersection,
     with uid and area_in_ha from the matched watershed attached.
-    Mirrors canal local compute logic exactly.
     """
     watersheds_gdf = validate_geometry(watersheds_gdf).reset_index(drop=True)
     drainage_density_gdf = validate_geometry(drainage_density_gdf).reset_index(
@@ -39,7 +59,8 @@ def _compute_drainage_density_for_watersheds(watersheds_gdf, drainage_density_gd
 
     outer_boundary = watersheds_gdf.geometry.unary_union
 
-    # ── Step 1: Coarse filter to study area ──────────────────────────────
+    # ── Step 1: Fine filter after bbox load ──────────────────────────────
+    # bbox may include features just outside the actual boundary
     dd_in_roi = drainage_density_gdf[
         drainage_density_gdf.intersects(outer_boundary)
     ].copy()
@@ -51,7 +72,7 @@ def _compute_drainage_density_for_watersheds(watersheds_gdf, drainage_density_gd
             crs=drainage_density_gdf.crs,
         )
 
-    print(f"Drainage density features within boundary: {len(dd_in_roi)}")
+    print(f"Drainage density features after fine filter: {len(dd_in_roi)}")
 
     # ── Step 2: Spatial join – dd (left) × watershed (right) ─────────────
     joined = gpd.sjoin(
@@ -93,7 +114,7 @@ def _compute_drainage_density_for_watersheds(watersheds_gdf, drainage_density_gd
             clipped_rows.append(new_row)
 
         except Exception as e:
-            print(f"Clip error for dd idx={idx}: {e}")
+            print(f"Clip error dd idx={idx}: {e}")
             continue
 
     if not clipped_rows:
@@ -127,15 +148,10 @@ def run_drainage_density_local(
     block=None,
     asset_suffix=None,
     roi=None,
-    drainage_density_vector_path=DRAINAGE_DENSITY_VECTOR_PATH,
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
-    """
-    Orchestrates local drainage density generation.
-    Mirrors canal local compute structure exactly.
-    """
     if state and district and block:
         layer_name = (
             f"{valid_gee_text(str(district).strip().lower())}_"
@@ -161,23 +177,14 @@ def run_drainage_density_local(
             roi,
             f"ROI file has no valid geometries: {roi}",
         )
-        print(f"ROI source: {roi}")
 
-    if not os.path.exists(drainage_density_vector_path):
-        raise FileNotFoundError(
-            f"Drainage density source file not found: {drainage_density_vector_path}"
-        )
-
-    print(f"Loading drainage density source: {drainage_density_vector_path}")
-    drainage_density_gdf = read_validated_vector_file(
-        drainage_density_vector_path,
-        f"Drainage density source file has no valid geometries: {drainage_density_vector_path}",
-    )
+    # ── Load only features overlapping the study area ─────────────────────
+    dd_gdf = _load_drainage_density_for_roi(watersheds_gdf)
 
     # ── Compute ───────────────────────────────────────────────────────────
     result_gdf = _compute_drainage_density_for_watersheds(
         watersheds_gdf=watersheds_gdf,
-        drainage_density_gdf=drainage_density_gdf,
+        drainage_density_gdf=dd_gdf,
     )
 
     # ── Save output ───────────────────────────────────────────────────────
@@ -196,7 +203,6 @@ def run_drainage_density_local(
     )
     print(f"Saved local drainage density vector: {asset_id}")
 
-    # ── Push to GeoServer ─────────────────────────────────────────────────
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
             os.path.splitext(asset_id)[0],
@@ -206,7 +212,6 @@ def run_drainage_density_local(
         )
         print(f"GeoServer response: {geoserver_response}")
 
-    # ── Sync layer metadata ───────────────────────────────────────────────
     if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -235,10 +240,6 @@ def drainage_density(
     app_type="MWS",
     gee_account_id=None,
 ):
-    """
-    Celery task for local drainage density vector generation.
-    Matches signature of the GEE drainage_density task.
-    """
     _ = self, asset_folder_list, app_type, gee_account_id
     return run_drainage_density_local(
         state=state,
