@@ -21,125 +21,108 @@ from computing.local_compute_helper import (
     PROJECT_ROOT,
 )
 
-DRAINAGE_DENSITY_VECTOR_PATH = (
+# Pan-India drainage LINES dataset (has ORDER column, stream order 1-11)
+DRAINAGE_LINES_GPKG_PATH = (
     PROJECT_ROOT / "data/drainage_density/drainage_density_pan_india.gpkg"
 )
 GEOSERVER_WORKSPACE = "drainage_density"
 
+# Influence factors for stream orders 1 to 11
+INFLUENCE_FACTORS = [
+    60 / 385,
+    55 / 385,
+    50 / 385,
+    45 / 385,
+    40 / 385,
+    35 / 385,
+    30 / 385,
+    25 / 385,
+    20 / 385,
+    15 / 385,
+    10 / 385,
+]
 
-def _load_drainage_density_for_roi(watersheds_gdf):
+
+def _load_drainage_lines_for_roi(watersheds_gdf):
     """
-    Loads only drainage density features overlapping the study area bbox.
-    GPKG has a spatial index so only matching tiles are read — fast.
+    Loads only drainage line features overlapping the study area bbox.
+    GPKG spatial index ensures only relevant tiles are read.
     """
-    bounds = watersheds_gdf.geometry.total_bounds  # minx, miny, maxx, maxy
+    bounds = watersheds_gdf.geometry.total_bounds
     bbox_geom = box(*bounds)
 
-    print(
-        f"Loading drainage density (bbox indexed read): {DRAINAGE_DENSITY_VECTOR_PATH}"
-    )
+    print(f"Loading drainage lines (bbox indexed read): {DRAINAGE_LINES_GPKG_PATH}")
     print(f"Study area bounds: {bounds}")
 
-    dd_gdf = gpd.read_file(DRAINAGE_DENSITY_VECTOR_PATH, bbox=bbox_geom)
+    lines_gdf = gpd.read_file(DRAINAGE_LINES_GPKG_PATH, bbox=bbox_geom)
 
-    print(f"Loaded {len(dd_gdf)} features within bounding box")
-    return dd_gdf
+    print(f"Loaded {len(lines_gdf)} drainage line features within bounding box")
+    return lines_gdf
 
 
-def _compute_drainage_density_for_watersheds(watersheds_gdf, drainage_density_gdf):
+def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     """
-    Clips pan-India drainage density polygons to watershed boundaries.
-    One feature per (drainage_density × watershed) intersection,
-    with uid and area_in_ha from the matched watershed attached.
+    Mirrors original generate_vector() DD logic exactly:
+
+    For each watershed:
+      1. Clip drainage lines to watershed boundary
+      2. For each stream order 1-11, calculate:
+           - total line length in km
+           - weighted drainage density using influence factor
+      3. Sum all stream order DDs → total DD
+      4. Store DD, DD_stream (per order density), str_len_km (per order length)
+
+    Output: watersheds GeoDataFrame with DD columns added.
     """
-    watersheds_gdf = validate_geometry(watersheds_gdf).reset_index(drop=True)
-    drainage_density_gdf = validate_geometry(drainage_density_gdf).reset_index(
-        drop=True
-    )
+    # Reproject to metric CRS for accurate length/area calculation
+    # (same as original: crs=7755 is India-specific metric projection)
+    drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
+    watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
 
-    outer_boundary = watersheds_gdf.geometry.unary_union
+    watersheds_gdf["DD"] = None
+    watersheds_gdf["DD_stream"] = None
+    watersheds_gdf["str_len_km"] = None
 
-    # ── Step 1: Fine filter after bbox load ──────────────────────────────
-    # bbox may include features just outside the actual boundary
-    dd_in_roi = drainage_density_gdf[
-        drainage_density_gdf.intersects(outer_boundary)
-    ].copy()
+    for index, watershed in watersheds_gdf.iterrows():
 
-    if dd_in_roi.empty:
-        print("No drainage density features found within the outer boundary.")
-        return gpd.GeoDataFrame(
-            columns=drainage_density_gdf.columns,
-            crs=drainage_density_gdf.crs,
+        # Clip drainage lines to this watershed boundary
+        clipped_lines = gpd.clip(drainage_lines_gdf, watershed.geometry)
+
+        # Area in km² (area_in_ha / 100)
+        area_km2 = watershed["area_in_ha"] / 100
+
+        stream_length = {}
+        stream_drainage_density = {}
+
+        for stream_order, influence_factor in zip(range(1, 12), INFLUENCE_FACTORS):
+
+            # Filter lines for this stream order
+            order_lines = clipped_lines[clipped_lines["ORDER"] == stream_order]
+
+            # Total length in km
+            total_length_km = order_lines.geometry.length.sum() / 1000
+
+            # Weighted drainage density for this stream order
+            dd = (
+                total_length_km * influence_factor * 100 / area_km2 if area_km2 else 0.0
+            )
+
+            stream_length[stream_order] = total_length_km
+            stream_drainage_density[stream_order] = dd
+
+        watersheds_gdf.at[index, "DD"] = sum(stream_drainage_density.values())
+        watersheds_gdf.at[index, "DD_stream"] = str(
+            [float(v) for v in stream_drainage_density.values()]
+        )
+        watersheds_gdf.at[index, "str_len_km"] = str(
+            [float(v) for v in stream_length.values()]
         )
 
-    print(f"Drainage density features after fine filter: {len(dd_in_roi)}")
+    # Restore geographic CRS
+    watersheds_gdf = watersheds_gdf.to_crs(crs=4326)
+    watersheds_gdf["DD"] = watersheds_gdf["DD"].astype(float)
 
-    # ── Step 2: Spatial join – dd (left) × watershed (right) ─────────────
-    joined = gpd.sjoin(
-        dd_in_roi,
-        watersheds_gdf[["uid", "area_in_ha", "geometry"]].reset_index(names="ws_iloc"),
-        how="inner",
-        predicate="intersects",
-    )
-
-    print(f"Matched dd-watershed pairs: {len(joined)}")
-
-    if joined.empty:
-        print("No matched drainage density segments.")
-        return gpd.GeoDataFrame(
-            columns=drainage_density_gdf.columns,
-            crs=drainage_density_gdf.crs,
-        )
-
-    # ── Step 3: Clip each dd feature to its matched watershed ────────────
-    clipped_rows = []
-
-    for idx, row in joined.iterrows():
-        try:
-            ws_geom = watersheds_gdf.geometry.iloc[int(row["ws_iloc"])]
-            dd_geom = row.geometry
-
-            if not dd_geom.is_valid:
-                dd_geom = dd_geom.buffer(0)
-            if not ws_geom.is_valid:
-                ws_geom = ws_geom.buffer(0)
-
-            clipped = dd_geom.intersection(ws_geom)
-
-            if clipped is None or clipped.is_empty or not clipped.is_valid:
-                continue
-
-            new_row = row.copy()
-            new_row["geometry"] = clipped
-            clipped_rows.append(new_row)
-
-        except Exception as e:
-            print(f"Clip error dd idx={idx}: {e}")
-            continue
-
-    if not clipped_rows:
-        print("No valid drainage density segments after clipping.")
-        return gpd.GeoDataFrame(
-            columns=drainage_density_gdf.columns,
-            crs=drainage_density_gdf.crs,
-        )
-
-    # ── Step 4: Build final GeoDataFrame ─────────────────────────────────
-    final_gdf = gpd.GeoDataFrame(clipped_rows, crs=drainage_density_gdf.crs)
-
-    final_gdf["uid"] = final_gdf["uid"].astype(str)
-    final_gdf["area_in_ha"] = final_gdf["area_in_ha"].astype(str)
-
-    for col in ["index_right", "ws_iloc"]:
-        if col in final_gdf.columns:
-            final_gdf = final_gdf.drop(columns=[col])
-
-    final_gdf = final_gdf[~final_gdf.geometry.is_empty]
-    final_gdf = final_gdf[final_gdf.geometry.is_valid]
-    final_gdf = final_gdf[final_gdf.geometry.notna()]
-
-    print(f"Final drainage density segments: {len(final_gdf)}")
-    return final_gdf
+    return watersheds_gdf
 
 
 def run_drainage_density_local(
@@ -178,14 +161,17 @@ def run_drainage_density_local(
             f"ROI file has no valid geometries: {roi}",
         )
 
-    # ── Load only features overlapping the study area ─────────────────────
-    dd_gdf = _load_drainage_density_for_roi(watersheds_gdf)
+    # ── Load drainage lines for study area ────────────────────────────────
+    drainage_lines_gdf = _load_drainage_lines_for_roi(watersheds_gdf)
 
-    # ── Compute ───────────────────────────────────────────────────────────
-    result_gdf = _compute_drainage_density_for_watersheds(
+    # ── Compute DD per watershed ──────────────────────────────────────────
+    print("Computing drainage density per watershed...")
+    result_gdf = _compute_drainage_density(
         watersheds_gdf=watersheds_gdf,
-        drainage_density_gdf=dd_gdf,
+        drainage_lines_gdf=drainage_lines_gdf,
     )
+
+    print(f"Total watersheds processed: {len(result_gdf)}")
 
     # ── Save output ───────────────────────────────────────────────────────
     output_path = build_output_vector_path(
@@ -203,6 +189,7 @@ def run_drainage_density_local(
     )
     print(f"Saved local drainage density vector: {asset_id}")
 
+    # ── Push to GeoServer ─────────────────────────────────────────────────
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
             os.path.splitext(asset_id)[0],
@@ -212,6 +199,7 @@ def run_drainage_density_local(
         )
         print(f"GeoServer response: {geoserver_response}")
 
+    # ── Sync layer metadata ───────────────────────────────────────────────
     if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
