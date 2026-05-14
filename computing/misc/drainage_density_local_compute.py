@@ -68,9 +68,9 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
     watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
 
-    watersheds_gdf["DD"] = 0.0
-    watersheds_gdf["DD_stream"] = None
-    watersheds_gdf["str_len_km"] = None
+    watersheds_gdf["drainage_density"] = 0.0
+    watersheds_gdf["drainage_density_stream"] = None
+    watersheds_gdf["stream_length_km"] = None
 
     for index, watershed in watersheds_gdf.iterrows():
         # Clip drainage lines to this watershed boundary
@@ -97,9 +97,9 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
             stream_dd[stream_order] = dd
 
         # Store results as strings of lists to match GEE output
-        watersheds_gdf.at[index, "DD"] = float(sum(stream_dd.values()))
-        watersheds_gdf.at[index, "DD_stream"] = str([float(v) for v in stream_dd.values()])
-        watersheds_gdf.at[index, "str_len_km"] = str([float(v) for v in stream_length.values()])
+        watersheds_gdf.at[index, "drainage_density"] = float(sum(stream_dd.values()))
+        watersheds_gdf.at[index, "drainage_density_stream"] = str([float(v) for v in stream_dd.values()])
+        watersheds_gdf.at[index, "stream_length_km"] = str([float(v) for v in stream_length.values()])
 
     # Restore geographic CRS
     watersheds_gdf = watersheds_gdf.to_crs(crs=4326)
@@ -118,7 +118,7 @@ def run_drainage_density_local(
 ):
     """
     Main entry point for local drainage density computation.
-    Produces MWS polygons with DD attributes.
+    Produces MWS polygons with drainage_density attributes.
     """
     if state and district and block:
         layer_name = (
@@ -146,11 +146,11 @@ def run_drainage_density_local(
         print(f"Error loading drainage lines: {e}")
         return False
 
-    # 2. Compute DD per watershed
+    # 2. Compute drainage_density per watershed
     print("Computing drainage density per watershed...")
     result_gdf = _compute_drainage_density(watersheds_gdf, drainage_lines_gdf)
 
-    # 3. Save result vector (MWS polygons with DD attributes)
+    # 3. Save result vector (MWS polygons with drainage_density attributes)
     output_path = build_output_vector_path(
         layer_name=layer_name,
         state=state,
@@ -164,7 +164,7 @@ def run_drainage_density_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local DD vector: {asset_id}")
+    print(f"Saved local drainage_density vector: {asset_id}")
 
     # 4. Push to GeoServer
     if push_to_geoserver:
