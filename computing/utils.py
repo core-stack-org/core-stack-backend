@@ -1,49 +1,48 @@
-import os
-
-import geopandas as gpd
-import fiona
 import copy
-
-from computing.models import Layer, Dataset
-from geoadmin.models import (
-    TehsilSOI,
-    DistrictSOI,
-    StateSOI,
-    State_Disritct_Block_Properties,
-)
-from projects.models import Project
-from utilities.gee_utils import (
-    ee_initialize,
-    sync_vector_to_gcs,
-    check_task_status,
-    get_geojson_from_gcs,
-    is_gee_asset_exists,
-    valid_gee_text,
-    get_gee_asset_path,
-    get_gee_dir_path,
-    is_asset_public,
-)
-from utilities.geoserver_utils import Geoserver
-import shutil
-from utilities.constants import (
-    ADMIN_BOUNDARY_OUTPUT_DIR,
-    SHAPEFILE_DIR,
-    GEE_HELPER_PATH,
-    GEE_ASSET_PATH,
-    GEE_PATHS,
-)
-import ee
 import json
-from shapely.geometry import shape
-from shapely.validation import explain_validity
+import logging
+import os
+import shutil
 import zipfile
 from datetime import datetime, timedelta
-from django.conf import settings
-import logging
+
+import ee
+import fiona
+import geopandas as gpd
 import requests
+from django.conf import settings
+from shapely.geometry import shape
+from shapely.validation import explain_validity
+
+from computing.models import Dataset, Layer
+from geoadmin.models import (
+    DistrictSOI,
+    State_Disritct_Block_Properties,
+    StateSOI,
+    TehsilSOI,
+)
+from projects.models import Project
+from utilities.constants import (
+    ADMIN_BOUNDARY_OUTPUT_DIR,
+    GEE_ASSET_PATH,
+    GEE_HELPER_PATH,
+    GEE_PATHS,
+    SHAPEFILE_DIR,
+)
+from utilities.gee_utils import (
+    check_task_status,
+    ee_initialize,
+    get_gee_asset_path,
+    get_gee_dir_path,
+    get_geojson_from_gcs,
+    is_asset_public,
+    is_gee_asset_exists,
+    sync_vector_to_gcs,
+    valid_gee_text,
+)
+from utilities.geoserver_utils import Geoserver
 
 logger = logging.getLogger(__name__)
-
 
 
 def generate_shape_files(path):
@@ -827,7 +826,9 @@ def clean_geometry(geom):
     # 3. Buffer polygons smaller than 1 pixel (< 900 m²)
     area = geom.area()
     geom = ee.Algorithms.If(
-        area.lt(900), geom.buffer(15), geom  # ensure raster pixel center is captured
+        area.lt(900),
+        geom.buffer(15),
+        geom,  # ensure raster pixel center is captured
     )
 
     return ee.Geometry(geom)
@@ -991,78 +992,6 @@ def _update_layer_sync_remote(
         logger.error(
             "Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e
         )
-
-    # Check if there’s an existing layer
-    existing_layer = (
-        Layer.objects.filter(
-            dataset=dataset,
-            layer_name=layer_name,
-            state=state_obj,
-            district=district_obj,
-            block=block_obj,
-        )
-        .order_by("-layer_version")
-        .first()
-    )
-
-    if existing_layer:
-        if existing_layer.algorithm_version != algorithm_version:
-            # Algorithm version changed --> create new record with incremented layer_version
-            new_layer_version = str(float(existing_layer.layer_version) + 1)
-            print(
-                f"Algorithm version changed. Creating new layer version: {new_layer_version}"
-            )
-            layer_obj = Layer.objects.create(
-                dataset=dataset,
-                layer_name=layer_name,
-                state=state_obj,
-                district=district_obj,
-                block=block_obj,
-                layer_version=new_layer_version,
-                algorithm=algorithm,
-                algorithm_version=algorithm_version,
-                is_sync_to_geoserver=sync_to_geoserver,
-                is_public_gee_asset=is_public,
-                is_override=is_override,
-                misc=misc,
-                gee_asset_path=asset_id,
-            )
-        else:
-            # Algorithm version is same --> update existing layer
-            print("Algorithm version same. Updating existing layer.")
-            for field, value in {
-                "algorithm": algorithm,
-                "algorithm_version": algorithm_version,
-                "is_sync_to_geoserver": sync_to_geoserver,
-                "is_public_gee_asset": is_public,
-                "is_override": is_override,
-                "misc": misc,
-                "gee_asset_path": asset_id,
-            }.items():
-                setattr(existing_layer, field, value)
-            existing_layer.save()
-            layer_obj = existing_layer
-    else:
-        # No existing record --> create a new one
-        print("No existing layer found. Creating new one.")
-        layer_obj = Layer.objects.create(
-            dataset=dataset,
-            layer_name=layer_name,
-            state=state_obj,
-            district=district_obj,
-            block=block_obj,
-            layer_version=layer_version,
-            algorithm=algorithm,
-            algorithm_version=algorithm_version,
-            is_sync_to_geoserver=sync_to_geoserver,
-            is_public_gee_asset=is_public,
-            is_override=is_override,
-            misc=misc,
-            gee_asset_path=asset_id,
-        )
-
-    print(f"Saved layer info (id={layer_obj.id}, version={layer_obj.layer_version})")
-    return layer_obj.id
 
 
 def update_layer_sync_status(
