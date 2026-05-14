@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any, Dict, Optional
 
@@ -28,11 +29,14 @@ from utilities.constants import (
     ODK_SYNC_URL_WELL,
 )
 
+from moderation.utils.update_csdb import sync_form_type
+
+logger = logging.getLogger(__name__)
+
 from .build_layer import build_layer
-from .models import ODKSyncLog, Plan, PlanApp
+from .models import ODKSyncLog, Plan
 from .serializers import PlanAppSerializer
-from .utils import fetch_bearer_token, fetch_odk_data
-from geoadmin.models import GramPanchayat
+from .utils import fetch_bearer_token, fetch_db_data
 
 
 # MARK: Get Plans API
@@ -91,19 +95,43 @@ def add_resources(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
+    logger.info(
+        f"add_resources: received request — resource_type={resource_type}, "
+        f"plan_id={plan_id}, block={block}, district={district}, layer_name={layer_name}"
+    )
+
     CSV_PATH = os.path.join(
         TMP_LOCATION,
         f"{resource_type}_{plan_id}_{block}.csv",
     )
 
-    odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
+    logger.info(f"add_resources: triggering incremental ODK sync for resource_type={resource_type}")
+    sync_ok = sync_form_type(resource_type)
+    if not sync_ok:
+        logger.warning(
+            f"add_resources: sync failed for resource_type={resource_type}; "
+            f"proceeding with existing DB data"
+        )
+    else:
+        logger.info(f"add_resources: sync completed for resource_type={resource_type}")
 
-    if not odk_data_found:
+    logger.info(f"add_resources: fetching data from DB for plan_id={plan_id}, block={block}")
+    db_data_found = fetch_db_data(CSV_PATH, resource_type, block, plan_id)
+
+    if not db_data_found:
+        logger.warning(
+            f"add_resources: no DB data found for resource_type={resource_type}, "
+            f"plan_id={plan_id}, block={block}"
+        )
         return Response(
-            {"error": f"No ODK data found for the given Plan ID: {plan_id}"},
+            {"error": f"No data found for the given Plan ID: {plan_id}"},
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    logger.info(
+        f"add_resources: building GeoServer layer — layer_type=resources, "
+        f"item_type={resource_type}, plan_id={plan_id}, district={district}, block={block}"
+    )
     try:
         success = build_layer(
             layer_type="resources",
@@ -114,11 +142,19 @@ def add_resources(request):
             csv_path=CSV_PATH,
         )
         if not success:
+            logger.error(
+                f"add_resources: build_layer returned False for resource_type={resource_type}, "
+                f"plan_id={plan_id}"
+            )
             return Response(
                 {"error": "Failed to build resource layer."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
     except Exception as e:
+        logger.exception(
+            f"add_resources: unexpected error during build_layer for "
+            f"resource_type={resource_type}, plan_id={plan_id}: {e}"
+        )
         return Response(
             {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -126,7 +162,12 @@ def add_resources(request):
     finally:
         if os.path.exists(CSV_PATH):
             os.remove(CSV_PATH)
+            logger.info(f"add_resources: cleaned up temp CSV at {CSV_PATH}")
 
+    logger.info(
+        f"add_resources: successfully built resource layer for "
+        f"resource_type={resource_type}, plan_id={plan_id}, block={block}"
+    )
     return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
 
 
@@ -145,19 +186,43 @@ def add_works(request):
     district = request.data.get("district_name").lower()
     block = request.data.get("block_name").lower()
 
+    logger.info(
+        f"add_works: received request — work_type={work_type}, "
+        f"plan_id={plan_id}, block={block}, district={district}, layer_name={layer_name}"
+    )
+
     CSV_PATH = os.path.join(
         TMP_LOCATION,
         f"{work_type}_{plan_id}_{block}.csv",
     )
 
-    odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
+    logger.info(f"add_works: triggering incremental ODK sync for work_type={work_type}")
+    sync_ok = sync_form_type(work_type)
+    if not sync_ok:
+        logger.warning(
+            f"add_works: sync failed for work_type={work_type}; "
+            f"proceeding with existing DB data"
+        )
+    else:
+        logger.info(f"add_works: sync completed for work_type={work_type}")
 
-    if not odk_data_found:
+    logger.info(f"add_works: fetching data from DB for plan_id={plan_id}, block={block}")
+    db_data_found = fetch_db_data(CSV_PATH, work_type, block, plan_id)
+
+    if not db_data_found:
+        logger.warning(
+            f"add_works: no DB data found for work_type={work_type}, "
+            f"plan_id={plan_id}, block={block}"
+        )
         return Response(
-            {"error": f"No ODK data found for the given Plan ID: {plan_id}"},
+            {"error": f"No data found for the given Plan ID: {plan_id}"},
             status=status.HTTP_404_NOT_FOUND,
         )
 
+    logger.info(
+        f"add_works: building GeoServer layer — layer_type=works, "
+        f"item_type={work_type}, plan_id={plan_id}, district={district}, block={block}"
+    )
     try:
         success = build_layer(
             layer_type="works",
@@ -168,11 +233,19 @@ def add_works(request):
             csv_path=CSV_PATH,
         )
         if not success:
+            logger.error(
+                f"add_works: build_layer returned False for work_type={work_type}, "
+                f"plan_id={plan_id}"
+            )
             return Response(
                 {"error": "Failed to build work layer."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
     except Exception as e:
+        logger.exception(
+            f"add_works: unexpected error during build_layer for "
+            f"work_type={work_type}, plan_id={plan_id}: {e}"
+        )
         return Response(
             {"error": f"An unexpected error occurred: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -180,6 +253,7 @@ def add_works(request):
     finally:
         if os.path.exists(CSV_PATH):
             os.remove(CSV_PATH)
+            logger.info(f"add_works: cleaned up temp CSV at {CSV_PATH}")
 
     return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
 
@@ -293,7 +367,7 @@ def _validate_sync_request(
             "propose_maintenance_ws_swb",
             "propose_maintenance_irrigation_st",
             "livelihood",
-            "agrohorticulture",
+            "agrohorticulture"
         ]
         if work_type not in valid_work_types:
             return Response(

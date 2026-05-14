@@ -8,6 +8,11 @@ import dateutil.parser
 import requests
 
 from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
+from dpr.models import (
+    ODK_settlement, ODK_well, ODK_waterbody,
+    ODK_groundwater, ODK_agri, ODK_livelihood, ODK_crop,
+    SWB_maintenance,
+)
 from utilities.constants import (
     ODK_URL_SESSION,
     ODK_URL_agri,
@@ -128,26 +133,26 @@ def odk_data(ODK_url, csv_path, block, plan_id, resource_type):
         logger.warning(f"No ODK data found for the given Plan ID: {plan_id}")
         return False
 
+    _write_csv(resource_type, modified_response_list, all_keys, csv_path)
+    return True
+
+
+def _write_csv(resource_type, modified_response_list, all_keys, csv_path):
     if resource_type in ["settlement", "well", "waterbody", "cropping"]:
         header_keys = modified_response_list[0].keys()
-        print("FIELD NAMES", header_keys)
         with open(csv_path, "w", encoding="utf-8") as output_file:
             dict_writer = csv.DictWriter(
                 output_file, fieldnames=header_keys, extrasaction="ignore"
             )
             dict_writer.writeheader()
             dict_writer.writerows(modified_response_list)
-            logger.info(f"CSV generated for resource : {resource_type}")
     elif resource_type in ["plan_gw", "main_swb", "plan_agri", "livelihood"]:
         with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
-            dict_writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            dict_writer = csv.DictWriter(csvfile, fieldnames=list(all_keys))
             dict_writer.writeheader()
             for item in modified_response_list:
-                flattened_item = flatten_dict(item)
-                dict_writer.writerow(flattened_item)
-            logger.info(f"CSV generated for the work : {resource_type}")
-
-    return True
+                dict_writer.writerow(flatten_dict(item))
+    logger.info(f"CSV generated for '{resource_type}' at {csv_path}")
 
 
 # MARK: Modify ODK Settlement Data
@@ -589,6 +594,106 @@ def modify_response_list_livelihood(res, block, plan_id):
         result["status_re"] = result["__system"]["reviewState"]
         res_list.append(result)
     return res_list
+
+
+_DB_CONFIG = {
+    "settlement": (ODK_settlement,  "data_settlement",      True),
+    "well":       (ODK_well,        "data_well",            True),
+    "waterbody":  (ODK_waterbody,   "data_waterbody",       True),
+    "cropping":   (ODK_crop,        "data_crop",            False),
+    "plan_gw":    (ODK_groundwater, "data_groundwater",     True),
+    "plan_agri":  (ODK_agri,        "data_agri",            True),
+    "livelihood": (ODK_livelihood,  "data_livelihood",      True),
+    "main_swb":   (SWB_maintenance, "data_swb_maintenance", False),
+}
+
+
+# MARK: Fetch DB Data
+def fetch_db_data(csv_path, resource_type, block, plan_id):
+    logger.info(
+        f"fetch_db_data: starting — resource_type={resource_type}, "
+        f"plan_id={plan_id}, block={block}, csv_path={csv_path}"
+    )
+
+    entry = _DB_CONFIG.get(resource_type)
+    if not entry:
+        logger.warning(f"fetch_db_data: unknown resource_type '{resource_type}'")
+        return False
+
+    model, data_field, has_block_col = entry
+    logger.info(
+        f"fetch_db_data: querying {model.__name__}.{data_field} "
+        f"with plan_id={plan_id}, is_deleted=False"
+        + (f", block_name icontains '{block}'" if has_block_col else " (no block_name column, skipping DB block filter)")
+    )
+
+    qs = model.objects.filter(plan_id=str(plan_id), is_deleted=False)
+
+    if has_block_col:
+        qs = qs.filter(block_name__icontains=block.replace("_", " ").strip())
+
+    raw_records = list(qs.values_list(data_field, flat=True))
+    logger.info(
+        f"fetch_db_data: DB returned {len(raw_records)} record(s) for "
+        f"resource_type={resource_type}, plan_id={plan_id}"
+    )
+
+    response_list = [r for r in raw_records if r]
+    skipped = len(raw_records) - len(response_list)
+    if skipped:
+        logger.warning(
+            f"fetch_db_data: skipped {skipped} record(s) with empty {data_field}"
+        )
+
+    if not response_list:
+        logger.warning(
+            f"fetch_db_data: no usable records for resource_type={resource_type}, "
+            f"plan_id={plan_id}, block={block}"
+        )
+        return False
+
+    logger.info(
+        f"fetch_db_data: running transform for resource_type={resource_type} "
+        f"on {len(response_list)} record(s)"
+    )
+
+    all_keys = set()
+    if resource_type == "settlement":
+        rows = modify_response_list_settlement(response_list, block, plan_id)
+    elif resource_type == "well":
+        rows = modify_response_list_well(response_list, block, plan_id)
+    elif resource_type == "waterbody":
+        rows = modify_response_list_waterbody(response_list, block, plan_id)
+    elif resource_type == "cropping":
+        rows = modify_reponse_list_cropping(response_list, block, plan_id)
+    elif resource_type in ["plan_gw", "main_swb", "plan_agri"]:
+        rows = modify_response_list_plan(response_list, block, plan_id)
+        for item in rows:
+            all_keys.update(extract_keys(item))
+    elif resource_type == "livelihood":
+        rows = modify_response_list_livelihood(response_list, block, plan_id)
+        for item in rows:
+            all_keys.update(extract_keys(item))
+    else:
+        logger.warning(f"fetch_db_data: no transform defined for resource_type='{resource_type}'")
+        return False
+
+    logger.info(
+        f"fetch_db_data: transform produced {len(rows)} row(s) "
+        f"(filtered from {len(response_list)}) for resource_type={resource_type}"
+    )
+
+    if not rows:
+        logger.warning(
+            f"fetch_db_data: transform returned empty list for "
+            f"resource_type={resource_type}, plan_id={plan_id}, block={block}"
+        )
+        return False
+
+    logger.info(f"fetch_db_data: writing CSV to {csv_path}")
+    _write_csv(resource_type, rows, all_keys, csv_path)
+    logger.info(f"fetch_db_data: done — {len(rows)} row(s) written to {csv_path}")
+    return True
 
 
 def flatten_dict(d, parent_key="", sep="_"):
