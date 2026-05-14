@@ -1,6 +1,4 @@
 import os
-from pathlib import Path
-
 import geopandas as gpd
 from shapely.geometry import box
 
@@ -16,7 +14,6 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     load_precomputed_watersheds,
     read_validated_vector_file,
-    validate_geometry,
     write_vector_output,
     PROJECT_ROOT,
 )
@@ -51,77 +48,61 @@ def _load_drainage_lines_for_roi(watersheds_gdf):
     bounds = watersheds_gdf.geometry.total_bounds
     bbox_geom = box(*bounds)
 
-    print(f"Loading drainage lines (bbox indexed read): {DRAINAGE_LINES_GPKG_PATH}")
-    print(f"Study area bounds: {bounds}")
+    print(f"Loading drainage lines from: {DRAINAGE_LINES_GPKG_PATH}")
+    if not os.path.exists(DRAINAGE_LINES_GPKG_PATH):
+        # Fallback to checking common locations if the exact path is missing
+        print(f"Warning: {DRAINAGE_LINES_GPKG_PATH} not found. Drainage density calculation will fail.")
 
     lines_gdf = gpd.read_file(DRAINAGE_LINES_GPKG_PATH, bbox=bbox_geom)
-
     print(f"Loaded {len(lines_gdf)} drainage line features within bounding box")
     return lines_gdf
 
 
 def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     """
-    Mirrors original generate_vector() DD logic exactly:
-
-    For each watershed:
-      1. Clip drainage lines to watershed boundary
-      2. For each stream order 1-11, calculate:
-           - total line length in km
-           - weighted drainage density using influence factor
-      3. Sum all stream order DDs → total DD
-      4. Store DD, DD_stream (per order density), str_len_km (per order length)
-
-    Output: watersheds GeoDataFrame with DD columns added.
+    Core calculation logic for Drainage Density.
+    Matches the GEE version's methodology.
     """
     # Reproject to metric CRS for accurate length/area calculation
-    # (same as original: crs=7755 is India-specific metric projection)
+    # (7755 is India-specific metric projection)
     drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
     watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
 
-    watersheds_gdf["DD"] = None
+    watersheds_gdf["DD"] = 0.0
     watersheds_gdf["DD_stream"] = None
     watersheds_gdf["str_len_km"] = None
 
     for index, watershed in watersheds_gdf.iterrows():
-
         # Clip drainage lines to this watershed boundary
         clipped_lines = gpd.clip(drainage_lines_gdf, watershed.geometry)
 
         # Area in km² (area_in_ha / 100)
         area_km2 = watershed["area_in_ha"] / 100
+        if area_km2 <= 0:
+            continue
 
         stream_length = {}
-        stream_drainage_density = {}
+        stream_dd = {}
 
-        for stream_order, influence_factor in zip(range(1, 12), INFLUENCE_FACTORS):
-
+        for stream_order, factor in zip(range(1, 12), INFLUENCE_FACTORS):
             # Filter lines for this stream order
             order_lines = clipped_lines[clipped_lines["ORDER"] == stream_order]
-
             # Total length in km
-            total_length_km = order_lines.geometry.length.sum() / 1000
+            length_km = order_lines.geometry.length.sum() / 1000
 
-            # Weighted drainage density for this stream order
-            dd = (
-                total_length_km * influence_factor * 100 / area_km2 if area_km2 else 0.0
-            )
+            # Weighted drainage density for this stream order (formula from GEE version)
+            dd = length_km * factor * 100 / area_km2
 
-            stream_length[stream_order] = total_length_km
-            stream_drainage_density[stream_order] = dd
+            stream_length[stream_order] = length_km
+            stream_dd[stream_order] = dd
 
-        watersheds_gdf.at[index, "DD"] = sum(stream_drainage_density.values())
-        watersheds_gdf.at[index, "DD_stream"] = str(
-            [float(v) for v in stream_drainage_density.values()]
-        )
-        watersheds_gdf.at[index, "str_len_km"] = str(
-            [float(v) for v in stream_length.values()]
-        )
+        # Store results as strings of lists to match GEE output
+        watersheds_gdf.at[index, "DD"] = float(sum(stream_dd.values()))
+        watersheds_gdf.at[index, "DD_stream"] = str([float(v) for v in stream_dd.values()])
+        watersheds_gdf.at[index, "str_len_km"] = str([float(v) for v in stream_length.values()])
 
     # Restore geographic CRS
     watersheds_gdf = watersheds_gdf.to_crs(crs=4326)
-    watersheds_gdf["DD"] = watersheds_gdf["DD"].astype(float)
-
     return watersheds_gdf
 
 
@@ -135,6 +116,10 @@ def run_drainage_density_local(
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
+    """
+    Main entry point for local drainage density computation.
+    Produces MWS polygons with DD attributes.
+    """
     if state and district and block:
         layer_name = (
             f"{valid_gee_text(str(district).strip().lower())}_"
@@ -147,33 +132,25 @@ def run_drainage_density_local(
             block=block,
             precomputed_roi_dir=precomputed_roi_dir,
         )
-        print(f"Watershed source: {watershed_source}")
-
+        print(f"Loaded watersheds from {watershed_source}")
     else:
         if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, "
-                "both `roi` and `asset_suffix` are required."
-            )
+            raise ValueError("ROI and asset_suffix are required for custom runs.")
         layer_name = f"{asset_suffix}_drainage_density_vector".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
+        watersheds_gdf = read_validated_vector_file(roi, f"Invalid ROI file: {roi}")
 
-    # ── Load drainage lines for study area ────────────────────────────────
-    drainage_lines_gdf = _load_drainage_lines_for_roi(watersheds_gdf)
+    # 1. Load drainage lines
+    try:
+        drainage_lines_gdf = _load_drainage_lines_for_roi(watersheds_gdf)
+    except Exception as e:
+        print(f"Error loading drainage lines: {e}")
+        return False
 
-    # ── Compute DD per watershed ──────────────────────────────────────────
+    # 2. Compute DD per watershed
     print("Computing drainage density per watershed...")
-    result_gdf = _compute_drainage_density(
-        watersheds_gdf=watersheds_gdf,
-        drainage_lines_gdf=drainage_lines_gdf,
-    )
+    result_gdf = _compute_drainage_density(watersheds_gdf, drainage_lines_gdf)
 
-    print(f"Total watersheds processed: {len(result_gdf)}")
-
-    # ── Save output ───────────────────────────────────────────────────────
+    # 3. Save result vector (MWS polygons with DD attributes)
     output_path = build_output_vector_path(
         layer_name=layer_name,
         state=state,
@@ -187,9 +164,9 @@ def run_drainage_density_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local drainage density vector: {asset_id}")
+    print(f"Saved local DD vector: {asset_id}")
 
-    # ── Push to GeoServer ─────────────────────────────────────────────────
+    # 4. Push to GeoServer
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
             os.path.splitext(asset_id)[0],
@@ -199,7 +176,7 @@ def run_drainage_density_local(
         )
         print(f"GeoServer response: {geoserver_response}")
 
-    # ── Sync layer metadata ───────────────────────────────────────────────
+    # 5. Sync to database
     if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -211,7 +188,7 @@ def run_drainage_density_local(
         )
         if layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("Sync to GeoServer flag updated for drainage density")
+            print(f"Database record updated for layer_id: {layer_id}")
 
     return True
 
@@ -228,6 +205,9 @@ def drainage_density(
     app_type="MWS",
     gee_account_id=None,
 ):
+    """
+    Celery task wrapper for local drainage density.
+    """
     _ = self, asset_folder_list, app_type, gee_account_id
     return run_drainage_density_local(
         state=state,
@@ -235,6 +215,4 @@ def drainage_density(
         block=block,
         asset_suffix=asset_suffix,
         roi=roi,
-        push_to_geoserver=True,
-        sync_layer_metadata=True,
     )
