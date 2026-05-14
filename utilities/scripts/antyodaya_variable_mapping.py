@@ -57,14 +57,20 @@ COUNT_SUM_COLUMNS = {
     "total_hhd_with_clean_energy",
     "total_hhd_with_kuccha_wall_kuccha_roof",
     "total_hhd_have_got_pmay_house",
+    "total_hhd_got_benefit_under_state_housing_scheme",
     "total_hhd_in_pmay_permanent_wait_list",
     "total_hhd_availing_pmuy_benefits",
     "total_no_of_registered_children_in_anganwadi",
     "total_childs_aged_0_to_3_years",
     "total_childs_aged_0_to_3_years_reg_under_aanganwadi",
+    "total_childs_aged_3_to_6_years_reg_under_aanganwadi",
     "total_childs_aged_0_to_3_years_immunized",
     "total_no_of_children_in_icds_cas",
-    "total_no_of_children_0_to_6_years_immunized_under_icds",
+    "total_male_child_age_bw_0_6",
+    "total_female_child_age_bw_0_6",
+    "total_underweight_child_age_under_6_years",
+    "total_childs_categorized_non_stunted_as_per_icds",
+    "total_no_of_young_anemic_children_6_59_months_in_icds_cas",
     "total_no_of_pregnant_women",
     "total_anemic_pregnant_women",
     "total_no_of_pregnant_women_receiving_services_under_icds",
@@ -75,6 +81,7 @@ COUNT_SUM_COLUMNS = {
     "total_no_of_women_delivered_babies_at_hospitals_registered_asha",
     "total_no_of_beneficiaries_receiving_benefits_under_pmmvy",
     "total_no_of_eligible_beneficiaries_under_pmmvy",
+    "total_hhd_registered_under_pmjay",
     "total_hhd_having_piped_water_connection",
     "total_hhd_not_having_sanitary_latrines",
     "total_hhd_engaged_cottage_small_scale_units",
@@ -90,7 +97,6 @@ COUNT_SUM_COLUMNS = {
     "total_no_of_farmers_received_benefit_under_pmfby",
     "total_no_farmers_adopted_organic_farming",
     "total_no_of_farmers_registered_under_pmkpy",
-    "total_no_of_farmers_subscribed_aged_18_40_under_pmkpy",
     "total_no_of_farmers_add_fert_in_soil_as_per_report",
     "total_approved_labour_budget_for_year",
     "total_expenditure_approved_under_nrm_labour_budget_during_yr",
@@ -105,6 +111,8 @@ COUNT_MAX_COLUMNS = {
     "total_no_of_elect_rep_undergone_training_under_rgsa",
     "total_no_of_elected_representatives",
     "total_no_of_elect_rep_oriented_under_rgsa",
+    "gp_total_no_of_eligible_beneficiaries_under_pmjay",
+    "gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay",
 }
 
 DISTANCE_MIN_COLUMNS: set[str] = set()
@@ -253,6 +261,55 @@ SCORE_DERIVATIONS = {
         "formula": "mean(piped_tap_water_coverage_score, clipped(total_hhd_having_piped_water_connection / total_hhd))",
         "description": "Composite piped water coverage score using habitation coverage and household connection ratio.",
     },
+    "pucca_housing_rate_score": {
+        "kind": "ratio_score",
+        "numerator": "total_hhd_with_kuccha_wall_kuccha_roof",
+        "denominator": "total_hhd",
+        "invert": True,
+        "formula": "1.0 - min(1.0, total_hhd_with_kuccha_wall_kuccha_roof / total_hhd)",
+        "description": "Pucca housing rate score from the inverse share of households with both kuccha wall and kuccha roof.",
+    },
+    "housing_scheme_coverage_score": {
+        "kind": "weighted_ratio_score",
+        "components": [
+            {
+                "numerators": [
+                    "total_hhd_have_got_pmay_house",
+                    "total_hhd_got_benefit_under_state_housing_scheme",
+                ],
+                "denominators": ["total_hhd"],
+                "cap": 1.0,
+                "weight": 1.0,
+                "label": "pmay_and_state_housing_benefit_share",
+            },
+        ],
+        "formula": "min(1.0, (total_hhd_have_got_pmay_house + total_hhd_got_benefit_under_state_housing_scheme) / total_hhd)",
+        "description": "Housing scheme coverage score combining PMAY and state housing scheme benefits over total households.",
+    },
+    "pmay_demand_met_score": {
+        "kind": "weighted_ratio_score",
+        "components": [
+            {
+                "numerators": ["total_hhd_have_got_pmay_house"],
+                "denominators": [
+                    "total_hhd_have_got_pmay_house",
+                    "total_hhd_in_pmay_permanent_wait_list",
+                ],
+                "cap": 1.0,
+                "weight": 1.0,
+                "label": "pmay_houses_over_pmay_houses_plus_waitlist",
+            },
+        ],
+        "formula": "min(1.0, total_hhd_have_got_pmay_house / (total_hhd_have_got_pmay_house + total_hhd_in_pmay_permanent_wait_list))",
+        "description": "PMAY demand-met score from PMAY houses divided by PMAY houses plus PMAY permanent waitlist.",
+    },
+    "ujjwala_coverage_score": {
+        "kind": "ratio_score",
+        "numerator": "total_hhd_availing_pmuy_benefits",
+        "denominator": "total_hhd",
+        "formula": "min(1.0, total_hhd_availing_pmuy_benefits / total_hhd)",
+        "description": "Ujjwala coverage score from PMUY beneficiary households over total households.",
+    },
     "internal_pucca_road_quality_score": {
         "kind": "ordinal_code_score",
         "source_column": "availability_of_internal_pucca_road",
@@ -301,6 +358,233 @@ SCORE_DERIVATIONS = {
         "formula": "mandi=1.00, regular market=0.75, weekly haat=0.50, no local market=0.00",
         "description": "Market hierarchy score from local market type only.",
     },
+    "children_under_age_6": {
+        "kind": "sum_columns",
+        "columns": [
+            "total_male_child_age_bw_0_6",
+            "total_female_child_age_bw_0_6",
+        ],
+        "formula": "total_male_child_age_bw_0_6 + total_female_child_age_bw_0_6",
+        "description": "Estimated children under age 6 from male and female child counts.",
+    },
+    "children_3_6_estimated": {
+        "kind": "difference_score",
+        "minuend": "children_under_age_6",
+        "subtrahend": "total_childs_aged_0_to_3_years",
+        "floor": 0.0,
+        "formula": "max(0, children_under_age_6 - total_childs_aged_0_to_3_years)",
+        "description": "Estimated age 3-6 child population from under-6 children minus age 0-3 children.",
+    },
+    "awc_0_3_coverage_score": {
+        "kind": "ratio_score",
+        "numerator": "total_childs_aged_0_to_3_years_reg_under_aanganwadi",
+        "denominator": "total_childs_aged_0_to_3_years",
+        "formula": "min(1.0, total_childs_aged_0_to_3_years_reg_under_aanganwadi / total_childs_aged_0_to_3_years)",
+        "description": "AWC registration coverage among children aged 0-3.",
+    },
+    "awc_3_6_coverage_score": {
+        "kind": "ratio_score",
+        "numerator": "total_childs_aged_3_to_6_years_reg_under_aanganwadi",
+        "denominator": "children_3_6_estimated",
+        "formula": "min(1.0, total_childs_aged_3_to_6_years_reg_under_aanganwadi / children_3_6_estimated)",
+        "description": "AWC registration coverage among estimated children aged 3-6.",
+    },
+    "overall_awc_enrollment_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_children_in_icds_cas",
+        "denominator": "children_under_age_6",
+        "formula": "min(1.0, total_no_of_children_in_icds_cas / children_under_age_6)",
+        "description": "Overall ICDS CAS enrollment coverage among children under age 6.",
+    },
+    "awc_total_enrollment_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_registered_children_in_anganwadi",
+        "denominator": "children_under_age_6",
+        "formula": "min(1.0, total_no_of_registered_children_in_anganwadi / children_under_age_6)",
+        "description": "Total AWC registered child coverage among children under age 6.",
+    },
+    "awc_infra_enrollment_coverage_score": {
+        "kind": "mean_mixed_score",
+        "components": [
+            {"binary_column": "is_aanganwadi_centre_available", "label": "awc_available"},
+            {"binary_column": "availability_of_mother_child_health_facilities", "label": "mch_facility_available"},
+            {"binary_column": "is_early_childhood_edu_provided_in_anganwadi", "label": "ece_available"},
+            {"score_column": "awc_0_3_coverage_score", "label": "awc_0_3_coverage"},
+            {"score_column": "awc_3_6_coverage_score", "label": "awc_3_6_coverage"},
+            {"score_column": "overall_awc_enrollment_score", "label": "overall_awc_enrollment"},
+            {"score_column": "awc_total_enrollment_score", "label": "awc_total_enrollment"},
+        ],
+        "formula": "mean(awc_available, mch_facility_available, ece_available, awc_0_3_coverage_score, awc_3_6_coverage_score, overall_awc_enrollment_score, awc_total_enrollment_score)",
+        "description": "Composite AWC infrastructure and enrollment coverage score. Ratio components are capped at 1.0.",
+    },
+    "pregnant_service_coverage_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_pregnant_women_receiving_services_under_icds",
+        "denominator": "total_no_of_pregnant_women",
+        "formula": "min(1.0, total_no_of_pregnant_women_receiving_services_under_icds / total_no_of_pregnant_women)",
+        "description": "Pregnant women ICDS service coverage.",
+    },
+    "lactating_service_coverage_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_lactating_mothers_receiving_services_under_icds",
+        "denominator": "total_no_of_lactating_mothers",
+        "formula": "min(1.0, total_no_of_lactating_mothers_receiving_services_under_icds / total_no_of_lactating_mothers)",
+        "description": "Lactating mothers ICDS service coverage.",
+    },
+    "maternal_anemia_rate": {
+        "kind": "ratio_score",
+        "numerator": "total_anemic_pregnant_women",
+        "denominator": "total_no_of_pregnant_women",
+        "formula": "min(1.0, total_anemic_pregnant_women / total_no_of_pregnant_women)",
+        "description": "Maternal anemia rate among pregnant women.",
+    },
+    "maternal_anemia_score": {
+        "kind": "ratio_score",
+        "numerator": "total_anemic_pregnant_women",
+        "denominator": "total_no_of_pregnant_women",
+        "invert": True,
+        "formula": "1.0 - min(1.0, total_anemic_pregnant_women / total_no_of_pregnant_women)",
+        "description": "Inverse maternal anemia score, so higher means less anemia.",
+    },
+    "institutional_delivery_rate_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_women_delivered_babies_at_hospitals_registered_asha",
+        "denominator": "total_no_of_pregnant_women",
+        "formula": "min(1.0, total_no_of_women_delivered_babies_at_hospitals_registered_asha / total_no_of_pregnant_women)",
+        "description": "Institutional delivery coverage among pregnant women.",
+    },
+    "maternal_health_care_access_score": {
+        "kind": "mean_mixed_score",
+        "components": [
+            {"score_column": "pregnant_service_coverage_score", "label": "pregnant_service_coverage"},
+            {"score_column": "lactating_service_coverage_score", "label": "lactating_service_coverage"},
+            {"score_column": "maternal_anemia_score", "label": "maternal_anemia_score"},
+            {"score_column": "institutional_delivery_rate_score", "label": "institutional_delivery_rate"},
+        ],
+        "formula": "mean(pregnant_service_coverage_score, lactating_service_coverage_score, maternal_anemia_score, institutional_delivery_rate_score)",
+        "description": "Composite maternal care access score with anemia inverted so higher is better.",
+    },
+    "child_immunization_rate_score": {
+        "kind": "ratio_score",
+        "numerator": "total_childs_aged_0_to_3_years_immunized",
+        "denominator": "total_childs_aged_0_to_3_years",
+        "formula": "min(1.0, total_childs_aged_0_to_3_years_immunized / total_childs_aged_0_to_3_years)",
+        "description": "Immunization coverage among children aged 0-3.",
+    },
+    "child_underweight_rate": {
+        "kind": "ratio_score",
+        "numerator": "total_underweight_child_age_under_6_years",
+        "denominator": "children_under_age_6",
+        "formula": "min(1.0, total_underweight_child_age_under_6_years / children_under_age_6)",
+        "description": "Underweight rate among children under age 6.",
+    },
+    "child_nutrition_score": {
+        "kind": "ratio_score",
+        "numerator": "total_underweight_child_age_under_6_years",
+        "denominator": "children_under_age_6",
+        "invert": True,
+        "formula": "1.0 - min(1.0, total_underweight_child_age_under_6_years / children_under_age_6)",
+        "description": "Inverse underweight score, so higher means fewer underweight children.",
+    },
+    "stunted_children": {
+        "kind": "difference_score",
+        "minuend": "total_no_of_registered_children_in_anganwadi",
+        "subtrahend": "total_childs_categorized_non_stunted_as_per_icds",
+        "floor": 0.0,
+        "formula": "max(0, total_no_of_registered_children_in_anganwadi - total_childs_categorized_non_stunted_as_per_icds)",
+        "description": "Approximate stunted child count from registered children minus non-stunted children.",
+    },
+    "child_stunting_rate": {
+        "kind": "ratio_score",
+        "numerator": "stunted_children",
+        "denominator": "total_no_of_registered_children_in_anganwadi",
+        "formula": "min(1.0, stunted_children / total_no_of_registered_children_in_anganwadi)",
+        "description": "Approximate stunting rate among registered AWC children.",
+    },
+    "child_stunting_score": {
+        "kind": "ratio_score",
+        "numerator": "stunted_children",
+        "denominator": "total_no_of_registered_children_in_anganwadi",
+        "invert": True,
+        "formula": "1.0 - min(1.0, stunted_children / total_no_of_registered_children_in_anganwadi)",
+        "description": "Inverse stunting score, so higher means fewer stunted children.",
+    },
+    "child_anemia_rate": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_young_anemic_children_6_59_months_in_icds_cas",
+        "denominator": "total_no_of_children_in_icds_cas",
+        "undefined": "null",
+        "formula": "min(1.0, total_no_of_young_anemic_children_6_59_months_in_icds_cas / total_no_of_children_in_icds_cas)",
+        "description": "Young child anemia rate among children in ICDS CAS.",
+    },
+    "child_anemia_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_young_anemic_children_6_59_months_in_icds_cas",
+        "denominator": "total_no_of_children_in_icds_cas",
+        "invert": True,
+        "undefined": "null",
+        "formula": "1.0 - min(1.0, total_no_of_young_anemic_children_6_59_months_in_icds_cas / total_no_of_children_in_icds_cas)",
+        "description": "Inverse child anemia score, so higher means fewer anemic children.",
+    },
+    "child_nutrition_development_score": {
+        "kind": "mean_mixed_score",
+        "components": [
+            {"score_column": "child_immunization_rate_score", "label": "child_immunization_rate"},
+            {"score_column": "child_nutrition_score", "label": "child_nutrition_score"},
+            {"score_column": "child_stunting_score", "label": "child_stunting_score"},
+            {"score_column": "child_anemia_score", "label": "child_anemia_score"},
+        ],
+        "formula": "mean(child_immunization_rate_score, child_nutrition_score, child_stunting_score, child_anemia_score)",
+        "description": "Composite child nutrition and development score. Underweight, stunting, and anemia are inverted before averaging.",
+    },
+    "low_birth_weight_rate": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_newly_born_underweight_children",
+        "denominator": "total_no_of_newly_born_children",
+        "undefined": "null",
+        "formula": "min(1.0, total_no_of_newly_born_underweight_children / total_no_of_newly_born_children)",
+        "description": "Low birth weight rate among newly born children.",
+    },
+    "newborn_health_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_newly_born_underweight_children",
+        "denominator": "total_no_of_newly_born_children",
+        "invert": True,
+        "undefined": "null",
+        "formula": "1.0 - min(1.0, total_no_of_newly_born_underweight_children / total_no_of_newly_born_children)",
+        "description": "Newborn health score from inverse low birth weight rate.",
+    },
+    "matru_vandana_utilization_score": {
+        "kind": "ratio_score",
+        "numerator": "total_no_of_beneficiaries_receiving_benefits_under_pmmvy",
+        "denominator": "total_no_of_eligible_beneficiaries_under_pmmvy",
+        "formula": "min(1.0, total_no_of_beneficiaries_receiving_benefits_under_pmmvy / total_no_of_eligible_beneficiaries_under_pmmvy)",
+        "description": "PMMVY benefit utilization among eligible beneficiaries.",
+    },
+    "health_insurance_coverage_score": {
+        "kind": "ratio_score",
+        "numerator": "total_hhd_registered_under_pmjay",
+        "denominator": "total_hhd",
+        "formula": "min(1.0, total_hhd_registered_under_pmjay / total_hhd)",
+        "description": "PMJAY household registration coverage.",
+    },
+    "ayushman_bharat_utilization_score": {
+        "kind": "ratio_score",
+        "numerator": "gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay",
+        "denominator": "gp_total_no_of_eligible_beneficiaries_under_pmjay",
+        "formula": "min(1.0, gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay / gp_total_no_of_eligible_beneficiaries_under_pmjay)",
+        "description": "Gram Panchayat-level PMJAY utilization among eligible beneficiaries.",
+    },
+    "health_schemes_utilization_score": {
+        "kind": "mean_mixed_score",
+        "components": [
+            {"score_column": "matru_vandana_utilization_score", "label": "matru_vandana_utilization"},
+            {"score_column": "health_insurance_coverage_score", "label": "health_insurance_coverage"},
+            {"score_column": "ayushman_bharat_utilization_score", "label": "ayushman_bharat_utilization"},
+        ],
+        "formula": "mean(matru_vandana_utilization_score, health_insurance_coverage_score, ayushman_bharat_utilization_score)",
+        "description": "Composite health-scheme utilization score from PMMVY and PMJAY coverage/utilization.",
+    },
     "fisheries_aquaculture_score": {
         "kind": "mean_mixed_score",
         "components": [
@@ -325,11 +609,11 @@ SCORE_DERIVATIONS = {
         "source_column": "availability_of_livestock_extension_services",
         "code_scores": {
             "1": 1.0,
-            "2": 0.75,
+            "2": 1.0,
             "3": 0.0,
         },
-        "formula": "Livestock Extension Officer=1.00, PashuSakhi/Mitra=0.75, not available=0.00",
-        "description": "Livestock extension services score derived from raw extension availability type.",
+        "formula": "1 if availability_of_livestock_extension_services is 1 or 2, else 0",
+        "description": "Livestock extension services presence score: Livestock Extension Officer or PashuSakhi/Mitra available = 1, not available = 0.",
     },
     "veterinary_services_access_score": {
         "kind": "mean_mixed_score",
@@ -478,18 +762,13 @@ SCORE_DERIVATIONS = {
                 "label": "pmkpy_registration_coverage",
             },
             {
-                "numerator": "total_no_of_farmers_subscribed_aged_18_40_under_pmkpy",
-                "denominator": "total_no_of_farmers",
-                "label": "young_farmer_pension_adoption",
-            },
-            {
                 "numerator": "total_no_of_farmers_received_benefit_under_pmfby",
                 "denominator": "total_no_of_farmers",
                 "label": "crop_insurance_coverage",
             },
         ],
-        "formula": "mean(clipped component ratios)",
-        "description": "Agricultural risk-support score combining PMKPY and PMFBY coverage.",
+        "formula": "mean(clipped(total_no_of_farmers_registered_under_pmkpy / total_no_of_farmers), clipped(total_no_of_farmers_received_benefit_under_pmfby / total_no_of_farmers))",
+        "description": "Agricultural risk-support score combining PMKPY registration and PMFBY benefit coverage.",
     },
 }
 
@@ -620,10 +899,24 @@ def raw_dependencies_for_variable(variable: str) -> set[str]:
             deps.add(SCORE_DERIVATIONS[variable]["source_column"])
         if "distance_column" in SCORE_DERIVATIONS[variable]:
             deps.add(SCORE_DERIVATIONS[variable]["distance_column"])
+        for key in ("numerator", "denominator", "minuend", "subtrahend"):
+            dependency = definition.get(key)
+            if dependency:
+                if dependency in SCORE_DERIVATIONS and dependency not in seen:
+                    seen.add(dependency)
+                    deps.update(raw_dependencies_for_variable(dependency))
+                else:
+                    deps.add(dependency)
+        deps.update(definition.get("columns", []))
         for component in definition.get("components", []):
             for key in ("availability_column", "distance_column", "numerator", "denominator", "binary_column"):
                 if key in component:
-                    deps.add(component[key])
+                    dependency = component[key]
+                    if dependency in SCORE_DERIVATIONS and dependency not in seen:
+                        seen.add(dependency)
+                        deps.update(raw_dependencies_for_variable(dependency))
+                    else:
+                        deps.add(dependency)
             for key in ("numerators", "denominators"):
                 deps.update(component.get(key, []))
             for key in ("numerator_terms", "denominator_terms"):
@@ -646,6 +939,10 @@ def derived_dependencies_for_variable(variable: str) -> set[str]:
             score_column = component.get("score_column")
             if score_column and score_column in SCORE_DERIVATIONS:
                 deps.update(derived_dependencies_for_variable(score_column))
+        for key in ("numerator", "denominator", "minuend", "subtrahend"):
+            dependency = SCORE_DERIVATIONS.get(variable, {}).get(key)
+            if dependency and dependency in SCORE_DERIVATIONS:
+                deps.update(derived_dependencies_for_variable(dependency))
         return deps
     for definition in CATEGORICAL_DERIVATIONS.values():
         if variable in set(definition["code_map"].values()):
@@ -674,10 +971,16 @@ def raw_aggregation(column: str) -> str:
         for key in ("source_column", "distance_column"):
             if key in definition:
                 score_input_columns.add(definition[key])
+        for key in ("numerator", "denominator", "minuend", "subtrahend"):
+            dependency = definition.get(key)
+            if dependency and dependency not in SCORE_DERIVATIONS:
+                score_input_columns.add(dependency)
+        score_input_columns.update(definition.get("columns", []))
         for component in definition.get("components", []):
             for key in ("availability_column", "distance_column", "numerator", "denominator", "binary_column"):
-                if key in component:
-                    score_input_columns.add(component[key])
+                dependency = component.get(key)
+                if dependency and dependency not in SCORE_DERIVATIONS:
+                    score_input_columns.add(dependency)
             for key in ("numerators", "denominators"):
                 score_input_columns.update(component.get(key, []))
             for key in ("numerator_terms", "denominator_terms"):
@@ -719,9 +1022,22 @@ def build_feature_config(feature_rows: list[dict[str, Any]]) -> list[dict[str, A
         "piped_water_fully_covered_cluster",
         "non_farm_employment_cluster",
         "minority_credit_cluster",
+        "pmay_coverage_cluster",
         "irrigation_coverage_cluster",
         "cropping_intensity_cluster",
         "children_3_6_registered_cluster",
+        "awc_available_cluster",
+        "early_child_education_cluster",
+        "awc_0_3_coverage_cluster",
+        "overall_awc_enrollment_cluster",
+        "maternal_anemia_cluster",
+        "pregnant_service_cov_cluster",
+        "lactating_service_cov_cluster",
+        "low_birth_weight_cluster",
+        "institutional_delivery_cluster",
+        "child_immunization_cluster",
+        "matru_vandana_cluster",
+        "mother_child_health_facility_access_cluster",
         "land_cultivation_rate",
         "irrigation_coverage",
         "cropping_intensity",
@@ -801,6 +1117,24 @@ def build_feature_config(feature_rows: list[dict[str, Any]]) -> list[dict[str, A
             inverse = False
             display_name = "Railway Station Availability"
             description = "Railway Station Availability feature from the local station availability flag."
+        elif legacy_id == "pucca_housing_rate_cluster":
+            input_columns = ["pucca_housing_rate_score"]
+            method = "score"
+            inverse = False
+            display_name = "Pucca Housing Rate"
+            description = "Pucca Housing Rate feature from inverse kuccha wall and kuccha roof household share."
+        elif legacy_id == "pmay_demand_met_cluster":
+            input_columns = ["pmay_demand_met_score"]
+            method = "score"
+            inverse = False
+            display_name = "PMAY Demand Met"
+            description = "PMAY Demand Met feature from PMAY houses divided by PMAY houses plus PMAY permanent waitlist."
+        elif legacy_id == "ujjwala_coverage_cluster":
+            input_columns = ["ujjwala_coverage_score"]
+            method = "score"
+            inverse = False
+            display_name = "Ujjwala Coverage"
+            description = "Ujjwala Coverage feature from PMUY beneficiary households over total households."
         elif legacy_id == "fpo_cluster":
             input_columns = ["farmers_collective_score"]
             method = "score"
@@ -925,22 +1259,71 @@ def build_feature_config(feature_rows: list[dict[str, Any]]) -> list[dict[str, A
                 "description": "Piped Water Coverage feature from habitation coverage and household connection ratio.",
             }
         )
-    if not any(feature["feature_id"] == "mother_child_health_facility_access_feature" for feature in features):
+    maternal_child_health_features = [
+        (
+            "awc_infra_enrollment_coverage_feature",
+            "AWC Infrastructure and Enrollment Coverage",
+            ["awc_infra_enrollment_coverage_score"],
+            "Composite feature from AWC availability, MCH facility availability, early-childhood education availability, 0-3 AWC coverage, estimated 3-6 AWC coverage, ICDS CAS enrollment, and total AWC enrollment.",
+        ),
+        (
+            "maternal_health_care_access_feature",
+            "Maternal Health and Care Access",
+            ["maternal_health_care_access_score"],
+            "Composite feature from pregnant-service coverage, lactating-service coverage, inverse maternal anemia, and institutional delivery coverage.",
+        ),
+        (
+            "child_nutrition_development_feature",
+            "Child Nutrition and Development",
+            ["child_nutrition_development_score"],
+            "Composite feature from child immunization, inverse underweight rate, inverse stunting rate, and inverse child anemia rate.",
+        ),
+        (
+            "newborn_health_outcomes_feature",
+            "Newborn Health Outcomes",
+            ["newborn_health_score"],
+            "Feature from inverse low-birth-weight rate among newly born children.",
+        ),
+        (
+            "health_schemes_utilization_feature",
+            "Health Schemes Utilization",
+            ["health_schemes_utilization_score"],
+            "Composite feature from PMMVY utilization, PMJAY household coverage, and GP-level Ayushman Bharat utilization.",
+        ),
+    ]
+    existing_feature_ids = {feature["feature_id"] for feature in features}
+    for feature_id, display_name, input_variables, description in maternal_child_health_features:
+        if feature_id in existing_feature_ids:
+            continue
         features.append(
             {
-                "feature_id": "mother_child_health_facility_access_feature",
-                "feature_column": "mother_child_health_facility_access_feature",
-                "display_name": "Mother-Child Health Facility Availability",
+                "feature_id": feature_id,
+                "feature_column": feature_id,
+                "display_name": display_name,
                 "category_id": "maternal_child_health",
-                "method": "binary",
-                "method_label": "binary",
+                "method": "score",
+                "method_label": "score",
                 "inverse": False,
-                "input_variables": ["availability_of_mother_child_health_facilities"],
-                "raw_dependencies": sorted_unique(
-                    raw_dependencies_for_feature(["availability_of_mother_child_health_facilities"])
-                ),
-                "derived_dependencies": [],
-                "description": "Mother-Child Health Facility Availability feature from the local availability flag.",
+                "input_variables": input_variables,
+                "raw_dependencies": sorted_unique(raw_dependencies_for_feature(input_variables)),
+                "derived_dependencies": sorted_unique(derived_dependencies_for_feature(input_variables)),
+                "description": description,
+            }
+        )
+    if not any(feature["feature_id"] == "housing_scheme_coverage_feature" for feature in features):
+        features.append(
+            {
+                "feature_id": "housing_scheme_coverage_feature",
+                "feature_column": "housing_scheme_coverage_feature",
+                "display_name": "Housing Scheme Coverage",
+                "category_id": "housing_quality",
+                "method": "score",
+                "method_label": "score",
+                "inverse": False,
+                "input_variables": ["housing_scheme_coverage_score"],
+                "raw_dependencies": sorted_unique(raw_dependencies_for_feature(["housing_scheme_coverage_score"])),
+                "derived_dependencies": sorted_unique(derived_dependencies_for_feature(["housing_scheme_coverage_score"])),
+                "description": "Housing Scheme Coverage feature from PMAY plus state housing scheme beneficiary households over total households.",
             }
         )
     if not any(feature["feature_id"] == "waste_disposal_feature" for feature in features):
@@ -1019,13 +1402,19 @@ def build_category_config(category_rows: list[dict[str, Any]]) -> list[dict[str,
             ]
         if row["category_id"] == "maternal_child_health":
             feature_ids = [
-                feature_id
-                for feature_id in feature_ids
-                if feature_id != normalized_feature_id("children_3_6_registered_cluster")
+                "awc_infra_enrollment_coverage_feature",
+                "maternal_health_care_access_feature",
+                "child_nutrition_development_feature",
+                "newborn_health_outcomes_feature",
+                "health_schemes_utilization_feature",
             ]
-            if "mother_child_health_facility_access_feature" not in feature_ids:
-                insert_at = 1 if feature_ids else 0
-                feature_ids.insert(insert_at, "mother_child_health_facility_access_feature")
+        if row["category_id"] == "housing_quality":
+            feature_ids = [
+                "pucca_housing_rate_feature",
+                "housing_scheme_coverage_feature",
+                "pmay_demand_met_feature",
+                "ujjwala_coverage_feature",
+            ]
         display_name = row["display_name"]
         category_id = row["category_id"]
         if category_id == "livelihoods_cottage_traditional":
@@ -1052,6 +1441,7 @@ def build_category_config(category_rows: list[dict[str, Any]]) -> list[dict[str,
         if category_id in {
             "livelihoods_cottage_traditional_industry",
             "livelihoods_forest_resources",
+            "livelihoods_alternative_farming",
         }:
             category["category_cluster_rule"] = {
                 "n_clusters": 2,

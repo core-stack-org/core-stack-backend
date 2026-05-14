@@ -229,6 +229,7 @@ def category_feature_plot(
     category_index: int,
     *,
     vertical: bool = False,
+    single_cluster_label: str | None = None,
 ) -> Path:
     feature_ids = category["feature_ids"]
     value_df = feature_values[["village_key", *feature_ids]].set_index("village_key")
@@ -251,6 +252,8 @@ def category_feature_plot(
     ]
     if not present_clusters:
         present_clusters = ["Low"]
+    if single_cluster_label is not None:
+        present_clusters = [single_cluster_label]
 
     if vertical:
         fig_width = max(8.0, 1.15 * len(feature_ids) + 3.0)
@@ -350,7 +353,7 @@ def category_feature_plot(
     fig.text(
         0.5,
         0.01,
-        "Blue line = median | Red dashed line = mean | Box = Q1-Q3 | Whiskers = 1.5x IQR | n = villages in that final category class",
+        "Blue line = median | Red dashed line = mean | Box = Q1-Q3 | Whiskers = 1.5x IQR | n = villages in that feature class",
         ha="center",
         fontsize=10,
         color=TEXT_COLOR,
@@ -359,6 +362,8 @@ def category_feature_plot(
     fig.tight_layout(rect=[0, 0.04, 1, 0.94])
 
     suffix = "_vertical" if vertical else ""
+    if single_cluster_label is not None:
+        suffix = f"_{slugify(single_cluster_label)}{suffix}"
     path = output_dir / f"{category_index:02d}_{slugify(category['display_name'])}{suffix}.png"
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -383,6 +388,11 @@ def write_report(output_dir: Path, generated: dict[str, Any], metadata: dict[str
     lines.extend(["", "## Category Feature Box Plots - Vertical", ""])
     for item in generated.get("category_feature_plots_vertical", []):
         lines.append(f"- `{item['category']}`: `{Path(item['path']).relative_to(REPO_ROOT)}`")
+    lines.extend(["", "## Category Feature Box Plots - Separate Category Class Files", ""])
+    for item in generated.get("category_feature_plots_by_cluster", []):
+        lines.append(
+            f"- `{item['category']}` `{item['cluster']}`: `{Path(item['path']).relative_to(REPO_ROOT)}`"
+        )
     lines.extend(
         [
             "",
@@ -403,8 +413,10 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     category_plot_dir = args.output_dir / "category_feature_box_plots"
     vertical_category_plot_dir = args.output_dir / "category_feature_box_plots_vertical"
+    single_cluster_plot_dir = args.output_dir / "category_feature_box_plots_by_cluster"
     category_plot_dir.mkdir(parents=True, exist_ok=True)
     vertical_category_plot_dir.mkdir(parents=True, exist_ok=True)
+    single_cluster_plot_dir.mkdir(parents=True, exist_ok=True)
 
     config = load_json(args.mapping_config)
     metadata = load_json(args.cluster_metadata)
@@ -414,6 +426,7 @@ def main() -> int:
         "global": {},
         "category_feature_plots": [],
         "category_feature_plots_vertical": [],
+        "category_feature_plots_by_cluster": [],
     }
     generated["global"]["category_cluster_distribution"] = plot_category_distributions(metadata, args.output_dir)
     generated["global"]["category_cluster_entropy"] = plot_category_entropy(metadata, args.output_dir)
@@ -443,6 +456,30 @@ def main() -> int:
             vertical=True,
         )
         generated["category_feature_plots_vertical"].append({"category": category["display_name"], "path": vertical_path})
+        category_labels = category_clusters[category["category_column"]].dropna()
+        present_clusters = [
+            cluster
+            for cluster in CLUSTER_ORDER
+            if int((category_labels == cluster).sum()) > 0
+        ]
+        for cluster_label in present_clusters:
+            cluster_path = category_feature_plot(
+                category,
+                feature_values,
+                feature_clusters,
+                category_clusters,
+                features_by_id,
+                single_cluster_plot_dir,
+                index,
+                single_cluster_label=cluster_label,
+            )
+            generated["category_feature_plots_by_cluster"].append(
+                {
+                    "category": category["display_name"],
+                    "cluster": cluster_label,
+                    "path": cluster_path,
+                }
+            )
 
     report_path = write_report(args.output_dir, generated, metadata)
     print(
@@ -451,6 +488,7 @@ def main() -> int:
                 "global_plot_count": len(generated["global"]),
                 "category_plot_count": len(generated["category_feature_plots"]),
                 "vertical_category_plot_count": len(generated["category_feature_plots_vertical"]),
+                "single_cluster_category_plot_count": len(generated["category_feature_plots_by_cluster"]),
                 "report": str(report_path),
                 "output_dir": str(args.output_dir),
             },

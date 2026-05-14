@@ -105,6 +105,33 @@ def clipped_ratio_score(df: pd.DataFrame, numerator: str, denominator: str) -> n
     return num
 
 
+def ratio_score(df: pd.DataFrame, definition: dict[str, Any]) -> np.ndarray:
+    if definition.get("undefined") == "null":
+        num = numeric(df[definition["numerator"]]).fillna(0).to_numpy(dtype=np.float32, copy=True)
+        den = numeric(df[definition["denominator"]]).fillna(0).to_numpy(dtype=np.float32, copy=True)
+        valid = den > 0
+        values = np.full(len(df), np.nan, dtype=np.float32)
+        safe_den = den[valid].copy()
+        np.clip(safe_den, 1e-9, None, out=safe_den)
+        values[valid] = num[valid] / safe_den
+        np.clip(values, 0.0, 1.0, out=values)
+    else:
+        values = clipped_ratio_score(df, definition["numerator"], definition["denominator"])
+    if definition.get("invert", False):
+        np.subtract(1.0, values, out=values)
+    return values
+
+
+def difference_score(df: pd.DataFrame, definition: dict[str, Any]) -> np.ndarray:
+    values = numeric(df[definition["minuend"]]).fillna(0).to_numpy(dtype=np.float32, copy=True)
+    values -= numeric(df[definition["subtrahend"]]).fillna(0).to_numpy(dtype=np.float32, copy=True)
+    if "floor" in definition:
+        np.maximum(values, float(definition["floor"]), out=values)
+    if "ceiling" in definition:
+        np.minimum(values, float(definition["ceiling"]), out=values)
+    return values.astype(np.float32)
+
+
 def summed_columns(
     df: pd.DataFrame,
     columns: list[str],
@@ -193,7 +220,7 @@ def score_from_definition(df: pd.DataFrame, definition: dict[str, Any]) -> np.nd
 
 def mixed_component_score(df: pd.DataFrame, component: dict[str, Any]) -> np.ndarray:
     if "score_column" in component:
-        values = numeric(df[component["score_column"]]).fillna(0).to_numpy(dtype=np.float32, copy=True)
+        values = numeric(df[component["score_column"]]).to_numpy(dtype=np.float32, copy=True)
         np.clip(values, 0.0, 1.0, out=values)
         return values
     if "binary_column" in component:
@@ -205,7 +232,10 @@ def mixed_component_score(df: pd.DataFrame, component: dict[str, Any]) -> np.nda
 
 def mean_mixed_score(df: pd.DataFrame, definition: dict[str, Any]) -> np.ndarray:
     scores = [mixed_component_score(df, component) for component in definition["components"]]
-    return np.mean(np.vstack(scores), axis=0).astype(np.float32)
+    with np.errstate(invalid="ignore"):
+        values = np.nanmean(np.vstack(scores), axis=0)
+    values = np.nan_to_num(values, nan=0.0)
+    return values.astype(np.float32)
 
 
 def fit_continuous_labels(
@@ -451,6 +481,12 @@ def derive_variables(df: pd.DataFrame, config: dict[str, Any]) -> None:
             df[variable] = weighted_ratio_score(df, definition)
         elif definition["kind"] == "mean_mixed_score":
             df[variable] = mean_mixed_score(df, definition)
+        elif definition["kind"] == "ratio_score":
+            df[variable] = ratio_score(df, definition)
+        elif definition["kind"] == "sum_columns":
+            df[variable] = summed_columns(df, definition["columns"])
+        elif definition["kind"] == "difference_score":
+            df[variable] = difference_score(df, definition)
         else:
             raise ValueError(f"Unsupported score derivation kind: {definition['kind']}")
 
@@ -623,7 +659,6 @@ def write_category_gis_csv(
         chunk = base.iloc[start:stop].copy()
         for column in ordered_columns:
             chunk[f"{column}_index"] = category_values[column][start:stop]
-            chunk[f"{column}_cluster_code"] = category_labels[column][start:stop].astype(np.int8)
             chunk[f"{column}_cluster"] = pd.Series(category_labels[column][start:stop], index=chunk.index).map(INT_TO_LABEL)
         chunk.to_csv(output_path, mode="a" if header_written else "w", index=False, header=not header_written)
         header_written = True
@@ -701,7 +736,7 @@ def write_report(output_dir: Path, metadata: dict[str, Any]) -> Path:
     lines.extend(
         [
             "",
-            "The `category_gis_csv` file is the most convenient table for GIS use: each category has a normalized score column, numeric cluster code, and final Low/Medium/High or Low/High class label in the same village-level file.",
+            "The `village_category_indices_clusters_csv` file is the most convenient table for GIS use: each category has a normalized category index and final Low/Medium/High or Low/High class label in the same village-level file.",
             "",
             "## Method Notes",
             "",
@@ -773,7 +808,7 @@ def main() -> int:
         "feature_clusters_csv": args.output_dir / "antyodaya_village_feature_clusters.csv",
         "category_values_csv": args.output_dir / "antyodaya_village_category_values_normalized.csv",
         "category_clusters_csv": args.output_dir / "antyodaya_village_category_clusters.csv",
-        "category_gis_csv": args.output_dir / "antyodaya_village_category_gis.csv",
+        "village_category_indices_clusters_csv": args.output_dir / "antyodaya_village_category_indices_clusters.csv",
         "metadata_json": args.output_dir / "antyodaya_cluster_metadata.json",
     }
     output_files.update(quality_tables(feature_meta, category_meta, args.output_dir))
@@ -784,7 +819,7 @@ def main() -> int:
     write_label_csv(base, feature_labels, feature_order, output_files["feature_clusters_csv"])
     write_value_csv(base, category_values, category_order, output_files["category_values_csv"])
     write_label_csv(base, category_labels, category_order, output_files["category_clusters_csv"])
-    write_category_gis_csv(base, category_values, category_labels, category_order, output_files["category_gis_csv"])
+    write_category_gis_csv(base, category_values, category_labels, category_order, output_files["village_category_indices_clusters_csv"])
 
     metadata = {
         "pipeline": "antyodaya_cluster_analysis",
