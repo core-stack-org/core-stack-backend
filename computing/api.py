@@ -2084,6 +2084,7 @@ def generate_drainage_density_data(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
+            "None",
             drainage_density_vector_local_task,
         )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
