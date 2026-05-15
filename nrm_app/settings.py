@@ -133,7 +133,9 @@ INSTALLED_APPS = [
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS") if "CORS_ALLOWED_ORIGINS" in os.environ else []
+    CORS_ALLOWED_ORIGINS = (
+        env.list("CORS_ALLOWED_ORIGINS") if "CORS_ALLOWED_ORIGINS" in os.environ else []
+    )
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -409,7 +411,7 @@ WHATSAPP_MEDIA_PATH = resolve_env_path(
 )
 
 BASE_URL = "https://geoserver.core-stack.org/"
-DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
+DEFAULT_FROM_EMAIL = "CoRE Stack Support <support@core-stack.org>"
 
 PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 

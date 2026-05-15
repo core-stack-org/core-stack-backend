@@ -1059,13 +1059,15 @@ class DPRReportAdmin(admin.ModelAdmin):
         "dpr_report_id",
         "plan_id__id",
         "plan_name",
+        "organization_name",
+        "project_name",
         "status",
         "dpr_generated_at",
         "created_at",
         "s3_link",
     ]
-    list_filter = ["status", "created_at", "dpr_generated_at"]
-    search_fields = ["plan_name", "plan_id__plan"]
+    list_filter = ["status", "created_at", "dpr_generated_at", "plan_id__organization"]
+    search_fields = ["plan_name", "plan_id__plan", "plan_id__organization__name", "plan_id__project__name"]
     readonly_fields = [
         "dpr_report_id",
         "created_at",
@@ -1094,6 +1096,24 @@ class DPRReportAdmin(admin.ModelAdmin):
         return "-"
 
     s3_link_display.short_description = "S3 URL"
+
+    def organization_name(self, obj):
+        try:
+            return obj.plan_id.organization.name
+        except AttributeError:
+            return "-"
+
+    organization_name.short_description = "Organization"
+    organization_name.admin_order_field = "plan_id__organization__name"
+
+    def project_name(self, obj):
+        try:
+            return obj.plan_id.project.name
+        except AttributeError:
+            return "-"
+
+    project_name.short_description = "Project"
+    project_name.admin_order_field = "plan_id__project__name"
 
     fieldsets = (
         (
