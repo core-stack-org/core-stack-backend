@@ -10,6 +10,7 @@ from nrm_app.settings import (
     EARTH_DATA_PASSWORD,
     GEE_DEFAULT_ACCOUNT_ID,
     GEE_HELPER_ACCOUNT_ID,
+    GEE_STORAGE_PROJECT,
     FERNET_KEY,
     GCS_BUCKET_NAME,
 )
@@ -76,6 +77,33 @@ def _get_gee_account(account_id=None, project=None):
     return normalized_account_id, account
 
 
+def read_gee_project_from_json(credentials_path):
+    credentials_path = os.path.abspath(credentials_path)
+    if not os.path.isfile(credentials_path):
+        raise GEEInitializationError(
+            f"GEE credentials file was not found: {credentials_path}"
+        )
+
+    with open(credentials_path, "r", encoding="utf-8") as credentials_file:
+        key_dict = json.load(credentials_file)
+
+    return (key_dict.get("project_id") or "").strip()
+
+
+def get_gee_account_env_snapshot(account_id, service_account_key_path=""):
+    _, account = _get_gee_account(account_id)
+    helper_account_id = account.helper_account_id or account.id
+    key_path = (service_account_key_path or "").strip()
+
+    return {
+        "GEE_STORAGE_PROJECT": account.name,
+        "GEE_DEFAULT_ACCOUNT_ID": str(account.id),
+        "GEE_HELPER_ACCOUNT_ID": str(helper_account_id),
+        "GEE_SERVICE_ACCOUNT_KEY_PATH": key_path,
+        "GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH": key_path,
+    }
+
+
 def ee_initialize(
     account_id=GEE_DEFAULT_ACCOUNT_ID,
     strict=False,
@@ -99,7 +127,13 @@ def ee_initialize(
                 "https://www.googleapis.com/auth/devstorage.full_control",
             ],
         )
-        ee.Initialize(credentials)
+        ee_project = (
+            account.name or GEE_STORAGE_PROJECT or key_dict.get("project_id") or ""
+        ).strip()
+        if ee_project:
+            ee.Initialize(credentials, project=ee_project)
+        else:
+            ee.Initialize(credentials)
 
         return True
     except Exception as exc:
@@ -193,7 +227,7 @@ def copy_gee_credentials_into_repo(
 
 
 def upsert_gee_account_from_json(
-    credentials_path, account_name=None, helper_account_id=None
+    credentials_path, project_name=None, helper_account_id=None
 ):
     credentials_path = os.path.abspath(credentials_path)
     if not os.path.isfile(credentials_path):
@@ -211,16 +245,20 @@ def upsert_gee_account_from_json(
             "The provided credentials JSON does not contain client_email."
         )
 
-    account_name = (
-        account_name or os.path.splitext(os.path.basename(credentials_path))[0]
-    )
-    account = (
-        GEEAccount.objects.filter(service_account_email=service_account_email).first()
-        or GEEAccount.objects.filter(name=account_name).first()
-        or GEEAccount(name=account_name)
-    )
+    project_name = (project_name or key_dict.get("project_id") or "").strip()
+    if not project_name:
+        raise GEEInitializationError(
+            "GEE project name is required. Provide it explicitly or include "
+            "project_id in the service-account JSON."
+        )
 
-    account.name = account_name
+    account = GEEAccount.objects.filter(
+        service_account_email=service_account_email
+    ).first()
+    if account is None:
+        account = GEEAccount(service_account_email=service_account_email)
+
+    account.name = project_name
     account.service_account_email = service_account_email
     account.credentials_encrypted = Fernet(FERNET_KEY).encrypt(credentials_payload)
     account.is_visible = True

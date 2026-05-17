@@ -18,10 +18,11 @@ SHELL_RC="$HOME/.bashrc"
 INSTALL_STATE_DIR="$BACKEND_DIR/.installation_state"
 APP_ENV_FILE="$BACKEND_DIR/nrm_app/.env"
 LEGACY_ROOT_ENV_FILE="$BACKEND_DIR/.env"
-DEFAULT_GEE_ACCOUNT_NAME="local-gee-account"
 POST_INSTALL_REQUIRE_GEE=0
 POST_INSTALL_INITIALISATION_FAILED=0
 GEE_JSON_PATH_ARG=""
+GEE_PROJECT_NAME_ARG=""
+GCS_BUCKET_NAME_ARG=""
 PUBLIC_API_X_API_KEY_ARG=""
 PUBLIC_API_BASE_URL_ARG=""
 GEOSERVER_URL_ARG=""
@@ -39,6 +40,8 @@ declare -a ONLY_STEPS=()
 declare -a SKIP_STEPS=()
 declare -a OPTIONAL_INPUT_KEYS=(
     "gee_json"
+    "gee_project_name"
+    "gcs_bucket_name"
     "public_api_key"
     "public_api_base_url"
     "geoserver_url"
@@ -69,6 +72,7 @@ STEP_ORDER=(
     "seed_data"
     "superuser"
     "gee_configuration"
+    "gcs_bucket_configuration"
     "admin_boundary_data"
     "initialisation_check"
     "public_api_check"
@@ -88,7 +92,8 @@ function step_label() {
         seed_data) echo "Load seed data" ;;
         superuser) echo "Ensure test superuser" ;;
         geoserver) echo "Configure GeoServer connection/workspace" ;;
-        gee_configuration) echo "Configure Google Earth Engine" ;;
+        gee_configuration) echo "Configure Google Earth Engine account and project" ;;
+        gcs_bucket_configuration) echo "Configure Google Cloud Storage bucket for GEE" ;;
         admin_boundary_data) echo "Download admin-boundary data" ;;
         initialisation_check) echo "Run internal API initialisation check" ;;
         public_api_check) echo "Run public API smoke test" ;;
@@ -179,6 +184,8 @@ function parse_step_csv() {
 function optional_input_description() {
     case "$1" in
         gee_json) echo "Path to a GEE service-account JSON file" ;;
+        gee_project_name) echo "Earth Engine project id used for asset paths, for example ee-corestackdev" ;;
+        gcs_bucket_name) echo "Google Cloud Storage bucket name used by GEE exports and uploads" ;;
         public_api_key) echo "X-API-Key used by public API helper scripts and smoke tests" ;;
         public_api_base_url) echo "Base URL for public APIs, for example https://geoserver.core-stack.org/api/v1" ;;
         geoserver_url) echo "GeoServer base URL used for publish/download validation, for example https://host/geoserver" ;;
@@ -192,6 +199,8 @@ function optional_input_description() {
 function optional_input_example() {
     case "$1" in
         gee_json) echo "gee_json=/full/path/to/service-account.json" ;;
+        gee_project_name) echo "gee_project_name=ee-corestackdev" ;;
+        gcs_bucket_name) echo "gcs_bucket_name=core_stack" ;;
         public_api_key) echo "public_api_key=your-public-api-key" ;;
         public_api_base_url) echo "public_api_base_url=https://geoserver.core-stack.org/api/v1" ;;
         geoserver_url) echo "geoserver_url=https://host/geoserver" ;;
@@ -215,6 +224,12 @@ function normalize_optional_input_key() {
     case "$candidate" in
         gee_json)
             echo "gee_json"
+            ;;
+        gee_project_name)
+            echo "gee_project_name"
+            ;;
+        gcs_bucket_name)
+            echo "gcs_bucket_name"
             ;;
         public_api_key)
             echo "public_api_key"
@@ -267,6 +282,12 @@ function set_optional_input_value() {
     case "$key" in
         gee_json)
             GEE_JSON_PATH_ARG="$value"
+            ;;
+        gee_project_name)
+            GEE_PROJECT_NAME_ARG="$value"
+            ;;
+        gcs_bucket_name)
+            GCS_BUCKET_NAME_ARG="$value"
             ;;
         public_api_key)
             PUBLIC_API_X_API_KEY_ARG="$value"
@@ -593,8 +614,145 @@ function conda_env_exists() {
     conda env list | sed 's/^[* ]*//' | awk '{print $1}' | grep -qx "$CONDA_ENV_NAME"
 }
 
+function gee_account_configuration_present() {
+    [ -f "$APP_ENV_FILE" ] && \
+        grep -Eq '^GEE_DEFAULT_ACCOUNT_ID="?([0-9]+)' "$APP_ENV_FILE" && \
+        [ -n "$(current_env_value "$APP_ENV_FILE" "GEE_STORAGE_PROJECT")" ]
+}
+
+function gcs_bucket_configuration_present() {
+    [ -f "$APP_ENV_FILE" ] && \
+        [ -n "$(current_env_value "$APP_ENV_FILE" "GCS_BUCKET_NAME")" ]
+}
+
 function gee_configuration_present() {
-    [ -f "$APP_ENV_FILE" ] && grep -Eq '^GEE_DEFAULT_ACCOUNT_ID="?([0-9]+)' "$APP_ENV_FILE"
+    gee_account_configuration_present && gcs_bucket_configuration_present
+}
+
+function read_gee_project_from_json_file() {
+    local json_path="$1"
+    local project_name=""
+
+    activate_conda_env
+    cd "$BACKEND_DIR"
+    project_name=$(
+        GEE_JSON_PATH="$json_path" PYTHONPATH="$BACKEND_DIR" python - <<'PY'
+import os
+
+from utilities.gee_utils import read_gee_project_from_json
+
+print(read_gee_project_from_json(os.environ["GEE_JSON_PATH"]))
+PY
+    )
+    project_name="$(trim "$project_name")"
+    printf '%s' "$project_name"
+}
+
+function prompt_gee_project_name() {
+    local project_name="${GEE_PROJECT_NAME_ARG:-}"
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        [ -n "$project_name" ] || project_name="$(current_env_value "$APP_ENV_FILE" "GEE_STORAGE_PROJECT")"
+    fi
+
+    if [ -z "$project_name" ]; then
+        read -r -p "GEE project name (for example ee-corestackdev): " project_name
+    fi
+
+    GEE_PROJECT_NAME_ARG="$(trim "$project_name")"
+}
+
+function prompt_gcs_bucket_name() {
+    local gcs_bucket_name="${GCS_BUCKET_NAME_ARG:-}"
+
+    if [ -f "$APP_ENV_FILE" ]; then
+        [ -n "$gcs_bucket_name" ] || gcs_bucket_name="$(current_env_value "$APP_ENV_FILE" "GCS_BUCKET_NAME")"
+    fi
+
+    if [ -z "$gcs_bucket_name" ]; then
+        read -r -p "GCS bucket name: " gcs_bucket_name
+    fi
+
+    GCS_BUCKET_NAME_ARG="$(trim "$gcs_bucket_name")"
+}
+
+function apply_gee_account_env() {
+    local env_file="$APP_ENV_FILE"
+    local account_id="$1"
+    local key_path="$2"
+    local project_name="$3"
+    local helper_account_id=""
+
+    account_id="$(trim "$account_id")"
+    key_path="$(trim "$key_path")"
+    project_name="$(trim "$project_name")"
+
+    if [ -z "$account_id" ] || [ -z "$key_path" ] || [ -z "$project_name" ]; then
+        echo "GEE account id, project name, and staged credentials path are required."
+        return 1
+    fi
+
+    if [ ! -f "$env_file" ]; then
+        echo "Environment file not found at $env_file"
+        return 1
+    fi
+
+    activate_conda_env
+    cd "$BACKEND_DIR"
+    helper_account_id=$(
+        GEE_ACCOUNT_ID="$account_id" PYTHONPATH="$BACKEND_DIR" python - <<'PY'
+import os
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
+
+import django
+
+django.setup()
+
+from gee_computing.models import GEEAccount
+
+account = GEEAccount.objects.get(pk=int(os.environ["GEE_ACCOUNT_ID"]))
+print(account.helper_account_id or account.id)
+PY
+    )
+    helper_account_id="$(trim "$helper_account_id")"
+
+    set_env_value "$env_file" "GEE_STORAGE_PROJECT" "$project_name"
+    set_env_value "$env_file" "GEE_DEFAULT_ACCOUNT_ID" "$account_id"
+    set_env_value "$env_file" "GEE_HELPER_ACCOUNT_ID" "$helper_account_id"
+    set_env_value "$env_file" "GEE_SERVICE_ACCOUNT_KEY_PATH" "$key_path"
+    set_env_value "$env_file" "GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH" "$key_path"
+
+    echo "Updated .env for GEE account id=$account_id project=$project_name"
+    return 0
+}
+
+function apply_gcs_bucket_settings() {
+    local env_file="$APP_ENV_FILE"
+    local gcs_bucket_name="${GCS_BUCKET_NAME_ARG:-}"
+    local account_id=""
+
+    gcs_bucket_name="$(trim "$gcs_bucket_name")"
+
+    if [ -z "$gcs_bucket_name" ]; then
+        echo "GCS bucket name is required."
+        return 1
+    fi
+
+    if [ ! -f "$env_file" ]; then
+        echo "Environment file not found at $env_file"
+        return 1
+    fi
+
+    account_id="$(current_env_value "$env_file" "GEE_DEFAULT_ACCOUNT_ID")"
+    if [ -z "$account_id" ]; then
+        echo "Configure the GEE account before setting the GCS bucket."
+        return 1
+    fi
+
+    set_env_value "$env_file" "GCS_BUCKET_NAME" "$gcs_bucket_name"
+    echo "Configured GCS_BUCKET_NAME=$gcs_bucket_name in $env_file"
+    return 0
 }
 
 function directory_has_contents() {
@@ -1505,14 +1663,14 @@ function auto_configure_gee_account_ids() {
     fi
 }
 
-function configure_paths() {
+function import_gee_account() {
     local gee_json_path_input="$1"
-    local env_file="$APP_ENV_FILE"
-    local account_name="${2:-$DEFAULT_GEE_ACCOUNT_NAME}"
+    local project_name="${2:-}"
     local normalized_gee_json_path=""
     local import_result=""
     local account_id=""
     local staged_relative_path=""
+    local imported_project_name=""
 
     normalized_gee_json_path="$(normalize_user_path "$gee_json_path_input")"
 
@@ -1525,10 +1683,27 @@ function configure_paths() {
         return 1
     fi
 
+    project_name="$(trim "$project_name")"
+    if [ -z "$project_name" ]; then
+        project_name="$(read_gee_project_from_json_file "$normalized_gee_json_path")"
+    fi
+    if [ -z "$project_name" ]; then
+        prompt_gee_project_name
+        project_name="$GEE_PROJECT_NAME_ARG"
+    fi
+    if [ -z "$project_name" ]; then
+        echo "GEE project name is required."
+        return 1
+    fi
+
     activate_conda_env
     cd "$BACKEND_DIR"
 
-    import_result=$(GEE_JSON_PATH="$normalized_gee_json_path" GEE_ACCOUNT_NAME="$account_name" PYTHONPATH="$BACKEND_DIR" python - <<'PY'
+    import_result=$(
+        GEE_JSON_PATH="$normalized_gee_json_path" \
+        GEE_PROJECT_NAME="$project_name" \
+        PYTHONPATH="$BACKEND_DIR" \
+        python - <<'PY'
 import json
 import os
 
@@ -1546,90 +1721,154 @@ staged_credentials = copy_gee_credentials_into_repo(
 
 account = upsert_gee_account_from_json(
     credentials_path=staged_credentials["absolute_path"],
-    account_name=os.environ["GEE_ACCOUNT_NAME"],
+    project_name=os.environ["GEE_PROJECT_NAME"],
 )
 
 print(
     json.dumps(
         {
             "account_id": account.id,
+            "project_name": account.name,
             "relative_path": staged_credentials["relative_path"],
         }
     )
 )
 PY
-)
+    )
 
     account_id=$(echo "$import_result" | tail -n 1 | python -c 'import json,sys; print(json.loads(sys.stdin.read()).get("account_id",""))' 2>/dev/null | tr -d '[:space:]')
+    imported_project_name=$(echo "$import_result" | tail -n 1 | python -c 'import json,sys; print(json.loads(sys.stdin.read()).get("project_name",""))' 2>/dev/null | tr -d '\r')
     staged_relative_path=$(echo "$import_result" | tail -n 1 | python -c 'import json,sys; print(json.loads(sys.stdin.read()).get("relative_path",""))' 2>/dev/null | tr -d '\r')
 
-    if [ -z "$account_id" ] || [ -z "$staged_relative_path" ]; then
+    if [ -z "$account_id" ] || [ -z "$staged_relative_path" ] || [ -z "$imported_project_name" ]; then
         echo "Unable to create or update the GEE account from the provided JSON."
         return 1
     fi
 
-    set_env_value "$env_file" "GEE_DEFAULT_ACCOUNT_ID" "$account_id"
-    set_env_value "$env_file" "GEE_HELPER_ACCOUNT_ID" "$account_id"
-    set_env_value "$env_file" "GEE_SERVICE_ACCOUNT_KEY_PATH" "$staged_relative_path"
-    set_env_value "$env_file" "GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH" "$staged_relative_path"
+    if ! apply_gee_account_env "$account_id" "$staged_relative_path" "$imported_project_name"; then
+        return 1
+    fi
+
+    GEE_PROJECT_NAME_ARG="$imported_project_name"
     POST_INSTALL_REQUIRE_GEE=1
-    echo "Configured GEE account id=$account_id using staged credentials at $staged_relative_path"
-    mark_step_complete "gee_configuration"
+    echo "Configured GEEAccount id=$account_id with project name=$imported_project_name"
+    return 0
 }
 
 function optional_configure_gee_account() {
     local force="${1:-0}"
     local gee_json_path_input=""
-    local had_existing_gee_configuration=0
+    local had_existing_account=0
 
     auto_configure_gee_account_ids
-    if gee_configuration_present; then
-        had_existing_gee_configuration=1
+    if gee_account_configuration_present; then
+        had_existing_account=1
         POST_INSTALL_REQUIRE_GEE=1
     fi
 
     if [ -n "$GEE_JSON_PATH_ARG" ]; then
         gee_json_path_input="$GEE_JSON_PATH_ARG"
-    elif [ "$force" -ne 1 ] && [ "$had_existing_gee_configuration" -eq 1 ]; then
-        echo "Existing Google Earth Engine configuration detected. Keeping it."
+    elif [ "$force" -ne 1 ] && [ "$had_existing_account" -eq 1 ]; then
+        echo "Existing Google Earth Engine account configuration detected. Keeping it."
         mark_step_complete "gee_configuration"
         return
     elif [ ! -t 0 ]; then
-        if [ "$had_existing_gee_configuration" -eq 1 ]; then
-            echo "No interactive terminal detected. Keeping the existing GEE configuration."
+        if [ -n "$GEE_JSON_PATH_ARG" ] || [ -n "$GEE_PROJECT_NAME_ARG" ]; then
+            if [ -n "$GEE_JSON_PATH_ARG" ]; then
+                import_gee_account "$GEE_JSON_PATH_ARG" "$GEE_PROJECT_NAME_ARG" || true
+            fi
+        fi
+        if [ "$had_existing_account" -eq 1 ]; then
+            echo "No interactive terminal detected. Keeping the existing GEE account configuration."
             mark_step_complete "gee_configuration"
             return
         fi
-        echo "No interactive terminal detected. Skipping optional GEE setup."
+        echo "No interactive terminal detected. Skipping optional GEE account setup."
         POST_INSTALL_REQUIRE_GEE=0
         return
     else
         echo ""
-        echo "Optional: configure Google Earth Engine now."
-        echo "If your organization shared a service-account JSON, enter its full path below."
+        echo "Configure Google Earth Engine: import a service-account JSON."
+        echo "The installer uses project_id from the JSON as GEEAccount.name when present."
         echo "Windows paths like C:\\Users\\name\\Downloads\\file.json and relative paths like .\\file.json are accepted."
         echo "Press Enter to skip."
         read -r -p "GEE JSON path: " gee_json_path_input
     fi
 
     if [ -z "$gee_json_path_input" ]; then
-        if [ "$had_existing_gee_configuration" -eq 1 ]; then
-            echo "Keeping the existing GEE configuration."
+        if [ "$had_existing_account" -eq 1 ]; then
+            echo "Keeping the existing GEE account configuration."
             POST_INSTALL_REQUIRE_GEE=1
             mark_step_complete "gee_configuration"
             return
         fi
 
-        echo "Skipping optional GEE setup for now."
+        echo "Skipping optional GEE account setup for now."
         POST_INSTALL_REQUIRE_GEE=0
         return
     fi
 
-    if configure_paths "$gee_json_path_input"; then
-        echo "GEE credentials imported. The final initialisation test will validate the live GEE path too."
+    if import_gee_account "$gee_json_path_input" "$GEE_PROJECT_NAME_ARG"; then
+        echo "GEE account configured. Run the gcs_bucket_configuration step next."
+        mark_step_complete "gee_configuration"
     else
-        POST_INSTALL_REQUIRE_GEE="$had_existing_gee_configuration"
-        echo "GEE setup did not complete. Continuing with the core initialisation test only."
+        POST_INSTALL_REQUIRE_GEE="$had_existing_account"
+        echo "GEE account setup did not complete."
+    fi
+}
+
+function optional_configure_gcs_bucket() {
+    local force="${1:-0}"
+    local had_existing_bucket=0
+
+    if gcs_bucket_configuration_present; then
+        had_existing_bucket=1
+    fi
+
+    if ! gee_account_configuration_present; then
+        if [ "$force" -eq 1 ]; then
+            echo "Configure the GEE account before setting the GCS bucket."
+            return 1
+        fi
+        echo "Skipping GCS bucket setup because the GEE account is not configured yet."
+        return
+    fi
+
+    if [ "$force" -ne 1 ] && [ "$had_existing_bucket" -eq 1 ]; then
+        echo "Existing GCS bucket configuration detected. Keeping it."
+        mark_step_complete "gcs_bucket_configuration"
+        return
+    fi
+
+    if [ -n "$GCS_BUCKET_NAME_ARG" ]; then
+        :
+    elif [ ! -t 0 ]; then
+        if [ -n "$GCS_BUCKET_NAME_ARG" ]; then
+            apply_gcs_bucket_settings || true
+        fi
+        if [ "$had_existing_bucket" -eq 1 ]; then
+            mark_step_complete "gcs_bucket_configuration"
+        fi
+        return
+    else
+        echo ""
+        echo "Configure the Google Cloud Storage bucket used by GEE exports and uploads."
+        prompt_gcs_bucket_name
+    fi
+
+    if [ -z "$GCS_BUCKET_NAME_ARG" ]; then
+        if [ "$had_existing_bucket" -eq 1 ]; then
+            mark_step_complete "gcs_bucket_configuration"
+            return
+        fi
+        echo "Skipping GCS bucket setup for now."
+        return
+    fi
+
+    if apply_gcs_bucket_settings; then
+        mark_step_complete "gcs_bucket_configuration"
+    else
+        echo "GCS bucket setup did not complete."
     fi
 }
 
@@ -1924,6 +2163,9 @@ function run_step() {
             ;;
         gee_configuration)
             optional_configure_gee_account "$force"
+            ;;
+        gcs_bucket_configuration)
+            optional_configure_gcs_bucket "$force"
             ;;
         admin_boundary_data)
             download_admin_boundary_data "$force"
