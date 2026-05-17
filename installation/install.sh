@@ -636,12 +636,14 @@ function read_gee_project_from_json_file() {
     activate_conda_env
     cd "$BACKEND_DIR"
     project_name=$(
-        GEE_JSON_PATH="$json_path" PYTHONPATH="$BACKEND_DIR" python - <<'PY'
+        GEE_JSON_PATH="$json_path" python - <<'PY'
+import json
 import os
 
-from utilities.gee_utils import read_gee_project_from_json
+with open(os.environ["GEE_JSON_PATH"], "r", encoding="utf-8") as handle:
+    payload = json.load(handle)
 
-print(read_gee_project_from_json(os.environ["GEE_JSON_PATH"]))
+print((payload.get("project_id") or "").strip())
 PY
     )
     project_name="$(trim "$project_name")"
