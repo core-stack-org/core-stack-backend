@@ -92,6 +92,8 @@ def generate_mws_data_for_kyl_filters(
                 "dem": -1,
                 "canal": -1,
                 "river": -1,
+                "lulc_vector": -1,
+                "drainage_density": -1,
             }
 
             try:
@@ -658,29 +660,8 @@ def generate_mws_data_for_kyl_filters(
                         else None
                     )
 
-                    lulc_tree_on_slope = (
-                        df_lulc_slope_mws_data.get(
-                            "forests_area_percent", pd.Series([0])
-                        )
-                        .fillna(0)
-                        .iloc[0]
-                        if not df_lulc_slope_mws_data.empty
-                        else 0
-                    )
-
-                    lulc_shrubs_on_slope = (
-                        df_lulc_slope_mws_data.get(
-                            "shrub_scrubs_area_percent", pd.Series([0])
-                        )
-                        .fillna(0)
-                        .iloc[0]
-                        if not df_lulc_slope_mws_data.empty
-                        else 0
-                    )
                 except:
                     lulc_slope_category = ""
-                    lulc_tree_on_slope = 0
-                    lulc_shrubs_on_slope = 0
 
                 try:
                     df_lulc_plain_mws_data = sheets["terrain_lulc_plain"][
@@ -691,22 +672,9 @@ def generate_mws_data_for_kyl_filters(
                         if not df_lulc_plain_mws_data.empty
                         else None
                     )
-                    # Sum the cropping area percentages
-                    cropping_columns = [
-                        "single_non_kharif_area_percent",
-                        "single_kharif_area_percent",
-                        "double_cropping_area_percent",
-                        "triple_cropping_area_percent",
-                    ]
 
-                    # Or if you want the total sum of all values
-                    lulc_crops_on_plain = round(
-                        df_lulc_plain_mws_data[cropping_columns].fillna(0).sum().sum(),
-                        2,
-                    )
                 except:
                     lulc_plain_category = ""
-                    lulc_crops_on_plain = 0
 
                 ################# Restoration Vector  #########################
                 try:
@@ -923,6 +891,105 @@ def generate_mws_data_for_kyl_filters(
                     print(f"Error in getting canal data: {e}")
                     river_available = False
 
+                ############ lulc vector ########################
+                try:
+                    lulc_shrub_percent = 0
+                    lulc_forest_percent = 0
+                    lulc_crop_percent = 0
+
+                    lulc_df = sheets.get("lulc_vector")
+
+                    if lulc_df is not -1 and not lulc_df.empty:
+
+                        mws_lulc_data = lulc_df[lulc_df["UID"] == specific_mws_id]
+
+                        if not mws_lulc_data.empty:
+
+                            row = mws_lulc_data.iloc[0]
+
+                            # Total area
+                            area_in_ha = float(row.get("area_in_ha", 0))
+
+                            # Shrub
+                            shrub_cols = [
+                                col
+                                for col in lulc_df.columns
+                                if col.startswith("shrub_scrub_in_ha_")
+                            ]
+
+                            lulc_shrub_area = round(
+                                sum(row[col] for col in shrub_cols) / len(shrub_cols), 2
+                            )
+
+                            # Forest
+                            forest_cols = [
+                                col
+                                for col in lulc_df.columns
+                                if col.startswith("tree_forest_in_ha_")
+                            ]
+
+                            lulc_forest_area = round(
+                                sum(row[col] for col in forest_cols) / len(forest_cols),
+                                2,
+                            )
+
+                            # Crop
+                            crop_cols = [
+                                col
+                                for col in lulc_df.columns
+                                if (
+                                    col.startswith("single_kharif_in_ha_")
+                                    or col.startswith("single_non_kharif_in_ha_")
+                                    or col.startswith("double_crop_in_ha_")
+                                    or col.startswith("triple_crop_in_ha_")
+                                )
+                            ]
+
+                            lulc_crop_area = round(
+                                sum(row[col] for col in crop_cols) / len(crop_cols), 2
+                            )
+
+                            # Percentage calculation
+                            if area_in_ha > 0:
+                                lulc_shrub_percent = round(
+                                    (lulc_shrub_area / area_in_ha) * 100, 2
+                                )
+
+                                lulc_forest_percent = round(
+                                    (lulc_forest_area / area_in_ha) * 100, 2
+                                )
+
+                                lulc_crop_percent = round(
+                                    (lulc_crop_area / area_in_ha) * 100, 2
+                                )
+
+                except Exception as e:
+                    print(f"Error in LULC vector: {e}")
+
+                    lulc_shrub_percent = 0
+                    lulc_forest_percent = 0
+                    lulc_crop_percent = 0
+
+                ############ Canal ########################
+                try:
+                    drainage_density_df = sheets.get("drainage_density")
+                    if drainage_density_df is not -1 and not drainage_density_df.empty:
+                        mws_drainage_density_data = drainage_density_df[
+                            drainage_density_df["UID"] == specific_mws_id
+                        ]
+                        if not mws_drainage_density_data.empty:
+                            row = mws_drainage_density_data.iloc[0]
+                            drainage_density = round(row["drainage_density"], 2)
+                        else:
+                            drainage_density = 0
+
+                    else:
+                        drainage_density = 0
+
+                except Exception as e:
+                    print(f"Error in getting drainage_density data: {e}")
+                    drainage_density = 0
+
                 results.append(
                     {
                         "mws_id": specific_mws_id,
@@ -964,14 +1031,15 @@ def generate_mws_data_for_kyl_filters(
                         "green_credit": green_credit,
                         "factory_csr": factory_csr,
                         "mws_intersect_swb": mws_intersect_swb,
-                        "area_tree_on_slope": lulc_tree_on_slope,
-                        "area_shrubs_on_slope": lulc_shrubs_on_slope,
-                        "area_crops_on_plain": round(lulc_crops_on_plain, 2),
                         "relief": relief,
                         "mean_elevation": mean_elevation,
                         "relative_mean_elevation": relative_mean_elevation,
                         "canal_available": canal_available,
                         "river_available": river_available,
+                        "lulc_shrub_percent": lulc_shrub_percent,
+                        "lulc_forest_percent": lulc_forest_percent,
+                        "lulc_crop_percent": lulc_crop_percent,
+                        "drainage_density": drainage_density,
                     }
                 )
 

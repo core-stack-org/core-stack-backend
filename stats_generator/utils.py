@@ -243,9 +243,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "lulc_vector":
                 create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
             elif workspace == "drainage_density":
-                create_excel_for_drainage_density(
-                    geojson_data, writer, start_year, end_year
-                )
+                create_excel_for_drainage_density(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
@@ -359,7 +357,6 @@ def create_excel_for_river(data, writer):
         row = {
             "UID": properties.get("uid", ""),
             "river_name": properties.get("rivname", ""),
-            "basin_code": properties.get("bacode", ""),
         }
 
         df_data.append(row)
@@ -390,6 +387,8 @@ def create_excel_for_dem(data, writer):
 
     df = pd.DataFrame(df_data)
     df = df.sort_values(["UID"])
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
     df.to_excel(writer, sheet_name="dem", index=False)
     print("Excel file created for dem")
 
@@ -445,7 +444,7 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
 
     if not df.empty:
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-        df[numeric_cols] = df[numeric_cols].round(6)
+        df[numeric_cols] = df[numeric_cols].round(2)
 
     df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
     print("Excel sheet 'mws_intersect_swb' created successfully")
@@ -461,7 +460,8 @@ def create_excel_for_facilities(data, writer):
     first_cols = ["censuscode2011", "censusname"]
     other_cols = [c for c in df.columns if c not in first_cols]
     df = df[first_cols + other_cols]
-
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
     df.to_excel(writer, sheet_name="facilities_proximity", index=False)
     print("Excel file created for facilities_proximity")
 
