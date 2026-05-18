@@ -17,6 +17,7 @@ from shapely.geometry import Point
 
 from dpr.mapping import populate_maintenance_from_waterbody
 from dpr.utils import ensure_str, get_waterbody_repair_activities, transform_name
+from moderation.views import sync_odk_to_csdb
 from nrm_app.settings import (
     DEBUG,
     EMAIL_HOST,
@@ -38,8 +39,8 @@ from .models import (
 )
 from .services import (
     get_crops_data,
-    get_livestock_data,
     get_livelihood_data,
+    get_livestock_data,
     get_maintenance_data,
     get_nrm_works_data,
 )
@@ -51,7 +52,6 @@ from .utils import (
     to_utf8,
     transform_name,
 )
-from moderation.views import sync_odk_to_csdb
 
 logger = setup_logger(__name__)
 
@@ -68,7 +68,7 @@ def create_dpr_document(plan):
 
     doc = initialize_document()  # doc init
 
-    logger.info("Database sync started") # db sync
+    logger.info("Database sync started")  # db sync
     sync_odk_to_csdb()
     logger.info("Database sync complete")
 
@@ -100,39 +100,43 @@ def create_dpr_document(plan):
     )
     add_section_separator(doc)
     logger.info("Section B completed")
-    
+
     add_section_c(doc, plan)
     add_section_separator(doc)
     logger.info("Section C completed")
-    
+
     add_section_d(doc, plan, settlement_mws_ids, mws_gdf)
     add_section_separator(doc)
     logger.info("Section D completed")
-    
+
     add_section_e(doc, plan)
     add_section_separator(doc)
     logger.info("Section E completed")
-    
+
     add_section_f(doc, plan, mws_fortnight)
     add_section_separator(doc)
     logger.info("Section F completed")
-    
+
     add_section_g(doc, plan, mws_fortnight)
     add_section_separator(doc)
     logger.info("Section G completed")
 
     # MARK: local save /var/www/tmp/dpr/
-    # if DEBUG:
-    #     file_path = TMP_LOCATION + "dpr/"
+    if DEBUG:
+        file_path = TMP_LOCATION + "dpr/"
 
-    #     if not os.path.exists(file_path):
-    #         os.makedirs(file_path)
-    #     doc.save(file_path + plan.plan + ".docx")
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)
+        doc.save(file_path + plan.plan + ".docx")
     return doc
 
 
 def get_data_for_settlement(planid):
-    return ODK_settlement.objects.filter(plan_id=planid).exclude(status_re="rejected").exclude(is_deleted=True)
+    return (
+        ODK_settlement.objects.filter(plan_id=planid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    )
 
 
 def get_settlement_count_for_plan(planid):
@@ -554,7 +558,9 @@ def create_table_livestock(doc, plan):
     for item in get_livestock_data(plan.id):
         row_cells = livestock_table.add_row().cells
         row_cells[0].text = to_utf8(item["settlement_name"])
-        for i, lt in enumerate(["goats", "sheep", "cattle", "piggery", "poultry"], start=1):
+        for i, lt in enumerate(
+            ["goats", "sheep", "cattle", "piggery", "poultry"], start=1
+        ):
             row_cells[i].text = to_utf8(item[lt] or "NA")
 
 
@@ -608,9 +614,11 @@ def create_table_mws(doc, plan, settlement_mws_ids, mws_gdf, unique_mws_ids):
 
 def get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all wells across all MWS IDs with their corresponding MWS assignment"""
-    wells_in_plan = ODK_well.objects.filter(plan_id=plan.id).exclude(
-        status_re="rejected"
-    ).exclude(is_deleted=True)
+    wells_in_plan = (
+        ODK_well.objects.filter(plan_id=plan.id)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    )
     all_wells_with_mws = []
 
     for well in wells_in_plan:
@@ -635,9 +643,11 @@ def get_all_wells_with_mws(plan, unique_mws_ids, mws_gdf):
 
 def get_all_waterbodies_with_mws(plan, unique_mws_ids, mws_gdf):
     """Get all waterbodies across all MWS IDs with their corresponding MWS assignment"""
-    waterbodies_in_plan = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
-        status_re="rejected"
-    ).exclude(is_deleted=True)
+    waterbodies_in_plan = (
+        ODK_waterbody.objects.filter(plan_id=plan.id)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    )
     all_waterbodies_with_mws = []
 
     for waterbody in waterbodies_in_plan:
@@ -724,7 +734,9 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
         well_usage = "NA"
         if well.data_well and "Well_usage" in well.data_well:
             well_usage_data = well.data_well["Well_usage"]
-            select_one_well_used = ensure_str(well_usage_data.get("select_one_well_used"))
+            select_one_well_used = ensure_str(
+                well_usage_data.get("select_one_well_used")
+            )
             select_one_well_used_other = well_usage_data.get(
                 "select_one_well_used_other"
             )
@@ -760,7 +772,9 @@ def populate_consolidated_well_tables(doc, all_wells_with_mws):
             and "Well_condition" in well.data_well
         ):
             well_condition_data = well.data_well["Well_condition"]
-            well_repairs_type = ensure_str(well_condition_data.get("select_one_repairs_well"))
+            well_repairs_type = ensure_str(
+                well_condition_data.get("select_one_repairs_well")
+            )
             well_repairs_type_other = well_condition_data.get(
                 "select_one_repairs_well_other"
             )
@@ -993,8 +1007,6 @@ def maintenance_gw_table(doc, plan):
         row_cells[7].text = str(m["longitude"])
 
 
-
-
 def maintenance_agri_table(doc, plan):
     headers = [
         "Type of demand",
@@ -1139,8 +1151,14 @@ def add_section_g(doc, plan, mws):
     doc.add_heading("Section G: Proposed New Livelihood Works", level=1)
 
     all_livelihood = get_livelihood_data(plan.id)
-    livestock_fisheries = [r for r in all_livelihood if r["livelihood_work"] in ("Livestock", "Fisheries")]
-    plantations_etc = [r for r in all_livelihood if r["livelihood_work"] not in ("Livestock", "Fisheries")]
+    livestock_fisheries = [
+        r for r in all_livelihood if r["livelihood_work"] in ("Livestock", "Fisheries")
+    ]
+    plantations_etc = [
+        r
+        for r in all_livelihood
+        if r["livelihood_work"] not in ("Livestock", "Fisheries")
+    ]
 
     doc.add_heading("G.1 Livestock and Fisheries", level=2)
     lf_headers = [
