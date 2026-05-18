@@ -51,18 +51,6 @@ from .services import (
     patch_dpr_report_status,
     update_demand_status,
 )
-from .gen_multi_mws_report import (
-    get_cropping_mws_data,
-    get_degrad_mws_data,
-    get_drought_mws_data,
-    get_lulc_mws_data,
-    get_mws_data,
-    get_reduction_mws_data,
-    get_surface_wb_mws_data,
-    get_terrain_mws_data,
-    get_urban_mws_data,
-    get_water_balance_mws_data,
-)
 from .gen_mws_report import (
     get_change_detection_data,
     get_land_conflict_industrial_data,
@@ -209,19 +197,23 @@ def generate_dpr(request):
 @schema(None)
 def generate_mws_report(request):
     try:
-        # ? district, block, mwsId
+        # ? Extract and transform parameters
         params = request.GET
         result = {}
 
         for key, value in params.items():
             result[key] = value
 
+        # Transform district, block, and state
+        district = transform_name(result["district"])
+        block = transform_name(result["block"])
+        state = transform_name(result["state"])
+        uid = result["uid"]
+
         # print("Api Processing End 1", datetime.now())
 
         # ? OSM description generation
-        parameter_block, parameter_mws = get_osm_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        parameter_block, parameter_mws = get_osm_data(state, district, block, uid)
 
         # ? Terrain Description generation
         (
@@ -234,20 +226,16 @@ def generate_mws_report(request):
             lulc_block_slope,
             lulc_mws_plain,
             lulc_block_plain,
-        ) = get_terrain_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        ) = get_terrain_data(state, district, block, uid)
 
         # ? Degradation Description generation
         land_degrad, tree_degrad, urbanization, restore_desc = (
-            get_change_detection_data(
-                result["state"], result["district"], result["block"], result["uid"]
-            )
+            get_change_detection_data(state, district, block, uid)
         )
 
         # ? Double Cropping Description Generation
         double_crop_des, year_range_text = get_double_cropping_area(
-            result["state"], result["district"], result["block"], result["uid"]
+            state, district, block, uid
         )
 
         # ? Surface Waterbody Description
@@ -259,9 +247,7 @@ def generate_mws_report(request):
             rabi_data,
             zaid_data,
             water_years,
-        ) = get_surface_Water_bodies_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        ) = get_surface_Water_bodies_data(state, district, block, uid)
 
         # ? Water Balance Description
         (
@@ -273,20 +259,14 @@ def generate_mws_report(request):
             et_data,
             dg_data,
             wb_years,
-        ) = get_water_balance_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        ) = get_water_balance_data(state, district, block, uid)
 
         # ? SOGE Description
-        soge_desc = get_soge_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        soge_desc = get_soge_data(state, district, block, uid)
 
         # ? Drought Description
         drought_desc, drought_weeks, mod_drought, sev_drought, drysp_all, dg_years = (
-            get_drought_data(
-                result["state"], result["district"], result["block"], result["uid"]
-            )
+            get_drought_data(state, district, block, uid)
         )
 
         # ? Village Profile
@@ -302,36 +282,24 @@ def generate_mws_report(request):
             ofl_works,
             ca_works,
             ofw_works,
-        ) = get_village_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        ) = get_village_data(state, district, block, uid)
 
         # ? Cropping Intensity Description
         inten_desc1, inten_desc2, single, double, triple, uncrop, crop_years = (
-            get_cropping_intensity(
-                result["state"], result["district"], result["block"], result["uid"]
-            )
+            get_cropping_intensity(state, district, block, uid)
         )
 
         # ? LCW and Industrial Data Description
-        lcw_desc = get_land_conflict_industrial_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
-        factory_desc = get_factory_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
-        mining_desc = get_mining_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        lcw_desc = get_land_conflict_industrial_data(state, district, block, uid)
+        factory_desc = get_factory_data(state, district, block, uid)
+        mining_desc = get_mining_data(state, district, block, uid)
 
-        green_credits = get_green_credit_data(
-            result["state"], result["district"], result["block"], result["uid"]
-        )
+        green_credits = get_green_credit_data(state, district, block, uid)
 
         context = {
-            "district": result["district"],
-            "block": result["block"],
-            "mws_id": result["uid"],
+            "district": district,
+            "block": block,
+            "mws_id": uid,
             "block_osm": parameter_block,
             "mws_osm": parameter_mws,
             "terrain_mws": terrain_mws,
@@ -417,8 +385,8 @@ def generate_resource_report(request):
             result[key] = value
 
         context = {
-            "district": result["district"],
-            "block": result["block"],
+            "district": transform_name(result["district"]),
+            "block": transform_name(result["block"]),
             "plan_id": result["plan_id"],
             "plan_name": result["plan_name"],
         }
@@ -432,20 +400,39 @@ def generate_resource_report(request):
 @api_view(["GET"])
 @schema(None)
 @auth_free
-def download_mws_report(request):
-    # Require the usual params, but render from your external domain
-    required = ("state", "district", "block", "uid")
+def download_report(request):
+    report_type = request.GET.get('report_type')
+    
+    if not report_type:
+        return HttpResponseBadRequest("Missing 'report_type' parameter")
+    
+    # Define required params based on report type
+    if report_type == 'mws':
+        required = ("state", "district", "block", "uid", "report_type")
+    elif report_type == 'resource':
+        required = ("district", "block", "plan_id", "plan_name", "report_type")
+    else:
+        return HttpResponseBadRequest(f"Unknown report_type: {report_type}")
+    
     missing = [k for k in required if k not in request.GET]
     if missing:
         return HttpResponseBadRequest(f"Missing query params: {', '.join(missing)}")
-
-    qs = request.GET.urlencode()
-    report_html_url = (
-        f"https://geoserver.core-stack.org/api/v1/generate_mws_report/?{qs}"
-    )
+    
+    if report_type == 'mws':
+        report_html_url = (
+            f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
+            f"?state={request.GET.get('state')}&district={request.GET.get('district')}&block={request.GET.get('block')}&uid={request.GET.get('uid')}"
+        )
+        filename = f"mws_report_{request.GET.get('uid')}.pdf"
+    elif report_type == 'resource':
+        report_html_url = (
+            f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
+            f"?district={request.GET.get('district')}&block={request.GET.get('block')}&plan_id={request.GET.get('plan_id')}&plan_name={request.GET.get('plan_name')}"
+        )
+        filename = f"resource_report_{request.GET.get('plan_name')}.pdf"
+    
     pdf_bytes = render_pdf_with_firefox(report_html_url)
-
-    filename = f"mws_report_{request.GET.get('uid')}.pdf"
+    
     resp = HttpResponse(pdf_bytes, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
