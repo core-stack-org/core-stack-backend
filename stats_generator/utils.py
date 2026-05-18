@@ -240,12 +240,91 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_canal(geojson_data, writer)
             elif workspace == "river":
                 create_excel_for_river(geojson_data, writer)
+            elif workspace == "lulc_vector":
+                create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
+            elif workspace == "drainage_density":
+                create_excel_for_drainage_density(
+                    geojson_data, writer, start_year, end_year
+                )
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_drainage_density(data, writer):
+    print("Inside create_excel_for Drainage Density")
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "drainage_density": properties.get("drainage_density", ""),
+        }
+
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+    df.to_excel(writer, sheet_name="drainage_density", index=False)
+    print("Excel file created for Drainage Density")
+
+
+def create_excel_for_lulc_vector(data, writer, start_year, end_year):
+    df_data = []
+    features = data["features"]
+    years = list(range(start_year, end_year + 1))
+
+    classes = {
+        "barrenland": ("barrenland", "barrenla"),
+        "built_up_area": ("built-up_a", "built-up"),
+        "cropland": ("cropland_a", "cropland"),
+        "double_crop": ("doubly_cro", "doubly_c"),
+        "triple_crop": ("triply_cro", "triply_c"),
+        "tree_forest": ("tree_fores", "tree_for"),
+        "shrub_scrub": ("shrub_scru", "shrub_sc"),
+        "single_kharif": ("single_kha", "single_k"),
+        "single_non_kharif": ("single_non", "single_n"),
+        "k_water": ("k_water_ar", "k_water_"),
+        "kr_water": ("kr_water_a", "kr_water"),
+        "krz_water": ("krz_water_", "krz_wate"),
+    }
+
+    def get_key(base_key, trunc_prefix, idx):
+        """Derive the property key for a given year index."""
+        if idx == 0:
+            return base_key
+        return f"{trunc_prefix}_{idx}"
+
+    for feature in features:
+        properties = feature["properties"]
+
+        row = {
+            "UID": properties.get("uid", ""),
+            "area_in_ha": properties.get("area_in_ha", ""),
+            "sum_in_ha": (properties.get("sum") or 0) / 10000,
+        }
+
+        for idx, year in enumerate(years):
+            for class_name, (base_key, trunc_prefix) in classes.items():
+                key = get_key(base_key, trunc_prefix, idx)
+                row[f"{class_name}_in_ha_{year}"] = properties.get(key, 0)
+
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+    df.to_excel(writer, sheet_name="lulc_vector", index=False)
+    print("Excel file created for lulc vector")
 
 
 def create_excel_for_canal(data, writer):
