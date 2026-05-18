@@ -233,4 +233,19 @@ urlpatterns = [
         api.generate_canal_vector,
         name="generate-canal-vector",
     ),
+    path(
+        "generate_tree_in_grassland/",
+        api.generate_tree_in_grassland,
+        name="generate_tree_in_grassland",
+    ),
+    path(
+        "generate_forest_fringe/",
+        api.generate_forest_fringe,
+        name="generate_forest_fringe",
+    ),
+    path(
+        "generate_forest_fire/",
+        api.generate_forest_fire,
+        name="generate_forest_fire",
+    ),
 ]
