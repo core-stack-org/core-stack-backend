@@ -35,7 +35,67 @@ class LayerAdmin(admin.ModelAdmin):
 
 
 @admin.register(Dataset)
-class LayerAdmin(admin.ModelAdmin):
+class DatasetAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     list_display = ["name", "layer_type", "workspace"]
     list_filter = ["layer_type"]
+
+
+@admin.register(LayerMapping)
+class LayerMappingAdmin(admin.ModelAdmin):
+    readonly_fields = ("created_at", "updated_at")
+    search_fields = (
+        "layer_name",
+        "db_dataset_name",
+        "ee_layer_name",
+        "geoserver_layer_name",
+        "display_name",
+    )
+    list_display = [
+        "layer_name",
+        "layer_type",
+        "db_dataset_name",
+        "ee_layer_name",
+        "geoserver_workspace_name",
+        "geoserver_layer_name",
+        "auto_stac",
+    ]
+    list_filter = ["layer_type", "auto_stac", "geoserver_workspace_name", "theme"]
+    list_editable = ["auto_stac"]
+    fieldsets = (
+        (
+            "Identity",
+            {
+                "fields": (
+                    "display_name",
+                    "layer_type",
+                    "layer_name",
+                    "theme",
+                )
+            },
+        ),
+        (
+            "Source / GeoServer",
+            {
+                "fields": (
+                    "db_dataset_name",
+                    "ee_layer_name",
+                    "geoserver_workspace_name",
+                    "geoserver_layer_name",
+                    "spatial_resolution_in_meters",
+                )
+            },
+        ),
+        (
+            "STAC trigger",
+            {
+                "fields": (
+                    "auto_stac",
+                    "start_year",
+                    "end_year",
+                    "style_file_url",
+                )
+            },
+        ),
+        ("Audit", {"fields": ("created_at", "updated_at")}),
+    )
