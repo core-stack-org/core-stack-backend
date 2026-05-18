@@ -148,6 +148,7 @@ else:
         "http://127.0.0.1",
         "http://localhost:3000",
         "http://localhost:3001",
+        "https://staging.d2u6quqcimqsuk.amplifyapp.com/",
     ]
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
