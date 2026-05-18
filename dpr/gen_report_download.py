@@ -5,12 +5,11 @@ import time
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.print_page_options import PrintOptions
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.firefox import GeckoDriverManager
+from webdriver_manager.chrome import ChromeDriverManager
 
 from nrm_app.settings import TMP_LOCATION
 
@@ -18,40 +17,46 @@ from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-FIREFOX_BIN = os.environ.get("FIREFOX_BIN")
-GECKODRIVER_LOG = os.environ.get("GECKODRIVER_LOG", "geckodriver.log")
-
-# ---- Cache geckodriver path in memory ----
-_geckodriver_path = None
+# ---- Cache chromedriver path in memory ----
+_chromedriver_path = None
 
 
-def _get_geckodriver_path():
+def _get_chromedriver_path():
     """
-    Get geckodriver path. Install only on first call.
-    
-    Why this works:
-    - First request: install & cache
+    Get chromedriver path. Install only on first call per worker process.
+    - First request: find/install & cache
     - All subsequent requests: return cached path (instant)
-    - No race conditions because geckodriver is already cached on disk
+    - No race conditions because path is cached after first call
     """
-    global _geckodriver_path
-    
+    global _chromedriver_path
+
     # Already cached in this process
-    if _geckodriver_path:
-        return _geckodriver_path
-    
+    if _chromedriver_path:
+        return _chromedriver_path
+
     # Check env override
-    if os.environ.get("GECKODRIVER_PATH"):
-        _geckodriver_path = os.environ.get("GECKODRIVER_PATH")
-        logger.info("PDF: using GECKODRIVER_PATH from env: %s", _geckodriver_path)
-        return _geckodriver_path
-    
+    if os.environ.get("CHROMEDRIVER_PATH"):
+        _chromedriver_path = os.environ["CHROMEDRIVER_PATH"]
+        logger.info("PDF: using CHROMEDRIVER_PATH from env: %s", _chromedriver_path)
+        return _chromedriver_path
+
+    # Check well-known locations
+    for candidate in (
+        "/usr/bin/chromedriver",
+        "/usr/local/bin/chromedriver",
+        "/snap/chromium/current/usr/lib/chromium-browser/chromedriver",
+    ):
+        if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+            _chromedriver_path = candidate
+            logger.info("PDF: found chromedriver at: %s", _chromedriver_path)
+            return _chromedriver_path
+
     # Install once (only happens on first request in this worker process)
-    logger.info("PDF: installing geckodriver...")
-    _geckodriver_path = GeckoDriverManager().install()
-    logger.info("PDF: ✓ geckodriver installed at: %s", _geckodriver_path)
-    
-    return _geckodriver_path
+    logger.info("PDF: installing chromedriver...")
+    _chromedriver_path = ChromeDriverManager().install()
+    logger.info("PDF: ✓ chromedriver installed at: %s", _chromedriver_path)
+
+    return _chromedriver_path
 
 
 def render_pdf_with_firefox(
@@ -63,30 +68,38 @@ def render_pdf_with_firefox(
         viewport_height: int = 1200,
         print_landscape: bool = True,
 ) -> bytes:
-    opts = FirefoxOptions()
-    opts.add_argument("-headless")
-    opts.add_argument("--no-remote")
+    """
+    Renders a URL to PDF using headless Chromium.
+    Function name kept as render_pdf_with_firefox for API compatibility.
+    """
+    opts = ChromeOptions()
+    opts.add_argument("--headless=new")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--disable-gpu")
+    opts.add_argument("--remote-debugging-port=0")
+    opts.add_argument(f"--window-size={viewport_width},{viewport_height}")
 
     # ---- choose binary ----
-    firefox_bin = os.environ.get("FIREFOX_BIN")
-    if firefox_bin and os.path.exists(firefox_bin):
-        chosen = firefox_bin
-    elif os.path.exists("/usr/bin/firefox-esr"):
-        chosen = "/usr/bin/firefox-esr"
-    elif os.path.exists("/usr/bin/firefox"):
-        chosen = "/usr/bin/firefox"
-    elif os.path.exists("/usr/local/bin/firefox"):
-        chosen = "/usr/local/bin/firefox"
+    chrome_bin = os.environ.get("CHROME_BIN")
+    if chrome_bin and os.path.exists(chrome_bin):
+        chosen = chrome_bin
+    elif os.path.exists("/usr/bin/google-chrome"):
+        chosen = "/usr/bin/google-chrome"
+    elif os.path.exists("/usr/bin/chromium"):
+        chosen = "/usr/bin/chromium"
+    elif os.path.exists("/usr/bin/chromium-browser"):
+        chosen = "/usr/bin/chromium-browser"
+    elif os.path.exists("/snap/bin/chromium"):
+        chosen = "/snap/bin/chromium"
+    elif os.path.exists("/usr/bin/google-chrome-stable"):
+        chosen = "/usr/bin/google-chrome-stable"
     else:
         raise RuntimeError(
-            "No Firefox binary found. Set FIREFOX_BIN or install firefox/firefox-esr."
+            "No Chrome/Chromium binary found. Set CHROME_BIN or install chromium/google-chrome."
         )
     opts.binary_location = chosen
-    logger.info("PDF: using Firefox binary at %s", chosen)
-
-    # ---- geckodriver path (cached after first call) ----
-    geckopath = _get_geckodriver_path()
-    logger.info("PDF: using geckodriver at %s", geckopath)
+    logger.info("PDF: using Chrome binary at %s", chosen)
 
     # ---- logs ----
     try:
@@ -95,38 +108,21 @@ def render_pdf_with_firefox(
         base_dir = os.getcwd()
     logs_dir = os.path.join(base_dir, "logs")
     os.makedirs(logs_dir, exist_ok=True)
-    log_path = os.environ.get("GECKODRIVER_LOG", os.path.join(logs_dir, "geckodriver.log"))
+    log_path = os.path.join(logs_dir, "chromedriver.log")
     log_file = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
 
-    service = FirefoxService(executable_path=geckopath, log_output=log_file)
+    # Let Selenium Manager auto-download correct chromedriver for installed Chrome
+    service = ChromeService(log_output=log_file)
+    logger.info("PDF: using Selenium Manager to auto-detect chromedriver")
 
-    # ---- sanitize environment ----
-    for var in (
-            "LD_LIBRARY_PATH",
-            "DYLD_LIBRARY_PATH",
-            "GTK_PATH",
-            "GTK_DATA_PREFIX",
-            "MOZ_GMP_PATH",
-    ):
-        if os.environ.get(var):
-            logger.warning("PDF: unsetting %s to avoid binary/lib conflicts", var)
-            os.environ.pop(var, None)
-    os.environ.setdefault("XDG_RUNTIME_DIR", TMP_LOCATION)
+    # ---- temp user data dir ----
+    user_data_dir = tempfile.mkdtemp(prefix="chromeprof_")
+    opts.add_argument(f"--user-data-dir={user_data_dir}")
+    logger.info("PDF: using temp Chrome profile at %s", user_data_dir)
 
-    # ---- temp profile ----
-    profile_dir = tempfile.mkdtemp(prefix="ffprof_")
-    opts.add_argument("-profile")
-    opts.add_argument(profile_dir)
-    logger.info("PDF: using temp Firefox profile at %s", profile_dir)
-
-    driver = webdriver.Firefox(options=opts, service=service)
+    driver = webdriver.Chrome(options=opts, service=service)
 
     try:
-        try:
-            driver.set_window_rect(width=viewport_width, height=viewport_height)
-        except Exception:
-            pass
-
         driver.set_page_load_timeout(page_load_timeout)
         driver.get(url)
 
@@ -180,17 +176,15 @@ def render_pdf_with_firefox(
         except Exception:
             pass
 
-        # 3) Print to PDF
-        p = PrintOptions()
-        try:
-            p.orientation = "landscape" if print_landscape else "portrait"
-        except Exception:
-            pass
-        p.scale = 1.0
-        p.background = True
-
-        pdf_b64 = driver.print_page(p)
-        pdf_bytes = base64.b64decode(pdf_b64)
+        # 3) Print to PDF via Chrome DevTools Protocol
+        pdf_b64 = driver.execute_cdp_cmd("Page.printToPDF", {
+            "landscape": print_landscape,
+            "printBackground": True,
+            "scale": 1.0,
+            "paperWidth": 11,   # inches (landscape A4 equivalent)
+            "paperHeight": 8.5,
+        })
+        pdf_bytes = base64.b64decode(pdf_b64["data"])
         logger.info("PDF: successfully rendered %d bytes", len(pdf_bytes))
         return pdf_bytes
 
@@ -204,7 +198,7 @@ def render_pdf_with_firefox(
         except Exception:
             pass
         try:
-            for root, dirs, files in os.walk(profile_dir, topdown=False):
+            for root, dirs, files in os.walk(user_data_dir, topdown=False):
                 for name in files:
                     try:
                         os.remove(os.path.join(root, name))
@@ -215,6 +209,6 @@ def render_pdf_with_firefox(
                         os.rmdir(os.path.join(root, name))
                     except Exception:
                         pass
-            os.rmdir(profile_dir)
+            os.rmdir(user_data_dir)
         except Exception:
             pass
