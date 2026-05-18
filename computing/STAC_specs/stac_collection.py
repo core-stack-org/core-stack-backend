@@ -1319,10 +1319,11 @@ def generate_stac_collection_task(
     upload_to_s3=False,
     overwrite=False,
     overwrite_metadata=False,
+    layer_id=None,
 ):
     generator = STACCollectionGenerator()
     if layer_type == "raster":
-        return generator.generate_raster(
+        result = generator.generate_raster(
             state,
             district,
             block,
@@ -1333,8 +1334,8 @@ def generate_stac_collection_task(
             overwrite=overwrite,
             overwrite_metadata=overwrite_metadata,
         )
-    if layer_type == "vector":
-        return generator.generate_vector(
+    elif layer_type == "vector":
+        result = generator.generate_vector(
             state,
             district,
             block,
@@ -1343,4 +1344,24 @@ def generate_stac_collection_task(
             overwrite=overwrite,
             overwrite_metadata=overwrite_metadata,
         )
-    raise ValueError(f"Unknown layer_type: {layer_type}")
+    else:
+        raise ValueError(f"Unknown layer_type: {layer_type}")
+
+    if result and layer_id:
+        _mark_layer_stac_generated(layer_id)
+
+    return result
+
+
+def _mark_layer_stac_generated(layer_id):
+    """Flip `Layer.is_stac_specs_generated=True` without re-firing the trigger signal.
+
+    Uses queryset `.update()` so `post_save` is NOT invoked (avoiding any
+    redundant re-dispatch from the auto-trigger handler).
+    """
+    try:
+        from computing.models import Layer
+
+        Layer.objects.filter(id=layer_id).update(is_stac_specs_generated=True)
+    except Exception as exc:  # noqa: BLE001
+        log.error("Failed to mark layer id=%s as STAC-generated: %s", layer_id, exc)
