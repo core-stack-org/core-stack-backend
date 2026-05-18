@@ -133,22 +133,9 @@ INSTALLED_APPS = [
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS = [
-        "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
-        "https://nrm.core-stack.org",
-        "https://master.d1rx3d0dyjc5v7.amplifyapp.com",
-        "https://nrm.gramvaanidev.org",
-        "https://dashboard.core-stack.org",
-        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
-        "https://uat.dashboard.core-stack.org",
-        "https://www.explorer.core-stack.org",
-        "https://development.d2s4eeyazvtd2g.amplifyapp.com",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1",
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ]
+    CORS_ALLOWED_ORIGINS = (
+        env.list("CORS_ALLOWED_ORIGINS") if "CORS_ALLOWED_ORIGINS" in os.environ else []
+    )
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -424,7 +411,7 @@ WHATSAPP_MEDIA_PATH = resolve_env_path(
 )
 
 BASE_URL = "https://geoserver.core-stack.org/"
-DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
+DEFAULT_FROM_EMAIL = "CoRE Stack Support <support@core-stack.org>"
 
 PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 
