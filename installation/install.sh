@@ -36,6 +36,7 @@ DEFAULT_PUBLIC_API_BASE_URL="https://geoserver.core-stack.org/api/v1"
 DEFAULT_PUBLIC_API_SAMPLE_STATE="assam"
 DEFAULT_PUBLIC_API_SAMPLE_DISTRICT="cachar"
 DEFAULT_PUBLIC_API_SAMPLE_TEHSIL="lakhipur"
+DEFAULT_NREGA_BUCKET="naregageojson"
 declare -a ONLY_STEPS=()
 declare -a SKIP_STEPS=()
 declare -a OPTIONAL_INPUT_KEYS=(
@@ -1463,6 +1464,7 @@ function generate_env_file() {
             echo ""
             echo "SECRET_KEY=$(openssl rand -base64 32)"
             echo "DEBUG=True"
+            echo "LAYER_GENERATION_SYNC_MODE=True"
             echo ""
         } > "$env_file"
     else
@@ -1472,7 +1474,7 @@ function generate_env_file() {
     existing_vars=$(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$env_file" | cut -d'=' -f1 | sort -u || true)
 
     while IFS= read -r var_name; do
-        if [ -z "$var_name" ] || [ "$var_name" = "SECRET_KEY" ] || [ "$var_name" = "DEBUG" ]; then
+        if [ -z "$var_name" ] || [ "$var_name" = "SECRET_KEY" ] || [ "$var_name" = "DEBUG" ] || [ "$var_name" = "LAYER_GENERATION_SYNC_MODE" ]; then
             continue
         fi
 
@@ -1495,6 +1497,9 @@ function generate_env_file() {
                 ;;
             EXCEL_PATH)
                 echo 'EXCEL_PATH=$BACKEND_DIR' >> "$env_file"
+                ;;
+            NREGA_BUCKET)
+                echo "NREGA_BUCKET=$DEFAULT_NREGA_BUCKET" >> "$env_file"
                 ;;
             *)
                 echo "${var_name}=\"\"" >> "$env_file"
@@ -1559,6 +1564,16 @@ function generate_env_file() {
         fernet_key="$(generate_fernet_key)"
         set_env_value "$env_file" "FERNET_KEY" "$fernet_key"
         echo "FERNET_KEY generated and added to .env"
+    fi
+
+    if [ -z "$(current_env_value "$env_file" "LAYER_GENERATION_SYNC_MODE")" ]; then
+        set_env_value "$env_file" "LAYER_GENERATION_SYNC_MODE" "True"
+        echo "LAYER_GENERATION_SYNC_MODE=True (layer APIs run in-process without a Celery worker)"
+    fi
+
+    if [ -z "$(current_env_value "$env_file" "NREGA_BUCKET")" ]; then
+        set_env_value "$env_file" "NREGA_BUCKET" "$DEFAULT_NREGA_BUCKET"
+        echo "NREGA_BUCKET=$DEFAULT_NREGA_BUCKET (S3 bucket for NREGA GeoJSON assets)"
     fi
 
     local resolved_user="${USER:-$(id -un 2>/dev/null || true)}"

@@ -353,6 +353,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -398,9 +403,9 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 
-# S3 access keys
-S3_SECRET_KEY = env("S3_SECRET_KEY")
-S3_ACCESS_KEY = env("S3_ACCESS_KEY")
+# S3 access keys (optional for public buckets such as NREGA GeoJSON)
+S3_SECRET_KEY = env("S3_SECRET_KEY", default="")
+S3_ACCESS_KEY = env("S3_ACCESS_KEY", default="")
 
 # S3 settings
 S3_BUCKET = env("S3_BUCKET")

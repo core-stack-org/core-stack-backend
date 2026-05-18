@@ -2,6 +2,11 @@ import os
 import ee
 from nrm_app.celery import app
 import geopandas as gpd
+from utilities.layer_generation_logging import (
+    log_task_failure,
+    log_task_step,
+    task_location_context,
+)
 from geojson import Feature, FeatureCollection
 from shapely.geometry import mapping
 from computing.utils import (
@@ -27,67 +32,125 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from computing.STAC_specs import generate_STAC_layerwise
 
 
+TASK_NAME = "generate_tehsil_shape_file_data"
+
+
 @app.task(bind=True)
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
     """
     It will generate Admin boundary of given location as tehsil levels
     """
-    ee_initialize(gee_account_id)
-    description = (
-        "admin_boundary_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+    ctx = task_location_context(
+        state=state,
+        district=district,
+        block=block,
+        gee_account_id=gee_account_id,
     )
-    asset_id = get_gee_asset_path(state, district, block) + description
+    log_task_step(TASK_NAME, "start", **ctx)
+    try:
+        log_task_step(TASK_NAME, "ee_initialize", **ctx)
+        ee_initialize(gee_account_id)
 
-    collection, state_dir = clip_block_from_admin_boundary(state, district, block)
-
-    layer_id = None
-    # Generate shape files and sync to geoserver
-    shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
-    create_gee_directory(state, district, block)
-
-    if not is_gee_asset_exists(asset_id):
-        layer_name = (
+        description = (
             "admin_boundary_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
         )
-        layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
-        upload_shp_to_gee(layer_path, layer_name, asset_id)
+        asset_id = get_gee_asset_path(state, district, block) + description
+        log_task_step(TASK_NAME, "asset_id_resolved", asset_id=asset_id, **ctx)
 
-    if is_gee_asset_exists(asset_id):
-        make_asset_public(asset_id)
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
-            asset_id=asset_id,
-            dataset_name="Admin Boundary",
+        log_task_step(TASK_NAME, "clip_block_from_admin_boundary", **ctx)
+        collection, state_dir = clip_block_from_admin_boundary(state, district, block)
+        feature_count = len(collection.get("features", []))
+        log_task_step(
+            TASK_NAME,
+            "clip_complete",
+            feature_count=feature_count,
+            state_dir=str(state_dir),
+            **ctx,
         )
+        if feature_count == 0:
+            raise ValueError(
+                f"No admin boundary features for state={state!r} "
+                f"district={district!r} block={block!r}. "
+                "Check census/SOI inputs and spelling."
+            )
 
-    res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
-    layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag updated")
+        layer_id = None
+        log_task_step(TASK_NAME, "create_shp_files", **ctx)
+        shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
+        log_task_step(TASK_NAME, "shapefile_created", shp_path=shp_path, **ctx)
 
-        layer_STAC_generated = False
-        layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-            state=state,
-            district=district,
-            block=block,
-            layer_name="admin_boundaries_vector",
+        log_task_step(TASK_NAME, "create_gee_directory", **ctx)
+        create_gee_directory(state, district, block)
+
+        if not is_gee_asset_exists(asset_id):
+            layer_name = (
+                "admin_boundary_"
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
+            )
+            layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
+            log_task_step(
+                TASK_NAME,
+                "upload_shp_to_gee",
+                layer_path=layer_path,
+                layer_name=layer_name,
+                asset_id=asset_id,
+                **ctx,
+            )
+            upload_shp_to_gee(layer_path, layer_name, asset_id)
+
+        if is_gee_asset_exists(asset_id):
+            log_task_step(TASK_NAME, "make_asset_public", asset_id=asset_id, **ctx)
+            make_asset_public(asset_id)
+            layer_id = save_layer_info_to_db(
+                state,
+                district,
+                block,
+                layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+                asset_id=asset_id,
+                dataset_name="Admin Boundary",
+            )
+            log_task_step(TASK_NAME, "layer_saved_to_db", layer_id=layer_id, **ctx)
+
+        log_task_step(
+            TASK_NAME,
+            "push_shape_to_geoserver",
+            shp_path=shp_path,
+            workspace="panchayat_boundaries",
+            **ctx,
         )
-        update_layer_sync_status(
-            layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+        res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
+        layer_at_geoserver = False
+        log_task_step(
+            TASK_NAME,
+            "geoserver_response",
+            status_code=res.get("status_code"),
+            response=res,
+            **ctx,
         )
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
-        layer_at_geoserver = True
-    return layer_at_geoserver
+            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+                state=state,
+                district=district,
+                block=block,
+                layer_name="admin_boundaries_vector",
+            )
+            update_layer_sync_status(
+                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            )
+            layer_at_geoserver = True
+
+        log_task_step(TASK_NAME, "complete", layer_at_geoserver=layer_at_geoserver, **ctx)
+        return layer_at_geoserver
+    except Exception as exc:
+        log_task_failure(TASK_NAME, exc, **ctx)
+        raise
 
 
 def create_shp_files(collection, state_dir, district, block, layer_id):
@@ -107,32 +170,51 @@ def create_shp_files(collection, state_dir, district, block, layer_id):
 
 
 def clip_block_from_admin_boundary(state, district, block):
+    census_path = (
+        f"{ADMIN_BOUNDARY_INPUT_DIR}/{state.replace(' ', '_')}/"
+        f"{district.replace(' ', '_')}.geojson"
+    )
+    log_task_step(
+        TASK_NAME,
+        "load_census_geojson",
+        census_path=census_path,
+        **task_location_context(state=state, district=district, block=block),
+    )
     census_2011 = None
     try:
-        census_2011 = gpd.read_file(
-            ADMIN_BOUNDARY_INPUT_DIR
-            + "/"
-            + state.replace(" ", "_")
-            + "/"
-            + district.replace(" ", "_")
-            + ".geojson"
+        census_2011 = gpd.read_file(census_path)
+        log_task_step(
+            TASK_NAME,
+            "census_loaded",
+            row_count=len(census_2011),
+            columns=list(census_2011.columns),
         )
-        print("census_2011", census_2011)
-
     except Exception as e:
-        print(f"Error occurred: Census data not available: {e}")
+        log_task_step(TASK_NAME, "census_not_available", census_path=census_path, error=str(e))
 
     admin_boundary_data = None
     features = []
 
     if census_2011 is not None and "TEHSIL" in list(census_2011.columns):
         admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
+        log_task_step(
+            TASK_NAME,
+            "filter_census_tehsil",
+            matched_rows=len(admin_boundary_data),
+        )
     else:
+        log_task_step(TASK_NAME, "load_soi_tehsil", soi_path=SOI_TEHSIL)
         soi = gpd.read_file(SOI_TEHSIL)
 
         soi = soi[(soi["STATE"].str.lower() == state)]
         soi = soi[(soi["District"].str.lower() == district)]
         soi = soi[(soi["TEHSIL"].str.lower() == block)]
+        log_task_step(TASK_NAME, "filter_soi_tehsil", matched_rows=len(soi))
+        if len(soi) == 0:
+            raise ValueError(
+                f"No SOI tehsil match for state={state!r} district={district!r} "
+                f"block={block!r}"
+            )
         soi.rename(
             columns={"STATE": "state_name", "District": "district_name"}, inplace=True
         )

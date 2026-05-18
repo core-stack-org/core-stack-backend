@@ -12,8 +12,12 @@ from utilities.constants import (
     NREGA_ASSETS_OUTPUT_DIR,
 )
 import boto3
+import requests
+from botocore import UNSIGNED
+from botocore.config import Config
 from io import BytesIO
 from nrm_app.settings import NREGA_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY
+from utilities.layer_generation_logging import log_task_failure, log_task_step
 from utilities.gee_utils import (
     gdf_to_ee_fc,
     export_vector_asset_to_gee,
@@ -30,6 +34,77 @@ import numpy as np
 import shutil
 
 from computing.STAC_specs import generate_STAC_layerwise
+
+NREGA_S3_REGION = "ap-south-1"
+TASK_NAME = "clip_nrega_district_block"
+
+
+def _nrega_s3_credentials_configured():
+    return bool(str(S3_ACCESS_KEY or "").strip() and str(S3_SECRET_KEY or "").strip())
+
+
+def _nrega_s3_resource():
+    """Use explicit keys when configured; otherwise anonymous access for public buckets."""
+    if _nrega_s3_credentials_configured():
+        return boto3.resource(
+            "s3",
+            region_name=NREGA_S3_REGION,
+            aws_access_key_id=S3_ACCESS_KEY,
+            aws_secret_access_key=S3_SECRET_KEY,
+        )
+    return boto3.resource(
+        "s3",
+        region_name=NREGA_S3_REGION,
+        config=Config(signature_version=UNSIGNED),
+    )
+
+
+def _read_nrega_geojson_from_public_url(bucket, key):
+    """Fallback for public buckets: fetch object over HTTPS without signing."""
+    urls = (
+        f"https://{bucket}.s3.{NREGA_S3_REGION}.amazonaws.com/{key}",
+        f"https://s3.{NREGA_S3_REGION}.amazonaws.com/{bucket}/{key}",
+    )
+    last_error = None
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=120)
+            response.raise_for_status()
+            return BytesIO(response.content)
+        except Exception as exc:
+            last_error = exc
+    raise last_error or RuntimeError("Unable to download NREGA GeoJSON from public S3 URL")
+
+
+def read_nrega_district_geojson(state, district):
+    bucket = NREGA_BUCKET
+    key = f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+    log_task_step(
+        TASK_NAME,
+        "read_s3_geojson",
+        bucket=bucket,
+        key=key,
+        authenticated=_nrega_s3_credentials_configured(),
+    )
+
+    if _nrega_s3_credentials_configured():
+        s3 = _nrega_s3_resource()
+        file_obj = s3.Object(bucket, key).get()
+        return gpd.read_file(BytesIO(file_obj["Body"].read()))
+
+    try:
+        s3 = _nrega_s3_resource()
+        file_obj = s3.Object(bucket, key).get()
+        return gpd.read_file(BytesIO(file_obj["Body"].read()))
+    except Exception as boto_error:
+        log_task_step(
+            TASK_NAME,
+            "read_s3_anonymous_boto_failed_trying_https",
+            error=str(boto_error),
+            bucket=bucket,
+            key=key,
+        )
+        return gpd.read_file(_read_nrega_geojson_from_public_url(bucket, key))
 
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
@@ -50,21 +125,19 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     It will generate nrega layer for given location at tehsil level
     """
     ee_initialize(gee_account_id)
-    s3 = boto3.resource(
-        "s3",
-        region_name="ap-south-1",
-        aws_access_key_id=S3_ACCESS_KEY,
-        aws_secret_access_key=S3_SECRET_KEY,
-    )
-
-    key = f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
     layer_at_geoserver = False
 
     try:
-        file_obj = s3.Object(NREGA_BUCKET, key).get()
-        gdf = gpd.read_file(BytesIO(file_obj["Body"].read()))
+        gdf = read_nrega_district_geojson(state, district)
     except Exception as e:
-        print("Error while reading file from S3:", e)
+        log_task_failure(
+            TASK_NAME,
+            e,
+            state=state,
+            district=district,
+            block=block,
+            bucket=NREGA_BUCKET,
+        )
         return layer_at_geoserver
 
     # Ensure CRS
@@ -85,8 +158,11 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         geojson_dict["features"], crs="EPSG:4326"
     )
 
-    # Merge to single geometry
-    boundary_geom = boundary_gdf.union_all()
+    # Merge to single geometry (geometry.unary_union works on older geopandas; union_all is 0.14+)
+    if hasattr(boundary_gdf, "union_all"):
+        boundary_geom = boundary_gdf.union_all()
+    else:
+        boundary_geom = boundary_gdf.geometry.unary_union
 
     # BBOX filter (very fast)
     minx, miny, maxx, maxy = boundary_geom.bounds

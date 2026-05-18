@@ -16,3 +16,6 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks(INSTALLED_APPS)
+
+# Register Celery task logging signals (prerun / postrun / failure).
+import computing.celery_task_logging  # noqa: E402, F401
