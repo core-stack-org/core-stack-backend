@@ -42,6 +42,7 @@ def _get_chromedriver_path():
 
     # Check well-known locations
     for candidate in (
+        "/var/www/.wdm/drivers/chromedriver/linux64/148.0.7778.167/chromedriver-linux64/chromedriver",
         "/usr/bin/chromedriver",
         "/usr/local/bin/chromedriver",
         "/snap/chromium/current/usr/lib/chromium-browser/chromedriver",
@@ -78,12 +79,15 @@ def render_pdf_with_firefox(
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--remote-debugging-port=0")
+    opts.add_argument("--disable-features=VizDisplayCompositor")
     opts.add_argument(f"--window-size={viewport_width},{viewport_height}")
 
     # ---- choose binary ----
     chrome_bin = os.environ.get("CHROME_BIN")
     if chrome_bin and os.path.exists(chrome_bin):
         chosen = chrome_bin
+    elif os.path.exists("/usr/local/bin/chrome-wrapper"):     # ADD THIS
+        chosen = "/usr/local/bin/chrome-wrapper"   
     elif os.path.exists("/usr/bin/google-chrome"):
         chosen = "/usr/bin/google-chrome"
     elif os.path.exists("/usr/bin/chromium"):
@@ -112,8 +116,10 @@ def render_pdf_with_firefox(
     log_file = open(log_path, "a", buffering=1, encoding="utf-8", errors="replace")
 
     # Let Selenium Manager auto-download correct chromedriver for installed Chrome
-    service = ChromeService(log_output=log_file)
-    logger.info("PDF: using Selenium Manager to auto-detect chromedriver")
+    chromedriver_path = _get_chromedriver_path()
+    service = ChromeService(executable_path=chromedriver_path, log_output=log_file)
+    logger.info("PDF: using chromedriver at %s", chromedriver_path)
+    os.environ["NO_AT_BRIDGE"] = "1"
 
     # ---- temp user data dir ----
     user_data_dir = tempfile.mkdtemp(prefix="chromeprof_")
