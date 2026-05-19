@@ -1775,15 +1775,22 @@ class Geoserver:
             if len(f) > 0:
                 store_name = f[0]
 
+        content_type_by_extension = {
+            "gpkg": "application/geopackage+sqlite3",
+            "geopkg": "application/geopackage+sqlite3",
+            "shp": "application/zip",
+        }
         headers = {
-            "Content-type": "application/zip",
+            "Content-type": content_type_by_extension.get(
+                file_extension, "application/octet-stream"
+            ),
             "Accept": "application/xml",
         }
 
         if isinstance(path, dict):
             path = prepare_zip_file(store_name, path)
 
-        url = "{0}/rest/workspaces/{1}/datastores/{2}/file.{3}?filename={2}&update=overwrite".format(
+        url = "{0}/rest/workspaces/{1}/datastores/{2}/file.{3}?configure=all&update=overwrite".format(
             self.service_url, workspace, store_name, file_extension
         )
 
@@ -1797,7 +1804,7 @@ class Geoserver:
         if r.status_code in [200, 201, 202]:
             return {
                 "status_code": r.status_code,
-                "response_text": "The shapefile datastore created successfully!",
+                "response_text": f"The {file_extension} datastore created successfully!",
             }
         else:
             raise GeoserverException(r.status_code, r.content)
