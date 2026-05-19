@@ -87,7 +87,7 @@ OUTPUT_ADMIN_COLUMNS = [
     "district_name",
     "TEHSIL",
     "village_id",
-    "village name",
+    "village_name",
     "pc11_state_id",
     "pc11_district_id",
     "pc11_subdistrict_id",
@@ -570,7 +570,7 @@ def _join_antyodaya(admin_gdf: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, dict
         sort=False,
     )
     output_gdf["village_id"] = output_gdf["_admin_village_id_join"].astype("Int64")
-    output_gdf["village name"] = output_gdf["NAME"].astype("string")
+    output_gdf["village_name"] = output_gdf["NAME"].astype("string")
     output_gdf = output_gdf.drop(
         columns=["pc11_village_id", "NAME", "_admin_village_id_join", "village_id_join"],
         errors="ignore",
@@ -659,7 +659,7 @@ def _validate_output_gdf(gdf: gpd.GeoDataFrame) -> dict:
         "sanity_check_passed": True,
         "sanity_output_rows": int(len(gdf)),
         "sanity_village_id_unique": int(gdf["village_id"].nunique(dropna=True)),
-        "sanity_village_name_nulls": int(gdf["village name"].isna().sum()),
+        "sanity_village_name_nulls": int(gdf["village_name"].isna().sum()),
         "sanity_duplicate_village_ids": duplicate_village_ids,
         "sanity_null_geometries": null_geometries,
         "sanity_empty_geometries": empty_geometries,
@@ -682,14 +682,14 @@ def _layer_name(district: str, block: str) -> str:
     return f"{ANTYODAYA_LAYER_PREFIX}_{_normalize_location(district)}_{_normalize_location(block)}"
 
 
-def _write_local_outputs(gdf: gpd.GeoDataFrame, output_dir: Path, layer_name: str, metadata: dict) -> dict:
+def _write_local_outputs(gdf: gpd.GeoDataFrame, output_dir: Path, layer_name: str) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_base = output_dir / layer_name
     gpkg_path = gpkg_base.with_suffix(".gpkg")
     csv_path = output_dir / f"{layer_name}_gee_upload.csv"
-    metadata_path = output_dir / f"{layer_name}_metadata.json"
+    legacy_metadata_path = output_dir / f"{layer_name}_metadata.json"
 
-    for path in (gpkg_path, csv_path, metadata_path):
+    for path in (gpkg_path, csv_path, legacy_metadata_path):
         if path.exists():
             path.unlink()
 
@@ -699,13 +699,11 @@ def _write_local_outputs(gdf: gpd.GeoDataFrame, output_dir: Path, layer_name: st
     else:
         gdf.to_file(gpkg_path, layer=layer_name, driver="GPKG")
     _write_gee_upload_csv(gdf, csv_path)
-    metadata_path.write_text(_json_dumps_text(metadata, indent=True), encoding="utf-8")
 
     return {
         "gpkg_base_path": gpkg_base.as_posix(),
         "gpkg_path": gpkg_path.as_posix(),
         "gee_csv_path": csv_path.as_posix(),
-        "metadata_path": metadata_path.as_posix(),
     }
 
 
@@ -927,7 +925,7 @@ def generate_antyodaya_layer(
         **sanity_stats,
     }
     write_started = time.perf_counter()
-    paths = _write_local_outputs(output_gdf, output_dir, layer_name, metadata)
+    paths = _write_local_outputs(output_gdf, output_dir, layer_name)
     write_local_seconds = time.perf_counter() - write_started
 
     geoserver_response = None
