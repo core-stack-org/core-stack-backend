@@ -33,7 +33,7 @@ except Exception:
 
 LOCAL_OUTPUT_BASE_DIR = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
 TERRAIN_RASTER_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
-GEOSERVER_STYLE = "dem"
+GEOSERVER_STYLE = None
 GEOSERVER_WORKSPACE = "dem"
 ZERO_NODATA = -9999  # FABDEM nodata — 0 is valid elevation (sea level)
 
