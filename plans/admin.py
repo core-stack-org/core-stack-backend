@@ -12,7 +12,9 @@ def export_as_csv(fields, filename_prefix):
     def action(modeladmin, request, queryset):
         response = HttpResponse(content_type="text/csv")
         timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
-        response["Content-Disposition"] = f'attachment; filename="{filename_prefix}_{timestamp}.csv"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="{filename_prefix}_{timestamp}.csv"'
+        )
         writer = csv.writer(response)
         writer.writerow(fields)
         for obj in queryset.values_list(*fields):
@@ -88,6 +90,7 @@ class PlanAppAdmin(admin.ModelAdmin):
         "state_soi",
         "district_soi",
         "tehsil_soi",
+        "gp",
         "village_name",
         "facilitator_name",
         "created_by",
@@ -134,6 +137,7 @@ class PlanAppAdmin(admin.ModelAdmin):
         "tehsil_soi",
         "project",
         "organization",
+        "gp",
     )
 
     fieldsets = (
@@ -145,6 +149,7 @@ class PlanAppAdmin(admin.ModelAdmin):
                     "state_soi",
                     "district_soi",
                     "tehsil_soi",
+                    "gp",
                     "village_name",
                     "gram_panchayat",
                     "facilitator_name",

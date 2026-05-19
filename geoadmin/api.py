@@ -11,9 +11,10 @@ from rest_framework.response import Response
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 
-from .models import StateSOI, DistrictSOI, TehsilSOI, UserAPIKey
+from .models import StateSOI, DistrictSOI, TehsilSOI, UserAPIKey, GramPanchayat
 from .serializers import BlockSerializer, DistrictSerializer, StateSerializer
 from .utils import activated_tehsils, normalize_name, transform_data
+from plans.models import PlanApp
 
 
 # state id is the census code while the district id is the id of the district from the DB
@@ -355,3 +356,50 @@ def get_user_api_keys(request):
             {"success": False, "error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+# return GP on the basis of tehsil by plan id
+@api_view(["GET"])
+@api_security_check()
+@schema(None)
+def fetch_gp_tehsilwise(request):
+    plan_id = request.query_params.get("plan_id")
+
+    if not plan_id:
+        return Response(
+            {"success": False, "message": "plan_id is required"},
+            status=400,
+        )
+
+    try:
+        plan = PlanApp.objects.get(id=plan_id)
+
+    except PlanApp.DoesNotExist:
+        return Response(
+            {"success": False, "message": "Plan not found"},
+            status=404,
+        )
+
+    if not plan.tehsil_soi:
+        return Response(
+            {"success": False, "message": "Tehsil not mapped with plan"},
+            status=400,
+        )
+
+    gp_queryset = (
+        GramPanchayat.objects.filter(tehsil=plan.tehsil_soi)
+        .values(
+            "gram_panchayat_code",
+            "gram_panchayat_name",
+        )
+        .order_by("gram_panchayat_name")
+    )
+
+    return Response(
+        {
+            "success": True,
+            "tehsil": plan.tehsil_soi.tehsil_name,
+            "count": gp_queryset.count(),
+            "data": list(gp_queryset),
+        }
+    )

@@ -96,6 +96,11 @@ from .gen_tehsil_report import (
 from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email, transform_name
 from .tasks import generate_dpr_task
+import tempfile
+import os
+from .generate_yuktdhara_format import csv_to_kml, fetch_data
+import zipfile
+from django.http import FileResponse
 
 state_param = openapi.Parameter(
     "state",
@@ -583,7 +588,9 @@ class DPRPagination(PageNumberPagination):
 def _get_plan_or_404(plan_id):
     plan = get_plan_details(plan_id)
     if plan is None:
-        return None, Response({"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND)
+        return None, Response(
+            {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
+        )
     return plan, None
 
 
@@ -634,7 +641,9 @@ def dpr_settlements(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_settlements_data(plan_id), SettlementSerializer)
+    return _paginated_response(
+        request, get_settlements_data(plan_id), SettlementSerializer
+    )
 
 
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
@@ -652,7 +661,9 @@ def dpr_livestock(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_livestock_data(plan_id), LivestockSerializer)
+    return _paginated_response(
+        request, get_livestock_data(plan_id), LivestockSerializer
+    )
 
 
 # MARK: Section D
@@ -671,7 +682,9 @@ def dpr_waterbodies(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_waterbodies_data(plan_id), WaterbodySerializer)
+    return _paginated_response(
+        request, get_waterbodies_data(plan_id), WaterbodySerializer
+    )
 
 
 # MARK: Section E
@@ -684,10 +697,14 @@ def dpr_maintenance(request, plan_id):
     maintenance_type = request.query_params.get("type", "gw")
     if maintenance_type not in VALID_MAINTENANCE_TYPES:
         return Response(
-            {"error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"},
+            {
+                "error": f"Invalid type. Choose from: {', '.join(sorted(VALID_MAINTENANCE_TYPES))}"
+            },
             status=status.HTTP_400_BAD_REQUEST,
         )
-    return _paginated_response(request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer)
+    return _paginated_response(
+        request, get_maintenance_data(plan_id, maintenance_type), MaintenanceSerializer
+    )
 
 
 # MARK: Section F
@@ -707,7 +724,9 @@ def dpr_livelihood(request, plan_id):
     _, err = _get_plan_or_404(plan_id)
     if err:
         return err
-    return _paginated_response(request, get_livelihood_data(plan_id), LivelihoodSerializer)
+    return _paginated_response(
+        request, get_livelihood_data(plan_id), LivelihoodSerializer
+    )
 
 
 # MARK: DPR Report Status Summary
@@ -765,9 +784,12 @@ def dpr_global_status_tracking(request):
     status_filter = request.query_params.get("status")
     if status_filter:
         from .services import VALID_DEMAND_STATUSES
+
         if status_filter not in VALID_DEMAND_STATUSES:
             return Response(
-                {"error": f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"},
+                {
+                    "error": f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         filters["status"] = status_filter
@@ -826,7 +848,43 @@ def dpr_update_demand_status(request, plan_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    result, error = update_demand_status(plan_id, resource_type, resource_id, new_status)
+    result, error = update_demand_status(
+        plan_id, resource_type, resource_id, new_status
+    )
     if error:
         return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
     return Response(result)
+
+
+# api to download csv and kml file of demand data
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def export_yuktdhara(request):
+
+    plan_id = request.query_params.get("plan_id")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+
+        csv_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.csv")
+
+        kml_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.kml")
+
+        zip_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.zip")
+
+        fetch_data(plan_id, csv_path)
+
+        csv_to_kml(csv_path, kml_path)
+
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+
+            zipf.write(csv_path, arcname=os.path.basename(csv_path))
+
+            zipf.write(kml_path, arcname=os.path.basename(kml_path))
+
+        with open(zip_path, "rb") as f:
+            response = HttpResponse(f.read(), content_type="application/zip")
+            response["Content-Disposition"] = (
+                f"attachment; " f'filename="Yuktdhara_{plan_id}.zip"'
+            )
+
+            return response

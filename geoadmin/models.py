@@ -93,3 +93,12 @@ class UserAPIKey(AbstractAPIKey):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.user.username})"
+
+
+class GramPanchayat(models.Model):
+    gram_panchayat_code = models.IntegerField(primary_key=True)
+    gram_panchayat_name = models.CharField(max_length=255)
+    tehsil = models.ForeignKey(TehsilSOI, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.gram_panchayat_name
