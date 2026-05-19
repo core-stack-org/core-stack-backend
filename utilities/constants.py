@@ -192,7 +192,7 @@ GEE_FACILITIES_DATASET_PATH = (
 ANTYODAYA_ANALYSIS = (
     "data/antyodaya/output/antyodaya_feature_category_values_cluster.csv"
 )
-ANTYODAYA_OUTPUT_DIR = "data/antyodaya/output/clipped"
+ANTYODAYA_OUTPUT_DIR = "data/antyodaya/output/tehsil_data"
 ANTYODAYA_CACHE_DIR = "data/antyodaya/output/cache"
 
 GEE_PATHS = {
