@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import pandas as pd
 from xml.sax.saxutils import escape
+import os
 
 logger = setup_logger(__name__)
 
@@ -14,6 +15,11 @@ def load_csv_column_config():
     config_path = (
         Path(settings.BASE_DIR) / "data" / "Yuktdhara" / "yuktdhara_file_config.json"
     )
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            f"yuktdhara_file_config.json not found at: {config_path}\n"
+            "Please create data/Yuktdhara/yuktdhara_file_config.json as a JSON list of layer suffixes."
+        )
     with open(config_path, "r") as f:
         return json.load(f)
 
