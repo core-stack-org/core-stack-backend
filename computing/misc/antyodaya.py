@@ -247,6 +247,14 @@ def _normalize_for_match(value) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
 
 
+def _first_non_empty(series: pd.Series, fallback: str) -> str:
+    values = series.dropna().astype(str).str.strip()
+    values = values[values != ""]
+    if values.empty:
+        return str(fallback or "").replace("_", " ").strip()
+    return values.iloc[0]
+
+
 def _sql_quote(value: str) -> str:
     return value.replace("'", "''")
 
@@ -897,6 +905,9 @@ def generate_antyodaya_layer(
     admin_gdf, district_file, resolved_block = _read_admin_block_gdf(state, district, block)
     admin_read_seconds = time.perf_counter() - admin_started
     admin_gdf, valid_admin_stats = _filter_valid_admin_rows(admin_gdf)
+    db_state = _first_non_empty(admin_gdf["state_name"], state)
+    db_district = _first_non_empty(admin_gdf["district_name"], district)
+    db_block = _first_non_empty(admin_gdf["TEHSIL"], resolved_block)
 
     join_started = time.perf_counter()
     output_gdf, join_stats = _join_antyodaya(admin_gdf)
@@ -914,6 +925,9 @@ def generate_antyodaya_layer(
         "state_slug": state_slug,
         "district_slug": district_slug,
         "block_slug": block_slug,
+        "db_state": db_state,
+        "db_district": db_district,
+        "db_block": db_block,
         "resolved_block": resolved_block,
         "district_file": district_file.as_posix(),
         "source_antyodaya_csv": _repo_path(ANTYODAYA_ANALYSIS).as_posix(),
@@ -978,9 +992,9 @@ def generate_antyodaya_layer(
     if asset_id:
         _ensure_antyodaya_dataset()
         layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
+            db_state,
+            db_district,
+            db_block,
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name=ANTYODAYA_DATASET_NAME,
