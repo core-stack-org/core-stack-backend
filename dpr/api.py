@@ -856,32 +856,35 @@ def dpr_update_demand_status(request, plan_id):
     return Response(result)
 
 
+# api to download csv and kml file of demand data
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
 @schema(None)
 def export_yuktdhara(request):
 
-    plan_id = request.data.get("plan_id")
+    plan_id = request.query_params.get("plan_id")
 
     with tempfile.TemporaryDirectory() as temp_dir:
+
         csv_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.csv")
+
         kml_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.kml")
+
         zip_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.zip")
 
-        # generate csv
         fetch_data(plan_id, csv_path)
 
-        # generate kml
         csv_to_kml(csv_path, kml_path)
 
-        # zip files
         with zipfile.ZipFile(zip_path, "w") as zipf:
 
             zipf.write(csv_path, arcname=os.path.basename(csv_path))
 
             zipf.write(kml_path, arcname=os.path.basename(kml_path))
 
-        return FileResponse(
-            open(zip_path, "rb"),
-            as_attachment=True,
-            filename=f"Yuktdhara_{plan_id}.zip",
-        )
+        with open(zip_path, "rb") as f:
+            response = HttpResponse(f.read(), content_type="application/zip")
+            response["Content-Disposition"] = (
+                f"attachment; " f'filename="Yuktdhara_{plan_id}.zip"'
+            )
+
+            return response
