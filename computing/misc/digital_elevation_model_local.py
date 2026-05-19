@@ -258,11 +258,9 @@ def _compute_watershed_dem_stats(watersheds_gdf, raster_path):
     result_gdf["min_elevation"] = [s.get("min") for s in stats]
     result_gdf["max_elevation"] = [s.get("max") for s in stats]
     result_gdf["mean_elevation"] = [s.get("mean") for s in stats]
-    result_gdf["area_in_ha"] = [(s.get("count") or 0) * pixel_area_ha for s in stats]
 
     keep_cols = [
         "uid",
-        "area_in_ha",
         "min_elevation",
         "max_elevation",
         "mean_elevation",
