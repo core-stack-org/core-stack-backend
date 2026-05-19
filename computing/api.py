@@ -82,10 +82,19 @@ from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
+from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
+
+
+def _request_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ["1", "true", "yes", "y"]
 
 
 @api_security_check(allowed_methods="POST")
@@ -1579,6 +1588,59 @@ def generate_facilities_proximity(request):
         )
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_antyodaya(request):
+    print("Inside generate_antyodaya API.")
+    try:
+        state = str(request.data.get("state", "")).strip().lower()
+        district = str(request.data.get("district", "")).strip().lower()
+        block = str(request.data.get("block", "")).strip().lower()
+        missing_fields = [
+            field
+            for field, value in {
+                "state": state,
+                "district": district,
+                "block": block,
+            }.items()
+            if not value
+        ]
+        if missing_fields:
+            return Response(
+                {"Exception": f"Missing required fields: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gee_account_id = request.data.get("gee_account_id")
+        sync_to_gee = _request_bool(request.data.get("sync_to_gee"), default=True)
+        sync_to_geoserver = _request_bool(
+            request.data.get("sync_to_geoserver"), default=True
+        )
+        overwrite = _request_bool(request.data.get("overwrite"), default=False)
+        make_gee_asset_public = _request_bool(
+            request.data.get("make_gee_asset_public"), default=True
+        )
+        generate_antyodaya_layer_task.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+                "sync_to_gee": sync_to_gee,
+                "sync_to_geoserver": sync_to_geoserver,
+                "overwrite": overwrite,
+                "make_gee_asset_public": make_gee_asset_public,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_antyodaya api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
