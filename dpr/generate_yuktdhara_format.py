@@ -10,19 +10,6 @@ from utilities.constants import YUKTDHARA_DEMAND_OUTPUT_DIR
 
 logger = setup_logger(__name__)
 
-# CSV_COLUMNS = [
-#     "Irrigation work or Recharge Structure",
-#     "new/maintenance",
-#     "Type of demand",
-#     "Work demand",
-#     "Name of Beneficiary's Settlement",
-#     "Beneficiary's Name",
-#     "Beneficiary's Father's Name",
-#     "Area(In acres)/Dimension(In ft)",
-#     "Latitude",
-#     "Longitude",
-# ]
-
 
 def load_csv_column_config():
     config_path = (

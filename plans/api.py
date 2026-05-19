@@ -29,9 +29,10 @@ from utilities.constants import (
 )
 
 from .build_layer import build_layer
-from .models import ODKSyncLog, Plan
+from .models import ODKSyncLog, Plan, PlanApp
 from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_odk_data
+from geoadmin.models import GramPanchayat
 
 
 # MARK: Get Plans API
@@ -292,7 +293,7 @@ def _validate_sync_request(
             "propose_maintenance_ws_swb",
             "propose_maintenance_irrigation_st",
             "livelihood",
-            "agrohorticulture"
+            "agrohorticulture",
         ]
         if work_type not in valid_work_types:
             return Response(
@@ -437,3 +438,73 @@ def sync_offline_data(request, resource_type=None, work_type=None, feedback_type
     except Exception as e:
         print("Exception in sync_offline_data api :: ", e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# map plan to gp api
+@api_view(["PATCh"])
+@schema(None)
+def map_plan_to_gp(request):
+
+    plan_id = request.data.get("plan_id")
+    gp_id = request.data.get("gp_id")
+
+    if not plan_id or not gp_id:
+        return Response(
+            {
+                "success": False,
+                "message": "plan_id and gp_id are required",
+            },
+            status=400,
+        )
+
+    try:
+        plan = PlanApp.objects.get(id=plan_id)
+
+    except PlanApp.DoesNotExist:
+        return Response(
+            {
+                "success": False,
+                "message": "Plan not found",
+            },
+            status=404,
+        )
+
+    try:
+        gp = GramPanchayat.objects.get(gram_panchayat_code=gp_id)
+
+    except GramPanchayat.DoesNotExist:
+        return Response(
+            {
+                "success": False,
+                "message": "Gram Panchayat not found",
+            },
+            status=404,
+        )
+
+    # GP should belong to same tehsil
+
+    if plan.tehsil_soi_id != gp.tehsil_id:
+        return Response(
+            {
+                "success": False,
+                "message": "Selected GP does not belong to plan tehsil",
+            },
+            status=400,
+        )
+
+    plan.gp = gp
+    plan.updated_by = request.user
+
+    plan.save(update_fields=["gp", "updated_by", "updated_at"])
+
+    return Response(
+        {
+            "success": True,
+            "message": "Plan mapped with GP successfully",
+            "data": {
+                "plan_id": plan.id,
+                "gp_id": gp.gram_panchayat_code,
+                "gp_name": gp.gram_panchayat_name,
+            },
+        }
+    )
