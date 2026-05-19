@@ -524,10 +524,10 @@ def geojson_to_ee_featurecollection(geojson_data):
     return ee.FeatureCollection(ee_features)
 
 
-def is_gee_asset_exists(path):
+def is_gee_asset_exists(path, log=True):
     asset = ee.Asset(path)
     flag = asset.exists()
-    if flag:
+    if flag and log:
         print(f"{path} already exists.")
     return flag
 
@@ -763,9 +763,11 @@ def harmonize_band_types(image, target_type="Float"):
     return ee.ImageCollection(harmonized_bands).toBands().rename(band_names)
 
 
-def upload_file_to_gcs(local_file_path, destination_blob_name):
+def upload_file_to_gcs(
+    local_file_path, destination_blob_name, gee_account_id=GEE_DEFAULT_ACCOUNT_ID
+):
     """Upload a file to a Google Cloud Storage bucket"""
-    bucket = gcs_config()
+    bucket = gcs_config(gee_account_id)
     print(local_file_path)
     blob = bucket.blob(destination_blob_name)
 
@@ -810,7 +812,7 @@ def extract_task_id(command_output):
 
 
 def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
-    account = GEEAccount.objects.get(pk=gee_account_id)
+    _, account = _get_gee_account(gee_account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
 
     # Write credentials to a temp JSON file
@@ -842,6 +844,82 @@ def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
         print("STDOUT:", e.stdout)
         print("STDERR:", e.stderr)
         return None
+
+
+def gcs_csv_to_gee_table_manifest_cli(
+    gcs_uri,
+    asset_id,
+    gee_account_id,
+    primary_geometry_column="geometry",
+    crs="EPSG:4326",
+    max_vertices=None,
+    max_error_meters=None,
+    csv_delimiter=None,
+    csv_qualifier=None,
+    asset_properties=None,
+):
+    """Upload a CSV table from GCS to a GEE table asset using a manifest."""
+    _, account = _get_gee_account(gee_account_id)
+    key_dict = json.loads(account.get_credentials().decode("utf-8"))
+
+    source = {
+        "uris": [gcs_uri],
+        "charset": "UTF-8",
+        "crs": crs,
+        "primaryGeometryColumn": primary_geometry_column,
+    }
+    if max_vertices:
+        source["maxVertices"] = int(max_vertices)
+    if max_error_meters is not None:
+        source["maxErrorMeters"] = float(max_error_meters)
+    if csv_delimiter:
+        source["csvDelimiter"] = csv_delimiter
+    if csv_qualifier:
+        source["csvQualifier"] = csv_qualifier
+
+    manifest = {
+        "name": asset_id,
+        "sources": [source],
+    }
+    if asset_properties:
+        manifest["properties"] = asset_properties
+
+    service_account_file = None
+    manifest_file = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False) as f:
+            json.dump(key_dict, f)
+            service_account_file = f.name
+
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False) as f:
+            json.dump(manifest, f)
+            manifest_file = f.name
+
+        command = [
+            "earthengine",
+            f"--service_account_file={service_account_file}",
+            "upload",
+            "table",
+            "--manifest",
+            manifest_file,
+        ]
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        print("Manifest table upload initiated successfully.")
+        print("Output:", result.stdout)
+        if result.returncode == 0:
+            return extract_task_id(result.stdout)
+        return None
+    except subprocess.CalledProcessError as e:
+        print("An error occurred during manifest table upload.")
+        print("Command:", " ".join(command))
+        print("Return Code:", e.returncode)
+        print("STDOUT:", e.stdout)
+        print("STDERR:", e.stderr)
+        return None
+    finally:
+        for path in [service_account_file, manifest_file]:
+            if path and os.path.exists(path):
+                os.remove(path)
 
 
 def upload_shp_to_gee(
