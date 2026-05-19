@@ -2,6 +2,7 @@ import logging
 import subprocess
 
 import requests
+from pathlib import Path
 from utilities.constants import GEOSERVER_BASE
 
 from computing.config_loader import (
@@ -150,7 +151,9 @@ def ensure_microwatershed():
     Fill in _GDRIVE_MICROWATERSHED_FILE_ID above once the Drive link is available.
     """
     if MICROWATERSHED_PATH.exists():
-        logger.info("Microwatershed file already exists at %s, skipping.", MICROWATERSHED_PATH)
+        logger.info(
+            "Microwatershed file already exists at %s, skipping.", MICROWATERSHED_PATH
+        )
         return
 
     if not _GDRIVE_MICROWATERSHED_FILE_ID:
@@ -162,7 +165,9 @@ def ensure_microwatershed():
         return
 
     MICROWATERSHED_PATH.parent.mkdir(parents=True, exist_ok=True)
-    logger.info("Downloading Microwatershed_v2_with_details.geojson from Google Drive...")
+    logger.info(
+        "Downloading Microwatershed_v2_with_details.geojson from Google Drive..."
+    )
     try:
         subprocess.run(
             ["gdown", _GDRIVE_MICROWATERSHED_FILE_ID, "-O", str(MICROWATERSHED_PATH)],
@@ -184,18 +189,23 @@ def ensure_tehsil_watersheds():
     Both source files (SOI tehsil + microwatershed) must exist first.
     """
     if _is_dir_populated(TEHSIL_WATERSHEDS_DIR):
-        logger.info("Tehsil watershed files already present at %s, skipping.", TEHSIL_WATERSHEDS_DIR)
+        logger.info(
+            "Tehsil watershed files already present at %s, skipping.",
+            TEHSIL_WATERSHEDS_DIR,
+        )
         return
 
     if not SOI_TEHSIL_PATH.exists():
         logger.warning(
-            "Cannot generate tehsil watersheds: SOI tehsil file missing at %s.", SOI_TEHSIL_PATH
+            "Cannot generate tehsil watersheds: SOI tehsil file missing at %s.",
+            SOI_TEHSIL_PATH,
         )
         return
 
     if not MICROWATERSHED_PATH.exists():
         logger.warning(
-            "Cannot generate tehsil watersheds: microwatershed file missing at %s.", MICROWATERSHED_PATH
+            "Cannot generate tehsil watersheds: microwatershed file missing at %s.",
+            MICROWATERSHED_PATH,
         )
         return
 
