@@ -27,8 +27,6 @@ import ee
 import numpy as np
 import shutil
 
-from computing.STAC_specs import generate_STAC_layerwise
-
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
     print("Inside export shp to gee")
@@ -178,20 +176,7 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         res = push_shape_to_geoserver(output_dir, workspace="nrega_assets")
 
         if res["status_code"] == 201 and layer_id:
-
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-
-            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="nrega_vector",
-            )
-
-            update_layer_sync_status(
-                layer_id=layer_id,
-                is_stac_specs_generated=layer_STAC_generated,
-            )
 
             layer_at_geoserver = True
             print("nrega data sync to geoserver")

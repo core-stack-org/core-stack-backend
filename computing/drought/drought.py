@@ -20,7 +20,6 @@ from .merge_layers import (
     merge_yearly_layers,
 )
 from nrm_app.celery import app
-from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -192,21 +191,9 @@ def push_to_geoserver_db_stc(
         res = sync_fc_to_geoserver(fc, state, layer_name, "drought")
         print(res)
         if res["status_code"] == 201 and layer_id:
-            # update flag in db whether layer sync to geoserver or not
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
-
-            layer_STAC_generated = False
-            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="drought_frequency_vector",
-            )  # we only intend to run
-            # stac for drought frequency as it has style file. so please double check
-            # if this data is only of drought frequency and not additionally containing
-            # drought causalty data
     return layer_at_geoserver
 
 

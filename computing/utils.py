@@ -1006,26 +1006,27 @@ def update_layer_sync_status(
         return layer_id
 
     try:
-        layer_obj = Layer.objects.filter(id=layer_id)
+        layer_obj = Layer.objects.filter(id=layer_id).first()
+        if layer_obj is None:
+            return None
+
+        update_fields = []
         if sync_to_geoserver is not None:
-            updated_count = layer_obj.update(is_sync_to_geoserver=sync_to_geoserver)
-
-            if updated_count > 0:
-                print(
-                    f"Updated sync status to {sync_to_geoserver} for layer ID: {layer_id}"
-                )
-                return layer_id
-
+            layer_obj.is_sync_to_geoserver = sync_to_geoserver
+            update_fields.append("is_sync_to_geoserver")
         if is_stac_specs_generated is not None:
-            updated_count = layer_obj.update(
-                is_stac_specs_generated=is_stac_specs_generated
-            )
+            layer_obj.is_stac_specs_generated = is_stac_specs_generated
+            update_fields.append("is_stac_specs_generated")
 
-            if updated_count > 0:
-                print(
-                    f"Updated sync status to {is_stac_specs_generated} for layer ID: {layer_id}"
-                )
-                return layer_id
+        # `save(update_fields=...)` fires the post_save signal so the STAC
+        # auto-trigger handler in `computing.signals` can pick up the flip.
+        if update_fields:
+            layer_obj.save(update_fields=update_fields)
+            print(
+                f"Updated {update_fields} for layer ID: {layer_id} "
+                f"(sync={sync_to_geoserver}, stac={is_stac_specs_generated})"
+            )
+            return layer_id
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
