@@ -6,7 +6,6 @@ from pathlib import Path
 import json
 import pandas as pd
 from xml.sax.saxutils import escape
-from utilities.constants import YUKTDHARA_DEMAND_OUTPUT_DIR
 
 logger = setup_logger(__name__)
 

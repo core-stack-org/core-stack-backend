@@ -8,8 +8,6 @@ ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
-YUKTDHARA_DEMAND_OUTPUT_DIR = "data/Yuktdhara/"
-
 MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
