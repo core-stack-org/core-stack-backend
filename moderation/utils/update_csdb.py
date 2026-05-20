@@ -245,16 +245,23 @@ def resync_agrohorticulture(agrohorticulture_submissions):
     print(f"{count} agrohorticulture submissions synced")
 
 
-# TODO: add other maintenance and agrohoticulture forms
 _FORM_SYNC_CONFIG = {
-    "settlement": ("Settlement Form", resync_settlement),
-    "well": ("Well Form", resync_well),
-    "waterbody": ("water body form", resync_waterbody),
-    "cropping": ("cropping pattern form", resync_cropping),
-    "plan_gw": ("new recharge structure form", resync_gw),
-    "plan_agri": ("new irrigation form", resync_agri),
-    "livelihood": ("livelihood form", resync_livelihood),
-    "main_swb": ("propose maintenance on water structure form", resync_swb_maintenance),
+    # Resources
+    "settlement":       ("Settlement Form",                                           resync_settlement),
+    "well":             ("Well Form",                                                 resync_well),
+    "waterbody":        ("water body form",                                           resync_waterbody),
+    "cropping":         ("cropping pattern form",                                     resync_cropping),
+    # New works
+    "plan_gw":          ("new recharge structure form",                               resync_gw),
+    "plan_agri":        ("new irrigation form",                                       resync_agri),
+    "livelihood":       ("livelihood form",                                           resync_livelihood),
+    # Maintenance works
+    "main_swb":         ("propose maintenance on water structure form",               resync_swb_maintenance),
+    "main_gw":          ("propose maintenance on existing water recharge form",      resync_gw_maintenance),
+    "main_swb_rs":      ("propose maintenance of remotely sensed water structure form", resync_swb_rs_maintenance),
+    "main_agri":        ("propose maintenance on existing irrigation form",          resync_agri_maintenance),
+    # Other works
+    "agrohorticulture": ("Agrohorticulture",                                          resync_agrohorticulture),
 }
 
 
