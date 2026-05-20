@@ -22,6 +22,7 @@ class PlanAppSerializer(serializers.ModelSerializer):
             "tehsil_soi",
             "village_name",
             "gram_panchayat",
+            "gp",
             "facilitator_name",
             "organization",
             "organization_name",
