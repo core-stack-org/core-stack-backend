@@ -48,10 +48,12 @@ urlpatterns = [
     path("api/v1/", include("projects.urls")),
     path("api/v1/", include("plantations.urls")),
     path("api/v1/", include("public_api.urls")),
+    path("api/v2/", include("public_api.urls_v2")),
     path("api/v1/", include("gee_computing.urls")),
     path("api/v1/", include("community_engagement.urls")),
     path("api/v1/", include("bot_interface.urls"), name="whatsapp_webhook"),
     path("api/v1/", include("waterrejuvenation.urls")),
+    path("api/v2/", include("waterrejuvenation.urls_v2")),
     path("api/v1/", include("moderation.urls")),
     # Status page
     path("status/", include("status_monitor.urls")),

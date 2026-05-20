@@ -12,10 +12,22 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
 )
+from rest_framework.response import Response
+from rest_framework import status
+from nrm_app.settings import EXCEL_PATH
+import json
+import requests
+import pandas as pd
+import numpy as np
+import geopandas as gpd
+from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
 from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL, GEE_HELPER_ACCOUNT_ID
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
+from nrm_app.settings import GEOSERVER_URL
+from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
+from utilities.renderers import round_floats
 from django.db.models import Q
 
 # Create your views here.
@@ -397,7 +409,7 @@ def get_tehsil_json(state, district, tehsil, regenerate):
 
     if not regenerate and os.path.exists(json_path):
         with open(json_path, "r") as f:
-            return json.load(f)
+            return round_floats(json.load(f))
 
     xls = pd.read_excel(file_path, sheet_name=None)
     json_data = {}
@@ -408,7 +420,7 @@ def get_tehsil_json(state, district, tehsil, regenerate):
         df = df.where(pd.notnull(df), None)
         json_data[sheet_name] = df.to_dict(orient="records")
 
-    # Save JSON file
+    json_data = round_floats(json_data)
     with open(json_path, "w") as f:
         json.dump(json_data, f)
     return json_data
