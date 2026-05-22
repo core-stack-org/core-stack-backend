@@ -56,6 +56,7 @@ DEBUG = env.bool("DEBUG", default=False)
 TMP_LOCATION = resolve_env_path(
     "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
 )
+DATA_DIR = resolve_env_path("DATA_DIR", default="$BACKEND_DIR/data")
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
@@ -278,6 +279,7 @@ USE_TZ = True
 # Celery
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -288,13 +290,13 @@ STATIC_ROOT = "static/"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 
 # Media files (User uploaded content)
-MEDIA_ROOT = os.path.join(BASE_DIR, "data/")
+MEDIA_ROOT = DATA_DIR
 MEDIA_URL = "/media/"
 
 EXCEL_PATH = resolve_env_path("EXCEL_PATH", default="$BACKEND_DIR", trailing_sep=True)
 EXCEL_DIR = resolve_env_path(
     "EXCEL_DIR",
-    default="$BACKEND_DIR/data/excel_files",
+    default="$DATA_DIR/excel_files",
     trailing_sep=True,
 )
 
@@ -336,6 +338,11 @@ LOGGING = {
         "geoadmin": {
             "handlers": ["console"],
             "level": "DEBUG",
+            "propagate": False,
+        },
+        "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },
@@ -384,9 +391,9 @@ LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
 
-# S3 access keys
-S3_SECRET_KEY = env("S3_SECRET_KEY")
-S3_ACCESS_KEY = env("S3_ACCESS_KEY")
+# S3 access keys (optional for public buckets such as NREGA GeoJSON)
+S3_SECRET_KEY = env("S3_SECRET_KEY", default="")
+S3_ACCESS_KEY = env("S3_ACCESS_KEY", default="")
 
 # S3 settings
 S3_BUCKET = env("S3_BUCKET")

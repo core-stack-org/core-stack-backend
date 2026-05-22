@@ -13,12 +13,14 @@ from .utils import activated_tehsils, transform_data
 
 def generate_activated_locations_json_data():
     """Generate activated_locations_json and save to JSON file"""
+    data_dir = Path(getattr(settings, "DATA_DIR", Path(settings.BASE_DIR) / "data"))
     activate_locations_file_path = (
-        Path(settings.BASE_DIR) / "data/activated_locations/active_locations.json"
+        data_dir / "activated_locations" / "active_locations.json"
     )
     try:
         response_data = activated_tehsils()
         transformed_data = transform_data(data=response_data)
+        activate_locations_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write to JSON file
         with open(activate_locations_file_path, "w") as f:
