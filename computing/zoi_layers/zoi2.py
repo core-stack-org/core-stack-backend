@@ -19,19 +19,14 @@ def generate_zoi_ci(
     gee_account_id=None,
     proj_id=None,
     roi=None,
-    start_date=None,
-    end_date=None,
-    start_year=None,
-    end_year=None,
+    start_date="2017-07-01",
+    end_date="2025-06-30",
+    start_year=2017,
+    end_year=2024,
 ):
     from computing.cropping_intensity.cropping_intensity import (
         generate_cropping_intensity,
     )
-
-    if not start_date or not end_date or start_year is None or end_year is None:
-        raise ValueError(
-            "start_date, end_date, start_year, and end_year are required for ZOI CI."
-        )
 
     if state and district and block:
         asset_suffix = (

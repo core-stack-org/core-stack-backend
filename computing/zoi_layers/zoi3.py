@@ -9,7 +9,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
 )
-from waterrejuvenation.utils import wait_for_task_completion, resolve_zoi_ndvi_input
+from waterrejuvenation.utils import wait_for_task_completion
 import ee
 
 
@@ -20,25 +20,35 @@ def get_ndvi_for_zoi(
     zoi_roi=None,
     asset_suffix=None,
     asset_folder_list=None,
-    start_date=None,
-    end_date=None,
-    start_year=None,
-    end_year=None,
+    start_date="2017-07-01",
+    end_date="2025-06-30",
+    start_year=2017,
+    end_year=2024,
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
 ):
     print("started generating ndvi")
-    if not start_date or not end_date or start_year is None or end_year is None:
-        raise ValueError(
-            "start_date, end_date, start_year, and end_year are required for ZOI NDVI."
-        )
     ee_initialize(gee_account_id)
     from waterrejuvenation.utils import get_ndvi_data
 
-    zoi_collections = resolve_zoi_ndvi_input(
-        asset_folder_list, app_type, asset_suffix, zoi_roi=zoi_roi
-    )
+    if not proj_id:
+        description_zoi = "cropping_intensity_zoi_" + asset_suffix
+        asset_id_zoi = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description_zoi
+        )
+    else:
+
+        description_zoi = "cropping_intensity_zoi_" + asset_suffix
+        asset_id_zoi = (
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + description_zoi
+        )
 
     description_ndvi = asset_suffix
     ndvi_asset_path = (
@@ -48,6 +58,7 @@ def get_ndvi_for_zoi(
         + description_ndvi
     )
 
+    zoi_collections = ee.FeatureCollection(asset_id_zoi)
     fc = get_ndvi_data(
         zoi_collections, start_year, end_year, description_ndvi, ndvi_asset_path
     )

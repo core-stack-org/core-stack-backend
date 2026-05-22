@@ -4,12 +4,14 @@ from rest_framework import status
 from rest_framework.views import APIView
 import json
 import logging
+import os
+from nrm_app.settings import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 
 def load_json_data():
-    with open("data/output/all_states.json", "r") as f:
+    with open(os.path.join(DATA_DIR, "output", "all_states.json"), "r") as f:
         return json.load(f)
 
 

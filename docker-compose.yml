@@ -1,0 +1,25 @@
+services:
+  core-stack:
+    image: ubuntu:22.04
+    container_name: core-stack
+    stdin_open: true
+    tty: true
+    working_dir: /core-stack-dev
+    volumes:
+      - ${CORE_STACK_DEV_DIR:-.}:/core-stack-dev
+    ports:
+      - "9000:80"
+      - "9001:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      bash -lc "apt-get update &&
+      apt-get install -y git curl sudo wget bash nano &&
+      bash"
+
+  geoserver:
+    image: docker.osgeo.org/geoserver:2.25.2
+    container_name: geoserver
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
