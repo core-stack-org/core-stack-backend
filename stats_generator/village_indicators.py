@@ -31,6 +31,10 @@ def extract_facilities(df_facilities, v_id):
         valid = [v for v in values if pd.notna(v) and v != -1]
         return round(max(valid), 4) if valid else -1
 
+    def get_min(values):
+        valid = [v for v in values if pd.notna(v) and v != -1]
+        return round(min(valid), 4) if valid else -1
+
     # If a indicators contain only single column the safely check for Nan
     def safe_val(v):
         return round(v, 4) if pd.notna(v) and v != -1 else -1
@@ -52,7 +56,7 @@ def extract_facilities(df_facilities, v_id):
                 row.get("school_secondary_distance", -1),
             ]
         ),
-        "higher_education_infra": get_max(
+        "higher_education_infra": get_min(
             [
                 row.get("school_higher_secondary_distance", -1),
                 row.get("college_distance", -1),
@@ -65,7 +69,7 @@ def extract_facilities(df_facilities, v_id):
                 row.get("health_phc_distance", -1),
             ]
         ),
-        "advanced_health_services": get_max(
+        "advanced_health_services": get_min(
             [
                 row.get("health_chc_distance", -1),
                 row.get("health_dis_h_distance", -1),
@@ -85,13 +89,13 @@ def extract_facilities(df_facilities, v_id):
                 row.get("bank_atm_distance", -1),
             ]
         ),
-        "agri_market_access": get_max(
+        "agri_market_access": get_min(
             [
                 row.get("apmc_distance", -1),
                 row.get("agri_industry_markets_trading_distance", -1),
             ]
         ),
-        "post_harvest_infra": get_max(
+        "post_harvest_infra": get_min(
             [
                 row.get("agri_industry_storage_warehousing_distance", -1),
                 row.get("agri_industry_distribution_utilities_distance", -1),
