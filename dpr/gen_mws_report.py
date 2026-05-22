@@ -212,8 +212,6 @@ def get_rainfall_type(rainfall):
 def get_osm_data(state, district, block, uid):
     try:
         # * Area of the Tehsil
-        excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
-
         df = pd.read_excel(
             DATA_DIR_TEMP
             + state.upper()

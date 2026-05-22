@@ -70,7 +70,7 @@ def generate_dpr_task(self, plan_id: int, email_id: str, regenerate: bool = Fals
     for ids in mws_Ids:
         try:
             report_url = (
-                f"http://127.0.0.1:8000/api/v1/download_report/"
+                f"https://geoserver.core-stack.org/api/v1/download_report/"
                 f"?report_type=mws&state={state}&district={district}&block={block}&uid={ids}"
             )
             mws_reports.append(report_url)
@@ -80,7 +80,7 @@ def generate_dpr_task(self, plan_id: int, email_id: str, regenerate: bool = Fals
 
     # Fetch Resource Report PDF
     resource_report_url = (
-        f"http://127.0.0.1:8000/api/v1/download_report/"
+        f"https://geoserver.core-stack.org/api/v1/download_report/"
         f"?report_type=resource&district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
     )
     
