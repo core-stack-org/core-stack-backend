@@ -14,11 +14,12 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
-from utilities.constants import FIRST_COMPUTING_API_PATH, ADMIN_BOUNDARY_INPUT_DIR
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+
+from utilities.constants import FIRST_COMPUTING_API_PATH, ADMIN_BOUNDARY_INPUT_DIR
 
 for env_name in (
     "OPENBLAS_NUM_THREADS",

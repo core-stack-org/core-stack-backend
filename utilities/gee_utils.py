@@ -1,3 +1,8 @@
+from google.cloud.storage.bucket import Bucket
+from ee.image import Image
+from ee.featurecollection import FeatureCollection
+from ee.element import Element
+from ee.ee_string import String
 import os
 import shutil
 
@@ -32,7 +37,7 @@ class GEEInitializationError(RuntimeError):
     """Raised when Earth Engine credentials cannot be initialized safely."""
 
 
-def _normalize_gee_account_id(account_id=None, project=None):
+def _normalize_gee_account_id(account_id=None, project=None) -> int:
     if project == "helper":
         account_id = GEE_HELPER_ACCOUNT_ID
 
@@ -76,11 +81,11 @@ def _get_gee_account(account_id=None, project=None):
 
 
 def ee_initialize(
-    account_id=GEE_DEFAULT_ACCOUNT_ID,
+    account_id: int=GEE_DEFAULT_ACCOUNT_ID,
     strict=False,
     log_failure=True,
     project=None,
-):
+) -> bool:
     try:
         normalized_account_id, account = _get_gee_account(account_id, project=project)
 
@@ -109,7 +114,7 @@ def ee_initialize(
         return False
 
 
-def ee_initialize_safe(account_id=GEE_DEFAULT_ACCOUNT_ID):
+def ee_initialize_safe(account_id=GEE_DEFAULT_ACCOUNT_ID) -> bool:
     return ee_initialize(account_id=account_id, strict=False, log_failure=True)
 
 
@@ -118,7 +123,7 @@ def probe_gee_connection(account_id=GEE_DEFAULT_ACCOUNT_ID, project=None):
     return ee.Number(1).getInfo() == 1
 
 
-def probe_gcs_upload_access(gee_account_id=GEE_DEFAULT_ACCOUNT_ID, cleanup=True):
+def probe_gcs_upload_access(gee_account_id=GEE_DEFAULT_ACCOUNT_ID, cleanup: bool=True):
     normalized_account_id, account = _get_gee_account(gee_account_id)
     bucket = gcs_config(gee_account_id=normalized_account_id)
     blob_name = (
@@ -161,9 +166,9 @@ def probe_gcs_upload_access(gee_account_id=GEE_DEFAULT_ACCOUNT_ID, cleanup=True)
 
 def copy_gee_credentials_into_repo(
     credentials_path,
-    destination_dir="data/gee_confs",
+    destination_dir: str="data/gee_confs",
     destination_name=None,
-):
+) -> dict[str, str]:
     source_path = os.path.abspath(credentials_path)
     if not os.path.isfile(source_path):
         raise GEEInitializationError(
@@ -260,7 +265,7 @@ def upsert_gee_account_from_json(
 #         print("Exception in gee connection", e)
 
 
-def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
+def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID) -> Bucket:
     from google.oauth2 import service_account
 
     # # Authenticate Earth Engine
@@ -287,7 +292,7 @@ def gcs_config(gee_account_id=GEE_DEFAULT_ACCOUNT_ID):
     # print(list(bucket.list_blobs()))
 
 
-def download_gee_layer(state, district, block):
+def download_gee_layer(state, district, block) -> None:
     ee_initialize()
     fc = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -316,7 +321,7 @@ def check_gee_task_status(task_id):
         print("Exception in check_gee_task_status", e)
 
 
-def check_task_status(task_id_list, sleep_time=60):
+def check_task_status(task_id_list, sleep_time: int=60):
     task_id_list = list(filter(None, task_id_list))
     if len(task_id_list) > 0:
         time.sleep(sleep_time)
@@ -341,7 +346,7 @@ def check_task_status(task_id_list, sleep_time=60):
     return task_id_list
 
 
-def valid_gee_text(description):
+def valid_gee_text(description) -> str:
     description = re.sub(r"[^a-zA-Z0-9 ,:;_-]", "", description)
     return description.replace(" ", "_")
 
@@ -366,7 +371,7 @@ def earthdata_auth(file_name, path):
     return filename
 
 
-def gdf_to_ee_fc(gdf):
+def gdf_to_ee_fc(gdf) -> FeatureCollection:
     features = []
     for i, row in gdf.iterrows():
         properties = row.drop("geometry").to_dict()
@@ -376,7 +381,7 @@ def gdf_to_ee_fc(gdf):
     return ee.FeatureCollection(features)
 
 
-def create_gee_folder(folder_path, gee_project_path):
+def create_gee_folder(folder_path, gee_project_path) -> None:
     full_path = gee_project_path + folder_path
     parts = full_path.split("/")
     for i in range(1, len(parts) + 1):
@@ -398,8 +403,8 @@ def create_gee_directory(
     district=None,
     block=None,
     folder_path=None,
-    gee_project_path=GEE_ASSET_PATH,
-):
+    gee_project_path: str=GEE_ASSET_PATH,
+) -> None:
     if state and district and block:
         folder_path = (
             valid_gee_text(state.lower()) + "/" + valid_gee_text(district.lower())
@@ -419,7 +424,7 @@ def create_gee_directory(
         create_gee_folder(folder_path, gee_project_path)
 
 
-def get_gee_asset_path(state, district=None, block=None, asset_path=GEE_ASSET_PATH):
+def get_gee_asset_path(state, district=None, block=None, asset_path: str=GEE_ASSET_PATH):
     gee_path = asset_path + valid_gee_text(state.lower()) + "/"
     if district:
         gee_path += valid_gee_text(district.lower()) + "/"
@@ -428,7 +433,7 @@ def get_gee_asset_path(state, district=None, block=None, asset_path=GEE_ASSET_PA
     return gee_path
 
 
-def create_gee_dir(folder_list, gee_project_path=GEE_ASSET_PATH):
+def create_gee_dir(folder_list, gee_project_path: str=GEE_ASSET_PATH) -> None:
     folder_path = ""
     for folder in folder_list:
         folder_path += valid_gee_text(folder.lower())
@@ -436,14 +441,14 @@ def create_gee_dir(folder_list, gee_project_path=GEE_ASSET_PATH):
         folder_path = folder_path + "/"
 
 
-def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
+def get_gee_dir_path(folder_list, asset_path: str=GEE_ASSET_PATH):
     gee_path = asset_path
     for folder in folder_list:
         gee_path += valid_gee_text(folder.lower()) + "/"
     return gee_path
 
 
-def export_vector_asset_to_gee(fc, description, asset_id):
+def export_vector_asset_to_gee(fc, description: str, asset_id: str):
     try:
         task = ee.batch.Export.table.toAsset(
             collection=fc,
@@ -468,8 +473,8 @@ def export_raster_asset_to_gee(
     scale,
     region,
     pyramiding_policy=None,
-    max_pixel=1e13,
-    crs="EPSG:4326",
+    max_pixel: float=1e13,
+    crs: str="EPSG:4326",
 ):
     try:
         export_params = {
@@ -496,7 +501,7 @@ def export_raster_asset_to_gee(
         return None
 
 
-def geojson_to_ee_featurecollection(geojson_data):
+def geojson_to_ee_featurecollection(geojson_data) -> FeatureCollection:
     """
     Convert a GeoJSON FeatureCollection to an Earth Engine FeatureCollection
     """
@@ -524,7 +529,7 @@ def geojson_to_ee_featurecollection(geojson_data):
     return ee.FeatureCollection(ee_features)
 
 
-def is_gee_asset_exists(path):
+def is_gee_asset_exists(path: str):
     asset = ee.Asset(path)
     flag = asset.exists()
     if flag:
@@ -532,7 +537,7 @@ def is_gee_asset_exists(path):
     return flag
 
 
-def move_asset_to_another_folder(src_folder, dest_folder):
+def move_asset_to_another_folder(src_folder, dest_folder) -> None:
     ee_initialize()
     # folder from where to copy
     # src_folder = "projects/df-project-iit/assets/core-stack/andhra_pradesh/ananthapur/nallacheruvu"
@@ -552,7 +557,7 @@ def move_asset_to_another_folder(src_folder, dest_folder):
         # ee.data.deleteAsset(asset["id"])
 
 
-def make_asset_public(asset_id):
+def make_asset_public(asset_id) -> bool:
     try:
         # Get the ACL of the asset
         acl = ee.data.getAssetAcl(asset_id)
@@ -562,7 +567,7 @@ def make_asset_public(asset_id):
 
         # Update the ACL
         @retry.Retry()
-        def update_acl():
+        def update_acl() -> None:
             ee.data.setAssetAcl(asset_id, acl)
 
         update_acl()
@@ -580,7 +585,7 @@ def make_asset_public(asset_id):
         return False
 
 
-def is_asset_public(asset_id):
+def is_asset_public(asset_id) -> bool:
     try:
         acl = ee.data.getAssetAcl(asset_id)
         if acl.get("all_users_can_read"):
@@ -610,7 +615,7 @@ def sync_raster_to_gcs(image, scale, layer_name):
     return export_task.status()["id"]
 
 
-def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
+def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name) -> str:
     print("inside sync_raster_to_geoserver")
     geo = Geoserver()
     geo.delete_raster_store(workspace=workspace, store=layer_name)
@@ -629,7 +634,7 @@ def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_nam
     return f"File response: {file_upload_res}"
 
 
-def upload_tif_to_gcs(gcs_file_name, local_file_path):
+def upload_tif_to_gcs(gcs_file_name, local_file_path) -> str:
     bucket = gcs_config()
     blob_name = "nrm_raster/" + gcs_file_name
     blob = bucket.blob(blob_name)
@@ -650,7 +655,7 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
     return f"gs://{GCS_BUCKET_NAME}/{blob_name}"
 
 
-def gcs_file_exists(layer_name):
+def gcs_file_exists(layer_name) -> bool:
     bucket = gcs_config()
     blob = bucket.blob(f"nrm_raster/{layer_name}.tif")
     return blob.exists()
@@ -678,7 +683,7 @@ def upload_tif_from_gcs_to_gee(gcs_path, asset_id, scale):
     return task.status()["id"]
 
 
-def sync_vector_to_gcs(fc, layer_name, file_type="SHP"):
+def sync_vector_to_gcs(fc, layer_name, file_type: str="SHP"):
     print("inside sync_vector_to_gcs")
     export_task = ee.batch.Export.table.toCloudStorage(
         collection=fc,
@@ -711,7 +716,7 @@ def get_geojson_from_gcs(gcs_file_name):
     return geojson_data
 
 
-def download_csv_from_gcs(bucket_name, blob_name, destination_file_name):
+def download_csv_from_gcs(bucket_name, blob_name, destination_file_name) -> None:
     try:
         bucket = gcs_config()
         blob = bucket.blob(bucket_name + "/" + blob_name)
@@ -730,7 +735,7 @@ def download_csv_from_gcs(bucket_name, blob_name, destination_file_name):
         )
 
 
-def harmonize_band_types(image, target_type="Float"):
+def harmonize_band_types(image, target_type: str="Float") -> Image:
     """
     Harmonize all bands in an image to the same data type.
 
@@ -745,7 +750,7 @@ def harmonize_band_types(image, target_type="Float"):
     band_names = image.bandNames()
 
     # Function to cast each band to target type
-    def cast_band(band_name):
+    def cast_band(band_name: String):
         band = image.select(band_name)
         if target_type == "Float":
             return band.toFloat()
@@ -763,7 +768,7 @@ def harmonize_band_types(image, target_type="Float"):
     return ee.ImageCollection(harmonized_bands).toBands().rename(band_names)
 
 
-def upload_file_to_gcs(local_file_path, destination_blob_name):
+def upload_file_to_gcs(local_file_path, destination_blob_name: str) -> None:
     """Upload a file to a Google Cloud Storage bucket"""
     bucket = gcs_config()
     print(local_file_path)
@@ -778,7 +783,7 @@ def upload_file_to_gcs(local_file_path, destination_blob_name):
     print(f"File {local_file_path} uploaded to {destination_blob_name}.")
 
 
-def extract_task_id(command_output):
+def extract_task_id(command_output: str):
     """
     Extract the Earth Engine task ID from command output.
 
@@ -809,7 +814,7 @@ def extract_task_id(command_output):
     return None
 
 
-def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
+def gcs_to_gee_asset_cli(gcs_uri: str, asset_id, gee_account_id):
     account = GEEAccount.objects.get(pk=gee_account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
 
@@ -846,7 +851,7 @@ def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
 
 def upload_shp_to_gee(
     shapefile_path, file_name, asset_id, gee_account_id=GEE_DEFAULT_ACCOUNT_ID
-):
+) -> None:
     """
     Upload a shapefile to GEE asset from GCS using CLI commands
     Args:
@@ -878,7 +883,7 @@ def upload_shp_to_gee(
         check_task_status([task_id], 100)
 
 
-def merge_fc_into_existing_fc(asset_id, description, new_asset_id, join_on="id"):
+def merge_fc_into_existing_fc(asset_id, description, new_asset_id, join_on: str="id") -> None:
     print("Asset ID:", asset_id)
     print("New Asset ID:", new_asset_id)
     # Join on 'id'
@@ -889,7 +894,7 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id, join_on="id")
     )
 
     # Merge properties from both collections
-    def merge_properties(f):
+    def merge_properties(f) -> Element:
         f1 = ee.Feature(f.get("primary"))
         f2 = ee.Feature(f.get("secondary"))
         return f1.copyProperties(f2)
@@ -912,7 +917,7 @@ def merge_fc_into_existing_fc(asset_id, description, new_asset_id, join_on="id")
         ee.data.deleteAsset(f"{asset_id}_merge")
 
 
-def build_gee_helper_paths(app_type, helper_project):
+def build_gee_helper_paths(app_type, helper_project) -> str:
     gee_helper_base_path = f"projects/{helper_project}/assets/apps"
     return f"{gee_helper_base_path}/{app_type.lower()}/"
 
