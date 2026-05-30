@@ -13,7 +13,8 @@ def Get_NDVI_image_datewise(harmonized_LS_ic, roi_boundary):
             ee.Image(0)
             .float()
             .rename(["NDVI"])
-            .updateMask(ee.Image(0).clip(roi_boundary))
+            .selfMask()
+            # .updateMask(ee.Image(0).clip(roi_boundary))
         )
         return (
             harmonized_LS_ic.select(["NDVI"])
@@ -52,7 +53,7 @@ def pairLSModis(lsRenameBands, roi_boundary):
             ee.ImageCollection(VEGETATION_INDEX_OF_16_DAY)
             .filterDate(startDateT, endDateT)
             .select(["NDVI", "SummaryQA"])
-            .filterBounds(roi_boundary)
+            .filterBounds(roi_boundary.geometry().bounds())
             .median()
             .rename(["NDVI_modis", "SummaryQA_modis"])
         )
@@ -65,8 +66,7 @@ def pairLSModis(lsRenameBands, roi_boundary):
 # Function to get Pearson Correlation Coffecient to perform GapFilling
 def get_Pearson_Correlation_Coefficients(LSC_modis_paired_ic, roi_boundary, bandList):
     corr = (
-        LSC_modis_paired_ic.filterBounds(roi_boundary)
-        .select(bandList)
+        LSC_modis_paired_ic.select(bandList)  # .filterBounds(roi_boundary)
         .toArray()
         .arrayReduce(reducer=ee.Reducer.pearsonsCorrelation(), axes=[0], fieldAxis=1)
         .arrayProject([1])
@@ -227,13 +227,13 @@ def get_hls_collection(start_date, end_date, roi_boundary):
     hls_l30 = (
         ee.ImageCollection(HARMONIZED_LANDSAT_SENTINEL)
         .filterDate(start_date, end_date)
-        .filterBounds(roi_boundary)
+        .filterBounds(roi_boundary.geometry().bounds())
     )
 
     hls_s30 = (
         ee.ImageCollection(NBAR_MSI)
         .filterDate(start_date, end_date)
-        .filterBounds(roi_boundary)
+        .filterBounds(roi_boundary.geometry().bounds())
     )
 
     def add_hls_l30_ndvi(image):
@@ -256,7 +256,6 @@ def get_hls_collection(start_date, end_date, roi_boundary):
 
 # Function to get padded NDVI LSMC time series image for a given ROI
 def get_padded_ndvi_ts_image(startDate, endDate, roi_boundary, days=16):
-
     harmonized_LS_ic = get_hls_collection(startDate, endDate, roi_boundary)
 
     LSC = Get_LS_16Day_NDVI_TimeSeries(
@@ -267,7 +266,7 @@ def get_padded_ndvi_ts_image(startDate, endDate, roi_boundary, days=16):
 
     Interpolated_LSMC_NDVI = interpolate_timeseries(LSMC_NDVI)
 
-    Interpolated_LSMC_NDVI_clipped = Interpolated_LSMC_NDVI.map(
-        lambda image: image.clip(roi_boundary)
-    )
-    return Interpolated_LSMC_NDVI_clipped
+    # Interpolated_LSMC_NDVI_clipped = Interpolated_LSMC_NDVI.map(
+    #     lambda image: image.clip(roi_boundary)
+    # )
+    return Interpolated_LSMC_NDVI

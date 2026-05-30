@@ -29,7 +29,7 @@ from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
 from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
 from .lulc.v4.lulc_v4 import generate_lulc_v4
-from .misc.ndvi_time_series import ndvi_timeseries
+from computing.ndvi_timeseries.ndvi_time_series import ndvi_timeseries
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
