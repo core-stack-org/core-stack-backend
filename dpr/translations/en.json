@@ -1,0 +1,75 @@
+{
+  "common": {
+    "dpr_title": "Detailed Project Report",
+    "na": "NA"
+  },
+
+  "section_a": {
+    "title": "Section A: Team Details",
+    "organization": "Organization",
+    "project": "Project",
+    "plan": "Plan",
+    "facilitator": "Facilitator",
+    "process_preparation": "Process involved in the preparation of DPR PRA",
+    "process_preparation_value": "PRA, Gram Sabha, Transect Walk, GIS Mapping"
+  },
+
+  "section_b": {
+    "title": "Section B: Brief of Village",
+    "village": "Name of the Village",
+    "gram_panchayat": "Name of Gram the Panchayat",
+    "tehsil": "Tehsil",
+    "district": "District",
+    "state": "State",
+    "number_of_settlements": "Number of Settlements in the village",
+    "intersecting_mws": "Intersecting Micro Watershed IDs",
+    "intersecting_mws_inner_settlement": "Settlement",
+    "intersecting_mws_inner_mws": "MWS ID",
+    "latitude_and_longitude": "Latitude & Longitude of the Village"
+  },
+
+  "section_c_socio_economic": {
+    "title": "Section C: Social Economic Ecological Profile",
+    "description": "This section includes information on vulnerabilities, NREGA details, livelihoods, crop and livestock profiles.",
+    "name_of_the_settlement": "Name of the Settlement",
+    "number_of_households": "Total Number of Households",
+    "settlement_type": "Settlement Type",
+    "caste_group": "Caste Group",
+    "total_households": "Total Households",
+    "marginal_farmer": "Total marginal farmers (<2 acres)"
+  },
+
+  "section_c_mgnrega": {
+    "title": "MGNREGA Info",
+    "settlement_name": "Settlement's Name",
+    "total_household_applied_job_card": "Total Households- applied- have job cards in previous year",
+    "work_days_previous_year": "Total work days in previous year",
+    "demand_made_in_previous_year": "Work demands made in Previous year",
+    "involved_in_village_planing": "Were you involved in the village level planning?",
+    "issues": "Issues"
+  },
+
+  "section_c_crop": {
+    "title": "Crop Info",
+    "settlement_name": "Name of the Settlement",
+    "irrigation_source": "Irrigation Source",
+    "crop_in_kharif": "Crops grown in(Kharif)",
+    "kharif_acerage": "Kharif acreage( acres)",
+    "crop_in_rabi": "Crops grown  in (Rabi)",
+    "rabi_acerage": "Rabi acreage( acres)",
+    "crop_in_zaid": "Crops grown in (Zaid)",
+    "zaid_acerage": "Zaid acreage( acres)",
+    "crop_intensity": "Cropping Intensity",
+    "land_classification": "Land Classification"
+  },
+
+  "section_c_livelihood": {
+    "title": "Livestock Info",
+    "settlement_name": "Name of the Settlement",
+    "goat": "Goats",
+    "sheep": "Sheep",
+    "cattle": "Cattle",
+    "piggery": "Piggery",
+    "poultary": "Poultry"
+  }
+}

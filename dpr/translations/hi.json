@@ -1,0 +1,73 @@
+{
+  "common": {
+    "dpr_title": "विस्तृत परियोजना रिपोर्ट",
+    "na": "NA"
+  },
+
+  "section_a": {
+    "title": "अनुभाग A : टीम विवरण",
+    "organization": "संगठन",
+    "project": "परियोजना",
+    "plan": "योजना",
+    "facilitator": "सुविधाकर्ता",
+    "process_preparation": "डीपीआर पीआरए की तैयारी में शामिल प्रक्रिया:",
+    "process_preparation_value": "पीआरए, ग्राम सभा, ट्रांसेक्ट वॉक, जीआईएस मानचित्रण"
+  },
+
+  "section_b": {
+    "title": "अनुभाग बी: गाँव का संक्षिप्त विवरण",
+    "village": "गाँव का नाम",
+    "gram_panchayat": "ग्राम पंचायत का नाम",
+    "tehsil": "तहसील",
+    "district": "जिला",
+    "state": "राज्य",
+    "number_of_settlements": "गाँव में बस्तियों की संख्या",
+    "intersecting_mws": "अंतरवर्ती लघु जलाशय आईडी",
+    "latitude_and_longitude": "गाँव का अक्षांश और देशांतर"
+  },
+
+  "section_c_socio_economic": {
+    "title": "अनुभाग सी: सामाजिक-आर्थिक एवं पारिस्थितिक प्रोफ़ाइल",
+    "description": "इस अनुभाग में कमजोरियों, मनरेगा से संबंधित विवरण, आजीविका, तथा फसल और पशुधन की प्रोफ़ाइल से जुड़ी जानकारी शामिल है।",
+    "name_of_the_settlement": "बस्ती का नाम",
+    "number_of_households": "कुल परिवारों की संख्या",
+    "settlement_type": "बस्ती का प्रकार",
+    "caste_group": "जाति समूह",
+    "total_households": "कुल परिवार",
+    "marginal_farmer": "कुल सीमांत किसान (<2 एकड़)"
+  },
+
+  "section_c_mgnrega": {
+    "title": "मनरेगा जानकारी",
+    "settlement_name": "बस्ती का नाम",
+    "total_household_applied_job_card": "कुल परिवार – आवेदन किए – पिछले वर्ष जिनके पास जॉब कार्ड थे",
+    "work_days_previous_year": "पिछले वर्ष के कुल कार्य दिवस",
+    "demand_made_in_previous_year": "पिछले वर्ष की गई कार्य मांगें",
+    "involved_in_village_planing": "क्या आप ग्राम स्तर की योजना प्रक्रिया में शामिल थे?",
+    "issues": "समस्याएँ"
+  },
+
+  "section_c_crop": {
+    "title": "फसल जानकारी",
+    "settlement_name": "बस्ती का नाम",
+    "irrigation_source": "सिंचाई का स्रोत",
+    "crop_in_kharif": "कृषि फसलें (खरीफ) में उगाई गई",
+    "kharif_acerage": "खरीफ क्षेत्रफल (एकड़ में)",
+    "crop_in_rabi": "कृषि फसलें (रबी) में उगाई गई",
+    "rabi_acerage": "रबी क्षेत्रफल (एकड़ में)",
+    "crop_in_zaid": "कृषि फसलें (जायद) में उगाई गई",
+    "zaid_acerage": "जायद क्षेत्रफल (एकड़ में)",
+    "crop_intensity": "फसल घनत्व (क्रॉपिंग इंटेंसिटी)",
+    "land_classification": "भूमि वर्गीकरण"
+  },
+
+  "section_c_livelihood": {
+    "title": "पशुधन जानकारी",
+    "settlement_name": "बस्ती का नाम",
+    "goat": "बकरियाँ",
+    "sheep": "भेड़ें",
+    "cattle": "पशु (गाय/भैंस आदि)",
+    "piggery": "सूअर पालन",
+    "poultary": "मुर्गी पालन"
+  }
+}
