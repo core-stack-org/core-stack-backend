@@ -7,14 +7,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 R_SCRIPT = BASE_DIR / "drought" / "drought_spei.R"
 
 
-def run_spei_pipeline(state_safe=None, input_file=None, output_dir=None):
-
+def run_spei_pipeline(aez=None):
+    print(aez)
     command = [
         "Rscript",
         str(R_SCRIPT),
-        state_safe,
-        input_file,
-        output_dir,
+        aez,
     ]
 
     print("COMMAND:", command)
