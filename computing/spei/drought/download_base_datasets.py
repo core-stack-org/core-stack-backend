@@ -22,6 +22,7 @@ from pathlib import Path
 import ee
 import requests
 
+from utilities.constants import AEZ
 from utilities.gee_utils import ee_initialize
 
 CHIRPS_COLLECTION = "UCSB-CHG/CHIRPS/DAILY"
@@ -37,22 +38,24 @@ def initialize_earth_engine(project: str) -> None:
     print("Earth Engine initialized.")
 
 
-def get_aoi(aoi_type: str, state_name: str) -> ee.FeatureCollection:
-    # GAUL level1 contains Indian state boundaries. For pan-India, keep all
-    # Indian state features and use their combined geometry downstream.
-    # admin = ee.FeatureCollection("FAO/GAUL/2015/level1").filter(
-    #     ee.Filter.eq("ADM0_NAME", "India")
-    # )
-    admin = ee.FeatureCollection(
-        "projects/ext-datasets/assets/datasets/State_pan_india"
-    )
-
-    if aoi_type == "india":
-        admin = admin.filter(ee.Filter.neq("Name", "Andaman & Nicobar")).filter(
-            ee.Filter.neq("Name", "Lakshadweep")
-        )
-        return admin.union()
-    return admin.filter(ee.Filter.eq("Name", state_name))
+# def get_aoi(aoi_type: str, state_name: str) -> ee.FeatureCollection:
+#     # GAUL level1 contains Indian state boundaries. For pan-India, keep all
+#     # Indian state features and use their combined geometry downstream.
+#     # admin = ee.FeatureCollection("FAO/GAUL/2015/level1").filter(
+#     #     ee.Filter.eq("ADM0_NAME", "India")
+#     # )
+#     # admin = ee.FeatureCollection(
+#     #     "projects/ext-datasets/assets/datasets/State_pan_india"
+#     # )
+#
+#     admin = ee.FeatureCollection(AEZ)
+#
+#     if aoi_type == "india":
+#         admin = admin.filter(ee.Filter.neq("Name", "Andaman & Nicobar")).filter(
+#             ee.Filter.neq("Name", "Lakshadweep")
+#         )
+#         return admin.union()
+#     return admin.filter(ee.Filter.eq("Name", state_name))
 
 
 def date_range(
@@ -212,8 +215,7 @@ def dataset_label(dataset: str) -> str:
 
 
 def build_dataset_image(
-    aoi: str,
-    state: str,
+    aez: int,
     dataset: str,
     start_date: str,
     end_date: str,
@@ -224,11 +226,10 @@ def build_dataset_image(
     start_ee_date = ee.Date(start_date)
     end_date_exclusive = ee.Date(end_date).advance(1, "day")
 
-    region = get_aoi(aoi, state)
+    # region = get_aoi(aoi, state)
+    region = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez))
     chirps = ee.ImageCollection(CHIRPS_COLLECTION).select("precipitation")
     modis_pet = ee.ImageCollection(MODIS_PET_COLLECTION).select("PET")
-
-    aoi_label = "India" if aoi == "india" else state
 
     if dataset == "chirps":
         unit = "day" if frequency in ("daily", "native") else "month"
@@ -255,15 +256,13 @@ def build_dataset_image(
         labeled_dates.append((date, label))
 
     print(
-        f"Preparing {len(labeled_dates)} {frequency} {name} image(s) "
-        f"for {aoi_label}"
+        f"Preparing {len(labeled_dates)} {frequency} {name} image(s) " f"for aez {aez}"
     )
     return collection, region, name, labeled_dates
 
 
 def download_dataset_images(
-    aoi: str,
-    state: str,
+    aez: int,
     dataset: str,
     start_date: str,
     end_date: str,
@@ -277,14 +276,13 @@ def download_dataset_images(
 ) -> None:
     # End-to-end local workflow for one dataset:
     # download one small GeoTIFF per time step and keep those files on disk.
-    aoi_label = "India" if aoi == "india" else state
-    safe_aoi = aoi_label.replace(" ", "_")
+    # aoi_label = "India" if aez == "india" else state
+    # safe_aoi = aoi_label.replace(" ", "_")
     name = dataset_label(dataset)
-    dataset_output_dir = Path(output_dir) / safe_aoi / frequency / dataset
+    dataset_output_dir = Path(output_dir) / str(aez) / frequency / dataset
 
     collection, region, _, labeled_dates = build_dataset_image(
-        aoi=aoi,
-        state=state,
+        aez=aez,
         dataset=dataset,
         start_date=start_date,
         end_date=end_date,
@@ -320,7 +318,9 @@ def download_dataset_images(
     if max_workers <= 1:
         for index, current_date, band_name, single_path in download_jobs:
             if dataset == "chirps":
-                image, _ = make_chirps_image(collection, region, current_date, frequency)
+                image, _ = make_chirps_image(
+                    collection, region, current_date, frequency
+                )
             else:
                 image, _ = make_modis_pet_image(
                     collection, region, current_date, frequency, target_projection
@@ -334,7 +334,9 @@ def download_dataset_images(
         def download_one(job: tuple[int, ee.Date, str, Path]) -> tuple[int, str]:
             index, current_date, band_name, single_path = job
             if dataset == "chirps":
-                image, _ = make_chirps_image(collection, region, current_date, frequency)
+                image, _ = make_chirps_image(
+                    collection, region, current_date, frequency
+                )
             else:
                 image, _ = make_modis_pet_image(
                     collection, region, current_date, frequency, target_projection
@@ -354,13 +356,12 @@ def download_dataset_images(
     print(f"Downloaded {len(labeled_dates)} {name} image(s) to {dataset_output_dir}")
 
 
-def main(
-    aoi: str = "india",
+def download_data_locally(
+    aez: int,
     datasets: list[str] | str | None = None,
     start_date: str = "2004-01-01",
     end_date: str = "2023-12-31",
     frequency: str = "monthly",
-    state: str = "Madhya Pradesh",
     project: str = DEFAULT_PROJECT,
     output_dir: str = "data/drought_inputs",
     sleep: float = 0.2,
@@ -370,7 +371,7 @@ def main(
     # Public entry point for notebooks/scripts. datasets=["both"] downloads
     # separate CHIRPS and MODIS PET time-step GeoTIFFs.
     selected_datasets = datasets or ["both"]
-    validate_inputs(aoi, selected_datasets, frequency)
+    # validate_inputs(aez, selected_datasets, frequency)
     initialize_earth_engine(project)
 
     expanded_datasets = expand_datasets(selected_datasets)
@@ -378,8 +379,7 @@ def main(
         scale = 5500
         crs = "EPSG:4326"
         download_dataset_images(
-            aoi=aoi,
-            state=state,
+            aez=aez,
             dataset=dataset,
             start_date=start_date,
             end_date=end_date,

@@ -18,13 +18,13 @@ library(raster)
 # =============================================================================
 # MAIN FUNCTION
 # =============================================================================
-run_spei_pipeline <- function(
-    state_safe,
-    input_file,
-    output_dir
-) {
+run_spei_pipeline <- function(aez) {
 
     paste("Starting R script")
+    paste("aez", aez)
+
+    input_file = paste0("data/drought_inputs/", aez, "/monthly/P_PET_", aez, "_monthly_multiband.tif")
+    output_dir = paste0("data/drought_inputs/", aez, "/monthly")
 
     # -------------------------------------------------------------------------
     # Create output directory
@@ -38,14 +38,14 @@ run_spei_pipeline <- function(
     # -------------------------------------------------------------------------
     out_check <- file.path(
         output_dir,
-        paste0("SPEI12_", state_safe, ".tif")
+        paste0("SPEI12_", aez, ".tif")
     )
 
     if (file.exists(out_check)) {
         stop(
             paste(
                 "Already processed:",
-                state_safe,
+                aez,
                 "— delete output files to rerun."
             )
         )
@@ -162,7 +162,7 @@ run_spei_pipeline <- function(
 
     temp_file <- file.path(
         output_dir,
-        paste0(state_safe, "_temp.tif")
+        paste0(aez, "_temp.tif")
     )
 
     result_brick <- brick(
@@ -255,7 +255,7 @@ run_spei_pipeline <- function(
         spei1_brick,
         file.path(
             output_dir,
-            paste0("SPEI1_", state_safe, ".tif")
+            paste0("SPEI1_", aez, ".tif")
         ),
         format = "GTiff",
         overwrite = TRUE,
@@ -266,7 +266,7 @@ run_spei_pipeline <- function(
         spei3_brick,
         file.path(
             output_dir,
-            paste0("SPEI3_", state_safe, ".tif")
+            paste0("SPEI3_", aez, ".tif")
         ),
         format = "GTiff",
         overwrite = TRUE,
@@ -277,7 +277,7 @@ run_spei_pipeline <- function(
         spei12_brick,
         file.path(
             output_dir,
-            paste0("SPEI12_", state_safe, ".tif")
+            paste0("SPEI12_", aez, ".tif")
         ),
         format = "GTiff",
         overwrite = TRUE,
@@ -303,7 +303,7 @@ run_spei_pipeline <- function(
     cat(
         paste0(
             "  SPEI1_",
-            state_safe,
+            aez,
             ".tif — ",
             nlayers(spei1_brick),
             " bands\n"
@@ -313,7 +313,7 @@ run_spei_pipeline <- function(
     cat(
         paste0(
             "  SPEI3_",
-            state_safe,
+            aez,
             ".tif — ",
             nlayers(spei3_brick),
             " bands\n"
@@ -323,7 +323,7 @@ run_spei_pipeline <- function(
     cat(
         paste0(
             "  SPEI12_",
-            state_safe,
+            aez,
             ".tif — ",
             nlayers(spei12_brick),
             " bands\n"
@@ -334,8 +334,12 @@ run_spei_pipeline <- function(
 # =============================================================================
 # FUNCTION CALL
 # =============================================================================
-run_spei_pipeline(
-    state_safe = "Madhya_Pradesh",
-    input_file = "data/drought_inputs/Madhya_Pradesh/monthly/ppet/P_PET_Madhya_Pradesh_monthly_multiband.tif",
-    output_dir = "data/drought_inputs/Madhya_Pradesh/monthly/ppet"
-)
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) < 1) {
+    stop("AEZ argument is required")
+}
+
+aez <- args[1]
+
+run_spei_pipeline(aez)

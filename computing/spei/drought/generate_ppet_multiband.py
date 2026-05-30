@@ -20,14 +20,14 @@ from rasterio.warp import reproject
 
 
 # --- CONFIG ---
-state_name = "Madhya_Pradesh"
-start_year = 2004
-end_year = 2023
-
-input_root = Path("data/drought_inputs")
-output_dir = Path("data/drought_inputs") / state_name / "monthly" / "ppet"
-output_path = output_dir / f"P_PET_{state_name}_monthly_multiband.tif"
-OUTPUT_NODATA = -9999.0
+# state_name = "Madhya_Pradesh"
+# start_year = 2004
+# end_year = 2023
+#
+# input_root = Path("data/drought_inputs")
+# output_dir = Path("data/drought_inputs") / state_name / "monthly" / "ppet"
+# output_path = output_dir / f"P_PET_{state_name}_monthly_multiband.tif"
+# OUTPUT_NODATA = -9999.0
 
 
 def find_monthly_file(dataset_dir: Path, prefix: str, year: int, month: int) -> Path:
@@ -54,6 +54,7 @@ def reproject_modis_to_chirps_grid(
     chirps_dataset: rasterio.DatasetReader,
     log_metadata: bool = False,
 ) -> np.ma.MaskedArray:
+    OUTPUT_NODATA = -9999.0
     """Reproject/resample MODIS PET onto the CHIRPS projection and pixel grid."""
     with rasterio.open(modis_path) as modis_src:
         if log_metadata:
@@ -103,18 +104,23 @@ def reproject_modis_to_chirps_grid(
 
 
 def main(
-    state: str = state_name,
-    start: int = start_year,
-    end: int = end_year,
-    data_root: Path | str = input_root,
-    output: Path | str | None = output_path,
+    aez: str = None,
+    start: int = 2004,
+    end: int = 2023,
 ) -> Path:
-    data_root = Path(data_root)
-    chirps_dir = data_root / state / "monthly" / "chirps"
-    modis_dir = data_root / state / "monthly" / "modis_pet"
+    data_root = Path("data/drought_inputs")
+    chirps_dir = data_root / aez / "monthly" / "chirps"
+    modis_dir = data_root / aez / "monthly" / "modis_pet"
 
-    output_file = Path(output) if output else data_root / state / "ppet" / (
-        f"P_PET_{state}_monthly_multiband.tif"
+    # input_root = Path("data/drought_inputs")
+    output_dir = Path("data/drought_inputs") / aez / "monthly"
+    output = output_dir / f"P_PET_{aez}_monthly_multiband.tif"
+    OUTPUT_NODATA = -9999.0
+
+    output_file = (
+        Path(output)
+        if output
+        else data_root / aez / f"P_PET_{aez}_monthly_multiband.tif"
     )
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
