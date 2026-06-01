@@ -5,7 +5,14 @@ from weasyprint import HTML
 from .gen_dpr import get_settlement_count_for_plan
 from .utils import get_vector_layer_geoserver, transform_name
 from nrm_app.settings import GEOSERVER_URL
-from .get_dpr_sectionwise_data import get_section_b_data, get_section_c_data
+from .get_dpr_sectionwise_data import (
+    get_section_b_data,
+    get_section_c_data,
+    get_section_d_data,
+    get_section_e_data,
+    get_section_f_data,
+    get_section_g_data,
+)
 from django.http import HttpResponse
 from .gen_dpr import get_plan_details
 
@@ -26,6 +33,14 @@ def generate_dpr_html(plan, language="en"):
         plan, total_settlements, mws_fortnight
     )
     section_c_data = get_section_c_data(plan)
+    section_d_data = get_section_d_data(
+        plan,
+        settlement_mws_ids,
+        mws_gdf,
+    )
+    section_e_data = get_section_e_data(plan)
+    section_f_data = get_section_f_data(plan)
+    section_g_data = get_section_g_data(plan)
     html = render_to_string(
         "dpr/base.html",
         {
@@ -34,6 +49,10 @@ def generate_dpr_html(plan, language="en"):
             "section_a": plan,
             "section_b": section_b_data,
             "section_c": section_c_data,
+            "section_d": section_d_data,
+            "section_e": section_e_data,
+            "section_f": section_f_data,
+            "section_g": section_g_data,
         },
     )
 

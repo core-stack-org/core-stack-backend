@@ -1,0 +1,19 @@
+<h3>{{ t.section_e.asset_type_heading }}</h3>
+
+<table>
+
+    <thead>
+        <tr>
+            <th>{{ t.section_e.asset_type }}</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for asset in section_e.asset_types %}
+        <tr>
+            <td>{{ asset }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+
+</table>

@@ -1,0 +1,31 @@
+<div class="section">
+
+    <table>
+        <thead>
+            <tr>
+                <th>{{ t.section_d_mws_info.mws_id }}</th>
+                <th>{{ t.section_d_mws_info.lat_lon }}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for item in section_d.mws %}
+            <tr>
+
+                <td>
+                    {{ item.mws_id|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.centroid|default:t.common.na }}
+                </td>
+
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>

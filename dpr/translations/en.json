@@ -71,5 +71,128 @@
     "cattle": "Cattle",
     "piggery": "Piggery",
     "poultary": "Poultry"
+  },
+
+  "section_d_base": {
+    "title": "Section D: Wells and Water structures Details",
+    "description": "This section provides information on wells, water structures, and household beneficiaries."
+  },
+
+  "section_d_mws_info": {
+    "mws_id": "Microwatershed ID",
+    "lat_lon": "Latitude and Longitude (Centroid)"
+  },
+
+  "section_d_well_summary": {
+    "title": "Well Summary information",
+    "beneficiary_settlement": "Name of Beneficiary Settlement",
+    "no_of_wells": "Number of Wells",
+    "household_benefitted": "Total Number of Household Benefitted"
+  },
+
+  "section_d_detail_well": {
+    "title": "Detailed  Info on Wells  and their  Maintenance demands",
+    "mws_id": "MWS ID",
+    "beneficiary_settlement": "Name of Beneficiary Settlement",
+    "well_type": "Type of Well",
+    "well_owner": "Who owns the Well",
+    "beneficiary_name": "Beneficiary Name",
+    "beneficiary_father_name": "Beneficiary's Father's Name",
+    "water_availability": "Water Availability",
+    "households_benefitted": "Households Benefitted",
+    "caste_use": "Which Caste uses the well?",
+    "well_usage": "Well Usage",
+    "need_maintenance": "Need Maintenance?",
+    "repair_activities": "Repair Activities",
+    "latitude": "Latitude",
+    "longitude": "Longitude"
+  },
+
+  "section_d_water_structure_summary": {
+    "title": "Summary of Water structures:",
+    "beneficiary_settlement": "Name of Beneficiary's Settlement",
+    "water_structure_type": "Type of Water Structure",
+    "waterbodies_number": "Number of Waterbodies",
+    "household_benefitted": "Total Number of Household Benefitted"
+  },
+
+  "section_d_detail_water_structure": {
+    "title": "Detailed Water Structures Info:",
+    "mws_id": "MWS ID ",
+    "beneficiary_settlement": "Name of the Beneficiary Settlement",
+    "water_structure_owner": "Who owns the water structure?",
+    "beneficiary_name": "Name of Beneficiary ",
+    "beneficiary_father_name": "Name of Beneficiary Fathers Name",
+    "who_manage": "Who Manages?",
+    "caste_use": "Which Caste uses the water structure?",
+    "benefitted_household": "Households Benefitted",
+    "water_structure_type": "Type of Water Structure ",
+    "usage": "Usage of Water Structure",
+    "maintenance": "Need Maintenance ( Yes/No)",
+    "repair_activities": "Repair Activities",
+    "latitude": "Latitude",
+    "longitude": "Longitude"
+  },
+
+  "section_e": {
+    "title": "Section E: Proposed Maintenance Work",
+    "description": "This section presents information on proposed maintenance works for existing structures based on inputs from the Gram Sabha.",
+    "asset_type_heading": "Maintenance Works by Asset Type",
+    "asset_type": "Asset Type",
+
+    "water_recharge_structures": "Maintenance Works for Water Recharge Structures",
+    "irrigation_structures": "Maintenance Works for Irrigation Structures",
+    "surface_water_structures": "Maintenance Works for Surface Water Structures",
+    "remote_sensed_surface_water_structures": "Maintenance Works for Remote Sensed Surface Water Structures",
+
+    "type_of_demand": "Type of Demand",
+    "beneficiary_settlement": "Name of the Beneficiary Settlement",
+    "beneficiary_name": "Beneficiary Name",
+    "father_name": "Beneficiary's Father's Name",
+
+    "recharge_structure": "Type of Recharge Structure",
+    "irrigation_structure": "Type of Irrigation Structure",
+    "type_of_work": "Type of Work",
+
+    "repair_activities": "Repair Activities",
+    "latitude": "Latitude",
+    "longitude": "Longitude"
+  },
+
+  "section_f": {
+    "title": "Section F: Proposed New NRM Works",
+    "description": "This section outlines the details of proposed new NRM works based on community inputs put up to the Gram Sabha.",
+    "serial_no": "S.No",
+    "work_category": "Work Category : Irrigation Work or Recharge Structure",
+    "type_of_demand": "Type of Demand",
+    "work_demand": "Work Demand",
+    "beneficiary_settlement": "Name of Beneficiary's Settlement",
+    "beneficiary_name": "Beneficiary's Name",
+    "gender": "Gender",
+    "father_name": "Beneficiary's Father's Name",
+    "latitude": "Latitude",
+    "longitude": "Longitude"
+  },
+
+  "section_g": {
+    "title": "Section G: Proposed New Livelihood Works",
+
+    "livestock_and_fisheries": "G.1 Livestock and Fisheries",
+    "plantations_and_kitchen_gardens": "G.2 Plantations and Kitchen Gardens",
+
+    "livelihood_work": "Livelihood Works",
+    "type_of_demand": "Type of Demand",
+    "work_demand": "Work Demand",
+
+    "beneficiary_settlement": "Name of Beneficiary Settlement",
+    "beneficiary_name": "Beneficiary Name",
+    "gender": "Gender",
+    "father_name": "Beneficiary Father's Name",
+
+    "plantation_crop": "Name of Plantation Crop",
+    "total_acres": "Total Acres",
+
+    "latitude": "Latitude",
+    "longitude": "Longitude"
   }
 }
