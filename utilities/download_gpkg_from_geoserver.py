@@ -31,14 +31,16 @@ def build_layer_and_path(state, district, block, workspace):
     block = valid_gee_text(block.lower())
 
     # GeoServer layer
+    output_base = BASE_OUTPUT_DIR
+
     if workspace == "mws":
         layer_name = f"mws:mws_{district}_{block}"
-        BASE_OUTPUT_DIR = BASE_OUTPUT_DIR + "tehsil_watersheds"
+        output_base = output_base / "tehsil_watersheds"
     elif workspace == "panchayat_boundaries":
         layer_name = f"panchayat_boundaries:{district}_{block}"
-        BASE_OUTPUT_DIR = BASE_OUTPUT_DIR + "panchayat_boundaries"
+        output_base = output_base / "panchayat_boundaries"
 
-    output_dir = BASE_OUTPUT_DIR / state / district
+    output_dir = output_base / state / district
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_path = output_dir / f"{block}.gpkg"
 

@@ -89,8 +89,9 @@ def generate_facilities_proximity_local(
         )
 
     print("Loading Facilities data overlapping ROI...")
-    # Load using bounding box mask to save memory
-    facilities_gdf = gpd.read_file(PAN_INDIA_FACILITIES_PATH, mask=watersheds_gdf)
+    # Loading without mask because the source GeoJSON has coordinates as strings 
+    # which causes fiona to crash during bbox filtering. 
+    facilities_gdf = gpd.read_file(PAN_INDIA_FACILITIES_PATH)
     facilities_gdf = validate_geometry(facilities_gdf)
     if facilities_gdf.empty:
         print(
