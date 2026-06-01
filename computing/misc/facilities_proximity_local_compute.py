@@ -69,7 +69,7 @@ def generate_facilities_proximity_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"facilities_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_27may"
+        layer_name = f"facilities_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         panchayat_gdf, panchayat_source = load_precomputed_panchayat(
             state=state,
             district=district,
