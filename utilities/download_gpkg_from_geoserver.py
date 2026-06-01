@@ -38,7 +38,7 @@ def build_layer_and_path(state, district, block, workspace):
         output_base = output_base / "tehsil_watersheds"
     elif workspace == "panchayat_boundaries":
         layer_name = f"panchayat_boundaries:{district}_{block}"
-        output_base = output_base / "panchayat_boundaries"
+        output_base = output_base / "village_boundaries"
 
     output_dir = output_base / state / district
     output_dir.mkdir(parents=True, exist_ok=True)
