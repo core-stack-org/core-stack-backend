@@ -14,6 +14,7 @@ BASE_OUTPUT_DIR = Path(
     "/home/cfpt-jedi/developer/shiv/core-stack-backend/data/base_layers/"
 )
 
+
 def build_layer_and_path(state, district, block, workspace):
     """
     Create:
@@ -30,10 +31,10 @@ def build_layer_and_path(state, district, block, workspace):
     block = valid_gee_text(block.lower())
 
     # GeoServer layer
-    if workspace=='mws':
+    if workspace == "mws":
         layer_name = f"mws:mws_{district}_{block}"
         BASE_OUTPUT_DIR = BASE_OUTPUT_DIR + "tehsil_watersheds"
-    elif workspace=='panchayat_boundaries':
+    elif workspace == "panchayat_boundaries":
         layer_name = f"panchayat_boundaries:{district}_{block}"
         BASE_OUTPUT_DIR = BASE_OUTPUT_DIR + "panchayat_boundaries"
 
@@ -58,7 +59,7 @@ def read_layer_from_geoserver(layer_name):
         "srsName": "EPSG:4326",
     }
 
-    geoserver_url = settings.PROD_GEOSERVER_URL.rstrip('/')
+    geoserver_url = settings.PROD_GEOSERVER_URL.rstrip("/")
     wfs_url = f"{geoserver_url}/wfs"
 
     # Some workspaces might be protected, use auth if available
@@ -73,12 +74,14 @@ def read_layer_from_geoserver(layer_name):
         timeout=120,
         verify=False,
     )
-    
+
     response.raise_for_status()
 
     # Verify we actually got JSON and not an HTML redirect page
     if "text/html" in response.headers.get("Content-Type", ""):
-        raise ValueError(f"GeoServer returned HTML instead of JSON. Check the WFS URL and layer name: {layer_name}")
+        raise ValueError(
+            f"GeoServer returned HTML instead of JSON. Check the WFS URL and layer name: {layer_name}"
+        )
 
     return gpd.read_file(response.text)
 
@@ -90,7 +93,7 @@ def generate_gpkg(state, district, block, workspace):
 
     try:
         layer_name, gpkg_path, district, block = build_layer_and_path(
-            state, district, block
+            state, district, block, workspace
         )
         gdf = read_layer_from_geoserver(layer_name)
 
