@@ -75,7 +75,6 @@ def mws_connectivity_vector(
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
-    """
     if state and district and block:
         layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_connectivity"
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
