@@ -12,6 +12,7 @@ from utilities.gee_utils import valid_gee_text
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PRECOMPUTED_TEHSIL_WATERSHED_DIR = PROJECT_ROOT / "data/base_layers/tehsil_watersheds"
+PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
 AEZ_VECTOR_PATH = PROJECT_ROOT / "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
 LULC_BASE_DIR = PROJECT_ROOT / "data/base_layers/lulc"
@@ -94,7 +95,7 @@ def resolve_precomputed_vector_file(
     )
 
 
-from utilities.download_gpkg_from_geoserver import generate_mws_gpkg
+from utilities.download_gpkg_from_geoserver import generate_gpkg
 
 
 def load_precomputed_watersheds(
@@ -117,7 +118,7 @@ def load_precomputed_watersheds(
         print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
 
         # Generate dynamically
-        generate_mws_gpkg(state=state, district=district, block=block)
+        generate_gpkg(state=state, district=district, block=block, workspace="mws")
 
         # Retry after generation
         watershed_path = resolve_precomputed_vector_file(
@@ -136,6 +137,47 @@ def load_precomputed_watersheds(
     print(f"Loaded watershed boundaries: {watershed_path}")
 
     return watersheds_gdf, str(watershed_path)
+
+
+def load_precomputed_panchayat(
+    state,
+    district,
+    block,
+    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
+):
+    try:
+        panchayat_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Precomputed panchayat boundary file",
+        )
+
+    except FileNotFoundError:
+
+        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
+
+        # Generate dynamically
+        generate_gpkg(state=state, district=district, block=block, workspace="panchayat_boundaries")
+
+        # Retry after generation
+        panchayat_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Generated panchayat boundary file not found",
+        )
+
+    panchayat_gdf = read_validated_vector_file(
+        panchayat_path,
+        f"Precomputed panchayat file has no valid geometries: {panchayat_path}",
+    )
+
+    print(f"Loaded panchayat boundaries: {panchayat_path}")
+
+    return panchayat_gdf, str(panchayat_path)
 
 
 def load_precomputed_roi(

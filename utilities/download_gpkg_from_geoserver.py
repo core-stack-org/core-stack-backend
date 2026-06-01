@@ -6,16 +6,15 @@ from nrm_app import settings
 from utilities.gee_utils import valid_gee_text
 
 """
-from utilities.download_gpkg_from_geoserver import generate_mws_gpkg
-generate_mws_gpkg(state="Odisha", district="Srikakulam", block="Bhamini")
+from utilities.download_gpkg_from_geoserver import generate_gpkg
+generate_gpkg(state="Odisha", district="Srikakulam", block="Bhamini", workspace="panchayat_boundaries")
 """
 
 BASE_OUTPUT_DIR = Path(
-    "/home/cfpt-jedi/developer/shiv/core-stack-backend/data/base_layers/tehsil_watersheds"
+    "/home/cfpt-jedi/developer/shiv/core-stack-backend/data/base_layers/"
 )
 
-
-def build_layer_and_path(state, district, block):
+def build_layer_and_path(state, district, block, workspace):
     """
     Create:
     - sanitized names
@@ -31,7 +30,13 @@ def build_layer_and_path(state, district, block):
     block = valid_gee_text(block.lower())
 
     # GeoServer layer
-    layer_name = f"mws:mws_{district}_{block}"
+    if workspace=='mws':
+        layer_name = f"mws:mws_{district}_{block}"
+        BASE_OUTPUT_DIR = BASE_OUTPUT_DIR + "tehsil_watersheds"
+    elif workspace=='panchayat_boundaries':
+        layer_name = f"panchayat_boundaries:{district}_{block}"
+        BASE_OUTPUT_DIR = BASE_OUTPUT_DIR + "panchayat_boundaries"
+
     output_dir = BASE_OUTPUT_DIR / state / district
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_path = output_dir / f"{block}.gpkg"
@@ -78,17 +83,12 @@ def read_layer_from_geoserver(layer_name):
     return gpd.read_file(response.text)
 
 
-def generate_mws_gpkg(state, district, block):
+def generate_gpkg(state, district, block, workspace):
     """
     Generate GPKG for each location.
     """
 
-    # import urllib3
-
-    # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
     try:
-
         layer_name, gpkg_path, district, block = build_layer_and_path(
             state, district, block
         )

@@ -11,7 +11,7 @@ from computing.utils import (
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    load_precomputed_panchayat,
     read_validated_vector_file,
     write_vector_output,
     validate_geometry,
@@ -67,7 +67,7 @@ def generate_facilities_proximity_local(
 ):
     if state and district and block:
         layer_name = f"facilities_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_27may"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
+        panchayat_gdf, panchayat_source = load_precomputed_panchayat(
             state=state,
             district=district,
             block=block,

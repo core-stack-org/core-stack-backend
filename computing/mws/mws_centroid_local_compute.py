@@ -59,7 +59,7 @@ def generate_mws_centroid_data_local(
 ):
     _ = self, gee_account_id
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_centroid_27may"
+        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_centroid"
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
             district=district,

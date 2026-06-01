@@ -22,6 +22,7 @@ from computing.config_loader import (
 GEOSERVER_WORKSPACE = "slope_percentage"
 SLOPE_PERCENTAGE_STYLE_NAME = "slope_percentage"
 
+
 @app.task(bind=True)
 def generate_slope_percentage_data_local(
     self,
@@ -48,7 +49,9 @@ def generate_slope_percentage_data_local(
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
         layer_name_base = f"slope_percentage_{valid_gee_text(asset_suffix).lower()}"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        watersheds_gdf = read_validated_vector_file(
+            roi_path, f"Invalid ROI file: {roi_path}"
+        )
         print(f"ROI source: {roi_path}")
 
     # Raster Processing
@@ -94,7 +97,7 @@ def generate_slope_percentage_data_local(
         if raster_layer_id:
             update_layer_sync_status(layer_id=raster_layer_id, sync_to_geoserver=True)
             print(f"Database record updated for raster layer_id: {raster_layer_id}")
-            
+
             # STAC Specs for Raster
             try:
                 layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
@@ -104,7 +107,8 @@ def generate_slope_percentage_data_local(
                     layer_name="slope_percentage_raster",
                 )
                 update_layer_sync_status(
-                    layer_id=raster_layer_id, is_stac_specs_generated=layer_STAC_generated
+                    layer_id=raster_layer_id,
+                    is_stac_specs_generated=layer_STAC_generated,
                 )
                 print("STAC metadata updated for Slope Percentage raster")
             except Exception as e:

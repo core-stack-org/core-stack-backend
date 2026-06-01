@@ -22,6 +22,7 @@ from computing.config_loader import (
 GEOSERVER_WORKSPACE = "natural_depression"
 NATURAL_DEPRESSION_STYLE_NAME = "natural_depression"
 
+
 @app.task(bind=True)
 def generate_natural_depression_data_local(
     self,
@@ -36,7 +37,7 @@ def generate_natural_depression_data_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name_base = f"natural_depression_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster_27may"
+        layer_name_base = f"natural_depression_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
             district=district,
@@ -47,8 +48,12 @@ def generate_natural_depression_data_local(
     else:
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name_base = f"natural_depression_{valid_gee_text(asset_suffix).lower()}_raster"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        layer_name_base = (
+            f"natural_depression_{valid_gee_text(asset_suffix).lower()}_raster"
+        )
+        watersheds_gdf = read_validated_vector_file(
+            roi_path, f"Invalid ROI file: {roi_path}"
+        )
         print(f"ROI source: {roi_path}")
 
     # Raster Processing
@@ -94,7 +99,7 @@ def generate_natural_depression_data_local(
         if raster_layer_id:
             update_layer_sync_status(layer_id=raster_layer_id, sync_to_geoserver=True)
             print(f"Database record updated for raster layer_id: {raster_layer_id}")
-            
+
             # STAC Specs for Raster
             try:
                 layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
@@ -104,7 +109,8 @@ def generate_natural_depression_data_local(
                     layer_name="natural_depression_raster",
                 )
                 update_layer_sync_status(
-                    layer_id=raster_layer_id, is_stac_specs_generated=layer_STAC_generated
+                    layer_id=raster_layer_id,
+                    is_stac_specs_generated=layer_STAC_generated,
                 )
                 print("STAC metadata updated for Natural Depression raster")
             except Exception as e:
