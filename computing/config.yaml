@@ -27,9 +27,9 @@ base_layers:
           source: google_drive
           gdrive_id: 1CPV03S47s0asEJqdAozbNOT1lkgr0YkG
 
-        - path: data/base_layers/terrain_raster_fabdam_pan_india.tif
+        - path: data/base_layers/slope/slope_india_30m_merged.tif
           source: manual
-          note: Pan-India terrain raster used for slope/terrain classification
+          note: Pan-India slope raster used for slope/terrain classification
 
         - path: data/base_layers/AEZs/Agro_Ecological_Regions.shp
           source: manual

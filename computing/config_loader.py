@@ -43,7 +43,7 @@ LULC_BASE_DIR: Path = _abs(
 ).parent
 
 TERRAIN_RASTER_PATH: Path = PROJECT_ROOT / _find_input(
-    "data/base_layers/terrain_raster_fabdam_pan_india.tif"
+    "data/base_layers/slope/slope_india_30m_merged.tif"
 )["path"]
 
 AEZ_VECTOR_PATH: Path = PROJECT_ROOT / _find_input(

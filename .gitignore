@@ -11,6 +11,10 @@ venv/
 .DS_Store
 .cursor/
 
+#IDE
+.codex
+.vscode/*
+
 # Django
 *.log
 local_settings.py

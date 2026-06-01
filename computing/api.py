@@ -31,6 +31,7 @@ from .misc.ndvi_time_series import ndvi_timeseries
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
+from .mws.runoff_gpu import generate_runoff_gpu as generate_runoff_gpu_task
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -331,6 +332,48 @@ def generate_annual_hydrology(request):
     except Exception as e:
         print("Exception in generate_annual_hydrology api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_runoff_gpu(request):
+    print("Inside generate_runoff_gpu")
+    try:
+        compute = _get_compute_mode(request)
+        if compute != "local":
+            raise ValueError("runoff_gpu currently supports compute='local' only")
+
+        tehsil = request.data.get("tehsil") or request.data.get("block")
+        pan_india = request.data.get(
+            "pan_india",
+            request.data.get("pan-india", request.data.get("panIndia", False)),
+        )
+        task = generate_runoff_gpu_task.apply_async(
+            kwargs={
+                "state": request.data.get("state"),
+                "district": request.data.get("district"),
+                "tehsil": tehsil,
+                "pan_india": pan_india,
+                "start_date": request.data.get("start_date"),
+                "end_date": request.data.get("end_date"),
+                "start_year": request.data.get("start_year"),
+                "end_year": request.data.get("end_year"),
+            },
+            queue="nrm",
+        )
+        return Response(
+            {
+                "Success": "runoff_gpu task initiated",
+                "task_id": task.id,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except ValueError as e:
+        print("Invalid request in generate_runoff_gpu api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_runoff_gpu api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
