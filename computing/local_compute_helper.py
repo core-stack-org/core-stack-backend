@@ -95,6 +95,34 @@ def resolve_precomputed_vector_file(
     )
 
 
+def resolve_precomputed_panchayat_vector_file(
+    state,
+    district,
+    block,
+    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
+    extensions=PRECOMPUTED_ROI_EXTENSIONS,
+    missing_file_label="Precomputed vector file",
+):
+    roi_dir = Path(precomputed_roi_dir or PRECOMPUTED_PANCHAYAT_DIR)
+    state_slug = _slug(state, "unknown_state")
+    district_slug = _slug(district, "unknown_district")
+    block_slug = _slug(block, "unknown_tehsil")
+
+    expected_paths = [
+        roi_dir / state_slug / district_slug / f"{block_slug}{ext}"
+        for ext in extensions
+    ]
+    for path in expected_paths:
+        if path.exists():
+            return path
+
+    raise FileNotFoundError(
+        f"{missing_file_label} not found. "
+        f"state={state}, district={district}, block={block}. "
+        f"Expected one of: {[str(path) for path in expected_paths]}"
+    )
+
+
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 
 
@@ -146,7 +174,7 @@ def load_precomputed_panchayat(
     precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
 ):
     try:
-        panchayat_path = resolve_precomputed_vector_file(
+        panchayat_path = resolve_precomputed_panchayat_vector_file(
             state=state,
             district=district,
             block=block,
@@ -159,10 +187,15 @@ def load_precomputed_panchayat(
         print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
 
         # Generate dynamically
-        generate_gpkg(state=state, district=district, block=block, workspace="panchayat_boundaries")
+        generate_gpkg(
+            state=state,
+            district=district,
+            block=block,
+            workspace="panchayat_boundaries",
+        )
 
         # Retry after generation
-        panchayat_path = resolve_precomputed_vector_file(
+        panchayat_path = resolve_precomputed_panchayat_vector_file(
             state=state,
             district=district,
             block=block,
