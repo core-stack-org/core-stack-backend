@@ -32,11 +32,15 @@ def _compute_proximity_for_watersheds(watersheds_gdf, facilities_gdf):
         return facilities_gdf
 
     # Ensure CRS matches
-    if watersheds_gdf.crs and facilities_gdf.crs and watersheds_gdf.crs != facilities_gdf.crs:
+    if (
+        watersheds_gdf.crs
+        and facilities_gdf.crs
+        and watersheds_gdf.crs != facilities_gdf.crs
+    ):
         facilities_gdf = facilities_gdf.to_crs(watersheds_gdf.crs)
 
     outer_boundary = watersheds_gdf.geometry.unary_union
-    
+
     # Precise intersection check (since load-time mask is just bounding box)
     facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
 
@@ -74,18 +78,24 @@ def generate_facilities_proximity_local(
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
         layer_name = f"facilities_{valid_gee_text(asset_suffix).lower()}"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        watersheds_gdf = read_validated_vector_file(
+            roi_path, f"Invalid ROI file: {roi_path}"
+        )
         print(f"ROI source: {roi_path}")
 
     if not os.path.exists(PAN_INDIA_FACILITIES_PATH):
-        raise FileNotFoundError(f"PAN INDIA Facilities file not found at {PAN_INDIA_FACILITIES_PATH}")
+        raise FileNotFoundError(
+            f"PAN INDIA Facilities file not found at {PAN_INDIA_FACILITIES_PATH}"
+        )
 
     print("Loading Facilities data overlapping ROI...")
     # Load using bounding box mask to save memory
     facilities_gdf = gpd.read_file(PAN_INDIA_FACILITIES_PATH, mask=watersheds_gdf)
     facilities_gdf = validate_geometry(facilities_gdf)
     if facilities_gdf.empty:
-        print("Warning: PAN INDIA Facilities file has no valid geometries overlapping ROI")
+        print(
+            "Warning: PAN INDIA Facilities file has no valid geometries overlapping ROI"
+        )
     print(f"Loaded {len(facilities_gdf)} Facilities features")
 
     result_gdf = _compute_proximity_for_watersheds(

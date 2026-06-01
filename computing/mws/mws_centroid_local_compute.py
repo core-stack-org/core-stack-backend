@@ -29,14 +29,14 @@ def _compute_mws_centroids(watersheds_gdf):
 
     # Create a copy so we don't modify the original
     centroids_gdf = watersheds_gdf.copy()
-    
+
     # Ensure WGS84 for correct lat/lon coordinate extraction
     if centroids_gdf.crs != "EPSG:4326":
         centroids_gdf = centroids_gdf.to_crs("EPSG:4326")
 
     # Replace polygon geometry with point centroid
     centroids_gdf["geometry"] = centroids_gdf.geometry.centroid
-    
+
     # Extract coordinates
     centroids_gdf["centroid_lon"] = centroids_gdf.geometry.x
     centroids_gdf["centroid_lat"] = centroids_gdf.geometry.y
@@ -59,7 +59,7 @@ def generate_mws_centroid_data_local(
 ):
     _ = self, gee_account_id
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_centroid"
+        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_centroid_27may"
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
             district=district,
@@ -71,7 +71,9 @@ def generate_mws_centroid_data_local(
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
         layer_name = f"{valid_gee_text(asset_suffix).lower()}_mws_centroid"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        watersheds_gdf = read_validated_vector_file(
+            roi_path, f"Invalid ROI file: {roi_path}"
+        )
         print(f"ROI source: {roi_path}")
 
     print("Computing MWS centroids...")
