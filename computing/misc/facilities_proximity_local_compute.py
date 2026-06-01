@@ -21,7 +21,7 @@ from computing.config_loader import (
     LOCAL_FACILITIES_OUTPUT,
 )
 
-GEOSERVER_WORKSPACE = "facilities"
+GEOSERVER_WORKSPACE = "facilities_proximity"
 
 
 def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
