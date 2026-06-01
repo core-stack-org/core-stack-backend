@@ -24,22 +24,22 @@ from computing.config_loader import (
 GEOSERVER_WORKSPACE = "facilities"
 
 
-def _compute_proximity_for_watersheds(watersheds_gdf, facilities_gdf):
+def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
     """
-    Filters facilities to strictly those intersecting the watershed boundaries.
+    Filters facilities to strictly those intersecting the panchayat boundaries.
     """
     if facilities_gdf.empty:
         return facilities_gdf
 
     # Ensure CRS matches
     if (
-        watersheds_gdf.crs
+        panchayat_gdf.crs
         and facilities_gdf.crs
-        and watersheds_gdf.crs != facilities_gdf.crs
+        and panchayat_gdf.crs != facilities_gdf.crs
     ):
-        facilities_gdf = facilities_gdf.to_crs(watersheds_gdf.crs)
+        facilities_gdf = facilities_gdf.to_crs(panchayat_gdf.crs)
 
-    outer_boundary = watersheds_gdf.geometry.unary_union
+    outer_boundary = panchayat_gdf.geometry.unary_union
 
     # Precise intersection check (since load-time mask is just bounding box)
     facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
@@ -73,12 +73,12 @@ def generate_facilities_proximity_local(
             block=block,
             precomputed_roi_dir=precomputed_roi_dir,
         )
-        print(f"Watershed boundary source: {watershed_source}")
+        print(f"Panchayat boundary source: {panchayat_source}")
     else:
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
         layer_name = f"facilities_{valid_gee_text(asset_suffix).lower()}"
-        watersheds_gdf = read_validated_vector_file(
+        panchayat_gdf = read_validated_vector_file(
             roi_path, f"Invalid ROI file: {roi_path}"
         )
         print(f"ROI source: {roi_path}")
@@ -99,8 +99,8 @@ def generate_facilities_proximity_local(
         )
     print(f"Loaded {len(facilities_gdf)} Facilities features")
 
-    result_gdf = _compute_proximity_for_watersheds(
-        watersheds_gdf=watersheds_gdf,
+    result_gdf = _compute_proximity_for_panchayat(
+        panchayat_gdf=panchayat_gdf,
         facilities_gdf=facilities_gdf,
     )
     print(f"Final valid Facilities features after spatial filter: {len(result_gdf)}")
