@@ -44,6 +44,9 @@ def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
     # Precise intersection check (since load-time mask is just bounding box)
     facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
 
+    # Precisely clip the geometries so they don't extend outside the panchayat boundary
+    facilities_in_roi = gpd.clip(facilities_in_roi, outer_boundary)
+
     # Final cleanup
     facilities_in_roi = facilities_in_roi[~facilities_in_roi.geometry.is_empty]
     facilities_in_roi = facilities_in_roi[facilities_in_roi.geometry.is_valid]
