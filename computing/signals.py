@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -120,7 +121,7 @@ def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
         layer_name=mapping.layer_name,
         start_year=str(misc.get("start_year", "") or ""),
         end_year=str(misc.get("end_year", "") or ""),
-        upload_to_s3=True,
+        upload_to_s3=bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
         layer_id=instance.id,
     )
 
