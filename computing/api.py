@@ -1590,7 +1590,7 @@ def et_downscale(request):
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        tehsil = request.data.get("block").lower()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
@@ -1600,7 +1600,7 @@ def et_downscale(request):
             kwargs={
                 "state": state,
                 "district": district,
-                "block": block,
+                "tehsil": tehsil,
                 "start_year": start_year,
                 "end_year": end_year,
                 "gee_account_id": gee_account_id,
