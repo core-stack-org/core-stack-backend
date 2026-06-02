@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -126,7 +127,10 @@ def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
     )
 
     try:
-        generate_stac_collection_task.apply_async(kwargs=task_kwargs, queue=_STAC_QUEUE)
+        if bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False)):
+            generate_stac_collection_task.apply(kwargs=task_kwargs)
+        else:
+            generate_stac_collection_task.apply_async(kwargs=task_kwargs, queue=_STAC_QUEUE)
     except Exception as exc:  # noqa: BLE001
         log.error(
             "STAC auto-trigger: failed to dispatch task for layer id=%s: %s",
