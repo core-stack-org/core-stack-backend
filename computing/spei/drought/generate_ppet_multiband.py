@@ -19,17 +19,6 @@ from rasterio.enums import Resampling
 from rasterio.warp import reproject
 
 
-# --- CONFIG ---
-# state_name = "Madhya_Pradesh"
-# start_year = 2004
-# end_year = 2023
-#
-# input_root = Path("data/drought_inputs")
-# output_dir = Path("data/drought_inputs") / state_name / "monthly" / "ppet"
-# output_path = output_dir / f"P_PET_{state_name}_monthly_multiband.tif"
-# OUTPUT_NODATA = -9999.0
-
-
 def find_monthly_file(dataset_dir: Path, prefix: str, year: int, month: int) -> Path:
     """Find a downloaded monthly GeoTIFF, allowing nested folders from old runs."""
     label = f"{year}{month:02d}"
