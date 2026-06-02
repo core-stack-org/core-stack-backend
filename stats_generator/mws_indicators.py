@@ -933,23 +933,6 @@ def generate_mws_data_for_kyl_filters(
                                 2,
                             )
 
-                            # Crop
-                            crop_cols = [
-                                col
-                                for col in lulc_df.columns
-                                if (
-                                    col.startswith("single_kharif_in_ha_")
-                                    or col.startswith("single_non_kharif_in_ha_")
-                                    or col.startswith("double_crop_in_ha_")
-                                    or col.startswith("triple_crop_in_ha_")
-                                )
-                            ]
-
-                            lulc_crop_area = round(
-                                sum(row[col] for col in crop_cols) / len(crop_cols), 2
-                            )
-
-                            # Percentage calculation
                             if area_in_ha > 0:
                                 lulc_shrub_percent = round(
                                     (lulc_shrub_area / area_in_ha) * 100, 2
@@ -959,9 +942,17 @@ def generate_mws_data_for_kyl_filters(
                                     (lulc_forest_area / area_in_ha) * 100, 2
                                 )
 
-                                lulc_crop_percent = round(
-                                    (lulc_crop_area / area_in_ha) * 100, 2
-                                )
+                        df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
+                            sheets["croppingIntensity_annual"]["UID"] == specific_mws_id
+                        ]
+
+                        crp_row = df_crp_intensity_mws_data.iloc[0]
+                        area_in_ha = float(crp_row.get("area_in_ha", 0))
+                        cropped_area_in_ha = float(crp_row.get("sum_area_in_ha", 0))
+
+                        lulc_crop_percent = round(
+                            (cropped_area_in_ha / area_in_ha) * 100, 2
+                        )
 
                 except Exception as e:
                     print(f"Error in LULC vector: {e}")

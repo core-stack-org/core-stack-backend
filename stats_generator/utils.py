@@ -245,7 +245,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "drainage_density":
                 create_excel_for_drainage_density(geojson_data, writer)
             elif workspace == "antyodaya_analysis":
-                create_excel_for_antoyada_20(geojson_data, writer)
+                create_excel_for_antyodaya_20(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
@@ -254,27 +254,21 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     return results
 
 
-def create_excel_for_antoyada_20(data, writer):
+def create_excel_for_antyodaya_20(data, writer):
     features = data.get("features", [])
-
     df_data = [feature.get("properties", {}) for feature in features]
-
     df = pd.DataFrame(df_data)
 
     # Keep important columns first if they exist
     first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
-
     other_cols = [c for c in df.columns if c not in first_cols]
-
     df = df[first_cols + other_cols]
 
     # Round numeric columns
     numeric_cols = df.select_dtypes(include=["number"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
-
-    df.to_excel(writer, sheet_name="antoyada", index=False)
-
-    print("Excel file created for antoyada")
+    df.to_excel(writer, sheet_name="antyodaya", index=False)
+    print("Excel file created for antyodaya")
 
 
 def create_excel_for_drainage_density(data, writer):
@@ -2178,16 +2172,16 @@ def add_sheets_to_excel(state, district, block, sheets):
         sheets_to_add = [sheet.strip() for sheet in sheets.split(",") if sheet.strip()]
         results = []
 
-        # for sheet in sheets_to_add:
-        #     r = get_vector_layer_geoserver(state, district, block, sheet)
-        #     results.append(r)
+        for sheet in sheets_to_add:
+            r = get_vector_layer_geoserver(state, district, block, sheet)
+            results.append(r)
 
         from .mws_indicators import generate_mws_data_for_kyl_filters
         from .village_indicators import get_generate_filter_data_village
 
-        # from public_api.views import get_tehsil_json
+        from public_api.views import get_tehsil_json
 
-        # get_tehsil_json(state, district, block, 1)
+        get_tehsil_json(state, district, block, 1)
         generate_mws_data_for_kyl_filters(state, district, block, "json", 1)
         get_generate_filter_data_village(state, district, block, 1)
 
