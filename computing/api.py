@@ -1883,21 +1883,50 @@ def generate_stac_collection(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        generate_stac_collection_task.apply_async(
-            kwargs={
-                "layer_type": layer_type,
-                "state": state,
-                "district": district,
-                "block": block,
-                "layer_name": layer_name,
-                "start_year": start_year,
-                "end_year": end_year,
-                "upload_to_s3": upload_to_s3,
-                "overwrite": overwrite,
-                "overwrite_metadata": overwrite_metadata,
-            },
-            queue="nrm",
-        )
+        task_kwargs = {
+            "layer_type": layer_type,
+            "state": state,
+            "district": district,
+            "block": block,
+            "layer_name": layer_name,
+            "start_year": start_year,
+            "end_year": end_year,
+            "upload_to_s3": upload_to_s3,
+            "overwrite": overwrite,
+            "overwrite_metadata": overwrite_metadata,
+        }
+
+        if bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False)):
+            task_result = generate_stac_collection_task.apply(kwargs=task_kwargs)
+            if task_result.failed():
+                return Response(
+                    {"error": str(task_result.result)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            if not task_result.result:
+                return Response(
+                    {"error": "STAC collection generation failed"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            stac_spec = _collect_generated_stac_specs(
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name,
+                layer_type=layer_type,
+                start_year=start_year,
+                end_year=end_year,
+            )
+            return Response(
+                {
+                    "Success": "STAC collection generation completed",
+                    "stac_spec": stac_spec,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        generate_stac_collection_task.apply_async(kwargs=task_kwargs, queue="nrm")
         return Response(
             {"Success": "STAC collection generation initiated"},
             status=status.HTTP_200_OK,
@@ -1923,6 +1952,59 @@ def _read_json(path):
         return None
     with open(path) as f:
         return json.load(f)
+
+
+def _build_stac_item_id(state, district, block, layer_name, year=""):
+    parts = [state, district, block, layer_name]
+    if year not in (None, ""):
+        parts.append(str(year))
+    return "_".join(parts)
+
+
+def _collect_generated_stac_specs(
+    *,
+    state,
+    district,
+    block,
+    layer_name,
+    layer_type,
+    start_year="",
+    end_year="",
+):
+    state = sanitize_text(str(state).lower())
+    district = sanitize_text(str(district).lower())
+    block = sanitize_text(str(block).lower())
+    layer_name = sanitize_text(str(layer_name).lower())
+
+    block_dir = os.path.join(
+        STACConfig().stac_files_dir,
+        _TEHSIL,
+        state,
+        district,
+        block,
+    )
+    block_collection = _read_json(os.path.join(block_dir, "collection.json"))
+
+    years = []
+    if layer_type == "raster" and str(start_year).strip() and str(end_year).strip():
+        years = [str(y) for y in range(int(start_year), int(end_year) + 1)]
+    elif str(start_year).strip():
+        years = [str(start_year).strip()]
+    else:
+        years = [""]
+
+    items = []
+    for year in years:
+        item_id = _build_stac_item_id(state, district, block, layer_name, year)
+        item_path = os.path.join(block_dir, item_id, f"{item_id}.json")
+        item_spec = _read_json(item_path)
+        if item_spec is not None:
+            items.append(item_spec)
+
+    return {
+        "block_collection": block_collection,
+        "items": items,
+    }
 
 
 @api_view(["GET"])
