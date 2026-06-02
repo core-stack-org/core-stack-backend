@@ -271,6 +271,7 @@ USE_TZ = True
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
+STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
