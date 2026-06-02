@@ -211,13 +211,12 @@ def sync_layer_generation_if_enabled(view_func):
 
         try:
             payload = getattr(response, "data", None)
-            if (
-                isinstance(payload, dict)
-                and payload.get("status") == "initiated"
-                and "stac_spec" not in payload
-            ):
+            if isinstance(payload, dict):
                 stac_spec = _collect_stac_for_request(request)
                 if stac_spec is not None:
+                    # Always return existing/generated STAC JSON for this block,
+                    # even when is_stac_specs_generated was already True and
+                    # the signal skipped re-generation.
                     payload["stac_spec"] = stac_spec
         except Exception:
             logger.exception("Failed to enrich sync response with STAC specs")
