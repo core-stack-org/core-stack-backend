@@ -52,25 +52,32 @@ def _collect_stac_for_request(request):
     district_dir = os.path.join(state_dir, district)
     block_dir = os.path.join(district_dir, block)
 
-    if not os.path.isdir(block_dir):
-        return None
-
     items = []
-    for entry in sorted(os.listdir(block_dir)):
-        item_dir = os.path.join(block_dir, entry)
-        if not os.path.isdir(item_dir):
-            continue
-        item_json = os.path.join(item_dir, f"{entry}.json")
-        item_spec = _read_json(item_json)
-        if item_spec is not None:
-            items.append(item_spec)
+    if os.path.isdir(block_dir):
+        for entry in sorted(os.listdir(block_dir)):
+            item_dir = os.path.join(block_dir, entry)
+            if not os.path.isdir(item_dir):
+                continue
+            item_json = os.path.join(item_dir, f"{entry}.json")
+            item_spec = _read_json(item_json)
+            if item_spec is not None:
+                items.append(item_spec)
+
+    root_catalog = _read_json(os.path.join(stac_root, "catalog.json"))
+    tehsil_catalog = _read_json(os.path.join(tehsil_dir, "catalog.json"))
+    state_collection = _read_json(os.path.join(state_dir, "collection.json"))
+    district_collection = _read_json(os.path.join(district_dir, "collection.json"))
+    block_collection = _read_json(os.path.join(block_dir, "collection.json"))
+
+    has_stac_data = bool(block_collection) or bool(items)
 
     return {
-        "root_catalog": _read_json(os.path.join(stac_root, "catalog.json")),
-        "tehsil_catalog": _read_json(os.path.join(tehsil_dir, "catalog.json")),
-        "state_collection": _read_json(os.path.join(state_dir, "collection.json")),
-        "district_collection": _read_json(os.path.join(district_dir, "collection.json")),
-        "block_collection": _read_json(os.path.join(block_dir, "collection.json")),
+        "stac_status": "available" if has_stac_data else "not_generated_yet",
+        "root_catalog": root_catalog,
+        "tehsil_catalog": tehsil_catalog,
+        "state_collection": state_collection,
+        "district_collection": district_collection,
+        "block_collection": block_collection,
         "items": items,
     }
 
