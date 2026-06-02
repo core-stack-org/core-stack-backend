@@ -94,7 +94,10 @@ from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
-from utilities.layer_generation_mode import sync_layer_generation_if_enabled
+from utilities.layer_generation_mode import (
+    sync_layer_generation_if_enabled,
+    is_sync_layer_generation_request,
+)
 from utilities.layer_generation_logging import (
     layer_api_error_response,
     layer_generation_api_logging,
@@ -512,7 +515,7 @@ def lulc_v3(request):
         )
         asset_id = layer_assets.resolve_asset_id_field(asset_ids=asset_ids)
 
-        if bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False)):
+        if is_sync_layer_generation_request(request):
             task_result = clip_lulc_v3.apply(
                 args=[state, district, block, start_year, end_year, gee_account_id]
             )
@@ -1896,7 +1899,7 @@ def generate_stac_collection(request):
             "overwrite_metadata": overwrite_metadata,
         }
 
-        if bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False)):
+        if is_sync_layer_generation_request(request):
             task_result = generate_stac_collection_task.apply(kwargs=task_kwargs)
             if task_result.failed():
                 return Response(
@@ -1976,32 +1979,57 @@ def _collect_generated_stac_specs(
     block = sanitize_text(str(block).lower())
     layer_name = sanitize_text(str(layer_name).lower())
 
+    base_dir = STACConfig().stac_files_dir
+    tehsil_dir = os.path.join(base_dir, _TEHSIL)
+    state_dir = os.path.join(tehsil_dir, state)
+    district_dir = os.path.join(state_dir, district)
     block_dir = os.path.join(
-        STACConfig().stac_files_dir,
-        _TEHSIL,
-        state,
-        district,
+        district_dir,
         block,
     )
+    root_catalog = _read_json(os.path.join(base_dir, "catalog.json"))
+    tehsil_catalog = _read_json(os.path.join(tehsil_dir, "catalog.json"))
+    state_collection = _read_json(os.path.join(state_dir, "collection.json"))
+    district_collection = _read_json(os.path.join(district_dir, "collection.json"))
     block_collection = _read_json(os.path.join(block_dir, "collection.json"))
 
-    years = []
+    requested_item_ids = []
     if layer_type == "raster" and str(start_year).strip() and str(end_year).strip():
-        years = [str(y) for y in range(int(start_year), int(end_year) + 1)]
+        requested_item_ids = [
+            _build_stac_item_id(state, district, block, layer_name, str(y))
+            for y in range(int(start_year), int(end_year) + 1)
+        ]
     elif str(start_year).strip():
-        years = [str(start_year).strip()]
+        requested_item_ids = [
+            _build_stac_item_id(state, district, block, layer_name, str(start_year).strip())
+        ]
     else:
-        years = [""]
+        requested_item_ids = [_build_stac_item_id(state, district, block, layer_name, "")]
+
+    # For LULC and similar multi-year raster layers, include all year-wise items
+    # available for the requested block/layer even if the request did not include
+    # a full year range.
+    item_prefix = _build_stac_item_id(state, district, block, layer_name, "")
+    discovered_item_ids = []
+    if os.path.isdir(block_dir):
+        for entry in os.listdir(block_dir):
+            if entry.startswith(item_prefix) and os.path.isdir(os.path.join(block_dir, entry)):
+                discovered_item_ids.append(entry)
+
+    item_ids = sorted(set(requested_item_ids + discovered_item_ids))
 
     items = []
-    for year in years:
-        item_id = _build_stac_item_id(state, district, block, layer_name, year)
+    for item_id in item_ids:
         item_path = os.path.join(block_dir, item_id, f"{item_id}.json")
         item_spec = _read_json(item_path)
         if item_spec is not None:
             items.append(item_spec)
 
     return {
+        "root_catalog": root_catalog,
+        "tehsil_catalog": tehsil_catalog,
+        "state_collection": state_collection,
+        "district_collection": district_collection,
         "block_collection": block_collection,
         "items": items,
     }

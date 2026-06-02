@@ -14,6 +14,31 @@ def _sync_layer_generation_enabled():
     return bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False))
 
 
+def _read_request_mode(request):
+    if request is None or not hasattr(request, "data"):
+        return None
+    data = request.data
+    for key in ("layer_generation_mode", "layerGenerationMode", "layer_mode", "mode"):
+        value = data.get(key)
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+        if value is None:
+            continue
+        normalized = str(value).strip().lower()
+        if normalized:
+            return normalized
+    return None
+
+
+def is_sync_layer_generation_request(request=None):
+    request_mode = _read_request_mode(request)
+    if request_mode is not None:
+        return request_mode == "sync"
+    return _sync_layer_generation_enabled()
+
+
 def _apply_async_in_process(
     task_self,
     args=None,
@@ -89,7 +114,8 @@ def sync_layer_generation_if_enabled(view_func):
 
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-        if not _sync_layer_generation_enabled():
+        request = args[0] if args else kwargs.get("request")
+        if not is_sync_layer_generation_request(request):
             logger.debug(
                 "Layer generation mode=async for view=%s",
                 getattr(view_func, "__name__", "unknown"),
