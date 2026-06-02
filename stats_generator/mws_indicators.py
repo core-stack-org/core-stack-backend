@@ -785,7 +785,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ MWS Intersect Swb ########################
                 try:
-                    swb_df = sheets.get("mws_intersect_swb")
+                    swb_df = sheets["mws_intersect_swb"]
 
                     if swb_df is not -1 and not swb_df.empty:
                         mws_swb_data = swb_df[swb_df["UID"] == specific_mws_id]
@@ -820,7 +820,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ DEM (Digital Elevation Model) ########################
                 try:
-                    dem_df = sheets.get("dem")
+                    dem_df = sheets["dem"]
                     if dem_df is not -1 and not dem_df.empty:
                         mws_dem_data = dem_df[dem_df["UID"] == specific_mws_id]
 
@@ -859,7 +859,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ Canal ########################
                 try:
-                    canal_df = sheets.get("canal")
+                    canal_df = sheets["canal"]
                     if canal_df is not -1 and not canal_df.empty:
                         mws_canal_data = canal_df[canal_df["UID"] == specific_mws_id]
                         if not mws_canal_data.empty:
@@ -876,7 +876,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ Canal ########################
                 try:
-                    river_df = sheets.get("river")
+                    river_df = sheets["river"]
                     if river_df is not -1 and not river_df.empty:
                         mws_river_data = river_df[river_df["UID"] == specific_mws_id]
                         if not mws_river_data.empty:
@@ -897,7 +897,7 @@ def generate_mws_data_for_kyl_filters(
                     lulc_forest_percent = 0
                     lulc_crop_percent = 0
 
-                    lulc_df = sheets.get("lulc_vector")
+                    lulc_df = sheets["lulc_vector"]
 
                     if lulc_df is not -1 and not lulc_df.empty:
 
@@ -933,23 +933,6 @@ def generate_mws_data_for_kyl_filters(
                                 2,
                             )
 
-                            # Crop
-                            crop_cols = [
-                                col
-                                for col in lulc_df.columns
-                                if (
-                                    col.startswith("single_kharif_in_ha_")
-                                    or col.startswith("single_non_kharif_in_ha_")
-                                    or col.startswith("double_crop_in_ha_")
-                                    or col.startswith("triple_crop_in_ha_")
-                                )
-                            ]
-
-                            lulc_crop_area = round(
-                                sum(row[col] for col in crop_cols) / len(crop_cols), 2
-                            )
-
-                            # Percentage calculation
                             if area_in_ha > 0:
                                 lulc_shrub_percent = round(
                                     (lulc_shrub_area / area_in_ha) * 100, 2
@@ -959,9 +942,17 @@ def generate_mws_data_for_kyl_filters(
                                     (lulc_forest_area / area_in_ha) * 100, 2
                                 )
 
-                                lulc_crop_percent = round(
-                                    (lulc_crop_area / area_in_ha) * 100, 2
-                                )
+                        df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
+                            sheets["croppingIntensity_annual"]["UID"] == specific_mws_id
+                        ]
+
+                        crp_row = df_crp_intensity_mws_data.iloc[0]
+                        area_in_ha = float(crp_row.get("area_in_ha", 0))
+                        cropped_area_in_ha = float(crp_row.get("sum_area_in_ha", 0))
+
+                        lulc_crop_percent = round(
+                            (cropped_area_in_ha / area_in_ha) * 100, 2
+                        )
 
                 except Exception as e:
                     print(f"Error in LULC vector: {e}")
@@ -972,7 +963,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ Canal ########################
                 try:
-                    drainage_density_df = sheets.get("drainage_density")
+                    drainage_density_df = sheets["drainage_density"]
                     if drainage_density_df is not -1 and not drainage_density_df.empty:
                         mws_drainage_density_data = drainage_density_df[
                             drainage_density_df["UID"] == specific_mws_id

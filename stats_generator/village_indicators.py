@@ -147,7 +147,9 @@ def extract_soc_eco(df_soc_eco_indi, v_id):
 
 
 def get_generate_filter_data_village(state, district, block, regenerate=0):
+
     print("Generation of village filter json")
+
     state_folder = state.replace(" ", "_").upper()
     district_folder = district.replace(" ", "_").upper()
 
@@ -162,21 +164,45 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
     xlsx_file = file_xl_path + ".xlsx"
     json_path = file_xl_path + "_KYL_village_data.json"
 
+    # Return existing json if already generated
     if not regenerate and os.path.exists(json_path):
         with open(json_path, "rb") as file:
             response = HttpResponse(file.read(), content_type="application/json")
             response["Content-Disposition"] = (
-                f"attachment; filename={district}_{block}_KYL_village_data.json"
+                f"attachment; " f"filename={district}_{block}_KYL_village_data.json"
             )
+
             return response
 
+    # --------------------------------------------------
+    # Mandatory sheet check
+    # --------------------------------------------------
     try:
         df_soc_eco_indi = pd.read_excel(
             xlsx_file, sheet_name="social_economic_indicator"
         )
+
+        if df_soc_eco_indi.empty:
+            raise ValueError("Empty social_economic_indicator sheet")
     except Exception as e:
-        print("Failed to load social_economic_indicator:", e)
-        df_soc_eco_indi = pd.DataFrame()
+        print("No data found for panchayat boundary:", e)
+
+        empty_data = []
+
+        # Save empty json
+        with open(json_path, "w") as f:
+            json.dump(empty_data, f, indent=4)
+
+        return HttpResponse(
+            json.dumps(
+                {
+                    "message": "No data found for the panchayat boundary",
+                    "data": empty_data,
+                }
+            ),
+            content_type="application/json",
+            status=200,
+        )
 
     try:
         df_nrega_village = pd.read_excel(xlsx_file, sheet_name="nrega_assets_village")
@@ -190,40 +216,73 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
         print("Failed to load facilities_proximity:", e)
         df_facilities = pd.DataFrame()
 
+    # --------------------------------------------------
+    # Generate village json
+    # --------------------------------------------------
     results = []
 
-    if not df_soc_eco_indi.empty:
-        for v_id in df_soc_eco_indi["village_id"].unique():
-            if v_id == 0:
-                continue
+    for v_id in df_soc_eco_indi["village_id"].dropna().unique():
+        if v_id == 0:
+            continue
 
+        try:
             soc_eco = extract_soc_eco(df_soc_eco_indi, v_id)
-            total_assets = extract_nrega(df_nrega_village, v_id)
-            fac_data = extract_facilities(df_facilities, v_id)
+        except Exception as e:
+            print(f"extract_soc_eco failed " f"for village {v_id}: {e}")
+            soc_eco = {}
 
-            results.append(
-                {
-                    "village_id": v_id,
-                    **soc_eco,
-                    "total_assets": total_assets,
-                    **fac_data,
-                }
+        # ----------------------------------------------
+        # NREGA data
+        # ----------------------------------------------
+        try:
+            total_assets = (
+                extract_nrega(df_nrega_village, v_id)
+                if not df_nrega_village.empty
+                else 0
             )
+        except Exception as e:
+            print(f"extract_nrega failed " f"for village {v_id}: {e}")
+            total_assets = 0
 
-    results_list = pd.DataFrame(results).to_dict(orient="records")
+        # ----------------------------------------------
+        # Facilities data
+        # ----------------------------------------------
+        try:
+            fac_data = (
+                extract_facilities(df_facilities, v_id)
+                if not df_facilities.empty
+                else {}
+            )
+        except Exception as e:
+            print(f"extract_facilities failed " f"for village {v_id}: {e}")
+            fac_data = {}
 
+        # ----------------------------------------------
+        # Final village object
+        # ----------------------------------------------
+        results.append(
+            {
+                "village_id": int(v_id),
+                **soc_eco,
+                "total_assets": total_assets,
+                **fac_data,
+            }
+        )
+
+    # --------------------------------------------------
+    # Save generated json
+    # --------------------------------------------------
     with open(json_path, "w") as f:
-        json.dump(results_list, f, indent=4)
+        json.dump(results, f, indent=4, default=str)
 
-    if os.path.exists(json_path):
-        with open(json_path, "rb") as file:
-            response = HttpResponse(file.read(), content_type="application/json")
-            response["Content-Disposition"] = (
-                f"attachment; filename={district}_{block}_KYL_village_data.json"
-            )
-            return response
-
-    return Response(
-        {"status": "error", "message": "Failed to generate village data file"},
-        status=status.HTTP_404_NOT_FOUND,
+    # --------------------------------------------------
+    # Return response
+    # --------------------------------------------------
+    return HttpResponse(
+        json.dumps(
+            {"message": "Village data generated successfully", "data": results},
+            default=str,
+        ),
+        content_type="application/json",
+        status=200,
     )
