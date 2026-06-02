@@ -62,7 +62,12 @@ def _resolve_mapping(layer: Layer) -> LayerMapping | None:
         LayerMapping.objects.filter(db_dataset_name=dataset_name, auto_stac=True)
     )
     if not candidates:
-        return None
+        # Fallback: some environments have dataset naming drift between Layer and
+        # LayerMapping. In that case, try resolving from any auto_stac mapping
+        # by matching the fully formatted geoserver layer name.
+        candidates = list(LayerMapping.objects.filter(auto_stac=True))
+        if not candidates:
+            return None
     if len(candidates) == 1:
         return candidates[0]
 
