@@ -1,6 +1,9 @@
 from functools import wraps
 from unittest.mock import patch
 import logging
+import os
+import json
+import re
 
 from celery.app.task import Task
 from django.conf import settings
@@ -12,6 +15,64 @@ logger = logging.getLogger("core_stack.layer_generation")
 
 def _sync_layer_generation_enabled():
     return bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False))
+
+
+def _sanitize_text(text):
+    text = re.sub(r"[^a-zA-Z0-9 .,:;_-]", "", text)
+    return text.replace(" ", "_")
+
+
+def _read_json(path):
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
+def _collect_stac_for_request(request):
+    if request is None or not hasattr(request, "data"):
+        return None
+    state = request.data.get("state")
+    district = request.data.get("district")
+    block = request.data.get("block")
+    if not all([state, district, block]):
+        return None
+
+    state = _sanitize_text(str(state).lower())
+    district = _sanitize_text(str(district).lower())
+    block = _sanitize_text(str(block).lower())
+
+    stac_root = os.path.join(
+        getattr(settings, "DATA_DIR", ""),
+        "STAC_specs",
+        "CorestackCatalogs_merged_collection",
+    )
+    tehsil_dir = os.path.join(stac_root, "tehsil_wise")
+    state_dir = os.path.join(tehsil_dir, state)
+    district_dir = os.path.join(state_dir, district)
+    block_dir = os.path.join(district_dir, block)
+
+    if not os.path.isdir(block_dir):
+        return None
+
+    items = []
+    for entry in sorted(os.listdir(block_dir)):
+        item_dir = os.path.join(block_dir, entry)
+        if not os.path.isdir(item_dir):
+            continue
+        item_json = os.path.join(item_dir, f"{entry}.json")
+        item_spec = _read_json(item_json)
+        if item_spec is not None:
+            items.append(item_spec)
+
+    return {
+        "root_catalog": _read_json(os.path.join(stac_root, "catalog.json")),
+        "tehsil_catalog": _read_json(os.path.join(tehsil_dir, "catalog.json")),
+        "state_collection": _read_json(os.path.join(state_dir, "collection.json")),
+        "district_collection": _read_json(os.path.join(district_dir, "collection.json")),
+        "block_collection": _read_json(os.path.join(block_dir, "collection.json")),
+        "items": items,
+    }
 
 
 def _read_request_mode(request):
@@ -126,6 +187,21 @@ def sync_layer_generation_if_enabled(view_func):
             getattr(view_func, "__name__", "unknown"),
         )
         with patch.object(Task, "apply_async", _apply_async_in_process):
-            return view_func(*args, **kwargs)
+            response = view_func(*args, **kwargs)
+
+        try:
+            payload = getattr(response, "data", None)
+            if (
+                isinstance(payload, dict)
+                and payload.get("status") == "initiated"
+                and "stac_spec" not in payload
+            ):
+                stac_spec = _collect_stac_for_request(request)
+                if stac_spec is not None:
+                    payload["stac_spec"] = stac_spec
+        except Exception:
+            logger.exception("Failed to enrich sync response with STAC specs")
+
+        return response
 
     return wrapper
