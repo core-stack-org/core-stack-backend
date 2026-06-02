@@ -47,12 +47,13 @@ def _collect_stac_for_request(request):
     district = _sanitize_text(str(district).lower())
     block = _sanitize_text(str(block).lower())
 
-    stac_root = os.path.join(
-        getattr(settings, "DATA_DIR", ""),
-        "STAC_specs",
-        "CorestackCatalogs_merged_collection",
-    )
-    tehsil_dir = os.path.join(stac_root, "tehsil_wise")
+    # Use the same directory STAC generation writes to (BASE_DIR/data/STAC_specs/...),
+    # not settings.DATA_DIR which may point to a different mount in Docker.
+    from computing.STAC_specs.stac_collection import STACConfig
+
+    stac_config = STACConfig()
+    stac_root = stac_config.stac_files_dir
+    tehsil_dir = os.path.join(stac_root, stac_config.tehsil_dirname)
     state_dir = os.path.join(tehsil_dir, state)
     district_dir = os.path.join(state_dir, district)
     block_dir = os.path.join(district_dir, block)
