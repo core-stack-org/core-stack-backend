@@ -13,12 +13,12 @@ from __future__ import annotations
 
 import logging
 
-from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from computing.models import Layer, LayerMapping
 from utilities.gee_utils import valid_gee_text
+from utilities.layer_generation_mode import is_sync_layer_generation_context_active
 
 log = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
     )
 
     try:
-        if bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False)):
+        if is_sync_layer_generation_context_active():
             generate_stac_collection_task.apply(kwargs=task_kwargs)
         else:
             generate_stac_collection_task.apply_async(kwargs=task_kwargs, queue=_STAC_QUEUE)

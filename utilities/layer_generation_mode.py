@@ -4,6 +4,7 @@ import logging
 import os
 import json
 import re
+from contextvars import ContextVar
 
 from celery.app.task import Task
 from django.conf import settings
@@ -11,6 +12,10 @@ from django.conf import settings
 from utilities.layer_generation_logging import log_task_failure, log_task_step
 
 logger = logging.getLogger("core_stack.layer_generation")
+_SYNC_LAYER_GENERATION_CONTEXT = ContextVar(
+    "sync_layer_generation_context",
+    default=False,
+)
 
 
 def _sync_layer_generation_enabled():
@@ -107,6 +112,10 @@ def is_sync_layer_generation_request(request=None):
     return _sync_layer_generation_enabled()
 
 
+def is_sync_layer_generation_context_active():
+    return bool(_SYNC_LAYER_GENERATION_CONTEXT.get())
+
+
 def _apply_async_in_process(
     task_self,
     args=None,
@@ -193,8 +202,12 @@ def sync_layer_generation_if_enabled(view_func):
             "Layer generation mode=sync for view=%s",
             getattr(view_func, "__name__", "unknown"),
         )
-        with patch.object(Task, "apply_async", _apply_async_in_process):
-            response = view_func(*args, **kwargs)
+        token = _SYNC_LAYER_GENERATION_CONTEXT.set(True)
+        try:
+            with patch.object(Task, "apply_async", _apply_async_in_process):
+                response = view_func(*args, **kwargs)
+        finally:
+            _SYNC_LAYER_GENERATION_CONTEXT.reset(token)
 
         try:
             payload = getattr(response, "data", None)
