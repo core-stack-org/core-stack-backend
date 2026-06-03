@@ -167,6 +167,15 @@ def _compute_river_properties_for_watersheds(watersheds_gdf, rivers_gdf):
     final_gdf["uid"] = final_gdf["uid"].astype(str)
     final_gdf["area_in_ha"] = final_gdf["area_in_ha"].astype(str)
 
+    rename_cols = {}
+    if "st_area(sh" in final_gdf.columns:
+        rename_cols["st_area(sh"] = "st_area"
+    if "st_length(" in final_gdf.columns:
+        rename_cols["st_length("] = "st_length"
+    
+    if rename_cols:
+        final_gdf = final_gdf.rename(columns=rename_cols)
+
     for col in ["index_right"]:
         if col in final_gdf.columns:
             final_gdf = final_gdf.drop(columns=[col])
