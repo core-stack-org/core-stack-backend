@@ -229,7 +229,7 @@ urlpatterns = [
     ),
     path(
         "generate_dem_raster_vector/",
-        api.generate_dem_raster_vector,
+        api.generate_fabdem_raster_vector,
         name="generate-dem-raster-vector",
     ),
     path(
