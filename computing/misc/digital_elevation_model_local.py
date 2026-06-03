@@ -127,19 +127,19 @@ def run_raster_fabdem_local(
         output_path=str(output_raster_path),
     )
 
-    # if push_to_geoserver:
-    #     try:
-    #         upload_res, style_res = push_local_raster_to_geoserver(
-    #             file_path=clipped_raster_path,
-    #             layer_name=layer_name,
-    #             workspace=GEOSERVER_WORKSPACE,
-    #             style_name=GEOSERVER_STYLE,
-    #         )
-    #         print(f"GeoServer upload response: {upload_res}")
-    #         print(f"GeoServer style  response: {style_res}")
-    #     except Exception as error:
-    #         print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
-    #         return False, None
+    if push_to_geoserver:
+        try:
+            upload_res, style_res = push_local_raster_to_geoserver(
+                file_path=clipped_raster_path,
+                layer_name=layer_name,
+                workspace=GEOSERVER_WORKSPACE,
+                style_name=GEOSERVER_STYLE,
+            )
+            print(f"GeoServer upload response: {upload_res}")
+            print(f"GeoServer style  response: {style_res}")
+        except Exception as error:
+            print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
+            return False, None
 
     if sync_layer_metadata and state and district and block:
         from computing.STAC_specs import generate_STAC_layerwise
@@ -255,22 +255,22 @@ def run_vector_fabdem_local(
     )
     print(f"Saved local DEM vector: {asset_id}")
 
-    # if push_to_geoserver:
-    #     try:
-    #         geoserver_response = push_shape_to_geoserver(
-    #             os.path.splitext(asset_id)[0],
-    #             workspace=GEOSERVER_WORKSPACE,
-    #             layer_name=layer_name,
-    #             file_type="gpkg",
-    #         )
-    #         print(f"GeoServer vector response: {geoserver_response}")
-    #         if not isinstance(geoserver_response, dict) or geoserver_response.get(
-    #             "status_code"
-    #         ) not in (200, 201):
-    #             return False
-    #     except Exception as error:
-    #         print(f"Failed to sync local FABDEM vector to GeoServer: {error}")
-    #         return False
+    if push_to_geoserver:
+        try:
+            geoserver_response = push_shape_to_geoserver(
+                os.path.splitext(asset_id)[0],
+                workspace=GEOSERVER_WORKSPACE,
+                layer_name=layer_name,
+                file_type="gpkg",
+            )
+            print(f"GeoServer vector response: {geoserver_response}")
+            if not isinstance(geoserver_response, dict) or geoserver_response.get(
+                "status_code"
+            ) not in (200, 201):
+                return False
+        except Exception as error:
+            print(f"Failed to sync local FABDEM vector to GeoServer: {error}")
+            return False
 
     if sync_layer_metadata and state and district and block:
         from computing.utils import save_layer_info_to_db, update_layer_sync_status
