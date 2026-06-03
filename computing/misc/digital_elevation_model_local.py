@@ -254,7 +254,7 @@ def run_vector_fabdem_local(
     )
     print(f"Saved local DEM vector: {asset_id}")
 
-    if push_to_geoserver:
+    # if push_to_geoserver:
         # try:
         #     geoserver_response = push_shape_to_geoserver(
         #         os.path.splitext(asset_id)[0],
