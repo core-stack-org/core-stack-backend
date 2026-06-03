@@ -60,8 +60,12 @@ from .terrain_descriptor.terrain_raster_fabdem import (
 from .terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as generate_terrain_raster_clip_local_task,
 )
-from computing.misc.drainage_lines import clip_drainage_lines as clip_drainage_lines_gee_task
-from computing.misc.drainage_lines_local_compute import clip_drainage_lines as clip_drainage_lines_local_task
+from computing.misc.drainage_lines import (
+    clip_drainage_lines as clip_drainage_lines_gee_task,
+)
+from computing.misc.drainage_lines_local_compute import (
+    clip_drainage_lines as clip_drainage_lines_local_task,
+)
 from .lulc_X_terrain.lulc_on_slope_cluster import (
     lulc_on_slope_cluster as lulc_on_slope_cluster_gee_task,
 )
@@ -107,23 +111,41 @@ from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import layer_status, get_layers_of_workspace
 from .misc.lcw_conflict import generate_lcw_conflict_data
-from .misc.lcw_conflict_local_compute import generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task
+from .misc.lcw_conflict_local_compute import (
+    generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
+)
 from .misc.agroecological_space import generate_agroecological_data
-from .misc.agroecological_space_local_compute import generate_agroecological_data_local as generate_agroecological_data_local_task
+from .misc.agroecological_space_local_compute import (
+    generate_agroecological_data_local as generate_agroecological_data_local_task,
+)
 from .misc.factory_csr import generate_factory_csr_data
-from .misc.factory_csr_local_compute import generate_factory_csr_data_local as generate_factory_csr_data_local_task
+from .misc.factory_csr_local_compute import (
+    generate_factory_csr_data_local as generate_factory_csr_data_local_task,
+)
 from .misc.green_credit import generate_green_credit_data
-from .misc.green_credit_local_compute import generate_green_credit_data_local as generate_green_credit_data_local_task
+from .misc.green_credit_local_compute import (
+    generate_green_credit_data_local as generate_green_credit_data_local_task,
+)
 from .misc.mining_data import generate_mining_data
-from .misc.mining_data_local_compute import generate_mining_data_local as generate_mining_data_local_task
+from .misc.mining_data_local_compute import (
+    generate_mining_data_local as generate_mining_data_local_task,
+)
 from .misc.slope_percentage import generate_slope_percentage_data
-from .misc.slope_percentage_local_compute import generate_slope_percentage_data_local as generate_slope_percentage_data_local_task
+from .misc.slope_percentage_local_compute import (
+    generate_slope_percentage_data_local as generate_slope_percentage_data_local_task,
+)
 from .misc.naturaldepression import generate_natural_depression_data
-from .misc.naturaldepression_local_compute import generate_natural_depression_data_local as generate_natural_depression_data_local_task
+from .misc.naturaldepression_local_compute import (
+    generate_natural_depression_data_local as generate_natural_depression_data_local_task,
+)
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.distancetonearestdrainage_local_compute import generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task
+from .misc.distancetonearestdrainage_local_compute import (
+    generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task,
+)
 from .misc.catchment_area import generate_catchment_area_singleflow
-from .misc.catchment_area_local_compute import generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task
+from .misc.catchment_area_local_compute import (
+    generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task,
+)
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import (
     generate_mws_connectivity_data as generate_mws_connectivity_gee_task,
@@ -132,9 +154,13 @@ from .mws.mws_connectivity_local_compute import (
     mws_connectivity_vector as generate_mws_connectivity_local_task,
 )
 from .mws.mws_centroid import generate_mws_centroid_data
-from .mws.mws_centroid_local_compute import generate_mws_centroid_data_local as generate_mws_centroid_data_local_task
+from .mws.mws_centroid_local_compute import (
+    generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
+)
 from .misc.facilities_proximity import generate_facilities_proximity_task
-from .misc.facilities_proximity_local_compute import generate_facilities_proximity_local as generate_facilities_proximity_local_task
+from .misc.facilities_proximity_local_compute import (
+    generate_facilities_proximity_local as generate_facilities_proximity_local_task,
+)
 from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from django.conf import settings
 from .misc.digital_elevation_model import generate_dem_raster
@@ -151,9 +177,15 @@ from .misc.river_local_compute import river_vector as river_vector_local_task
 from .misc.drainage_density_local_compute import (
     drainage_density as drainage_density_vector_local_task,
 )
-from .misc.restoration_opportunity_local_compute import generate_restoration_opportunity_local as generate_restoration_opportunity_local_task
-from .misc.soge_vector_local_compute import generate_soge_vector_local as generate_soge_vector_local_task
-from .misc.nrega_local_compute import generate_nrega_data_local as generate_nrega_data_local_task
+from .misc.restoration_opportunity_local_compute import (
+    generate_restoration_opportunity_local as generate_restoration_opportunity_local_task,
+)
+from .misc.soge_vector_local_compute import (
+    generate_soge_vector_local as generate_soge_vector_local_task,
+)
+from .misc.nrega_local_compute import (
+    generate_nrega_data_local as generate_nrega_data_local_task,
+)
 
 
 @api_security_check(allowed_methods="POST")
@@ -198,7 +230,7 @@ def generate_nrega_layer(request):
                 "block": block,
                 "gee_account_id": gee_account_id,
             },
-            queue="nrm1"
+            queue="nrm1",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -1121,9 +1153,7 @@ def restoration_opportunity(request):
             generate_restoration_opportunity,
             generate_restoration_opportunity_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "restoration_opportunity task initiated"},
             status=status.HTTP_200_OK,
@@ -1217,9 +1247,7 @@ def soge_vector(request):
             generate_soge_vector,
             generate_soge_vector_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "SOGE vector task initiated"},
             status=status.HTTP_200_OK,
@@ -1492,9 +1520,7 @@ def generate_lcw(request):
             generate_lcw_conflict_data,
             generate_lcw_conflict_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1518,9 +1544,7 @@ def generate_agroecological(request):
             generate_agroecological_data,
             generate_agroecological_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1544,9 +1568,7 @@ def generate_factory_csr(request):
             generate_factory_csr_data,
             generate_factory_csr_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1570,9 +1592,7 @@ def generate_green_credit(request):
             generate_green_credit_data,
             generate_green_credit_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1596,9 +1616,7 @@ def generate_mining(request):
             generate_mining_data,
             generate_mining_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1635,9 +1653,7 @@ def generate_natural_depression(request):
             generate_natural_depression_data,
             generate_natural_depression_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1661,9 +1677,7 @@ def generate_distance_nearest_upstream_DL(request):
             generate_distance_to_nearest_drainage_line,
             generate_distance_to_nearest_drainage_line_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1687,9 +1701,7 @@ def generate_catchment_area_SF(request):
             generate_catchment_area_singleflow,
             generate_catchment_area_singleflow_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1713,9 +1725,7 @@ def generate_slope_percentage(request):
             generate_slope_percentage_data,
             generate_slope_percentage_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1834,9 +1844,7 @@ def generate_mws_centroid(request):
             generate_mws_centroid_data,
             generate_mws_centroid_data_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1860,9 +1868,7 @@ def generate_facilities_proximity(request):
             generate_facilities_proximity_task,
             generate_facilities_proximity_local_task,
         )
-        task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm1"
-        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -2146,7 +2152,7 @@ def generate_fabdem_raster_vector(request):
             generate_dem_raster_gee_task,
             generate_febdem_raster_vector_clip_local_task,
         )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
