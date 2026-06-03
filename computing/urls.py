@@ -228,9 +228,9 @@ urlpatterns = [
         name="update_layer_sync_remote",
     ),
     path(
-        "generate_fabdem_raster/",
-        api.generate_fabdem_raster,
-        name="generate-fab-dem-raster",
+        "generate_dem_raster_vector/",
+        api.generate_dem_raster_vector,
+        name="generate-dem-raster-vector",
     ),
     path(
         "generate_canal_vector/",

@@ -142,7 +142,7 @@ from .misc.digital_elevation_model import (
     generate_dem_raster as generate_dem_raster_gee_task,
 )
 from .misc.digital_elevation_model_local import (
-    generate_febdem_raster_clip as generate_febdem_raster_clip_local_task,
+    generate_febdem_raster_vector_clip as generate_febdem_raster_vector_clip_local_task,
 )
 from .misc.canal_layer import canal_vector
 from .misc.canal_local_compute import canal_vector as canal_vector_local_task
@@ -2133,7 +2133,7 @@ def sync_layer_remote(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_fabdem_raster(request):
+def generate_fabdem_raster_vector(request):
     print("Inside generate DEM raster layer API.")
     try:
         state = request.data.get("state").lower()
@@ -2144,7 +2144,7 @@ def generate_fabdem_raster(request):
         task = _select_compute_task(
             compute,
             generate_dem_raster_gee_task,
-            generate_febdem_raster_clip_local_task,
+            generate_febdem_raster_vector_clip_local_task,
         )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
