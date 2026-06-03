@@ -40,46 +40,45 @@ GEOSERVER_STYLE = None
 GEOSERVER_WORKSPACE = "dem"
 ZERO_NODATA = -9999
 
-
 def _clip_fabdem_with_roi(roi_gdf, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # with rasterio.open(PAN_INDIA_FABDEM_PATH) as src:
-    #     raster_crs = src.crs
+    with rasterio.open(PAN_INDIA_FABDEM_PATH) as src:
+        raster_crs = src.crs
 
-    #     # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
-    #     if roi_gdf.crs != raster_crs:
-    #         roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
-    #     else:
-    #         roi_in_raster_crs = roi_gdf
+        # Reproject ROI to raster CRS — use pyproj data dir to avoid broken PROJ
+        if roi_gdf.crs != raster_crs:
+            roi_in_raster_crs = roi_gdf.to_crs("EPSG:3857")
+        else:
+            roi_in_raster_crs = roi_gdf
 
-    #     roi_union = get_union_geometry(roi_in_raster_crs)
-    #     if roi_union is None or roi_union.is_empty:
-    #         raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
+        roi_union = get_union_geometry(roi_in_raster_crs)
+        if roi_union is None or roi_union.is_empty:
+            raise ValueError("ROI union geometry is empty — cannot clip FABDEM.")
 
-    #     roi_shape = mapping(roi_union)
+        roi_shape = mapping(roi_union)
 
-    #     clipped_array, clipped_transform = mask(
-    #         src,
-    #         shapes=[roi_shape],
-    #         crop=True,
-    #         filled=True,
-    #         nodata=ZERO_NODATA,
-    #     )
-    #     out_meta = src.meta.copy()
-    #     out_meta.update(
-    #         {
-    #             "driver": "GTiff",
-    #             "height": clipped_array.shape[1],
-    #             "width": clipped_array.shape[2],
-    #             "transform": clipped_transform,
-    #             "nodata": ZERO_NODATA,
-    #             "compress": "lzw",
-    #         }
-    #     )
+        clipped_array, clipped_transform = mask(
+            src,
+            shapes=[roi_shape],
+            crop=True,
+            filled=True,
+            nodata=ZERO_NODATA,
+        )
+        out_meta = src.meta.copy()
+        out_meta.update(
+            {
+                "driver": "GTiff",
+                "height": clipped_array.shape[1],
+                "width": clipped_array.shape[2],
+                "transform": clipped_transform,
+                "nodata": ZERO_NODATA,
+                "compress": "lzw",
+            }
+        )
 
-    # with rasterio.open(output_path, "w", **out_meta) as dst:
-    #     dst.write(clipped_array)
+    with rasterio.open(output_path, "w", **out_meta) as dst:
+        dst.write(clipped_array)
 
     print(f"Local clipped FABDEM raster written to: {output_path}")
     return str(output_path)
@@ -97,12 +96,12 @@ def run_raster_fabdem_local(
 ):
     if state and district and block:
         layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_dem_raster"
-        # roi_gdf = load_precomputed_roi(
-        #     state=state,
-        #     district=district,
-        #     block=block,
-        #     precomputed_roi_dir=precomputed_roi_dir,
-        # )
+        roi_gdf = load_precomputed_roi(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+        )
     else:
         if not roi or not asset_suffix:
             raise ValueError(
@@ -128,18 +127,18 @@ def run_raster_fabdem_local(
     )
 
     # if push_to_geoserver:
-    # try:
-    #     upload_res, style_res = push_local_raster_to_geoserver(
-    #         file_path=clipped_raster_path,
-    #         layer_name=layer_name,
-    #         workspace=GEOSERVER_WORKSPACE,
-    #         style_name=GEOSERVER_STYLE,
-    #     )
-    #     print(f"GeoServer upload response: {upload_res}")
-    #     print(f"GeoServer style  response: {style_res}")
-    # except Exception as error:
-    #     print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
-    #     return False, None
+    #     try:
+    #         upload_res, style_res = push_local_raster_to_geoserver(
+    #             file_path=clipped_raster_path,
+    #             layer_name=layer_name,
+    #             workspace=GEOSERVER_WORKSPACE,
+    #             style_name=GEOSERVER_STYLE,
+    #         )
+    #         print(f"GeoServer upload response: {upload_res}")
+    #         print(f"GeoServer style  response: {style_res}")
+    #     except Exception as error:
+    #         print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
+    #         return False, None
 
     if sync_layer_metadata and state and district and block:
         from computing.STAC_specs import generate_STAC_layerwise
@@ -217,12 +216,12 @@ def run_vector_fabdem_local(
 
     if state and district and block:
         layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_dem_vector"
-        # watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        #     state=state,
-        #     district=district,
-        #     block=block,
-        #     precomputed_roi_dir=precomputed_roi_dir,
-        # )
+        watersheds_gdf, watershed_source = load_precomputed_watersheds(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+        )
         print(f"Watershed boundary source: {watershed_source}")
     else:
         if not asset_suffix:
@@ -238,8 +237,8 @@ def run_vector_fabdem_local(
         )
         print(f"Watershed boundary source: {watershed_source}")
 
-    # result_gdf = _compute_watershed_dem_stats(watersheds_gdf, raster_path)
-    # print(f"Computed DEM stats for {len(result_gdf)} watersheds")
+    result_gdf = _compute_watershed_dem_stats(watersheds_gdf, raster_path)
+    print(f"Computed DEM stats for {len(result_gdf)} watersheds")
 
     output_path = build_output_vector_path(
         layer_name=layer_name,
@@ -256,21 +255,21 @@ def run_vector_fabdem_local(
     print(f"Saved local DEM vector: {asset_id}")
 
     # if push_to_geoserver:
-    # try:
-    #     geoserver_response = push_shape_to_geoserver(
-    #         os.path.splitext(asset_id)[0],
-    #         workspace=GEOSERVER_WORKSPACE,
-    #         layer_name=layer_name,
-    #         file_type="gpkg",
-    #     )
-    #     print(f"GeoServer vector response: {geoserver_response}")
-    #     if not isinstance(geoserver_response, dict) or geoserver_response.get(
-    #         "status_code"
-    #     ) not in (200, 201):
+    #     try:
+    #         geoserver_response = push_shape_to_geoserver(
+    #             os.path.splitext(asset_id)[0],
+    #             workspace=GEOSERVER_WORKSPACE,
+    #             layer_name=layer_name,
+    #             file_type="gpkg",
+    #         )
+    #         print(f"GeoServer vector response: {geoserver_response}")
+    #         if not isinstance(geoserver_response, dict) or geoserver_response.get(
+    #             "status_code"
+    #         ) not in (200, 201):
+    #             return False
+    #     except Exception as error:
+    #         print(f"Failed to sync local FABDEM vector to GeoServer: {error}")
     #         return False
-    # except Exception as error:
-    #     print(f"Failed to sync local FABDEM vector to GeoServer: {error}")
-    #     return False
 
     if sync_layer_metadata and state and district and block:
         from computing.utils import save_layer_info_to_db, update_layer_sync_status
@@ -292,7 +291,7 @@ def run_vector_fabdem_local(
 
 
 @app.task(bind=True)
-def generate_febdem_raster_vector_clip(
+def generate_febdem_raster_clip(
     self,
     state=None,
     district=None,
