@@ -126,7 +126,7 @@ def run_raster_fabdem_local(
         output_path=str(output_raster_path),
     )
 
-    if push_to_geoserver:
+    # if push_to_geoserver:
         # try:
         #     upload_res, style_res = push_local_raster_to_geoserver(
         #         file_path=clipped_raster_path,
