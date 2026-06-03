@@ -1,7 +1,7 @@
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PROJECT_ROOT_lc = "/home/cfpt-jedi/developer/shiv/core-stack-backend/data/canal/canal_local"
+PROJECT_ROOT_lc = Path("/home/cfpt-jedi/developer/shiv/core-stack-backend")
 
 
 PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
