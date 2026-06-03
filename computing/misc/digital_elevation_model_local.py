@@ -40,6 +40,7 @@ GEOSERVER_STYLE = None
 GEOSERVER_WORKSPACE = "dem"
 ZERO_NODATA = -9999
 
+
 def _clip_fabdem_with_roi(roi_gdf, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
@@ -291,7 +292,7 @@ def run_vector_fabdem_local(
 
 
 @app.task(bind=True)
-def generate_febdem_raster_clip(
+def generate_febdem_raster_vector_clip(
     self,
     state=None,
     district=None,
