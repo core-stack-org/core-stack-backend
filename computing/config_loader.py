@@ -1,6 +1,7 @@
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT1 = "/home/cfpt-jedi/developer/shiv/core-stack-backend/data/canal/canal_local"
 
 
 PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
@@ -13,7 +14,7 @@ LOCAL_DRAINAGE_LINES_OUTPUT = PROJECT_ROOT / "data/layers/drainage_lines/drainag
 LOCAL_DRAINAGE_DENSITY_OUTPUT = PROJECT_ROOT / "data/drainage_density"
 
 PAN_INDIA_CANAL_PATH = PROJECT_ROOT / "data/canal/Canal_pan_india.geojson"
-LOCAL_CANAL_OUTPUT = PROJECT_ROOT / "data/canal/canal_local"
+LOCAL_CANAL_OUTPUT = PROJECT_ROOT1 / "data/canal/canal_local"
 
 PAN_INDIA_AGROECOLOGICAL_PATH = PROJECT_ROOT / "data/base_layers/Pan_India_agroecological_farming.geojson"
 LOCAL_AGROECOLOGICAL_OUTPUT = PROJECT_ROOT / "data/layers/agroecological"
@@ -57,7 +58,7 @@ PAN_INDIA_RESTORATION_PATH = PROJECT_ROOT / "data/base_layers/Pan_India_WRI_Rest
 LOCAL_RESTORATION_OUTPUT = PROJECT_ROOT / "data/layers/restoration_opportunity"
 
 PAN_INDIA_RIVER_PATH = PROJECT_ROOT / "data/river/River_pan_india.geojson"
-LOCAL_RIVER_OUTPUT = PROJECT_ROOT / "data/river/river_local"
+LOCAL_RIVER_OUTPUT = PROJECT_ROOT1 / "data/river/river_local"
 
 PAN_INDIA_FABDEM_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
-LOCAL_FABDEM_OUTPUT = str(PROJECT_ROOT / "data/fabdem/fabdem_local")
+LOCAL_FABDEM_OUTPUT = str(PROJECT_ROOT1 / "data/fabdem/fabdem_local")
