@@ -187,6 +187,11 @@ urlpatterns = [
         name="generate_antyodaya",
     ),
     path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
+    path(
         "generate_stac_collection/",
         api.generate_stac_collection,
         name="generate_stac_collection",
