@@ -2,24 +2,28 @@ import ee
 from utilities.constants import AEZ
 from utilities.gee_utils import export_raster_asset_to_gee, ee_initialize
 
-# /**
-#  * Forest Sensitivity Analysis Pipeline — Script 1
-#  * Hybrid 30m Annual Tree Cover Mask + Contiguous Forest Period
-#  *
-#  * Produces per-pixel: length (years), start_year, end_year
-#  * of the most recent unbroken forest period (2003–2022).
-#  *
-#  * Sources:
-#  *   1. GLC-FCS30D (2003–2022)
-#  *   2. Dynamic World (2015–2022)
-#  *   3. IndiaSat LULC (2017–2022), Core-stack.
-#  *
-#  * Union logic: majority vote among active datasets per year.
-#  * Temporal correction: ±2 year window as used in other places too by the team.
-#  */
+"""
+    Forest Sensitivity Analysis Pipeline — Script 1
+    Hybrid 30m Annual Tree Cover Mask + Contiguous Forest Period
+
+    Produces per-pixel: length (years), start_year, end_year
+    of the most recent unbroken forest period (2003–2022).
+
+    Sources:
+      1. GLC-FCS30D (2003–2022)
+      2. . Dynamic World (2015–present)
+      3. IndiaSat LULC (2017–2024), Core-stack.
+
+    Union logic: majority vote among active datasets per year.
+      GLC-FCS30D: 2003–2022 (classes 51–92)
+      Dynamic World: 2015–present (class 1 = Trees)
+      IndiaSat LULC: 2017–2024 (class 6 = Trees)
+
+    Temporal correction: ±2 year window as used in other places too by the team.
+"""
 
 
-def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2022, gee_account_id=None):
+def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_id=None):
     ee_initialize(7)
 
     TEMPORAL_WINDOW = 2
@@ -69,12 +73,16 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2022, gee_account_i
 
         # GLC — always active, classes 51–92 are forests
         bandName = ee.String("b").cat(year.subtract(1999).format("%.0f"))
-        glcMask = (
-            glcMosaic.select(bandName)
-            .gte(51)
-            .And(glcMosaic.select(bandName).lte(92))
-            .rename("tree")
-        )
+
+        glcMask = ee.Image(
+            ee.Algorithms.If(
+                year.lte(2022),
+                glcMosaic.select(bandName)
+                .gte(51)
+                .And(glcMosaic.select(bandName).lte(92)),
+                ee.Image(0),
+            )
+        ).rename("tree")
         proj = glcMask.projection()
 
         # Dynamic World — active from 2015
@@ -95,10 +103,11 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2022, gee_account_i
         indiaSatMask = get_indiaSat_mask(year).reproject(crs=proj, scale=30)
 
         # Majority vote
+        glcActive = ee.Algorithms.If(year.lte(2022), 1, 0)
         forestSum = glcMask.unmask(0).add(dwMask.unmask(0)).add(indiaSatMask.unmask(0))
         dwActive = ee.Algorithms.If(year.gte(2015), 1, 0)
-        indiasatActive = ee.Algorithms.If(year.gte(2017), 1, 0)
-        activeDatasets = ee.Number(1).add(dwActive).add(indiasatActive)
+        indiasatActive = ee.Algorithms.If(year.gte(2017).And(year.lte(2024)), 1, 0)
+        activeDatasets = ee.Number(glcActive).add(dwActive).add(indiasatActive)
         requiredVotes = ee.Algorithms.If(activeDatasets.eq(1), 1, 2)
         hybridMask = forestSum.gte(ee.Number(requiredVotes))
 
