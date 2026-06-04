@@ -35,6 +35,41 @@ python utilities/scripts/build_admin_boundary_assets.py livestock \
 
 The generic join command accepts the same ``--keep-output-columns`` and
 ``--rename-output-columns old=new,old2=new2`` options.
+
+Export a GeoJSON sister file from an existing livestock GeoPackage:
+
+    python utilities/scripts/build_admin_boundary_assets.py export-layer \
+      --input-gpkg data/livestock/livestock_asset.gpkg \
+      --input-layer livestock \
+      --geojson-output data/livestock/livestock_asset.geojson \
+      --overwrite \
+      --chunk-size 25000 \
+      --reports-dir data/livestock/livestock_geojson_reports \
+      --keep-output-columns state_name,district_name,TEHSIL,pc11_village_id,NAME,pc11_state_id,pc11_district_id,pc11_subdistrict_id,cattle_male,cattle_female,cattle_total,buffalo_male,buffalo_female,buffalo_total,sheep_male,sheep_female,sheep_total,goat_male,goat_female,goat_total,pig_male,pig_female,pig_total
+
+Create only GeoJSON directly from the livestock join:
+
+    python utilities/scripts/build_admin_boundary_assets.py livestock \
+      --overwrite \
+      --admin-gpkg data/admin-boundary/cs_admin_sanitised.gpkg \
+      --output data/livestock/livestock_asset.gpkg \
+      --output-layer livestock \
+      --output-formats geojson \
+      --geojson-output data/livestock/livestock_asset.geojson \
+      --no-match-status \
+      --keep-output-columns state_name,district_name,TEHSIL,pc11_village_id,NAME,pc11_state_id,pc11_district_id,pc11_subdistrict_id,cattle_male,cattle_female,cattle_total,buffalo_male,buffalo_female,buffalo_total,sheep_male,sheep_female,sheep_total,goat_male,goat_female,goat_total,pig_male,pig_female,pig_total
+
+Create both GPKG and GeoJSON from the livestock join:
+
+    python utilities/scripts/build_admin_boundary_assets.py livestock \
+      --overwrite \
+      --admin-gpkg data/admin-boundary/cs_admin_sanitised.gpkg \
+      --output data/livestock/livestock_asset.gpkg \
+      --output-layer livestock \
+      --output-formats gpkg,geojson \
+      --geojson-output data/livestock/livestock_asset.geojson \
+      --no-match-status \
+      --keep-output-columns state_name,district_name,TEHSIL,pc11_village_id,NAME,pc11_state_id,pc11_district_id,pc11_subdistrict_id,cattle_male,cattle_female,cattle_total,buffalo_male,buffalo_female,buffalo_total,sheep_male,sheep_female,sheep_total,goat_male,goat_female,goat_total,pig_male,pig_female,pig_total
 """
 
 from __future__ import annotations
