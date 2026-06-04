@@ -10,6 +10,7 @@ from computing.et_downscale.helper import (
     finalize_export_image,
     MONTH_ABBR,
     export_product_asset,
+    monthly_valid_mask,
 )
 from computing.et_downscale.pet import build_pet_stack
 
@@ -42,7 +43,7 @@ def generate_rwdi(
 
         grid_proj = aet_stack.select("ET_01").projection()
         common_mask = build_common_pixel_mask(region, grid_proj)
-        footprint = aet_stack.select("ET_01").mask()
+        footprint = monthly_valid_mask(aet_stack, "ET")
 
     rwdi_monthly = build_rwdi_image(aet_stack, pet_stack).updateMask(footprint)
     rwdi_annual = ee_annual_mean_band(

@@ -10,6 +10,7 @@ from computing.et_downscale.helper import (
     finalize_export_image,
     MONTH_ABBR,
     export_product_asset,
+    monthly_valid_mask,
 )
 
 
@@ -45,7 +46,7 @@ def generate_wue(
 
         grid_proj = aet_stack.select("ET_01").projection()
         common_mask = build_common_pixel_mask(region, grid_proj)
-        footprint = aet_stack.select("ET_01").mask()
+        footprint = monthly_valid_mask(aet_stack, "ET")
 
     wue_monthly = build_wue_image(aet_stack, gpp_stack).updateMask(footprint)
     wue_annual = ee_annual_mean_band(

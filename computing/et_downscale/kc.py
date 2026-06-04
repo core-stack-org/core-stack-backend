@@ -10,6 +10,7 @@ from computing.et_downscale.helper import (
     ee_annual_mean_band,
     finalize_export_image,
     export_product_asset,
+    monthly_valid_mask,
 )
 from computing.et_downscale.pet import build_pet_stack
 
@@ -37,7 +38,7 @@ def generate_kc(
 
         grid_proj = aet_stack.select("ET_01").projection()
         common_mask = build_common_pixel_mask(region, grid_proj)
-        footprint = aet_stack.select("ET_01").mask()
+        footprint = monthly_valid_mask(aet_stack, "ET")
 
     kc_monthly = build_kc_image(aet_stack, pet_stack).updateMask(footprint)
     kc_annual = ee_annual_mean_band(kc_monthly, "KC", band_name="KC_annual").updateMask(

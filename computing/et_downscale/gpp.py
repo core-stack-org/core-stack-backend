@@ -11,6 +11,10 @@ from computing.et_downscale.helper import (
     finalize_export_image,
     MONTH_ABBR,
     export_product_asset,
+    cast_monthly_band,
+    empty_monthly_band,
+    ensure_monthly_band,
+    monthly_valid_mask,
 )
 
 # ---------------------------------------------------------------------------
@@ -57,7 +61,7 @@ def generate_gpp(
 
         grid_proj = aet_stack.select("ET_01").projection()
         common_mask = build_common_pixel_mask(region, grid_proj)
-        footprint = aet_stack.select("ET_01").mask()
+        footprint = monthly_valid_mask(aet_stack, "ET")
 
         proj = get_proj_30m(region, year)
 
@@ -160,9 +164,9 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
     )
     months = ee.List.sequence(1, 12)
     raw_ndvi_monthly = ee.ImageCollection.fromImages(
-        months.map(lambda m: make_raw_monthly_ndvi(ee.Number(m), ls_col, year))
+        months.map(lambda m: make_raw_monthly_ndvi(ee.Number(m), ls_col, year, proj))
     )
-    ndvi_monthly = fill_monthly_collection(raw_ndvi_monthly, "NDVI")
+    ndvi_monthly = fill_monthly_collection(raw_ndvi_monthly, "NDVI", proj=proj)
     ndvi_by_month = {
         month: ee.Image(
             ndvi_monthly.filter(ee.Filter.eq("month", month)).first()
@@ -240,16 +244,26 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
     return stack.clip(region)
 
 
-def make_raw_monthly_ndvi(month, ls_col, year):
+def make_raw_monthly_ndvi(month, ls_col, year, proj=None):
     start = ee.Date.fromYMD(year, month, 1)
     end = start.advance(1, "month")
     mid = start.advance(15, "day").millis()
     monthly_collection = ls_col.filterDate(start, end)
-    ndvi = (
-        monthly_collection.map(
-            lambda img: img.normalizedDifference(["SR_B5", "SR_B4"]).rename("NDVI")
+    source_count = monthly_collection.size()
+    ndvi_collection = monthly_collection.map(
+        lambda img: cast_monthly_band(
+            img.normalizedDifference(["SR_B5", "SR_B4"]).rename("NDVI"),
+            "NDVI",
         )
-        .mean()
-        .rename("NDVI")
     )
-    return ndvi.set("month", month).set("system:time_start", mid)
+    safe_collection = ndvi_collection.merge(
+        ee.ImageCollection.fromImages([empty_monthly_band("NDVI", proj)])
+    )
+    ndvi = safe_collection.mean().rename("NDVI")
+    return (
+        ensure_monthly_band(ndvi, "NDVI", proj)
+        .set("month", month)
+        .set("system:time_start", mid)
+        .set("source_count", source_count)
+        .set("is_placeholder", source_count.eq(0))
+    )

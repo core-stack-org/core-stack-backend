@@ -171,6 +171,8 @@ def wait_for_tasks(
     if fail_on_error:
         failed = []
         for spec in task_specs:
+            if not spec["task"]:
+                continue
             asset_id = spec["asset_id"]
             status = final_statuses.get(asset_id, {})
             state = status.get("state", "UNKNOWN")
@@ -229,29 +231,81 @@ def build_classifier(model_path: str) -> ee.Classifier:
     return ee.Classifier.decisionTreeEnsemble(trees)
 
 
+def cast_monthly_band(img: ee.Image, value_band: str) -> ee.Image:
+    """Force a one-band monthly image to a generic float schema."""
+    return (
+        ee.Image(img)
+        .select([value_band])
+        .cast({value_band: ee.PixelType.float()}, [value_band])
+    )
+
+
+def empty_monthly_band(value_band: str, proj: ee.Projection = None) -> ee.Image:
+    """Return a fully masked one-band image that preserves monthly schema."""
+    img = ee.Image.constant(0).rename(value_band).updateMask(ee.Image.constant(0))
+    img = cast_monthly_band(img, value_band)
+    if proj is not None:
+        img = img.setDefaultProjection(proj)
+    return img
+
+
+def ensure_monthly_band(
+    img: ee.Image, value_band: str, proj: ee.Projection = None
+) -> ee.Image:
+    """Keep value_band if present; otherwise replace with a masked placeholder."""
+    img = ee.Image(img)
+    empty = empty_monthly_band(value_band, proj)
+    out = ee.Image(
+        ee.Algorithms.If(
+            img.bandNames().contains(value_band),
+            cast_monthly_band(img.select(value_band).rename(value_band), value_band),
+            empty,
+        )
+    )
+    if proj is not None:
+        out = out.setDefaultProjection(proj)
+    return out
+
+
 def fill_monthly_collection(
-    raw_monthly: ee.ImageCollection, value_band: str, fallback_value=None
+    raw_monthly: ee.ImageCollection,
+    value_band: str,
+    fallback_value=None,
+    proj: ee.Projection = None,
 ) -> ee.ImageCollection:
     """Fill monthly gaps from neighbouring months within a +/-60 day window."""
 
+    """Fill monthly gaps from neighbouring months within a +/-30 day window."""
+
+    def normalize(img):
+        img = ee.Image(img)
+        out = ensure_monthly_band(img, value_band, proj)
+        return (
+            out.set("month", img.get("month"))
+            .set("system:time_start", img.get("system:time_start"))
+            .set("source_count", img.get("source_count"))
+            .set("is_placeholder", img.get("is_placeholder"))
+        )
+
+    safe_monthly = raw_monthly.map(normalize)
+
     def interpolate(img):
         time_start = img.get("system:time_start")
-        neighbours = raw_monthly.select(value_band).filterDate(
-            ee.Date(time_start).advance(-60, "day"),
-            ee.Date(time_start).advance(60, "day"),
+        neighbours = safe_monthly.select(value_band).filterDate(
+            ee.Date(time_start).advance(-30, "day"),
+            ee.Date(time_start).advance(30, "day"),
         )
         filled = neighbours.mean()
         out = img.select(value_band).unmask(filled)
         if fallback_value is not None:
             out = out.unmask(fallback_value)
         return (
-            out.rename(value_band)
-            .float()
+            cast_monthly_band(out.rename(value_band), value_band)
             .set("month", img.get("month"))
             .set("system:time_start", time_start)
         )
 
-    return raw_monthly.map(interpolate)
+    return safe_monthly.map(interpolate)
 
 
 def monthly_collection_to_stack(
@@ -282,7 +336,17 @@ def get_proj_30m(region: ee.Geometry, year: int) -> ee.Projection:
     ls_ref = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
         .filterBounds(region)
-        .filterDate(ee.Date.fromYMD(year, 1, 1), ee.Date.fromYMD(year, 12, 31))
+        .filterDate(ee.Date.fromYMD(year, 1, 1), ee.Date.fromYMD(year + 1, 1, 1))
         .first()
     )
     return ls_ref.select("SR_B5").projection()
+
+
+def monthly_valid_mask(monthly_stack: ee.Image, prefix: str) -> ee.Image:
+    """Mask pixels that have at least one valid monthly value for a prefix."""
+    valid = ee.Image.constant(0).float()
+    for month in range(1, 13):
+        valid = valid.max(
+            monthly_stack.select(f"{prefix}_{month:02d}").mask().gt(0).unmask(0)
+        )
+    return valid.gt(0).selfMask()
