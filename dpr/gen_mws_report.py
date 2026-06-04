@@ -2111,6 +2111,78 @@ def get_water_balance_data(state, district, block, uid):
         return "", "", "", [], [], [], [], []
 
 
+def get_hydro_tabular_data(state, district, block, uid):
+    try:
+        base_path = f"{DATA_DIR_TEMP}{state.upper()}/{district.upper()}/{district.lower()}_{block.lower()}.xlsx"
+        
+        # Read DEM
+        try:
+            df_dem = pd.read_excel(base_path, sheet_name="dem")
+            row_dem = df_dem.loc[df_dem["UID"] == uid]
+            if not row_dem.empty:
+                min_elev = row_dem["min_elevation"].values[0]
+                max_elev = row_dem["max_elevation"].values[0]
+                min_elev = round(float(min_elev), 2) if not pd.isna(min_elev) else "-"
+                max_elev = round(float(max_elev), 2) if not pd.isna(max_elev) else "-"
+                relief = round(max_elev - min_elev, 2) if min_elev != "-" and max_elev != "-" else "-"
+            else:
+                min_elev, max_elev, relief = "-", "-", "-"
+        except Exception as e:
+            logger.info(f"Failed to read dem sheet for {uid}: {e}")
+            min_elev, max_elev, relief = "-", "-", "-"
+
+        # Read Aquifer
+        try:
+            df_aq = pd.read_excel(base_path, sheet_name="aquifer_vector")
+            row_aq = df_aq.loc[df_aq["UID"] == uid]
+            aquifer_class = row_aq["aquifer_class"].values[0] if not row_aq.empty else "-"
+        except Exception as e:
+            logger.info(f"Failed to read aquifer_vector sheet for {uid}: {e}")
+            aquifer_class = "-"
+
+        # Read SOGE
+        try:
+            df_soge = pd.read_excel(base_path, sheet_name="soge_vector")
+            row_soge = df_soge.loc[df_soge["UID"] == uid]
+            soge_class = row_soge["class_name"].values[0] if not row_soge.empty else "-"
+        except Exception as e:
+            logger.info(f"Failed to read soge_vector sheet for {uid}: {e}")
+            soge_class = "-"
+
+        # Read Drainage Density
+        try:
+            df_dd = pd.read_excel(base_path, sheet_name="drainage_density")
+            row_dd = df_dd.loc[df_dd["UID"] == uid]
+            if not row_dd.empty:
+                drainage_density = row_dd["drainage_density"].values[0]
+                drainage_density = round(float(drainage_density), 2) if not pd.isna(drainage_density) else "-"
+                
+                # Check for stream_length_km
+                if "stream_length_km" in df_dd.columns:
+                    val = row_dd["stream_length_km"].values[0]
+                    if pd.isna(val):
+                        total_length = "-"
+                    elif isinstance(val, str) and val.startswith("["):
+                        import ast
+                        arr = ast.literal_eval(val)
+                        total_length = round(sum(arr), 2)
+                    else:
+                        total_length = round(float(val), 2)
+                else:
+                    total_length = "-"
+            else:
+                drainage_density, total_length = "-", "-"
+        except Exception as e:
+            logger.info(f"Failed to read drainage_density sheet for {uid}: {e}")
+            drainage_density, total_length = "-", "-"
+
+        return min_elev, max_elev, relief, aquifer_class, soge_class, drainage_density, total_length
+
+    except Exception as e:
+        logger.info(f"Error in get_hydro_tabular_data for {uid}: {e}")
+        return "-", "-", "-", "-", "-", "-", "-"
+
+
 def get_soge_data(state, district, block, uid):
     try :
         df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="aquifer_vector")

@@ -75,6 +75,18 @@
             gap: 10px;
         }
 
+        .map-group-3 {
+            width: 100%;
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+        }
+
+        .map-group-3 .map {
+            flex: 1 1 32%;
+            height: 300px;
+        }
+
         .chart-container {
             position: relative;
             height: 300px;
@@ -669,7 +681,7 @@
             border-radius: 2px;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
             width: 10vw;
-            height : 10vh;
+            height: 10vh;
             max-width: 10vw;
             max-height: 10vh;
             overflow-y: auto;
@@ -816,6 +828,7 @@
                 opacity: 0;
                 transform: translateX(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateX(0);
@@ -975,6 +988,39 @@
                 height: 400px !important;
                 min-height: 400px !important;
                 max-height: 400px !important;
+                max-width: none !important;
+            }
+
+            .map-group-3 {
+                display: flex !important;
+                flex-direction: row !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .map-group-3 .map {
+                width: 32% !important;
+                flex: 1 1 32% !important;
+                height: 300px !important;
+                min-height: 300px !important;
+                max-height: 300px !important;
+            }
+
+            .map-group-3 .map,
+            .map-group-3 .map>div,
+            .map-group-3 .map .ol-viewport,
+            .map-group-3 .map .ol-overlaycontainer,
+            .map-group-3 .map .ol-overlaycontainer-stopevent {
+                height: 300px !important;
+                min-height: 300px !important;
+                max-height: 300px !important;
+            }
+
+            .map-group-3 .map canvas,
+            .map-group-3 .map .ol-layer canvas {
+                height: 300px !important;
+                min-height: 300px !important;
+                max-height: 300px !important;
                 max-width: none !important;
             }
 
@@ -1340,16 +1386,151 @@
     </header>
 
     <div class="container">
-        <section class="section">
-            <h2>Overview of Tehsil characteristics</h2>
-            <p>{{block_osm}}</p>
-        </section>
 
         <section class="section">
             <h2>Landscape Overview</h2>
             <p>{{mws_osm}}</p>
 
             <div id="mainMap" class="map"></div>
+            <p class="legend-note" style="margin-bottom: 20px;">Fig: tehsil map with MWS highlighted. MWS id: {{mws_id}}
+            </p>
+
+            <div class="map-group-3">
+                <div id="demMap" class="map"></div>
+                <div id="drainageMap" class="map"></div>
+                <div id="terrainRasterMap" class="map"></div>
+            </div>
+
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 32%; text-align: center;">DEM Raster overlaid with contour lines</div>
+                <div style="width: 32%; text-align: center;">Drainage Lines Network</div>
+                <div style="width: 32%; text-align: center;">Terrain Raster</div>
+            </div>
+
+            <div class="map-group">
+                <div id="landscapeLulcMap" class="map" style="flex: 1 1 48%;"></div>
+                <div id="croppingIntensityMap" class="map" style="flex: 1 1 48%;"></div>
+            </div>
+
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">LULC Raster</div>
+                <div style="width: 48%; text-align: center;">Cropping intensity raster</div>
+            </div>
+
+            <div class="map-group">
+                <div id="hydroVectorMap" class="map"></div>
+            </div>
+
+            <div class="legend" style="margin-top: 10px;">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #00BFFF; border: 1px solid #0000FF;"></div>
+                    <span>Waterbodies</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #0000FF; height: 4px; margin-top: 5px;"></div>
+                    <span>Rivers</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #FF4500; height: 4px; margin-top: 5px;"></div>
+                    <span>Canals</span>
+                </div>
+            </div>
+
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px;">
+                Map showing Waterbodies, Rivers and Canals
+            </div>
+        </section>
+
+        <section class="section" id="hydro-table-section">
+            <h3>Hydrology and Land Use Land Cover in this Microwatershed</h3>
+            <table
+                style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
+                <tbody>
+                    <tr style="font-weight: bold;">
+                        <td colspan="6" style="padding: 10px; border: 1px solid black;">BASIN SHAPE</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Area<br>(hectares)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Perimeter<br>(km)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">
+                            Compactness<br>(Kc)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Max Elev</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Min Elev</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Relief</td>
+                    </tr>
+                    <tr>
+                        <td id="tbl-area" style="padding: 10px; border: 1px solid black;">-</td>
+                        <td id="tbl-perimeter" style="padding: 10px; border: 1px solid black;">-</td>
+                        <td id="tbl-compactness" style="padding: 10px; border: 1px solid black;">-</td>
+                        <td id="tbl-max-elev" style="padding: 10px; border: 1px solid black;">{{ max_elev }}</td>
+                        <td id="tbl-min-elev" style="padding: 10px; border: 1px solid black;">{{ min_elev }}</td>
+                        <td id="tbl-relief" style="padding: 10px; border: 1px solid black;">{{ dem_relief }}</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td colspan="6" style="padding: 10px; border: 1px solid black;">DRAINAGE NETWORK</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Total Length</td>
+                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Drainage Density</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3" id="tbl-drainage-length" style="padding: 10px; border: 1px solid black;">{{ drainage_length }}</td>
+                        <td colspan="3" id="tbl-drainage-density" style="padding: 10px; border: 1px solid black;">{{ drainage_density }}</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td colspan="6" style="padding: 10px; border: 1px solid black;">GROUNDWATER & AQUIFER
+                            CHARACTERISTICS</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td colspan="2" style="padding: 10px; border: 1px solid black;">Aquifer</td>
+                        <td colspan="2" style="padding: 10px; border: 1px solid black;">SOGE (2020)</td>
+                        <td colspan="2" style="padding: 10px; border: 1px solid black;">Water Balance Trend</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">{{ aquifer_class }}</td>
+                        <td colspan="2" id="tbl-soge" style="padding: 10px; border: 1px solid black;">{{ soge_class }}</td>
+                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="section">
+            <h3>Climate Trend</h3>
+            <p>Annual Precipitation</p>
+
+            <div class="chart-container">
+                <canvas id="precipChart"></canvas>
+            </div>
+            <br />
+        </section>
+
+        <section class="section">
+            <h3>Change Detection</h3>
+            <p>Farm Cover Loss and Tree Cover Loss</p>
+
+            <div class="map-group">
+                <div id="farmLossMap" class="map" style="flex: 1 1 48%;"></div>
+                <div id="treeLossMap" class="map" style="flex: 1 1 48%;"></div>
+            </div>
+
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Farm Cover Loss</div>
+                <div style="width: 48%; text-align: center;">Tree Cover Loss</div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h3>Demographics</h3>
+            <p>Village-level Demographics (Census 2011)</p>
+            <div class="map-group-3">
+                <div id="demographicPopMap" class="map"></div>
+                <div id="demographicLitMap" class="map"></div>
+                <div id="demographicMargMap" class="map"></div>
+            </div>
         </section>
 
         <section class="section">
@@ -1583,7 +1764,8 @@
             {% if factory_desc %}
             <div class="factory-section">
                 <h3>Industries in this Microwatershed</h3>
-                <p>The following {{ factory_desc|length }} Industr{{ factory_desc|length|pluralize:"y,ies" }} {{factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
+                <p>The following {{ factory_desc|length }} Industr{{ factory_desc|length|pluralize:"y,ies" }}
+                    {{factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
 
                 <div class="factory-list collapsible-list" id="factoryList">
                     {% for factory in factory_desc %}
@@ -1627,7 +1809,8 @@
             {% if mining_desc %}
             <div class="mining-section">
                 <h3>Mining Sites in this Microwatershed</h3>
-                <p>The following {{ mining_desc|length }} mining site{{ mining_desc|length|pluralize }} {{mining_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
+                <p>The following {{ mining_desc|length }} mining site{{ mining_desc|length|pluralize }}
+                    {{mining_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
 
                 <div class="mining-list collapsible-list" id="miningList">
                     {% for mining in mining_desc %}
@@ -1672,7 +1855,8 @@
         {% if green_credit_desc %}
         <div class="green-credit-section">
             <h3>Green Credit Sites in this Microwatershed</h3>
-            <p>The following {{ green_credit_desc|length }} green credit site{{ green_credit_desc|length|pluralize }} {{green_credit_desc|length|pluralize:"is,are" }} registered in this micro watershed:</p>
+            <p>The following {{ green_credit_desc|length }} green credit site{{ green_credit_desc|length|pluralize }}
+                {{green_credit_desc|length|pluralize:"is,are" }} registered in this micro watershed:</p>
 
             <div class="green-credit-list collapsible-list" id="greenCreditList">
                 {% for credit in green_credit_desc %}
@@ -1909,7 +2093,8 @@
             <p>{{drought_desc}}</p>
 
             <p>A Drought year is declared if the total number of weeks under severe intensity drought and moderate
-                intensity drought equal or exceeds 5, which means that the rainfall deficit was more than 25% for more than 5
+                intensity drought equal or exceeds 5, which means that the rainfall deficit was more than 25% for more
+                than 5
                 weeks during the monsoon of that year.</p>
 
             <p>The occurrence of dry spell is defined across four consecutive weeks with each week of these
@@ -1982,554 +2167,1005 @@
         </div>
     </footer>
     <script>
-    const baseLayer = new ol.layer.Tile({
-        source: new ol.source.XYZ({
-            url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-            maxZoom: 30,
-            transition: 500,
-        }),
-        preload: 4,
-    });
-    
-    const view = new ol.View({
-        center: [78.9, 23.6],
-        zoom: 10,
-        projection: "EPSG:4326",
-        constrainResolution: true,
-        smoothExtentConstraint: true,
-        smoothResolutionConstraint: true,
-    });
-    
-    const mainMap = new ol.Map({
-        target: 'mainMap',
-        layers: [baseLayer],
-        view: view,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    });
-    
-    // ============================================================================
-    // HELPER FUNCTION: Add village boundaries with spatial filtering
-    // ============================================================================
-    const addVillageBoundariesToMap = async (map, mwsFeature) => {
-        try {
-            const mwsGeometry = mwsFeature.getGeometry();
-            const mwsUid = mwsFeature.get('uid');
-            
-            if (!mwsGeometry || !mwsUid) {
-                return;
-            }
-    
-            // Get the bounding box of the MWS
-            const extent = mwsGeometry.getExtent();
-            const minLon = extent[0];
-            const minLat = extent[1];
-            const maxLon = extent[2];
-            const maxLat = extent[3];
-    
-            // Create WFS URL with BBOX filter (simpler, more compatible)
-            const baseUrl = 'https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows';
-            
-            // BBOX filter syntax: BBOX(geometry_column, minx, miny, maxx, maxy)
-            const bboxFilter = `BBOX(the_geom,${minLon},${minLat},${maxLon},${maxLat})`;
-    
-            const params = new URLSearchParams({
-                service: 'WFS',
-                version: '1.0.0',
-                request: 'GetFeature',
-                typeName: `panchayat_boundaries:{{district}}_{{block}}`,
-                outputFormat: 'application/json',
-                CQL_FILTER: bboxFilter
-            });
-    
-            const url = baseUrl + '?' + params.toString();
-    
-            // Fetch villages from GeoServer
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                return;
-            }
-    
-            const geoJsonData = await response.json();
-    
-            // Check if we got any features
-            if (!geoJsonData.features || geoJsonData.features.length === 0) {
-                return;
-            }
-    
-            // Create vector source from GeoJSON
-            const villageSource = new ol.source.Vector({
-                features: new ol.format.GeoJSON().readFeatures(geoJsonData)
-            });
-    
-            // Create and style the village layer
-            const villageLayer = new ol.layer.Vector({
-                source: villageSource,
-                style: new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: 'yellow',
-                        width: 1.5,
-                    }),
-                    // fill: new ol.style.Fill({
-                    //     color: 'rgba(255, 255, 0, 0.1)',
-                    // }),
-                }),
-                zIndex: 5,
-            });
-    
-            // Add layer to map
-            map.addLayer(villageLayer);
-    
-            // Handle errors silently
-            villageSource.on('change', (e) => {
-                if (villageSource.getState() === 'error') {
-                    // Silently handle errors
-                }
-            });
-    
-        } catch (error) {
-            // Gracefully handle any errors without breaking map rendering
-        }
-    };
-    
-    // ============================================================================
-    // WMS AND VECTOR LAYER DEFINITIONS
-    // ============================================================================
-    
-    const wmsLayer = new ol.layer.Image({
-        source: new ol.source.ImageWMS({
-            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-            params: {
-                'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
-                'STYLES': 'Terrain_Style_11_Classes'
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: true,
-        name: 'terrain_raster'
-    })
-    
-    const degradRaster = new ol.layer.Image({
-        source: new ol.source.ImageWMS({
-            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-            params: {
-                'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
-                'STYLES': "degradation"
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: true,
-        name: 'degrad_raster'
-    })
-    
-    const lulcRaster = new ol.layer.Image({
-        source: new ol.source.ImageWMS({
-            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-            params: {
-                'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
-                'STYLES': "lulc_level_3_style"
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: true,
-        name: 'lulc_raster'
-    })
-    
-    const waterRaster = new ol.layer.Image({
-        source: new ol.source.ImageWMS({
-            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-            params: {
-                'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
-                'STYLES': "lulc_water_pixels"
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: true,
-        name: 'water_raster'
-    })
-    
-    const urbanRaster = new ol.layer.Image({
-        source: new ol.source.ImageWMS({
-            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-            params: {
-                'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
-                'STYLES': "urbanization"
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: true,
-        name: 'tree_raster'
-    })
-    
-    const treeReduceRaster = new ol.layer.Image({
-        source: new ol.source.ImageWMS({
-            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-            params: {
-                'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
-                'STYLES': "deforestation"
-            },
-            ratio: 1,
-            serverType: 'geoserver',
-        }),
-        visible: true,
-        name: 'tree_raster'
-    })
-    
-    // ============================================================================
-    // MAP INITIALIZATION (with village boundaries)
-    // ============================================================================
-    
-    const tempView1 = new ol.View({
-        center: [78.9, 23.6],
-        zoom: 10,
-        projection: "EPSG:4326",
-        constrainResolution: true,
-        smoothExtentConstraint: true,
-        smoothResolutionConstraint: true,
-    })
-    
-    const TerrainMap = new ol.Map({
-        target: 'terrainMap',
-        layers: [wmsLayer],
-        view: tempView1,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const ComparisonMap1 = new ol.Map({
-        target: 'compMap1',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: tempView1,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const tempView2 = new ol.View({
-        center: [78.9, 23.6],
-        zoom: 10,
-        projection: "EPSG:4326",
-        constrainResolution: true,
-        smoothExtentConstraint: true,
-        smoothResolutionConstraint: true,
-    })
-    
-    const ComparisonMap2 = new ol.Map({
-        target: 'compMap2',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: tempView2,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const tempView3 = new ol.View({
-        center: [78.9, 23.6],
-        zoom: 10,
-        projection: "EPSG:4326",
-        constrainResolution: true,
-        smoothExtentConstraint: true,
-        smoothResolutionConstraint: true,
-    })
-    
-    const ComparisonMap3 = new ol.Map({
-        target: 'compMap3',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: tempView3,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const tempView4 = new ol.View({
-        center: [78.9, 23.6],
-        zoom: 10,
-        projection: "EPSG:4326",
-        constrainResolution: true,
-        smoothExtentConstraint: true,
-        smoothResolutionConstraint: true,
-    })
-    
-    const ComparisonMap4 = new ol.Map({
-        target: 'compMap4',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: tempView4,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const tempView5 = new ol.View({
-        center: [78.9, 23.6],
-        zoom: 10,
-        projection: "EPSG:4326",
-        constrainResolution: true,
-        smoothExtentConstraint: true,
-        smoothResolutionConstraint: true,
-    })
-    
-    const ComparisonMap5 = new ol.Map({
-        target: 'compMap5',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: tempView5,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const lulcMap = new ol.Map({
-        target: 'lulcMap',
-        layers: [lulcRaster],
-        view: tempView2,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const DegradMap = new ol.Map({
-        target: 'degradLandMap',
-        layers: [degradRaster],
-        view: tempView3,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const treeReduceMap = new ol.Map({
-        target: 'treeReduceMap',
-        layers: [treeReduceRaster],
-        view: tempView4,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const swbMap = new ol.Map({
-        target: 'swbMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const sogeMap = new ol.Map({
-        target: 'sogeMap',
-        layers: [
-            new ol.layer.Tile({
-                source: new ol.source.XYZ({
-                    url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                    maxZoom: 30,
-                    transition: 500,
-                }),
-                preload: 4,
-            })
-        ],
-        view: new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        }),
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    const urbanMap = new ol.Map({
-        target: 'urbanMap',
-        layers: [urbanRaster],
-        view: tempView5,
-        interactions: new ol.Collection([
-            new ol.interaction.DragPan(),
-            new ol.interaction.KeyboardPan(),
-            new ol.interaction.KeyboardZoom(),
-        ])
-    })
-    
-    // ============================================================================
-    // FETCH MWS BOUNDARIES AND ADD TO MAIN MAP
-    // ============================================================================
-    
-    fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
-        .then(response => response.json())
-        .then(data => {
-            const vectorSource = new ol.source.Vector({
-                features: new ol.format.GeoJSON().readFeatures(data),
-            });
-    
-            const styleFunction = feature => {
-                const uid = feature.get('uid');
-                let strokeColor = 'skyblue';
-                let fillColor = 'rgba(135, 206, 235, 0.4)';
-    
-                if (uid === '{{mws_id}}') {
-                    strokeColor = 'yellow';
-                    fillColor = 'rgba(255, 255, 0, 0.4)';
-                }
-    
-                return new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: strokeColor,
-                        width: 2,
-                    }),
-                    fill: new ol.style.Fill({
-                        color: fillColor,
-                    }),
-                });
-            };
-    
-            const vectorLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: styleFunction,
-            });
-    
-            mainMap.addLayer(vectorLayer);
-    
-            const arr = vectorSource.getExtent();
-            const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-            mainMap.getView().setCenter(mapcenter);
-        })
-        .catch(error => {
-            // Silently handle fetch errors
+        const baseLayer = new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                maxZoom: 30,
+                transition: 500,
+            }),
+            preload: 4,
         });
-    
-    // ============================================================================
-    // FETCH FEATURE BY UID AND APPLY SPATIAL FILTERING
-    // ============================================================================
-    
-    const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
-        await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+
+        const view = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        });
+
+        const mainMap = new ol.Map({
+            target: 'mainMap',
+            layers: [baseLayer],
+            view: view,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        // ============================================================================
+        // HELPER FUNCTION: Add village boundaries with spatial filtering
+        // ============================================================================
+        const addVillageBoundariesToMap = async (map, mwsFeature) => {
+            try {
+                const mwsGeometry = mwsFeature.getGeometry();
+                const mwsUid = mwsFeature.get('uid');
+
+                if (!mwsGeometry || !mwsUid) {
+                    return;
+                }
+
+                // Get the bounding box of the MWS
+                const extent = mwsGeometry.getExtent();
+                const minLon = extent[0];
+                const minLat = extent[1];
+                const maxLon = extent[2];
+                const maxLat = extent[3];
+
+                // Create WFS URL with BBOX filter (simpler, more compatible)
+                const baseUrl = 'https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows';
+
+                // BBOX filter syntax: BBOX(geometry_column, minx, miny, maxx, maxy)
+                const bboxFilter = `BBOX(the_geom,${minLon},${minLat},${maxLon},${maxLat})`;
+
+                const params = new URLSearchParams({
+                    service: 'WFS',
+                    version: '1.0.0',
+                    request: 'GetFeature',
+                    typeName: `panchayat_boundaries:{{district}}_{{block}}`,
+                    outputFormat: 'application/json',
+                    CQL_FILTER: bboxFilter
+                });
+
+                const url = baseUrl + '?' + params.toString();
+
+                // Fetch villages from GeoServer
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const geoJsonData = await response.json();
+
+                // Check if we got any features
+                if (!geoJsonData.features || geoJsonData.features.length === 0) {
+                    return;
+                }
+
+                // Create vector source from GeoJSON
+                const villageSource = new ol.source.Vector({
+                    features: new ol.format.GeoJSON().readFeatures(geoJsonData)
+                });
+
+                // Create and style the village layer
+                const villageLayer = new ol.layer.Vector({
+                    source: villageSource,
+                    style: new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: 'yellow',
+                            width: 1.5,
+                        }),
+                        // fill: new ol.style.Fill({
+                        //     color: 'rgba(255, 255, 0, 0.1)',
+                        // }),
+                    }),
+                    zIndex: 5,
+                });
+
+                // Add layer to map
+                map.addLayer(villageLayer);
+
+                // Handle errors silently
+                villageSource.on('change', (e) => {
+                    if (villageSource.getState() === 'error') {
+                        // Silently handle errors
+                    }
+                });
+
+            } catch (error) {
+                // Gracefully handle any errors without breaking map rendering
+            }
+        };
+
+        const getPopColor = (val) => {
+            if (!val) return 'rgba(0,0,0,0)';
+            if (val < 500) return '#ffb3ba';
+            if (val < 1000) return '#ffdfba';
+            if (val < 2000) return '#ffffba';
+            if (val < 4000) return '#baffc9';
+            return '#bae1ff';
+        };
+
+        const getLitColor = (val) => {
+            if (!val) return 'rgba(0,0,0,0)';
+            if (val < 40) return '#f3c5ff';
+            if (val < 55) return '#c5ebff';
+            if (val < 70) return '#e2ffc5';
+            if (val < 85) return '#ffc5d9';
+            return '#ffe8c5';
+        };
+
+        const getMargColor = (val) => {
+            if (!val) return 'rgba(0,0,0,0)';
+            if (val < 20) return '#d4a5a5';
+            if (val < 40) return '#a5c4d4';
+            if (val < 60) return '#d4d4a5';
+            if (val < 80) return '#a5d4a5';
+            return '#d4a5d4';
+        };
+
+        const addDemographicBoundariesToMap = async (mwsFeature) => {
+            try {
+                const mwsGeometry = mwsFeature.getGeometry();
+                const mwsUid = mwsFeature.get('uid');
+
+                if (!mwsGeometry || !mwsUid) return;
+
+                const extent = mwsGeometry.getExtent();
+                const bboxFilter = `BBOX(the_geom,${extent[0]},${extent[1]},${extent[2]},${extent[3]})`;
+
+                const url = `https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=panchayat_boundaries:{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(bboxFilter)}`;
+
+                const response = await fetch(url);
+                if (!response.ok) return;
+                const geoJsonData = await response.json();
+                if (!geoJsonData.features || geoJsonData.features.length === 0) return;
+
+                const format = new ol.format.GeoJSON();
+                const features = format.readFeatures(geoJsonData);
+
+                // Population Layer
+                const popSource = new ol.source.Vector({ features: features });
+                const popLayer = new ol.layer.Vector({
+                    source: popSource,
+                    style: function (feature) {
+                        const tot_p = feature.get('TOT_P');
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({ color: 'yellow', width: 1 }),
+                            fill: new ol.style.Fill({ color: getPopColor(tot_p) }),
+                        });
+                    },
+                    zIndex: 5,
+                });
+                demographicPopMap.addLayer(popLayer);
+
+                // Literacy Layer
+                const litSource = new ol.source.Vector({ features: features });
+                const litLayer = new ol.layer.Vector({
+                    source: litSource,
+                    style: function (feature) {
+                        const tot_p = feature.get('TOT_P');
+                        const p_lit = feature.get('P_LIT');
+                        const pct = tot_p > 0 ? (p_lit / tot_p) * 100 : 0;
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({ color: 'yellow', width: 1 }),
+                            fill: new ol.style.Fill({ color: getLitColor(pct) }),
+                        });
+                    },
+                    zIndex: 5,
+                });
+                demographicLitMap.addLayer(litLayer);
+
+                // Marginalized Layer
+                const margSource = new ol.source.Vector({ features: features });
+                const margLayer = new ol.layer.Vector({
+                    source: margSource,
+                    style: function (feature) {
+                        const tot_p = feature.get('TOT_P');
+                        const p_sc = feature.get('P_SC') || 0;
+                        const p_st = feature.get('P_ST') || 0;
+                        const pct = tot_p > 0 ? ((p_sc + p_st) / tot_p) * 100 : 0;
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({ color: 'yellow', width: 1 }),
+                            fill: new ol.style.Fill({ color: getMargColor(pct) }),
+                        });
+                    },
+                    zIndex: 5,
+                });
+                demographicMargMap.addLayer(margLayer);
+
+                // MWS Boundary Layer
+                const mwsSource = new ol.source.Vector({ features: [mwsFeature] });
+                const mwsStyle = new ol.style.Style({
+                    stroke: new ol.style.Stroke({ color: 'skyblue', width: 2 }),
+                    fill: new ol.style.Fill({ color: 'rgba(135, 206, 235, 0.4)' })
+                });
+
+                demographicPopMap.addLayer(new ol.layer.Vector({ source: mwsSource, style: mwsStyle, zIndex: 10 }));
+                demographicLitMap.addLayer(new ol.layer.Vector({ source: mwsSource, style: mwsStyle, zIndex: 10 }));
+                demographicMargMap.addLayer(new ol.layer.Vector({ source: mwsSource, style: mwsStyle, zIndex: 10 }));
+
+                // Embedded Map Legends
+                const legendStyle = 'position: absolute; bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; pointer-events: none; font-size: 10px; line-height: 1.2; border: 1px solid #ccc; z-index: 1000;';
+
+                const popLegend = document.createElement('div');
+                popLegend.className = 'ol-unselectable ol-control';
+                popLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
+                popLegend.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 3px;">Total Population</div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffb3ba; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 500</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffdfba; border: 1px solid #999; margin-right: 4px;"></div><span>500-1000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffba; border: 1px solid #999; margin-right: 4px;"></div><span>1000-2000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #baffc9; border: 1px solid #999; margin-right: 4px;"></div><span>2000-4000</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #bae1ff; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 4000</span></div>
+                `;
+                demographicPopMap.addControl(new ol.control.Control({ element: popLegend }));
+
+                const litLegend = document.createElement('div');
+                litLegend.className = 'ol-unselectable ol-control';
+                litLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
+                litLegend.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 3px;">Literacy (%)</div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #f3c5ff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 40%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #c5ebff; border: 1px solid #999; margin-right: 4px;"></div><span>40-55%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #e2ffc5; border: 1px solid #999; margin-right: 4px;"></div><span>55-70%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffc5d9; border: 1px solid #999; margin-right: 4px;"></div><span>70-85%</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ffe8c5; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 85%</span></div>
+                `;
+                demographicLitMap.addControl(new ol.control.Control({ element: litLegend }));
+
+                const margLegend = document.createElement('div');
+                margLegend.className = 'ol-unselectable ol-control';
+                margLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
+                margLegend.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 3px;">Marginalized Communities (%)</div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4a5a5; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 20%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5c4d4; border: 1px solid #999; margin-right: 4px;"></div><span>20-40%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>40-60%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>60-80%</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #d4a5d4; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 80%</span></div>
+                `;
+                demographicMargMap.addControl(new ol.control.Control({ element: margLegend }));
+
+            } catch (error) {
+                console.error("Error fetching demographics:", error);
+            }
+        };
+
+        // ============================================================================
+        // WMS AND VECTOR LAYER DEFINITIONS
+        // ============================================================================
+
+        const wmsLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                    'STYLES': 'Terrain_Style_11_Classes'
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const demLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/dem/wms',
+                params: {
+                    'LAYERS': "dem:{{district}}_{{block}}_dem_raster"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const drainageLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/drainage/wms',
+                params: {
+                    'LAYERS': "drainage:{{district}}_{{block}}"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const terrainRasterLayer2 = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "terrain:{{district}}_{{block}}_terrain_raster",
+                    'STYLES': 'Terrain_Style_11_Classes'
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'terrain_raster'
+        })
+
+        const landscapeLulcRasterLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wms',
+                params: {
+                    'LAYERS': "LULC_level_1:LULC_17_18_{{district}}_{{block}}_level_1"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const getLineSld = (layerName, color) => `<?xml version="1.0" encoding="ISO-8859-1"?>
+<StyledLayerDescriptor version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <NamedLayer>
+    <Name>${layerName}</Name>
+    <UserStyle>
+      <FeatureTypeStyle>
+        <Rule>
+          <LineSymbolizer>
+            <Stroke>
+              <CssParameter name="stroke">${color}</CssParameter>
+              <CssParameter name="stroke-width">2</CssParameter>
+            </Stroke>
+          </LineSymbolizer>
+        </Rule>
+      </FeatureTypeStyle>
+    </UserStyle>
+  </NamedLayer>
+</StyledLayerDescriptor>`;
+
+        const getPolygonSld = (layerName, fillColor, strokeColor) => `<?xml version="1.0" encoding="ISO-8859-1"?>
+<StyledLayerDescriptor version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <NamedLayer>
+    <Name>${layerName}</Name>
+    <UserStyle>
+      <FeatureTypeStyle>
+        <Rule>
+          <PolygonSymbolizer>
+            <Fill>
+              <CssParameter name="fill">${fillColor}</CssParameter>
+              <CssParameter name="fill-opacity">0.6</CssParameter>
+            </Fill>
+            <Stroke>
+              <CssParameter name="stroke">${strokeColor}</CssParameter>
+              <CssParameter name="stroke-width">1</CssParameter>
+            </Stroke>
+          </PolygonSymbolizer>
+        </Rule>
+      </FeatureTypeStyle>
+    </UserStyle>
+  </NamedLayer>
+</StyledLayerDescriptor>`;
+
+        const waterbodiesLayerName = "swb:surface_waterbodies_{{district}}_{{block}}";
+        const waterbodiesLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/swb/wms',
+                params: {
+                    'LAYERS': waterbodiesLayerName,
+                    'SLD_BODY': getPolygonSld(waterbodiesLayerName, '#00BFFF', '#0000FF')
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const riverLayerName = "river:{{district}}_{{block}}_river_vector";
+        const riverLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/river/wms',
+                params: {
+                    'LAYERS': riverLayerName,
+                    'SLD_BODY': getLineSld(riverLayerName, '#0000FF')
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const canalLayerName = "canal:{{district}}_{{block}}_canal_vector";
+        const canalLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/canal/wms',
+                params: {
+                    'LAYERS': canalLayerName,
+                    'SLD_BODY': getLineSld(canalLayerName, '#FF4500')
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        })
+
+        const degradRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
+                    'STYLES': "degradation"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'degrad_raster'
+        })
+
+        const lulcRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                    'STYLES': "lulc_level_3_style"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'lulc_raster'
+        })
+
+        const waterRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                    'STYLES': "lulc_water_pixels"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'water_raster'
+        })
+
+        const urbanRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Urbanization",
+                    'STYLES': "urbanization"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'tree_raster'
+        })
+
+        const treeReduceRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
+                    'STYLES': "deforestation"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'tree_raster'
+        })
+
+        // ============================================================================
+        // MAP INITIALIZATION (with village boundaries)
+        // ============================================================================
+
+        const tempView1 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const TerrainMap = new ol.Map({
+            target: 'terrainMap',
+            layers: [wmsLayer],
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const demView = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const drainageView = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const terrainRasterView = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const demMap = new ol.Map({
+            target: 'demMap',
+            layers: [demLayer],
+            view: demView,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const drainageMap = new ol.Map({
+            target: 'drainageMap',
+            layers: [drainageLayer],
+            view: drainageView,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const terrainRasterMap = new ol.Map({
+            target: 'terrainRasterMap',
+            layers: [terrainRasterLayer2],
+            view: terrainRasterView,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const landscapeLulcMap = new ol.Map({
+            target: 'landscapeLulcMap',
+            layers: [landscapeLulcRasterLayer],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const farmLossRasterMapLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/change_detection/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Degradation",
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'farm_loss_raster'
+        });
+
+        const treeLossRasterMapLayer = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/change_detection/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Deforestation",
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'tree_loss_raster'
+        });
+
+        const farmLossMap = new ol.Map({
+            target: 'farmLossMap',
+            layers: [farmLossRasterMapLayer],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        const treeLossMap = new ol.Map({
+            target: 'treeLossMap',
+            layers: [treeLossRasterMapLayer],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        const demographicPopMap = new ol.Map({
+            target: 'demographicPopMap',
+            layers: [],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        const demographicLitMap = new ol.Map({
+            target: 'demographicLitMap',
+            layers: [],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        const demographicMargMap = new ol.Map({
+            target: 'demographicMargMap',
+            layers: [],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        const croppingIntensityMap = new ol.Map({
+            target: 'croppingIntensityMap',
+            layers: [],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const hydroVectorMap = new ol.Map({
+            target: 'hydroVectorMap',
+            layers: [waterbodiesLayer, riverLayer, canalLayer],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ComparisonMap1 = new ol.Map({
+            target: 'compMap1',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView1,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView2 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const ComparisonMap2 = new ol.Map({
+            target: 'compMap2',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView3_2 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const ComparisonMap3 = new ol.Map({
+            target: 'compMap3',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView3_2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView4 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const ComparisonMap4 = new ol.Map({
+            target: 'compMap4',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const tempView5 = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const ComparisonMap5 = new ol.Map({
+            target: 'compMap5',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const lulcMap = new ol.Map({
+            target: 'lulcMap',
+            layers: [lulcRaster],
+            view: tempView2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const DegradMap = new ol.Map({
+            target: 'degradLandMap',
+            layers: [degradRaster],
+            view: tempView3_2,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const treeReduceMap = new ol.Map({
+            target: 'treeReduceMap',
+            layers: [treeReduceRaster],
+            view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const swbMap = new ol.Map({
+            target: 'swbMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const sogeMap = new ol.Map({
+            target: 'sogeMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const urbanMap = new ol.Map({
+            target: 'urbanMap',
+            layers: [urbanRaster],
+            view: tempView5,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        // ============================================================================
+        // FETCH MWS BOUNDARIES AND ADD TO MAIN MAP
+        // ============================================================================
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
             .then(response => response.json())
             .then(data => {
-                const features = new ol.format.GeoJSON().readFeatures(data);
-                const feature = features.find(f => f.get('uid') === uid);
-    
                 const vectorSource = new ol.source.Vector({
-                    features: [feature],
+                    features: new ol.format.GeoJSON().readFeatures(data),
                 });
-    
-                if (feature) {
-                    // Apply crop filter to all WMS layers
-                    var crop = new ol.filter.Crop({
-                        feature: feature,
-                        wrapX: true,
-                        inner: false
-                    })
-                    wmsLayer1.addFilter(crop);
-                    degradRaster1.addFilter(crop);
-                    lulcRaster1.addFilter(crop);
-                    treeReduceRaster1.addFilter(crop);
-                    urbanRaster1.addFilter(crop);
-    
-                    // Add village boundaries to all comparison maps with spatial filter
-                    addVillageBoundariesToMap(ComparisonMap1, feature);
-                    addVillageBoundariesToMap(ComparisonMap2, feature);
-                    addVillageBoundariesToMap(ComparisonMap3, feature);
-                    addVillageBoundariesToMap(ComparisonMap4, feature);
-                    addVillageBoundariesToMap(ComparisonMap5, feature);
-                    addVillageBoundariesToMap(swbMap, feature);
-                    addVillageBoundariesToMap(sogeMap, feature);
-                }
-    
-                const styleFunctionComp = feature => {
-                    strokeColor = 'skyblue';
-                    fillColor = 'rgba(135, 206, 235, 0.4)';
+
+                const styleFunction = feature => {
+                    const uid = feature.get('uid');
+                    let strokeColor = 'skyblue';
+                    let fillColor = 'rgba(135, 206, 235, 0.4)';
+
+                    if (uid === '{{mws_id}}') {
+                        strokeColor = 'yellow';
+                        fillColor = 'rgba(255, 255, 0, 0.4)';
+                    }
+
                     return new ol.style.Style({
                         stroke: new ol.style.Stroke({
                             color: strokeColor,
@@ -2540,175 +3176,313 @@
                         }),
                     });
                 };
-    
-                const vectorLayerComp = new ol.layer.Vector({
+
+                const vectorLayer = new ol.layer.Vector({
                     source: vectorSource,
-                    style: styleFunctionComp,
+                    style: styleFunction,
                 });
-    
-                ComparisonMap1.addLayer(vectorLayerComp)
-                ComparisonMap2.addLayer(vectorLayerComp)
-                ComparisonMap3.addLayer(vectorLayerComp)
-                ComparisonMap4.addLayer(vectorLayerComp)
-                ComparisonMap5.addLayer(vectorLayerComp)
-                swbMap.addLayer(vectorLayerComp)
-    
+
+                mainMap.addLayer(vectorLayer);
+
                 const arr = vectorSource.getExtent();
                 const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-    
-                TerrainMap.getView().setCenter(mapcenter);
-                TerrainMap.getView().setZoom(13);
-    
-                DegradMap.getView().setCenter(mapcenter);
-                DegradMap.getView().setZoom(13);
-    
-                lulcMap.getView().setCenter(mapcenter);
-                lulcMap.getView().setZoom(13);
-    
-                treeReduceMap.getView().setCenter(mapcenter);
-                treeReduceMap.getView().setZoom(13);
-    
-                ComparisonMap1.getView().setCenter(mapcenter);
-                ComparisonMap1.getView().setZoom(13);
-    
-                ComparisonMap2.getView().setCenter(mapcenter);
-                ComparisonMap2.getView().setZoom(13);
-    
-                ComparisonMap3.getView().setCenter(mapcenter);
-                ComparisonMap3.getView().setZoom(13);
-    
-                ComparisonMap4.getView().setCenter(mapcenter);
-                ComparisonMap4.getView().setZoom(13);
-    
-                ComparisonMap5.getView().setCenter(mapcenter);
-                ComparisonMap5.getView().setZoom(13);
-    
-                urbanMap.getView().setCenter(mapcenter);
-                urbanMap.getView().setZoom(13);
-    
-                swbMap.getView().setCenter(mapcenter);
-                swbMap.getView().setZoom(13);
-    
-                sogeMap.getView().setCenter(mapcenter);
-                sogeMap.getView().setZoom(13);
+                mainMap.getView().setCenter(mapcenter);
             })
             .catch(error => {
                 // Silently handle fetch errors
             });
-    };
-    
-    // ============================================================================
-    // FETCH SURFACE WATERBODIES
-    // ============================================================================
-    
-    fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
-        .then(response => response.json())
-        .then(data => {
-            const vectorSource = new ol.source.Vector({
-                features: new ol.format.GeoJSON().readFeatures(data),
-            });
-    
-            const vectorLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: 'rgb(0, 150, 255)',
-                        width: 2,
-                    }),
-                    fill: new ol.style.Fill({
-                        color: 'rgba(137, 207, 240, 0.4)',
-                    }),
-                })
-            });
-    
-            swbMap.addLayer(vectorLayer);
-            swbMap.addLayer(waterRaster);
-        })
-        .catch(error => {
-            // Silently handle fetch errors
-        });
-    
-    // ============================================================================
-    // FETCH GROUNDWATER EXTRACTION STATUS
-    // ============================================================================
-    
-    fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
-        .then(response => response.json())
-        .then(data => {
-            const vectorSource = new ol.source.Vector({
-                features: new ol.format.GeoJSON().readFeatures(data),
-            });
-    
-            const styleFunction = feature => {
-                const uid = feature.get('uid');
-                const type = feature.get('class');
-                let strokeColor = 'rgba(51, 51, 51, 0.0)';
-                let fillColor = 'rgba(135, 206, 235, 0.0)';
-    
-                if (uid === '{{mws_id}}') {
-                    if (type === "Safe") {
-                        strokeColor = "rgba(51, 51, 51, 1)";
-                        fillColor = "rgba(255, 255, 255, 0.4)";
-                    } else if (type === "Semi-critical") {
-                        strokeColor = "rgba(51, 51, 51, 1)";
-                        fillColor = "rgba(224, 243, 248, 0.4)";
-                    } else if (type === "Critical") {
-                        strokeColor = "rgba(51, 51, 51, 1)";
-                        fillColor = "rgba(69, 117, 180, 0.4)";
-                    } else if (type === "Not Assessed") {
-                        strokeColor = "rgba(51, 51, 51, 1)";
-                        fillColor = "rgba(169, 169, 169, 0.4)";
-                    } else {
-                        strokeColor = "rgba(51, 51, 51, 1)";
-                        fillColor = "rgba(49, 54, 149, 0.4)";
+
+        // ============================================================================
+        // FETCH FEATURE BY UID AND APPLY SPATIAL FILTERING
+        // ============================================================================
+
+        const populateHydrologyTable = async (mwsFeature) => {
+            const uid = mwsFeature.get('uid');
+            const area = mwsFeature.get('area_in_ha');
+
+            if (area !== undefined) {
+                document.getElementById('tbl-area').innerText = parseFloat(area).toFixed(2);
+            }
+
+            try {
+                const geom = mwsFeature.getGeometry();
+                const lengthMeters = ol.sphere.getLength(geom, { projection: 'EPSG:4326' });
+                const perimeterKm = (lengthMeters / 1000).toFixed(2);
+                document.getElementById('tbl-perimeter').innerText = perimeterKm;
+            } catch (e) {
+                console.error("Error calculating perimeter:", e);
+            }
+        };
+
+        const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
+            await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
+                .then(response => response.json())
+                .then(data => {
+                    const features = new ol.format.GeoJSON().readFeatures(data);
+                    const feature = features.find(f => f.get('uid') === uid);
+
+                    const vectorSource = new ol.source.Vector({
+                        features: [feature],
+                    });
+
+                    if (feature) {
+                        // Apply crop filter to all WMS layers
+                        var crop = new ol.filter.Crop({
+                            feature: feature,
+                            wrapX: true,
+                            inner: false
+                        })
+                        wmsLayer1.addFilter(crop);
+                        degradRaster1.addFilter(crop);
+                        lulcRaster1.addFilter(crop);
+                        treeReduceRaster1.addFilter(crop);
+                        urbanRaster1.addFilter(crop);
+
+                        demLayer.addFilter(crop);
+                        drainageLayer.addFilter(crop);
+                        terrainRasterLayer2.addFilter(crop);
+                        landscapeLulcRasterLayer.addFilter(crop);
+                        waterbodiesLayer.addFilter(crop);
+                        riverLayer.addFilter(crop);
+                        canalLayer.addFilter(crop);
+                        farmLossRasterMapLayer.addFilter(crop);
+                        treeLossRasterMapLayer.addFilter(crop);
+
+
+                        // Add village boundaries to all comparison maps with spatial filter
+                        addVillageBoundariesToMap(ComparisonMap1, feature);
+                        addVillageBoundariesToMap(ComparisonMap2, feature);
+                        addVillageBoundariesToMap(ComparisonMap3, feature);
+                        addVillageBoundariesToMap(ComparisonMap4, feature);
+                        addVillageBoundariesToMap(ComparisonMap5, feature);
+                        addVillageBoundariesToMap(swbMap, feature);
+                        addVillageBoundariesToMap(sogeMap, feature);
+                        addDemographicBoundariesToMap(feature);
+                        populateHydrologyTable(feature);
                     }
-                }
-    
-                return new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: strokeColor,
-                        width: 2,
-                    }),
-                    fill: new ol.style.Fill({
-                        color: fillColor,
-                    }),
+
+                    const styleFunctionComp = feature => {
+                        strokeColor = 'skyblue';
+                        fillColor = 'rgba(135, 206, 235, 0.4)';
+                        return new ol.style.Style({
+                            stroke: new ol.style.Stroke({
+                                color: strokeColor,
+                                width: 2,
+                            }),
+                            fill: new ol.style.Fill({
+                                color: fillColor,
+                            }),
+                        });
+                    };
+
+                    const vectorLayerComp = new ol.layer.Vector({
+                        source: vectorSource,
+                        style: styleFunctionComp,
+                    });
+
+                    ComparisonMap1.addLayer(vectorLayerComp)
+                    ComparisonMap2.addLayer(vectorLayerComp)
+                    ComparisonMap3.addLayer(vectorLayerComp)
+                    ComparisonMap4.addLayer(vectorLayerComp)
+                    ComparisonMap5.addLayer(vectorLayerComp)
+                    swbMap.addLayer(vectorLayerComp)
+
+                    demMap.addLayer(vectorLayerComp)
+                    drainageMap.addLayer(vectorLayerComp)
+                    terrainRasterMap.addLayer(vectorLayerComp)
+                    landscapeLulcMap.addLayer(vectorLayerComp)
+                    croppingIntensityMap.addLayer(vectorLayerComp)
+                    hydroVectorMap.addLayer(vectorLayerComp)
+
+                    const arr = vectorSource.getExtent();
+                    const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+
+                    TerrainMap.getView().setCenter(mapcenter);
+                    TerrainMap.getView().setZoom(13);
+
+                    demMap.getView().setCenter(mapcenter);
+                    demMap.getView().setZoom(13);
+
+                    drainageMap.getView().setCenter(mapcenter);
+                    drainageMap.getView().setZoom(13);
+
+                    terrainRasterMap.getView().setCenter(mapcenter);
+                    terrainRasterMap.getView().setZoom(13);
+
+                    landscapeLulcMap.getView().setCenter(mapcenter);
+                    landscapeLulcMap.getView().setZoom(13);
+
+                    croppingIntensityMap.getView().setCenter(mapcenter);
+                    croppingIntensityMap.getView().setZoom(13);
+
+                    hydroVectorMap.getView().setCenter(mapcenter);
+                    hydroVectorMap.getView().setZoom(13);
+
+                    DegradMap.getView().setCenter(mapcenter);
+                    DegradMap.getView().setZoom(13);
+
+                    lulcMap.getView().setCenter(mapcenter);
+                    lulcMap.getView().setZoom(13);
+
+                    treeReduceMap.getView().setCenter(mapcenter);
+                    treeReduceMap.getView().setZoom(13);
+
+                    ComparisonMap1.getView().setCenter(mapcenter);
+                    ComparisonMap1.getView().setZoom(13);
+
+                    ComparisonMap2.getView().setCenter(mapcenter);
+                    ComparisonMap2.getView().setZoom(13);
+
+                    ComparisonMap3.getView().setCenter(mapcenter);
+                    ComparisonMap3.getView().setZoom(13);
+
+                    ComparisonMap4.getView().setCenter(mapcenter);
+                    ComparisonMap4.getView().setZoom(13);
+
+                    ComparisonMap5.getView().setCenter(mapcenter);
+                    ComparisonMap5.getView().setZoom(13);
+
+                    urbanMap.getView().setCenter(mapcenter);
+                    urbanMap.getView().setZoom(13);
+
+                    farmLossMap.getView().setCenter(mapcenter);
+                    farmLossMap.getView().setZoom(13);
+
+                    treeLossMap.getView().setCenter(mapcenter);
+                    treeLossMap.getView().setZoom(13);
+
+                    demographicPopMap.getView().setCenter(mapcenter);
+                    demographicPopMap.getView().setZoom(13);
+
+                    demographicLitMap.getView().setCenter(mapcenter);
+                    demographicLitMap.getView().setZoom(13);
+
+                    demographicMargMap.getView().setCenter(mapcenter);
+                    demographicMargMap.getView().setZoom(13);
+
+                    swbMap.getView().setCenter(mapcenter);
+                    swbMap.getView().setZoom(13);
+
+                    sogeMap.getView().setCenter(mapcenter);
+                    sogeMap.getView().setZoom(13);
+                })
+                .catch(error => {
+                    // Silently handle fetch errors
                 });
-            };
-    
-            const vectorLayer = new ol.layer.Vector({
-                source: vectorSource,
-                style: styleFunction,
+        };
+
+        // ============================================================================
+        // FETCH SURFACE WATERBODIES
+        // ============================================================================
+
+        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
+            .then(response => response.json())
+            .then(data => {
+                const vectorSource = new ol.source.Vector({
+                    features: new ol.format.GeoJSON().readFeatures(data),
+                });
+
+                const vectorLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: 'rgb(0, 150, 255)',
+                            width: 2,
+                        }),
+                        fill: new ol.style.Fill({
+                            color: 'rgba(137, 207, 240, 0.4)',
+                        }),
+                    })
+                });
+
+                swbMap.addLayer(vectorLayer);
+                swbMap.addLayer(waterRaster);
+            })
+            .catch(error => {
+                // Silently handle fetch errors
             });
-    
-            sogeMap.addLayer(vectorLayer);
-        })
-        .catch(error => {
-            // Silently handle fetch errors
-        });
-    
-    // ============================================================================
-    // EXTRACT FEATURE AND APPLY FILTERING
-    // ============================================================================
-    
-    fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
-    // Function to add scale control to a map
-    const addVisualScaleBar = (map) => {
-        const scaleControl = new ol.control.ScaleLine({
-            units: 'metric',
-            bar: true,
-            steps: 4,
-            text: true,
-            minWidth: 100
-        });
-        map.addControl(scaleControl);
-    };
 
-    const addGoogleMapsLegend = (mapElement) => {
-        if (mapElement.querySelector('.google-maps-legend')) {
-            return;
-        }
+        // ============================================================================
+        // FETCH GROUNDWATER EXTRACTION STATUS
+        // ============================================================================
 
-        const legendHTML = `
+        fetch("https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_{{district}}_{{block}}&outputFormat=application/json")
+            .then(response => response.json())
+            .then(data => {
+                const vectorSource = new ol.source.Vector({
+                    features: new ol.format.GeoJSON().readFeatures(data),
+                });
+
+                const styleFunction = feature => {
+                    const uid = feature.get('uid');
+                    const type = feature.get('class');
+                    let strokeColor = 'rgba(51, 51, 51, 0.0)';
+                    let fillColor = 'rgba(135, 206, 235, 0.0)';
+
+                    if (uid === '{{mws_id}}') {
+                        if (type === "Safe") {
+                            strokeColor = "rgba(51, 51, 51, 1)";
+                            fillColor = "rgba(255, 255, 255, 0.4)";
+                        } else if (type === "Semi-critical") {
+                            strokeColor = "rgba(51, 51, 51, 1)";
+                            fillColor = "rgba(224, 243, 248, 0.4)";
+                        } else if (type === "Critical") {
+                            strokeColor = "rgba(51, 51, 51, 1)";
+                            fillColor = "rgba(69, 117, 180, 0.4)";
+                        } else if (type === "Not Assessed") {
+                            strokeColor = "rgba(51, 51, 51, 1)";
+                            fillColor = "rgba(169, 169, 169, 0.4)";
+                        } else {
+                            strokeColor = "rgba(51, 51, 51, 1)";
+                            fillColor = "rgba(49, 54, 149, 0.4)";
+                        }
+                    }
+
+                    return new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: strokeColor,
+                            width: 2,
+                        }),
+                        fill: new ol.style.Fill({
+                            color: fillColor,
+                        }),
+                    });
+                };
+
+                const vectorLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: styleFunction,
+                });
+
+                sogeMap.addLayer(vectorLayer);
+            })
+            .catch(error => {
+                // Silently handle fetch errors
+            });
+
+        // ============================================================================
+        // EXTRACT FEATURE AND APPLY FILTERING
+        // ============================================================================
+
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
+        // Function to add scale control to a map
+        const addVisualScaleBar = (map) => {
+            const scaleControl = new ol.control.ScaleLine({
+                units: 'metric',
+                bar: true,
+                steps: 4,
+                text: true,
+                minWidth: 100
+            });
+            map.addControl(scaleControl);
+        };
+
+        const addGoogleMapsLegend = (mapElement) => {
+            if (mapElement.querySelector('.google-maps-legend')) {
+                return;
+            }
+
+            const legendHTML = `
             <div class="google-maps-legend">
                 
                 <div class="legend-section">
@@ -2735,37 +3509,40 @@
             </div>
         `;
 
-        mapElement.insertAdjacentHTML('beforeend', legendHTML);
-    };
+            mapElement.insertAdjacentHTML('beforeend', legendHTML);
+        };
 
-    const initializeMapControls = () => {
-        // Add scale bars to ALL maps
-        if (typeof mainMap !== 'undefined') addVisualScaleBar(mainMap);
+        const initializeMapControls = () => {
+            // Add scale bars to ALL maps
+            if (typeof mainMap !== 'undefined') addVisualScaleBar(mainMap);
+            if (typeof demMap !== 'undefined') addVisualScaleBar(demMap);
+            if (typeof drainageMap !== 'undefined') addVisualScaleBar(drainageMap);
+            if (typeof terrainRasterMap !== 'undefined') addVisualScaleBar(terrainRasterMap);
 
-        if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
-        if (typeof ComparisonMap2 !== 'undefined') addVisualScaleBar(ComparisonMap2);
-        if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
-        if (typeof ComparisonMap4 !== 'undefined') addVisualScaleBar(ComparisonMap4);
-        if (typeof ComparisonMap5 !== 'undefined') addVisualScaleBar(ComparisonMap5);
+            if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
+            if (typeof ComparisonMap2 !== 'undefined') addVisualScaleBar(ComparisonMap2);
+            if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
+            if (typeof ComparisonMap4 !== 'undefined') addVisualScaleBar(ComparisonMap4);
+            if (typeof ComparisonMap5 !== 'undefined') addVisualScaleBar(ComparisonMap5);
 
 
-        if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
-        if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
-        if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
+            if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
+            if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
+            if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
-        // Add legends to boundary maps
-        const boundaryMaps = ['mainMap', 'compMap1', 'compMap2', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'sogeMap'];
-        
-        boundaryMaps.forEach(mapId => {
-            const mapElement = document.getElementById(mapId);
-            if (mapElement) {
-                addGoogleMapsLegend(mapElement);
-            }
-        });
-    };
+            // Add legends to boundary maps
+            const boundaryMaps = ['mainMap', 'compMap1', 'compMap2', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'sogeMap'];
 
-    // Initialize after page loads
-    setTimeout(initializeMapControls, 1000);
+            boundaryMaps.forEach(mapId => {
+                const mapElement = document.getElementById(mapId);
+                if (mapElement) {
+                    addGoogleMapsLegend(mapElement);
+                }
+            });
+        };
+
+        // Initialize after page loads
+        setTimeout(initializeMapControls, 1000);
 
         // Terrain Bar Chart
         const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
@@ -3152,6 +3929,77 @@
             }
         });
 
+        // Climate Trend Graph
+        fetch(`https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers%3AdeltaG_well_depth_{{district}}_{{block}}&outputFormat=application%2Fjson`)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.features) {
+                    const mwsData = data.features.find(f => f.properties && f.properties.uid === '{{mws_id}}');
+                    if (mwsData) {
+                        const labels = [];
+                        const precipData = [];
+
+                        // Extract years from properties (e.g. 2017_2018)
+                        for (const key in mwsData.properties) {
+                            if (/^\d{4}_\d{4}$/.test(key)) {
+                                labels.push(key);
+                            }
+                        }
+                        labels.sort(); // Sort chronologically
+
+                        for (const key of labels) {
+                            try {
+                                const valStr = mwsData.properties[key];
+                                const val = typeof valStr === 'string' ? JSON.parse(valStr) : valStr;
+                                precipData.push(val.Precipitation || 0);
+                            } catch (e) {
+                                precipData.push(0);
+                            }
+                        }
+
+                        // Convert labels to readable format e.g. 2017-18
+                        const formattedLabels = labels.map(l => {
+                            const parts = l.split('_');
+                            return `${parts[0]}-${parts[1].slice(2)}`;
+                        });
+
+                        new Chart(document.getElementById('precipChart'), {
+                            type: 'bar',
+                            data: {
+                                labels: formattedLabels,
+                                datasets: [{
+                                    label: 'Annual Precipitation (mm)',
+                                    data: precipData,
+                                    backgroundColor: '#3498db',
+                                    borderColor: '#2980b9',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: 'Precipitation (mm)' }
+                                    },
+                                    x: {
+                                        title: { display: true, text: 'Year' }
+                                    }
+                                },
+                                animation: { duration: 0 }
+                            }
+                        });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching precipitation data:", error);
+            });
+
         // Drought Graphs
         const mod_weeks = JSON.parse('{{mod_drought|safe}}')
         const sev_weeks = JSON.parse('{{sev_drought|safe}}')
@@ -3254,140 +4102,142 @@
         })
 
         // Toggle show more/less for collapsible lists
-function toggleList(listId, button) {
-    const list = document.getElementById(listId);
-    const hiddenItems = list.querySelectorAll('.hidden-item');
-    const isExpanded = button.textContent.includes('Show Less');
- 
-    hiddenItems.forEach(item => {
-        if (isExpanded) {
-            item.style.display = 'none';
-        } else {
-            item.style.display = 'flex';
-        }
-    });
- 
-    if (isExpanded) {
-        const count = hiddenItems.length;
-        button.textContent = `Show More (${count} more)`;
-    } else {
-        button.textContent = 'Show Less';
-    }
-}
- 
-// Set report date
-const currentDate = new Date();
-const formattedDate = currentDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-});
-document.getElementById("report-date").textContent = formattedDate;
- 
-// Print functionality
-function printReport() {
-    window.print();
-}
- 
-window.printReport = printReport;
- 
-// Beforeprint event handler
-window.addEventListener('beforeprint', function () {
-    const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap,
-        urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-        ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
- 
-    allMaps.forEach(function (map) {
-        if (map) {
-            map.updateSize();
-            map.renderSync();
-        }
-    });
-});
- 
-window.addEventListener('afterprint', function () {
-    const printVisibleItems = document.querySelectorAll('.print-visible');
-    printVisibleItems.forEach(item => {
-        item.classList.remove('print-visible');
-    });
- 
-    const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap,
-        urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-        ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
- 
-    setTimeout(function () {
-        allMaps.forEach(function (map) {
-            if (map) {
-                try {
-                    map.updateSize();
-                } catch (e) { }
+        function toggleList(listId, button) {
+            const list = document.getElementById(listId);
+            const hiddenItems = list.querySelectorAll('.hidden-item');
+            const isExpanded = button.textContent.includes('Show Less');
+
+            hiddenItems.forEach(item => {
+                if (isExpanded) {
+                    item.style.display = 'none';
+                } else {
+                    item.style.display = 'flex';
+                }
+            });
+
+            if (isExpanded) {
+                const count = hiddenItems.length;
+                button.textContent = `Show More (${count} more)`;
+            } else {
+                button.textContent = 'Show Less';
             }
+        }
+
+        // Set report date
+        const currentDate = new Date();
+        const formattedDate = currentDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
-    }, 100);
-});
- 
-// Maps ready detection
-(function () {
-    const layersToWatch = [
-        baseLayer,
-        wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
-    ].filter(Boolean);
- 
-    let pending = 0;
-    let resolveReady;
-    const readyPromise = new Promise(res => (resolveReady = res));
- 
-    function hookSource(src) {
-        if (src && src.on) {
-            src.on('tileloadstart', () => pending++);
-            src.on(['tileloadend', 'tileloaderror'], () => { 
-                pending = Math.max(0, pending - 1); 
-                check(); 
-            });
-            src.on('imageloadstart', () => pending++);
-            src.on(['imageloadend', 'imageloaderror'], () => { 
-                pending = Math.max(0, pending - 1); 
-                check(); 
-            });
+        document.getElementById("report-date").textContent = formattedDate;
+
+        // Print functionality
+        function printReport() {
+            window.print();
         }
-    }
- 
-    layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
- 
-    let renderedOnce = false;
-    function afterRender() {
-        renderedOnce = true;
-        check();
-    }
- 
-    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
-        ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
-        .filter(Boolean)
-        .forEach(m => m.once('rendercomplete', afterRender));
- 
-    window.__chartsReady = true;
- 
-    let settleTimer;
-    function check() {
-        if (pending === 0 && renderedOnce && window.__chartsReady) {
-            clearTimeout(settleTimer);
-            settleTimer = setTimeout(() => {
-                try {
-                    [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap,
-                        ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
-                        .filter(Boolean)
-                        .forEach(m => m.renderSync());
-                } catch (e) { }
-                window.__mapsReady = true;
-                resolveReady(true);
-            }, 300);
-        }
-    }
- 
-    window.__mapsReadyPromise = readyPromise;
- 
-    setTimeout(check, 0);
-})();
+
+        window.printReport = printReport;
+
+        // Beforeprint event handler
+        window.addEventListener('beforeprint', function () {
+            const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
+                ComparisonMap4, ComparisonMap5, demMap, drainageMap, terrainRasterMap, swbMap, sogeMap];
+
+            allMaps.forEach(function (map) {
+                if (map) {
+                    map.updateSize();
+                    map.renderSync();
+                }
+            });
+        });
+
+        window.addEventListener('afterprint', function () {
+            const printVisibleItems = document.querySelectorAll('.print-visible');
+            printVisibleItems.forEach(item => {
+                item.classList.remove('print-visible');
+            });
+
+            const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
+                ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
+
+            setTimeout(function () {
+                allMaps.forEach(function (map) {
+                    if (map) {
+                        try {
+                            map.updateSize();
+                        } catch (e) { }
+                    }
+                });
+            }, 100);
+        });
+
+        // Maps ready detection
+        (function () {
+            const layersToWatch = [
+                baseLayer,
+                wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
+            ].filter(Boolean);
+
+            let pending = 0;
+            let resolveReady;
+            const readyPromise = new Promise(res => (resolveReady = res));
+
+            function hookSource(src) {
+                if (src && src.on) {
+                    src.on('tileloadstart', () => pending++);
+                    src.on(['tileloadend', 'tileloaderror'], () => {
+                        pending = Math.max(0, pending - 1);
+                        check();
+                    });
+                    src.on('imageloadstart', () => pending++);
+                    src.on(['imageloadend', 'imageloaderror'], () => {
+                        pending = Math.max(0, pending - 1);
+                        check();
+                    });
+                }
+            }
+
+            layersToWatch.forEach(l => hookSource(l.getSource && l.getSource()));
+
+            let renderedOnce = false;
+            function afterRender() {
+                renderedOnce = true;
+                check();
+            }
+
+            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                demMap, drainageMap, terrainRasterMap,
+                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                .filter(Boolean)
+                .forEach(m => m.once('rendercomplete', afterRender));
+
+            window.__chartsReady = true;
+
+            let settleTimer;
+            function check() {
+                if (pending === 0 && renderedOnce && window.__chartsReady) {
+                    clearTimeout(settleTimer);
+                    settleTimer = setTimeout(() => {
+                        try {
+                            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                                demMap, drainageMap, terrainRasterMap,
+                                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                                .filter(Boolean)
+                                .forEach(m => m.renderSync());
+                        } catch (e) { }
+                        window.__mapsReady = true;
+                        resolveReady(true);
+                    }, 300);
+                }
+            }
+
+            window.__mapsReadyPromise = readyPromise;
+
+            setTimeout(check, 0);
+        })();
 
     </script>
 </body>

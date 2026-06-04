@@ -59,6 +59,7 @@ from .gen_mws_report import (
     get_drought_data,
     get_osm_data,
     get_soge_data,
+    get_hydro_tabular_data,
     get_surface_Water_bodies_data,
     get_terrain_data,
     get_village_data,
@@ -270,6 +271,9 @@ def generate_mws_report(request):
         # ? SOGE Description
         soge_desc = get_soge_data(state, district, block, uid)
 
+        # ? Hydro Tabular Data
+        min_elev, max_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length = get_hydro_tabular_data(state, district, block, uid)
+
         # ? Drought Description
         drought_desc, drought_weeks, mod_drought, sev_drought, drysp_all, dg_years = (
             get_drought_data(state, district, block, uid)
@@ -327,6 +331,13 @@ def generate_mws_report(request):
             "inten_desc1": inten_desc1,
             "inten_desc2": inten_desc2,
             "soge_desc": soge_desc,
+            "min_elev": min_elev,
+            "max_elev": max_elev,
+            "dem_relief": dem_relief,
+            "aquifer_class": aquifer_class,
+            "soge_class": soge_class,
+            "drainage_density": drainage_density,
+            "drainage_length": total_length,
             "mws_areas": json.dumps(mws_areas),
             "block_areas": json.dumps(block_areas),
             "lulc_mws_slope": json.dumps(lulc_mws_slope),
