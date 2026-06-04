@@ -195,7 +195,7 @@ def generate_antyodaya_layer_task(
     resolved_district = _canonical_asset_name(district)
     resolved_block = _canonical_asset_name(block)
     try:
-        gdf = _read_clip(resolved_state, resolved_district, resolved_block)
+        gdf = _read_clip(resolved_state, resolved_distrantyodaya20ict, resolved_block)
     except ValueError:
         resolved_state, resolved_district, resolved_block = _resolve_location(
             state, district, block
@@ -204,8 +204,23 @@ def generate_antyodaya_layer_task(
     gpkg_path = _write_clip(gdf, output_dir, layer_name)
 
     geoserver = None
-    if _bool(sync_to_geoserver):
-        geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
+    # if _bool(sync_to_geoserver):
+    #     geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
+
+    if sync_to_geoserver and state and district and block:
+        layer_id = save_layer_info_to_db(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=layer_name,
+            asset_id=gpkg_path.as_posix(),
+            dataset_name="Antyodaya 2020",
+            misc={"is_generated_locally": True},
+        )
+        if layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("Sync to GeoServer flag updated for Antyodaya 2020")
+
 
     return {
         "status": "success",
