@@ -40,6 +40,7 @@ The generic join command accepts the same ``--keep-output-columns`` and
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import csv
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -106,6 +107,8 @@ DEFAULT_ADMIN_REPORTS_DIR = Path("data/admin-boundary/cs_admin_sanitised_reports
 DEFAULT_LIVESTOCK_INPUT = Path("data/livestock/livestock_pan_india.csv")
 DEFAULT_LIVESTOCK_OUTPUT = Path("data/livestock/livestock.gpkg")
 DEFAULT_LIVESTOCK_LAYER = "livestock"
+DEFAULT_OUTPUT_FORMATS = "gpkg"
+SUPPORTED_OUTPUT_FORMATS = {"gpkg", "geojson"}
 
 ADMIN_COLUMNS = [
     "state_name",
@@ -1986,6 +1989,63 @@ def parse_rename_map(value: str | None) -> dict[str, str]:
     return rename_map
 
 
+def parse_output_formats(value: str | None) -> list[str]:
+    formats = [item.strip().lower() for item in (value or DEFAULT_OUTPUT_FORMATS).split(",") if item.strip()]
+    if not formats:
+        raise SystemExit("At least one output format is required.")
+    unknown = [item for item in formats if item not in SUPPORTED_OUTPUT_FORMATS]
+    if unknown:
+        raise SystemExit(
+            "Unsupported output format(s): "
+            + ", ".join(unknown)
+            + ". Use one or more of: "
+            + ", ".join(sorted(SUPPORTED_OUTPUT_FORMATS))
+        )
+    deduped: list[str] = []
+    for item in formats:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped
+
+
+def default_geojson_path(output_path: Path) -> Path:
+    return output_path.with_suffix(".geojson")
+
+
+class ChunkedGeoJSONWriter:
+    """Stream GeoDataFrame chunks into a single GeoJSON FeatureCollection."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.handle = None
+        self.first_feature = True
+        self.rows_written = 0
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.handle = self.path.open("w", encoding="utf-8")
+        self.handle.write('{"type":"FeatureCollection","features":[\n')
+        return self
+
+    def write(self, gdf: Any) -> int:
+        if gdf.empty:
+            return 0
+        written = 0
+        for feature in gdf.iterfeatures(na="null", drop_id=True):
+            if not self.first_feature:
+                self.handle.write(",\n")
+            self.handle.write(json_dumps_text(feature))
+            self.first_feature = False
+            written += 1
+        self.rows_written += written
+        return written
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        if self.handle is not None:
+            self.handle.write("\n]}\n")
+            self.handle.close()
+
+
 def project_and_rename_output(
     gdf: Any,
     *,
@@ -2181,22 +2241,31 @@ def write_join_summary(reports_dir: Path, summary: dict[str, Any]) -> None:
     )
 
 
+def validate_output_path(path: Path, *, overwrite: bool, label: str) -> None:
+    if path.exists():
+        if not overwrite:
+            raise SystemExit(f"{label} {path} exists. Pass --overwrite to rebuild it.")
+        path.unlink()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
 def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
     ensure_dependencies()
     started = time.perf_counter()
     admin_gpkg = repo_path(args.admin_gpkg)
     source_path = repo_path(args.input)
     output_gpkg = repo_path(args.output)
+    output_formats = parse_output_formats(args.output_formats)
+    output_geojson = repo_path(args.geojson_output) if args.geojson_output else default_geojson_path(output_gpkg)
     reports_dir = repo_path(args.reports_dir)
     if not admin_gpkg.exists():
         raise SystemExit(f"Admin cache not found: {admin_gpkg}. Run `build-admin` first.")
     if not source_path.exists():
         raise SystemExit(f"Join input not found: {source_path}")
-    if output_gpkg.exists():
-        if not args.overwrite:
-            raise SystemExit(f"{output_gpkg} exists. Pass --overwrite to rebuild it.")
-        output_gpkg.unlink()
-    output_gpkg.parent.mkdir(parents=True, exist_ok=True)
+    if "gpkg" in output_formats:
+        validate_output_path(output_gpkg, overwrite=args.overwrite, label="GeoPackage")
+    if "geojson" in output_formats:
+        validate_output_path(output_geojson, overwrite=args.overwrite, label="GeoJSON")
 
     info = pyogrio.read_info(admin_gpkg, layer=args.admin_layer)
     admin_columns = [str(field) for field in info.get("fields", [])]
@@ -2221,54 +2290,61 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
     rows_written = 0
     matched_rows = 0
     first_chunk = True
+    last_output_fields: list[str] = []
     print(
         f"[join] joining {len(join_table.records_by_key):,} source keys onto "
         f"{total_features:,} admin features",
         flush=True,
     )
 
-    while True:
-        gdf = pyogrio.read_dataframe(
-            admin_gpkg,
-            layer=args.admin_layer,
-            skip_features=offset,
-            max_features=args.chunk_size,
-        )
-        if gdf.empty:
-            break
-        normalised_keys = gdf[args.left_key].map(normalize_join_id)
-        matched = normalised_keys.map(lambda key: key in join_table.records_by_key if key is not None else False)
-        matched_rows += int(matched.sum())
+    geojson_writer = ChunkedGeoJSONWriter(output_geojson) if "geojson" in output_formats else None
+    with geojson_writer if geojson_writer is not None else nullcontext(None) as writer:
+        while True:
+            gdf = pyogrio.read_dataframe(
+                admin_gpkg,
+                layer=args.admin_layer,
+                skip_features=offset,
+                max_features=args.chunk_size,
+            )
+            if gdf.empty:
+                break
+            normalised_keys = gdf[args.left_key].map(normalize_join_id)
+            matched = normalised_keys.map(lambda key: key in join_table.records_by_key if key is not None else False)
+            matched_rows += int(matched.sum())
 
-        for output_column in join_table.output_columns:
-            gdf[output_column] = [
-                join_table.records_by_key.get(key, {}).get(output_column)
-                if key is not None
-                else None
-                for key in normalised_keys
-            ]
-        if not args.no_match_status:
-            gdf[args.match_status_column] = matched.astype("boolean")
-        gdf = coerce_join_output_columns(gdf, join_table)
-        gdf = project_and_rename_output(
-            gdf,
-            keep_columns=keep_output_columns,
-            rename_map=rename_output_columns,
-        )
+            for output_column in join_table.output_columns:
+                gdf[output_column] = [
+                    join_table.records_by_key.get(key, {}).get(output_column)
+                    if key is not None
+                    else None
+                    for key in normalised_keys
+                ]
+            if not args.no_match_status:
+                gdf[args.match_status_column] = matched.astype("boolean")
+            gdf = coerce_join_output_columns(gdf, join_table)
+            gdf = project_and_rename_output(
+                gdf,
+                keep_columns=keep_output_columns,
+                rename_map=rename_output_columns,
+            )
+            last_output_fields = [column for column in gdf.columns if column != gdf.geometry.name]
 
-        pyogrio.write_dataframe(
-            gdf,
-            output_gpkg,
-            layer=args.output_layer,
-            driver="GPKG",
-            append=not first_chunk,
-            promote_to_multi=True,
-        )
-        rows_written += len(gdf)
-        offset += len(gdf)
-        first_chunk = False
-        if rows_written == len(gdf) or rows_written % (args.chunk_size * 2) == 0:
-            print(f"[join] wrote {rows_written:,}/{total_features:,} joined features", flush=True)
+            if "gpkg" in output_formats:
+                pyogrio.write_dataframe(
+                    gdf,
+                    output_gpkg,
+                    layer=args.output_layer,
+                    driver="GPKG",
+                    append=not first_chunk,
+                    promote_to_multi=True,
+                )
+            if "geojson" in output_formats:
+                writer.write(gdf)
+            rows_written += len(gdf)
+            offset += len(gdf)
+            first_chunk = False
+            if rows_written == len(gdf) or rows_written % (args.chunk_size * 2) == 0:
+                print(f"[join] wrote {rows_written:,}/{total_features:,} joined features", flush=True)
 
     final_left_key = rename_output_columns.get(args.left_key, args.left_key)
     final_location_columns = [
@@ -2276,17 +2352,24 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
         for column in ["state_name", "district_name", "TEHSIL"]
     ]
     index_columns = []
-    final_fields = set(pyogrio.read_info(output_gpkg, layer=args.output_layer).get("fields", []))
-    if final_left_key in final_fields:
-        index_columns.append([final_left_key])
-    if all(column in final_fields for column in final_location_columns):
-        index_columns.append(final_location_columns)
-    ensure_gpkg_indexes(output_gpkg, args.output_layer, index_columns)
+    final_fields: list[str] = []
+    if "gpkg" in output_formats:
+        final_fields = list(pyogrio.read_info(output_gpkg, layer=args.output_layer).get("fields", []))
+        final_fields_set = set(final_fields)
+        if final_left_key in final_fields_set:
+            index_columns.append([final_left_key])
+        if all(column in final_fields_set for column in final_location_columns):
+            index_columns.append(final_location_columns)
+        ensure_gpkg_indexes(output_gpkg, args.output_layer, index_columns)
+    else:
+        final_fields = last_output_fields
     summary = {
         "admin_gpkg": admin_gpkg.as_posix(),
         "admin_layer": args.admin_layer,
         "input": source_path.as_posix(),
-        "output": output_gpkg.as_posix(),
+        "output": output_gpkg.as_posix() if "gpkg" in output_formats else None,
+        "geojson_output": output_geojson.as_posix() if "geojson" in output_formats else None,
+        "output_formats": output_formats,
         "output_layer": args.output_layer,
         "left_key": args.left_key,
         "right_key": args.right_key,
@@ -2294,7 +2377,7 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
         "output_columns": join_table.output_columns,
         "keep_output_columns": keep_output_columns,
         "rename_output_columns": rename_output_columns,
-        "final_output_columns": list(pyogrio.read_info(output_gpkg, layer=args.output_layer).get("fields", [])),
+        "final_output_columns": final_fields,
         "source_rows": join_table.source_rows,
         "source_rows_with_key": join_table.source_rows_with_key,
         "source_unique_keys": len(join_table.records_by_key),
@@ -2307,10 +2390,75 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
         "total_seconds": round(time.perf_counter() - started, 6),
     }
     write_join_summary(reports_dir, summary)
-    write_gpkg_metadata(output_gpkg, f"{normalize_slug(args.output_layer)}_join_metadata", {}, summary)
+    if "gpkg" in output_formats:
+        write_gpkg_metadata(output_gpkg, f"{normalize_slug(args.output_layer)}_join_metadata", {}, summary)
     print(
         f"[join] complete: {matched_rows:,}/{rows_written:,} admin features matched "
         f"in {summary['total_seconds']:.1f}s",
+        flush=True,
+    )
+    return summary
+
+
+def export_gpkg_layer_to_geojson(args: argparse.Namespace) -> dict[str, Any]:
+    ensure_dependencies()
+    started = time.perf_counter()
+    input_gpkg = repo_path(args.input_gpkg)
+    output_geojson = repo_path(args.geojson_output)
+    reports_dir = repo_path(args.reports_dir)
+    if not input_gpkg.exists():
+        raise SystemExit(f"Input GeoPackage not found: {input_gpkg}")
+
+    keep_output_columns = parse_csv_list(args.keep_output_columns)
+    rename_output_columns = parse_rename_map(args.rename_output_columns)
+    validate_output_path(output_geojson, overwrite=args.overwrite, label="GeoJSON")
+
+    info = pyogrio.read_info(input_gpkg, layer=args.input_layer)
+    total_features = int(info.get("features") or 0)
+    rows_written = 0
+    offset = 0
+    final_fields: list[str] = []
+    print(
+        f"[export] writing {total_features:,} features from "
+        f"{input_gpkg}:{args.input_layer} to {output_geojson}",
+        flush=True,
+    )
+    with ChunkedGeoJSONWriter(output_geojson) as writer:
+        while True:
+            gdf = pyogrio.read_dataframe(
+                input_gpkg,
+                layer=args.input_layer,
+                skip_features=offset,
+                max_features=args.chunk_size,
+            )
+            if gdf.empty:
+                break
+            gdf = project_and_rename_output(
+                gdf,
+                keep_columns=keep_output_columns,
+                rename_map=rename_output_columns,
+            )
+            final_fields = [column for column in gdf.columns if column != gdf.geometry.name]
+            writer.write(gdf)
+            rows_written += len(gdf)
+            offset += len(gdf)
+            if rows_written == len(gdf) or rows_written % (args.chunk_size * 2) == 0:
+                print(f"[export] wrote {rows_written:,}/{total_features:,} features", flush=True)
+
+    summary = {
+        "input_gpkg": input_gpkg.as_posix(),
+        "input_layer": args.input_layer,
+        "geojson_output": output_geojson.as_posix(),
+        "rows_written": rows_written,
+        "final_output_columns": final_fields,
+        "keep_output_columns": keep_output_columns,
+        "rename_output_columns": rename_output_columns,
+        "total_seconds": round(time.perf_counter() - started, 6),
+    }
+    write_join_summary(reports_dir, summary)
+    print(
+        f"[export] complete: wrote {rows_written:,} features in "
+        f"{summary['total_seconds']:.1f}s",
         flush=True,
     )
     return summary
@@ -2362,6 +2510,8 @@ def run_livestock(args: argparse.Namespace) -> dict[str, Any]:
         match_status_column=args.match_status_column,
         keep_output_columns=args.keep_output_columns,
         rename_output_columns=args.rename_output_columns,
+        output_formats=args.output_formats,
+        geojson_output=args.geojson_output,
     )
     return join_properties_to_admin(join_args)
 
@@ -2394,6 +2544,16 @@ def add_join_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--output-layer", required=True)
+    parser.add_argument(
+        "--output-formats",
+        default=DEFAULT_OUTPUT_FORMATS,
+        help="Comma-separated output formats: gpkg, geojson, or gpkg,geojson.",
+    )
+    parser.add_argument(
+        "--geojson-output",
+        type=Path,
+        help="Optional GeoJSON output path. Defaults to --output with .geojson suffix.",
+    )
     parser.add_argument("--left-key", default="pc11_village_id")
     parser.add_argument("--right-key", default="village_code")
     parser.add_argument("--columns", help="Comma-separated columns to copy from the input table")
@@ -2428,6 +2588,16 @@ def add_livestock_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--input", type=Path, default=DEFAULT_LIVESTOCK_INPUT)
     parser.add_argument("--output", type=Path, default=DEFAULT_LIVESTOCK_OUTPUT)
     parser.add_argument("--output-layer", default=DEFAULT_LIVESTOCK_LAYER)
+    parser.add_argument(
+        "--output-formats",
+        default=DEFAULT_OUTPUT_FORMATS,
+        help="Comma-separated output formats: gpkg, geojson, or gpkg,geojson.",
+    )
+    parser.add_argument(
+        "--geojson-output",
+        type=Path,
+        help="Optional GeoJSON output path. Defaults to --output with .geojson suffix.",
+    )
     parser.add_argument("--left-key", default="pc11_village_id")
     parser.add_argument("--right-key", default="village_code")
     parser.add_argument("--columns", help="Comma-separated livestock columns to join")
@@ -2462,6 +2632,23 @@ def add_livestock_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_export_layer_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--input-gpkg", type=Path, required=True)
+    parser.add_argument("--input-layer", required=True)
+    parser.add_argument("--geojson-output", type=Path, required=True)
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--chunk-size", type=int, default=DEFAULT_GPKG_CHUNK_SIZE)
+    parser.add_argument("--reports-dir", type=Path, default=Path("data/admin-boundary/export_reports"))
+    parser.add_argument(
+        "--keep-output-columns",
+        help="Comma-separated final attribute columns to keep. Geometry is always retained.",
+    )
+    parser.add_argument(
+        "--rename-output-columns",
+        help="Comma-separated `old=new` final output column renames applied after projection.",
+    )
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     if not raw_argv:
@@ -2481,6 +2668,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     livestock_parser = subparsers.add_parser("livestock", help="Build the livestock GPKG from default inputs")
     add_livestock_args(livestock_parser)
 
+    export_parser = subparsers.add_parser("export-layer", help="Export a GPKG layer to GeoJSON")
+    add_export_layer_args(export_parser)
+
     return parser.parse_args(raw_argv)
 
 
@@ -2492,6 +2682,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         join_properties_to_admin(args)
     elif args.command == "livestock":
         run_livestock(args)
+    elif args.command == "export-layer":
+        export_gpkg_layer_to_geojson(args)
     else:  # pragma: no cover - argparse prevents this.
         raise SystemExit(f"Unknown command: {args.command}")
 
