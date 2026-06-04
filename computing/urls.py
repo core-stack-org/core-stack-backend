@@ -247,4 +247,9 @@ urlpatterns = [
         api.generate_drainage_density_data,
         name="generate-drainage-density-vector",
     ),
+    path(
+        "generate_antyodaya/",
+        api.generate_antyodaya,
+        name="generate_antyodaya",
+    ),
 ]

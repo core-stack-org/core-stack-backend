@@ -62,3 +62,6 @@ LOCAL_RIVER_OUTPUT = PROJECT_ROOT_lc / "data/river/river_local"
 
 PAN_INDIA_FABDEM_PATH = str(PROJECT_ROOT / "data/fabdem/fabdem_pan_india.tif")
 LOCAL_FABDEM_OUTPUT = str(PROJECT_ROOT_lc / "data/fabdem/fabdem_local")
+
+PAN_INDIA_ANTYODAYA_2020 = PROJECT_ROOT / "data/base_layers/pan_india_antyodaya_2020.gpkg"
+LOCAL_ANTYODAYA_2020_OUTPUT = PROJECT_ROOT_lc / "data/antyodaya/output/antyodaya_local"
